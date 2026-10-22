@@ -13,10 +13,8 @@ import SwiftUI
 //   Apply, and re-running the search restores it, so nothing
 //   irreversible is dropped — no confirmation is needed.
 // - Confirm route: when `hasUnappliedSelections` is
-//   true — the user modified selections this session
-//   (`userModifiedSelections`), OR the session carries an
-//   auto-selected set from the magic-wand preselect flow that has never
-//   been reviewed (`hasUnreviewedPreselection`) — Dismiss instead raises
+//   true — a selected result no live applied region covers — Dismiss
+//   instead raises
 //   the "Discard selections?" `.confirmationDialog`
 //   (`SearchAndRedactSheet.dismissTitle` / `.dismissMessage`); only a
 //   confirmed tap calls through with `afterConfirmation: true`.

@@ -129,10 +129,6 @@ extension DocumentEditorView {
                 state.piiCategoryFilter = nil
                 state.sortOrder = .discoveryOrder
                 state.userModifiedSelections = false
-                // The arriving review is a fresh all-deselected
-                // context; a stale unreviewed-preselect flag from the
-                // cleared session must not carry into it.
-                state.hasUnreviewedPreselection = false
             }
         } else {
             let state = SearchState()

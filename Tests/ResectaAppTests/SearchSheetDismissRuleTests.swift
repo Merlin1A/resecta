@@ -16,8 +16,8 @@ import CoreGraphics
 //      button reads it as the gate (false → bypass, true → confirm).
 //   2. USER selection gestures flip it (row circle, footer Select All,
 //      Select-Where, keyboard space toggle, review-row equivalents).
-//   3. Programmatic selection writes do NOT flip it (magic-wand
-//      arrival preselect, mode-switch undo restore).
+//   3. Programmatic selection writes do NOT flip it (mode-switch
+//      undo restore).
 //   4. A successful apply RESETS it — the modified selections were
 //      committed, so a post-apply Dismiss has nothing unsaved to
 //      confirm.
@@ -62,18 +62,6 @@ struct SearchSheetDismissRuleTests {
 
     // MARK: - Programmatic writes do NOT count
 
-    @Test("Magic-wand arrival preselect does not touch the tracker")
-    func magicWandPreselectIsNotUserWork() {
-        let state = SearchState()
-        state.preselectIncomingResults = true
-        state.appendResult(makeResult())
-        state.flushPendingResults()
-        #expect(state.results.first?.isSelected == true,
-                "precondition: the arrival preselect fired")
-        #expect(state.userModifiedSelections == false,
-                "machine-made selections are not user selection work")
-    }
-
     @Test("Mode-switch undo restore does not touch the tracker")
     func modeSwitchRestoreIsNotUserWork() {
         let state = SearchState()
@@ -89,84 +77,6 @@ struct SearchSheetDismissRuleTests {
         #expect(state.results.count == 1)
         #expect(state.userModifiedSelections == false,
                 "a programmatic restore is not user selection work")
-    }
-
-    // MARK: - The arm-on-preselect tracker
-
-    @Test("Magic-wand preselect consumption arms hasUnreviewedPreselection")
-    func magicWandPreselectArmsUnreviewedTracker() {
-        let state = SearchState()
-        state.preselectIncomingResults = true
-        state.appendResult(makeResult())
-        state.flushPendingResults()
-
-        #expect(state.hasUnreviewedPreselection == true,
-                "a session that actually received an auto-selected result is armed")
-        #expect(state.userModifiedSelections == false,
-                "the separate USER-touched tracker stays false — predicate #3 above")
-        #expect(state.hasUnappliedSelections(liveApplied: []) == true,
-                "the combined gate reads true from the unreviewed-preselect fact alone")
-    }
-
-    @Test("A session that never receives a preselected result stays unarmed")
-    func noPreselectLeavesUnreviewedTrackerFalse() {
-        let state = SearchState()
-        state.appendResult(makeResult())
-        state.flushPendingResults()
-
-        #expect(state.hasUnreviewedPreselection == false)
-        #expect(state.hasUnappliedSelections(liveApplied: []) == false)
-    }
-
-    @Test("Mode-switch undo restore does not arm hasUnreviewedPreselection")
-    func modeSwitchRestoreDoesNotArmUnreviewedTracker() {
-        let state = SearchState()
-        let snapshot = SearchAndRedactSheet.ModeSwitchSnapshot(
-            mode: .text,
-            results: [makeResult(selected: true)],
-            appliedResultIDs: [],
-            piiCategoryFilter: nil,
-            sortOrder: .discoveryOrder,
-            appliedFilter: .all
-        )
-        SearchAndRedactSheet.restoreModeSwitchSnapshot(snapshot, in: state)
-
-        #expect(state.hasUnreviewedPreselection == false,
-                "a programmatic restore writes `results` directly — it never calls appendResult")
-        #expect(state.hasUnappliedSelections(liveApplied: []) == true,
-                "the restored row is selected and no region covers it: the live predicate holds on the rows, not on a tracker")
-        #expect(state.hasUnappliedSelections(liveApplied: Set(state.results.map(\.id))) == false,
-                "covered by a live region, it holds nothing")
-    }
-
-    @Test("clear() resets hasUnreviewedPreselection with the session")
-    func clearResetsUnreviewedPreselectionTracker() {
-        let state = SearchState()
-        state.preselectIncomingResults = true
-        state.appendResult(makeResult())
-        state.flushPendingResults()
-        #expect(state.hasUnreviewedPreselection == true, "precondition")
-
-        state.clear()
-
-        #expect(state.hasUnreviewedPreselection == false)
-        #expect(state.hasUnappliedSelections(liveApplied: []) == false)
-    }
-
-    @Test("A successful search-origin apply resets hasUnreviewedPreselection")
-    func applyResetsUnreviewedPreselectionTracker() async {
-        let redactionState = RedactionState()
-        let search = SearchState()
-        search.preselectIncomingResults = true
-        search.appendResult(makeResult())
-        search.flushPendingResults()
-        redactionState.activeSearch = search
-        #expect(search.hasUnreviewedPreselection == true, "precondition")
-
-        _ = await redactionState.applyFindings(.selectedSearchResults, undoManager: nil)
-
-        #expect(search.hasUnreviewedPreselection == false,
-                "the committed preselected set no longer needs protecting")
     }
 
     @Test("SearchState.setSelection itself never flips the tracker (gesture sites own the flip)")

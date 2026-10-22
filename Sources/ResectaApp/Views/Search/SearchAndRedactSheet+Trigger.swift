@@ -463,11 +463,6 @@ extension SearchAndRedactSheet {
         // empty-state discriminator from "not run yet" to a
         // genuine result verdict.
         searchState.hasCompletedRunSinceClear = true
-        // Magic-wand pre-select flag is single-use:
-        // applies to the matches this scan emits, then resets
-        // so a follow-up search from the same sheet session
-        // doesn't carry magic-wand semantics forward.
-        searchState.preselectIncomingResults = false
         searchState.isSearching = false
 
         if prepared.isPIIScan {

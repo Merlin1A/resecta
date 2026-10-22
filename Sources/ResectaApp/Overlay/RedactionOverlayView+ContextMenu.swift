@@ -1,32 +1,9 @@
 import UIKit
 import RedactionEngine
 
-// The canvas long-press menu, moved out of `RedactionOverlayView.swift`
-// (the hub) along its `// MARK: - Context Menu` seam: the
-// `UIContextMenuInteractionDelegate` conformance (the region menu, the
-// magic-wand menu over an OCR word) and the magic-wand request payload.
-// The hub installs the interaction in `init` as before.
-
 // MARK: - Context Menu
 
 extension RedactionOverlayView: UIContextMenuInteractionDelegate {
-
-    /// Return the OCR word whose normalized bounding box
-    /// contains the given overlay-space point. Returns nil when no
-    /// word is hit or when the OCR cache hasn't been populated for
-    /// the page. Pure helper so `MagicWandUITests` can pin the gating
-    /// contract without touching `UIContextMenuInteraction`. The
-    /// hit-test runs in overlay space (top-left origin) —
-    /// `pdfNormalizedToOverlay` flips the Y axis so the rect aligns
-    /// with UIKit touch coordinates.
-    func hitTestOCRWord(at point: CGPoint) -> OCRWord? {
-        guard !ocrWords.isEmpty else { return nil }
-        for word in ocrWords {
-            let overlayRect = pdfNormalizedToOverlay(word.normalizedRect)
-            if overlayRect.contains(point) { return word }
-        }
-        return nil
-    }
 
     func contextMenuInteraction(
         _ interaction: UIContextMenuInteraction,
@@ -36,14 +13,6 @@ extension RedactionOverlayView: UIContextMenuInteractionDelegate {
         // tool is on — a hold-then-drag would otherwise pop the menu and
         // cancel the draw in flight.
         guard !isDrawingMode else { return nil }
-        // When no region is at the touch point but an OCR word is,
-        // surface the magic-wand "Select all instances" menu (gated on hit).
-        // Existing region menu still wins when both are present so the
-        // user can still operate on a region they long-pressed on top of.
-        if hitTestRegion(at: location) == nil,
-           let ocrWord = hitTestOCRWord(at: location) {
-            return makeMagicWandMenuConfiguration(for: ocrWord)
-        }
 
         guard let region = hitTestRegion(at: location) else { return nil }
 
@@ -143,52 +112,4 @@ extension RedactionOverlayView: UIContextMenuInteractionDelegate {
             return UIMenu(children: actions)
         })
     }
-
-    /// Build the magic-wand context menu for a long-pressed OCR
-    /// word. The menu reads "Select all instances" and routes through
-    /// `RedactionState.pendingMagicWandRequest` so the host view can
-    /// open the search sheet pre-filled with an exact-match search.
-    /// Regex specials in the hit word are escaped at this call site —
-    /// the engine accepts the raw term and
-    /// does not regex-escape inside the runtime.
-    private func makeMagicWandMenuConfiguration(
-        for ocrWord: OCRWord
-    ) -> UIContextMenuConfiguration {
-        UIContextMenuConfiguration(actionProvider: { [weak self] _ in
-            guard let self else { return UIMenu(children: []) }
-            let escapedTerm = RedactionOverlayView.escapeRegexSpecials(in: ocrWord.text)
-            let action = UIAction(
-                title: "Select all instances",
-                image: UIImage(systemName: "wand.and.stars")
-            ) { [weak self] _ in
-                guard let self else { return }
-                let request = MagicWandSearchRequest(
-                    escapedTerm: escapedTerm
-                )
-                self.coordinator?.redactionState?.pendingMagicWandRequest = request
-            }
-            return UIMenu(children: [action])
-        })
-    }
-
-    /// Escape the regex metacharacters that
-    /// `NSRegularExpression.escapedPattern(for:)` would handle, so a hit
-    /// word like `C++` matches the literal sequence and not a regex
-    /// (regex-escape at the call site, not in
-    /// the engine runtime). The engine's text path uses literal
-    /// substring matching so the escape is belt-and-suspenders — kept
-    /// because the design keeps the escape responsibility on
-    /// the caller, and a future routing change in the engine must not
-    /// silently break the magic-wand contract.
-    static func escapeRegexSpecials(in term: String) -> String {
-        NSRegularExpression.escapedPattern(for: term)
-    }
-}
-
-/// Payload carried by `RedactionState.pendingMagicWandRequest`
-/// when the canvas long-press menu fires "Select all instances".
-/// `escapedTerm` is the regex-escaped form fed into the search engine via
-/// `SearchMode.text(escapedTerm, options:)` with `exactMatch = true`.
-struct MagicWandSearchRequest: Equatable, Sendable {
-    let escapedTerm: String
 }

@@ -157,12 +157,7 @@ extension SearchAndRedactSheet {
                        || searchState.selectionFullyApplied),
                 onDismiss: {
                     // Conditional dismiss: route through the dialog
-                    // when the USER has modified selections this
-                    // session, OR when this session received
-                    // an auto-selected set (magic-wand preselect) that
-                    // has not yet been reviewed — a never-reviewed
-                    // preselect no longer drops silently on the way
-                    // out. An untouched, non-preselected sheet still
+                    // while a selection is unapplied. Otherwise the sheet still
                     // dismisses directly so the common no-op case adds
                     // no friction.
                     if DocumentState.hasUnappliedSelections(redactionState) {

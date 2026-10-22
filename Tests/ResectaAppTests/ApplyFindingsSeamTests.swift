@@ -836,7 +836,6 @@ struct ApplySeamSingleResultOriginTests {
         let second = makeSearchResult(y: 0.6, matchedText: "987-65-4321")
         search.results = [first, second]
         search.userModifiedSelections = true
-        search.hasUnreviewedPreselection = true
         state.activeSearch = search
 
         let outcome = await state.applyFindings(.searchResult(id: first.id), undoManager: nil)
@@ -844,6 +843,5 @@ struct ApplySeamSingleResultOriginTests {
         #expect(outcome?.applied == 1)
         #expect(search.userModifiedSelections == true,
                 "the other selections are still live work — the tracker stays set")
-        #expect(search.hasUnreviewedPreselection == true)
     }
 }

@@ -191,21 +191,6 @@ class RedactionOverlayView: UIView {
     /// Empty when OCR has not run for the page (snap path no-ops).
     var ocrTextBlockNormalizedRects: [CGRect] = []
 
-    /// Magic-wand source data — per-word OCR hits for the current
-    /// page, paired with the recognized text. Bounding boxes are in
-    /// normalized PDF coordinates (0–1, bottom-left origin) so a touch
-    /// point can be hit-tested without re-running OCR. When the
-    /// long-press point falls inside one of these rects, the
-    /// `UIContextMenuInteraction` adds a "Select all instances" item
-    /// that drives a pre-filled exact-match search via
-    /// `RedactionState.pendingMagicWandRequest`. Empty when OCR has not
-    /// run for the page (the menu item is gated off).
-    struct OCRWord: Equatable, Sendable {
-        let text: String
-        let normalizedRect: CGRect
-    }
-    var ocrWords: [OCRWord] = []
-
     /// When true, the rectangle-draw tool consults
     /// `ocrTextBlockNormalizedRects` during drag and snaps edges within
     /// `snapToTextTolerance = 8 / zoomScale` overlay points to the

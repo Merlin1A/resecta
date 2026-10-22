@@ -94,8 +94,8 @@ struct SearchAndRedactSheet: View {
     /// `+Trigger` extension file.
     @State var isApplying = false
     // Conditional dismiss: Dismiss is conditional on user selection work: an
-    // untouched sheet closes in one tap (a live machine-made selection,
-    // e.g. the magic-wand preselect, is deselected in-place on the way
+    // untouched sheet closes in one tap (a live machine-made selection
+    // is deselected in-place on the way
     // out); once the USER has modified selections this session
     // (`searchState.userModifiedSelections`), Dismiss routes through a
     // confirmation dialog. This generalizes the retired triage sheet's
@@ -390,18 +390,6 @@ struct SearchAndRedactSheet: View {
             // reopen): the raised keyboard would cover the very
             // document the float exists to expose.
             isSearchFieldFocused = selectedDetent != .compactFloat
-            // When the sheet appears already carrying a
-            // magic-wand pre-fill (the host wrote `queryText` +
-            // `preselectIncomingResults = true` before flipping
-            // `activeSearch` non-nil), the TextField's `.onChange` does
-            // not fire on the initial render — kick off the search here
-            // so the first run actually executes. Gated on the
-            // magic-wand flag so non-magic-wand sheet sessions retain
-            // their existing manual-entry behavior.
-            if searchState.preselectIncomingResults,
-               !searchState.queryText.isEmpty {
-                triggerSearch()
-            }
             // One-tap contract: the toolbar Scan button armed a
             // one-shot flag before presenting. Consume it exactly once
             // here — this is the sole trigger for the auto-run.
@@ -409,9 +397,7 @@ struct SearchAndRedactSheet: View {
             // coalesce through the single-flight gate
             // (`beginTriggerSetup`), so a second same-turn trigger site
             // re-runs once instead of racing; the single consume stays
-            // the first line of defense. Mutually exclusive with the
-            // magic-wand branch above by construction (magic wand seeds
-            // `.text`; the Scan button seeds the scan mode).
+            // the first line of defense.
             if searchState.pendingAutoRunScan {
                 searchState.pendingAutoRunScan = false
                 if searchState.searchModeType == .piiScan {
@@ -432,15 +418,10 @@ struct SearchAndRedactSheet: View {
             // the results-arrival layout states are reachable on the
             // sim drive even when the AX automation server is
             // unavailable.
-            // Skipped when a magic-wand pre-fill already ran above —
-            // overlapping calls would coalesce through the
-            // single-flight gate, but one deliberate trigger per
-            // launch stays the cleaner contract.
             if let queryArg = CommandLine.arguments
                 .first(where: { $0.hasPrefix("--searchQuery=") })?
                 .split(separator: "=").last,
-               searchState.searchModeType != .piiScan,
-               !searchState.preselectIncomingResults {
+               searchState.searchModeType != .piiScan {
                 isSearchFieldFocused = false
                 searchState.queryText = String(queryArg)
                 triggerSearch()

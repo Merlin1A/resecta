@@ -519,10 +519,7 @@ struct DocumentEditorView: View {
                     // modified selections this session, so the Dismiss
                     // button's confirmation dialog can't be bypassed.
                     // An untouched sheet swipes away freely (one-tap
-                    // dismiss rule). An unreviewed magic-wand
-                    // preselect also blocks the swipe now — a
-                    // never-reviewed auto-selected set no longer drops
-                    // silently.
+                    // dismiss rule).
                     .interactiveDismissDisabled(DocumentState.hasUnappliedSelections(redactionState))
                     // Compact float detent — a fixed hug for the
                     // glanceable handle (`CompactFloatDetent.swift`):
@@ -634,20 +631,6 @@ struct DocumentEditorView: View {
                 }
             )
             redactionState.markManualDrawNudgeSuppressed()
-        }
-        // Magic-wand "Select all instances" observer. The canvas
-        // long-press menu sets `pendingMagicWandRequest` carrying the
-        // escaped term; here we open (or re-use) the search sheet with
-        // a pre-filled exact-match query so the engine runs the same
-        // text-search path with word-boundary semantics. The pre-fill
-        // is symmetric with the existing search-sheet API surface —
-        // `SearchState.queryText` + `SearchState.options.exactMatch`
-        // is the canonical entry point.
-        .onChange(of: redactionState.pendingMagicWandRequest) { _, _ in
-            guard let request = redactionState.pendingMagicWandRequest
-            else { return }
-            applyMagicWandRequest(request)
-            redactionState.pendingMagicWandRequest = nil
         }
         .popover(isPresented: $showHoverPopover, attachmentAnchor: .point(.center)) {
             if let metadata = hoveredMetadata {
@@ -1408,45 +1391,6 @@ struct DocumentEditorView: View {
             handleHomeTap()
         }
         .accessibilityIdentifier("editorHomeButton")
-    }
-
-    // MARK: - Magic Wand
-
-    /// Open / re-use the SearchAndRedactSheet with the magic-wand
-    /// term pre-filled and `exactMatch` engaged. Reuses
-    /// the search-origin apply — do not
-    /// introduce a new apply method. If a search session is already
-    /// active we mutate it in place; otherwise a fresh `SearchState` is
-    /// created via the existing `redactionState.activeSearch = ...`
-    /// path that drives the `.sheet(isPresented:)` binding.
-    fileprivate func applyMagicWandRequest(_ request: MagicWandSearchRequest) {
-        let state = redactionState.activeSearch ?? SearchState()
-        // Programmatic transition, same contract as saved-search recall:
-        // armed only when the mode actually changes so the hub's
-        // `.onChange` neither re-clears the session it is about to
-        // repopulate nor mis-attributes the clear to a mode-picker tap
-        // the user never made. (A fresh `SearchState` starts in `.text`,
-        // so the flag stays false on the new-session path.)
-        state.isProgrammaticModeChange = state.searchModeType != .text
-        state.searchModeType = .text
-        // Clear synchronously: the programmatic transition above makes
-        // the mode-switch `.onChange` preserve results (the recall
-        // contract), but the magic wand REPLACES the session — without
-        // this, the old session's verdict renders against the new query
-        // until the debounce fires. Post-clear the interim empty state
-        // reads "Not run yet", which is honest.
-        state.clearResults()
-        state.options.exactMatch = true
-        // Auto-select every match so the user can apply with one
-        // tap. Flag is consumed by `SearchState.appendResult` for every
-        // result the engine streams in; `triggerSearch` resets it after
-        // kickoff so a later non-magic-wand search in the same sheet
-        // session returns to the default selection shape.
-        state.preselectIncomingResults = true
-        state.queryText = request.escapedTerm
-        if redactionState.activeSearch == nil {
-            redactionState.activeSearch = state
-        }
     }
 
     // MARK: - Export (lifted from VerificationResultsView)

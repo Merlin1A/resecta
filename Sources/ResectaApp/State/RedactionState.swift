@@ -408,14 +408,6 @@ class RedactionState {
     /// action — so the canvas density cap stays at 6 menu items.
     var pendingManualDrawNudge: SearchResult?
 
-    /// Pending magic-wand search request. Set by
-    /// `RedactionOverlayView.contextMenuInteraction` when the user taps
-    /// "Select all instances" on a long-pressed OCR word; observed by
-    /// `DocumentEditorView` via `.onChange(of:)` to open / re-use the
-    /// `SearchAndRedactSheet` pre-filled with an exact-match query.
-    /// Cleared by the host after dispatch.
-    var pendingMagicWandRequest: MagicWandSearchRequest?
-
     /// Per-search-session suppression flag. Set after
     /// the first nudge is enqueued so the user sees at most one toast
     /// per search session — the V1.x interpretation of the
@@ -595,14 +587,13 @@ class RedactionState {
         // over the next document.
         pendingCanvasRationaleRequest = nil
         ocrPixelCapSkippedPages = []
-        // The manual-draw nudge state and any pending magic-wand request
+        // The manual-draw nudge state
         // never carry across documents. The `activeSearch` didSet above
         // already resets the nudge flag; the explicit reset keeps the
         // contract for a caller that clears state without crossing that
         // boundary.
         manualDrawNudgeSuppressedForSession = false
         pendingManualDrawNudge = nil
-        pendingMagicWandRequest = nil
         invalidateRegionCaches()
         regionPageIndex.removeAll()
     }
@@ -984,10 +975,6 @@ class RedactionState {
             let outcome = applyStagedDetectionsOrigin(undoManager: undoManager)
             if outcome != nil {
                 activeSearch?.userModifiedSelections = false
-                // A full staged-review apply resolves the whole
-                // search sheet's selection context, same as the search
-                // origin above.
-                activeSearch?.hasUnreviewedPreselection = false
             }
             return outcome
         case .entityGroup(let group):
@@ -1063,12 +1050,6 @@ class RedactionState {
         let selected = search.results.filter(\.isSelected)
         guard !selected.isEmpty else {
             search.userModifiedSelections = false
-            // An apply with nothing selected still resolves the
-            // session's selection context (either it never carried a
-            // preselect, or the user reviewed and deselected every
-            // preselected result before tapping Apply); either way there
-            // is nothing unreviewed left to protect.
-            search.hasUnreviewedPreselection = false
             return .zero
         }
 
@@ -1119,10 +1100,6 @@ class RedactionState {
         // prepare suspension (a dismissed-and-reopened sheet must not
         // inherit a stale apply's reset).
         search.userModifiedSelections = false
-        // The applied selections (preselected or not) were just
-        // committed; nothing unreviewed remains to protect from a silent
-        // dismiss.
-        search.hasUnreviewedPreselection = false
 
         // Caller is responsible for clearing activeSearch after showing feedback.
         return ApplyOutcome(
