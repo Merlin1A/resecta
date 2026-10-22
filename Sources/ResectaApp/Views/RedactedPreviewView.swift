@@ -24,6 +24,10 @@ struct RedactedPreviewView: View {
     /// Drives the nav-bar capsule; nil (the default) renders no capsule.
     var verdict: VerificationStatus? = nil
 
+    /// The page to open at (0-based): a results row's page link. Nil opens
+    /// at the first page.
+    var page: Int? = nil
+
     @State private var loaded: LoadState = .pending
 
     private enum LoadState: Equatable {
@@ -106,7 +110,7 @@ struct RedactedPreviewView: View {
     private var content: some View {
         switch loaded {
         case .ready(let doc):
-            RedactedPDFView(document: doc)
+            RedactedPDFView(document: doc, page: page)
                 .accessibilityIdentifier("redactedPreview")
         case .pending:
             ProgressView()
@@ -159,6 +163,7 @@ final class RedactedPreviewLinkPolicy: NSObject, PDFViewDelegate {
 
 private struct RedactedPDFView: UIViewRepresentable {
     let document: PDFDocument
+    var page: Int? = nil
 
     func makeCoordinator() -> RedactedPreviewLinkPolicy {
         RedactedPreviewLinkPolicy()
@@ -182,6 +187,14 @@ private struct RedactedPDFView: UIViewRepresentable {
         // detectors are off for it (see `RedactedPreviewLinkPolicy`).
         context.coordinator.applyLinkPolicy(to: pdfView)
         context.coordinator.assign(document, to: pdfView)
+        // A page link opens at its page once the view has its size (an
+        // un-laid-out PDFView ignores `go(to:)`).
+        if let page, let target = document.page(at: page) {
+            DispatchQueue.main.async {
+                pdfView.layoutDocumentView()
+                pdfView.go(to: target)
+            }
+        }
         return pdfView
     }
 

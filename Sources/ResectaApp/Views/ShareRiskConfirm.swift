@@ -56,9 +56,9 @@ extension DocumentEditorView {
     /// confirm when a check did not run in full on the output: any SKIPPED
     /// layer (the digest-less verify-only degrade, with or without routine
     /// WARN layers beside it) or any could-not-verify WARN layer
-    /// (`CouldNotVerifyWarn.matches`). Either way the confirm sheet reuses
-    /// the masthead's own sentence — no new string — and lists the
-    /// could-not-verify checks under the existing list header. A WARN made
+    /// (`CouldNotVerifyWarn.matches`). Either way the confirm sheet lists
+    /// the could-not-verify and skipped checks under its own title and
+    /// list header. A WARN made
     /// only of routine notes (a structural or metadata note, a positional
     /// graze, an attestation mismatch) stays confirm-free.
     /// `report` alone can't carry the acknowledgement (`VerificationReport`

@@ -54,6 +54,10 @@ enum ResectaTokens {
         static let card: CGFloat = 16
         /// 24pt — Sheets, modals, Liquid Glass floating overlays
         static let sheet: CGFloat = 24
+        /// 25pt — the inset-grouped section of the results page, the
+        /// system's own corner as measured on an iOS 26 simulator (a
+        /// settings `Form` section at @3x).
+        static let groupedSection: CGFloat = 25
         /// Capsule shape — pill buttons, single-line toasts. Use `Capsule()` shape.
     }
 
@@ -287,6 +291,83 @@ enum ResectaTokens {
         /// of the same idea under a new name for a new, now-referenced
         /// purpose.
         static let minimum: CGFloat = 46
+    }
+
+    // MARK: - Verification results
+
+    /// The verification results page: the count ring, the action capsules,
+    /// the grouped sections and their rows. Measured against the design of
+    /// record at 390 pt.
+    nonisolated enum Results {
+        /// The count ring: 80 pt across, a 4-pt round-capped arc.
+        static let ringSize: CGFloat = 80
+        static let ringStroke: CGFloat = 4
+        /// The ring's figure: 22 pt below ten checks, 20 pt from ten.
+        static let ringFigureSmallCount: CGFloat = 22
+        static let ringFigureLargeCount: CGFloat = 20
+        /// The word under the figure and the SKIPPED glyph.
+        static let ringWord: CGFloat = 12
+        static let ringSkippedGlyph: CGFloat = 30
+        /// The ring's track: tertiary fill, 0.12 light / 0.32 dark.
+        static let trackOpacityLight: Double = 0.12
+        static let trackOpacityDark: Double = 0.32
+        /// A report that passed nothing draws the whole track in the
+        /// verdict's text colour, never a solid ring.
+        static let zeroTrackOpacityLight: Double = 0.24
+        static let zeroTrackOpacityDark: Double = 0.40
+        /// The arc's draw-in: once, after the entry flash.
+        static let arcDrawIn: Animation = .easeOut(duration: 0.6)
+        static let arcDrawInDelay: TimeInterval = 1.2
+
+        /// Gaps of the masthead: ring → title 12, title → sentence 4,
+        /// sentence → the first capsule 24. The sentence's column cap.
+        static let ringToTitle: CGFloat = 12
+        static let titleToSentence: CGFloat = 4
+        static let sentenceMaxWidth: CGFloat = 326
+
+        /// The action capsules: 50 pt tall, 12 apart; the outlined stroke.
+        static let capsuleHeight: CGFloat = 50
+        static let capsuleGap: CGFloat = 12
+        static let capsuleStroke: CGFloat = 1.5
+        /// The disabled reason under its capsule; the gap to the next block.
+        static let reasonGap: CGFloat = 8
+        static let blockGap: CGFloat = 24
+
+        /// A section header hugs its section.
+        static let headerGap: CGFloat = 6
+        /// Rows: at least 52 pt; the leading column 28 wide, the titles at 56.
+        static let rowMinHeight: CGFloat = 52
+        static let rowVerticalPadding: CGFloat = 11
+        /// The chevron's column: 12 wide, 8 after the text, 16 to the edge.
+        static let chevronColumn: CGFloat = 12
+        static let leadColumn: CGFloat = 28
+        static let leadMark: CGFloat = 22
+        static let titleInset: CGFloat = 56
+        static let actionTile: CGFloat = 28
+        static let actionTileRadius: CGFloat = 7
+        /// The opened row's wash.
+        static let rowWashLight: Double = 0.035
+        static let rowWashDark: Double = 0.06
+        /// The opened block: the lead group, 12, the reference lines at 8.
+        static let leadToReference: CGFloat = 12
+        /// Page chips: 26 tall, padded 10; at most five on a collapsed row.
+        static let chipHeight: CGFloat = 26
+        static let chipPadding: CGFloat = 10
+        static let chipPressedOpacity: Double = 0.5
+        static let chipCap = 5
+        /// The completion line to the legal text; SKIPPED's undo note to it.
+        static let completionToLegal: CGFloat = 18
+        static let undoToLegalSkipped: CGFloat = 32
+
+        /// The light WARN arc: a ring-only orange (#C26A00), the text tier
+        /// reading bronze at 4 pt; dark keeps `warnText`.
+        static let warnRing: Color = Color(
+            uiColor: UIColor { trait in
+                trait.userInterfaceStyle == .dark
+                    ? UIColor(red: 0xFF/255, green: 0x9F/255, blue: 0x0A/255, alpha: 1)
+                    : UIColor(red: 0xC2/255, green: 0x6A/255, blue: 0x00/255, alpha: 1)
+            }
+        )
     }
 
     // MARK: - Branded Surface

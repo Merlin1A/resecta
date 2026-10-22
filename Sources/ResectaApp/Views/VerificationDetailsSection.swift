@@ -1,327 +1,72 @@
 import SwiftUI
 import RedactionEngine
 
-// The Verification Details disclosure of the results screen: the header
-// row and, expanded, the page-modes section, the deselection row and the
-// per-layer rows grouped by outcome — Findings → Could not verify → Notes →
-// Nothing to check → the pass cluster. Moved out of
-// `VerificationResultsView` (the page stack stays there): the parent keeps
-// the auto-expand state (`detailsExpanded` + `didAutoExpand` +
-// `shouldAutoExpand`) and threads it in as `isExpanded`; this view owns
-// which layer row is open, whether the pass cluster is open and whether
-// the page-modes section is open. The static copy builders the display
-// tests pin (`detailsSummaryText(for:)`, the deselection / fallback-reason
-// strings) stay on `VerificationResultsView`, in the extension at the
-// bottom of this file.
+// The results page's check sections, below the actions: Findings → Could
+// not verify → Notes → Nothing to check, each with its count; the
+// headerless run section (the run facts, Page Modes, the deselection row);
+// then one row for the checks that passed — or, on a run where every check
+// passed, the `Checks` list. One item is open at a time across the rows and
+// Page Modes. A page link asks the results view to push the Preview at
+// that page; it never changes the phase. The static copy builders the
+// display tests pin stay on `VerificationResultsView`, in the extension at
+// the bottom of this file.
 
 struct VerificationDetailsSection: View {
     let report: VerificationReport
     /// Deselection facts captured at run entry (see
     /// `VerificationResultsView.deselectionSnapshot`).
     let deselectionSnapshot: RedactionState.DeselectionSnapshot?
-    /// The disclosure's open state — owned by the parent, which auto-expands
-    /// it on appear per `VerificationResultsView.shouldAutoExpand`.
-    @Binding var isExpanded: Bool
-    /// The page column's width cap (`VerificationResultsView.columnMaxWidth`).
-    let columnMaxWidth: CGFloat?
+    /// The run facts' lines (`VerificationResultsView.RunFactsStrip`).
+    var runFactsLines: [String] = []
+    /// Page links show — and open the Preview — only while the redacted PDF
+    /// exists; otherwise the captions carry the pages.
+    var previewAvailable: Bool = false
+    /// Push the Preview at a page (0-based) on the results view's stack.
+    var onOpenPage: (Int) -> Void = { _ in }
 
-    @Environment(DocumentState.self) private var documentState
-    // The header tile's wash is per appearance (tileWashLight / tileWashDark).
-    @Environment(\.colorScheme) private var colorScheme
-    // Routes the
-    // page-modes / layer-detail `.move(edge:)` transitions through
-    // `Anim.resolvedTransition`.
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    // At accessibility sizes the header stacks: the tile, then the title
-    // and the chevron, then the summary.
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.colorScheme) private var colorScheme
 
-    @State private var expandedLayer: Int?
-    @State private var showPageModes = false
+    /// The one open item: a row (by engine index) or Page Modes.
+    enum OpenItem: Hashable {
+        case layer(Int)
+        case pageModes
+    }
+
+    @State private var openItem: OpenItem?
     /// The pass cluster's open state once the user has toggled it; until
-    /// then it is open exactly when nothing sits above it.
+    /// then `clusterOpensByDefault`.
     @State private var clusterExpanded: Bool?
 
-    /// The Page Modes and deselection rows' icon column: the hairline
-    /// between them insets past it and the icon's gap.
-    @ScaledMetric(relativeTo: .title3) private var iconColumn: CGFloat = 30
-    /// Their icon's point size, scaling with the column.
-    @ScaledMetric(relativeTo: .title3) private var iconSize: CGFloat = 20
-    /// The layer rows' glyph and mark columns (`LayerResultRow.column`, the
-    /// same metric): the hairlines between rows inset past both and their
-    /// gaps, so they start where the row titles start.
-    @ScaledMetric(relativeTo: .subheadline) private var rowColumn: CGFloat = 20
-
-    private var hairlineInset: CGFloat { iconColumn + ResectaTokens.Spacing.sm }
-    private var rowHairlineInset: CGFloat { 2 * (rowColumn + ResectaTokens.Spacing.sm) }
-
-    /// The header's teal tile, scaling with the headline it sits beside.
-    /// 36 pt with 12 pt of padding is the measured ceiling that keeps the
-    /// PASS summary on one line and the timing line above the 6.3″ fold.
-    @ScaledMetric(relativeTo: .headline) private var headerTile: CGFloat = 36
-
-    // MARK: - Details disclosure
-    //
-    // Phase 2 lock: collapsed by default; closed-state row carries the
-    // pass/note/issue summary; chevron rotates 90° on expand (mirrors the
-    // pageModesSection pattern). The header is a mini-card in the action
-    // cards' grammar: the brand glyph on a teal tile, the title and the
-    // summary, one chevron; the card's material and shadow are the
-    // HomeChoiceCardButtonStyle chrome minus the press scale — a
-    // disclosure, not a navigation card.
-
     var body: some View {
+        let partition = VerificationLayerPartition(layers: report.layers, perPageModes: report.perPageModes)
         VStack(alignment: .leading, spacing: 0) {
-            Button {
-                withAnimation(ResectaTokens.Anim.stateChange) {
-                    isExpanded.toggle()
-                }
-            } label: {
-                headerLabel
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(VerificationResultsView.detailsHeaderAccessibilityLabel(for: report))
-            .accessibilityHint(isExpanded ? "Hides the checks" : "Shows the checks")
-
-            if isExpanded {
-                groups
-            }
-        }
-        // One material for the whole disclosure (the rows inside are flat).
-        // The shadow sits on the background shape itself: a `.shadow` on
-        // the whole view would also be cast by every opaque child.
-        .background {
-            RoundedRectangle(cornerRadius: ResectaTokens.CornerRadius.card, style: .continuous)
-                .fill(.regularMaterial)
-                .shadow(
-                    color: ResectaTokens.Shadow.subtle.color,
-                    radius: ResectaTokens.Shadow.subtle.radius,
-                    x: ResectaTokens.Shadow.subtle.x,
-                    y: ResectaTokens.Shadow.subtle.y)
-        }
-        .frame(maxWidth: columnMaxWidth)
-    }
-
-    // MARK: - The header
-
-    /// The brand glyph on the tile wash (the HomeChoiceCardContent
-    /// subtle-tile rule).
-    private var headerTileView: some View {
-        Image(systemName: "list.bullet.rectangle")
-            .font(.body.weight(.semibold))
-            .foregroundStyle(ResectaTokens.BrandTeal.text)
-            .frame(width: headerTile, height: headerTile)
-            .background(
-                ResectaTokens.BrandTeal.tint.opacity(
-                    colorScheme == .dark
-                        ? ResectaTokens.Opacity.tileWashDark
-                        : ResectaTokens.Opacity.tileWashLight),
-                in: RoundedRectangle(cornerRadius: ResectaTokens.CornerRadius.medium, style: .continuous))
-    }
-
-    private var headerSummary: some View {
-        Text(detailsSummary)
-            .font(.caption)
-            .foregroundStyle(ResectaTokens.SemanticColor.supportText)
-    }
-
-    /// The tile, the title over the summary, one chevron. At accessibility
-    /// sizes "Verification Details" alone is wider than the column beside
-    /// the tile, so the header stacks: the tile, the title and the chevron,
-    /// the summary.
-    @ViewBuilder
-    private var headerLabel: some View {
-        if dynamicTypeSize.isAccessibilitySize {
-            VStack(alignment: .leading, spacing: ResectaTokens.Spacing.sm) {
-                headerTileView
-                HStack(alignment: .firstTextBaseline, spacing: ResectaTokens.Spacing.sm) {
-                    Text("Verification Details")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    DisclosureChevron(isExpanded: isExpanded, tint: ResectaTokens.BrandTeal.text)
-                }
-                headerSummary
-            }
-            .padding(ResectaTokens.Spacing.sm + ResectaTokens.Spacing.xs)
-            .contentShape(Rectangle())
-        } else {
-            HStack(spacing: ResectaTokens.Spacing.md) {
-                headerTileView
-
-                // The text column takes the width a Spacer would have
-                // taken — a Spacer costs its minimum length plus two
-                // HStack gaps and wraps the PASS summary onto two lines
-                // at 402 pt. The summary is caption-sized: at footnote
-                // size "5 of 5 checks passed · 2 informational notes"
-                // needs ≈ 270 pt against the 262-pt column and wraps
-                // (measured on the iPhone 17 simulator, 2026-09-24);
-                // at caption size it is one line and the header 60 pt.
-                VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xs) {
-                    Text("Verification Details")
-                        .font(.headline)
-                    headerSummary
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                DisclosureChevron(isExpanded: isExpanded, tint: ResectaTokens.BrandTeal.text)
-                    .frame(width: 16)
-            }
-            // 12 pt: the disclosure's own row pads tighter than the
-            // 16 pt action cards above it; with the 36 pt tile this
-            // keeps the timing line ≈31 pt above the 6.3″ fold.
-            .padding(ResectaTokens.Spacing.sm + ResectaTokens.Spacing.xs)
-            .contentShape(Rectangle())
-        }
-    }
-
-    // MARK: - The groups
-
-    /// Groups, 24 pt apart; inside a group the header hugs its rows and the
-    /// rows sit flat, a hairline between them.
-    private var groups: some View {
-        VStack(alignment: .leading, spacing: ResectaTokens.Spacing.lg) {
-            // Page Modes and the deselection row are one item.
-            //
-            // Deselection visibility at share time: a PASS
-            // legitimately says "without issues" — the checks ran
-            // on what was redacted, not on what the user chose to
-            // leave. When the run started with known scan results
-            // deliberately un-checked, say so here, at the surface
-            // where the share decision is made.
-            let showsDeselection = VerificationResultsView.shouldShowDeselectionRow(
-                snapshot: deselectionSnapshot)
-            if report.perPageModes.hasMixedModes || showsDeselection {
-                VStack(alignment: .leading, spacing: 0) {
-                    if report.perPageModes.hasMixedModes {
-                        pageModesSection
-                    }
-                    if report.perPageModes.hasMixedModes, showsDeselection {
-                        hairline
-                    }
-                    if showsDeselection, let snapshot = deselectionSnapshot {
-                        deselectionRow(snapshot: snapshot)
-                    }
-                }
-            }
-
-            // The layers grouped by outcome — one enumeration
-            // (`VerificationLayerPartition`), engine order inside each
-            // group: what needs attention first, then the checks that could
-            // not verify part of the output (Share asks before sending),
-            // then the notes and the checks with nothing to check, then one
-            // row for the checks that passed. `layerIndex` stays
-            // engine-position-based (1-indexed) so the identifier
-            // "layerResult_\(layerIndex - 1)" stays stable across grouping;
-            // the rows are keyed by that index.
-            let partition = VerificationLayerPartition(
-                layers: report.layers, perPageModes: report.perPageModes)
             ForEach(Self.groups(partition), id: \.header) { group in
-                VStack(alignment: .leading, spacing: 0) {
-                    sectionHeader(group.header, count: group.indices.count)
-                    layerRows(group.indices)
+                GroupedSection(
+                    header: VerificationLayerPartition.sectionHeader(group.header, count: group.indices.count),
+                    spokenHeader: VerificationLayerPartition.sectionHeaderSpoken(group.header, count: group.indices.count)
+                ) {
+                    layerRows(group.indices, layout: .lead, showsStatusWord: group.header == "Findings")
                 }
+                .padding(.top, ResectaTokens.Results.blockGap)
             }
-            if !partition.cluster.isEmpty {
-                passCluster(partition)
+            if showsRunSection {
+                GroupedSection { runSection }
+                    .padding(.top, ResectaTokens.Spacing.xl)
             }
-        }
-        // The content column pads like the action cards (16 pt);
-        // the flat rows inside carry no horizontal padding of their
-        // own, so the row columns, the hairlines and the group
-        // headers all measure from this edge.
-        .padding(.horizontal, ResectaTokens.Spacing.md)
-        .padding(.bottom, ResectaTokens.Spacing.md)
-        // Routed
-        // through the resolver so Reduce Motion swaps the slide
-        // for an opacity-only crossfade.
-        .transition(ResectaTokens.Anim.resolvedTransition(
-            standard: .opacity.combined(with: .move(edge: .top)),
-            reduceMotion: reduceMotion))
-    }
-
-    /// One row in the layer rows' anatomy — the pass mark, "N checks
-    /// passed", a chevron — that opens to the passing checks (and the notes
-    /// with nothing remaining). Open by default only when nothing sits
-    /// above it; collapsing it closes an open member.
-    @ViewBuilder
-    private func passCluster(_ partition: VerificationLayerPartition) -> some View {
-        let isOpen = clusterExpanded ?? partition.isWhollyClean
-        let clusterTitle = partition.clusterTitle
-        VStack(alignment: .leading, spacing: 0) {
-            Button {
-                withAnimation(ResectaTokens.Anim.stateChange) {
-                    if isOpen, let open = expandedLayer, partition.cluster.contains(open) {
-                        expandedLayer = nil
-                    }
-                    clusterExpanded = !isOpen
+            if Self.isEveryCheckPassed(partition) {
+                GroupedSection(header: "Checks", spokenHeader: "Checks.") {
+                    layerRows(Array(report.layers.indices), layout: .bare, showsStatusWord: false)
                 }
-            } label: {
-                HStack(alignment: .top, spacing: ResectaTokens.Spacing.sm) {
-                    // The glyph column stays empty: the cluster names no
-                    // single check.
-                    Color.clear.frame(width: rowColumn, height: rowColumn)
-                    Image(systemName: VerificationOutcome.passed.markSymbolName)
-                        .font(.system(size: rowColumn, weight: .semibold))
-                        .foregroundStyle(VerificationOutcome.passed.textColor)
-                        .frame(width: rowColumn, height: rowColumn)
-                    Text(clusterTitle)
-                        .font(.subheadline.weight(.medium))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    DisclosureChevron(isExpanded: isOpen)
-                        .frame(width: 16, height: rowColumn)
-                }
-                .padding(.vertical, ResectaTokens.Spacing.sm + ResectaTokens.Spacing.xxs)
-                .frame(minHeight: ResectaTokens.TouchTarget.minimum)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(partition.clusterSpokenLabel)
-            .accessibilityHint(isOpen ? "Hides the passed checks" : "Shows the passed checks")
-            .accessibilityIdentifier("passedChecksCluster")
-
-            if isOpen {
-                VStack(alignment: .leading, spacing: 0) {
-                    ForEach(partition.cluster, id: \.self) { index in
-                        rowHairline
-                        layerRow(layer: report.layers[index], index: index)
-                    }
-                }
-                // Opacity only: the members appear in place.
-                .transition(.opacity)
+                .padding(.top, ResectaTokens.Results.blockGap)
+            } else if !partition.cluster.isEmpty {
+                GroupedSection { passCluster(partition) }
+                    .padding(.top, ResectaTokens.Spacing.xl)
             }
         }
     }
 
-    // MARK: - Deselection row
-
-    @ViewBuilder
-    private func deselectionRow(
-        snapshot: RedactionState.DeselectionSnapshot
-    ) -> some View {
-        let rowText = VerificationResultsView.deselectionRowText(
-            deselected: snapshot.deselectedCount, total: snapshot.totalCount)
-        HStack(spacing: ResectaTokens.Spacing.sm) {
-            // The glyph on a neutral tile, the rows' icon column wide — a
-            // fact about the run, not a status.
-            Image(systemName: "checklist.unchecked")
-                .font(.system(size: iconSize))
-                .foregroundStyle(ResectaTokens.SemanticColor.supportText)
-                .frame(width: iconColumn, height: iconColumn)
-                .background(
-                    Color.secondary.opacity(0.12),
-                    in: RoundedRectangle(cornerRadius: ResectaTokens.CornerRadius.small, style: .continuous))
-                .accessibilityHidden(true)
-
-            Text(rowText)
-                .font(.caption)
-                .foregroundStyle(ResectaTokens.SemanticColor.supportText)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(.vertical, ResectaTokens.Spacing.sm)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(rowText)
-        .accessibilityIdentifier("deselectionRow")
-    }
+    // MARK: - The rules
 
     /// The groups above the cluster, in screen order, each with its rows'
     /// engine indices; an empty group is left out.
@@ -334,205 +79,230 @@ struct VerificationDetailsSection: View {
         ].filter { !$0.1.isEmpty }
     }
 
-    /// A group's header with its count, one VoiceOver header.
-    private func sectionHeader(_ header: String, count: Int) -> some View {
-        Text(VerificationLayerPartition.sectionHeader(header, count: count))
-            .font(.footnote.weight(.semibold))
-            .foregroundStyle(ResectaTokens.SemanticColor.supportText)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.bottom, ResectaTokens.Spacing.xs)
-            .accessibilityLabel(VerificationLayerPartition.sectionHeaderSpoken(header, count: count))
-            .accessibilityAddTraits(.isHeader)
+    /// A wholly clean run: every row Passed — the `Checks` list, no cluster.
+    static func isEveryCheckPassed(_ partition: VerificationLayerPartition) -> Bool {
+        partition.total > 0 && partition.passedCount == partition.total
     }
 
-    /// The hairline between the Page Modes section and the deselection
-    /// row: inset past their icon column.
-    private var hairline: some View {
-        Divider().padding(.leading, hairlineInset)
+    /// The cluster opens by default only when it holds riding notes and no
+    /// result section sits above it (the run section does not count).
+    static func clusterOpensByDefault(_ partition: VerificationLayerPartition) -> Bool {
+        partition.isWhollyClean && partition.clusterNoteCount > 0
     }
 
-    /// The hairline between two layer rows: inset to the row titles.
-    private var rowHairline: some View {
-        Divider().padding(.leading, rowHairlineInset)
+    private var showsDeselection: Bool {
+        VerificationResultsView.shouldShowDeselectionRow(snapshot: deselectionSnapshot)
     }
 
-    /// The rows for a group's engine indices, flat, a hairline between
-    /// consecutive rows; the section owns the hairlines, the rows none.
-    @ViewBuilder
-    private func layerRows(_ indices: [Int]) -> some View {
-        ForEach(Array(indices.enumerated()), id: \.element) { position, index in
-            if position > 0 {
-                rowHairline
-            }
-            layerRow(layer: report.layers[index], index: index)
+    private var showsRunSection: Bool {
+        !runFactsLines.isEmpty || VerificationResultsView.showsPageModes(report: report) || showsDeselection
+    }
+
+    private func toggle(_ item: OpenItem) {
+        withAnimation(ResectaTokens.Anim.resolved(ResectaTokens.Anim.stateChange, reduceMotion: reduceMotion)) {
+            openItem = openItem == item ? nil : item
         }
     }
 
+    // MARK: - Rows
+
     @ViewBuilder
-    private func layerRow(layer: LayerResult, index: Int) -> some View {
+    private func layerRows(_ indices: [Int], layout: LayerResultRow.GroupedLayout, showsStatusWord: Bool) -> some View {
+        ForEach(Array(indices.enumerated()), id: \.element) { position, index in
+            if position > 0 {
+                GroupedRowDivider(inset: layout == .bare ? ResectaTokens.Spacing.md : ResectaTokens.Results.titleInset)
+            }
+            layerRow(index: index, layout: layout, showsStatusWord: showsStatusWord)
+        }
+    }
+
+    private func layerRow(index: Int, layout: LayerResultRow.GroupedLayout, showsStatusWord: Bool) -> some View {
         LayerResultRow(
-            layer: layer,
+            layer: report.layers[index],
             layerIndex: index + 1,
-            isExpanded: expandedLayer == index,
-            onTap: {
-                withAnimation(ResectaTokens.Anim.stateChange) {
-                    expandedLayer = expandedLayer == index ? nil : index
-                }
-            },
-            onPageTap: { pageIndex in
-                documentState.currentPageIndex = pageIndex
-                documentState.transition(to: .editing)
-            },
-            chrome: .plain,
-            perPageModes: report.perPageModes
+            isExpanded: openItem == .layer(index),
+            onTap: { toggle(.layer(index)) },
+            onPageTap: { page in onOpenPage(page) },
+            chrome: .grouped,
+            perPageModes: report.perPageModes,
+            groupedLayout: layout,
+            showsStatusWord: showsStatusWord,
+            pagesOnChips: previewAvailable
         )
     }
 
-    /// Closed-state summary line: only passing checks count as passed.
-    private var detailsSummary: String { VerificationResultsView.detailsSummaryText(for: report) }
+    // MARK: - The pass cluster
 
-    // MARK: - Page Modes Section (verbatim from prior implementation)
-    //
-    // Collapsible section showing per-page pipeline mode breakdown. Only
-    // rendered when modes are mixed (at least one page fell back). Follows
-    // the LayerResultRow expand/collapse pattern. Lives inside the new
-    // details disclosure; identifier preserved.
+    /// One row — the pass mark, "N checks passed[ · k notes]", a chevron —
+    /// that opens to the passing checks and the notes riding with them.
+    /// Collapsing it closes an open member.
+    @ViewBuilder
+    private func passCluster(_ partition: VerificationLayerPartition) -> some View {
+        let isOpen = clusterExpanded ?? Self.clusterOpensByDefault(partition)
+        Button {
+            withAnimation(ResectaTokens.Anim.resolved(ResectaTokens.Anim.stateChange, reduceMotion: reduceMotion)) {
+                if isOpen, case .layer(let open) = openItem, partition.cluster.contains(open) {
+                    openItem = nil
+                }
+                clusterExpanded = !isOpen
+            }
+        } label: {
+            HStack(spacing: 0) {
+                Image(systemName: "checkmark")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(VerificationOutcome.passed.textColor)
+                    .frame(width: ResectaTokens.Results.leadColumn)
+                    .padding(.leading, ResectaTokens.Spacing.md)
+                    .padding(.trailing, ResectaTokens.Results.titleInset
+                             - ResectaTokens.Spacing.md - ResectaTokens.Results.leadColumn)
+                Text(partition.clusterTitle)
+                    .font(.body)
+                    .foregroundStyle(.primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                DisclosureChevron(isExpanded: isOpen, tint: Color(.secondaryLabel))
+                    .frame(width: ResectaTokens.Results.chevronColumn)
+                    .padding(.leading, ResectaTokens.Spacing.sm)
+                    .padding(.trailing, ResectaTokens.Spacing.md)
+            }
+            .frame(minHeight: ResectaTokens.Results.rowMinHeight)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(ResultsRowButtonStyle())
+        .accessibilityLabel(partition.clusterSpokenLabel)
+        .accessibilityHint(isOpen ? "Hides the passed checks" : "Shows the passed checks")
+        .accessibilityIdentifier("passedChecksCluster")
+        if isOpen {
+            ForEach(partition.cluster, id: \.self) { index in
+                GroupedRowDivider()
+                layerRow(index: index,
+                         layout: partition.outcomes[index] == .note ? .lead : .member,
+                         showsStatusWord: false)
+            }
+            .transition(.opacity)
+        }
+    }
+
+    // MARK: - The run section
 
     @ViewBuilder
-    private var pageModesSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header row (always visible)
-            Button {
-                withAnimation(ResectaTokens.Anim.stateChange) {
-                    showPageModes.toggle()
-                }
-            } label: {
-                HStack(spacing: ResectaTokens.Spacing.sm) {
-                    Image(systemName: "square.2.layers.3d")
-                        .font(.system(size: iconSize))
-                        .foregroundStyle(ResectaTokens.SemanticColor.searchableMode)
-                        .frame(width: iconColumn)
+    private var runSection: some View {
+        ForEach(Array(runFactsLines.enumerated()), id: \.offset) { position, line in
+            if position > 0 { GroupedRowDivider() }
+            runSectionRow(symbol: "info.circle") {
+                Text(line)
+                    .font(.subheadline)
+                    .foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier(position == 0 ? "runFactsStrip" : "runFactsLine_\(position)")
+        }
+        if VerificationResultsView.showsPageModes(report: report) {
+            if !runFactsLines.isEmpty { GroupedRowDivider() }
+            pageModesRow
+        }
+        if showsDeselection, let snapshot = deselectionSnapshot {
+            if !runFactsLines.isEmpty || VerificationResultsView.showsPageModes(report: report) {
+                GroupedRowDivider()
+            }
+            let rowText = VerificationResultsView.deselectionRowText(
+                deselected: snapshot.deselectedCount, total: snapshot.totalCount)
+            runSectionRow(symbol: "checklist.unchecked") {
+                Text(rowText)
+                    .font(.body)
+                    .foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(rowText)
+            .accessibilityIdentifier("deselectionRow")
+        }
+    }
 
+    /// A run-section row: a glyph in the lead column, the text at 56. Not
+    /// a button.
+    private func runSectionRow<Content: View>(symbol: String, @ViewBuilder content: () -> Content) -> some View {
+        HStack(alignment: .top, spacing: 0) {
+            Image(systemName: symbol)
+                .font(.system(size: ResectaTokens.Results.leadMark - 2))
+                .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+                .frame(width: ResectaTokens.Results.leadColumn)
+                .padding(.leading, ResectaTokens.Spacing.md)
+                .padding(.trailing, ResectaTokens.Results.titleInset
+                         - ResectaTokens.Spacing.md - ResectaTokens.Results.leadColumn)
+                .accessibilityHidden(true)
+            content()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.trailing, ResectaTokens.Spacing.md)
+        }
+        .padding(.vertical, ResectaTokens.Spacing.sm + ResectaTokens.Spacing.xs - 1)
+        .frame(minHeight: ResectaTokens.Results.rowMinHeight)
+    }
+
+    /// Page Modes: the summary, and opened, one line per mode with ranges,
+    /// then the fallback lines. One of the open items.
+    private var pageModesRow: some View {
+        let isOpen = openItem == .pageModes
+        let summary = VerificationResultsView.pageModesSummaryText(modes: report.perPageModes)
+        return VStack(alignment: .leading, spacing: 0) {
+            Button { toggle(.pageModes) } label: {
+                HStack(alignment: .top, spacing: 0) {
+                    Image(systemName: "square.2.layers.3d")
+                        .font(.system(size: ResectaTokens.Results.leadMark - 2))
+                        .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+                        .frame(width: ResectaTokens.Results.leadColumn)
+                        .padding(.leading, ResectaTokens.Spacing.md)
+                        .padding(.trailing, ResectaTokens.Results.titleInset
+                                 - ResectaTokens.Spacing.md - ResectaTokens.Results.leadColumn)
                     VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xxs) {
                         Text("Page Modes")
-                            .font(.subheadline.weight(.medium))
-                        Text(modeChipSummary)
-                            .font(.caption)
+                            .font(.body)
+                            .foregroundStyle(.primary)
+                        Text(summary)
+                            .font(.subheadline)
                             .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                     }
-
-                    Spacer()
-
-                    DisclosureChevron(isExpanded: showPageModes)
-                        .frame(width: 16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    DisclosureChevron(isExpanded: isOpen, tint: Color(.secondaryLabel))
+                        .frame(width: ResectaTokens.Results.chevronColumn)
+                        .padding(.top, ResectaTokens.Spacing.xs)
+                        .padding(.leading, ResectaTokens.Spacing.sm)
+                        .padding(.trailing, ResectaTokens.Spacing.md)
                 }
-                .padding(.vertical, ResectaTokens.Spacing.sm)
+                .padding(.vertical, ResectaTokens.Spacing.sm + ResectaTokens.Spacing.xs - 1)
+                .frame(minHeight: ResectaTokens.Results.rowMinHeight)
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Page Modes, \(modeChipSummary)")
-            .accessibilityHint(showPageModes ? "Hides details" : "Shows details")
-
-            // Expanded: color-coded page chips
-            if showPageModes {
-                hairline
+            .buttonStyle(ResultsRowButtonStyle())
+            .accessibilityLabel("Page Modes, \(summary)")
+            .accessibilityHint(isOpen ? "Hides details" : "Shows details")
+            if isOpen {
                 VStack(alignment: .leading, spacing: ResectaTokens.Spacing.sm) {
-                    FlowLayout(spacing: ResectaTokens.Spacing.xs) {
-                        ForEach(Array(report.perPageModes.enumerated()), id: \.offset) { index, mode in
-                            Button {
-                                documentState.currentPageIndex = index
-                                documentState.transition(to: .editing)
-                            } label: {
-                                Text("\(index + 1)")
-                                    .font(.caption.monospacedDigit())
-                                    // Searchable chips carry blue-family
-                                    // small TEXT → AA text tier; rasterized chips
-                                    // keep .secondary via badgeColor. The 0.1 wash
-                                    // below stays on the glyph/fill tier.
-                                    .foregroundStyle(
-                                        mode == .searchableRedaction
-                                            ? ResectaTokens.SemanticColor.infoText
-                                            : mode.badgeColor
-                                    )
-                                    .padding(.horizontal, ResectaTokens.Spacing.xs)
-                                    .padding(.vertical, ResectaTokens.Spacing.xxs)
-                                    .background(
-                                        mode.badgeColor.opacity(0.1),
-                                        in: RoundedRectangle(cornerRadius: ResectaTokens.CornerRadius.small, style: .continuous)
-                                    )
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(
-                                VerificationResultsView.pageChipAccessibilityLabel(
-                                    pageNumber: index + 1, mode: mode,
-                                    reason: fallbackReason(at: index))
-                            )
+                    VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xxs) {
+                        ForEach(VerificationResultsView.pageModeLines(modes: report.perPageModes), id: \.self) { line in
+                            Text(line)
                         }
                     }
-
-                    // Legend
-                    HStack(spacing: ResectaTokens.Spacing.md) {
-                        // Caption2 legend text takes the AA text-tier
-                        // blue; the glyph keeps the searchableMode tint (glyph tier).
-                        Label {
-                            Text("Searchable")
-                                .foregroundStyle(ResectaTokens.SemanticColor.infoText)
-                        } icon: {
-                            PipelineMode.searchableRedaction.glyph
-                                .foregroundStyle(ResectaTokens.SemanticColor.searchableMode)
-                        }
-                        .font(.caption2)
-                        Label {
-                            Text("Rasterized")
-                        } icon: {
-                            PipelineMode.secureRasterization.glyph
-                        }
-                        .font(.caption2)
-                        .foregroundStyle(ResectaTokens.SemanticColor.supportText)
-                    }
-
-                    // Why each rasterized page fell back, for
-                    // Searchable-mode runs only (secure-raster runs carry no
-                    // reasons — every page rasterized by choice). One caption
-                    // row per fallback page, same factual register as the
-                    // legend above.
                     if report.perPageFallbackReasons.hasAnyFallbackReason {
                         VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xxs) {
-                            ForEach(
-                                VerificationResultsView.fallbackReasonRowTexts(
-                                    reasons: report.perPageFallbackReasons),
-                                id: \.self
-                            ) { line in
+                            ForEach(VerificationResultsView.fallbackReasonRowTexts(
+                                reasons: report.perPageFallbackReasons), id: \.self) { line in
                                 Text(line)
-                                    .font(.caption2)
-                                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                             }
                         }
                     }
                 }
-                .padding(.vertical, ResectaTokens.Spacing.sm)
-                // Routed
-                // through the resolver so Reduce Motion swaps the slide
-                // for an opacity-only crossfade.
-                .transition(ResectaTokens.Anim.resolvedTransition(
-                    standard: .opacity.combined(with: .move(edge: .top)),
-                    reduceMotion: reduceMotion))
+                .font(.footnote.monospacedDigit())
+                .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+                .padding(.leading, ResectaTokens.Results.titleInset)
+                .padding(.trailing, ResectaTokens.Spacing.md)
+                .padding(.bottom, ResectaTokens.Spacing.md - 2)
+                .transition(.opacity)
             }
         }
-        // Flat inside the disclosure card — no nested material.
+        .background(isOpen ? LayerResultRow.rowWash(colorScheme) : .clear)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("pageModesSection")
-    }
-
-    private var modeChipSummary: String {
-        VerificationResultsView.pageModesSummaryText(modes: report.perPageModes)
-    }
-
-    /// The report's fallback reason for a page index, nil when the
-    /// reasons array is absent (old-session verify-only resume) or shorter
-    /// than the mode array.
-    private func fallbackReason(at index: Int) -> TextLayerDetector.FallbackReason? {
-        guard report.perPageFallbackReasons.indices.contains(index) else { return nil }
-        return report.perPageFallbackReasons[index]
     }
 }
 
@@ -572,18 +342,6 @@ extension VerificationResultsView {
     /// Pinned by `VerificationDisplayTests`.
     static func detailsSummaryText(for report: VerificationReport) -> String {
         VerificationLayerPartition(layers: report.layers, perPageModes: report.perPageModes).summaryText
-    }
-
-    /// The header's spoken label: "Verification Details. 7 of 12 checks
-    /// passed. 1 needs review, 1 warning, …" — line 2's dots spoken as
-    /// commas.
-    static func detailsHeaderAccessibilityLabel(for report: VerificationReport) -> String {
-        let partition = VerificationLayerPartition(layers: report.layers, perPageModes: report.perPageModes)
-        var label = "Verification Details. \(partition.summaryLine1)."
-        if let line2 = partition.summaryLine2 {
-            label += " " + line2.replacingOccurrences(of: " · ", with: ", ") + "."
-        }
-        return label
     }
 
     /// The Page Modes summary: "2 Searchable, 1 Rasterized", a zero clause
@@ -629,15 +387,39 @@ extension VerificationResultsView {
         return lines
     }
 
-    /// Chip VoiceOver label: carries the fallback reason when the page has
-    /// one, so the reason rows below are not the only disclosure surface.
-    static func pageChipAccessibilityLabel(
-        pageNumber: Int, mode: PipelineMode,
-        reason: TextLayerDetector.FallbackReason?
-    ) -> String {
-        if let reason {
-            return "Page \(pageNumber), \(mode.shortDisplayName) — \(reason.shortReasonText)"
+    /// The Page Modes lines: one per mode present, Searchable first, with
+    /// runs of three or more pages as en-dash ranges — "Searchable · pages
+    /// 1–12, 14, and 16–40" · "Rasterized · page 3".
+    static func pageModeLines(modes: [PipelineMode]) -> [String] {
+        [(PipelineMode.searchableRedaction, "Searchable"), (.secureRasterization, "Rasterized")]
+            .compactMap { mode, name in
+                let pages = modes.indices.filter { modes[$0] == mode }
+                guard !pages.isEmpty else { return nil }
+                let items = pageRanges(pages)
+                let noun = pages.count == 1 ? "page" : "pages"
+                return "\(name) · \(noun) \(VerificationRowModel.listPhrase(items))"
+            }
+    }
+
+    /// 0-based pages → 1-based items, a run of three or more as "a–b".
+    static func pageRanges(_ pages: [Int]) -> [String] {
+        var items: [String] = []
+        var start = 0
+        while start < pages.count {
+            var end = start
+            while end + 1 < pages.count, pages[end + 1] == pages[end] + 1 { end += 1 }
+            if end - start >= 2 {
+                items.append("\(pages[start] + 1)\u{2013}\(pages[end] + 1)")
+            } else {
+                items += pages[start...end].map { String($0 + 1) }
+            }
+            start = end + 1
         }
-        return "Page \(pageNumber), \(mode.shortDisplayName)"
+        return items
+    }
+
+    /// Page Modes shows when the modes are mixed or any page fell back.
+    static func showsPageModes(report: VerificationReport) -> Bool {
+        report.perPageModes.hasMixedModes || report.perPageFallbackReasons.hasAnyFallbackReason
     }
 }

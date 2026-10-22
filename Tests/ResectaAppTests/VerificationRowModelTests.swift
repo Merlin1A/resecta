@@ -425,8 +425,8 @@ struct VerificationRowModelTests {
         let review = VerificationRowModel(
             layer: Self.layer(.attention("x"), identity: .binaryStringSearch, pages: [1], terms: ["Delia"]),
             perPageModes: [])
-        #expect(review.caption == "\u{201C}Delia\u{201D} is still readable on\u{00A0}page\u{00A0}2. "
-                + "It matches text you redacted. Use text\u{00A0}search to redact the rest.")
+        #expect(review.caption == "\u{201C}Delia\u{201D} is still readable on\u{00A0}page\u{00A0}2.")
+        #expect(review.lead == ["It matches text you redacted. Use text\u{00A0}search to redact the rest."])
         #expect(review.captionIsPrivacySensitive)
         for status in RowModelStatusAxis.allCases where status != .attention {
             let model = VerificationRowModel(layer: Self.layer(status.status, identity: .ocrCheck, terms: ["Delia"]),
@@ -449,10 +449,7 @@ struct VerificationRowModelTests {
         let two = VerificationRowModel(layer: result(["Delia", "Hartwell"], pages: [0, 2], fragment: true), perPageModes: [])
         #expect(two.caption == "Parts of \u{201C}Delia\u{201D} and \u{201C}Hartwell\u{201D} are readable beside redaction boxes on pages 1\u{00A0}and\u{00A0}3. Adjust the boxes and redact again.")
         let whole = VerificationRowModel(layer: result(["Delia"], pages: [1], fragment: false), perPageModes: [])
-        #expect(whole.caption == "\u{201C}Delia\u{201D} is still readable on\u{00A0}page\u{00A0}2. It matches text you redacted. Use text\u{00A0}search to redact the rest.")
-        #expect(LayerResultRow.rowSubtitleText(layer: result(["123-45-6789"], pages: [1], fragment: true))
-                == "Part of \u{201C}123-45-6789\u{201D} is readable beside a redaction box on\u{00A0}page\u{00A0}2. Adjust the box and redact again.")
-        #expect(LayerResultRow.rowSubtitleIsPrivacySensitive(layer: result(["123-45-6789"], pages: [1], fragment: true)))
+        #expect(whole.caption == "\u{201C}Delia\u{201D} is still readable on\u{00A0}page\u{00A0}2.")
     }
 
     @Test("The spoken label is the title, the status word and the caption")
@@ -598,7 +595,7 @@ struct VerificationRowModelTests {
         #expect(items(Self.layer(.warn("x"), identity: .ocrCheck, cnv: true))
                 == [ocr, ocrRule, .detail("Engine detail."), took])
         #expect(items(Self.layer(.attention("x"), identity: .ocrCheck, pages: [0], terms: ["t"]), pages: false)
-                == [ocr, ocrRule, .detail("Engine detail."), took])
+                == [.lead("It matches text you redacted. Use text\u{00A0}search to redact the rest."), ocr, ocrRule, .detail("Engine detail."), took])
         #expect(items(Self.layer(.fail("x"), identity: .ocrCheck)) == [ocr, ocrRule, .detail("Engine detail."), took])
         #expect(items(Self.layer(.info("x"), identity: .ocrCheck)) == [ocr, ocrRule, .detail("Engine detail."), took])
         #expect(items(Self.layer(.pass, identity: .characterCount), [.secureRasterization])
@@ -624,9 +621,9 @@ struct VerificationRowModelTests {
         let row = Self.layer(.attention("x"), identity: .operatorReExtraction, pages: [1], terms: ["Delia"])
         let modes: [PipelineMode] = [.searchableRedaction, .searchableRedaction, .searchableRedaction]
         #expect(VerificationRowModel(layer: row, perPageModes: modes).lead
-                == ["Scanning stopped at page 2. Later pages were not searched."])
-        #expect(VerificationRowModel(layer: row, perPageModes: Array(modes.prefix(2))).lead == [])
-        #expect(VerificationRowModel(layer: row, perPageModes: []).lead == [])
+                == ["It matches text you redacted. Use text\u{00A0}search to redact the rest.", "Scanning stopped at page 2. Later pages were not searched."])
+        #expect(VerificationRowModel(layer: row, perPageModes: Array(modes.prefix(2))).lead == ["It matches text you redacted. Use text\u{00A0}search to redact the rest."])
+        #expect(VerificationRowModel(layer: row, perPageModes: []).lead == ["It matches text you redacted. Use text\u{00A0}search to redact the rest."])
     }
 
     @Test("Review terms are normalised: whitespace collapsed, case duplicates dropped")
@@ -635,11 +632,9 @@ struct VerificationRowModelTests {
                 == ["Margaret Thompson", "O'Brien Ltd"])
         #expect(VerificationRowModel.reviewSentence(termTexts: ["Delia", "Fox", "Lane"], pages: [0, 1, 2])
                 == "\u{201C}Delia\u{201D}, \u{201C}Fox\u{201D}, and \u{201C}Lane\u{201D} are still readable "
-                + "on pages 1, 2,\u{00A0}and\u{00A0}3. They match text you redacted. "
-                + "Use text\u{00A0}search to redact the rest.")
+                + "on pages 1, 2,\u{00A0}and\u{00A0}3.")
         #expect(VerificationRowModel.reviewSentence(termTexts: ["acme"], pages: nil)
-                == "\u{201C}acme\u{201D} is still readable in the PDF. It matches text you redacted. "
-                + "Use text\u{00A0}search to redact the rest.")
+                == "\u{201C}acme\u{201D} is still readable in the PDF.")
     }
 
     @Test("A Search Re-check that needs review names its searches, the matches and the pages")
