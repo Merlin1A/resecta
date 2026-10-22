@@ -1300,10 +1300,7 @@ struct DocumentEditorView: View {
     static func runVerificationRoute(
         hasOutput: Bool, isVerificationStale: Bool, hasUnappliedSelections: Bool = false
     ) -> RunVerificationRoute {
-        if hasOutput && !isVerificationStale { return .verifyOnly }
-        // The full run enters the funnel, which refuses over unapplied
-        // selections; the session is kept, not dropped on the way there.
-        return hasUnappliedSelections ? .blockedBySelections : .fullPipeline
+        hasOutput && !isVerificationStale ? .verifyOnly : (hasUnappliedSelections ? .blockedBySelections : .fullPipeline)
     }
 
     /// Action for the Run Verification card on the skipped results screen.
@@ -1319,8 +1316,7 @@ struct DocumentEditorView: View {
         documentState.pausedFromPhase = nil
         switch Self.runVerificationRoute(
             hasOutput: redactionState.outputURL != nil,
-            isVerificationStale: redactionState.isVerificationStale,
-            hasUnappliedSelections: DocumentState.hasUnappliedSelections(redactionState)
+            isVerificationStale: redactionState.isVerificationStale, hasUnappliedSelections: DocumentState.hasUnappliedSelections(redactionState)
         ) {
         case .verifyOnly:
             coordinator.runVerifyOnly()

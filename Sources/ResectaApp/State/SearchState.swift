@@ -1230,24 +1230,13 @@ final class SearchState: Identifiable {
     /// sheet's teardown then spares it, so Cancel re-presents it whole.
     var parkedForHomeClose: Bool = false
 
-    /// The document the session was parked over (the document state's
-    /// per-import token): it is restored only over that document — a file
-    /// dropped in behind the close dialog replaces the document, and the
-    /// parked results name the old one's pages.
+    /// The document state's per-import token the session was parked over: restored only over that document.
     var parkedDocument: UUID?
 
-    /// Selections not yet applied, computed from the rows: a selected
-    /// result that no live region covers (`liveApplied` = the result ids
-    /// whose applied region is still on its page,
-    /// `RedactionState.liveAppliedSearchResultIDs`; a dedup-skipped
-    /// covered result counts as applied), or an auto-selected set never
-    /// reviewed. Read by the Redact gate, the Home dialog and the sheet's
-    /// own Dismiss — never from a gesture tracker: Deselect All leaves
-    /// nothing to apply, and an undone apply uncovers the rows again.
+    /// Selections not yet applied, from the rows (never a gesture tracker): a selected result no live applied
+    /// region covers (`liveApplied` = `RedactionState.liveAppliedSearchResultIDs`; covered counts as applied), or an unreviewed preselect.
     func hasUnappliedSelections(liveApplied: Set<UUID>) -> Bool {
-        hasUnreviewedPreselection || results.contains {
-            $0.isSelected && !liveApplied.contains($0.id) && !coveredResultIDs.contains($0.id)
-        }
+        hasUnreviewedPreselection || results.contains { $0.isSelected && !liveApplied.contains($0.id) && !coveredResultIDs.contains($0.id) }
     }
 
     /// Buffer a result from the search stream. Flushed in batches

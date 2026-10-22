@@ -75,14 +75,15 @@ struct DocumentBoundaryTests {
     @Test("A drop on the results or error screen is refused with a notice")
     func dropOnResultsOrErrorIsRefusedWithANotice() {
         let redaction = RedactionState()
-        for phase: DocumentState.Phase in [
-            .verified(report: .skipped),
-            .failed(error: .importError(.corrupt), returnPhase: .empty),
+        // The notice names the screen's own way back (its button's title).
+        for (phase, wayBack): (DocumentState.Phase, String) in [
+            (.verified(report: .skipped), "Keep Editing"),
+            (.failed(error: .importError(.corrupt), returnPhase: .empty), "Choose Another File"),
         ] {
             let doc = DocumentState()
             doc.phase = phase
             #expect(doc.importRefusalMessage(with: redaction)
-                    == "Cannot import from this screen. Return to the editor first.")
+                    == "Cannot import from this screen. Tap \(wayBack) first.")
         }
         let editing = DocumentState()
         editing.phase = .editing
