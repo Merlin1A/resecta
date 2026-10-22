@@ -1183,8 +1183,7 @@ final class SearchState: Identifiable {
     /// sheet's donor rule, generalized to the whole surface).
     ///
     /// Written `true` only at user-gesture sites (row circle, footer
-    /// Select All, Select-Where, keyboard space toggle, Pencil circle
-    /// select, review-row equivalents) — NEVER by programmatic
+    /// Select All, Select-Where, keyboard space toggle) — NEVER by programmatic
     /// selection writes: saved-search
     /// recall, and the mode-switch undo restore don't count as user
     /// selection work. Reset by a successful apply (the modified
