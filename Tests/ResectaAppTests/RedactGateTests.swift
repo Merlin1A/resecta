@@ -31,13 +31,17 @@ struct RedactGateTests {
         #expect(documentState.redactRefusal(with: redactionState) == nil)
     }
 
-    @Test("Selections the user touched, or an auto-selected set never reviewed, refuse Redact")
+    @Test("A selected result no region covers, or an auto-selected set never reviewed, refuses Redact; a touched session with nothing selected does not")
     func pendingSelectionsBlock() {
         let (documentState, redactionState) = states()
         let touched = SearchState(defaults: makeScratchDefaults().0)
         touched.userModifiedSelections = true
         redactionState.activeSearch = touched
-        #expect(documentState.redactRefusal(with: redactionState) == .selectedMatches)
+        #expect(documentState.redactRefusal(with: redactionState) == nil, "touched, nothing selected: nothing to apply")
+        touched.results = [SearchResult(
+            pageIndex: 0, normalizedRect: CGRect(x: 0.1, y: 0.1, width: 0.2, height: 0.03),
+            matchedText: "alpha", contextSnippet: "…alpha…", source: .textLayer, term: "alpha", isSelected: true)]
+        #expect(documentState.redactRefusal(with: redactionState) == .selectedMatches, "a selected row no region covers")
         let preselected = SearchState(defaults: makeScratchDefaults().0)
         preselected.hasUnreviewedPreselection = true
         redactionState.activeSearch = preselected
@@ -57,7 +61,9 @@ struct RedactGateTests {
     func hint() {
         let (documentState, redactionState) = states(effective: false)
         let touched = SearchState(defaults: makeScratchDefaults().0)
-        touched.userModifiedSelections = true
+        touched.results = [SearchResult(
+            pageIndex: 0, normalizedRect: CGRect(x: 0.1, y: 0.1, width: 0.2, height: 0.03),
+            matchedText: "alpha", contextSnippet: "…alpha…", source: .textLayer, term: "alpha", isSelected: true)]
         redactionState.activeSearch = touched
         #expect(documentState.redactRefusal(with: redactionState)?.hint
                 == "Apply or clear the selected matches first")

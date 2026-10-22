@@ -1223,21 +1223,31 @@ final class SearchState: Identifiable {
     /// `applyFindings(.stagedDetections)`), the review-arrival re-target
     /// resets it (`DocumentEditorView.presentReviewInScanInterface`, a
     /// fresh all-deselected context), and `clear()` resets it on session
-    /// teardown. See `requiresDismissConfirmation`.
+    /// teardown. See `hasUnappliedSelections(liveApplied:)`.
     var hasUnreviewedPreselection: Bool = false
 
     /// True while the Home close dialog holds this session parked: the
     /// sheet's teardown then spares it, so Cancel re-presents it whole.
     var parkedForHomeClose: Bool = false
 
-    /// The single predicate both dismiss-gate sites
-    /// (`DocumentEditorView`'s `.interactiveDismissDisabled` and
-    /// `SearchSheetHeaderSection`'s Dismiss handler) read: true when
-    /// either the user touched selections, or an auto-selected set has
-    /// never been reviewed. Either fact means a silent dismiss would
-    /// discard work the user hasn't confirmed away.
-    var requiresDismissConfirmation: Bool {
-        userModifiedSelections || hasUnreviewedPreselection
+    /// The document the session was parked over (the source document's
+    /// object identity): it is restored only over that document — a file
+    /// dropped in behind the close dialog replaces the document, and the
+    /// parked results name the old one's pages.
+    var parkedDocument: ObjectIdentifier?
+
+    /// Selections not yet applied, computed from the rows: a selected
+    /// result that no live region covers (`liveApplied` = the result ids
+    /// whose applied region is still on its page,
+    /// `RedactionState.liveAppliedSearchResultIDs`; a dedup-skipped
+    /// covered result counts as applied), or an auto-selected set never
+    /// reviewed. Read by the Redact gate, the Home dialog and the sheet's
+    /// own Dismiss — never from a gesture tracker: Deselect All leaves
+    /// nothing to apply, and an undone apply uncovers the rows again.
+    func hasUnappliedSelections(liveApplied: Set<UUID>) -> Bool {
+        hasUnreviewedPreselection || results.contains {
+            $0.isSelected && !liveApplied.contains($0.id) && !coveredResultIDs.contains($0.id)
+        }
     }
 
     /// Buffer a result from the search stream. Flushed in batches

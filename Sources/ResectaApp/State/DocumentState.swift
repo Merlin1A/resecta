@@ -353,10 +353,12 @@ class DocumentState {
     }
 
     /// True while the live search session holds selections not yet applied
-    /// (touched, or auto-selected and never reviewed) — the sheet's own
-    /// dismiss rule. Redact refuses on it; Home asks before closing on it.
+    /// (a selected row no live region covers, or an auto-selected set never
+    /// reviewed) — the sheet's own dismiss rule. Redact refuses on it; Home
+    /// asks before closing on it.
     static func hasUnappliedSelections(_ redactionState: RedactionState) -> Bool {
-        redactionState.activeSearch?.requiresDismissConfirmation ?? false
+        redactionState.activeSearch?.hasUnappliedSelections(
+            liveApplied: redactionState.liveAppliedSearchResultIDs) ?? false
     }
 
     /// The refusal that holds now, or nil when Redact may start. The
@@ -397,18 +399,29 @@ class DocumentState {
         "Cannot import while reviewing detections. Apply or dismiss them first."
 
     /// Toast copy for a drop on the results or error screen, which admit no
-    /// import: what the app declined to do plus a recovery hint.
-    static let importBlockedOnThisScreenMessage =
-        "Cannot import from this screen. Return to the editor first."
+    /// import: what the app declined to do plus the way back that screen
+    /// offers, by its button's own title.
+    static func importBlockedOnThisScreenMessage(wayBack: String) -> String {
+        "Cannot import from this screen. Tap \(wayBack) first."
+    }
+
+    /// The results screen's way back to the editor.
+    static let keepEditingTitle = "Keep Editing"
 
     /// The notice for a refused drop, or nil when the import may start: a
     /// pending review, the results or error screen, else a run in progress.
     func importRefusalMessage(with redactionState: RedactionState) -> String? {
         if canStartImport(with: redactionState) { return nil }
         if canStartImport { return Self.importBlockedDuringTriageMessage }
-        switch phaseKind {
-        case .verified, .failed: return Self.importBlockedOnThisScreenMessage
-        default: return Self.importBlockedDuringPipelineMessage
+        switch phase {
+        case .verified:
+            return Self.importBlockedOnThisScreenMessage(wayBack: Self.keepEditingTitle)
+        case .failed(let error, let returnPhase):
+            return Self.importBlockedOnThisScreenMessage(
+                wayBack: FailedStateView.primaryActionLabel(
+                    FailedStateView.primaryAction(error: error, returnPhase: returnPhase)))
+        default:
+            return Self.importBlockedDuringPipelineMessage
         }
     }
 

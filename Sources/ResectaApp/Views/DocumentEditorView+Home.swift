@@ -105,11 +105,13 @@ extension DocumentEditorView {
     }
 
     /// Pure gate for re-presenting a parked search session after the close
-    /// dialog went down without Close: the slot idle, the session editing.
+    /// dialog went down without Close: the slot idle, the session editing,
+    /// and the same document still open (a drop behind the dialog replaces
+    /// it; the old session's results would name the wrong pages).
     static func homeCloseShouldRestoreSearch(
-        sheetPresented: Bool, phaseKind: DocumentState.PhaseKind
+        sheetPresented: Bool, phaseKind: DocumentState.PhaseKind, sameDocument: Bool
     ) -> Bool {
-        !sheetPresented && phaseKind == .editing
+        !sheetPresented && phaseKind == .editing && sameDocument
     }
 
     /// Pure gate for re-presenting a parked review after the close dialog
@@ -141,6 +143,7 @@ extension DocumentEditorView {
         if let search = redactionState.activeSearch {
             if Self.homeCloseParksSearch(hasPendingTriage: redactionState.pendingTriage != nil) {
                 search.parkedForHomeClose = true
+                search.parkedDocument = documentState.sourceDocument.map(ObjectIdentifier.init)
                 parkedEditorSearch = search
             } else {
                 homeCloseParkedReview = true
@@ -160,8 +163,15 @@ extension DocumentEditorView {
         parkedEditorSearch = nil
         parked.parkedForHomeClose = false
         guard Self.homeCloseShouldRestoreSearch(
-            sheetPresented: editorSheetIsPresented, phaseKind: documentState.phaseKind
-        ) else { return }
+            sheetPresented: editorSheetIsPresented, phaseKind: documentState.phaseKind,
+            sameDocument: parked.parkedDocument == documentState.sourceDocument.map(ObjectIdentifier.init)
+        ) else {
+            // The slot busy, the session over, or the document replaced
+            // behind the dialog: the parked session goes down, as Close
+            // takes it down.
+            parked.cancelSearchWithoutAwait()
+            return
+        }
         redactionState.activeSearch = parked
     }
 

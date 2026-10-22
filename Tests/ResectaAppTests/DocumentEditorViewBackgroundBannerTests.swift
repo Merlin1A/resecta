@@ -88,6 +88,19 @@ struct DocumentEditorViewBackgroundBannerTests {
         )
     }
 
+    @Test("The full-pipeline leg holds the Redact gate: unapplied selections block it, the verify-only leg is untouched")
+    func testFullPipelineLegHoldsTheRedactGate() {
+        #expect(DocumentEditorView.runVerificationRoute(
+            hasOutput: false, isVerificationStale: true, hasUnappliedSelections: true) == .blockedBySelections)
+        #expect(DocumentEditorView.runVerificationRoute(
+            hasOutput: true, isVerificationStale: true, hasUnappliedSelections: true) == .blockedBySelections)
+        #expect(DocumentEditorView.runVerificationRoute(
+            hasOutput: true, isVerificationStale: false, hasUnappliedSelections: true) == .verifyOnly,
+            "verify-only keeps the session; nothing to hold")
+        #expect(DocumentEditorView.runVerificationRoute(
+            hasOutput: false, isVerificationStale: true, hasUnappliedSelections: false) == .fullPipeline)
+    }
+
     @Test("Full-pipeline route when regions modified after redact")
     func testFullPipelineRouteWhenRegionsModified() {
         let redaction = RedactionState()

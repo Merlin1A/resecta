@@ -522,7 +522,7 @@ struct DocumentEditorView: View {
                     // preselect also blocks the swipe now — a
                     // never-reviewed auto-selected set no longer drops
                     // silently.
-                    .interactiveDismissDisabled(searchState.requiresDismissConfirmation)
+                    .interactiveDismissDisabled(DocumentState.hasUnappliedSelections(redactionState))
                     // Compact float detent — a fixed hug for the
                     // glanceable handle (`CompactFloatDetent.swift`):
                     // title + the result-nav cluster. The PDF surfaces behind;
@@ -1295,12 +1295,15 @@ struct DocumentEditorView: View {
     /// output; a stale or absent output needs the full pipeline (regions
     /// changed since the run, or the output is gone). Static so the routing
     /// is unit-testable without a SwiftUI host (mirrors `resumeAction`).
-    enum RunVerificationRoute: Equatable { case verifyOnly, fullPipeline }
+    enum RunVerificationRoute: Equatable { case verifyOnly, fullPipeline, blockedBySelections }
 
     static func runVerificationRoute(
-        hasOutput: Bool, isVerificationStale: Bool
+        hasOutput: Bool, isVerificationStale: Bool, hasUnappliedSelections: Bool = false
     ) -> RunVerificationRoute {
-        hasOutput && !isVerificationStale ? .verifyOnly : .fullPipeline
+        if hasOutput && !isVerificationStale { return .verifyOnly }
+        // The full run enters the funnel, which refuses over unapplied
+        // selections; the session is kept, not dropped on the way there.
+        return hasUnappliedSelections ? .blockedBySelections : .fullPipeline
     }
 
     /// Action for the Run Verification card on the skipped results screen.
@@ -1316,10 +1319,13 @@ struct DocumentEditorView: View {
         documentState.pausedFromPhase = nil
         switch Self.runVerificationRoute(
             hasOutput: redactionState.outputURL != nil,
-            isVerificationStale: redactionState.isVerificationStale
+            isVerificationStale: redactionState.isVerificationStale,
+            hasUnappliedSelections: DocumentState.hasUnappliedSelections(redactionState)
         ) {
         case .verifyOnly:
             coordinator.runVerifyOnly()
+        case .blockedBySelections:
+            toastManager.enqueue(DocumentState.RedactRefusal.selectedMatches.hint, severity: .info)
         case .fullPipeline:
             Self.prepareForPurgeRerun(
                 documentState: documentState,

@@ -104,7 +104,7 @@ struct SearchSheetDismissRuleTests {
                 "a session that actually received an auto-selected result is armed")
         #expect(state.userModifiedSelections == false,
                 "the separate USER-touched tracker stays false — predicate #3 above")
-        #expect(state.requiresDismissConfirmation == true,
+        #expect(state.hasUnappliedSelections(liveApplied: []) == true,
                 "the combined gate reads true from the unreviewed-preselect fact alone")
     }
 
@@ -115,7 +115,7 @@ struct SearchSheetDismissRuleTests {
         state.flushPendingResults()
 
         #expect(state.hasUnreviewedPreselection == false)
-        #expect(state.requiresDismissConfirmation == false)
+        #expect(state.hasUnappliedSelections(liveApplied: []) == false)
     }
 
     @Test("Mode-switch undo restore does not arm hasUnreviewedPreselection")
@@ -133,7 +133,10 @@ struct SearchSheetDismissRuleTests {
 
         #expect(state.hasUnreviewedPreselection == false,
                 "a programmatic restore writes `results` directly — it never calls appendResult")
-        #expect(state.requiresDismissConfirmation == false)
+        #expect(state.hasUnappliedSelections(liveApplied: []) == true,
+                "the restored row is selected and no region covers it: the live predicate holds on the rows, not on a tracker")
+        #expect(state.hasUnappliedSelections(liveApplied: Set(state.results.map(\.id))) == false,
+                "covered by a live region, it holds nothing")
     }
 
     @Test("clear() resets hasUnreviewedPreselection with the session")
@@ -147,7 +150,7 @@ struct SearchSheetDismissRuleTests {
         state.clear()
 
         #expect(state.hasUnreviewedPreselection == false)
-        #expect(state.requiresDismissConfirmation == false)
+        #expect(state.hasUnappliedSelections(liveApplied: []) == false)
     }
 
     @Test("A successful search-origin apply resets hasUnreviewedPreselection")
