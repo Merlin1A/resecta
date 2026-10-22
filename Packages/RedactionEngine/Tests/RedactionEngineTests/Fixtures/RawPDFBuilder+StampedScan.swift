@@ -48,11 +48,47 @@ extension TestFixtures {
     /// A 150-dpi scan (1275 × 1650 px) drawn over the whole letter page, and
     /// one 12-pt text line "EXHIBIT B - 000123" at the top: a stamped scan.
     /// The text layer holds the stamp only.
-    static func stampedScanPDF() -> Data {
+    /// With a smaller `scanWidth` × `scanHeight` the scan's pixels fall below
+    /// half the page at 100 dpi, and only the stamp-thin text layer marks it.
+    static func stampedScanPDF(scanWidth: Int = 1275, scanHeight: Int = 1650) -> Data {
         onePage(
             stream: "q 612 0 0 792 0 0 cm /Im1 Do Q\nBT /F1 12 Tf 72 760 Td (EXHIBIT B - 000123) Tj ET",
             resources: "/Font << /F1 5 0 R >> /XObject << /Im1 6 0 R >>",
-            extra: [imageXObject(id: 6, width: 1275, height: 1650)])
+            extra: [imageXObject(id: 6, width: scanWidth, height: scanHeight)])
+    }
+
+    /// A short born-digital page (a title line and a date, no image): not
+    /// image content, whatever its density.
+    static func shortTitlePagePDF() -> Data {
+        onePage(
+            stream: "BT /F1 24 Tf 72 700 Td (CONFIDENTIAL SETTLEMENT MEMORANDUM) Tj ET\nBT /F1 12 Tf 72 660 Td (October 2026) Tj ET",
+            resources: "/Font << /F1 5 0 R >>",
+            extra: [])
+    }
+
+    /// The scan's image reached through a chain of `depth` form objects; with
+    /// `selfReferencing` the innermost form also names itself.
+    static func imageInNestedFormsPDF(depth: Int, selfReferencing: Bool = false) -> Data {
+        let firstForm = 7
+        var objects: [PDFObject] = [imageXObject(id: 6, width: 1275, height: 1650)]
+        for index in 0..<depth {
+            let id = firstForm + index
+            let last = index == depth - 1
+            let child = last ? "/Im1 6 0 R" : "/Fx\(index + 2) \(id + 1) 0 R"
+            let selfEntry = last && selfReferencing ? " /Fx\(index + 1) \(id) 0 R" : ""
+            let stream = last ? "q 612 0 0 792 0 0 cm /Im1 Do Q" : "/Fx\(index + 2) Do"
+            objects.append(PDFObject(id: id, content: """
+                << /Type /XObject /Subtype /Form /BBox [0 0 612 792] \
+                /Resources << /XObject << \(child)\(selfEntry) >> >> /Length \(stream.utf8.count) >>
+                stream
+                \(stream)
+                endstream
+                """))
+        }
+        return onePage(
+            stream: "/Fx1 Do\nBT /F1 12 Tf 72 760 Td (EXHIBIT B - 000123) Tj ET",
+            resources: "/Font << /F1 5 0 R >> /XObject << /Fx1 \(firstForm) 0 R >>",
+            extra: objects)
     }
 
     /// The same scan under an invisible text layer of about 1,200 characters

@@ -51,6 +51,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Document canvas: with a hardware keyboard, Select All then Copy (⌘A, ⌘C) no longer places the document's text on the system pasteboard. The canvas view refuses the copy, cut, paste, select and select-all actions and builds its menu without the edit, look-up, learn and share groups; in 1.2.0 that keyboard path copied the whole document's text with no selection shown.
 ### Fixed
 
+- Search and Scan: a page that carries both a text layer and a page-sized image (a scan with a stamp or a header, or a scan under a recognised-text layer) is read on both: the text layer and the recognised text of the image. Before, such a page was read from its text layer only, so text inside the image was never searched. When text recognition is off, the page is listed as not fully analysed.
 - Search: a phrase whose words are separated by more than one space, a tab, a line break or an invisible character is now found, and a match that wraps onto a second line gets a box on each line, counted once per line. Before, such a phrase was not found at all.
 - Search: in Regex mode, the start and end anchors (`^` and `$`) match at each line of the page. Before, they matched only the start and the end of the whole page.
 - Search: with every term required, the result cap counts the matches that pass the every-term test. Before, a page dense in one term alone could fill the cap and leave later pages unread.

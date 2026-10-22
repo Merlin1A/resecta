@@ -203,7 +203,7 @@ public actor DocumentSearcher {
     // "scanned region not analyzed" signal. Only trips when text-layer status is
     // supplied (production); absent-status callers (default `[:]`) never fire it.
     // Side-effect only — never changes which results are yielded.
-    private var scannedRegionNotAnalyzedSink: (@Sendable (Int) -> Void)?
+    var scannedRegionNotAnalyzedSink: (@Sendable (Int) -> Void)?
 
     // Per-page coverage reporting for the verification
     // search re-check. Fires for every page a search visits with which
@@ -825,11 +825,9 @@ public actor DocumentSearcher {
                     pageText: pageText, query: query, options: options,
                     page: page, pageIndex: pageIndex, term: query
                 )
-                for result in results {
-                    if totalYielded >= Self.maxResults { break }
-                    continuation.yield(result)
-                    totalYielded += 1
-                }
+                let hybrid = await hybridOCRLeg(page: page, pageIndex: pageIndex, textLayerRects: results.map(\.normalizedRect),
+                    includeOCR: options.includeOCR) { await self.searchPageViaOCR(page: page, pageIndex: pageIndex, query: query, options: options, term: query) }
+                emitCapped(results + hybrid, into: continuation, total: &totalYielded)
             } else if options.includeOCR {
                 // OCR fallback path — page has no usable text layer
                 // (empty, or a `.sparse`/`.none` layer over a scanned body)
@@ -837,11 +835,7 @@ public actor DocumentSearcher {
                     page: page, pageIndex: pageIndex,
                     query: query, options: options, term: query
                 )
-                for result in ocrResults {
-                    if totalYielded >= Self.maxResults { break }
-                    continuation.yield(result)
-                    totalYielded += 1
-                }
+                emitCapped(ocrResults, into: continuation, total: &totalYielded)
             } else if !pageHasRichTextLayer(pageIndex) {
                 // Scanned region (`.sparse`/`.none`) with OCR
                 // disabled: its body text was not analyzed. Surface the signal.
@@ -906,11 +900,7 @@ public actor DocumentSearcher {
                         page: page, pageIndex: pageIndex,
                         regex: regex, options: options
                     )
-                    for result in ocrResults {
-                        if totalYielded >= Self.maxResults { break }
-                        continuation.yield(result)
-                        totalYielded += 1
-                    }
+                    emitCapped(ocrResults, into: continuation, total: &totalYielded)
                     if totalYielded >= Self.maxResults { break }
                 } else if !pageHasRichTextLayer(pageIndex) {
                     // Scanned region with OCR disabled: not
@@ -936,6 +926,7 @@ public actor DocumentSearcher {
             let startTime = ContinuousClock.now
             let effectiveTimeout: Duration =
                 regexTimeoutOverride ?? Self.perPageRegexTimeout
+            var pageRects: [CGRect] = []
             let (yielded, _) = SearchCore.enumerateRegexMatches(
                 in: searchText, regex: regex,
                 wholeWord: options.wholeWord, unconvertibleRangePasses: false,
@@ -957,6 +948,7 @@ public actor DocumentSearcher {
                 )
                 // One result per line the match touches (the counting rule).
                 let occurrence = rects.count > 1 ? UUID() : nil
+                pageRects.append(contentsOf: rects)
                 for normalizedRect in rects {
                     continuation.yield(SearchResult(
                         pageIndex: pageIndex,
@@ -972,6 +964,8 @@ public actor DocumentSearcher {
                 return true
             }
             totalYielded += yielded
+            emitCapped(await hybridOCRLeg(page: page, pageIndex: pageIndex, textLayerRects: pageRects, includeOCR: options.includeOCR) {
+                await self.searchPageViaOCRFallback_regex(page: page, pageIndex: pageIndex, regex: regex, options: options) }, into: continuation, total: &totalYielded)
 
             if totalYielded >= Self.maxResults { break }
         }
@@ -1035,10 +1029,9 @@ public actor DocumentSearcher {
                     if Task.isCancelled { break }
 
                     if useTextLayer {
-                        pageHits.append(contentsOf: findTextMatches(
-                            pageText: pageText, query: term, options: options,
-                            page: page, pageIndex: pageIndex, term: term
-                        ))
+                        let hits = findTextMatches(pageText: pageText, query: term, options: options, page: page, pageIndex: pageIndex, term: term)
+                        pageHits += hits + (await hybridOCRLeg(page: page, pageIndex: pageIndex, textLayerRects: hits.map(\.normalizedRect), includeOCR: options.includeOCR,
+                            reportsWhenOff: term == terms.first) { await self.searchPageViaOCR(page: page, pageIndex: pageIndex, query: term, options: options, term: term) })
                     } else if options.includeOCR {
                         pageHits.append(contentsOf: await searchPageViaOCR(
                             page: page, pageIndex: pageIndex,
@@ -1055,11 +1048,7 @@ public actor DocumentSearcher {
                 // The conjunction: the page streams only when every term
                 // matched on it; the cap counts what streams.
                 guard allTerms.isSubset(of: Set(pageHits.map(\.term))) else { continue }
-                for hit in pageHits {
-                    if totalYielded >= Self.maxResults { break }
-                    continuation.yield(hit)
-                    totalYielded += 1
-                }
+                emitCapped(pageHits, into: continuation, total: &totalYielded)
             }
 
             continuation.finish()
@@ -1097,21 +1086,15 @@ public actor DocumentSearcher {
                         pageText: pageText, query: term, options: options,
                         page: page, pageIndex: pageIndex, term: term
                     )
-                    for result in results {
-                        if totalYielded >= Self.maxResults { break }
-                        continuation.yield(result)
-                        totalYielded += 1
-                    }
+                    let hybrid = await hybridOCRLeg(page: page, pageIndex: pageIndex, textLayerRects: results.map(\.normalizedRect), includeOCR: options.includeOCR,
+                        reportsWhenOff: term == terms.first) { await self.searchPageViaOCR(page: page, pageIndex: pageIndex, query: term, options: options, term: term) }
+                    emitCapped(results + hybrid, into: continuation, total: &totalYielded)
                 } else if options.includeOCR {
                     let ocrResults = await searchPageViaOCR(
                         page: page, pageIndex: pageIndex,
                         query: term, options: options, term: term
                     )
-                    for result in ocrResults {
-                        if totalYielded >= Self.maxResults { break }
-                        continuation.yield(result)
-                        totalYielded += 1
-                    }
+                    emitCapped(ocrResults, into: continuation, total: &totalYielded)
                 }
             }
             // Scanned region (`.sparse`/`.none`) with OCR off:
@@ -1185,6 +1168,7 @@ public actor DocumentSearcher {
                 // Site-B parity: partition, gate, compose, re-sort — the
                 // text feature source is `pageText` (in scope).
                 let matches = gateAndCompose(merged, pageText: pageText)
+                var pageRects: [CGRect] = []
                 for match in matches {
                     if Task.isCancelled || totalYielded >= Self.maxResults { break }
 
@@ -1210,6 +1194,7 @@ public actor DocumentSearcher {
                         ? contextSnippet(text: pageText, matchNSRange: match.range)
                         : ContextWindow(snippet: match.text, matchRange: 0..<match.text.count)
 
+                    pageRects.append(normalizedRect)
                     continuation.yield(SearchResult(
                         pageIndex: pageIndex,
                         normalizedRect: normalizedRect,
@@ -1239,6 +1224,7 @@ public actor DocumentSearcher {
                     for hit in alwaysFlagResult.hits {
                         if Task.isCancelled || totalYielded >= Self.maxResults { break }
                         guard let normalizedRect = boundingRect(for: hit.range, page: page) else { continue }
+                        pageRects.append(normalizedRect)
                         let ns = pageText as NSString
                         let matchedText = ns.substring(with: hit.range)
                         let window = contextSnippet(
@@ -1269,17 +1255,15 @@ public actor DocumentSearcher {
                         }
                     }
                 }
+                emitCapped(await hybridOCRLeg(page: page, pageIndex: pageIndex, textLayerRects: pageRects, includeOCR: options.includeOCR) {
+                    await self.scanPagePIIViaOCR(page: page, pageIndex: pageIndex, categories: categories) }, into: continuation, total: &totalYielded)
             } else if options.includeOCR {
                 // OCR fallback: render page, OCR, then run PIIDetector on OCR text.
                 let ocrResults = await scanPagePIIViaOCR(
                     page: page, pageIndex: pageIndex,
                     categories: categories
                 )
-                for result in ocrResults {
-                    if totalYielded >= Self.maxResults { break }
-                    continuation.yield(result)
-                    totalYielded += 1
-                }
+                emitCapped(ocrResults, into: continuation, total: &totalYielded)
             } else if !pageHasRichTextLayer(pageIndex) {
                 // Scanned region (`.sparse`/`.none`) with OCR
                 // disabled: PII in the scanned body was not analyzed.
