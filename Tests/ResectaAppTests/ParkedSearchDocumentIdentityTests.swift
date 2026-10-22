@@ -4,9 +4,9 @@ import PDFKit
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// The identity a parked search session is matched against on restore. An
-// object identifier names an address: once the old document is freed, a
-// new document can take the same address and read as the parked one. The
+// The identity a parked search session is matched against on restore: the
+// document state's per-import token, not the object's address — once the
+// old document is freed, a new document can take the same address. The
 // fixture frees a document and allocates replacements until one lands on
 // the freed address (it usually does within a few tries); the rule under
 // test is that a different document never reads as the parked one.
@@ -25,22 +25,34 @@ struct ParkedSearchDocumentIdentityTests {
     @Test("A new document at the freed document's address does not read as the parked one")
     func freedAddressReuseDoesNotMatch() throws {
         let data = pdfData()
-        var old: PDFDocument? = try #require(PDFDocument(data: data))
-        let parked = ObjectIdentifier(old!)   // what the park records at this head
-        old = nil
+        let documentState = DocumentState()
+        documentState.sourceDocument = try #require(PDFDocument(data: data))
+        let oldAddress = ObjectIdentifier(documentState.sourceDocument!)
+        let parked = documentState.sourceDocumentToken   // what the park records
+        documentState.sourceDocument = nil
 
-        var replacement: PDFDocument?
         var reused = false
         for _ in 0..<500 {
-            replacement = PDFDocument(data: data)
-            if let replacement, ObjectIdentifier(replacement) == parked { reused = true; break }
+            documentState.sourceDocument = PDFDocument(data: data)
+            if ObjectIdentifier(documentState.sourceDocument!) == oldAddress { reused = true; break }
         }
-        guard reused else {
-            // The allocator did not hand the address back within 500 tries:
-            // the mechanism is not reproduced on this run.
-            return
-        }
-        let readsAsParked = ObjectIdentifier(replacement!) == parked
-        #expect(!readsAsParked, "a different document at the freed address reads as the parked one")
+        // Whether or not the allocator handed the address back, the new
+        // document carries a new token and never reads as the parked one.
+        #expect(documentState.sourceDocumentToken != parked,
+                reused ? "the freed address was reused and the token still tells the documents apart" : "a different document, a different token")
+    }
+
+    @Test("The token changes with the document, not with a re-assignment of the same one")
+    func tokenFollowsTheDocument() throws {
+        let documentState = DocumentState()
+        let first = try #require(PDFDocument(data: pdfData()))
+        documentState.sourceDocument = first
+        let token = documentState.sourceDocumentToken
+        documentState.sourceDocument = first
+        #expect(documentState.sourceDocumentToken == token, "the same document keeps its token")
+        documentState.sourceDocument = PDFDocument(data: pdfData())
+        #expect(documentState.sourceDocumentToken != token, "a new document gets a new token")
+        documentState.sourceDocument = nil
+        #expect(documentState.sourceDocumentToken != token, "no document is not the old one")
     }
 }

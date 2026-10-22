@@ -101,7 +101,14 @@ class DocumentState {
     // MARK: - State
 
     var phase: Phase = .empty
-    var sourceDocument: PDFDocument?
+    var sourceDocument: PDFDocument? {
+        didSet { if oldValue !== sourceDocument { sourceDocumentToken = UUID() } }
+    }
+    /// A fresh token for every document that enters `sourceDocument`: the
+    /// identity a parked search session is matched against on restore. A
+    /// token, not the object's address — a freed document's address can
+    /// be reused by the next one.
+    private(set) var sourceDocumentToken = UUID()
     var currentPageIndex: Int = 0
     var pageCount: Int { sourceDocument?.pageCount ?? 0 }
 

@@ -143,7 +143,7 @@ extension DocumentEditorView {
         if let search = redactionState.activeSearch {
             if Self.homeCloseParksSearch(hasPendingTriage: redactionState.pendingTriage != nil) {
                 search.parkedForHomeClose = true
-                search.parkedDocument = documentState.sourceDocument.map(ObjectIdentifier.init)
+                search.parkedDocument = documentState.sourceDocumentToken
                 parkedEditorSearch = search
             } else {
                 homeCloseParkedReview = true
@@ -164,7 +164,7 @@ extension DocumentEditorView {
         parked.parkedForHomeClose = false
         guard Self.homeCloseShouldRestoreSearch(
             sheetPresented: editorSheetIsPresented, phaseKind: documentState.phaseKind,
-            sameDocument: parked.parkedDocument == documentState.sourceDocument.map(ObjectIdentifier.init)
+            sameDocument: parked.parkedDocument == documentState.sourceDocumentToken
         ) else {
             // The slot busy, the session over, or the document replaced
             // behind the dialog: the parked session goes down, as Close

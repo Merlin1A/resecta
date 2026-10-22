@@ -1230,11 +1230,11 @@ final class SearchState: Identifiable {
     /// sheet's teardown then spares it, so Cancel re-presents it whole.
     var parkedForHomeClose: Bool = false
 
-    /// The document the session was parked over (the source document's
-    /// object identity): it is restored only over that document — a file
+    /// The document the session was parked over (the document state's
+    /// per-import token): it is restored only over that document — a file
     /// dropped in behind the close dialog replaces the document, and the
     /// parked results name the old one's pages.
-    var parkedDocument: ObjectIdentifier?
+    var parkedDocument: UUID?
 
     /// Selections not yet applied, computed from the rows: a selected
     /// result that no live region covers (`liveApplied` = the result ids

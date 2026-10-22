@@ -94,7 +94,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Keep Editing after verification was interrupted by leaving the app no longer shows the Processing was paused banner over a finished redaction.
 - Home asks before closing when the search sheet holds selected matches that are not applied; Redact and the sheet's own Dismiss already guard them.
 - Redact, Home and the sheet's Dismiss read the live selection — a selected match no region covers — instead of a tracker any selection gesture armed: Deselect All no longer disables Redact or makes Home ask with nothing to apply, and an undone apply gates Redact again until its matches are applied or cleared.
-- Home → Cancel brings a parked search session back only over the same document; a file dropped in behind the close dialog does not inherit the old session's results.
+- Home → Cancel brings a parked search session back only over the same document, matched by a per-import token rather than the document object's address; a file dropped in behind the close dialog does not inherit the old session's results.
 - The Run Verification card's full run holds the Redact gate too: with selected matches not applied it shows the hint instead of dropping the session.
 - A refused drop on the results screen or an error screen names that screen's way back: Keep Editing, Return to Editor, Return to Results, Choose Another File or Re-open Document.
 - A document dropped over an open one starts with an empty undo history, the redaction mode set in Settings and no notices from the previous document; a drop on the results or error screen is refused with a notice instead of doing nothing.
