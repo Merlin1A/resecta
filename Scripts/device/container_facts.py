@@ -37,10 +37,17 @@ STORES = "Library/Application Support/"
 SNAPSHOTS = "Library/SplashBoard/Snapshots/"
 
 
+class ListingError(Exception):
+    pass
+
+
 def entries(path):
     """{relative path: entry} for one listing, with the subdirectory restored."""
     with open(path, encoding="utf-8") as fh:
         doc = json.load(fh)
+    if "error" in doc:
+        info = (doc["error"].get("userInfo") or {}).get("NSLocalizedDescription") or {}
+        raise ListingError(info.get("string") or "the listing failed")
     args = (doc.get("info") or {}).get("arguments") or []
     prefix = ""
     if "--subdirectory" in args:
@@ -115,6 +122,18 @@ SYNTHETIC = {
 }
 
 
+def failed_listing_raises():
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as fh:
+        json.dump({"error": {"userInfo": {"NSLocalizedDescription": {"string": "not found"}}}}, fh)
+    try:
+        entries(fh.name)
+    except ListingError:
+        return True
+    finally:
+        os.unlink(fh.name)
+    return False
+
+
 def dotted(obj, key):
     for part in key.split("."):
         obj = obj[int(part)] if isinstance(obj, list) else obj.get(part) if isinstance(obj, dict) else None
@@ -141,6 +160,7 @@ def self_test(samples=None, expect=None):
         (d["added"], ["Documents/copy.pdf", "Library/SplashBoard/Snapshots/b.ktx"]),
         (d["removed"], ["tmp/redacted_session_1/redacted_1.pdf"]),
         (d["changed"], ["Library/Application Support/UserTerms/user-terms.v1.json"]),
+        (failed_listing_raises(), True),
     ]
     for i, (got, want) in enumerate(checks):
         if got != want:
@@ -172,12 +192,12 @@ def main():
     a = ap.parse_args()
     if a.self_test:
         return self_test(a.samples, a.expect)
-    if a.verb == "summary" and len(a.listings) == 1:
-        result = summary(a.listings[0])
-    elif a.verb == "diff" and len(a.listings) == 2:
-        result = diff(*a.listings)
-    else:
+    if not ((a.verb == "summary" and len(a.listings) == 1) or (a.verb == "diff" and len(a.listings) == 2)):
         ap.error("summary takes one listing; diff takes two")
+    try:
+        result = summary(a.listings[0]) if a.verb == "summary" else diff(*a.listings)
+    except ListingError as e:
+        result = {"error": str(e)}
     text = json.dumps(result, indent=1)
     if a.out:
         with open(a.out, "w", encoding="utf-8") as fh:
