@@ -149,6 +149,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Rendering a page from a PDFKit page and from its Core Graphics page runs one render body.
 - The rectangle and polygon character filters share one sort, search and cancellation skeleton.
 - Engine: the public surface is reduced to the document-runner API and what the app and its tests name; 103 more declarations become `internal` (access level only).
+- A Mac-side recorder for attended runs on a physical device: per-step Instruments capture, crash-report and container-attribute facts, PDF checks and a filled record (`Scripts/device/`).
 
 ## [1.2.0] — 2026-09-29
 
