@@ -107,6 +107,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ### Internal
 
+- CI: the pull-request gate also compiles the engine package's test bundle; the weekly simulator suite leaves out the 12-page searchable preflight and the two suites that call text recognition directly, which stall the hosted runner; the pre-push hook posts a `local-suites` commit status for each pushed commit it passed.
 - The app's unit tests build their settings on a scratch defaults suite: the shared coordinator helpers take a fresh suite by default, and the source check that lists tests reading the shared defaults domain now fails on any such site.
 - The engine package's test copy of the app's per-page mode choice is removed; the app's tests check the production choice through the coordinator, on a right-to-left page and on every page of the bundled sample.
 - App tests: the six trapping requires in the mode-switch toast tests are throwing requires, and the hosting and transition smoke tests assert what they name; the two review-dismiss UI tests call their survival check from the test body.
