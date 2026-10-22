@@ -359,7 +359,8 @@ public final class PageRasterizer: @unchecked Sendable {
             // fills' own reader (`hasInklessGlyph`).
             if let entries = textLayerEntries,
                try Self.hasInklessGlyph(
-                   context: ctx, entries: entries, pageSize: effectiveSize
+                   context: ctx, entries: entries, pageSize: effectiveSize,
+                   rotation: page.rotation
                ) {
                 textLayerEntries = nil
                 redactionRectsForTextLayer = []
@@ -379,11 +380,22 @@ public final class PageRasterizer: @unchecked Sendable {
                 }
             }
 
+            // 4c. Ink growth, read on the rendered page before any fill: a
+            // text-derived fill grows over the ink that crosses its edge.
+            let growth = try inkGrowthRects(context: ctx, regions: page.regions)
+
             // 5. Apply fills — bitmap dimensions only, no PDF geometry.
             // 256-row band cancellation checks happen inside.
             try applyRedactionFills(
                 context: ctx, regions: page.regions, fillColor: page.fillColor
             )
+            for rect in growth {
+                ctx.setBlendMode(.copy); ctx.setShouldAntialias(false)
+                ctx.setFillColor(page.fillColor.cgColor); ctx.fill(rect)
+                guard try verifyFill(context: ctx, rect: rect, expectedColor: page.fillColor.expectedPixel) else {
+                    throw PipelineError.redactionError(.fillVerificationFailed(pageIndex: page.pageIndex))
+                }
+            }
 
             // 6. Verify fills. 256-row band cancellation
             // checks happen inside; a thrown CancellationError propagates here.
@@ -453,13 +465,21 @@ public final class PageRasterizer: @unchecked Sendable {
     /// halo), read by the floor's band reader over the same BGRA buffer the
     /// fills and the verify loop see. A box wholly outside the visible page shows no ink to the
     /// reader and answers true before any pixel is read; whitespace-lineage
-    /// glyphs and boxes under `hiddenTextMinimumBoxArea` are exempt. Cooperative cancellation every
+    /// glyphs and boxes under `hiddenTextMinimumBoxArea` are exempt. Each box
+    /// is read against `InkContrastFloor.band(forBox:…)`: the narrow band on
+    /// clean paper, the wider one where the content around the box is
+    /// textured. A letter or digit is also read on its CORE (`InkContrastFloor.glyphCore`): the middle band of
+    /// its box across the font's height, without the halo. A box drawn over
+    /// the text that stops short of the halo — at the selection rectangle,
+    /// at the ink bounds — leaves page colour in the halo but covers the
+    /// core, so the core reads uniform (`InkContrastFloor.isCoreNearUniform`)
+    /// and the page goes image-only. Cooperative cancellation every
     /// 256 glyphs. A test that cannot run — no bitmap data to read, no page
     /// size to map onto — also answers true: a page that could not be
     /// checked is not known to be clean (`inkTestCanRun` tells the two
     /// apart for the recorded reason).
     static func hasInklessGlyph(
-        context: CGContext, entries: [CharacterInfo], pageSize: CGSize
+        context: CGContext, entries: [CharacterInfo], pageSize: CGSize, rotation: Int = 0
     ) throws -> Bool {
         guard inkTestCanRun(context: context, pageSize: pageSize) else {
             return true
@@ -484,11 +504,38 @@ public final class PageRasterizer: @unchecked Sendable {
             ).intersection(bitmap)
             guard !box.isEmpty,
                   Int(box.width) * Int(box.height) >= hiddenTextMinimumBoxArea else { continue }
-            if try InkContrastFloor.isNearUniform(context: context, rect: box) {
+            let band = try InkContrastFloor.band(forBox: box, rotation: rotation, context: context)
+            if try InkContrastFloor.isNearUniform(context: context, rect: box, band: band) {
+                return true
+            }
+            if isLetterOrDigit(entry.character),
+               let core = InkContrastFloor.glyphCore(normalized, rotation: rotation,
+                                    bitmapWidth: context.width, bitmapHeight: context.height),
+               Int(core.width) * Int(core.height) >= hiddenTextMinimumBoxArea,
+               try InkContrastFloor.isCoreNearUniform(context: context, rect: core, band: band) {
                 return true
             }
         }
         return false
+    }
+
+    /// One letter or decimal digit, with only its own combining marks after
+    /// it: the glyphs with stroke in the middle of their box. A lone mark, a
+    /// modifier letter, punctuation, a ligature and an entry recomposed
+    /// across a line break are read by the halo test alone.
+    static func isLetterOrDigit(_ character: String) -> Bool {
+        var scalars = character.unicodeScalars.makeIterator()
+        switch scalars.next()?.properties.generalCategory {
+        case .uppercaseLetter, .lowercaseLetter, .titlecaseLetter, .otherLetter, .decimalNumber: break
+        default: return false
+        }
+        while let next = scalars.next() {
+            switch next.properties.generalCategory {
+            case .nonspacingMark, .spacingMark, .enclosingMark: continue
+            default: return false
+            }
+        }
+        return true
     }
 
     // MARK: - Render with Timeout

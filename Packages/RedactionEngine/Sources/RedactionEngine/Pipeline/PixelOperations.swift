@@ -257,3 +257,102 @@ func verifyFill(
     }
     return true
 }
+
+// MARK: - Ink growth
+
+/// How far a fill may grow past its region to cover the ink that crosses its
+/// edge: a quarter of the region's shorter side (the font's height for a
+/// line of text), at least 2 px and at most 64 px.
+func inkGrowthLimit(for fillRect: CGRect) -> Int {
+    min(64, max(2, Int((0.25 * min(fillRect.width, fillRect.height)).rounded())))
+}
+
+/// Levels of 255 a pixel must differ from the paper around a fill, on some
+/// channel, to count as ink the fill grows over. Well above scanner noise and
+/// compression ringing; ordinary text, accents and rules clear it.
+let inkGrowthContrast: Int = 64
+
+/// The fill rect grown to cover the rendered ink that crosses its edge — an
+/// accent above a selection rectangle, an italic overhang past it, a stroke
+/// the box cuts through — read on the page as rendered, BEFORE any fill.
+/// Ink is a pixel more than `inkGrowthContrast` from the paper colour (the
+/// most common colour on the frame of the search window). The growth follows
+/// only ink 8-connected to ink inside the fill's edge, and stops at
+/// `inkGrowthLimit` past the fill on every side, so a rule or a neighbouring
+/// word that touches the box costs at most that margin. Nil when no ink
+/// crosses the edge (the fill is unchanged). `fillRect` is in bitmap pixels
+/// with a bottom-left origin, as `normalizedToFillPixels` returns it.
+func inkGrowthRect(context: CGContext, fillRect: CGRect) throws -> CGRect? {
+    guard let data = context.data, !fillRect.isEmpty else { return nil }
+    let buffer = data.assumingMemoryBound(to: UInt8.self)
+    let width = context.width, height = context.height, bytesPerRow = context.bytesPerRow
+    let fill = fillRect.intersection(CGRect(x: 0, y: 0, width: width, height: height))
+    guard !fill.isNull, !fill.isEmpty else { return nil }
+    let g = inkGrowthLimit(for: fill)
+    let fx0 = Int(fill.minX), fy0 = Int(fill.minY), fx1 = Int(fill.maxX), fy1 = Int(fill.maxY)
+    let wx0 = max(0, fx0 - g), wy0 = max(0, fy0 - g)
+    let wx1 = min(width, fx1 + g), wy1 = min(height, fy1 + g)
+    guard wx0 < fx0 || wy0 < fy0 || wx1 > fx1 || wy1 > fy1 else { return nil }
+    try Task.checkCancellation()
+
+    func pixel(_ x: Int, _ y: Int) -> UnsafeMutablePointer<UInt8> {
+        buffer + (height - 1 - y) * bytesPerRow + x * 4
+    }
+    // The paper: the most common colour on the window's outer frame.
+    var counts: [UInt32: Int] = [:]
+    func tally(_ x: Int, _ y: Int) {
+        let p = pixel(x, y)
+        counts[UInt32(p[0]) | UInt32(p[1]) << 8 | UInt32(p[2]) << 16 | UInt32(p[3]) << 24, default: 0] += 1
+    }
+    for x in wx0..<wx1 { tally(x, wy0); tally(x, wy1 - 1) }
+    for y in wy0..<wy1 { tally(wx0, y); tally(wx1 - 1, y) }
+    guard let paperKey = counts.max(by: { $0.value < $1.value })?.key else { return nil }
+    let paper = [Int(paperKey & 0xFF), Int(paperKey >> 8 & 0xFF), Int(paperKey >> 16 & 0xFF), Int(paperKey >> 24 & 0xFF)]
+    func isInk(_ x: Int, _ y: Int) -> Bool {
+        let p = pixel(x, y)
+        return abs(Int(p[0]) - paper[0]) > inkGrowthContrast || abs(Int(p[1]) - paper[1]) > inkGrowthContrast
+            || abs(Int(p[2]) - paper[2]) > inkGrowthContrast || abs(Int(p[3]) - paper[3]) > inkGrowthContrast
+    }
+    func insideFill(_ x: Int, _ y: Int) -> Bool { x >= fx0 && x < fx1 && y >= fy0 && y < fy1 }
+
+    // Seeds: ink just outside the fill whose neighbour across the edge is ink.
+    let windowWidth = wx1 - wx0
+    var visited = [Bool](repeating: false, count: windowWidth * (wy1 - wy0))
+    var stack: [(Int, Int)] = []
+    func push(_ x: Int, _ y: Int) {
+        guard x >= wx0, x < wx1, y >= wy0, y < wy1, !insideFill(x, y) else { return }
+        let i = (y - wy0) * windowWidth + (x - wx0)
+        guard !visited[i], isInk(x, y) else { return }
+        visited[i] = true
+        stack.append((x, y))
+    }
+    for x in fx0..<fx1 {
+        if isInk(x, fy0) { for dx in -1...1 { push(x + dx, fy0 - 1) } }
+        if isInk(x, fy1 - 1) { for dx in -1...1 { push(x + dx, fy1) } }
+    }
+    for y in fy0..<fy1 {
+        if isInk(fx0, y) { for dy in -1...1 { push(fx0 - 1, y + dy) } }
+        if isInk(fx1 - 1, y) { for dy in -1...1 { push(fx1, y + dy) } }
+    }
+    guard !stack.isEmpty else { return nil }
+    var gx0 = fx0, gy0 = fy0, gx1 = fx1, gy1 = fy1
+    while let (x, y) = stack.popLast() {
+        gx0 = min(gx0, x); gx1 = max(gx1, x + 1); gy0 = min(gy0, y); gy1 = max(gy1, y + 1)
+        for dy in -1...1 { for dx in -1...1 where dx != 0 || dy != 0 { push(x + dx, y + dy) } }
+    }
+    return CGRect(x: gx0, y: gy0, width: gx1 - gx0, height: gy1 - gy0)
+}
+
+/// The ink-growth rects for a page's text-derived regions (search matches and
+/// detected PII; a box the user drew, or a face, is filled as drawn), read
+/// from the rendered page before any fill.
+func inkGrowthRects(context: CGContext, regions: [RedactionRegion]) throws -> [CGRect] {
+    try regions.compactMap { region in
+        switch region.source {
+        case .searchMatch, .detectedPII: break
+        case .manual, .detectedFace: return nil
+        }
+        return try inkGrowthRect(context: context, fillRect: normalizedToFillPixels(
+            region.normalizedRect, bitmapWidth: context.width, bitmapHeight: context.height))
+    }
+}
