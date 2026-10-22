@@ -220,9 +220,11 @@ enum ImportService {
             return .completed
         } catch is CancellationError { // LegalPhrases:safe (Swift keyword)
             // Cooperative cancellation surrenders silently —
-            // `cancelActivePipeline` has already transitioned the phase to
-            // `.empty`. Adding a failed-transition here would duplicate
-            // the user-initiated cancel.
+            // `cancelActivePipeline` has already transitioned the phase
+            // (back to the open document, else to `.empty`) and leaves the
+            // open document's password holder alone. Adding a
+            // failed-transition here would duplicate the user-initiated
+            // cancel.
             return .refused
         } catch let error as PipelineError { // LegalPhrases:safe (Swift keyword)
             // Defensive path: PDFKit may surface a typed error
@@ -311,6 +313,7 @@ enum ImportService {
         documentState.sourceFilledFormFieldCount = loaded.facts.filledFormFieldCount
         documentState.annotationNoticeDismissed = false
         documentState.lastUsedPipelineMode = nil
+        documentState.documentOverride = nil
         documentState.wasPausedByBackground = false
         documentState.pausedFromPhase = nil  // clear alongside wasPausedByBackground
         documentState.transition(to: .editing)

@@ -102,7 +102,14 @@ class DocumentState {
     // MARK: - State
 
     var phase: Phase = .empty
-    var sourceDocument: PDFDocument?
+    var sourceDocument: PDFDocument? {
+        didSet { if oldValue !== sourceDocument { sourceDocumentToken = UUID() } }
+    }
+    /// A fresh token for every document that enters `sourceDocument`: the
+    /// identity a parked search session is matched against on restore. A
+    /// token, not the object's address — a freed document's address can
+    /// be reused by the next one.
+    private(set) var sourceDocumentToken = UUID()
     var currentPageIndex: Int = 0
     var pageCount: Int { sourceDocument?.pageCount ?? 0 }
 
@@ -264,6 +271,10 @@ class DocumentState {
     /// Pipeline mode used for the most recent redaction run.
     var lastUsedPipelineMode: PipelineMode?
 
+    /// The redaction mode the editor's picker chose for this document (nil =
+    /// the global setting); every new document and Start Over clear it.
+    var documentOverride: PipelineMode?
+
     /// Recognition level of the most recent Auto-Detect run,
     /// recorded by `runDetectionPipeline`. A detect-pause resume re-uses it so
     /// the re-run matches the level the user originally chose (fallback
@@ -286,7 +297,9 @@ class DocumentState {
     /// permitted transition from the current phase and no run is pending.
     /// False during phases that own in-flight mutation of `sourceDocument`
     /// or `redactionState` (`.importing`, `.detecting`, `.redacting`,
-    /// `.verifying`), and while `activePipelineTask` is set: a full run
+    /// `.verifying`), on the results and error screens (`.verified`,
+    /// `.failed`), which the table gives no import, and while
+    /// `activePipelineTask` is set: a full run
     /// holds the task from the Redact tap — through its run-entry capture,
     /// which suspends while the phase is still `.editing` — to its end, and
     /// a replacement document admitted under it would be rasterized and
@@ -297,9 +310,9 @@ class DocumentState {
     var canStartImport: Bool {
         guard activePipelineTask == nil else { return false }
         switch phaseKind {
-        case .empty, .editing, .verified, .failed:
+        case .empty, .editing:
             return true
-        case .importing, .detecting, .redacting, .verifying, .exporting:
+        case .importing, .detecting, .redacting, .verifying, .verified, .exporting, .failed:
             return false
         }
     }
@@ -335,6 +348,41 @@ class DocumentState {
         canStartPipeline && redactionState.pendingTriage == nil
     }
 
+    /// Why Redact may not start now. The button, ⇧⌘R and the run funnel
+    /// (`PipelineCoordinator.runFullPipeline`) read this one rule.
+    enum RedactRefusal: Equatable {
+        case selectedMatches  // unapplied search selections; a run would drop them
+        case noRegions        // no region survives the minimum-dimension filter
+        case busy             // another phase, a run in flight or a pending review; no hint
+
+        /// The hint the button speaks and the funnel shows.
+        var hint: String {
+            switch self {
+            case .selectedMatches: return "Apply or clear the selected matches first"
+            case .noRegions: return "Draw regions or apply Scan or Search results first"
+            case .busy: return ""
+            }
+        }
+    }
+
+    /// True while the live search session holds selections not yet applied
+    /// (a selected row no live region covers, or an auto-selected set never
+    /// reviewed) — the sheet's own dismiss rule. Redact refuses on it; Home
+    /// asks before closing on it.
+    static func hasUnappliedSelections(_ redactionState: RedactionState) -> Bool {
+        redactionState.activeSearch?.hasUnappliedSelections(
+            liveApplied: redactionState.liveAppliedSearchResultIDs) ?? false
+    }
+
+    /// The refusal that holds now, or nil when Redact may start. The
+    /// selected matches come first, then the missing regions.
+    func redactRefusal(with redactionState: RedactionState) -> RedactRefusal? {
+        if Self.hasUnappliedSelections(redactionState) { return .selectedMatches }
+        if !redactionState.hasEffectiveRegions { return .noRegions }
+        if !canStartPipeline(with: redactionState) { return .busy }
+        return nil
+    }
+
     /// True when caller mutations of `redactionState.regions` /
     /// `redactionState.regionMetadata` are a safe transition. False during
     /// phases that the pipeline owns (`.detecting`, `.redacting`,
@@ -362,6 +410,33 @@ class DocumentState {
     /// what the app declined to do plus a recovery hint.
     static let importBlockedDuringTriageMessage =
         "Cannot import while reviewing detections. Apply or dismiss them first."
+
+    /// Toast copy for a drop on the results or error screen, which admit no
+    /// import: what the app declined to do plus the way back that screen
+    /// offers, by its button's own title.
+    static func importBlockedOnThisScreenMessage(wayBack: String) -> String {
+        "Cannot import from this screen. Tap \(wayBack) first."
+    }
+
+    /// The results screen's way back to the editor.
+    static let keepEditingTitle = "Keep Editing"
+
+    /// The notice for a refused drop, or nil when the import may start: a
+    /// pending review, the results or error screen, else a run in progress.
+    func importRefusalMessage(with redactionState: RedactionState) -> String? {
+        if canStartImport(with: redactionState) { return nil }
+        if canStartImport { return Self.importBlockedDuringTriageMessage }
+        switch phase {
+        case .verified:
+            return Self.importBlockedOnThisScreenMessage(wayBack: Self.keepEditingTitle)
+        case .failed(let error, let returnPhase):
+            return Self.importBlockedOnThisScreenMessage(
+                wayBack: FailedStateView.primaryActionLabel(
+                    FailedStateView.primaryAction(error: error, returnPhase: returnPhase)))
+        default:
+            return Self.importBlockedDuringPipelineMessage
+        }
+    }
 
     /// Toast copy for a dropped file that is not a PDF (an image payload,
     /// refused at the drop door). It is the unsupported-format message the
@@ -618,6 +693,7 @@ class DocumentState {
         annotationNoticeDismissed = false
         currentPageIndex = 0
         lastUsedPipelineMode = nil
+        documentOverride = nil
         wasPausedByBackground = false
         pausedFromPhase = nil  // clear alongside wasPausedByBackground
         transition(to: .empty)
@@ -660,9 +736,9 @@ class DocumentState {
             // No `sourceDocument` mutation here — the import
             // path applies state only after validation succeeds (see
             // `ImportService.validateAndLoad`), so cancellation leaves
-            // any prior document untouched. Returning to `.empty` matches
-            // the documented user-facing contract for "Cancel Import."
-            transition(to: .empty)
+            // any prior document untouched. Cancel returns to that open
+            // document, else to the empty state.
+            transition(to: sourceDocument != nil ? .editing : .empty)
         case .detecting:
             transition(to: .editing)
         case .redacting:
@@ -725,6 +801,16 @@ extension DocumentState.PhaseKind {
     var isCancellable: Bool {
         switch self {
         case .detecting, .redacting, .verifying, .importing: true
+        default: false
+        }
+    }
+
+    /// The cancellable phases whose background pause raises the editor's
+    /// paused banner: a run the editor can restart. A cancelled import has
+    /// nothing to restart; a cancelled Verify lands on the results screen.
+    var raisesResumeBanner: Bool {
+        switch self {
+        case .detecting, .redacting: true
         default: false
         }
     }

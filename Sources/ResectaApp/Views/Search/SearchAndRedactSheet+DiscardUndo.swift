@@ -7,12 +7,12 @@ import SwiftUI
 // that this file's `currentSelectionSnapshot` / `clearSelection` helpers
 // underpin:
 //
-// - Silent route: when `searchState.requiresDismissConfirmation` is
+// - Silent route: when `DocumentState.hasUnappliedSelections` is
 //   false, tapping `Dismiss` deselects every selected result in-place
 //   and dismisses the sheet in the same tap. The selection only feeds
 //   Apply, and re-running the search restores it, so nothing
 //   irreversible is dropped — no confirmation is needed.
-// - Confirm-if-touched route: when `requiresDismissConfirmation` is
+// - Confirm route: when `hasUnappliedSelections` is
 //   true — the user modified selections this session
 //   (`userModifiedSelections`), OR the session carries an
 //   auto-selected set from the magic-wand preselect flow that has never

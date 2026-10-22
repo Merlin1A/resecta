@@ -35,7 +35,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - The "Marked N" notice is shorter so its "Not redacted until you tap Redact" clause fits at the default text size.
 - A saved search's suggested name no longer carries the query text.
 - The page bar stays while a match walk is parked.
-- Moving to another page clears the region selection.
+- Moving to another page keeps only the selected regions on the page in view; a delete or a nudge never reaches a region you cannot see.
 
 ### Removed
 
@@ -75,6 +75,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - The password sheet says Resecta does not store the password, and that any offer to save it is the system's own.
 - Settings: the Searchable Redaction description and the mode picker's hint state the limit the README states — text covered by a picture in the page can still enter the text layer.
 - Redact clears the undo history at the Apply seam, as the results card says; an Undo after Keep Editing no longer unlinks the built output.
+- Redact clears the undo history once the redacted copy is built, as the results card says; Stop, a background pause or a failed run keep it, and an Undo after Keep Editing no longer unlinks the built output.
 - Search sheet: the "unapplied matches cleared" toasts no longer count matches a region already covers.
 - Search sheet: the custom-term time-limit toast names neither the term nor the page, and is shown once for a scan instead of once per page.
 - Accessibility: the search sheet's header stacks Dismiss, the title and Apply on lines of their own at accessibility text sizes, so no button hyphenates and the title keeps its words.
@@ -112,9 +113,18 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Save current search is disabled while the session has no query or terms.
 - The footer says how many selected matches a filter hides.
 - The Scan category chips wrap instead of clipping at the right edge.
-- Tapping an already-selected region without moving it no longer records a Move or Resize step, re-arms Redo or clears the sheet's applied markers.
+- Tapping an already-selected region, or one region of a selected group, without moving it no longer records a Move or Resize step, re-arms Redo or clears the sheet's applied markers.
 - With Add to Selection on, a marquee adds to the selection and an empty marquee leaves it unchanged.
 - VoiceOver announces region resizes.
+- The paused banner's Restart no longer starts a run that Redact itself would refuse: with selected matches not yet applied, or no region left to redact, it shows Redact's notice and leaves the search, the regions and the undo history as they were. The purge Re-run and Run Verification's full run are refused the same way when no region is left.
+- Cancel on the Importing card, or leaving the app, while a dropped document imports over an open one returns to that document instead of a blank editor.
+- Keep Editing after verification was interrupted by leaving the app no longer shows the Processing was paused banner over a finished redaction.
+- Home asks before closing when the search sheet holds selected matches that are not applied; Redact and the sheet's own Dismiss already guard them.
+- Redact, Home and the sheet's Dismiss read the live selection — a selected match no region covers — instead of a tracker any selection gesture armed: Deselect All no longer disables Redact or makes Home ask with nothing to apply, and an undone apply gates Redact again until its matches are applied or cleared.
+- Home → Cancel brings a parked search session back only over the same document, matched by a per-import token rather than the document object's address; a file dropped in behind the close dialog does not inherit the old session's results.
+- The Run Verification card's full run holds the Redact gate too: with selected matches not applied it shows the hint instead of dropping the session.
+- A refused drop on the results screen or an error screen names that screen's way back: Keep Editing, Return to Editor, Return to Results, Choose Another File or Re-open Document.
+- A document dropped over an open one starts with an empty undo history, the redaction mode set in Settings and no notices from the previous document; a drop on the results or error screen is refused with a notice instead of doing nothing.
 
 ### Internal
 
