@@ -444,14 +444,14 @@ struct VerificationRowModelTests {
         }
         let one = VerificationRowModel(layer: result(["123-45-6789"], pages: [1], fragment: true), perPageModes: [])
         #expect(one.outcome == .needsReview)
-        #expect(one.caption == "Part of '123-45-6789' is readable beside a redaction box on page 2. Adjust the box and redact again.")
+        #expect(one.caption == "Part of \u{201C}123-45-6789\u{201D} is readable beside a redaction box on\u{00A0}page\u{00A0}2. Adjust the box and redact again.")
         #expect(one.captionIsPrivacySensitive)
         let two = VerificationRowModel(layer: result(["Delia", "Hartwell"], pages: [0, 2], fragment: true), perPageModes: [])
-        #expect(two.caption == "Parts of 'Delia', 'Hartwell' are readable beside redaction boxes on pages 1 and 3. Adjust the boxes and redact again.")
+        #expect(two.caption == "Parts of \u{201C}Delia\u{201D} and \u{201C}Hartwell\u{201D} are readable beside redaction boxes on pages 1\u{00A0}and\u{00A0}3. Adjust the boxes and redact again.")
         let whole = VerificationRowModel(layer: result(["Delia"], pages: [1], fragment: false), perPageModes: [])
-        #expect(whole.caption == "'Delia' is still readable on page 2. It matches text you redacted elsewhere. Use text search to redact remaining instances.")
+        #expect(whole.caption == "\u{201C}Delia\u{201D} is still readable on\u{00A0}page\u{00A0}2. It matches text you redacted. Use text\u{00A0}search to redact the rest.")
         #expect(LayerResultRow.rowSubtitleText(layer: result(["123-45-6789"], pages: [1], fragment: true))
-                == "Part of '123-45-6789' is readable beside a redaction box on page 2. Adjust the box and redact again.")
+                == "Part of \u{201C}123-45-6789\u{201D} is readable beside a redaction box on\u{00A0}page\u{00A0}2. Adjust the box and redact again.")
         #expect(LayerResultRow.rowSubtitleIsPrivacySensitive(layer: result(["123-45-6789"], pages: [1], fragment: true)))
     }
 
