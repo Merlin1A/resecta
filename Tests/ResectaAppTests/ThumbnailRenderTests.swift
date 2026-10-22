@@ -41,4 +41,28 @@ struct ThumbnailRenderTests {
             .deletingLastPathComponent()   // <repo root>
             .appendingPathComponent(relativePath)
     }
+
+    @Test("A heavy page's thumbnail render on the main actor is bounded (the time is logged)")
+    func heavyPageRenderTime() throws {
+        let data = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 612, height: 792)).pdfData { ctx in
+            ctx.beginPage()
+            let attrs: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 4)]
+            for i in 0..<4000 {
+                ("Heavy page text run \(i) lorem ipsum dolor sit amet" as NSString)
+                    .draw(at: CGPoint(x: CGFloat(i % 40) * 15, y: CGFloat(i / 40) * 7), withAttributes: attrs)
+            }
+            for i in 0..<3000 {
+                let path = UIBezierPath(ovalIn: CGRect(x: CGFloat(i % 60) * 10, y: CGFloat(i / 60) * 15, width: 9, height: 12))
+                UIColor(hue: CGFloat(i % 360) / 360, saturation: 0.6, brightness: 0.8, alpha: 0.5).setFill()
+                path.fill()
+            }
+        }
+        let document = try #require(PDFDocument(data: data))
+        let page = try #require(document.page(at: 0))
+        let clock = ContinuousClock()
+        let elapsed = clock.measure { _ = PageThumbnailView.render(page, size: CGSize(width: 180, height: 240)) }
+        let ms = Double(elapsed.components.seconds) * 1000 + Double(elapsed.components.attoseconds) / 1e15
+        print("THUMBNAIL-PROBE heavy page (4000 text runs + 3000 paths) render: \(Int(ms)) ms")
+        #expect(ms < 5000, "a heavy page's thumbnail took \(Int(ms)) ms on the main actor")
+    }
 }

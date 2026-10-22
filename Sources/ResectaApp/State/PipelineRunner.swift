@@ -472,8 +472,10 @@ struct PipelineRunner {
         )
 
         sink(.verified(report, burnedRegionVersion: burnedRegionVersion))
-        // VoiceOver overall announcement
-        sink(.announce("Verification complete. \(VerificationResultsView.mastheadAccessibilityLabel(report: report))"))
+        // VoiceOver overall announcement: the status only. The masthead's
+        // label quotes the review terms on a needs-review result, and an
+        // announcement speaks document text aloud.
+        sink(.announce("Verification complete. \(report.overallStatus.accessibilityLabel)"))
         return .completed
     }
 }

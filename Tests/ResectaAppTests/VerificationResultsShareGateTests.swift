@@ -522,7 +522,7 @@ struct ShareRiskConfirmSheetTests {
         #expect(ShareRiskConfirmKind.failOrAttention(report).title == "Share with reported issues?")
         #expect(ShareRiskConfirmKind.incompleteWarn(report).title == "Share with incomplete checks?")
         #expect(ShareRiskConfirmKind.skipped(report).title == "Share without verification?")
-        #expect(ShareRiskConfirmKind.failOrAttention(report).listHeader == "These checks reported issues:")
+        #expect(ShareRiskConfirmKind.failOrAttention(report).listHeader == "These checks reported issues or did not run in full:")
         #expect(ShareRiskConfirmKind.incompleteWarn(report).listHeader == "These checks did not run in full:")
         #expect(ShareRiskConfirmKind.skipped(report).listHeader == nil)
     }
@@ -545,7 +545,7 @@ struct ShareRiskConfirmSheetTests {
         )
     }
 
-    @Test("Item list includes only FAIL/ATTENTION layers, in layer order, composed from the title")
+    @Test("Item list: the FAIL/ATTENTION layers in layer order, then the checks that did not run in full, composed from the title")
     func itemListDerivation() {
         let mixedReport = VerificationReport(
             layers: [
@@ -560,7 +560,7 @@ struct ShareRiskConfirmSheetTests {
             overallStatus: .fail("x"), durationSeconds: 0
         )
         let lines = DocumentEditorView.atRiskItemLines(report: mixedReport)
-        #expect(lines == ["Layer: failed", "Layer: needs review"])
+        #expect(lines == ["Layer: failed", "Layer: needs review", "Layer: skipped"], "the skipped check follows the at-risk ones")
         // Content-free: never the matched text (reviewTermTexts) or an
         // engine sentence.
         let joined = lines.joined()

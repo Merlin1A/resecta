@@ -199,8 +199,18 @@ struct PageThumbnailList: View {
 enum ThumbnailCache {
     // nonisolated(unsafe): all callers are MainActor-isolated (SwiftUI views).
     // NSCache is thread-safe internally but not Sendable.
-    nonisolated(unsafe) static let cache: NSCache<NSString, UIImage> = {
-        let c = NSCache<NSString, UIImage>()
+    /// A cached thumbnail with the document it was drawn from, held
+    /// weakly: a new document at a freed document's address shares its
+    /// key, and the weak reference tells them apart (nil once the old
+    /// document is gone).
+    final class Entry {
+        let image: UIImage
+        weak var document: PDFDocument?
+        init(image: UIImage, document: PDFDocument) { self.image = image; self.document = document }
+    }
+
+    nonisolated(unsafe) static let cache: NSCache<NSString, Entry> = {
+        let c = NSCache<NSString, Entry>()
         c.countLimit = 200
         c.totalCostLimit = 64 * 1024 * 1024  // 64 MB
         return c
@@ -211,12 +221,14 @@ enum ThumbnailCache {
         "\(ObjectIdentifier(document))#\(pageIndex)" as NSString
     }
     static func get(document: PDFDocument, pageIndex: Int) -> UIImage? {
-        cache.object(forKey: key(document, pageIndex))
+        guard let entry = cache.object(forKey: key(document, pageIndex)), entry.document === document else { return nil }
+        return entry.image
     }
     static func set(_ image: UIImage, document: PDFDocument, pageIndex: Int) {
         let key = key(document, pageIndex)
+        let entry = Entry(image: image, document: document)
         writeQueue.async {
-            cache.setObject(image, forKey: key)
+            cache.setObject(entry, forKey: key)
         }
     }
     static func clear() { cache.removeAllObjects() }

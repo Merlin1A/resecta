@@ -36,4 +36,26 @@ struct ThumbnailCacheTests {
         ThumbnailCache.clear()
         #expect(ThumbnailCache.get(document: first, pageIndex: 0) == nil)
     }
+
+    @Test("A new document at a freed document's address does not read the freed document's thumbnail")
+    func freedAddressReuseMisses() {
+        ThumbnailCache.clear()
+        var old: PDFDocument? = makeTestPDFDocument()
+        let oldAddress = ObjectIdentifier(old!)
+        let image = makeThumbnail(gray: 0.5)
+        ThumbnailCache.set(image, document: old!, pageIndex: 0)
+        ThumbnailCache.writeQueue.sync {}
+        #expect(ThumbnailCache.get(document: old!, pageIndex: 0) === image)
+        old = nil
+
+        var replacement = makeTestPDFDocument()
+        var reused = false
+        for _ in 0..<500 {
+            replacement = makeTestPDFDocument()
+            if ObjectIdentifier(replacement) == oldAddress { reused = true; break }
+        }
+        #expect(ThumbnailCache.get(document: replacement, pageIndex: 0) == nil,
+                reused ? "the freed address was reused; the entry's weak document is gone, so it misses" : "a different document misses")
+        ThumbnailCache.clear()
+    }
 }
