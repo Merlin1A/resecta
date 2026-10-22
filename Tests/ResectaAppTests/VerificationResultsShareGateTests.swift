@@ -560,8 +560,7 @@ struct ShareRiskConfirmSheetTests {
             overallStatus: .fail("x"), durationSeconds: 0
         )
         let lines = DocumentEditorView.atRiskItemLines(report: mixedReport)
-        #expect(lines == ["Layer: failed", "Layer: needs review", "Layer: skipped"],
-                "the skipped check follows the at-risk ones; pass, info and warn never appear")
+        #expect(lines == ["Layer: failed", "Layer: needs review", "Layer: skipped"], "the skipped check follows the at-risk ones")
         // Content-free: never the matched text (reviewTermTexts) or an
         // engine sentence.
         let joined = lines.joined()
