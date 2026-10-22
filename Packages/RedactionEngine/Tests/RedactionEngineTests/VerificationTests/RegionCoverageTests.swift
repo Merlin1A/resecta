@@ -49,7 +49,8 @@ struct RegionCoverageTests {
     func driftedAndNeighbouringBoxes() {
         let first = CGRect(x: 0.10, y: 0.50, width: 0.20, height: 0.02)
         let second = CGRect(x: 0.32, y: 0.50, width: 0.20, height: 0.02)
-        let matches = [RegionCoverage.PageMatch(requestIndex: 0, rect: first), RegionCoverage.PageMatch(requestIndex: 0, rect: second)]
+        let matches = [RegionCoverage.PageMatch(requestIndex: 0, rect: first, term: "SEED"),
+                       RegionCoverage.PageMatch(requestIndex: 0, rect: second, term: "SEED")]
         func box(_ rect: CGRect, source: RedactionRegion.Source) -> RedactionRegion {
             RedactionRegion(id: UUID(), normalizedRect: rect, source: source)
         }
@@ -61,8 +62,16 @@ struct RegionCoverageTests {
         // The same box drawn by hand: the matches were left unselected.
         #expect(RegionCoverage.pageShortfalls(page: 3, matches: matches, boxes: [box(drifted.normalizedRect, source: .manual)]).isEmpty)
         // Two drifted boxes, two untouched matches: both reported; one drifted box beside one covered match: one.
-        let drifted2 = box(CGRect(x: 0.60, y: 0.60, width: 0.20, height: 0.02), source: .detectedPII(kind: .ssn))
+        let drifted2 = box(CGRect(x: 0.60, y: 0.60, width: 0.20, height: 0.02), source: searchSource)
         #expect(RegionCoverage.pageShortfalls(page: 3, matches: matches, boxes: [drifted, drifted2]).count == 2)
+        // A drifted box vouches only for its own term: a box placed for another term, or a detected item of a
+        // category the untouched match is not, leaves the match as unselected.
+        let otherTerm = box(drifted.normalizedRect, source: .searchMatch(term: "OTHER"))
+        #expect(RegionCoverage.pageShortfalls(page: 3, matches: matches, boxes: [otherTerm]).isEmpty)
+        let ssnItem = box(drifted.normalizedRect, source: .detectedPII(kind: .ssn))
+        #expect(RegionCoverage.pageShortfalls(page: 3, matches: matches, boxes: [ssnItem]).isEmpty)
+        let ssnMatch = [RegionCoverage.PageMatch(requestIndex: 1, rect: first, term: PIICategory.ssn.rawValue)]
+        #expect(RegionCoverage.pageShortfalls(page: 3, matches: ssnMatch, boxes: [ssnItem]).count == 1)
         let onFirst = box(first, source: searchSource)
         let oneDrift = RegionCoverage.pageShortfalls(page: 3, matches: matches, boxes: [onFirst, drifted])
         #expect(oneDrift == [RegionCoverage.Shortfall(pageIndex: 3, requestIndex: 0, coveredFraction: 0)])

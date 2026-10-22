@@ -70,10 +70,28 @@ struct RegionCoverage: Sendable {
         }
     }
 
-    /// One re-run match on a page: the request it came from and its rect.
+    /// One re-run match on a page: the request it came from, its rect,
+    /// and the term the searcher reported for it (a typed search's term, a
+    /// scan's category name) — the term an applied box records.
     struct PageMatch {
         let requestIndex: Int
         let rect: CGRect
+        var term: String = ""
+    }
+
+    /// Whether `region` is a box a search or scan placed for a match of
+    /// `term` (a re-run match's term: a typed search's term, a scan's
+    /// category name): a search box records its term, a detected item its
+    /// kind. A manual or face box was placed by no search.
+    static func placed(_ region: RedactionRegion, forTerm term: String) -> Bool {
+        switch region.source {
+        case .searchMatch(let placed, _):
+            return placed.lowercased() == term.lowercased()
+        case .detectedPII(let kind, _):
+            return PIICategory(rawValue: term)?.piiKind == kind
+        case .manual, .detectedFace:
+            return false
+        }
     }
 
     /// The shortfalls on one page, from every applied request's matches
@@ -85,7 +103,9 @@ struct RegionCoverage: Sendable {
     /// no box touches was left unselected — unless the page also carries a
     /// search-placed box that touches none of the page's matches: a box
     /// placed for a match and drifted clear of it; each such box pairs with
-    /// one untouched match, in request then page order, as a shortfall.
+    /// one untouched match OF THE TERM IT RECORDS, in request then page
+    /// order, as a shortfall — a box placed for one term never vouches for
+    /// another term's match left unselected.
     static func pageShortfalls(
         page: Int, matches: [PageMatch], boxes: [RedactionRegion]
     ) -> [Shortfall] {
@@ -112,10 +132,12 @@ struct RegionCoverage: Sendable {
         let driftedBoxes = boxes.indices.filter { b in
             isSearchPlaced(boxes[b]) && !matches.indices.contains { touches[$0][b] }
         }
-        let ordered = untouched.sorted {
+        var ordered = untouched.sorted {
             ($0.1.requestIndex, $0.1.rect.minY, $0.1.rect.minX) < ($1.1.requestIndex, $1.1.rect.minY, $1.1.rect.minX)
         }
-        for (_, match, fraction) in ordered.prefix(driftedBoxes.count) {
+        for b in driftedBoxes {
+            guard let pick = ordered.firstIndex(where: { placed(boxes[b], forTerm: $0.1.term) }) else { continue }
+            let (_, match, fraction) = ordered.remove(at: pick)
             found.append(Shortfall(pageIndex: page, requestIndex: match.requestIndex, coveredFraction: fraction))
         }
         return found
@@ -189,7 +211,7 @@ struct RegionCoverage: Sendable {
                 if !request.appliedPages.isEmpty, !request.appliedPages.contains(result.pageIndex) { continue }
                 guard let pageRegions = regions[result.pageIndex], !pageRegions.isEmpty else { continue }
                 matchesByPage[result.pageIndex, default: []].append(
-                    PageMatch(requestIndex: index, rect: result.normalizedRect.clampedToNormalized()))
+                    PageMatch(requestIndex: index, rect: result.normalizedRect.clampedToNormalized(), term: result.term))
             }
             await searcher.setPageCoverageSink(nil)
             await searcher.setRegexTimeoutSink(nil)
