@@ -40,13 +40,14 @@ no network requests of its own, it has no means of its own to upload your
 documents.
 
 The only links that leave the app — the Privacy Policy, End-User License
-Agreement, Source Code, Report an Issue, and Send Feedback items in Settings,
-and the Report an Issue link on the screen shown when an import, a redaction
-run or an export fails — open in a Safari view or your mail app, each running
-in its own process outside Resecta; Resecta itself makes no network requests,
-and links inside a document you import are not followed. Once you follow one
-of those links, the practices of the website or mail provider you reach apply,
-not this policy.
+Agreement, Source Code, Report an Issue, Send Feedback, and Rate Resecta on
+the App Store items in Settings, and the Report an Issue link on the screen
+shown when an import, a redaction run or an export fails — open in a Safari
+view, your mail app or the App Store app, each running in its own process
+outside Resecta; Resecta itself makes no network requests, and links inside a
+document you import are not followed. Once you follow one of those links, the
+practices of the website, mail provider or App Store you reach apply, not this
+policy.
 
 ## On-device storage
 

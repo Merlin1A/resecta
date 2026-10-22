@@ -250,10 +250,13 @@ networking and hand-off symbols: a bare `Link(`, `NWListener(`,
 `NWBrowser(`, `NSURLConnection(`, the CFNetwork socket and stream
 constructors, the BSD `socket(` / `connect(` / `getaddrinfo(` calls,
 `openURL`, `UIApplication.shared.open(` and an `import Network` line, with
-comments and string literals skipped. Every hit must be a site pinned in the
-script with its reason; today that is one site, the Settings view's feedback
-link, a `mailto:` hand-off to Mail. A new use of one of those symbols fails
-the hook and the gate. The lint names those symbols and no others: a
+comments and string literals skipped. Every hit must match a site pinned in
+the script with its reason, one pin per site: the file, the symbol and an
+identifier of the call, such as its destination. Today two sites are pinned,
+both in the Settings view: the Send Feedback link, a `mailto:` hand-off to
+Mail, and the Rate link, which opens the app's App Store page in the App
+Store app. A new use of one of those symbols fails the hook and the gate,
+including a second use in a file that already has a pinned site. The lint names those symbols and no others: a
 `Data(contentsOf:)` on a remote URL, SwiftUI's `AsyncImage`, an `import
 WebKit` or a configuration type such as `URLSessionConfiguration` is outside
 it and is held by review, so the property holds for what the lint names, not
