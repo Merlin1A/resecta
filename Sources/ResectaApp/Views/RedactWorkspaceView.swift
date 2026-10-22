@@ -13,6 +13,7 @@ struct RedactWorkspaceView: View {
     let workspace: RedactWorkspace
     @Environment(SettingsState.self) private var settingsState
     @Environment(ToastQueueManager.self) private var toastManager
+    @Environment(AppCoordinator.self) private var appCoordinator
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     // The capture/mirroring privacy shield gates the iPad page-thumbnail
     // sidebar. Thumbnails are derived from page bitmaps, so they leak the
@@ -77,7 +78,8 @@ struct RedactWorkspaceView: View {
                 // we still return true so the system snaps the payload back
                 // rather than leaving it dangling, and we surface the precise
                 // reason via toast.
-                if let refusal = workspace.documentState.importRefusalMessage(with: workspace.redactionState) {
+                if let refusal = workspace.documentState.importRefusalMessage(
+                    with: workspace.redactionState, door: appCoordinator.openedDoor) {
                     toastManager.enqueue(refusal, severity: .warning)
                     return true
                 }

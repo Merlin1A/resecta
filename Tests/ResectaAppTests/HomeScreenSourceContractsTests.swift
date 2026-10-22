@@ -97,11 +97,21 @@ struct HomeScreenSourceContractsTests {
 
     @Test("The failed screen's primary action names photos for the Photos door")
     func chooseAnotherLabelPerDoor() {
-        #expect(FailedStateView.primaryButtonLabel(for: .chooseAnotherFile, door: .photos) == "Choose Other Photos")
-        #expect(FailedStateView.primaryButtonLabel(for: .chooseAnotherFile, door: .files) == "Choose Another File")
-        #expect(FailedStateView.primaryButtonLabel(for: .chooseAnotherFile, door: nil) == "Choose Another File")
-        #expect(FailedStateView.primaryButtonLabel(for: .chooseAnotherFile, door: .sample) == "Choose Another File")
-        #expect(FailedStateView.primaryButtonLabel(for: .reopenDocument, door: .photos) == "Re-open Document")
+        #expect(FailedStateView.primaryActionLabel(.chooseAnotherFile, door: .photos) == "Choose Other Photos")
+        #expect(FailedStateView.primaryActionLabel(.chooseAnotherFile, door: .files) == "Choose Another File")
+        #expect(FailedStateView.primaryActionLabel(.chooseAnotherFile, door: nil) == "Choose Another File")
+        #expect(FailedStateView.primaryActionLabel(.chooseAnotherFile, door: .sample) == "Choose Another File")
+        #expect(FailedStateView.primaryActionLabel(.reopenDocument, door: .photos) == "Re-open Document")
+    }
+
+    @Test("A refused drop on the failed screen names the button as it reads after a Photos import")
+    func refusalNamesThePhotosButton() {
+        let documentState = DocumentState()
+        documentState.phase = .failed(error: .importError(.unsupportedFormat), returnPhase: .empty)
+        #expect(documentState.importRefusalMessage(with: RedactionState(), door: .photos)
+                == "Cannot import from this screen. Tap Choose Other Photos first.")
+        #expect(documentState.importRefusalMessage(with: RedactionState(), door: .files)
+                == "Cannot import from this screen. Tap Choose Another File first.")
     }
 
     @Test("The masthead and the gate title carry the header trait")
