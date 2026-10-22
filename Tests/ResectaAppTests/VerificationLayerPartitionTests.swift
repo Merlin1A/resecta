@@ -4,8 +4,8 @@ import Foundation
 @testable import RedactionEngine
 
 // `VerificationLayerPartition` — the one enumeration behind the details
-// disclosure's grouping (FINDINGS → COULD NOT VERIFY → NOTES → the pass
-// cluster) and the summary line's counts. Indices are engine positions, so
+// disclosure's grouping (Findings → Could not verify → Notes → Nothing to
+// check → the pass cluster) and the summary line's counts. Indices are engine positions, so
 // the rows' `layerResult_N` identifiers stay stable across grouping.
 
 @Suite("Verification layer partition", .tags(.display))
@@ -88,7 +88,7 @@ struct VerificationLayerPartitionTests {
         #expect(p.clusterTitle == "4 checks passed · 3\u{00A0}notes")
     }
 
-    @Test("A sweep note with items sits in NOTES; the cluster title counts one passing check alone")
+    @Test("A sweep note with items sits in Notes; the cluster title counts one passing check alone")
     func sweepNoteWithItemsSitsAboveTheCluster() {
         let line = SearchRecheckQueryLine(label: "Scan (17 detectors)", foundCount: 0, foundHitCap: false,
                                           appliedCount: 0, remainingCount: 3, route: .ocr)
@@ -100,5 +100,24 @@ struct VerificationLayerPartitionTests {
         #expect(p.cluster == [0])
         #expect(p.isWhollyClean == false)
         #expect(p.clusterTitle == "1 check passed")
+    }
+
+    @Test("Nothing-to-check rows have their own group; the headers carry counts, spoken with a comma")
+    func nothingToCheckGroupAndHeaders() {
+        let idle = LayerResult(name: "Search Re-check", symbolName: "shield", status: .info("x"),
+                               shortDescription: "", detailDescription: "", pageReferences: nil,
+                               durationSeconds: 0, layer: .searchRecheck)
+        let p = VerificationLayerPartition(layers: [layer(.pass), idle], perPageModes: [])
+        #expect(p.nothingToCheck == [1])
+        #expect(p.notes == [])
+        #expect(p.isWhollyClean == false)
+        #expect(p.summaryLine1 == "1 of 2 checks passed")
+        #expect(p.summaryLine2 == "1\u{00A0}had nothing to check")
+        #expect(VerificationLayerPartition.sectionHeader("Nothing to check", count: 3) == "Nothing to check · 3")
+        #expect(VerificationLayerPartition.sectionHeaderSpoken("Findings", count: 3) == "Findings, 3.")
+        let one = VerificationLayerPartition(layers: [layer(.fail("f"))], perPageModes: [])
+        #expect(one.summaryLine1 == "0 of 1 check passed")
+        let riding = VerificationLayerPartition(layers: [layer(.pass), layer(.info("i"))], perPageModes: [])
+        #expect(riding.clusterSpokenLabel == "1 check passed, 1\u{00A0}note")
     }
 }

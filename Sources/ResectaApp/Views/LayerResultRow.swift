@@ -6,21 +6,35 @@ import RedactionEngine
 
 struct LayerResultRow: View {
     /// The row's chrome. `.card` — the row paints its own material (the
-    /// progress view's rows); `.plain` — flat, the section that stacks the
-    /// rows owns the hairlines between them.
+    /// progress view's rows); `.grouped` — a row of the results page's
+    /// inset-grouped sections, which own the hairlines between rows.
     // nonisolated: a plain value read from `@Test(arguments:)` arrays,
     // which Swift Testing hoists into a nonisolated peer (the SE-0466
     // rationale on `ResectaTokens.SemanticColor`).
     nonisolated enum Chrome: Equatable {
         case card
-        case plain
+        case grouped
+    }
+
+    /// Where a grouped row starts: `.lead` — the outcome mark in the lead
+    /// column, the title at 56 (the check sections, a riding note); `.member`
+    /// — the title at 56, no mark (a passing check inside the cluster);
+    /// `.bare` — the title at 16 (the `Checks` list of a wholly clean run).
+    nonisolated enum GroupedLayout: Equatable {
+        case lead
+        case member
+        case bare
     }
 
     /// One item of the expanded block, in display order.
     nonisolated enum ExpandedItem: Equatable {
+        /// What to do about this row, first.
+        case lead(String)
         /// What the check reads — on every row whose caption is not
         /// already that line.
         case explainer(String)
+        /// What must be true for the check to pass, and what it does not see.
+        case rule(String)
         /// The engine's detail sentence, verbatim.
         case detail(String)
         /// The query lines and their per-term sub-lines.
@@ -35,6 +49,8 @@ struct LayerResultRow: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     // At accessibility sizes the status word drops under the title.
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    // The opened grouped row's wash is per appearance.
+    @Environment(\.colorScheme) private var colorScheme
 
     /// The glyph column and the mark column, each scaling with the title.
     /// The text column, the expanded block and the section's hairlines
@@ -61,9 +77,16 @@ struct LayerResultRow: View {
     /// The run's per-page modes (the report's) — empty while the run is in
     /// progress, which reads every vacuous pass as passed.
     var perPageModes: [PipelineMode] = []
+    /// The grouped chrome's layout, its status word (under Findings only)
+    /// and its page chips (only while the redacted PDF exists — otherwise
+    /// the caption names the pages).
+    var groupedLayout: GroupedLayout = .lead
+    var showsStatusWord: Bool = false
+    var pagesOnChips: Bool = false
 
     private var model: VerificationRowModel {
-        VerificationRowModel(layer: layer, perPageModes: perPageModes)
+        VerificationRowModel(layer: layer, perPageModes: perPageModes,
+                             pagesOnChips: chrome == .grouped && pagesOnChips)
     }
 
     /// The row's own horizontal inset: 8 pt inside its card chrome; none
@@ -85,6 +108,17 @@ struct LayerResultRow: View {
     }
 
     var body: some View {
+        Group {
+            if chrome == .grouped {
+                groupedBody
+            } else {
+                cardBody
+            }
+        }
+        .accessibilityIdentifier("layerResult_\(layerIndex - 1)") // zero-indexed
+    }
+
+    private var cardBody: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header — always visible. A Button when the row opens (every
             // row of a finished run); the progress view's rows render the
@@ -111,16 +145,12 @@ struct LayerResultRow: View {
                 expandedBlock
             }
         }
-        // `.card` paints the row's own material (the progress view); `.plain`
-        // draws nothing — the section owns the hairlines.
-        .background(
-            chrome == .card ? AnyShapeStyle(.regularMaterial) : AnyShapeStyle(.clear),
-            in: RoundedRectangle(cornerRadius: ResectaTokens.CornerRadius.toast))
+        // `.card` paints the row's own material (the progress view).
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: ResectaTokens.CornerRadius.toast))
         // Collapsed: one combined element (header label above). Expanded:
         // a container, so VoiceOver can reach the detail text and the
         // "Go to page N" chips instead of having them flattened away.
         .accessibilityElement(children: isExpanded ? .contain : .combine)
-        .accessibilityIdentifier("layerResult_\(layerIndex - 1)") // zero-indexed
         // A collapsed row with pages: each page is a named action, so a
         // VoiceOver user need not open the row to go there.
         .accessibilityActions {
@@ -162,21 +192,8 @@ struct LayerResultRow: View {
                         word
                     }
                 }
-                if let caption = model.caption {
-                    Text(caption)
-                        .font(.caption)
-                        .foregroundStyle(ResectaTokens.SemanticColor.supportText)
-                        // A needs-review sentence quotes the user's redacted
-                        // terms; every other caption is the check's own copy.
-                        .privacySensitive(model.captionIsPrivacySensitive)
-                }
-                // The Detection Sweep's gate, on the collapsed row only —
-                // the expanded detail states it once already.
-                if !isExpanded, let caption = Self.rowCaptionText(layer: layer) {
-                    Text(caption)
-                        .font(.caption)
-                        .foregroundStyle(ResectaTokens.SemanticColor.supportText)
-                }
+                captionText(font: .caption)
+                gateLine(font: .caption)
             }
 
             if isExpandable {
@@ -188,6 +205,31 @@ struct LayerResultRow: View {
         .padding(.horizontal, horizontalInset)
         .frame(minHeight: ResectaTokens.TouchTarget.minimum)
         .contentShape(Rectangle())
+    }
+
+    /// The caption under the title — one view for both chromes. A
+    /// needs-review caption quotes the user's terms or searches; every other
+    /// caption is the check's own copy. A trailing page number keeps its
+    /// noun.
+    @ViewBuilder
+    private func captionText(font: Font) -> some View {
+        if let caption = model.caption {
+            Text(Self.gluedPageTail(caption))
+                .font(font)
+                .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+                .privacySensitive(model.captionIsPrivacySensitive)
+        }
+    }
+
+    /// The Detection Sweep's gate, on the collapsed row only — the expanded
+    /// detail states it once already.
+    @ViewBuilder
+    private func gateLine(font: Font) -> some View {
+        if !isExpanded, let caption = Self.rowCaptionText(layer: layer) {
+            Text(caption)
+                .font(font)
+                .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+        }
     }
 
     private var title: some View {
@@ -211,7 +253,7 @@ struct LayerResultRow: View {
             ForEach(Array(Self.expandedItems(model: model, layer: layer, opensPages: onPageTap != nil)
                 .enumerated()), id: \.offset) { _, item in
                 switch item {
-                case .explainer(let line), .detail(let line):
+                case .lead(let line), .explainer(let line), .rule(let line), .detail(let line):
                     Text(line)
                         .font(.caption)
                         .foregroundStyle(ResectaTokens.SemanticColor.supportText)
@@ -282,16 +324,20 @@ struct LayerResultRow: View {
         }
     }
 
-    /// The expanded block's items, in order: the explainer (unless the
-    /// caption already is it — a passing row), the engine detail (never on
-    /// a skipped check, whose engine detail names a reason that does not
-    /// apply), the query lines, the page chips (when the host navigates),
-    /// the timing. The engine's short line is never repeated here.
+    /// The expanded block's items, in order: the lead lines, the explainer
+    /// (unless the caption already is it — a passing row), the rule, the
+    /// engine detail (never on a skipped check, whose engine detail names a
+    /// reason that does not apply), the query lines, the page chips (when
+    /// the host navigates), the timing. The engine's short line is never
+    /// repeated here.
     static func expandedItems(model: VerificationRowModel, layer: LayerResult,
                               opensPages: Bool) -> [ExpandedItem] {
-        var items: [ExpandedItem] = []
+        var items: [ExpandedItem] = model.lead.map(ExpandedItem.lead)
         if let explainer = model.explainer, model.caption != explainer {
             items.append(.explainer(explainer))
+        }
+        if let rule = model.rule {
+            items.append(.rule(rule))
         }
         if model.showsEngineDetail, layer.hasDetail {
             items.append(.detail(layer.detailDescription))
@@ -302,33 +348,29 @@ struct LayerResultRow: View {
         if opensPages, let pages = layer.pageReferences, !pages.isEmpty {
             items.append(.pageChips(pages))
         }
-        items.append(.timing(expandedTimingText(durationSeconds: layer.durationSeconds)))
+        items.append(.timing(expandedTimingText(durationSeconds: layer.durationSeconds, layer: layer.layer)))
         return items
     }
 
     /// The expanded row's last line. "Took under 0.1 s" for every duration
     /// below a tenth of a second (most checks finish there, and "0.0s"
-    /// read as "did not run"); otherwise one decimal, a space before the
-    /// unit. The footer keeps the run's total.
+    /// read as "did not run"); one decimal below a minute, a space before
+    /// the unit; "Took 4 min 56 s" from 60 s. The footer keeps the run's
+    /// total.
     static func expandedTimingText(durationSeconds seconds: Double) -> String {
-        seconds < 0.1 ? "Took under 0.1 s" : String(format: "Took %.1f s", seconds)
+        if seconds < 0.1 { return "Took under 0.1 s" }
+        if seconds < 60 { return String(format: "Took %.1f s", seconds) }
+        return "Took \(VerificationResultsView.minutesText(seconds))"
     }
 
-    // MARK: - Row subtitle (attention rows name the exact text)
-
-    /// The engine-side line of a row: attention rows compose a sentence from
-    /// the display-only review term texts — the user reads exactly which
-    /// text remains and how to remedy it; every other status gives the
-    /// layer's own `shortDescription` unchanged. Static so the composition
-    /// is unit-testable without a SwiftUI host.
-    static func rowSubtitleText(layer: LayerResult) -> String {
-        guard layer.status.isAttention,
-              let terms = layer.reviewTermTexts, !terms.isEmpty else {
-            return layer.shortDescription
+    /// The timing line by check: the Search Re-check and the Detection Sweep
+    /// share one post pass, timed on the re-check row; the sweep row says so.
+    static func expandedTimingText(durationSeconds seconds: Double, layer: VerificationLayer?) -> String {
+        switch layer {
+        case .searchRecheck: "\(expandedTimingText(durationSeconds: seconds)), shared with Detection Sweep"
+        case .detectionSweep: "Timed with Search Re-check"
+        default: expandedTimingText(durationSeconds: seconds)
         }
-        return layer.reviewIsFragment
-            ? VerificationRowModel.fragmentSentence(termTexts: terms, pages: layer.pageReferences)
-            : reviewRowText(termTexts: terms, pages: layer.pageReferences)
     }
 
     /// The Detection Sweep's gate, as a fixed line of the collapsed row and
@@ -348,19 +390,6 @@ struct LayerResultRow: View {
         layer.layer == .detectionSweep ? detectionSweepGateCaption : nil
     }
 
-    /// Whether `rowSubtitleText(layer:)` names user text: true exactly when
-    /// it takes the attention arm and composes its sentence from the review
-    /// terms. Static so the predicate is unit-testable without a SwiftUI host.
-    static func rowSubtitleIsPrivacySensitive(layer: LayerResult) -> Bool {
-        layer.status.isAttention && !(layer.reviewTermTexts ?? []).isEmpty
-    }
-
-    /// Attention-row sentence: names the term(s), where they remain, and
-    /// the remedy (`VerificationRowModel.reviewSentence`).
-    static func reviewRowText(termTexts: [String], pages: [Int]?) -> String {
-        VerificationRowModel.reviewSentence(termTexts: termTexts, pages: pages)
-    }
-
     // MARK: - Search Re-check query lines (static for unit testability)
 
     /// The query lines and per-term sub-lines always render under
@@ -369,8 +398,8 @@ struct LayerResultRow: View {
     /// constant and the display pin holds it true.
     static let queryLinesArePrivacySensitive = true
 
-    /// The per-query line as displayed: "{label} · found {N} · applied {M}
-    /// · {R} remain", then the option badges ("case-sensitive", "whole
+    /// The per-query line as displayed: "{label} · {N} found · {M} redacted
+    /// · {R} remaining", then the option badges ("case-sensitive", "whole
     /// word") when set. "found 1,000+" when the original run stopped at
     /// the result cap. The label is the engine's display label (quoted
     /// query / pattern, or the multi-term form); the route is not
@@ -387,16 +416,16 @@ struct LayerResultRow: View {
         // printing "0 remain", which would read as a clear.
         let remaining = line.unchecked
             ? "not re-checked (pattern not accepted)"
-            : "\(line.remainingCount) remain"
-        var text = "\(line.label) · found \(found) · applied \(line.appliedCount) · \(remaining)"
+            : "\(line.remainingCount) remaining"
+        var text = "\(line.label) · \(found) found · \(line.appliedCount) redacted · \(remaining)"
         for badge in line.optionBadges {
             text += " · \(badge)"
         }
         return text
     }
 
-    /// A multi-term query's per-term sub-lines: "“term” · {R} remain", with
-    /// "found {n} · applied {m}" ahead of the remaining count when the
+    /// A multi-term query's per-term sub-lines: "“term” · {R} remaining",
+    /// with "{n} found · {m} redacted" ahead of the remaining count when the
     /// record carries per-term counts. Empty for single-query lines.
     static func perTermLineTexts(_ line: SearchRecheckQueryLine, in layer: VerificationLayer?) -> [String] {
         // A scan line's sub-lines are per detector category, named as the
@@ -406,14 +435,14 @@ struct LayerResultRow: View {
             return (line.perTerm ?? []).map { category in
                 sweep
                     ? "\(category.term) · \(possibleItems(category.remaining))"
-                    : "\(category.term) · \(category.remaining) remain"
+                    : "\(category.term) · \(category.remaining) remaining"
             }
         }
         return (line.perTerm ?? []).map { term in
             var text = "\u{201C}\(term.term)\u{201D}"
-            if let found = term.found { text += " · found \(found)" }
-            if let applied = term.applied { text += " · applied \(applied)" }
-            text += " · \(term.remaining) remain"
+            if let found = term.found { text += " · \(found) found" }
+            if let applied = term.applied { text += " · \(applied) redacted" }
+            text += " · \(term.remaining) remaining"
             return text
         }
     }
@@ -454,8 +483,9 @@ struct LayerResultRow: View {
     // MARK: - Spoken strings (static for unit testability)
 
     /// Row label: "{Title}, {Word}." and the caption, then the sweep's gate
-    /// (it rides the spoken label as it rides the collapsed row) and the
-    /// page count when the layer carries page references. The duration is
+    /// (it rides the spoken label as it rides the collapsed row) and, last,
+    /// the pages ("Page 2." · "Pages 1 and 3." · up to five, then a count).
+    /// Every part ends in a period. The duration is
     /// not spoken: it is not in the collapsed row, and the expanded row's
     /// timing line is its own reachable element. "Layer N" is not spoken
     /// here — grouped, the ordinals read out of sequence; the mid-run
@@ -465,8 +495,8 @@ struct LayerResultRow: View {
         if let caption = Self.rowCaptionText(layer: layer) {
             label += " \(caption)"
         }
-        if let pages = layer.pageReferences, !pages.isEmpty {
-            label += ", \(pages.count) affected page\(pages.count == 1 ? "" : "s")"
+        if let pages = VerificationRowModel.spokenPages(layer.pageReferences ?? []) {
+            label += " \(pages)"
         }
         return label
     }
@@ -475,6 +505,259 @@ struct LayerResultRow: View {
     /// there the tap is a no-op, so advertising it misleads.
     static func accessibilityHint(isExpandable: Bool, isExpanded: Bool) -> String {
         guard isExpandable else { return "" }
-        return "Tap to \(isExpanded ? "collapse" : "expand") details"
+        return isExpanded ? "Hides details" : "Shows details"
+    }
+
+    // MARK: - Grouped chrome (the results page)
+
+    /// The grouped row: a tap container, never a `Button` — it hosts the
+    /// page chips' `Button`s, which a `Button` label cannot (the tap would
+    /// never reach them). The header speaks as one button: its label, its
+    /// hint, a default action; collapsed, the whole row is one element whose
+    /// `Go to page N` actions follow the chips.
+    private var groupedBody: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            groupedHeader
+                .contentShape(Rectangle())
+                .onTapGesture(perform: onTap)
+                // Open: the header is the row's button element.
+                .modifier(GroupedRowAccessibility(
+                    applies: isExpanded, combines: true, model: model, layer: layer,
+                    isExpanded: isExpanded, action: onTap))
+            if isExpanded {
+                groupedExpandedBlock
+            }
+        }
+        .background(isExpanded ? Self.rowWash(colorScheme) : .clear)
+        .accessibilityElement(children: isExpanded ? .contain : .combine)
+        // Collapsed: the whole row is the button element.
+        .modifier(GroupedRowAccessibility(
+            applies: !isExpanded, combines: false, model: model, layer: layer,
+            isExpanded: isExpanded, action: onTap))
+        .accessibilityActions {
+            if !isExpanded, pagesOnChips, let onPageTap {
+                ForEach(layer.pageReferences ?? [], id: \.self) { page in
+                    Button("Go to page \(page + 1)") { onPageTap(page) }
+                }
+            }
+        }
+    }
+
+    /// [mark] title / caption / gate / meta line [chevron]: the mark in a
+    /// 28-pt column, the title at 56; a bare pass row starts its title at
+    /// 16 (the clean `Checks` list), a cluster member at 56 with no mark.
+    private var groupedHeader: some View {
+        HStack(alignment: .top, spacing: 0) {
+            switch groupedLayout {
+            case .lead:
+                Image(systemName: model.outcome.markSymbolName)
+                    .font(.system(size: ResectaTokens.Results.leadMark))
+                    .foregroundStyle(Self.groupedMarkColor(model.outcome))
+                    .frame(width: ResectaTokens.Results.leadColumn)
+                    .padding(.leading, ResectaTokens.Spacing.md)
+                    .padding(.trailing, ResectaTokens.Results.titleInset
+                             - ResectaTokens.Spacing.md - ResectaTokens.Results.leadColumn)
+                    .accessibilityHidden(true)
+            case .member:
+                Color.clear.frame(width: ResectaTokens.Results.titleInset, height: 1)
+            case .bare:
+                Color.clear.frame(width: ResectaTokens.Spacing.md, height: 1)
+            }
+            VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xxs) {
+                Text(model.title)
+                    .font(.body)
+                    .foregroundStyle(.primary)
+                if groupedLayout == .lead {
+                    captionText(font: .subheadline)
+                }
+                gateLine(font: .subheadline)
+                if let meta = metaLine {
+                    meta
+                        .padding(.top, ResectaTokens.Spacing.xs)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            DisclosureChevron(isExpanded: isExpanded, tint: Color(.secondaryLabel))
+                .frame(width: ResectaTokens.Results.chevronColumn)
+                .padding(.top, ResectaTokens.Spacing.xs)
+                .padding(.leading, ResectaTokens.Spacing.sm)
+                .padding(.trailing, ResectaTokens.Spacing.md)
+        }
+        .padding(.vertical, ResectaTokens.Spacing.sm + ResectaTokens.Spacing.xs - 1)
+        .frame(minHeight: ResectaTokens.Results.rowMinHeight, alignment: .top)
+    }
+
+    /// The status word (under Findings only, grey; the colour stays on the
+    /// mark) and the page chips — at most five, else four and `+n more`,
+    /// shown only while the redacted PDF exists. Nil when neither shows.
+    private var metaLine: AnyView? {
+        let pages = pagesOnChips ? (layer.pageReferences ?? []) : []
+        guard showsStatusWord || !pages.isEmpty else { return nil }
+        let shown = Self.collapsedChipPages(pages)
+        return AnyView(FlowLayout(spacing: ResectaTokens.Spacing.sm) {
+            if showsStatusWord {
+                Text(model.outcome.word)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+                    .frame(minHeight: ResectaTokens.Results.chipHeight)
+            }
+            ForEach(shown, id: \.self) { page in
+                PageChip(pageIndex: page) { onPageTap?(page) }
+            }
+            if let more = Self.moreChipsText(pages) {
+                Text(more)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+                    .frame(minHeight: ResectaTokens.Results.chipHeight)
+            }
+        })
+    }
+
+    /// The opened block: the lead group, 12 pt, the glyph line, the rule,
+    /// the engine detail, the query lines, the full chip set when capped,
+    /// the timing.
+    private var groupedExpandedBlock: some View {
+        let items = Self.groupedExpandedItems(model: model, layer: layer, pagesOnChips: pagesOnChips)
+        let leads = items.compactMap { if case .lead(let line) = $0 { line } else { nil } }
+        return VStack(alignment: .leading, spacing: ResectaTokens.Results.leadToReference) {
+            if !leads.isEmpty {
+                VStack(alignment: .leading, spacing: ResectaTokens.Spacing.sm) {
+                    ForEach(Array(leads.enumerated()), id: \.offset) { _, line in
+                        Text(line)
+                            .font(.subheadline)
+                            .foregroundStyle(.primary)
+                    }
+                }
+            }
+            VStack(alignment: .leading, spacing: ResectaTokens.Spacing.sm) {
+                ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                    switch item {
+                    case .lead:
+                        EmptyView()
+                    case .explainer(let line):
+                        // The glyph line: the check's glyph in the lead
+                        // column, its one-line description at the title.
+                        Text(line)
+                            .font(.subheadline)
+                            .foregroundStyle(.primary)
+                            .overlay(alignment: .topLeading) {
+                                VerificationSymbol.icon(for: layer)
+                                    .font(.system(size: ResectaTokens.Results.leadMark - 2))
+                                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+                                    .frame(width: ResectaTokens.Results.leadColumn)
+                                    .offset(x: -(ResectaTokens.Results.titleInset - ResectaTokens.Spacing.md))
+                                    .accessibilityHidden(true)
+                            }
+                    case .rule(let line), .detail(let line):
+                        Text(Self.gluedPageTail(line))
+                            .font(.subheadline)
+                            .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+                    case .timing(let line):
+                        Text(line)
+                            .font(.subheadline.monospacedDigit())
+                            .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+                    case .queryLines:
+                        queryLines
+                    case .pageChips(let pages):
+                        FlowLayout(spacing: ResectaTokens.Spacing.sm) {
+                            ForEach(pages, id: \.self) { page in
+                                PageChip(pageIndex: page) { onPageTap?(page) }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .padding(.leading, groupedLayout == .bare ? ResectaTokens.Spacing.md : ResectaTokens.Results.titleInset)
+        .padding(.trailing, ResectaTokens.Spacing.md)
+        .padding(.bottom, ResectaTokens.Spacing.md - 2)
+        .transition(ResectaTokens.Anim.resolvedTransition(
+            standard: .opacity, reduceMotion: reduceMotion))
+    }
+
+    /// The opened block's items in the grouped chrome: the lead lines, the
+    /// glyph line (every row with an identity — the bare pass rows show
+    /// no caption), the rule, the engine detail (never on a skipped check),
+    /// the query lines, the full chip set when the collapsed row capped it,
+    /// the timing.
+    static func groupedExpandedItems(model: VerificationRowModel, layer: LayerResult,
+                                     pagesOnChips: Bool) -> [ExpandedItem] {
+        var items: [ExpandedItem] = model.lead.map(ExpandedItem.lead)
+        if let explainer = model.explainer { items.append(.explainer(explainer)) }
+        if let rule = model.rule { items.append(.rule(rule)) }
+        if model.showsEngineDetail, layer.hasDetail { items.append(.detail(layer.detailDescription)) }
+        if !(layer.queryLines ?? []).isEmpty { items.append(.queryLines) }
+        if pagesOnChips, let pages = layer.pageReferences, pages.count > ResectaTokens.Results.chipCap {
+            items.append(.pageChips(pages))
+        }
+        items.append(.timing(expandedTimingText(durationSeconds: layer.durationSeconds, layer: layer.layer)))
+        return items
+    }
+
+    /// The pages a collapsed row shows as chips: all of up to five, else
+    /// the first four.
+    static func collapsedChipPages(_ pages: [Int]) -> [Int] {
+        pages.count <= ResectaTokens.Results.chipCap ? pages : Array(pages.prefix(ResectaTokens.Results.chipCap - 1))
+    }
+
+    /// "+8 more" beside four chips; nil when every page has its chip.
+    static func moreChipsText(_ pages: [Int]) -> String? {
+        guard pages.count > ResectaTokens.Results.chipCap else { return nil }
+        return "+\(pages.count - (ResectaTokens.Results.chipCap - 1))\u{00A0}more"
+    }
+
+    /// The mark's colour: the outcome's text tier on a failure, a review or a warning; a note,
+    /// a check that could not verify and one with nothing to check read
+    /// grey — the header names them.
+    static func groupedMarkColor(_ outcome: VerificationOutcome) -> Color {
+        switch outcome {
+        case .note, .couldNotVerify, .nothingToCheck: ResectaTokens.SemanticColor.supportText
+        default: outcome.textColor
+        }
+    }
+
+    /// The opened row's wash.
+    static func rowWash(_ scheme: ColorScheme) -> Color {
+        scheme == .dark
+            ? Color.white.opacity(ResectaTokens.Results.rowWashDark)
+            : Color.black.opacity(ResectaTokens.Results.rowWashLight)
+    }
+
+    /// A trailing "on page N" (or any phrase whose last word is a page
+    /// number) keeps its last three words together, so a page number never
+    /// wraps away from its noun. Text already held together is left alone.
+    static func gluedPageTail(_ text: String) -> String {
+        var words = text.components(separatedBy: " ")
+        guard words.count >= 3, let last = words.last,
+              last.trimmingCharacters(in: CharacterSet(charactersIn: ".")).allSatisfy(\.isNumber),
+              !last.isEmpty, !last.contains("\u{00A0}") else { return text }
+        let tail = words.suffix(3).joined(separator: "\u{00A0}")
+        words.removeLast(3)
+        return (words + [tail]).joined(separator: " ")
+    }
+}
+
+/// The grouped row's button element: its label, its hint, the button trait
+/// and a default action — on the header while the row is open (combined
+/// into one element), on the whole row while it is collapsed.
+private struct GroupedRowAccessibility: ViewModifier {
+    let applies: Bool
+    let combines: Bool
+    let model: VerificationRowModel
+    let layer: LayerResult
+    let isExpanded: Bool
+    let action: () -> Void
+
+    func body(content: Content) -> some View {
+        if applies {
+            content
+                .accessibilityElement(children: combines ? .combine : .contain)
+                .accessibilityLabel(LayerResultRow.accessibilityLabel(model: model, layer: layer))
+                .accessibilityHint(LayerResultRow.accessibilityHint(isExpandable: true, isExpanded: isExpanded))
+                .accessibilityAddTraits(.isButton)
+                .accessibilityAction { action() }
+        } else {
+            content
+        }
     }
 }

@@ -46,24 +46,22 @@ struct VerificationFallbackReasonDisplayTests {
     func chipReasonRowText() {
         let row = VerificationResultsView.fallbackReasonRowText(
             pageNumber: 2, reason: .rtlText)
-        #expect(row == "Page 2 — Rasterized — right-to-left text")
+        #expect(row == "Page 2 · Rasterized · right-to-left text")
     }
 
-    @Test("Chip accessibility label carries the reason when present")
-    func chipAccessibilityLabelWithReason() {
-        let label = VerificationResultsView.pageChipAccessibilityLabel(
-            pageNumber: 3, mode: .secureRasterization, reason: .unresolvedEncoding)
-        #expect(label == "Page 3, Rasterized — unresolved encoding")
-    }
-
-    @Test("Chip accessibility label unchanged without a reason")
-    func chipAccessibilityLabelWithoutReason() {
-        let searchable = VerificationResultsView.pageChipAccessibilityLabel(
-            pageNumber: 1, mode: .searchableRedaction, reason: nil)
-        #expect(searchable == "Page 1, Searchable")
-        let secure = VerificationResultsView.pageChipAccessibilityLabel(
-            pageNumber: 2, mode: .secureRasterization, reason: nil)
-        #expect(secure == "Page 2, Rasterized")
+    @Test("Fallback lines: a run of three or more same-reason pages reads as one range")
+    func fallbackReasonRanges() {
+        var reasons = [TextLayerDetector.FallbackReason?](repeating: .verticalText, count: 200)
+        reasons += [nil, .rtlText, .rtlText]
+        #expect(VerificationResultsView.fallbackReasonRowTexts(reasons: reasons) == [
+            "Pages 1\u{2013}200 · Rasterized · vertical text",
+            "Page 202 · Rasterized · right-to-left text",
+            "Page 203 · Rasterized · right-to-left text",
+        ])
+        #expect(VerificationResultsView.pageModesSummaryText(modes: [.secureRasterization, .secureRasterization])
+                == "2 Rasterized")
+        #expect(VerificationResultsView.pageModesSummaryText(modes: [.searchableRedaction, .secureRasterization])
+                == "1 Searchable, 1 Rasterized")
     }
 
     @Test("Thumbnail badge text: reasoned for fallback pages, plain otherwise")

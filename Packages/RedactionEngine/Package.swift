@@ -14,11 +14,20 @@ let package = Package(
     // only — the iOS compilation path is unchanged.
     platforms: [.iOS(.v26), .macOS(.v15)],
     products: [
-        .library(name: "RedactionEngine", targets: ["RedactionEngine"]),
+        .library(name: "RedactionEngine", targets: ["RedactionEngine", "PDFKitGuard"]),
     ],
     targets: [
+        // One Objective-C function: `-[PDFDocument dataRepresentation]`
+        // behind an exception boundary (a damaged `/Info` dictionary makes
+        // PDFKit raise, which Swift cannot intercept). Exported with the
+        // library so the app's own copy path can use it.
+        .target(
+            name: "PDFKitGuard",
+            linkerSettings: [.linkedFramework("PDFKit")]
+        ),
         .target(
             name: "RedactionEngine",
+            dependencies: ["PDFKitGuard"],
             resources: [
                 .copy("Resources/Gazetteers"),
                 .copy("Resources/Classifier"),

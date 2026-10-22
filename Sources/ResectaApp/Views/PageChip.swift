@@ -1,37 +1,38 @@
 import SwiftUI
 
-// Shared tappable page pill button — extracted from LayerResultRow inline styling.
-// Used in LayerResultRow.
-// 1-indexed display, 0-indexed data.
+// The page link of a results row: "Page N" on a tertiary capsule, 26 pt
+// tall, inside a 46-pt hit frame. It opens the Preview at that page; its
+// spoken label names where it goes. 1-indexed display, 0-indexed data.
 
 struct PageChip: View {
     let pageIndex: Int  // 0-indexed
     let action: () -> Void
 
-    // The wash opacity is per appearance (tileWashLight / tileWashDark).
-    @Environment(\.colorScheme) private var colorScheme
+    @ScaledMetric(relativeTo: .footnote) private var height: CGFloat = ResectaTokens.Results.chipHeight
 
     var body: some View {
         Button(action: action) {
-            // The numeral on the brand text tier over the teal wash — the
-            // `FilterChip` recipe: the drawn capsule stays small, the
-            // 46-pt layout frame around it is the hit target.
-            Text("\(pageIndex + 1)")  // 1-indexed display
-                .font(.caption.monospacedDigit().weight(.medium))
+            Text("Page \(pageIndex + 1)")  // 1-indexed display
+                .font(.footnote.weight(.semibold).monospacedDigit())
                 .foregroundStyle(ResectaTokens.BrandTeal.text)
-                .padding(.horizontal, ResectaTokens.Spacing.sm)
-                .padding(.vertical, ResectaTokens.Spacing.xs)
-                .background(
-                    ResectaTokens.BrandTeal.tint.opacity(
-                        colorScheme == .dark
-                            ? ResectaTokens.Opacity.tileWashDark
-                            : ResectaTokens.Opacity.tileWashLight),
-                    in: Capsule())
-                .frame(minWidth: ResectaTokens.TouchTarget.minimum,
-                       minHeight: ResectaTokens.TouchTarget.minimum)
+                .padding(.horizontal, ResectaTokens.Results.chipPadding)
+                .frame(minHeight: height)
+                .background(Color(.tertiarySystemFill), in: Capsule())
+                // The 46-pt hit frame reaches past the drawn capsule
+                // without taking layout space: the meta line stays tight.
+                .frame(minHeight: ResectaTokens.TouchTarget.minimum)
                 .contentShape(Rectangle())
+                .padding(.vertical, -(ResectaTokens.TouchTarget.minimum - ResectaTokens.Results.chipHeight) / 2)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PageChipButtonStyle())
         .accessibilityLabel("Go to page \(pageIndex + 1)")
+    }
+}
+
+/// The chip's press: half opacity, no other effect.
+private struct PageChipButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .opacity(configuration.isPressed ? ResectaTokens.Results.chipPressedOpacity : 1)
     }
 }

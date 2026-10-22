@@ -8,15 +8,20 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ### Added
 
+- Settings: a "Rate Resecta on the App Store" row under Support opens the App Store's review page for the app.
+- Acknowledgements: the third-party data and typeface notices the app ships (the repo-root NOTICE) are bundled and readable in-app, from the first-launch gate beside the EULA and Privacy Policy and from Settings.
 - Double-tap the page to return to the fit zoom.
 - Page bar: a Mark Whole Page control beside the page chevrons adds one redaction region covering the page on screen, through the same path a drawn region takes — the counter reads "1 region", Undo removes it in one step, and no search term is captured from it.
 - Import: a password-protected PDF can be opened by entering its password; the import checks run on the unlocked document, and the redacted copy is not password-protected. The password is held in memory while the document is open and released when the session closes; the failed-state card beneath the password sheet reads as locked rather than damaged. A document that was encrypted — one opened with a password, or one carrying only an owner password — shows a notice at import and a caption on the Share card saying the redacted copy carries neither the password nor the original's usage restrictions.
 
 ### Changed
 
+- Verification results: the outcome titles follow the check list's words: Attention Needed reads Needs Review, Issues Found reads Checks Failed, and Completed with Notes reads Completed with Warnings, or Some Checks Incomplete when a check could not run in full.
 - Search sheet: the recent-search recall chips, the per-term section headers of the results list and the saved-search names are marked privacy-sensitive, matching the result rows and the saved-query previews.
 - Import: a file over the 50 MB cap is refused by its size on disk before any byte is read, from the Files picker and from a drop alike; a dropped file arrives as a file and is read inside its transfer rather than as 50 MB of memory.
-- Verification results: the Verification Details list groups each check by its outcome — findings first, then checks that could not verify part of the output or were skipped (Share asks you to confirm before sending), then notes and checks that had nothing to check, then one line for the checks that passed, which opens to the individual rows. Every row shows the check's glyph, one status mark and one status word; the header counts only passing checks as passed and names failed checks, checks that need review, checks that could not verify, warnings, notes and checks with nothing to check separately. The ten core checks carry plain-language titles, a passing check's row says in one line what the check reads, and the results headline names warnings and checks that could not verify in the list's words.
+- Verification results: the screen is a grouped list. The headline shows how many checks passed in a ring, names the outcome in the list's words and says what to do next. Share is the main button; when a check failed or needs review, or Share cannot share, Keep Editing leads and Share is outlined or greyed with the reason under it, and the undo note sits under the actions on every run. Findings, checks that could not verify, notes and checks with nothing to check follow in their own sections with their counts; each problem row shows its status and a link per affected page that opens the preview at that page, five at most until the row is opened. The run's facts, the page modes and the items left unredacted share one section; the passing checks fold into one row, or list as Checks when every check passed. Page Modes names the pages of each mode, in ranges, instead of a button per page.
+- Verification results: the headline is titled in the list's words (Checks Passed, Completed with Warnings, Some Checks Incomplete, Needs Review, Checks Failed, Verification Skipped) and says, on every verdict, which control to use next; a skipped verification names Run Verification, and on a Searchable run the full Redact that includes every check. The check titles, the one-line descriptions, a second line on what each check requires and what it does not see, the reasons a check had nothing to check, the needs-review and search re-check captions, the group headers with their counts (Findings, Could not verify, Notes, Nothing to check), the share-disabled reasons, the timing lines and the VoiceOver labels follow one vocabulary; the results headline's spoken label also states the counts, and Share says when sharing will ask you to confirm.
+- Share: the confirmation names each check and its outcome (failed, needs review, could not verify, skipped) instead of quoting the check's message, lists skipped checks, and has its own title for incomplete checks and for unverified output.
 - Documentation: the privacy policy describes the detection the app performs (the seventeen text categories a scan reads from the page text layer or from recognized text, with the bundled gazetteers, Bloom filters and context scorer; no face or barcode sentence), says the app makes no network requests of its own and names the two system services that do, drops the detection-priors clause no shipped path stores or reads, and states the failed-state screen, the delete-all controls, the per-session workspace and its sweep, and the in-place metadata patches as they work; the EULA's Searchable Redaction fallback names hidden text. Both effective dates move to 2026-10-15.
 - Documentation: the threat model says the share confirmation lists a line for each check that reported or could not verify, and no longer describes OCR word hints the shipped flow never builds.
 - Documentation: the security policy gains a recipe for verifying a signed release tag: `.github/allowed_signers` lists the release-tag signing key under `security@resecta.app`, and `git tag -v` checks a tag against it once `gpg.ssh.allowedSignersFile` points at the file; the threat model's signed-tag row points at the recipe.
@@ -48,6 +53,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - `THREAT-MODEL.md` §7 re-dated at `28b9a777` (2026-10-20), with rows for the release-tag ruleset (`v*` tags cannot be updated, deleted or force-pushed once pushed), immutable releases in the app repository, and the mail policy on the reporting domain (DMARC `p=reject`, SPF `-all`); the branch-rules row states that the admin role may bypass the required check on a pull request, and names the rulesets API as the check a reader can run without a login.
 - Searchable redaction treats optional content as hidden when the default configuration turns layers off through its base state, when a page inherits the resources that name it, or when a form object carries it; a glyph outside the visible page counts as showing no ink.
 - The Searchable-mode ink test treats a glyph box whose pixels all lie within a fixed tolerance of one color as showing no ink, so near-white, nearly transparent and nearly covered text exports as an image only.
+- Import refuses a PDF whose catalog, non-widget annotation or form field additional actions, or a rendition action, carry JavaScript or a launch action; a PDF with XFA form data or embedded files imports with a notice that form data and attachments are not carried into the redacted copy.
 - Document canvas: with a hardware keyboard, Select All then Copy (⌘A, ⌘C) no longer places the document's text on the system pasteboard. The canvas view refuses the copy, cut, paste, select and select-all actions and builds its menu without the edit, look-up, learn and share groups; in 1.2.0 that keyboard path copied the whole document's text with no selection shown.
 ### Fixed
 
@@ -55,11 +61,19 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Verification: the Search Re-check also re-runs each applied search and scan on the original page and fails when a redaction box leaves part of a match uncovered, and the OCR Check reports the start or the end of a redacted term read beside a box. Before, a box placed off its text by one or more characters passed every check while the uncovered characters stayed printed on the page: the rebuilt text layer dropped them, the text-reading checks read that layer, and the OCR Check read only the box.
 - Search: a match's rect now covers the matched glyphs on every page, in Text mode and in Regex mode. Before, on a page whose text layer carries a ligature or another character that normalization expands, the rect sat as many characters to the right as the expansions before the match had added (and Regex mode still placed it there); and on a page with an emoji, a letter written with a separate accent mark or another character wider than one text unit before the match, the rect sat to the left of the match and short by those units.
 - In Regex mode the Case-sensitive option now governs the pattern; with it off, "smith" matches "Smith".
+- A PDF whose document-information dictionary holds a key PDFKit cannot read no longer ends the app when it is searched or verified: the write PDFKit performs on the way to the search copy and to the verification reader runs behind an exception boundary, and such a document reads as "could not read" on the paths that already handle it.
 - Redact: a page that finishes after Stop no longer brings the progress card back for a frame — Stop invalidates the run, and the run's later reports are dropped.
 - Redact: the per-page retry's memory check estimates the 150-DPI render it performs, instead of a 96-DPI render the rasterizer never makes.
 - Done and Home reset the session through the one Start Over path, so a re-imported document no longer shows the previous document's form-field notice.
 - Home at the compact width: Cancel on the close dialog brings a presented search session back whole — its results and selections — instead of dropping it.
+- The page sidebar renders each thumbnail on the main actor, behind its cache, instead of drawing a page of the open document from another thread while the canvas draws it.
+- Toasts have no line cap at the accessibility text sizes (the standard sizes keep two lines), so a two-sentence toast's second sentence — the one that says what to do — is no longer cut off.
 - Redact and ⇧⌘R are unavailable while the search sheet holds selected matches that are not applied, with the hint "Apply or clear the selected matches first", instead of tearing the session down and dropping them.
+- Redact: a Stop that lands while the output is being finalized leaves no output file behind in the session folder.
+- The app-switcher cover sits in its own window above every presented sheet, so the Search & Redact sheet and Settings → Custom Terms are covered too.
+- The failed screen's copy for a refused page names its rotation beside the size and scale, and the advice says so.
+- The password sheet says Resecta does not store the password, and that any offer to save it is the system's own.
+- Settings: the Searchable Redaction description and the mode picker's hint state the limit the README states — text covered by a picture in the page can still enter the text layer.
 - Redact clears the undo history at the Apply seam, as the results card says; an Undo after Keep Editing no longer unlinks the built output.
 - Search sheet: the "unapplied matches cleared" toasts no longer count matches a region already covers.
 - Search sheet: the custom-term time-limit toast names neither the term nor the page, and is shown once for a scan instead of once per page.
@@ -79,7 +93,9 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Custom terms: a literal term typed with a ligature or a compatibility character matches its plain spelling on pages whose text is plain ASCII.
 - Verification: the Character Count and Font Verification checks report the per-page warnings their checks raise — a count excess as a note, a page whose fonts could not be inspected as not verified — where before the check passed.
 - Searchable Redaction: a page whose text layout does not settle within the re-flow limit is written without a text layer instead of with a character placed inside a redacted area.
-- Verification results: the Verification Details summary no longer counts notes or checks with nothing to check as passed, and no longer reports a check that could not verify part of the output as completed.
+- Verification results: the count of passed checks no longer counts notes or checks with nothing to check as passed, and a check that could not verify part of the output no longer reads as completed.
+- Verification results: a one-check report reads "0 of 1 check passed" and "1 check"; a page-count stop reads "Stopped at the Page Count check."; durations of a minute or more read in minutes and seconds.
+- Share: when the redacted PDF was removed while the app was in the background, tapping Share shows the export failure; before, the attempt was refused as an invalid step and nothing was shown.
 - Share: a report with a skipped check asks for confirmation before sharing even when another check reported a routine warning.
 - Verification results: a search line starting 'Scan (' keeps its term formatting.
 - The Source filter can be changed back from OCR on a document whose pages read as text, Reset to Defaults clears it, and the empty results state offers Show All.
@@ -94,6 +110,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ### Internal
 
+- CI: the pull-request gate also compiles the engine package's test bundle; the weekly simulator suite leaves out the 12-page searchable preflight and the two suites that call text recognition directly, which stall the hosted runner; the pre-push hook posts a `local-suites` commit status for each pushed commit it passed.
 - The app's unit tests build their settings on a scratch defaults suite: the shared coordinator helpers take a fresh suite by default, and the source check that lists tests reading the shared defaults domain now fails on any such site.
 - The engine package's test copy of the app's per-page mode choice is removed; the app's tests check the production choice through the coordinator, on a right-to-left page and on every page of the bundled sample.
 - App tests: the six trapping requires in the mode-switch toast tests are throwing requires, and the hosting and transition smoke tests assert what they name; the two review-dismiss UI tests call their survival check from the test body.
@@ -136,6 +153,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Rendering a page from a PDFKit page and from its Core Graphics page runs one render body.
 - The rectangle and polygon character filters share one sort, search and cancellation skeleton.
 - Engine: the public surface is reduced to the document-runner API and what the app and its tests name; 103 more declarations become `internal` (access level only).
+- A Mac-side recorder for attended runs on a physical device: per-step Instruments capture, crash-report and container-attribute facts, PDF checks and a filled record (`Scripts/device/`).
 
 ## [1.2.0] — 2026-09-29
 

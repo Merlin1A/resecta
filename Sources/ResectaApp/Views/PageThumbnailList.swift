@@ -239,8 +239,12 @@ extension PageThumbnailList {
 
 // MARK: - Page Thumbnail Renderer
 
-/// Renders a PDF page thumbnail asynchronously to avoid blocking MainActor.
-/// Uses ThumbnailCache to avoid re-rendering on repeated sidebar scrolls.
+/// Renders a PDF page thumbnail on the main actor, behind `ThumbnailCache`
+/// so repeated sidebar scrolls render each page once. On the main actor by
+/// design: the page belongs to the document the canvas is drawing, and a
+/// PDFKit page is not safe to draw from another thread while the view draws
+/// it. The render is small (60×80 pt at the display scale) and yields to
+/// the run loop first, so the list settles before each page draws.
 struct PageThumbnailView: View {
     /// The thumbnail's display size in points. The sidebar frames each
     /// thumbnail at this size and the renderer draws it at this size times
@@ -249,6 +253,12 @@ struct PageThumbnailView: View {
 
     let document: PDFDocument?
     let pageIndex: Int
+
+    /// The one render: the page's thumbnail at `size`, on the main actor
+    /// (the caller's), never a detached task over a page the canvas draws.
+    static func render(_ page: PDFPage, size: CGSize) -> UIImage {
+        page.thumbnail(of: size, for: .cropBox)
+    }
 
     @State private var thumbnail: UIImage?
 
@@ -270,16 +280,14 @@ struct PageThumbnailView: View {
                 return
             }
             guard let page = document.page(at: pageIndex) else { return }
-            // PDFPage is not Sendable; render via nonisolated(unsafe) bridge.
-            nonisolated(unsafe) let unsafePage = page
             // Render at the display size, not 2× oversized.
             // Saves ~75% pixel work and cache memory per thumbnail.
             let scale = UITraitCollection.current.displayScale
             let size = CGSize(width: Self.thumbnailSize.width * scale,
                               height: Self.thumbnailSize.height * scale)
-            let rendered = await Task.detached(priority: .utility) {
-                unsafePage.thumbnail(of: size, for: .cropBox)
-            }.value
+            await Task.yield()
+            if Task.isCancelled { return }
+            let rendered = Self.render(page, size: size)
             if !Task.isCancelled {
                 ThumbnailCache.set(rendered, document: document, pageIndex: pageIndex)
                 thumbnail = rendered

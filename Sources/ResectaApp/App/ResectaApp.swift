@@ -31,6 +31,9 @@ struct ResectaApp: App {
     // own layout would not span the whole scene). No animation change to
     // the obscure path here.
     @State private var obscureContent = false
+    // The cover's own window: above presented sheets, which the ZStack
+    // overlay below does not reach (`SnapshotPrivacyWindowController`).
+    @State private var privacyWindow = SnapshotPrivacyWindowController()
 
     // Tracks scene phase at the root so we can drive `obscureContent`
     // alongside the existing pipeline-cancel behavior.
@@ -203,6 +206,28 @@ struct ResectaApp: App {
                                         .first(where: { $0.hasPrefix("--seedVerifiedReport=") })?
                                         .split(separator: "=").last,
                                        let report = VerificationDebugFixtures.all[String(name)] {
+                                        // `--seedOutput`: a copy of the loaded
+                                        // sample stands in for the redacted PDF,
+                                        // so Share, its confirm and Preview are
+                                        // live; the fixture's run inputs carry
+                                        // the mode and the run facts.
+                                        if launchArguments.contains("--seedOutput"),
+                                           let source = Bundle.main.url(
+                                               forResource: sampleName, withExtension: "pdf") {
+                                            let copy = FileManager.default.temporaryDirectory
+                                                .appendingPathComponent("seeded-output.pdf")
+                                            try? FileManager.default.removeItem(at: copy)
+                                            if (try? FileManager.default.copyItem(at: source, to: copy)) != nil {
+                                                ws.redactionState.outputURL = copy
+                                            }
+                                        }
+                                        if let run = VerificationDebugFixtures.runInputs(for: String(name)) {
+                                            ws.redactionState.recordLastRunInputs(.init(
+                                                perPageModes: run.modes, perPageFallbackReasons: run.reasons,
+                                                sensitiveTerms: SensitiveTermSet(terms: [], manualRegionsWithoutText: 0),
+                                                appliedSearches: [], deselection: nil,
+                                                ocrSkippedPages: run.ocrSkippedPages, degradeFailures: nil))
+                                        }
                                         ws.documentState.transition(to: .redacting(progress: .init(
                                             currentPage: 1, totalPages: 1, currentStep: "Seeded")))
                                         ws.documentState.transition(to: .verified(report: report))
@@ -291,8 +316,10 @@ struct ResectaApp: App {
                 switch SnapshotPrivacyPolicy.action(for: newPhase) {
                 case .obscureSynchronously:
                     withAnimation(.none) { obscureContent = true }
+                    privacyWindow.show()
                 case .revealAnimated:
                     withAnimation(.easeIn(duration: 0.15)) { obscureContent = false }
+                    privacyWindow.hide()
                 case .none:
                     break
                 }

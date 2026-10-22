@@ -134,17 +134,17 @@ Tests and gates: [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
 ## Testing
 
-The test tree is larger than the source tree: roughly 65,000 lines of Swift source to roughly 100,000 lines of test code, about 1.6×. Counted from the current tree:
+The test tree is larger than the source tree: roughly 65,000 lines of Swift source to roughly 100,000 lines of test code, about 1.5×. Counted from the current tree:
 
-- **Engine package** (`Packages/RedactionEngine/Tests`) — 1,971 Swift Testing `@Test` functions across 270 suites: the pipeline and rasterization, the verification layers, the security suites (fake redaction, pixel destruction, rotated-page coordinates, adversarial verification), search, detection, and the corpus measurement harnesses.
-- **App target** (`Tests/ResectaAppTests`) — 1,767 `@Test` functions across 255 suites: the pipeline state machine, cancellation and restart races, view-level predicates, and the honesty guards that keep the docs and UI copy accurate.
-- **UI / end-to-end** (`Tests/ResectaAppUITests`) — 50 XCUITest methods that drive the built app on a simulator (run from Xcode; the batched runner and CI build them without running them): the first-launch legal gate, search-to-redaction flows, the search re-check on the results screen, and the editor's handling of links inside a document.
+- **Engine package** (`Packages/RedactionEngine/Tests`) — 1,976 Swift Testing `@Test` functions across 271 suites: the pipeline and rasterization, the verification layers, the security suites (fake redaction, pixel destruction, rotated-page coordinates, adversarial verification), search, detection, and the corpus measurement harnesses.
+- **App target** (`Tests/ResectaAppTests`) — 1,799 `@Test` functions across 262 suites: the pipeline state machine, cancellation and restart races, view-level predicates, and the honesty guards that keep the docs and UI copy accurate.
+- **UI / end-to-end** (`Tests/ResectaAppUITests`) — 51 XCUITest methods that drive the built app on a simulator (run from Xcode; the batched runner and CI build them without running them): the first-launch legal gate, search-to-redaction flows, the search re-check on the results screen, and the editor's handling of links inside a document.
 
 Together the suites carry about 9,900 `#expect`/`#require` assertions. Beyond ordinary coverage, they pin the things this project cannot afford to regress: the named fake-redaction attacks (text under an opaque annotation must be destroyed at the text-layer, byte, and annotation level), the rotation × geometry placement matrix, fill-readback edge cases, cancellation and restart races, and the app's own copy — overclaiming is treated as a defect class with its own red tests. The reasoning behind that structure is in [`ENGINEERING.md`](./ENGINEERING.md).
 
 The commands that run both suites locally, and what the batched runner reports, are in [`CONTRIBUTING.md`](./CONTRIBUTING.md#running-the-tests).
 
-**On GitHub Actions.** Every pull request runs the required `pr-gate` check (`ci.yml`), which builds the app and its unit- and UI-test bundles without running them and runs the lint, count and hash checks. The app's unit suite also runs on a hosted simulator for every pull request to `main`, as a non-required check, and both schemes (app and engine) run weekly and on release tags; the engine's host-side workflow has not yet reached a verdict on the hosted runner. The full gate list is in [`CONTRIBUTING.md`](./CONTRIBUTING.md#what-every-change-passes).
+**On GitHub Actions.** Every pull request runs the required `pr-gate` check (`ci.yml`), which builds the app and its unit- and UI-test bundles without running them and runs the lint, count and hash checks. The app's unit suite also runs on a hosted simulator for every pull request to `main`, as a non-required check, and both schemes (app and engine) run weekly and on release tags; the engine suite runs locally on a simulator before every push, through the pre-push hook or an explicit batched run recorded with the pull request. The full gate list is in [`CONTRIBUTING.md`](./CONTRIBUTING.md#what-every-change-passes).
 
 ## Contributing
 

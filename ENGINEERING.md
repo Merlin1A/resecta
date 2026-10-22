@@ -112,10 +112,10 @@ Details a reviewer should know exist:
   while every could-not-verify condition keeps its severity. A warning tier
   that fires on every normal document carries no information.
 - Verification is advisory by design. A failed or attention-level verdict, a
-  check that reports something it could not verify, skipped checks in a
-  report with no other warning, or a verification that did not run does not
-  hard-block export — it routes the share action through an explicit
-  confirmation instead. I chose that over hard-blocking because the check has
+  check that reports something it could not verify, any skipped check, or a
+  verification that did not run does not hard-block export — it routes the
+  share action through an explicit confirmation instead, which names each
+  such check and its outcome. I chose that over hard-blocking because the check has
   known epistemic limits (below), and a tool that refuses to hand you your own
   document on the strength of a heuristic is making a judgment it cannot back.
 
@@ -252,8 +252,12 @@ constructors, the BSD `socket(` / `connect(` / `getaddrinfo(` calls,
 `openURL`, `UIApplication.shared.open(` and an `import Network` line, with
 comments and string literals skipped. Every hit must be a site pinned in the
 script with its reason; today that is one site, the Settings view's feedback
-link, a `mailto:` hand-off to Mail. A new site fails the hook and the gate,
-so the property holds going forward, not just today. The in-app
+link, a `mailto:` hand-off to Mail. A new use of one of those symbols fails
+the hook and the gate. The lint names those symbols and no others: a
+`Data(contentsOf:)` on a remote URL, SwiftUI's `AsyncImage`, an `import
+WebKit` or a configuration type such as `URLSessionConfiguration` is outside
+it and is held by review, so the property holds for what the lint names, not
+for every way the platform can reach the network. The in-app
 legal/support links open in a Safari view or Mail, each in its own process —
 the binary embeds no web engine of its own. The privacy manifest ships at `Resources/PrivacyInfo.xcprivacy`
 and declares no collected data types and no tracking, matching `PRIVACY.md`
@@ -270,7 +274,7 @@ concurrent entry points. The working rules, checkable by grep:
 - The app target contains **one** `DispatchQueue` reference (a labeled serial
   queue for writes to the in-memory thumbnail cache) and **zero** `.main.async`
   calls — main-thread work is expressed through actor isolation, not queue hops.
-- Isolation opt-outs are rare and deliberate: 18 `nonisolated(unsafe)`
+- Isolation opt-outs are rare and deliberate: 17 `nonisolated(unsafe)`
   declarations across ~65,000 lines of app + engine source, and the working
   convention is a written rationale at the declaration site saying why the
   access is safe.

@@ -154,7 +154,9 @@ struct PipelineRunner {
             // `outputURL` and removes the file from disk. Registering the
             // URL eagerly closes the leak where a post-rename failure would
             // otherwise orphan the file in the per-session temp
-            // subdirectory until tear-down.
+            // subdirectory until tear-down. A Stop invalidates the run
+            // before any of this: then `processDocument` refuses the
+            // promotion itself, since this run's recovery no longer runs.
             sink(.outputRegistered(outputURL))
 
             // --- Rasterization + Reconstruction ---
@@ -471,7 +473,7 @@ struct PipelineRunner {
 
         sink(.verified(report, burnedRegionVersion: burnedRegionVersion))
         // VoiceOver overall announcement
-        sink(.announce("Verification complete. \(report.overallStatus.accessibilityLabel)"))
+        sink(.announce("Verification complete. \(VerificationResultsView.mastheadAccessibilityLabel(report: report))"))
         return .completed
     }
 }

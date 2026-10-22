@@ -30,7 +30,7 @@ struct AccessibilityLabelTests {
         // promise.
         #expect(
             SettingsView.defaultModeAccessibilityHint
-            == "Choose how redacted output is produced. Secure Rasterization produces image-only output with all text removed; Searchable Redaction preserves non-redacted text, except on pages whose text shows no ink."
+            == "Choose how redacted output is produced. Secure Rasterization produces image-only output with all text removed; Searchable Redaction preserves non-redacted text, except on pages whose text shows no ink; text covered by a picture in the page can still enter the text layer."
         )
     }
 
@@ -138,42 +138,60 @@ struct AccessibilityLabelTests {
         )
     }
 
-    @Test("Toast lifts to 3 lines at AX5 for every severity",
+    @Test("Toast has no line cap at the accessibility sizes, for every severity",
           arguments: [
             ToastSeverity.info,
             .success,
             .warning,
             .error,
           ])
-    func testToastAtAX5LiftsToThreeLines(severity: ToastSeverity) {
-        // At .accessibility5 the cap lifts to 3
-        // lines for all severities, mirroring the InlineWarningBanner
-        // pattern. Same lift applies regardless
-        // of the per-severity baseline so long messages remain readable
-        // when the text size is at its accessibility maximum.
+    func testToastAtAccessibilitySizesHasNoCap(severity: ToastSeverity) {
+        for size in [DynamicTypeSize.accessibility1, .accessibility2, .accessibility3, .accessibility4, .accessibility5] {
+            #expect(ToastView.toastLineLimit(severity: severity, dynamicTypeSize: size) == nil, "\(size)")
+        }
+        #expect(ToastView.toastLineLimit(severity: severity, dynamicTypeSize: .xxxLarge) == 2,
+                "the largest standard size keeps the two-line cap")
+    }
+
+    @Test("Toast has no cap at AX5 for every severity",
+          arguments: [
+            ToastSeverity.info,
+            .success,
+            .warning,
+            .error,
+          ])
+    func testToastAtAX5HasNoCap(severity: ToastSeverity) {
         #expect(
             ToastView.toastLineLimit(
                 severity: severity,
                 dynamicTypeSize: .accessibility5
-            ) == 3
+            ) == nil
         )
     }
 
-    @Test("Toast stays at the severity baseline at AX4")
-    func testToastAtAX4HoldsBaseline() {
-        // .accessibility4 is the boundary below the AX5 lift — the
-        // 2-line baseline still applies; the 3-line lift hasn't kicked in.
+    @Test("The toast's icon stacks above the text at the accessibility sizes, beside it at the standard sizes")
+    func testToastIconStacksAtAccessibilitySizes() {
+        for size in [DynamicTypeSize.accessibility1, .accessibility3, .accessibility5] {
+            #expect(ToastView.stacksIconAboveText(size), "\(size)")
+        }
+        for size in [DynamicTypeSize.large, .xxxLarge] {
+            #expect(!ToastView.stacksIconAboveText(size), "\(size)")
+        }
+    }
+
+    @Test("Toast has no cap at AX4 (the second sentence shows whole)")
+    func testToastAtAX4HasNoCap() {
         #expect(
             ToastView.toastLineLimit(
                 severity: .info,
                 dynamicTypeSize: .accessibility4
-            ) == 2
+            ) == nil
         )
         #expect(
             ToastView.toastLineLimit(
                 severity: .warning,
                 dynamicTypeSize: .accessibility4
-            ) == 2
+            ) == nil
         )
     }
 
@@ -198,7 +216,7 @@ struct AccessibilityLabelTests {
         // `HomeChoiceCardContent`; same explicit-label contract as Share.
         #expect(
             VerificationResultsView.previewCardAccessibilityLabel
-            == "Preview Redacted Document. Open the redacted output in a read-only viewer."
+            == "Preview Redacted Document. Open the redacted PDF in a read-only viewer."
         )
     }
 
@@ -246,16 +264,16 @@ struct AccessibilityLabelTests {
 
     // The duration is not spoken: it is not
     // in the collapsed row any more (the expanded row's "Took … s" line is
-    // its own reachable element), so the label ends at the page count.
-    @Test("Row label speaks the reported diagnostic and page count, never the duration")
+    // its own reachable element), so the label ends at the pages.
+    @Test("Row label speaks the reported diagnostic and the pages, never the duration")
     func testRowLabelWarnWithPagesAndDuration() {
         let label = Self.rowLabel(Self.layer(
             status: .warn("w"),
-            shortDescription: "OCR could not be run on 1 page.",
+            shortDescription: "OCR could not be run on 1 page",
             pageReferences: [3, 7],
             durationSeconds: 1.34
         ))
-        #expect(label == "OCR Check, Warning. OCR could not be run on 1 page., 2 affected pages")
+        #expect(label == "OCR Check, Warning. OCR could not be run on 1 page. Pages 4 and 8.")
     }
 
     // The expanded row's last line: "Took under 0.1 s" for every duration
@@ -267,9 +285,22 @@ struct AccessibilityLabelTests {
             (0.1, "Took 0.1 s"),
             (1.34, "Took 1.3 s"),
             (0.0, "Took under 0.1 s"),
+            (296.2, "Took 4 min 56 s"),
+            (60.0, "Took 1 min 0 s"),
           ])
     func expandedTimingTextPinsTheUnderOneTenthFloor(seconds: Double, expected: String) {
         #expect(LayerResultRow.expandedTimingText(durationSeconds: seconds) == expected)
+    }
+
+    @Test("The re-check row's timing is shared with the sweep; the sweep row says so")
+    func sharedPostPassTiming() {
+        #expect(LayerResultRow.expandedTimingText(durationSeconds: 4.2, layer: .searchRecheck)
+                == "Took 4.2 s, shared with Detection Sweep")
+        #expect(LayerResultRow.expandedTimingText(durationSeconds: 296.2, layer: .searchRecheck)
+                == "Took 4 min 56 s, shared with Detection Sweep")
+        #expect(LayerResultRow.expandedTimingText(durationSeconds: 1.8, layer: .detectionSweep)
+                == "Timed with Search Re-check")
+        #expect(LayerResultRow.expandedTimingText(durationSeconds: 1.8, layer: .ocrCheck) == "Took 1.8 s")
     }
 
     @Test("Row label singular page suffix")
@@ -279,8 +310,8 @@ struct AccessibilityLabelTests {
             shortDescription: "Text remains on 1 page.",
             pageReferences: [0]
         ))
-        #expect(label.contains("1 affected page,") == false)
-        #expect(label.hasSuffix("Text remains on 1 page., 1 affected page"))
+        #expect(label.contains("Page 1.,") == false)
+        #expect(label.hasSuffix("Text remains on 1 page. Page 1."))
     }
 
     @Test("Row label pass: no page suffix, no duration tail at zero")
@@ -292,8 +323,8 @@ struct AccessibilityLabelTests {
 
     @Test("Expand hint only on expandable rows",
           arguments: [
-            (true, false, "Tap to expand details"),
-            (true, true, "Tap to collapse details"),
+            (true, false, "Shows details"),
+            (true, true, "Hides details"),
             (false, false, ""),
             (false, true, ""),
           ])

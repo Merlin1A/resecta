@@ -1,5 +1,6 @@
 import Foundation
 import PDFKit
+import PDFKitGuard
 import Vision
 import ImageIO
 #if canImport(UIKit)
@@ -524,14 +525,20 @@ public struct VerificationEngine: Sendable {
     /// Load raw PDF bytes and a CGPDFDocument from a PDFDocument.
     /// Prefers URL-based loading; reads the file with default options (no
     /// mapping requested).
-    /// Falls back to dataRepresentation() for non-file documents.
+    /// Falls back to the document's data representation for non-file
+    /// documents, through `RSGuardedDataRepresentation`: PDFKit raises an
+    /// Objective-C exception while writing a document whose `/Info`
+    /// dictionary holds an unreadable key, and Swift cannot intercept it. The
+    /// guard returns nil instead, so a damaged or crafted file reads as
+    /// "could not load" on the nil path below rather than aborting the
+    /// verification.
     func loadPDFData(_ doc: PDFDocument) -> (Data, CGPDFDocument)? {
         if let url = doc.documentURL,
            let data = try? Data(contentsOf: url),
            let cgDoc = CGPDFDocument(url as CFURL) {
             return (data, cgDoc)
         }
-        guard let data = doc.dataRepresentation(),
+        guard let data = RSGuardedDataRepresentation(doc),
               let provider = CGDataProvider(data: data as CFData),
               let cgDoc = CGPDFDocument(provider) else {
             return nil

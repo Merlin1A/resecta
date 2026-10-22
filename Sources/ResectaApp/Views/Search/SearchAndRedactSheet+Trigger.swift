@@ -13,9 +13,23 @@ import RedactionEngine
 extension SearchAndRedactSheet {
 
     /// The custom-term time-limit toast: one content-free, page-free
-    /// message, so the queue shows it once however many pages ran out.
+    /// message, shown once for a scan (`ScanOnceLatch`) however many pages
+    /// ran out.
     static let customTermTimeoutMessage =
         "A custom term was not fully checked on some pages — time limit reached."
+
+    /// One firing per scan. A new scan installs a new latch with its sinks,
+    /// so the time-limit toast is shown once for that scan, including for a
+    /// page that runs out after the first toast has left the screen.
+    final class ScanOnceLatch {
+        private var fired = false
+
+        /// True on the first call only.
+        func fire() -> Bool {
+            defer { fired = true }
+            return !fired
+        }
+    }
 
     // MARK: - Search Trigger
 
@@ -391,11 +405,15 @@ extension SearchAndRedactSheet {
         // sink. `DocumentSearcher` calls this once per (page, user-
         // authored pattern) when `UserTermMatcher.alwaysFlagHits`
         // reports a term the page's time budget did not let it check
-        // in full. The message names neither the term nor the page, so
-        // the queue coalesces a multi-page storm to one toast (the
-        // OCR-off sink below takes the same shape).
+        // in full. The message names neither the term nor the page, and
+        // a latch on this scan shows it once however many pages run out:
+        // the queue's own coalescing lasts only while the first toast is
+        // on screen or queued, so a page that ran out later showed it
+        // again (the OCR-off sink below takes the message's shape).
+        let timeoutToast = ScanOnceLatch()
         await searcher.setUserTermsTimeoutSink({ [weak toastManager] _, _ in
             Task { @MainActor in
+                guard timeoutToast.fire() else { return }
                 toastManager?.enqueue(SearchAndRedactSheet.customTermTimeoutMessage, severity: .warning)
             }
         })

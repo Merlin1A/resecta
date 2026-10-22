@@ -60,6 +60,23 @@ struct ActiveContentScanTests {
                 == .annotationAction(pageIndex: 0))
     }
 
+    static let widenedCarriers: [(String, Data, ActiveContentLocation)] = [
+        ("catalog /AA JavaScript", TestFixtures.withCatalogAdditionalActionJavaScript(),
+         .catalogAdditionalAction),
+        ("Screen annotation /AA JavaScript", TestFixtures.withScreenAnnotationAdditionalActionJavaScript(),
+         .annotationAdditionalAction(pageIndex: 0)),
+        ("field /AA JavaScript off a widget", TestFixtures.withFieldAdditionalActionJavaScript(),
+         .fieldAdditionalAction),
+        ("/OpenAction Rendition with /JS", TestFixtures.withOpenActionRenditionJavaScript(),
+         .openAction),
+    ]
+
+    @Test("The catalog, non-widget annotation and field additional actions, and a rendition's script, are reported",
+          arguments: widenedCarriers)
+    func widenedCarriersAreReported(name: String, data: Data, expected: ActiveContentLocation) throws {
+        #expect(try scan(data) == expected, "\(name)")
+    }
+
     // MARK: - Clean shapes at the same locations pass
 
     @Test("Clean shapes at the walked locations are not reported")
@@ -75,6 +92,11 @@ struct ActiveContentScanTests {
             // design (ordinary forms carry them; the raster omits them;
             // the verification pass reports them on the output).
             ("widget /AA JavaScript (not walked)", TestFixtures.withWidgetAdditionalActionJavaScript()),
+            ("catalog /AA with a GoTo only", TestFixtures.withCatalogAdditionalActionGoTo()),
+            // XFA form data and embedded files import with a notice; the
+            // walk does not refuse them.
+            ("/AcroForm /XFA", TestFixtures.withXFAFormData()),
+            ("/Names → /EmbeddedFiles", TestFixtures.withEmbeddedFile()),
         ]
         for (label, data) in clean {
             #expect(try scan(data) == nil, "\(label) must not be reported")

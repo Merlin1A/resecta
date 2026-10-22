@@ -309,6 +309,17 @@
         }
       }
     },
+    "eula_view_acknowledgements" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Acknowledgements"
+          }
+        }
+      }
+    },
     "eula_view_eula" : {
       "extractionState" : "manual",
       "localizations" : {

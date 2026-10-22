@@ -3,7 +3,9 @@
 # an iPhone 17 simulator under a watchdog, perf suites alone and
 # report-only. Both schemes run every Monday and on release tags, one job
 # each; a dispatch runs the scheme it names; ResectaApp alone runs on every
-# pull request to main as a non-required check (twenty to forty minutes).
+# pull request to main as a non-required check (twenty to forty minutes),
+# except a pull request that changes documentation only (the paths-ignore
+# list below), which starts no job here.
 # RedactionEngine here runs the engine package's suites on the simulator
 # (the package's one hosted run: a host `swift test` of the whole package
 # never reached a verdict on a hosted runner) and stays off pull requests
@@ -47,6 +49,13 @@ on:
     tags: ['v*']
   pull_request:
     branches: [main]
+    # A pull request whose every changed file is documentation has nothing
+    # for the simulator suite to test and would take one of the account's
+    # macOS slots from a pull request that does. The suite is not a required
+    # check on pull requests, so a skipped run holds nothing up at merge.
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
 
 permissions:
   contents: read
@@ -83,7 +92,13 @@ jobs:
       # own time limit cannot end a hang inside a system framework. The
       # runner leaves them out, names them in the summary and counts them in
       # the VERDICT line; the pre-push hook runs every suite on every push.
-      TEST_BATCHED_EXCLUDE: ${{ matrix.scheme == 'ResectaApp' && 'PipelineCoordinatorSecurityTests PageParallelRasterizationTests' || 'PacketOCRQualityRoleTests SearchRecheckOCRTests SearchRecheckParallelismTests' }}
+      # Added 2026-10-21: the engine job's batch 6 stalled on 2026-10-12,
+      # 2026-10-19 and a dispatched run on 2026-10-21 (no output for 900 s,
+      # every test in the batch left open). The same suites were open each
+      # time; the two that call Vision directly, OCREngineTests and
+      # OCRCacheCoherenceTests, are left out here with the 12-page, 12-layer
+      # searchable preflight (PacketSearchableProbeTests).
+      TEST_BATCHED_EXCLUDE: ${{ matrix.scheme == 'ResectaApp' && 'PipelineCoordinatorSecurityTests PageParallelRasterizationTests' || 'PacketOCRQualityRoleTests SearchRecheckOCRTests SearchRecheckParallelismTests PacketSearchableProbeTests OCREngineTests OCRCacheCoherenceTests' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 

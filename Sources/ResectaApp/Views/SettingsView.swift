@@ -10,7 +10,7 @@ struct SettingsView: View {
     // constants so the contract can be pinned by unit tests without
     // rendering the form. Mirrors the `InlineWarningBanner.lineLimit(for:)`
     // pattern used for the AX5 line-cap predicate.
-    static let defaultModeAccessibilityHint = "Choose how redacted output is produced. Secure Rasterization produces image-only output with all text removed; Searchable Redaction preserves non-redacted text, except on pages whose text shows no ink."
+    static let defaultModeAccessibilityHint = "Choose how redacted output is produced. Secure Rasterization produces image-only output with all text removed; Searchable Redaction preserves non-redacted text, except on pages whose text shows no ink; text covered by a picture in the page can still enter the text layer."
     static let fillColorAccessibilityHint = "Color used to fill redacted regions in the output."
     static let verifyToggleDefaultHint = "When enabled, the app runs verification checks before you can export"
     static let verifyToggleParanoidLockedHint = "Locked on because Paranoid Mode is enabled."
@@ -36,6 +36,8 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var safariURL: URL?
+    /// The in-app Acknowledgements sheet (the bundled NOTICE).
+    @State private var presentedLegalDocument: LegalDocument?
     // Destructive-action confirmation symmetry. The
     // Reset-to-Defaults button is wired through a `.confirmationDialog`
     // so a stray tap doesn't wipe user preferences. Custom Terms and
@@ -198,7 +200,7 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
                     .listRowSeparator(.hidden)
             case .searchableRedaction:
-                Text("Preserves non-redacted text for search and selection. A page whose text shows no ink is exported as an image only. Available for documents with an existing text layer.")
+                Text("Preserves non-redacted text for search and selection. A page whose text shows no ink is exported as an image only; text covered by a picture in the page can still enter the text layer. Available for documents with an existing text layer.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .listRowSeparator(.hidden)
@@ -479,6 +481,15 @@ struct SettingsView: View {
             Button("End-User License Agreement") {
                 safariURL = Links.eula
             }
+
+            // The third-party notices, read in-app (no network).
+            Button(String(localized: "eula_view_acknowledgements", table: "Legal")) {
+                presentedLegalDocument = .acknowledgements
+            }
+            .accessibilityIdentifier("settingsAcknowledgements")
+            .sheet(item: $presentedLegalDocument) { document in
+                LegalDocumentView(document: document)
+            }
         } header: {
             Label("Privacy", systemImage: "lock.shield")
         } footer: {
@@ -509,11 +520,16 @@ struct SettingsView: View {
             Link(destination: Links.sendFeedback) {
                 Label("Send Feedback", systemImage: "envelope")
             }
+
+            Link(destination: Links.rateOnTheAppStore) {
+                Label("Rate Resecta on the App Store", systemImage: "star")
+            }
+            .accessibilityIdentifier("settingsRateLink")
         } header: {
             Label("Support", systemImage: "questionmark.circle")
         } footer: {
             // Safari warning footer
-            Text("These links open in Safari. Resecta itself makes no network connections.")
+            Text("These links open in Safari or the App Store. Resecta itself makes no network connections.")
         }
     }
 
@@ -536,6 +552,9 @@ struct SettingsView: View {
         static let eula = URL(string: "https://resecta.app/eula")!
         static let sourceCode = URL(string: "https://github.com/Merlin1A/resecta")!
         static let reportIssue = URL(string: "https://github.com/Merlin1A/resecta/issues")!
+        /// The App Store's review page for Resecta (`action=write-review`
+        /// opens it on the rating).
+        static let rateOnTheAppStore = URL(string: "https://apps.apple.com/app/id6786922787?action=write-review")!
         static let sendFeedback = URL(string: "mailto:support@resecta.app?subject=Resecta%20Feedback")!
     }
 }

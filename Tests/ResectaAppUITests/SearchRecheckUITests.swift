@@ -8,12 +8,12 @@ import XCTest
 /// Route: `--openSearchSheet` over the bundled single-page fixture
 /// ("Sample Document Page 1") → type "Sample" → Select All → Apply →
 /// dismiss the sheet → overflow → Redact (default Secure Rasterization,
-/// Verify Before Export on by default) → "Checks Passed" → expand
-/// Verification Details → the sixth row (`layerResult_5`) is the Search
-/// Re-check and reads "Check passed."; the seventh (`layerResult_6`) is the
-/// Detection Sweep. The row's accessibility label is
-/// the ordinal + name + status phrase + the layer's own line, so the
-/// black-box assertion needs no `@testable` import.
+/// Verify Before Export on by default) → "Checks Passed" → the headline
+/// (`verificationMasthead`) states the counts → the sixth row
+/// (`layerResult_5`) is the Search Re-check and reads "Passed."; the seventh
+/// (`layerResult_6`) is the Detection Sweep. The row's accessibility label
+/// is the title + status phrase + the row's own line, so the black-box
+/// assertion needs no `@testable` import.
 ///
 /// Runs in the simulator suite census, not the pull-request gate (no
 /// XCUI there). Cost class: one Redact of a one-page fixture.
@@ -95,22 +95,18 @@ nonisolated final class SearchRecheckUITests: XCTestCase {
         XCTAssertFalse(detectionLine.exists, "The detection-disclosure line must not render.")
         attachScreenshot(named: "search-recheck-01-checks-passed")
 
-        // Expand Verification Details (label = "Verification Details, <summary>").
-        // The toggle sits at the foot of the results scroll view on this
-        // device class and the rows render beneath it, below the fold, so
-        // scroll it up before the tap and scroll again for the rows —
+        // The headline states the counts (label = "{Title}. {P} of {T}
+        // checks passed. … {sentence}"). Every check passed, so the rows
+        // render as one `Checks` list below the fold — scroll for them;
         // elements outside the scroll view's visible region are not
         // reliably served to XCUITest.
         let results = app.scrollViews["verificationResults"]
         XCTAssertTrue(results.waitForExistence(timeout: 10), "Results scroll view not found.")
+        let masthead = app.descendants(matching: .any)["verificationMasthead"]
+        XCTAssertTrue(masthead.waitForExistence(timeout: 10), "The results headline not found.")
+        XCTAssertTrue(masthead.label.hasPrefix("Checks Passed. 7 of 7 checks passed."),
+                      "Secure Rasterization runs a 7-layer check, every one passing: \(masthead.label)")
         results.swipeUp()
-        let details = app.buttons.matching(
-            NSPredicate(format: #"label BEGINSWITH "Verification Details""#)
-        ).firstMatch
-        XCTAssertTrue(details.waitForExistence(timeout: 10), "Verification Details toggle not found.")
-        XCTAssertEqual(details.label, "Verification Details, 7 of 7 checks passed",
-                       "Secure Rasterization runs a 7-layer check, every one passing: \(details.label)")
-        details.tap()
 
         // The sixth row (zero-indexed identifier) is the Search Re-check in
         // Secure Rasterization. Collapsed, the row is one combined element
@@ -175,14 +171,11 @@ nonisolated final class SearchRecheckUITests: XCTestCase {
 
         let results = app.scrollViews["verificationResults"]
         XCTAssertTrue(results.waitForExistence(timeout: 10), "Results scroll view not found.")
+        let masthead = app.descendants(matching: .any)["verificationMasthead"]
+        XCTAssertTrue(masthead.waitForExistence(timeout: 10), "The results headline not found.")
+        XCTAssertTrue(masthead.label.contains("6 of 7 checks passed. 1\u{00A0}had nothing to check."),
+                      "No typed search: the re-check had nothing to check: \(masthead.label)")
         results.swipeUp()
-        let details = app.buttons.matching(
-            NSPredicate(format: #"label BEGINSWITH "Verification Details""#)
-        ).firstMatch
-        XCTAssertTrue(details.waitForExistence(timeout: 10), "Verification Details toggle not found.")
-        XCTAssertTrue(details.label.contains("6 of 7 checks passed · 1\u{00A0}had nothing to check"),
-                      "No typed search: the re-check had nothing to check: \(details.label)")
-        details.tap()
         // The idle re-check sits above the pass cluster, so the cluster
         // starts collapsed: open it to reach the sweep's row.
         let cluster = app.buttons["passedChecksCluster"]

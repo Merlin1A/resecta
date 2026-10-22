@@ -1,5 +1,6 @@
 # Pull-request gate; also runs on every push to main. Builds the app and
-# its unit- and UI-test bundles without running them, runs the audit lint
+# its unit- and UI-test bundles and the engine package's test bundle
+# without running them, runs the audit lint
 # over the lines the change adds and the claims lint over the shipping
 # docs and the view-layer strings, checks the documented counts against
 # the tree, checks the shipped-asset hashes, fails when a source or test
@@ -85,6 +86,20 @@ jobs:
             -derivedDataPath "${RUNNER_TEMP}/dd" \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO -quiet
           echo "BFT_SECS=$((SECONDS - t0))" >> "$GITHUB_ENV"
+
+      # The engine package's tests run on a simulator before each push and in
+      # the weekly suite, not here; compiling their bundle on every pull
+      # request means an engine change that breaks a test target fails the
+      # gate instead of the next local run.
+      - name: Build the engine test bundle
+        run: |
+          t0=$SECONDS
+          xcodebuild build-for-testing \
+            -project ResectaApp.xcodeproj -scheme RedactionEngine \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "${RUNNER_TEMP}/dd" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO -quiet
+          echo "EBFT_SECS=$((SECONDS - t0))" >> "$GITHUB_ENV"
 
       # The copies sit one directory under the checkout because two of the
       # scripts locate the tree relative to their own path. audit-lint.sh
@@ -252,6 +267,7 @@ jobs:
             echo "|---|---|"
             echo "| xcodebuild build | ${BUILD_SECS:-—} |"
             echo "| xcodebuild build-for-testing | ${BFT_SECS:-—} |"
+            echo "| xcodebuild build-for-testing (engine) | ${EBFT_SECS:-—} |"
             echo "| claims-lint | ${CLAIMS_SECS:-—} |"
             echo "| doc-metrics (check) | ${DOCMETRICS_SECS:-—} |"
             echo "| audit-lint (range) | ${AUDIT_SECS:-—} |"
