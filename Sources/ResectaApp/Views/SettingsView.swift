@@ -36,6 +36,8 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var safariURL: URL?
+    /// The in-app Acknowledgements sheet (the bundled NOTICE).
+    @State private var presentedLegalDocument: LegalDocument?
     // Destructive-action confirmation symmetry. The
     // Reset-to-Defaults button is wired through a `.confirmationDialog`
     // so a stray tap doesn't wipe user preferences. Custom Terms and
@@ -478,6 +480,15 @@ struct SettingsView: View {
 
             Button("End-User License Agreement") {
                 safariURL = Links.eula
+            }
+
+            // The third-party notices, read in-app (no network).
+            Button(String(localized: "eula_view_acknowledgements", table: "Legal")) {
+                presentedLegalDocument = .acknowledgements
+            }
+            .accessibilityIdentifier("settingsAcknowledgements")
+            .sheet(item: $presentedLegalDocument) { document in
+                LegalDocumentView(document: document)
             }
         } header: {
             Label("Privacy", systemImage: "lock.shield")
