@@ -1003,16 +1003,17 @@ public actor DocumentSearcher {
             return
         }
 
-        // AND mode requires accumulate-then-filter-then-stream.
+        // AND mode filters each page as it completes, then streams it: a
+        // page is kept when every term matched on it, and the result cap
+        // counts the survivors, so a page dense in one term alone cannot
+        // use up the cap for the pages that carry every term.
         // OR mode (default) streams results directly as before (zero behavior change).
         if options.multiTermConjunction {
-            // Accumulation phase: collect all per-term results up to maxResults.
-            // Peak memory is bounded by the existing cap — no page-streaming
-            // variant is needed.
-            var accumulated: [SearchResult] = []
+            let allTerms = Set(terms)
+            var totalYielded = 0
 
             for pageIndex in 0..<pageCount {
-                if Task.isCancelled || accumulated.count >= Self.maxResults { break }
+                if Task.isCancelled || totalYielded >= Self.maxResults { break }
                 // Per-page yield (mirrors searchRegex) so
                 // queued actor setters drain on each page boundary; the .rich
                 // text-layer arm otherwise holds the actor for the whole document.
@@ -1029,27 +1030,20 @@ public actor DocumentSearcher {
                 let useTextLayer = !pageText.isEmpty && pageHasRichTextLayer(pageIndex)
                 if useTextLayer { pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer)) }
 
+                var pageHits: [SearchResult] = []
                 for term in terms {
-                    if Task.isCancelled || accumulated.count >= Self.maxResults { break }
+                    if Task.isCancelled { break }
 
                     if useTextLayer {
-                        let hits = findTextMatches(
+                        pageHits.append(contentsOf: findTextMatches(
                             pageText: pageText, query: term, options: options,
                             page: page, pageIndex: pageIndex, term: term
-                        )
-                        for hit in hits {
-                            if accumulated.count >= Self.maxResults { break }
-                            accumulated.append(hit)
-                        }
+                        ))
                     } else if options.includeOCR {
-                        let ocrHits = await searchPageViaOCR(
+                        pageHits.append(contentsOf: await searchPageViaOCR(
                             page: page, pageIndex: pageIndex,
                             query: term, options: options, term: term
-                        )
-                        for hit in ocrHits {
-                            if accumulated.count >= Self.maxResults { break }
-                            accumulated.append(hit)
-                        }
+                        ))
                     }
                 }
                 // Scanned region (`.sparse`/`.none`) with OCR
@@ -1057,20 +1051,15 @@ public actor DocumentSearcher {
                 if !pageHasRichTextLayer(pageIndex) && !options.includeOCR {
                     scannedRegionNotAnalyzedSink?(pageIndex)
                 }
-            }
 
-            // Conjunction filter: retain only pages where every term has
-            // at least one result.
-            let allTerms = Set(terms)
-            let pageResults = Dictionary(grouping: accumulated, by: \.pageIndex)
-            let conjunctPages = pageResults.filter { _, pageHits in
-                let termsOnPage = Set(pageHits.map(\.term))
-                return allTerms.isSubset(of: termsOnPage)
-            }
-            let filteredResults = accumulated.filter { conjunctPages[$0.pageIndex] != nil }
-
-            for result in filteredResults {
-                continuation.yield(result)
+                // The conjunction: the page streams only when every term
+                // matched on it; the cap counts what streams.
+                guard allTerms.isSubset(of: Set(pageHits.map(\.term))) else { continue }
+                for hit in pageHits {
+                    if totalYielded >= Self.maxResults { break }
+                    continuation.yield(hit)
+                    totalYielded += 1
+                }
             }
 
             continuation.finish()
