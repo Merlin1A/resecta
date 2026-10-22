@@ -87,6 +87,7 @@ struct DocumentEditorView: View {
     // overallStatus, so at most one case is ever non-nil, and the type
     // itself now says so rather than a convention across two Bools.
     @State private var shareRiskConfirmKind: ShareRiskConfirmKind?
+    @State private var shareConcealedPages: [Int] = []   // ConcealingAnnotations.pages, read at the Share tap
 
     // iPad hover popover state
     @State private var showHoverPopover = false
@@ -720,7 +721,7 @@ struct DocumentEditorView: View {
             kind: $shareRiskConfirmKind,
             documentState: documentState,
             deselectionSnapshot: redactionState.lastRunInputs?.deselection,
-            beginExport: beginExport
+            beginExport: beginExport, concealedPages: shareConcealedPages
         ))
         .onDisappear {
             dismissBannerTask?.cancel()
@@ -1485,38 +1486,9 @@ struct DocumentEditorView: View {
     private var previewAvailable: Bool { outputFileExists }
 
     private func handleExportTap(report: VerificationReport) {
-        // FAIL override / "Option B": a standing FAIL/ATTENTION verdict
-        // (not yet overridden) routes the Share tap through the bespoke
-        // share-risk confirm sheet before any export. WARN/INFO/PASS (and an
-        // already-overridden FAIL/ATTENTION) fall straight through to the
-        // share sheet.
-        if Self.shareNeedsFailConfirm(
-            report: report,
-            acknowledged: documentState.failShareAcknowledged
-        ) {
-            shareRiskConfirmKind = .failOrAttention(report)
-            return
-        }
-        // Skipped-share confirm: an unacknowledged SKIPPED report routes
-        // through the same sheet — the user is sharing an output whose
-        // redaction was never verified. Mutually exclusive with the FAIL
-        // branch by overallStatus.
-        if Self.shareNeedsSkippedConfirm(
-            report: report,
-            acknowledged: documentState.skippedShareAcknowledged
-        ) {
-            shareRiskConfirmKind = .skipped(report)
-            return
-        }
-        // Incomplete-WARN confirm — a WARN whose digest-dependent layers
-        // were skipped, or whose layers include a could-not-verify WARN,
-        // not yet acknowledged. Mutually exclusive with both branches above
-        // by overallStatus.
-        if Self.shareNeedsIncompleteWarnConfirm(
-            report: report,
-            acknowledged: documentState.incompleteWarnShareAcknowledged
-        ) {
-            shareRiskConfirmKind = .incompleteWarn(report)
+        shareConcealedPages = ConcealingAnnotations.pages(in: documentState.sourceDocument, regions: redactionState.regions)
+        if let kind = Self.shareConfirmKind(report: report, documentState: documentState, concealedPages: shareConcealedPages) {
+            shareRiskConfirmKind = kind
             return
         }
         beginExport(report: report)

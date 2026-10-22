@@ -67,6 +67,44 @@ extension DocumentEditorView {
     /// parameter, sourced at the call site from
     /// `DocumentState.incompleteWarnShareAcknowledged`. Pure + `static` for
     /// the same testability reason as the two siblings.
+    /// The Share tap's gate (moved from `handleExportTap`): the confirm
+    /// family the tap routes through, or nil to share directly. In order:
+    /// a standing FAIL/ATTENTION verdict (FAIL override / "Option B"; WARN,
+    /// INFO and PASS and an overridden FAIL fall through), an unacknowledged
+    /// SKIPPED report (the redaction was never verified), an incomplete WARN
+    /// (skipped digest-dependent layers or a could-not-verify WARN) — the
+    /// three exclusive by `overallStatus` — then, on any verdict, source
+    /// annotations over text no box covers (`concealedPages`), whose line
+    /// the first three families' sheets carry as well.
+    static func shareConfirmKind(
+        report: VerificationReport, documentState: DocumentState, concealedPages: [Int]
+    ) -> ShareRiskConfirmKind? {
+        if shareNeedsFailConfirm(report: report, acknowledged: documentState.failShareAcknowledged) {
+            return .failOrAttention(report)
+        }
+        if shareNeedsSkippedConfirm(report: report, acknowledged: documentState.skippedShareAcknowledged) {
+            return .skipped(report)
+        }
+        if shareNeedsIncompleteWarnConfirm(report: report, acknowledged: documentState.incompleteWarnShareAcknowledged) {
+            return .incompleteWarn(report)
+        }
+        if shareNeedsConcealedAnnotationsConfirm(
+            pages: concealedPages, acknowledged: documentState.concealedAnnotationsShareAcknowledged) {
+            return .concealedAnnotations(report)
+        }
+        return nil
+    }
+
+    /// Concealing-annotations confirm predicate: annotations in the source
+    /// covered text no redaction box covers (`ConcealingAnnotations.pages`),
+    /// not yet acknowledged for this send — on EVERY verdict, PASS included:
+    /// the checks read the output, where the annotation is gone and the text
+    /// is ordinary page text. Read last in `handleExportTap`; when another
+    /// family presents, its sheet carries the same line.
+    static func shareNeedsConcealedAnnotationsConfirm(pages: [Int], acknowledged: Bool) -> Bool {
+        !pages.isEmpty && !acknowledged
+    }
+
     static func shareNeedsIncompleteWarnConfirm(
         report: VerificationReport, acknowledged: Bool
     ) -> Bool {
@@ -186,7 +224,12 @@ extension DocumentEditorView {
             documentState.acknowledgeSkippedShare()
         case .incompleteWarn:
             documentState.acknowledgeIncompleteWarnShare()
+        case .concealedAnnotations:
+            break
         }
+        // Every family's sheet carries the concealing-annotations line when
+        // it applies, so a completed confirm acknowledges it as well.
+        documentState.acknowledgeConcealedAnnotationsShare()
         shareRiskConfirmHaptic()
         if case .verified(let report) = documentState.phase {
             beginExport(report)
@@ -212,19 +255,23 @@ enum ShareRiskConfirmKind: Identifiable {
     /// WARN whose digest-dependent layers were skipped, or whose layers
     /// include a could-not-verify WARN (`CouldNotVerifyWarn`).
     case incompleteWarn(VerificationReport)
+    /// Annotations in the source covered text no redaction box covers, and
+    /// no other family applies (`ConcealingAnnotations`).
+    case concealedAnnotations(VerificationReport)
 
     var id: String {
         switch self {
         case .failOrAttention: "failOrAttention"
         case .skipped: "skipped"
         case .incompleteWarn: "incompleteWarn"
+        case .concealedAnnotations: "concealedAnnotations"
         }
     }
 
     /// The captured report, for display derivation.
     var report: VerificationReport {
         switch self {
-        case .failOrAttention(let r), .skipped(let r), .incompleteWarn(let r): r
+        case .failOrAttention(let r), .skipped(let r), .incompleteWarn(let r), .concealedAnnotations(let r): r
         }
     }
 
@@ -238,6 +285,7 @@ enum ShareRiskConfirmKind: Identifiable {
         case .failOrAttention: "shareAnywayConfirm"
         case .skipped: "shareSkippedConfirm"
         case .incompleteWarn: "shareIncompleteWarnConfirm"
+        case .concealedAnnotations: "shareConcealedAnnotationsConfirm"
         }
     }
 
@@ -247,6 +295,7 @@ enum ShareRiskConfirmKind: Identifiable {
         case .failOrAttention: DocumentEditorView.shareRiskConfirmTitle
         case .incompleteWarn: DocumentEditorView.shareIncompleteConfirmTitle
         case .skipped: DocumentEditorView.shareSkippedConfirmTitle
+        case .concealedAnnotations: ConcealingAnnotations.confirmTitle
         }
     }
 
@@ -256,7 +305,7 @@ enum ShareRiskConfirmKind: Identifiable {
         switch self {
         case .failOrAttention: DocumentEditorView.shareRiskConfirmListHeader
         case .incompleteWarn: DocumentEditorView.shareIncompleteListHeader
-        case .skipped: nil
+        case .skipped, .concealedAnnotations: nil
         }
     }
 
@@ -271,7 +320,7 @@ enum ShareRiskConfirmKind: Identifiable {
             DocumentEditorView.atRiskItemLines(report: report)
         case .incompleteWarn(let report):
             DocumentEditorView.couldNotVerifyItemLines(report: report)
-        case .skipped:
+        case .skipped, .concealedAnnotations:
             []
         }
     }
@@ -297,6 +346,9 @@ struct ShareRiskConfirmPresentation: ViewModifier {
     let documentState: DocumentState
     let deselectionSnapshot: RedactionState.DeselectionSnapshot?
     let beginExport: (VerificationReport) -> Void
+    /// 0-based pages where a source annotation covered text no box covers
+    /// (`ConcealingAnnotations.pages`), read at the Share tap.
+    var concealedPages: [Int] = []
 
     func body(content: Content) -> some View {
         content
@@ -304,6 +356,7 @@ struct ShareRiskConfirmPresentation: ViewModifier {
                 ShareRiskConfirmSheet(
                     kind: activeKind,
                     deselectionSnapshot: deselectionSnapshot,
+                    concealedPages: concealedPages,
                     onConfirm: {
                         DocumentEditorView.completeShareRiskConfirm(
                             kind: activeKind,
@@ -325,6 +378,7 @@ struct ShareRiskConfirmPresentation: ViewModifier {
 struct ShareRiskConfirmSheet: View {
     let kind: ShareRiskConfirmKind
     let deselectionSnapshot: RedactionState.DeselectionSnapshot?
+    var concealedPages: [Int] = []
     let onConfirm: () -> Void
     let onCancel: () -> Void
 
@@ -372,6 +426,15 @@ struct ShareRiskConfirmSheet: View {
                         // never the masthead's sentence, which points at
                         // the results below the sheet.
                         itemList
+                    case .concealedAnnotations:
+                        EmptyView()   // its line is the cross-cutting one below
+                    }
+
+                    // Cross-cutting like the deselection line: the source's
+                    // annotations covered text no box covers.
+                    if !concealedPages.isEmpty {
+                        Text(ConcealingAnnotations.confirmLine(pages: concealedPages))
+                            .font(.subheadline)
                     }
 
                     // The share reminder keeps its own rule — any item left
