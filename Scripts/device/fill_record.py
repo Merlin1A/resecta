@@ -39,6 +39,7 @@ import re
 import sys
 import tempfile
 
+sys.dont_write_bytecode = True  # importing the sibling reader leaves no cache beside it
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from xctrace_facts import allowed_text  # noqa: E402
 
