@@ -162,9 +162,10 @@ extension VerificationCorpusRunnerTests {
     /// for the harness's manual regions — the seeds WITHOUT a value (a GT
     /// seed with a value stands for a detected region and keeps the
     /// matched-text rule above). On a page whose text layer is rich the
-    /// words fully inside the region (the engine's word-span primitive) join
-    /// the set: a multi-word run as one substring term plus each token of
-    /// three or more scalars bounded; a single word as one bounded token.
+    /// words the Searchable filter would touch join the set line by line
+    /// (`capturedLines`): a region over one word keeps it bounded; else each
+    /// line of two or more words as its verbatim span, unbounded, plus each
+    /// word the admission rule keeps (`VerificationCorpusStopWords.admits`).
     /// On any other page the region is counted, not captured. A whole-page
     /// region (area ≥ 0.95) is skipped; a below-floor or out-of-range seed
     /// never became a region and is ignored.
@@ -186,14 +187,16 @@ extension VerificationCorpusRunnerTests {
                 withoutText += 1
                 continue
             }
-            let words = TextSpan.words(fullyInside: rect, polygon: region.vertices, on: page)
-                .map(\.text)
+            let lines = capturedLines(touching: rect, polygon: region.vertices, on: page)
+            let words = lines.flatMap(\.words)
             if words.count == 1 {
                 insert(words[0], bounded: true)
             } else if words.count > 1 {
-                insert(words.joined(separator: " "), bounded: false)
-                for word in words where word.unicodeScalars.count >= 3 {
-                    insert(word, bounded: true)
+                for line in lines {
+                    if line.words.count > 1 { insert(line.text, bounded: false) }
+                    for word in line.words where VerificationCorpusStopWords.admits(word) {
+                        insert(word, bounded: true)
+                    }
                 }
             }
         }
@@ -201,6 +204,57 @@ extension VerificationCorpusRunnerTests {
             SensitiveTerm(text: $0.key, requiresTokenBoundary: $0.value)
         }.sorted { $0.text < $1.text }
         return (terms, withoutText)
+    }
+
+    /// The app's capture reader (`ManualCapturePageWords.lines(touching:polygon:)`)
+    /// in lockstep: a word is taken when its box meets the region, or meets
+    /// the region's 3-pt halo while the region meets the word's own line
+    /// band; with a polygon the word's centre must lie inside it. Consecutive
+    /// taken words whose boxes overlap vertically form one line, whose text
+    /// is the page text's verbatim span from the first word to the last when
+    /// their ranges read in order with no line break inside, else the words
+    /// space-joined. Lines never join across.
+    static func capturedLines(
+        touching rect: CGRect, polygon: [CGPoint]?, on page: PDFPage
+    ) -> [(text: String, words: [String])] {
+        guard rect.width > 0, rect.height > 0,
+              let source = EmbeddedTextSource.make(from: page),
+              let pageText = page.string else { return [] }
+        let size = effectiveBounds(page.bounds(for: .cropBox), rotation: page.rotation).size
+        guard size.width > 0, size.height > 0 else { return [] }
+        let text = pageText as NSString
+        let entries = source.wordBounds
+            .filter { NSMaxRange($0.range) <= text.length }
+            .map { (box: $0.normalizedRect, range: $0.range) }
+        let halo = rect.insetBy(dx: -3.0 / size.width, dy: -3.0 / size.height)
+        var lines: [[(box: CGRect, range: NSRange)]] = []
+        var previousIndex = -1
+        for (index, word) in entries.enumerated() {
+            let onBand = rect.minY < word.box.maxY && word.box.minY < rect.maxY
+            guard word.box.intersects(rect) || (onBand && word.box.intersects(halo)) else { continue }
+            if let polygon, polygon.count >= 3,
+               !pointInPolygon(CGPoint(x: word.box.midX, y: word.box.midY), vertices: polygon) {
+                continue
+            }
+            if index == previousIndex + 1, let last = lines.last?.last,
+               last.box.minY < word.box.maxY && word.box.minY < last.box.maxY {
+                lines[lines.count - 1].append(word)
+            } else {
+                lines.append([word])
+            }
+            previousIndex = index
+        }
+        return lines.map { line in
+            let words = line.map { text.substring(with: $0.range) }
+            guard let first = line.first, let last = line.last, line.count > 1,
+                  first.range.location < last.range.location else {
+                return (words.joined(separator: " "), words)
+            }
+            let span = text.substring(
+                with: NSRange(location: first.range.location,
+                              length: NSMaxRange(last.range) - first.range.location))
+            return (span.rangeOfCharacter(from: .newlines) == nil ? span : words.joined(separator: " "), words)
+        }
     }
 
     /// The app's dedup across contributors: one entry per text, plain
