@@ -254,7 +254,7 @@ enum VerificationDebugFixtures {
                 .fontVerification: row(.fontVerification, .warn("Could not inspect page fonts on page 3"),
                                        short: "Could not inspect page fonts on page 3", pages: [2], cnv: true),
             ]),
-            overallStatus: .attention(twoTerms), durationSeconds: 7.9,
+            overallStatus: .attention(twoTerms), durationSeconds: 7.4,
             perPageModes: mixed, perPageFallbackReasons: mixedReasons)
     }()
 
@@ -328,14 +328,15 @@ enum VerificationDebugFixtures {
 
     // MARK: - Previews
 
+    /// The whole results screen on a fixture, as a seeded launch shows it
+    /// with an output (Share live, page links on).
     @MainActor
     static func section(_ report: VerificationReport) -> some View {
-        ScrollView {
-            VerificationDetailsSection(report: report, deselectionSnapshot: nil,
-                                       isExpanded: .constant(true), columnMaxWidth: 380)
-                .padding(ResectaTokens.Spacing.md)
-        }
-        .environment(DocumentState())
+        VerificationResultsView(
+            report: report, canExport: true, outputExists: true, isVerificationStale: false,
+            previewAvailable: true, onExport: {}, onRunVerification: {})
+            .environment(DocumentState())
+            .environment(RedactionState())
     }
 }
 

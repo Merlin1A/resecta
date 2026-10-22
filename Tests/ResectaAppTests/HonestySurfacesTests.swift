@@ -50,15 +50,9 @@ struct HonestyDisclaimerMountTests {
         }
     }
 
-    // The disclaimer's one gate-wrapped mount is the LAST element of the
-    // page on EVERY verdict — inside the footer block beneath the
-    // trust strip, after the timing footer's mount — no per-status
-    // placement branches. On SKIPPED there is no timing line, so the
-    // disclaimer sits directly under the strip (accepted as-falls).
-    // The block's spacing is `disclaimerFootGap` (144 pt,
-    // was `Spacing.sm`) so the note starts below the first screen at the
-    // default type size on the 6.3″ and 6.9″ phones.
-    @Test("Placement: one gate-wrapped mount, last on the page beneath the trust strip and the timing footer, spaced by disclaimerFootGap")
+    // The disclaimer is the last section's footer: one gate-wrapped mount,
+    // under the completion line, above the trust line that closes the page.
+    @Test("Placement: one gate-wrapped mount, under the completion line, above the trust line")
     func disclaimerMountSitsAtThePageFoot() throws {
         let source = try loadRepoFile(
             "Sources/ResectaApp/Views/VerificationResultsView.swift")
@@ -66,45 +60,28 @@ struct HonestyDisclaimerMountTests {
             separatedBy: "Self.shouldShowHonestyDisclaimer(").count - 1
         #expect(gateCalls == 1,
                 "expected exactly ONE gated disclaimer mount in the body, found \(gateCalls)")
-        // Ordering inside the page stack, by mount position: the trust
-        // strip, then the timing footer's mount, then the disclaimer's.
-        guard let stackStart = source.range(
-                  of: "VStack(spacing: ResectaTokens.Spacing.xl) {"),
-              let strip = source.range(
-                  of: "\n                    trustStrip\n",
-                  range: stackStart.upperBound..<source.endIndex),
-              let footerMount = source.range(
-                  of: "\n                            footer\n",
-                  range: strip.upperBound..<source.endIndex),
-              let disclaimerMount = source.range(
-                  of: "\n                            honestyDisclaimer\n",
-                  range: footerMount.upperBound..<source.endIndex)
+        // The page stack: the sections, then the footer block, then the trust line.
+        guard let sections = source.range(of: "VerificationDetailsSection("),
+              let footer = source.range(of: "\n                        footerBlock\n",
+                                        range: sections.upperBound..<source.endIndex),
+              let trust = source.range(of: "                        trustStrip\n",
+                                       range: footer.upperBound..<source.endIndex)
         else {
-            Issue.record("Could not locate the page stack's trustStrip → footer → honestyDisclaimer mounts")
+            Issue.record("Could not locate the page stack's sections → footerBlock → trustStrip mounts")
             return
         }
-        #expect(strip.upperBound <= footerMount.lowerBound
-                    && footerMount.upperBound <= disclaimerMount.lowerBound,
-                "the disclaimer mount must be the last element, beneath trustStrip and the footer mount")
-        // The two mounts share ONE footer block spaced by
-        // `disclaimerFootGap` (was `Spacing.sm`).
-        #expect(source.contains(
-            "VStack(spacing: Self.disclaimerFootGap) {\n"
-            + "                        if Self.shouldShowRunBreakdown(report: report) {\n"
-            + "                            footer\n"
-            + "                        }\n"
-            + "                        if Self.shouldShowHonestyDisclaimer("),
-                "the timing footer and the disclaimer must share one footer block spaced by disclaimerFootGap")
-    }
-
-    // The gap is a pinned value — 3 × `Spacing.xxl` =
-    // 144 pt, sized from the measured PASS layout so the note's top edge
-    // lands ≈23 pt below the 6.9″ screen and ≈105 pt below the 6.3″ one.
-    // Re-measure before changing it (the App Store frame depends on it).
-    @Test("The timing-line → disclaimer gap is 3 × Spacing.xxl = 144 pt")
-    func disclaimerFootGapIsPinned() {
-        #expect(VerificationResultsView.disclaimerFootGap == 144)
-        #expect(VerificationResultsView.disclaimerFootGap == ResectaTokens.Spacing.xxl * 3)
+        #expect(sections.upperBound <= footer.lowerBound && footer.upperBound <= trust.lowerBound)
+        // Inside the footer block: the completion line, then the disclaimer.
+        guard let block = source.range(of: "private var footerBlock: some View {"),
+              let completion = source.range(of: "Self.completionLineText(report: report)",
+                                            range: block.upperBound..<source.endIndex),
+              let mount = source.range(of: "\n                honestyDisclaimer\n",
+                                       range: completion.upperBound..<source.endIndex)
+        else {
+            Issue.record("Could not locate the footer block's completion line → honestyDisclaimer")
+            return
+        }
+        #expect(completion.upperBound <= mount.lowerBound)
     }
 
     @Test("Results view mounts the .redacted-profile disclaimer (source pin)")
@@ -465,15 +442,18 @@ struct RunFactsStripTests {
 
     // MARK: - Source pin (mirrors HonestyDisclaimerMountTests.resultsViewMountsRedactedProfile)
 
-    @Test("VerificationResultsView mounts runFactsStrip")
+    @Test("The run facts mount as the run section's first rows")
     func sourcePinsForNewMounts() throws {
-        // The non-visual limit line was removed (and with it the
-        // RedactedPreviewView label composition) — the strip pin is
-        // what remains of the earlier source pins.
+        // The results view threads the lines in; the run section mounts
+        // them, the first carrying the `runFactsStrip` identifier.
         let viewSource = try loadRepoFile(
             "Sources/ResectaApp/Views/VerificationResultsView.swift")
-        #expect(viewSource.contains("runFactsStrip"),
-                "VerificationResultsView must mount the run-facts strip")
+        #expect(viewSource.contains("runFactsLines: runFactsLines"),
+                "VerificationResultsView must thread the run facts into the sections")
+        let sectionSource = try loadRepoFile(
+            "Sources/ResectaApp/Views/VerificationDetailsSection.swift")
+        #expect(sectionSource.contains("\"runFactsStrip\""),
+                "the run section must mount the run-facts rows")
     }
 
     private func loadRepoFile(

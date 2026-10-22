@@ -471,7 +471,7 @@ struct PipelineRunner {
 
         sink(.verified(report, burnedRegionVersion: burnedRegionVersion))
         // VoiceOver overall announcement
-        sink(.announce("Verification complete. \(report.overallStatus.accessibilityLabel)"))
+        sink(.announce("Verification complete. \(VerificationResultsView.mastheadAccessibilityLabel(report: report))"))
         return .completed
     }
 }

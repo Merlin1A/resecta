@@ -3,60 +3,15 @@ import Foundation
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// The share confirm's words and Share's spoken hint. The hint is spoken
-// exactly when tapping Share opens a confirm: it reads the live confirm
-// predicates with their acknowledgements, so after a completed share — the
-// acknowledgement spent — it promises nothing. The confirm sheet's lines
-// name each check by its title, the outcome and the pages; never an engine
-// sentence, never matched text.
+// The share confirm's words: the sheet's lines name each check by its
+// title, the outcome and the pages; never an engine sentence, never
+// matched text. (Share's spoken hint is pinned with the actions.)
 
-@Suite("Share confirm copy and hint", .tags(.display))
+@Suite("Share confirm copy", .tags(.display))
 @MainActor
 struct ShareRiskConfirmCopyTests {
 
     typealias Fixtures = VerificationDebugFixtures
-
-    static func willConfirm(_ report: VerificationReport, canExport: Bool = true,
-                            fail: Bool = false, skipped: Bool = false, incomplete: Bool = false) -> Bool {
-        VerificationResultsView.shareWillConfirm(
-            report: report, canExport: canExport, failAcknowledged: fail,
-            skippedAcknowledged: skipped, incompleteWarnAcknowledged: incomplete)
-    }
-
-    @Test("The hint text is spoken only — one sentence, no promise")
-    func hintText() {
-        #expect(VerificationResultsView.shareConfirmHint == "Asks you to confirm before sharing.")
-    }
-
-    @Test("The hint follows the confirm families: FAIL, ATTENTION, SKIPPED, the incomplete WARN")
-    func hintWhereAConfirmOpens() {
-        #expect(Self.willConfirm(Fixtures.secureFail))
-        #expect(Self.willConfirm(Fixtures.searchableAttentionMixed))
-        #expect(Self.willConfirm(Fixtures.secureSkippedOff))
-        #expect(Self.willConfirm(Fixtures.searchableSkipInduced))
-        #expect(!Self.willConfirm(Fixtures.secureAllPass))
-        #expect(!Self.willConfirm(Fixtures.secureWarningOnly))
-        #expect(!Self.willConfirm(Fixtures.securePassRidingNote))
-    }
-
-    @Test("No hint once the family is acknowledged — after a completed share — or when Share is disabled")
-    func noHintWhenNoConfirmOpens() {
-        #expect(!Self.willConfirm(Fixtures.secureFail, fail: true))
-        #expect(!Self.willConfirm(Fixtures.searchableAttentionMixed, fail: true))
-        #expect(!Self.willConfirm(Fixtures.secureSkippedOff, skipped: true))
-        #expect(!Self.willConfirm(Fixtures.searchableSkipInduced, incomplete: true))
-        for report in [Fixtures.secureFail, Fixtures.secureSkippedOff, Fixtures.searchableSkipInduced] {
-            #expect(!Self.willConfirm(report, canExport: false))
-        }
-        // The hint is the predicates, never the rows: the predicates alone
-        // decide, verdict by verdict.
-        for (_, report) in Fixtures.all {
-            let predicates = DocumentEditorView.shareNeedsFailConfirm(report: report, acknowledged: false)
-                || DocumentEditorView.shareNeedsSkippedConfirm(report: report, acknowledged: false)
-                || DocumentEditorView.shareNeedsIncompleteWarnConfirm(report: report, acknowledged: false)
-            #expect(Self.willConfirm(report) == predicates)
-        }
-    }
 
     @Test("The FAIL/ATTENTION family's lines: title, outcome, pages, the short titles")
     func atRiskLines() {

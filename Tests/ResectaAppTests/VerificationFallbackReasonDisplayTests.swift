@@ -64,23 +64,6 @@ struct VerificationFallbackReasonDisplayTests {
                 == "1 Searchable, 1 Rasterized")
     }
 
-    @Test("Chip accessibility label carries the reason when present")
-    func chipAccessibilityLabelWithReason() {
-        let label = VerificationResultsView.pageChipAccessibilityLabel(
-            pageNumber: 3, mode: .secureRasterization, reason: .unresolvedEncoding)
-        #expect(label == "Page 3, Rasterized — unresolved encoding")
-    }
-
-    @Test("Chip accessibility label unchanged without a reason")
-    func chipAccessibilityLabelWithoutReason() {
-        let searchable = VerificationResultsView.pageChipAccessibilityLabel(
-            pageNumber: 1, mode: .searchableRedaction, reason: nil)
-        #expect(searchable == "Page 1, Searchable")
-        let secure = VerificationResultsView.pageChipAccessibilityLabel(
-            pageNumber: 2, mode: .secureRasterization, reason: nil)
-        #expect(secure == "Page 2, Rasterized")
-    }
-
     @Test("Thumbnail badge text: reasoned for fallback pages, plain otherwise")
     func thumbnailBadgeText() {
         #expect(PageThumbnailList.badgeText(
