@@ -9,11 +9,10 @@ import SwiftUI
 // gaps in the system snapshot.
 //
 // Behavior contract:
-// - Opaque `Color(uiColor: .systemBackground)` fill (no transparency).
-// - Branded placeholder: the `doc.text.redact` SF Symbol + "Resecta" label,
-//   with `doc.viewfinder` as the fallback where the running OS has no such
-//   symbol (the KI-3 guard, as on the home and EULA screens) — the overlay
-//   never renders icon-less.
+// - Opaque grouped background fill (the home screen's grey; no transparency).
+// - Branded placeholder: the app's mark drawn from shapes (`HomeMark`, as
+//   on the home and first-launch screens) + "Resecta" label, always centred
+//   in the window — the overlay covers every screen, not Home alone.
 // - No taps, no gestures, no interactivity — the overlay must not race with
 //   the system snapshotting path.
 // - Reveal animation lives in the call site (ResectaApp) so this view stays
@@ -21,18 +20,11 @@ import SwiftUI
 //
 // No animation change to the obscure path.
 struct SnapshotPrivacyOverlay: View {
-    /// KI-3: `doc.text.redact` availability is checked on the running OS;
-    /// `doc.viewfinder` stands in where it resolves to nothing.
-    static let symbolName: String =
-        UIImage(systemName: "doc.text.redact") != nil ? "doc.text.redact" : "doc.viewfinder"
-
     var body: some View {
         ZStack {
-            Color(uiColor: .systemBackground)
+            Color(.systemGroupedBackground)
             VStack(spacing: ResectaTokens.Spacing.sm) {
-                Image(systemName: Self.symbolName)
-                    .font(.system(size: 48))
-                    .foregroundStyle(.secondary)
+                HomeMark(height: ResectaTokens.HomeEntry.markHeight)
                 Text("Resecta")
                     .font(.title2)
                     .foregroundStyle(.secondary)

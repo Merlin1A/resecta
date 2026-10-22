@@ -31,13 +31,19 @@ struct SnapshotOverlayTests {
         #expect(action == .obscureSynchronously)
     }
 
-    @Test("The overlay's symbol name resolves to an image on the running OS")
-    func symbolNameResolves() {
-        // The KI-3 guard picks `doc.text.redact` where the OS has it and
-        // `doc.viewfinder` otherwise; either way the name must render.
-        #expect(UIImage(systemName: SnapshotPrivacyOverlay.symbolName) != nil,
-                "the chosen symbol must resolve: \(SnapshotPrivacyOverlay.symbolName)")
-        #expect(["doc.text.redact", "doc.viewfinder"].contains(SnapshotPrivacyOverlay.symbolName))
+    @Test("The overlay draws the app's mark on the grouped background and looks up no symbol")
+    func overlayDrawsTheMark() throws {
+        // The placeholder is the app's mark drawn from shapes, centred on
+        // the grouped grey: no SF Symbol is looked up, so no OS-version
+        // guard exists.
+        let path = URL(fileURLWithPath: "\(#filePath)")
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/ResectaApp/Views/SnapshotPrivacyOverlay.swift")
+        let source = try String(contentsOf: path, encoding: .utf8)
+        #expect(source.contains("HomeMark("))
+        #expect(source.contains("systemGroupedBackground"))
+        #expect(!source.contains("UIImage(systemName:"))
+        #expect(!source.contains("symbolName"))
     }
 
     @Test("`.background` also maps to synchronous obscure")

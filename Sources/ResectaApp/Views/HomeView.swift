@@ -1,10 +1,10 @@
 import SwiftUI
-import UIKit
 
-// Variant B home screen — wordmark masthead, three choice cards (Open a
-// Document / Import Photos / Try the Sample), trust strip, version footer.
+// The home screen — the app's mark over the wordmark and tagline, three
+// entries (Open a Document · Import Photos · Try the Sample), the trust
+// words and the version, centred between the bar and the home indicator.
 // Mechanism-description language only — no outcome promises.
-// Frozen strings: tagline, card bodies, trust labels.
+// Frozen strings: the tagline and the trust words.
 
 struct HomeView: View {
     @Environment(AppCoordinator.self) private var appCoordinator
@@ -15,17 +15,24 @@ struct HomeView: View {
     @State private var showFilePicker = false
     @State private var showPhotoPicker = false
     @State private var showSettings = false
+    /// The scroll view's visible height, read from its geometry; the stack is
+    /// given it as a minimum height so it centres when it fits and scrolls
+    /// from the top when it does not.
+    @State private var viewportHeight: CGFloat = 0
+    /// Armed when an entry opens a workspace, so a second tap before the
+    /// switch opens nothing more; a cancelled picker opens no workspace and
+    /// leaves the entries live. Home is rebuilt on every return, so the flag
+    /// needs no reset.
+    @State private var isOpening = false
     // The prior `showImportError` state field
     // drove a generic `.alert("Import Error", ...)` on HomeView. Removed —
     // import errors now uniformly surface through the workspace-level
     // FailedStateView via `.failed(.importError(.corrupt))`. See
     // `handleFileImportResult` for the failure-routing path.
 
-    // KI-3: doc.text.redact SF Symbol availability unverified for iOS 26.
-    private var heroSymbol: String {
-        UIImage(systemName: "doc.text.redact") != nil
-            ? "doc.text.redact" : "doc.viewfinder"
-    }
+    static let tagline = "On-device PDF redaction designed to remove the underlying content."
+
+    private var isAccessibilitySize: Bool { dynamicTypeSize.isAccessibilitySize }
 
     var body: some View {
         NavigationStack {
@@ -34,17 +41,34 @@ struct HomeView: View {
                     .ignoresSafeArea()
 
                 ScrollView(.vertical, showsIndicators: false) {
-                    VStack(spacing: ResectaTokens.Spacing.xl) {
+                    VStack(spacing: 0) {
                         masthead
-                        choiceStack
-                        trustStrip
+                        Spacer().frame(height: ResectaTokens.Spacing.xl)
+                        entries
+                        if isAccessibilitySize {
+                            // The tagline moves below the entries; the
+                            // masthead element keeps speaking it.
+                            Spacer().frame(height: ResectaTokens.Spacing.lg)
+                            taglineText
+                                .accessibilityHidden(true)
+                        }
+                        Spacer().frame(height: ResectaTokens.Spacing.lg)
+                        TrustLine()
+                            .frame(maxWidth: columnMaxWidth)
+                        Spacer().frame(height: ResectaTokens.Spacing.sm)
                         footer
                     }
                     .padding(.horizontal, ResectaTokens.Spacing.md)
-                    .padding(.vertical, dynamicTypeSize.isAccessibilitySize
-                        ? ResectaTokens.Spacing.lg : ResectaTokens.Spacing.xxl)
-                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, ResectaTokens.HomeEntry.verticalPad)
+                    .frame(maxWidth: .infinity, minHeight: viewportHeight, alignment: .center)
                 }
+                .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                    // containerSize is already inset by the bar and the home indicator.
+                    geometry.containerSize.height
+                } action: { _, height in
+                    viewportHeight = max(0, height)
+                }
+
                 .scrollBounceBehavior(.basedOnSize)
             }
             .toolbarTitleDisplayMode(.inline)
@@ -58,6 +82,7 @@ struct HomeView: View {
                     // white in dark; scoped to the button, so the Settings
                     // sheet's own tint is unaffected.
                     .tint(.primary)
+                    .accessibilityIdentifier("homeSettingsButton")
                 }
             }
             .fileImporter(
@@ -68,12 +93,23 @@ struct HomeView: View {
                 handleFileImportResult(result)
             }
             .photoImport(isPresented: $showPhotoPicker) { images, count in
+                guard !isOpening else { return }
+                isOpening = true
                 Task { await appCoordinator.openRedactWithImages(images, count: count) }
             }
             .sheet(isPresented: $showSettings) {
                 SettingsView()
                     .environment(settingsState)
                     .presentationDetents([.medium, .large])
+            }
+            // The failed screen's "Choose Another File" asks for the door the
+            // document came through to open again; the fresh Home presents it.
+            .task {
+                switch appCoordinator.consumeReopenDoor() {
+                case .files: showFilePicker = true
+                case .photos: showPhotoPicker = true
+                default: break
+                }
             }
             #if DEBUG
             // Sim-verification hook (read-only MCP — no taps): open the
@@ -102,68 +138,70 @@ struct HomeView: View {
             : ResectaTokens.BrandedSurface.panelMaxWidthCompact
     }
 
+    private var taglineText: some View {
+        Text(Self.tagline)
+            .font(.subheadline)
+            .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: ResectaTokens.HomeEntry.taglineMaxWidth)
+    }
+
+    /// The mark, the wordmark and the tagline: one spoken heading. At the
+    /// accessibility sizes the mark is hidden and the tagline shows below
+    /// the entries instead.
     private var masthead: some View {
         VStack(spacing: ResectaTokens.Spacing.sm) {
-            Image(systemName: heroSymbol)
-                .font(.system(size: 56))
-                .foregroundStyle(.primary)
-                .accessibilityHidden(true)
+            if !isAccessibilitySize {
+                HomeMark(height: ResectaTokens.HomeEntry.markHeight)
+            }
 
             Text("Resecta")
                 .font(.largeTitle.weight(.semibold))
                 .foregroundStyle(.primary)
 
-            Text("On-device PDF redaction designed to remove the underlying content.")
-                .font(.subheadline)
-                .foregroundStyle(ResectaTokens.SemanticColor.supportText)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 320)
+            if !isAccessibilitySize {
+                taglineText
+            }
         }
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Resecta") + Text(", ") + Text(Self.tagline))
+        .accessibilityAddTraits(.isHeader)
     }
 
-    private var choiceStack: some View {
-        VStack(spacing: ResectaTokens.Spacing.md) {
+    private var entries: some View {
+        VStack(spacing: ResectaTokens.HomeEntry.gap) {
             HomeChoiceCard(
                 symbol: "doc.badge.plus",
                 style: .primary,
                 title: "Open a Document",
                 bodyText: "Import a PDF or an image from Files. Nothing is uploaded.",
-                affordance: "Choose File →",
                 action: { showFilePicker = true }
             )
+            .accessibilityHint("Opens the Files picker.")
+            .accessibilityIdentifier("homeOpenDocument")
 
             HomeChoiceCard(
                 symbol: "photo.on.rectangle.angled",
                 style: .subtle,
                 title: "Import Photos",
-                bodyText: "Choose photos from your library. Each photo becomes one page; nothing is uploaded.",
-                affordance: "Choose Photos →",
+                bodyText: "Choose up to 20 photos, one page each. Nothing is uploaded.",
                 action: { showPhotoPicker = true }
             )
+            .accessibilityHint("Opens the system Photos picker.")
             .accessibilityIdentifier("homeImportPhotos")
 
             HomeChoiceCard(
-                symbol: "sparkles",
-                style: .subtle,
+                symbol: "doc.text",
+                style: .row,
                 title: "Try the Sample",
-                bodyText: "Open a bundled sample bank statement to see what Resecta does before importing your own.",
-                affordance: "Open Sample →",
+                bodyText: "A bundled 3-page bank statement.",
                 action: { openSampleDocument() }
             )
+            .accessibilityHint("Opens the sample in the editor.")
+            .accessibilityIdentifier("homeTrySample")
         }
         .frame(maxWidth: columnMaxWidth)
-    }
-
-    private var trustStrip: some View {
-        FlowLayout(spacing: ResectaTokens.Spacing.sm, alignment: .center) {
-            TrustItem(label: "On-device")
-            Text("·").foregroundStyle(.tertiary).font(.footnote)
-            TrustItem(label: "No tracking")
-            Text("·").foregroundStyle(.tertiary).font(.footnote)
-            TrustItem(label: "Open source")
-        }
-        .frame(maxWidth: columnMaxWidth)
+        .disabled(isOpening)
     }
 
     private var footer: some View {
@@ -180,12 +218,17 @@ struct HomeView: View {
         switch result {
         case .success(let urls):
             guard let url = urls.first else { return }
+            guard !isOpening else { return }
+            isOpening = true
             Task {
                 await appCoordinator.openRedactWithDocument(url: url)
             }
         case .failure(let error):
-            // User cancellation returns CocoaError.userCancelled — no surface needed.
+            // A cancelled picker may be reported as `userCancelled`; nothing
+            // to show, no workspace opens, and the entries stay live.
             if (error as? CocoaError)?.code == .userCancelled { return }
+            guard !isOpening else { return }
+            isOpening = true
             // Open a fresh workspace and drive
             // its DocumentState to `.failed(.importError(.corrupt))`. The
             // workspace's FailedStateView is the same surface a corrupt-
@@ -194,7 +237,7 @@ struct HomeView: View {
             // prior dual-surface design (HomeView alert + workspace
             // FailedStateView). The user reaches workspace chrome and
             // can re-import via the standard recovery affordance.
-            appCoordinator.openRedact()
+            appCoordinator.openRedact(door: .files)
             guard case .redact(let workspace) = appCoordinator.activeWorkspace else { return }
             workspace.documentState.transition(to: .importing)
             workspace.documentState.transition(to: .failed(
@@ -208,13 +251,13 @@ struct HomeView: View {
     // workspace-scoped (created by RedactWorkspace), so we spin up a
     // fresh workspace before loading the doc — same pattern as the
     // --loadTestDocument debug hook in ResectaApp.swift.
-    // The "Try the Sample" card is a permanent affordance
+    // The "Try the Sample" entry is a permanent affordance
     // by design, so this path no longer flips a first-run flag.
-    // The dead `hasCompletedFirstRun` @AppStorage write+declaration (it had no
-    // reader anywhere in Sources/) was removed.
     private func openSampleDocument() {
+        guard !isOpening else { return }
+        isOpening = true
         Task {
-            appCoordinator.openRedact()
+            appCoordinator.openRedact(door: .sample)
             guard case .redact(let workspace) = appCoordinator.activeWorkspace else { return }
             await ImportService.loadSampleDocument(
                 documentState: workspace.documentState,

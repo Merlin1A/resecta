@@ -161,8 +161,9 @@ struct ResectaApp: App {
             // root (rather than nesting inside ContentView) is intended to
             // cover the full window on iPad Stage Manager and split-view.
             ZStack {
-                // EULA gate — show clickwrap before any app content
-                if disclaimerAccepted {
+                // EULA gate — show clickwrap before any app content; the
+                // host fades the gate out and the app in.
+                RootGate(accepted: disclaimerAccepted) {
                     ContentView()
                         .environment(settingsState)
                         .environment(savedRegexStore)
@@ -312,8 +313,6 @@ struct ResectaApp: App {
                             }
                             #endif
                         }
-                } else {
-                    EULAGateView()
                 }
 
                 // Branded placeholder rendered above all content
@@ -380,5 +379,37 @@ struct ResectaApp: App {
             // wherever the OS honors it.
             .tint(ResectaTokens.BrandTeal.tint)
         }
+    }
+}
+
+/// The root swap between the first-launch gate and the app, with the fade
+/// between them: the gate fades out, then the app fades in after the gate
+/// is gone, so the two marks never show together; under Reduce Motion one
+/// plain cross-fade. Hosted as a view so it reads the environment.
+private struct RootGate<Content: View>: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let accepted: Bool
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        // The app's fade waits out the gate's removal; under Reduce Motion
+        // both legs resolve to one 0.2-s fade and run together.
+        let delay: Double = reduceMotion ? 0 : 0.12
+        Group {
+            if accepted {
+                content()
+                    .transition(.asymmetric(
+                        insertion: .opacity.animation(
+                            ResectaTokens.Anim.resolved(.easeOut(duration: 0.18), reduceMotion: reduceMotion)?.delay(delay)),
+                        removal: .opacity))
+            } else {
+                EULAGateView()
+                    .transition(.asymmetric(
+                        insertion: .opacity,
+                        removal: .opacity.animation(
+                            ResectaTokens.Anim.resolved(.easeIn(duration: 0.12), reduceMotion: reduceMotion))))
+            }
+        }
+        .animation(ResectaTokens.Anim.resolved(.easeInOut(duration: 0.3), reduceMotion: reduceMotion), value: accepted)
     }
 }

@@ -91,7 +91,12 @@ extension PipelineError {
             case .passwordProtected:
                 "The document was not opened because its password was not entered. Choose the file again to enter the password."
             case .tooLarge(let bytes):
-                "This file is approximately \(bytes / (1024 * 1024)) MB. Try a smaller document or reduce the page count."
+                // The byte cap throws with a count over the cap; the page cap
+                // throws with the file's own (smaller) count, so the page
+                // sentence is the one that is true then.
+                bytes > ImportLimits.standard.maxBytes
+                    ? "This file is approximately \(bytes / (1024 * 1024)) MB. Try a smaller document or reduce the page count."
+                    : "This document has more than \(ImportLimits.standard.maxPages) pages. Try a document with fewer pages."
             case .unsupportedFormat:
                 "Resecta works with PDF files and JPEG, PNG and HEIC images. Other formats are not supported."
             case .invalidPageDimensions(let p):

@@ -113,7 +113,7 @@ struct VerificationProgressView: View {
                     // Trust strip below the shimmers — verification is
                     // the only multi-second wait in the app, so the privacy
                     // reassurance fits the moment. Mirrors HomeView's strip
-                    // exactly; reuses TrustItem + FlowLayout.
+                    // exactly; reuses the shared trust line.
                     trustStrip
                 }
             }
@@ -152,19 +152,13 @@ struct VerificationProgressView: View {
     }
 
     private var trustStrip: some View {
-        FlowLayout(spacing: ResectaTokens.Spacing.sm, alignment: .center) {
-            TrustItem(label: "On-device")
-            Text("·").foregroundStyle(.tertiary).font(.footnote)
-            TrustItem(label: "No tracking")
-            Text("·").foregroundStyle(.tertiary).font(.footnote)
-            TrustItem(label: "Open source")
-        }
-        .frame(maxWidth: columnMaxWidth)
+        TrustLine()
+            .frame(maxWidth: columnMaxWidth)
     }
 
     // MARK: - Layout helpers
 
-    /// Mirrors `HomeView.columnMaxWidth` (HomeView.swift:77-81) and
+    /// Mirrors `HomeView.columnMaxWidth` (HomeView's `columnMaxWidth`) and
     /// `VerificationResultsView.columnMaxWidth`. Lifted to a static helper
     /// so the gate is testable without a SwiftUI host (mirrors
     /// `shouldAutoReturnHome` and `shouldAutoExpand`).

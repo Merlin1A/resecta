@@ -1,9 +1,10 @@
 import SwiftUI
-import UIKit
 
 // First-launch clickwrap. Verbatim legal text — do NOT modify.
-// Full-screen cover, opaque background, no glass interference.
-// ScrollView wrapper for Dynamic Type accessibility (AX5).
+// A root view swap (the app's window shows this view until the terms are
+// accepted), opaque background, no glass interference.
+// ScrollView wrapper for Dynamic Type accessibility (AX5); I Agree stays
+// pinned beneath the scrolling text.
 // Legal text referenced from Legal.xcstrings catalog.
 
 struct EULAGateView: View {
@@ -18,8 +19,9 @@ struct EULAGateView: View {
     private static let supersededDisclaimerKeys: [String] = []
 
     // Mirror HomeView's content-column cap so the gate and the screen it
-    // precedes share the same width on regular-width (iPad) layouts.
+    // precedes share the same width on regular-width layouts.
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     // Which bundled legal document is open read-only over the
     // gate, if any. Viewing is presentation-only — nothing here touches
@@ -27,13 +29,11 @@ struct EULAGateView: View {
     // still-blocking gate.
     @State private var presentedDocument: LegalDocument?
 
-    // KI-3: doc.text.redact SF Symbol availability unverified for iOS 26.
-    private var appSymbolName: String {
-        UIImage(systemName: "doc.text.redact") != nil
-            ? "doc.text.redact" : "doc.viewfinder"
-    }
+    /// The scroll view's visible height; the column takes it as a minimum
+    /// height so it centres when it fits and scrolls when it does not.
+    @State private var viewportHeight: CGFloat = 0
 
-    // Mirrors HomeView.columnMaxWidth (HomeView.swift:82–86).
+    // Mirrors HomeView's `columnMaxWidth`.
     private var columnMaxWidth: CGFloat {
         horizontalSizeClass == .regular
             ? ResectaTokens.BrandedSurface.panelMaxWidthRegular
@@ -41,79 +41,92 @@ struct EULAGateView: View {
     }
 
     var body: some View {
-        VStack(spacing: ResectaTokens.Spacing.lg) {
-            // ScrollView activates only when content exceeds the
-            // available height (e.g., at AX5 Dynamic Type). The minHeight tied
-            // to the scroll viewport centers content vertically when it fits and
-            // yields to natural scrolling once content grows taller than the gate.
-            GeometryReader { proxy in
-                ScrollView {
-                    VStack(spacing: ResectaTokens.Spacing.md) {
-                        // Monochrome masthead-style glyph — matches HomeView's 56pt
-                        // `.primary` hero icon (HomeView.swift:90–92); no system tint.
-                        Image(systemName: appSymbolName)
-                            .font(.system(size: 56))
-                            .foregroundStyle(.primary)
-                            .accessibilityHidden(true)
-
-                        // Legal string catalog reference
-                        Text("eula_title", tableName: "Legal")
-                            .font(.title2.weight(.semibold))
-
-                        // Verbatim clickwrap text (do NOT modify).
-                        // Referenced from Legal.xcstrings.
-                        Text("eula_body", tableName: "Legal")
-                            .font(.body)
-                            .multilineTextAlignment(.center)
-
-                        // View-only access to the documents the
-                        // body asks agreement to, readable from the gate
-                        // itself. Plain borderless buttons — link
-                        // affordance without competing with "I Agree".
-                        VStack(spacing: ResectaTokens.Spacing.sm) {
-                            Button(String(localized: "eula_view_eula", table: "Legal")) {
-                                presentedDocument = .eula
-                            }
-                            .accessibilityIdentifier("eulaViewEULA")
-
-                            Button(String(localized: "eula_view_privacy", table: "Legal")) {
-                                presentedDocument = .privacyPolicy
-                            }
-                            .accessibilityIdentifier("eulaViewPrivacy")
-
-                            Button(String(localized: "eula_view_acknowledgements", table: "Legal")) {
-                                presentedDocument = .acknowledgements
-                            }
-                            .accessibilityIdentifier("eulaViewAcknowledgements")
-                        }
-                        .buttonStyle(.borderless)
-                        .padding(.top, ResectaTokens.Spacing.sm)
-                    }
-                    .frame(maxWidth: columnMaxWidth)   // cap content column (mirrors Home)
-                    // Fill the viewport so the capped column centers both
-                    // horizontally and vertically; content taller than the
-                    // viewport scrolls instead (minHeight, not height).
-                    .frame(maxWidth: .infinity, minHeight: proxy.size.height)
-                    .padding(.horizontal, ResectaTokens.Spacing.md)
+        ScrollView {
+            VStack(spacing: ResectaTokens.Spacing.md) {
+                // The app's mark, as the home screen draws it; hidden at
+                // the accessibility sizes, as there.
+                if !dynamicTypeSize.isAccessibilitySize {
+                    HomeMark(height: ResectaTokens.HomeEntry.markHeight)
+                        .padding(.bottom, ResectaTokens.Spacing.xs)
                 }
-                .scrollBounceBehavior(.basedOnSize)
-            }
 
-            // "I Agree" button pinned at bottom, outside scroll.
-            // Standard `.borderedProminent` (system accent) — kept identical to the
-            // app's other primary buttons (e.g. FailedStateView:80–83). Deliberately
-            // NOT re-tinted, so every primary action shares one button language.
-            Button(String(localized: "eula_agree", table: "Legal")) {
+                // Legal string catalog reference
+                Text("eula_title", tableName: "Legal")
+                    .font(.title2.weight(.semibold))
+                    .multilineTextAlignment(.center)
+                    .accessibilityAddTraits(.isHeader)
+
+                // Verbatim clickwrap text (do NOT modify).
+                // Referenced from Legal.xcstrings.
+                Text("eula_body", tableName: "Legal")
+                    .font(.body)
+                    .foregroundStyle(.primary)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                // View-only access to the documents the
+                // body asks agreement to, readable from the gate
+                // itself. Plain borderless buttons — link
+                // affordance without competing with "I Agree".
+                VStack(spacing: ResectaTokens.Spacing.sm) {
+                    Button(String(localized: "eula_view_eula", table: "Legal")) {
+                        presentedDocument = .eula
+                    }
+                    .accessibilityIdentifier("eulaViewEULA")
+
+                    Button(String(localized: "eula_view_privacy", table: "Legal")) {
+                        presentedDocument = .privacyPolicy
+                    }
+                    .accessibilityIdentifier("eulaViewPrivacy")
+
+                    Button(String(localized: "eula_view_acknowledgements", table: "Legal")) {
+                        presentedDocument = .acknowledgements
+                    }
+                    .accessibilityIdentifier("eulaViewAcknowledgements")
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(ResectaTokens.BrandTeal.text)
+                .padding(.top, ResectaTokens.Spacing.sm)
+            }
+            .frame(maxWidth: columnMaxWidth)   // cap content column (mirrors Home)
+            .padding(.horizontal, ResectaTokens.Spacing.md)
+            .padding(.vertical, ResectaTokens.HomeEntry.verticalPad)
+            // Fill the viewport so the capped column centres both
+            // horizontally and vertically; content taller than the
+            // viewport scrolls instead (minHeight, not height).
+            .frame(maxWidth: .infinity, minHeight: viewportHeight, alignment: .center)
+        }
+        .onScrollGeometryChange(for: CGFloat.self) { geometry in
+            // containerSize is already inset by the status bar and the I Agree inset.
+            geometry.containerSize.height
+        } action: { _, height in
+            viewportHeight = max(0, height)
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .scrollEdgeEffectStyle(.soft, for: .bottom)
+        // "I Agree" pinned beneath the scrolling text as a bottom bar: the
+        // text scrolls under it and fades at the soft scroll edge (a bar
+        // gets the edge effect; a plain inset does not). The filled brand
+        // tier (the home screen's primary tile), so the capsule reads the
+        // same in both themes.
+        .safeAreaBar(edge: .bottom) {
+            Button {
                 disclaimerAccepted = true
                 // Drop any superseded EULA keys so a key bump does not
                 // orphan stale acceptance flags in UserDefaults.
                 for key in Self.supersededDisclaimerKeys {
                     UserDefaults.standard.removeObject(forKey: key)
                 }
+            } label: {
+                Text(String(localized: "eula_agree", table: "Legal"))
+                    .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
-            .padding(.bottom, ResectaTokens.Spacing.md)
+            .tint(ResectaTokens.BrandTeal.fill)
+            .frame(maxWidth: columnMaxWidth)
+            .padding(.horizontal, ResectaTokens.Spacing.md)
+            .padding(.vertical, ResectaTokens.Spacing.md)
             .accessibilityIdentifier("eulaAccept")
         }
         // Read-only document sheet OVER the gate. `.sheet(item:)`
@@ -123,9 +136,9 @@ struct EULAGateView: View {
             LegalDocumentView(document: document)
         }
         // Opaque background (systemGroupedBackground is opaque) — keeps
-        // legal text readable and matches the HomeView backdrop (HomeView.swift:34)
-        // the gate gives way to. `.ignoresSafeArea()` lets the color fill edge-to-edge
-        // while content stays within the safe area (prevents a top/bottom seam).
+        // legal text readable and matches the home screen's backdrop the
+        // gate gives way to. `.ignoresSafeArea()` lets the color fill
+        // edge-to-edge while content stays within the safe area.
         .background(Color(.systemGroupedBackground).ignoresSafeArea())
     }
 }

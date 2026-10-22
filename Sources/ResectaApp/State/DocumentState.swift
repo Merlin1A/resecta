@@ -423,7 +423,7 @@ class DocumentState {
 
     /// The notice for a refused drop, or nil when the import may start: a
     /// pending review, the results or error screen, else a run in progress.
-    func importRefusalMessage(with redactionState: RedactionState) -> String? {
+    func importRefusalMessage(with redactionState: RedactionState, door: ImportDoor? = nil) -> String? {
         if canStartImport(with: redactionState) { return nil }
         if canStartImport { return Self.importBlockedDuringTriageMessage }
         switch phase {
@@ -432,7 +432,7 @@ class DocumentState {
         case .failed(let error, let returnPhase):
             return Self.importBlockedOnThisScreenMessage(
                 wayBack: FailedStateView.primaryActionLabel(
-                    FailedStateView.primaryAction(error: error, returnPhase: returnPhase)))
+                    FailedStateView.primaryAction(error: error, returnPhase: returnPhase), door: door))
         default:
             return Self.importBlockedDuringPipelineMessage
         }

@@ -9,6 +9,21 @@ import Foundation
 @MainActor
 struct ErrorRecoveryTests {
 
+    // MARK: - The too-large message names what was measured
+
+    @Test("A page-count refusal names the page cap, never a size of 0 MB")
+    func pageCountRefusalNamesPages() {
+        let text = PipelineError.importError(.tooLarge(bytesRead: 300_000)).localizedRecovery
+        #expect(text == "This document has more than 500 pages. Try a document with fewer pages.")
+        #expect(!text.contains("0 MB"))
+    }
+
+    @Test("A byte-cap refusal keeps the size sentence with a true figure")
+    func byteCapRefusalKeepsTheSize() {
+        let text = PipelineError.importError(.tooLarge(bytesRead: 60 * 1024 * 1024)).localizedRecovery
+        #expect(text == "This file is approximately 60 MB. Try a smaller document or reduce the page count.")
+    }
+
     // MARK: - Failed State Transitions
 
     @Test("Failed from redaction recoverable to editing")

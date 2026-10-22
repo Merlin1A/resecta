@@ -7,8 +7,9 @@ import UIKit
 // card is hosted in a `UIHostingController` inside a key `UIWindow`, laid
 // out, and must fit to a non-zero size. Structural: the card's body is a
 // `Button` whose label is `HomeChoiceCardContent` carrying the symbol, the
-// style, and the title / body / affordance strings the card was given — the
-// same `Mirror` pin `ToastManagerLetInjectionTests` uses. The strings are
+// style, and the title / body strings the card was given — the same
+// `Mirror` pin `ToastManagerLetInjectionTests` uses. The row style, the
+// press look and the filled tile are pinned beside them. The strings are
 // not read back through the accessibility tree because a unit-test host
 // receives no accessibility elements from SwiftUI on the iOS 26.5 simulator
 // runtime (measured 2026-08-27; the 26.4 runtime does publish them), and the
@@ -26,7 +27,6 @@ struct HomeChoiceCardTests {
             style: .primary,
             title: "Title",
             bodyText: "Body",
-            affordance: "Affordance →",
             action: { fired = true }
         )
         card.action()
@@ -43,17 +43,45 @@ struct HomeChoiceCardTests {
 
     @Test("Subtle style hosts at a non-zero size and composes its content with the given strings")
     func subtleRenders() {
-        let card = Self.makeCard(style: .subtle, symbol: "sparkles")
+        let card = Self.makeCard(style: .subtle, symbol: "photo.on.rectangle.angled")
         let size = Self.hostedSize(of: card)
         #expect(size.width > 0 && size.height > 0, "hosted subtle card fitted to \(size)")
-        Self.expectContent(of: card, style: .subtle, symbol: "sparkles")
+        Self.expectContent(of: card, style: .subtle, symbol: "photo.on.rectangle.angled")
+    }
+
+    @Test("The row style hosts shorter than a card at the iPhone width")
+    func rowRenders() {
+        let row = Self.makeCard(style: .row, symbol: "doc.text")
+        let card = Self.makeCard(style: .primary, symbol: "doc.badge.plus")
+        let rowSize = Self.hostedSize(of: row)
+        let cardSize = Self.hostedSize(of: card)
+        #expect(rowSize.height > 0)
+        #expect(rowSize.height < cardSize.height, "row \(rowSize.height) vs card \(cardSize.height)")
+        Self.expectContent(of: row, style: .row, symbol: "doc.text")
+    }
+
+    @Test("The press shrinks and fades; under Reduce Motion it shades instead; at rest nothing")
+    func pressLook() {
+        let pressed = HomeChoiceCardButtonStyle.pressLook(isPressed: true, reduceMotion: false)
+        #expect(pressed.scale == ResectaTokens.HomeEntry.pressScale && pressed.opacity == ResectaTokens.HomeEntry.pressOpacity && pressed.overlay == 0)
+        let reduced = HomeChoiceCardButtonStyle.pressLook(isPressed: true, reduceMotion: true)
+        #expect(reduced.scale == 1 && reduced.opacity == 1 && reduced.overlay == ResectaTokens.Opacity.pressOverlay)
+        let rest = HomeChoiceCardButtonStyle.pressLook(isPressed: false, reduceMotion: false)
+        #expect(rest.scale == 1 && rest.opacity == 1 && rest.overlay == 0)
+        let restReduced = HomeChoiceCardButtonStyle.pressLook(isPressed: false, reduceMotion: true)
+        #expect(restReduced.scale == 1 && restReduced.opacity == 1 && restReduced.overlay == 0)
+    }
+
+    @Test("The primary tile is the filled brand tier")
+    func primaryTileIsTheFill() {
+        #expect(HomeChoiceCardContent.tileFill(style: .primary) == ResectaTokens.BrandTeal.fill)
+        #expect(HomeChoiceCardContent.tileFill(style: .primary, tintOverride: .red) == .red)
     }
 
     // MARK: - Fixture
 
     private static let title = "Card title"
     private static let bodyText = "Card body"
-    private static let affordance = "Card affordance"
 
     private static func makeCard(style: HomeChoiceCard.Style, symbol: String) -> HomeChoiceCard {
         HomeChoiceCard(
@@ -61,7 +89,6 @@ struct HomeChoiceCardTests {
             style: style,
             title: LocalizedStringKey(title),
             bodyText: LocalizedStringKey(bodyText),
-            affordance: LocalizedStringKey(affordance),
             action: {}
         )
     }
@@ -107,7 +134,7 @@ struct HomeChoiceCardTests {
         #expect(content.style == style)
         #expect(literal(of: content.title) == title)
         #expect(literal(of: content.bodyText) == bodyText)
-        #expect(literal(of: content.affordance) == affordance)
+        #expect(content.affordance == nil, "the home screen passes no trailing line")
     }
 
     private static func child(of value: Any, named label: String) -> Any? {

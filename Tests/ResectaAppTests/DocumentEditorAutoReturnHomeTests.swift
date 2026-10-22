@@ -56,6 +56,25 @@ struct DocumentEditorAutoReturnHomeTests {
         )
     }
 
+    // MARK: - The return beat
+
+    /// The `.empty` arm returns home after one yield — long enough to let
+    /// a bootstrap's own `.importing` land first, short enough that no
+    /// empty page shows on the way back.
+    @Test("The auto-return awaits one yield, not a timed sleep")
+    func autoReturnYieldsOnce() throws {
+        let path = URL(fileURLWithPath: "\(#filePath)")
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/ResectaApp/Views/DocumentEditorView.swift")
+        let source = try String(contentsOf: path, encoding: .utf8)
+        let arm = try #require(source.range(of: "case .empty:"))
+        let gate = try #require(source.range(of: "shouldAutoReturnHome(", range: arm.upperBound..<source.endIndex))
+        let body = String(source[arm.upperBound..<gate.lowerBound])
+        #expect(body.contains("await Task.yield()"))
+        #expect(!body.contains("milliseconds(150)"))
+        #expect(!body.contains("Task.sleep"))
+    }
+
     // MARK: - Window UndoManager cleared on editor close
 
     /// The per-window UndoManager outlives a closed document, so its stack must
