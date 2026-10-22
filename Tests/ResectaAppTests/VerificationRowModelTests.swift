@@ -448,8 +448,30 @@ struct VerificationRowModelTests {
         #expect(one.captionIsPrivacySensitive)
         let two = VerificationRowModel(layer: result(["Delia", "Hartwell"], pages: [0, 2], fragment: true), perPageModes: [])
         #expect(two.caption == "Parts of \u{201C}Delia\u{201D} and \u{201C}Hartwell\u{201D} are readable beside redaction boxes on pages 1\u{00A0}and\u{00A0}3. Adjust the boxes and redact again.")
+        // The box count follows the terms named, not the pages: one term on two pages is one box to adjust;
+        // two terms on one page are two.
+        let oneTermTwoPages = VerificationRowModel(layer: result(["Delia"], pages: [0, 2], fragment: true), perPageModes: [])
+        #expect(oneTermTwoPages.caption == "Part of \u{201C}Delia\u{201D} is readable beside a redaction box on pages 1\u{00A0}and\u{00A0}3. Adjust the box and redact again.")
+        let twoTermsOnePage = VerificationRowModel(layer: result(["Delia", "Hartwell"], pages: [1], fragment: true), perPageModes: [])
+        #expect(twoTermsOnePage.caption == "Parts of \u{201C}Delia\u{201D} and \u{201C}Hartwell\u{201D} are readable beside redaction boxes on\u{00A0}page\u{00A0}2. Adjust the boxes and redact again.")
         let whole = VerificationRowModel(layer: result(["Delia"], pages: [1], fragment: false), perPageModes: [])
         #expect(whole.caption == "\u{201C}Delia\u{201D} is still readable on\u{00A0}page\u{00A0}2.")
+    }
+
+    @Test("A Search Re-check that re-ran no typed search (a scan-only run) captions its passed row with the check's own compare line; a typed re-run keeps the explainer")
+    func scanOnlyRecheckPassedCaption() {
+        let compareLine = "No typed searches to re-run; the applied scan's 1 match was compared with its box on the original pages — it is covered."
+        let scanOnly = VerificationRowModel(layer: Self.layer(.pass, identity: .searchRecheck, short: compareLine, lines: nil), perPageModes: [])
+        #expect(scanOnly.outcome == .passed)
+        #expect(scanOnly.caption == compareLine)
+        let typedLine = SearchRecheckQueryLine(label: "\u{201C}Delia\u{201D}", foundCount: 2, foundHitCap: false,
+                                               appliedCount: 2, remainingCount: 0, route: .ocr)
+        let typed = VerificationRowModel(layer: Self.layer(.pass, identity: .searchRecheck, short: "Re-ran 1 search on the output — no remaining matches in the text the app can read.", lines: [typedLine]), perPageModes: [])
+        #expect(typed.caption == VerificationRowModel.explainer(for: .searchRecheck))
+        // Nothing applied: the nothing-to-check reason is unchanged.
+        let idle = VerificationRowModel(layer: Self.layer(.info("No searches were applied — the search re-check did not run."), identity: .searchRecheck, lines: nil), perPageModes: [])
+        #expect(idle.outcome == .nothingToCheck)
+        #expect(idle.caption == "No searches were applied.")
     }
 
     @Test("The spoken label is the title, the status word and the caption")

@@ -339,6 +339,13 @@ nonisolated struct VerificationRowModel: Equatable {
                         perPageModes: [PipelineMode] = [], pagesOnChips: Bool = false) -> String? {
         switch outcome {
         case .passed:
+            // A Search Re-check that re-ran no typed search (a run that
+            // applied a scan only) carries no query lines: its own line says
+            // what the coverage check compared, and the re-run explainer
+            // would not be true of it.
+            if layer.layer == .searchRecheck, (layer.queryLines ?? []).isEmpty {
+                return layer.shortDescription
+            }
             return layer.layer.map { explainer(for: $0, perPageModes: perPageModes) } ?? layer.shortDescription
         case .nothingToCheck:
             return layer.layer.flatMap(nothingToCheckReason(for:)) ?? layer.shortDescription
@@ -464,7 +471,8 @@ nonisolated struct VerificationRowModel: Equatable {
     static func fragmentSentence(termTexts: [String], pages: [Int]?, pagesOnChips: Bool = false) -> String {
         let terms = normalizedTerms(termTexts)
         let one = terms.count == 1
-        let oneBox = (pages?.count ?? 1) == 1
+        // One box per term: the count follows the terms, not the pages.
+        let oneBox = terms.count == 1
         let boxes = oneBox ? "a redaction box" : "redaction boxes"
         let remedy = oneBox ? "Adjust the box and redact again." : "Adjust the boxes and redact again."
         let hasPages = !(pages ?? []).isEmpty
