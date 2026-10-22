@@ -47,6 +47,10 @@
 #   4. The runs. The runner tests the working tree, so a needed scheme with no
 #      accepted verdict runs only when the pushed commit is this checkout's
 #      HEAD and no tracked file is modified; otherwise the push is refused.
+#   5. The record. An allowed push posts a `local-suites` commit status for
+#      each pushed commit ("PASS @ tree <tree8>: <schemes>") once GitHub has
+#      the commit; a SKIP_TESTS=1 push posts none, so on a pull request a
+#      skipped push shows no such check.
 #
 # Each pushed commit ends with one summary line:
 #   → pre-push: diff <base8>..<sha8>: engine <n> · app <n> · no-scheme <n> ·
@@ -558,6 +562,31 @@ PYEOF
     echo "self-test: FAIL" >&2; exit 1
 }
 
+# Posts a `local-suites` commit status (success, "PASS @ tree <tree>: <schemes>")
+# for each pushed commit, so a pull request shows which commits passed the
+# local suites; a SKIP_TESTS=1 push posts none. GitHub has the commit only
+# after the push, so a detached job retries for up to five minutes and the push
+# never waits on it. Nothing is posted without `gh` or without a GitHub origin.
+publish_local_status() {
+    command -v gh >/dev/null 2>&1 || return 0
+    local url slug j sha tree desc
+    url="$(git remote get-url origin 2>/dev/null || true)"
+    case "$url" in *github.com[:/]*) ;; *) return 0 ;; esac
+    slug="${url#*github.com[:/]}"; slug="${slug%.git}"
+    j=0
+    while [ "$j" -lt "${#P_SHA[@]}" ]; do
+        sha="${P_SHA[$j]}"; tree="$(git rev-parse "$sha^{tree}")"
+        desc="PASS @ tree ${tree:0:8}: $(join_list ${P_NEED[$j]})"
+        ( for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do
+              gh api -X POST "repos/$slug/statuses/$sha" -f state=success -f context=local-suites \
+                  -f description="$desc" >/dev/null 2>&1 && exit 0
+              sleep 10
+          done ) </dev/null >/dev/null 2>&1 &
+        echo "→ pre-push: posting local-suites ($desc) for ${sha:0:8} once GitHub has it" >&2
+        j=$((j + 1))
+    done
+}
+
 # ── Main ──────────────────────────────────────────────────────────────────
 
 [ "${1:-}" = "--self-test" ] && self_test
@@ -677,4 +706,5 @@ for s in RedactionEngine ResectaApp self-tests; do
 done
 
 summary 1
+publish_local_status
 echo "→ pre-push: push allowed." >&2

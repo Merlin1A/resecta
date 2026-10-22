@@ -92,7 +92,13 @@ jobs:
       # own time limit cannot end a hang inside a system framework. The
       # runner leaves them out, names them in the summary and counts them in
       # the VERDICT line; the pre-push hook runs every suite on every push.
-      TEST_BATCHED_EXCLUDE: ${{ matrix.scheme == 'ResectaApp' && 'PipelineCoordinatorSecurityTests PageParallelRasterizationTests' || 'PacketOCRQualityRoleTests SearchRecheckOCRTests SearchRecheckParallelismTests' }}
+      # Added 2026-10-21: the engine job's batch 6 stalled on 2026-10-12,
+      # 2026-10-19 and a dispatched run on 2026-10-21 (no output for 900 s,
+      # every test in the batch left open). The same suites were open each
+      # time; the two that call Vision directly, OCREngineTests and
+      # OCRCacheCoherenceTests, are left out here with the 12-page, 12-layer
+      # searchable preflight (PacketSearchableProbeTests).
+      TEST_BATCHED_EXCLUDE: ${{ matrix.scheme == 'ResectaApp' && 'PipelineCoordinatorSecurityTests PageParallelRasterizationTests' || 'PacketOCRQualityRoleTests SearchRecheckOCRTests SearchRecheckParallelismTests PacketSearchableProbeTests OCREngineTests OCRCacheCoherenceTests' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
