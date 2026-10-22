@@ -3,7 +3,7 @@ import PDFKit
 
 // The geometry every search path shares: the NSRange → normalized-rect conversion
 // (SECURITY: a wrong normalization is a fill at the wrong pixel position), the OCR
-// thumbnail size, the OCR line-rect lookup with its padding and the page-level OCR
+// thumbnail size, the OCR line union with its padding and the page-level OCR
 // confidence. Moved whole from DocumentSearcher.swift; no line inside a moved body changes.
 
 extension DocumentSearcher {
@@ -29,40 +29,29 @@ extension DocumentSearcher {
         return CGSize(width: effective.width * scale, height: effective.height * scale)
     }
 
-    // MARK: - Regex OCR Fallback Helpers
+    // MARK: - The OCR line union
 
-    /// Map a character offset in a newline-joined OCR text to the bounding
-    /// rect of the containing OCR line. Used by the regex fallback to
-    /// associate a regex match position with a visual location.
-    ///
-    /// - Parameters:
-    ///   - offset: Character offset into `text` (the "\n"-joined concatenation
-    ///             of `lines[i].text` values, same join order as the caller).
-    ///   - text: The concatenated OCR text that was searched.
-    ///   - lines: The source OCR lines in the same order used when building `text`.
-    ///   - page: The page, used to compute padding in normalized coordinates.
-    /// - Returns: The normalized bounding rect of the containing line, padded
-    ///   for OCR imprecision, or `nil` if no line contains the offset.
-    func ocrLineRect(
-        forCharOffset offset: Int,
-        inText text: String,
-        lines: [OCREngine.TextLine],
+    /// The recognised lines a match overlaps, with their padded union rect.
+    /// `range` is a UTF-16 range on the line-feed-joined normalized text
+    /// (the Scan leg's offsets and the regex leg's are both UTF-16; each
+    /// line is followed by one line feed), and a line overlaps when its span
+    /// meets the range. One home for both legs: a match that runs across two
+    /// recognised lines is boxed on every line it touches, never on the line
+    /// where it began alone. nil when no line overlaps.
+    nonisolated func ocrUnionRect(
+        forUTF16Range range: NSRange,
+        lineOffsets: [OCRPageCache.NormalizedLineEntry],
         page: PDFPage
-    ) -> CGRect? {
-        // Walk lines in the same order they were joined with "\n".
-        // Each line occupies `line.text.count` characters followed by a
-        // "\n" separator (1 character), so the running total advances by
-        // `lineLength + 1` per line.
-        var cursor = 0
-        for line in lines {
-            let lineLength = line.text.count
-            let lineEnd = cursor + lineLength  // exclusive, before the "\n"
-            if offset >= cursor && offset <= lineEnd {
-                return Self.paddedNormalizedRect(line.normalizedRect, in: page)
-            }
-            cursor += lineLength + 1  // +1 for the "\n"
+    ) -> (rect: CGRect, lines: [OCRPageCache.NormalizedLineEntry])? {
+        let matchStart = range.location
+        let matchEnd = matchStart + range.length
+        let overlapping = lineOffsets.filter { entry in
+            let lineEnd = entry.start + entry.normalizedText.utf16.count + 1
+            return entry.start < matchEnd && lineEnd > matchStart
         }
-        return nil
+        guard let first = overlapping.first else { return nil }
+        let union = overlapping.dropFirst().reduce(first.normalizedRect) { $0.union($1.normalizedRect) }
+        return (Self.paddedNormalizedRect(union, in: page), overlapping)
     }
 
     /// A Vision line rect (normalized 0–1, bottom-left origin) padded by

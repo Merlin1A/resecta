@@ -1389,21 +1389,9 @@ public actor DocumentSearcher {
         func mapToOCR(
             _ range: NSRange
         ) -> (rect: CGRect, window: ContextWindow, ocrConfidence: Float)? {
-            let matchStart = range.location
-            let matchEnd = matchStart + range.length
-
-            let overlappingLines = lineOffsets.filter { entry in
-                let lineEnd = entry.start + entry.normalizedText.utf16.count + 1
-                return entry.start < matchEnd && lineEnd > matchStart
-            }
-            guard let firstLine = overlappingLines.first else { return nil }
-
-            var unionRect = firstLine.normalizedRect
-            for entry in overlappingLines.dropFirst() {
-                unionRect = unionRect.union(entry.normalizedRect)
-            }
-
-            let paddedRect = Self.paddedNormalizedRect(unionRect, in: page)
+            guard let (paddedRect, overlappingLines) = ocrUnionRect(
+                forUTF16Range: range, lineOffsets: lineOffsets, page: page
+            ) else { return nil }
 
             // The canonical context window over the
             // normalized concatenation the detector matched in — the same
@@ -1411,7 +1399,7 @@ public actor DocumentSearcher {
             // with the match located inside it.
             let window = contextSnippet(text: concatenated, matchNSRange: range)
 
-            let ocrConfidence = overlappingLines.map(\.confidence).min() ?? firstLine.confidence
+            let ocrConfidence = overlappingLines.map(\.confidence).min() ?? 1.0
             return (paddedRect, window, ocrConfidence)
         }
 
@@ -1757,11 +1745,20 @@ public actor DocumentSearcher {
         var searchText = normalizedLines.joined(separator: "\n")
         guard !searchText.isEmpty else { return [] }
         // Page-side smart punctuation, same contract as the
-        // text-layer regex path. 1:1 substitution keeps both UTF-16
-        // NSRanges and the Character-offset line walk in ocrLineRect
-        // aligned with the per-line lengths.
+        // text-layer regex path. 1:1 substitution keeps the UTF-16
+        // NSRanges aligned with the per-line offsets below.
         if options.normalizeSmartPunctuation {
             searchText = TextNormalizer.normalizeSmartPunctuation(searchText)
+        }
+        // Each line's start in the joined text, in UTF-16 units (one line
+        // feed after each line), for the line union behind every rect.
+        var lineOffsets: [NormalizedLineEntry] = []
+        var cursor = 0
+        for (line, normalizedText) in zip(lines, normalizedLines) {
+            lineOffsets.append(NormalizedLineEntry(
+                start: cursor, normalizedText: normalizedText,
+                normalizedRect: line.normalizedRect, confidence: line.confidence))
+            cursor += normalizedText.utf16.count + 1
         }
 
         let nsString = searchText as NSString
@@ -1789,27 +1786,11 @@ public actor DocumentSearcher {
             timeout: effectiveTimeout, startTime: startTime,
             onTimeout: { snapshotTimeoutSink?(pageIndex) }
         ) { matchRange in
-            // Map the match start character offset to the containing OCR
-            // line's bounding rect. The NSRange location is a UTF-16 offset;
-            // convert to a Character offset first for the line-walk cursor.
-            // NOTE: OCRTextNormalizer is same-length by construction, so
-            // Character offset == UTF-16 offset for all ASCII-range confusable
-            // substitutions. For robustness, use String.index conversion.
-            let charOffset: Int
-            if let swiftRange = Range(matchRange, in: searchText) {
-                charOffset = searchText.distance(
-                    from: searchText.startIndex, to: swiftRange.lowerBound
-                )
-            } else {
-                charOffset = matchRange.location
-            }
-
-            guard let normalizedRect = ocrLineRect(
-                forCharOffset: charOffset,
-                inText: searchText,
-                lines: lines,
-                page: sendablePage.page
+            // The union of every recognised line the match overlaps.
+            guard let mapped = ocrUnionRect(
+                forUTF16Range: matchRange, lineOffsets: lineOffsets, page: sendablePage.page
             ) else { return false }
+            let normalizedRect = mapped.rect
 
             let matchedText = nsString.substring(with: matchRange)
             let window = contextSnippet(text: searchText, matchNSRange: matchRange)
