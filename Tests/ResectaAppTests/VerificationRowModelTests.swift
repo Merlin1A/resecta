@@ -471,7 +471,7 @@ struct VerificationRowModelTests {
         // Nothing applied: the nothing-to-check reason is unchanged.
         let idle = VerificationRowModel(layer: Self.layer(.info("No searches were applied — the search re-check did not run."), identity: .searchRecheck, lines: nil), perPageModes: [])
         #expect(idle.outcome == .nothingToCheck)
-        #expect(idle.caption == "No searches were applied.")
+        #expect(idle.caption == VerificationRowModel.nothingToCheckReason(for: .searchRecheck))
     }
 
     @Test("The spoken label is the title, the status word and the caption")
