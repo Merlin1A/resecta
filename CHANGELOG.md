@@ -68,6 +68,9 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Home at the compact width: Cancel on the close dialog brings a presented search session back whole — its results and selections — instead of dropping it.
 - The page sidebar renders each thumbnail on the main actor, behind its cache, instead of drawing a page of the open document from another thread while the canvas draws it.
 - Toasts have no line cap at the accessibility text sizes (the standard sizes keep two lines), so a two-sentence toast's second sentence — the one that says what to do — is no longer cut off.
+- The share confirmation for a failed or needs-review result also lists the same report's checks that could not verify part of the output or were skipped, as the documents say; its header reads "These checks reported issues or did not run in full:".
+- The page sidebar's thumbnail cache tells a new document apart from a freed one at the same address, so a new session never shows the previous document's page images.
+- The VoiceOver announcement at the end of a run speaks the verification status only, not the masthead sentence that can quote review terms.
 - Redact and ⇧⌘R are unavailable while the search sheet holds selected matches that are not applied, with the hint "Apply or clear the selected matches first", instead of tearing the session down and dropping them.
 - Redact: a Stop that lands while the output is being finalized leaves no output file behind in the session folder.
 - The app-switcher cover sits in its own window above every presented sheet, so the Search & Redact sheet and Settings → Custom Terms are covered too.
@@ -110,6 +113,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ### Internal
 
+- CI: the simulator suite runs on every pull request to `main` again, documentation-only ones included, because its honesty tests read the README, ENGINEERING, THREAT-MODEL, PRIVACY and EULA text.
 - CI: the pull-request gate also compiles the engine package's test bundle; the weekly simulator suite leaves out the 12-page searchable preflight and the two suites that call text recognition directly, which stall the hosted runner; the pre-push hook posts a `local-suites` commit status for each pushed commit it passed.
 - The app's unit tests build their settings on a scratch defaults suite: the shared coordinator helpers take a fresh suite by default, and the source check that lists tests reading the shared defaults domain now fails on any such site.
 - The engine package's test copy of the app's per-page mode choice is removed; the app's tests check the production choice through the coordinator, on a right-to-left page and on every page of the bundled sample.

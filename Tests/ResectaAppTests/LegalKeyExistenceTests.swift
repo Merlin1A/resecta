@@ -30,7 +30,7 @@ struct LegalKeyExistenceTests {
     // extended the original three EULAGateView keys.
     nonisolated static let eulaKeys = [
         "eula_title", "eula_body", "eula_agree",
-        "eula_view_eula", "eula_view_privacy",
+        "eula_view_eula", "eula_view_privacy", "eula_view_acknowledgements",
         "legal_doc_done", "legal_doc_unavailable",
     ]
 
