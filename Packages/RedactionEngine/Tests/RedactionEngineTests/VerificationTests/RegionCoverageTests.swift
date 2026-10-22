@@ -114,13 +114,101 @@ struct RegionCoverageTests {
         let passed = await Self.recheck(source: doc, output: placedOut, region: placed, request: request)
         #expect(passed.status == .pass, "\(name): the searcher's own box covers its match — got \(passed.status)")
 
-        // Without the source the coverage check does not run: the drifted
-        // output reads as before (the term is gone from the rebuilt text layer).
+        // Without the source the coverage check cannot run, and the layer
+        // says so: the drifted output's rebuilt text layer has no trace of the
+        // term, so the output half is clean — never a PASS by silence.
         let blind = await VerificationEngine().runLayer(
             .searchRecheck, outputDocument: SendablePDFDocument(driftedOut), sourcePageCount: 1,
             regions: [0: [drifted]], sensitiveTerms: [], pipelineMode: .searchableRedaction,
             filterDigests: [nil], perPageModes: [.searchableRedaction], appliedSearches: [request])
-        #expect(blind.status == .pass, "\(name)")
+        #expect(blind.status.isWarn && blind.couldNotVerify, "\(name): got \(blind.status)")
+        #expect(blind.shortDescription == "Re-ran 1 search; \(SearchRecheck.coverageNotRunClause)", "\(name)")
+    }
+
+    // MARK: - The source the check cannot read
+
+    @Test("fold: with the coverage check not run, a clean re-run is a could-not-verify WARN, remaining matches keep ATTENTION with the clause, and unchecked pages join it")
+    func foldCoverageNotRun() {
+        let request = TestFixtures.textRequest("Delia")
+        let clean = RecheckObservation(
+            pageIndex: 0, route: .textLayer, regexTimedOut: false,
+            counts: [0: RecheckObservation.Count(remaining: 0, hitCap: false, perTerm: [:])])
+        let warned = SearchRecheck.fold(requests: [request], observations: [clean], pageCount: 1, coverageRan: false)
+        guard case .warn(let message) = warned.status else { Issue.record("expected WARN, got \(warned.status)"); return }
+        #expect(message == "Re-ran 1 search; the original pages could not be read, so the coverage check did not run")
+        #expect(warned.pageReferences == nil)
+        #expect(warned.queryLines?.count == 1)
+        #expect(warned.copyOverride?.detail == "\(SearchRecheck.detailLead) Text was read from the output's text layer. \(SearchRecheck.coverageNotRunDetail)")
+        #expect(SearchRecheck.fold(requests: [request], observations: [clean], pageCount: 1).status == .pass)
+
+        let remaining = RecheckObservation(
+            pageIndex: 0, route: .textLayer, regexTimedOut: false,
+            counts: [0: RecheckObservation.Count(remaining: 1, hitCap: false, perTerm: ["Delia": 1])])
+        let attention = SearchRecheck.fold(requests: [request], observations: [remaining], pageCount: 1, coverageRan: false)
+        guard case .attention(let kept) = attention.status else { Issue.record("expected ATTENTION, got \(attention.status)"); return }
+        #expect(kept == "Re-ran 1 search — 1 match remains on page 1; the original pages could not be read, so the coverage check did not run")
+        #expect(attention.reviewTermTexts == ["Delia"])
+
+        let unchecked = RecheckObservation(pageIndex: 1, route: .ocrUnavailable, regexTimedOut: false, counts: [:])
+        let both = SearchRecheck.fold(requests: [request], observations: [clean, unchecked], pageCount: 2, coverageRan: false)
+        guard case .warn(let two) = both.status else { Issue.record("expected WARN, got \(both.status)"); return }
+        #expect(two == "Re-ran 1 search; 1 page could not be checked: 2 (OCR did not run); the original pages could not be read, so the coverage check did not run")
+        #expect(both.pageReferences == [1])
+    }
+
+    @Test("An applied scan with no readable source is a could-not-verify WARN; the run's own sweep alone stays INFO")
+    func scanOnlyCoverageNotRun() async throws {
+        let output = SendablePDFDocument(try #require(PDFDocument(data: TestFixtures.textLayerPDF(text: "nothing here"))))
+        let scan = AppliedSearchRecord(query: AppliedSearchQuery(kind: .piiScan(categories: [.ssn]), options: SearchOptions()), foundCount: 1)
+        let applied = SearchRecheckRequest(record: scan, appliedCount: 1, appliedPages: [0])
+        let blind = try await SearchRecheck().run(outputDocument: output, requests: [applied])
+        guard case .warn(let message) = blind.status else { Issue.record("expected WARN, got \(blind.status)"); return }
+        #expect(message == "The original pages could not be read, so the coverage check did not run")
+        #expect(blind.copyOverride?.detail == SearchRecheck.coverageNotRunDetail)
+        #expect(blind.queryLines == nil && blind.pageReferences == nil)
+        let sweep = SearchRecheckRequest(record: scan, appliedCount: 0, appliedPages: [], origin: .sweep)
+        let idle = try await SearchRecheck().run(outputDocument: output, requests: [sweep])
+        #expect(idle.status.isInfo, "the sweep applied nothing: nothing to cover — got \(idle.status)")
+        // A locked source counts as unreadable too.
+        let locked = try #require(PDFDocument(data: try Data(contentsOf: LockedImportTests.directory.appendingPathComponent("r4-aes-128.pdf"))))
+        #expect(locked.isLocked)
+        let stillLocked = try await SearchRecheck().run(outputDocument: output, requests: [applied], sourceDocument: SendablePDFDocument(locked))
+        #expect(stillLocked.status.isWarn, "got \(stillLocked.status)")
+    }
+
+    /// The 128-bit password fixtures (RC4 R3, AES R4): their bytes re-emit
+    /// encrypted, so a copy made without the password stays locked.
+    static let lockedFixtures = ["r3-rc4-128.pdf", "r4-aes-128.pdf"]
+
+    @Test("A 128-bit password document: a locked source is could-not-verify; unlocked, a drifted box FAILS and the placed box PASSES",
+          arguments: lockedFixtures)
+    func lockedSourceThenUnlocked(name: String) async throws {
+        let bytes = try Data(contentsOf: LockedImportTests.directory.appendingPathComponent(name))
+        let request = TestFixtures.textRequest("SEED")
+        let output = try #require(PDFDocument(data: TestFixtures.textLayerPDF(text: "ENCRYPTED 7731")))
+
+        let locked = try #require(PDFDocument(data: bytes))
+        try #require(locked.isLocked, "\(name) opens locked")
+        let anyBox = RedactionRegion(id: UUID(), normalizedRect: CGRect(x: 0.1, y: 0.1, width: 0.2, height: 0.05), source: .searchMatch(term: "SEED"))
+        let blind = await Self.recheck(source: locked, output: output, region: anyBox, request: request)
+        #expect(blind.status.isWarn && blind.couldNotVerify, "\(name): got \(blind.status)")
+        #expect(blind.shortDescription == "Re-ran 1 search; \(SearchRecheck.coverageNotRunClause)", "\(name)")
+
+        let unlocked = try #require(PDFDocument(data: bytes))
+        try #require(unlocked.unlock(withPassword: "user"), "\(name) unlocks with the fixture password")
+        let page = try #require(unlocked.page(at: 0))
+        let raw = try #require(page.string)
+        let range = (raw as NSString).range(of: "SEED")
+        try #require(range.location != NSNotFound, "\(name) reads its text once unlocked")
+        let trueRect = try #require(DocumentSearcher().boundingRect(for: range, page: page))
+        let placed = RedactionRegion(id: UUID(), normalizedRect: trueRect, source: .searchMatch(term: "SEED"))
+        let passed = await Self.recheck(source: unlocked, output: output, region: placed, request: request)
+        #expect(passed.status == .pass, "\(name): the placed box covers its match — got \(passed.status)")
+        let driftedRect = trueRect.offsetBy(dx: trueRect.width * 0.6, dy: 0)
+        let drifted = RedactionRegion(id: UUID(), normalizedRect: driftedRect, source: .searchMatch(term: "SEED"))
+        let failed = await Self.recheck(source: unlocked, output: output, region: drifted, request: request)
+        #expect(failed.status.isFail, "\(name): a box drifted off its match must fail — got \(failed.status)")
+        #expect(failed.reviewTermTexts == ["SEED"], "\(name)")
     }
 
     @Test("Regex mode: the drifted box on the ligature page FAILS the re-check through the whole report; the placed box passes it")
@@ -191,14 +279,38 @@ struct Layer2FragmentBesideRegionTests {
     func foldOrder() {
         #expect(VerificationEngine.pageBucket(for: .sensitiveTermFragmentBesideRegion, effectiveMode: .searchableRedaction) == .sensitiveTermFragmentBesideRegion)
         #expect(VerificationEngine.pageBucket(for: .sensitiveTermFragmentBesideRegion, effectiveMode: .secureRasterization) == .sensitiveTermFragmentBesideRegion)
-        let (status, pages, terms, cnv, _) = VerificationEngine.foldLayer2PageOutcomes(
+        let (status, pages, terms, cnv, _, fragment) = VerificationEngine.foldLayer2PageOutcomes(
             [(2, .sensitiveTermFragmentBesideRegion), (1, .textInRegionSearchable)],
             pipelineMode: .searchableRedaction, documentHasRegions: true, reviewTermsByPage: [2: ["123-45-6789"]])
         #expect(status.isAttention)
         #expect(pages == [1] && terms == ["123-45-6789"] && cnv == false)
-        let (whole, _, _, _, _) = VerificationEngine.foldLayer2PageOutcomes(
+        #expect(fragment, "the fragment arm carries the flag the results row reads")
+        let (whole, _, _, _, _, wholeFlag) = VerificationEngine.foldLayer2PageOutcomes(
             [(2, .sensitiveTermFragmentBesideRegion), (1, .sensitiveTermOutsideRegions)],
             pipelineMode: .searchableRedaction, documentHasRegions: true)
         if case .attention(let message) = whole { #expect(message.hasPrefix("Text matching your redactions")) } else { Issue.record("\(whole)") }
+        #expect(!wholeFlag)
+    }
+
+    @Test("On one page the fragment outranks the fill-artifact note, pairs with in-region text by the page's mode, and yields to a whole occurrence")
+    func classifierOrder() {
+        let fragment = hit("ffile ffile 123-", x: 0.30, width: 0.19)
+        let fillSample = VerificationEngine.BoxFillSample(fillFraction: 1, contrastFraction: 0, maxDeviation: 0)
+        let artifact = VerificationEngine.OCRHit(
+            box: CGRect(x: 0.52, y: 0.405, width: 0.05, height: 0.02), wordBoxes: [], text: "III", confidence: 0.9, boxFill: [fillSample])
+        #expect(VerificationEngine.classifyPageOCR(hits: [artifact], pageRegions: [box], sensitiveTerms: [term]) == .fillArtifactInRegion)
+        #expect(VerificationEngine.classifyPageOCR(hits: [artifact, fragment], pageRegions: [box], sensitiveTerms: [term]) == .sensitiveTermFragmentBesideRegion)
+        let inRegionText = VerificationEngine.OCRHit(
+            box: CGRect(x: 0.52, y: 0.405, width: 0.05, height: 0.02), wordBoxes: [], text: "plain", confidence: 0.9)
+        #expect(VerificationEngine.classifyPageOCR(hits: [inRegionText], pageRegions: [box], sensitiveTerms: [term]) == .textInRegion)
+        let paired = VerificationEngine.classifyPageOCR(hits: [inRegionText, fragment], pageRegions: [box], sensitiveTerms: [term])
+        #expect(paired == .textInRegionAndSensitiveTermFragmentBesideRegion)
+        #expect(VerificationEngine.pageBucket(for: paired, effectiveMode: .searchableRedaction) == .sensitiveTermFragmentBesideRegion)
+        #expect(VerificationEngine.pageBucket(for: paired, effectiveMode: .secureRasterization) == .textInRegionSecureRaster)
+        let whole = hit("SSN 123-45-6789", x: 0.05, width: 0.19)
+        #expect(VerificationEngine.classifyPageOCR(hits: [whole, fragment], pageRegions: [box], sensitiveTerms: [term]) == .sensitiveTermOutsideRegions)
+        // The fill note keeps its place ahead of the whole-term arm (as before this check existed), never ahead of the fragment.
+        #expect(VerificationEngine.classifyPageOCR(hits: [artifact, whole], pageRegions: [box], sensitiveTerms: [term]) == .fillArtifactInRegion)
+        #expect(VerificationEngine.classifyPageOCR(hits: [artifact, whole, fragment], pageRegions: [box], sensitiveTerms: [term]) == .sensitiveTermFragmentBesideRegion)
     }
 }

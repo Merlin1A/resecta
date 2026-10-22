@@ -277,7 +277,36 @@ nonisolated struct VerificationRowModel: Equatable {
             guard let terms = layer.reviewTermTexts, !terms.isEmpty else {
                 return layer.shortDescription
             }
-            return reviewSentence(termTexts: terms, pages: layer.pageReferences)
+            return layer.reviewIsFragment
+                ? fragmentSentence(termTexts: terms, pages: layer.pageReferences)
+                : reviewSentence(termTexts: terms, pages: layer.pageReferences)
+        }
+    }
+
+    /// The needs-review sentence for the OCR Check's edge-fragment arm
+    /// (`LayerResult.reviewIsFragment`): part of the term is readable
+    /// beside a redaction box — the box is short of its text, so the remedy
+    /// is the box, not a search. Pages are 0-based storage, displayed
+    /// 1-based.
+    static func fragmentSentence(termTexts: [String], pages: [Int]?) -> String {
+        let quoted = termTexts.map { "'\($0)'" }.joined(separator: ", ")
+        let one = termTexts.count == 1
+        let location = pageLocationPhrase(pages)
+        let boxes = (pages?.count ?? 1) == 1 ? "a redaction box" : "redaction boxes"
+        let remedy = (pages?.count ?? 1) == 1 ? "Adjust the box and redact again." : "Adjust the boxes and redact again."
+        return "\(one ? "Part" : "Parts") of \(quoted) \(one ? "is" : "are") readable beside \(boxes) \(location). \(remedy)"
+    }
+
+    /// "on page 2" · "on pages 1 and 3" · "on pages 1, 2, and 4" · "in the
+    /// document" when the layer names no pages. 0-based storage, 1-based
+    /// display.
+    private static func pageLocationPhrase(_ pages: [Int]?) -> String {
+        guard let pages, !pages.isEmpty else { return "in the document" }
+        let shown = pages.map { String($0 + 1) }
+        switch shown.count {
+        case 1:  return "on page \(shown[0])"
+        case 2:  return "on pages \(shown[0]) and \(shown[1])"
+        default: return "on pages \(shown.dropLast().joined(separator: ", ")), and \(shown[shown.count - 1])"
         }
     }
 
@@ -317,17 +346,7 @@ nonisolated struct VerificationRowModel: Equatable {
     static func reviewSentence(termTexts: [String], pages: [Int]?) -> String {
         let quoted = termTexts.map { "'\($0)'" }.joined(separator: ", ")
         let verb = termTexts.count == 1 ? "is" : "are"
-        let location: String
-        if let pages, !pages.isEmpty {
-            let shown = pages.map { String($0 + 1) }
-            switch shown.count {
-            case 1:  location = "on page \(shown[0])"
-            case 2:  location = "on pages \(shown[0]) and \(shown[1])"
-            default: location = "on pages \(shown.dropLast().joined(separator: ", ")), and \(shown[shown.count - 1])"
-            }
-        } else {
-            location = "in the document"
-        }
+        let location = pageLocationPhrase(pages)
         let matchClause = termTexts.count == 1
             ? "It matches text you redacted elsewhere."
             : "They match text you redacted elsewhere."
