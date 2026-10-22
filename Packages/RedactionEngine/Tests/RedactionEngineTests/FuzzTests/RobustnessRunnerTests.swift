@@ -12,9 +12,11 @@ import CryptoKit
 // (T4.1/T4.2/T4.4, resolved via RESECTA_DOCS_ROOT + robustness-fixtures.json)
 // — through the product pipeline in the app's order:
 //
-//   import validation (ImportService.validatePDFOffMainActor MIRROR: open →
-//   isLocked → page count 0 → 500-page cap → per-page dimensions → the
-//   engine's active-content walk) → Scan (DocumentSearcher.performSearch(.piiScan),
+//   import validation (the route by leading bytes, then the
+//   ImportService.validatePDFOffMainActor MIRROR: open → isLocked → page
+//   count 0 → 500-page cap → per-page dimensions → the engine's
+//   active-content walk; or the image loader's MIRROR, in
+//   ImportMirrorImageRoute.swift) → Scan (DocumentSearcher.performSearch(.piiScan),
 //   the H1.2 natural-run shape) → redact (H2.2 processDocument mirror) →
 //   verify (H2.2 runVerification mirror).
 //
@@ -382,7 +384,7 @@ struct RobustnessRunnerTests {
             return
         }
         let root = Self.docsRoot()
-        var fixtures = Self.factoryFixtures()
+        var fixtures = Self.factoryFixtures() + Self.imageFixtures()
         if let root {
             fixtures += try Self.sdFixtures(root: root)
             fixtures += try Self.fuzzFixtures(root: root)
@@ -422,7 +424,7 @@ struct RobustnessRunnerTests {
             var verifyRan = false
             var verifyOverall: String? = nil
 
-            switch Self.importMirror(data) {
+            switch Self.importRouteMirror(data) {
             case .reject(let errorClass):
                 gotImportError = errorClass
             case .open(let doc, let status, let hasHiddenOCG):

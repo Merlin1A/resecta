@@ -133,6 +133,25 @@ struct ResectaApp: App {
     static func testDocumentName(for arguments: [String]) -> String {
         arguments.lazy.compactMap { fixtureArgMap[$0] }.first ?? "test_sample"
     }
+
+    /// The bundled synthetic image `--loadTestImage` opens through the
+    /// image loader (UITestFixtures/, Debug only): `--loadTestImage=<name>`
+    /// names one; the bare flag, or the flag followed by a name, opens
+    /// `uitest_image`. Nil when the flag is absent.
+    static func testImageName(for arguments: [String]) -> String? {
+        for (index, argument) in arguments.enumerated() {
+            if argument.hasPrefix("--loadTestImage=") {
+                let name = String(argument.dropFirst("--loadTestImage=".count))
+                return name.isEmpty ? "uitest_image" : name
+            }
+            if argument == "--loadTestImage" {
+                let next = arguments.indices.contains(index + 1) ? arguments[index + 1] : nil
+                if let next, !next.hasPrefix("--") { return next }
+                return "uitest_image"
+            }
+        }
+        return nil
+    }
     #endif
 
     var body: some Scene {
@@ -142,8 +161,9 @@ struct ResectaApp: App {
             // root (rather than nesting inside ContentView) is intended to
             // cover the full window on iPad Stage Manager and split-view.
             ZStack {
-                // EULA gate — show clickwrap before any app content
-                if disclaimerAccepted {
+                // EULA gate — show clickwrap before any app content; the
+                // host fades the gate out and the app in.
+                RootGate(accepted: disclaimerAccepted) {
                     ContentView()
                         .environment(settingsState)
                         .environment(savedRegexStore)
@@ -164,6 +184,7 @@ struct ResectaApp: App {
                             // triage state is seeded.
                             let launchArguments = CommandLine.arguments
                             if launchArguments.contains("--loadTestDocument")
+                                || Self.testImageName(for: launchArguments) != nil
                                 || launchArguments.contains("--seedTriage")
                                 || launchArguments.contains("--openSearchSheet")
                                 || launchArguments.contains("--openSavedSearches")
@@ -181,10 +202,21 @@ struct ResectaApp: App {
                                     // fixture. See `fixtureArgMap`.
                                     let sampleName = Self.testDocumentName(
                                         for: launchArguments)
-                                    await ImportService.loadSampleDocument(
-                                        named: sampleName,
-                                        documentState: ws.documentState,
-                                        redactionState: ws.redactionState)
+                                    if let imageName = Self.testImageName(for: launchArguments) {
+                                        // `--loadTestImage`: one bundled synthetic
+                                        // image through the image loader, the
+                                        // path the out-of-process Photos picker
+                                        // cannot be driven down by a UI test.
+                                        await ImportService.loadTestImage(
+                                            named: imageName,
+                                            documentState: ws.documentState,
+                                            redactionState: ws.redactionState)
+                                    } else {
+                                        await ImportService.loadSampleDocument(
+                                            named: sampleName,
+                                            documentState: ws.documentState,
+                                            redactionState: ws.redactionState)
+                                    }
                                     // DEBUG review repro hook: seed mock
                                     // detections so the unified review (the
                                     // search sheet's Scan interface) presents
@@ -281,8 +313,6 @@ struct ResectaApp: App {
                             }
                             #endif
                         }
-                } else {
-                    EULAGateView()
                 }
 
                 // Branded placeholder rendered above all content
@@ -349,5 +379,37 @@ struct ResectaApp: App {
             // wherever the OS honors it.
             .tint(ResectaTokens.BrandTeal.tint)
         }
+    }
+}
+
+/// The root swap between the first-launch gate and the app, with the fade
+/// between them: the gate fades out, then the app fades in after the gate
+/// is gone, so the two marks never show together; under Reduce Motion one
+/// plain cross-fade. Hosted as a view so it reads the environment.
+private struct RootGate<Content: View>: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let accepted: Bool
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        // The app's fade waits out the gate's removal; under Reduce Motion
+        // both legs resolve to one 0.2-s fade and run together.
+        let delay: Double = reduceMotion ? 0 : 0.12
+        Group {
+            if accepted {
+                content()
+                    .transition(.asymmetric(
+                        insertion: .opacity.animation(
+                            ResectaTokens.Anim.resolved(.easeOut(duration: 0.18), reduceMotion: reduceMotion)?.delay(delay)),
+                        removal: .opacity))
+            } else {
+                EULAGateView()
+                    .transition(.asymmetric(
+                        insertion: .opacity,
+                        removal: .opacity.animation(
+                            ResectaTokens.Anim.resolved(.easeIn(duration: 0.12), reduceMotion: reduceMotion))))
+            }
+        }
+        .animation(ResectaTokens.Anim.resolved(.easeInOut(duration: 0.3), reduceMotion: reduceMotion), value: accepted)
     }
 }

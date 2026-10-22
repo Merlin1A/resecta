@@ -104,6 +104,10 @@ enum ResectaTokens {
         /// on it).
         static let tileWashLight: Double = 0.10
         static let tileWashDark: Double = 0.18
+
+        /// The Reduce Motion press: a primary-colour shade over a card in
+        /// place of the scale and fade.
+        static let pressOverlay: Double = 0.08
     }
 
     // MARK: - Borders
@@ -372,6 +376,42 @@ enum ResectaTokens {
 
     // MARK: - Branded Surface
 
+    // MARK: - Home entries
+
+    /// The home screen's entries: the two cards, the sample row, the mark
+    /// and the stack's spacing. The tile sizes are fixed points (the glyphs
+    /// do not scale with Dynamic Type); the accessibility sizes restack
+    /// every entry with the smaller tile above its text.
+    enum HomeEntry {
+        /// Between entries.
+        static let gap: CGFloat = 12
+        /// The sample row's vertical padding.
+        static let rowPadV: CGFloat = 12
+        /// The sample row's tile, its radius and glyph.
+        static let rowTile: CGFloat = 34
+        static let rowTileRadius: CGFloat = 9
+        static let rowGlyph: CGFloat = 17
+        /// The slot every tile sits in, so the text starts on one edge.
+        static let slot: CGFloat = 56
+        /// A card's tile, its radius and glyph.
+        static let tile: CGFloat = 56
+        static let tileRadius: CGFloat = 14
+        static let tileGlyph: CGFloat = 28
+        /// The tile at accessibility sizes.
+        static let tileAX: CGFloat = 44
+        static let tileRadiusAX: CGFloat = 11
+        static let tileGlyphAX: CGFloat = 22
+        /// The mark's height in the masthead, the gate and the overlay.
+        static let markHeight: CGFloat = 48
+        /// The tagline's width cap.
+        static let taglineMaxWidth: CGFloat = 320
+        /// The stack's vertical padding at every size.
+        static let verticalPad: CGFloat = 24
+        /// The press.
+        static let pressScale: CGFloat = 0.985
+        static let pressOpacity: Double = 0.9
+    }
+
     enum BrandedSurface {
         /// Content panel max width — compact size class and default
         static let panelMaxWidthCompact: CGFloat = 380
@@ -425,6 +465,40 @@ enum ResectaTokens {
                 trait.userInterfaceStyle == .dark
                     ? UIColor(red: 0x7B/255, green: 0xD7/255, blue: 0xE2/255, alpha: 1)
                     : UIColor(red: 0x0A/255, green: 0x5D/255, blue: 0x66/255, alpha: 1)
+            }
+        )
+
+        /// The glyph on a washed tile (the subtle entries' tiles). Light =
+        /// the tint #0B646F · Dark #3FAEBD (5.3 / 5.0:1 on the wash).
+        static let tileGlyph: Color = Color(
+            uiColor: UIColor { trait in
+                trait.userInterfaceStyle == .dark
+                    ? UIColor(red: 0x3F/255, green: 0xAE/255, blue: 0xBD/255, alpha: 1)
+                    : UIColor(red: 0x0B/255, green: 0x64/255, blue: 0x6F/255, alpha: 1)
+            }
+        )
+    }
+
+    // MARK: - The mark
+
+    /// The app icon's redaction-bars mark, drawn in code: two label-colour
+    /// bars, one teal bar and twelve grey text runs. Decorative colours, no
+    /// contrast floor.
+    nonisolated enum BrandMark {
+        /// The third bar. Light #138696 · Dark #1A9AAE.
+        static let teal: Color = Color(
+            uiColor: UIColor { trait in
+                trait.userInterfaceStyle == .dark
+                    ? UIColor(red: 0x1A/255, green: 0x9A/255, blue: 0xAE/255, alpha: 1)
+                    : UIColor(red: 0x13/255, green: 0x86/255, blue: 0x96/255, alpha: 1)
+            }
+        )
+        /// The text runs. Light #8C8A82 · Dark #A6A49D.
+        static let runs: Color = Color(
+            uiColor: UIColor { trait in
+                trait.userInterfaceStyle == .dark
+                    ? UIColor(red: 0xA6/255, green: 0xA4/255, blue: 0x9D/255, alpha: 1)
+                    : UIColor(red: 0x8C/255, green: 0x8A/255, blue: 0x82/255, alpha: 1)
             }
         )
     }

@@ -37,16 +37,15 @@ struct LegalPhraseLintTests {
         #expect(LegalPhrases.bannedTerms.count >= 10)
     }
 
-    @Test("The first-launch agreement body describes PDF documents, not images")
-    func gateBodyIsPDFOnly() throws {
-        // The app opens PDF files only; the sentence the first-launch
-        // screen shows must not describe images as an input.
+    @Test("The first-launch agreement body describes PDF documents and images")
+    func gateBodyDescribesPDFDocumentsAndImages() throws {
+        // The app opens PDF files and JPEG, PNG and HEIC images; the
+        // sentence the first-launch screen shows names both inputs.
         let catalog = try loadCatalog()
         let body = try #require(
             catalog.strings["eula_body"]?.localizations?["en"]?.stringUnit?.value
         )
-        #expect(body.contains("in PDF documents."))
-        #expect(!body.lowercased().contains("images"))
+        #expect(body.contains("in PDF documents and images."))
     }
 
     // MARK: - Helpers

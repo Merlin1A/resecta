@@ -1,5 +1,6 @@
 import Foundation
 import PDFKit
+import UniformTypeIdentifiers
 import RedactionEngine
 
 // The import wrapper: the phase transitions around a load. A door hands the
@@ -10,6 +11,15 @@ import RedactionEngine
 // `PDFImportLoader.swift` (the PDF stages).
 
 enum ImportService {
+
+    // MARK: - The accepted types
+
+    /// The image types the loader decodes, as the Files picker and the
+    /// Photos door read them. Never the generic image type: that would
+    /// admit every codec Image I/O carries.
+    static let acceptedImageTypes: [UTType] = [.jpeg, .png, .heic, .heif]
+    /// What the Files picker offers: PDF and the image types above.
+    static let acceptedContentTypes: [UTType] = [.pdf] + acceptedImageTypes
 
     // MARK: - Import from Security-Scoped URL (the Files door)
 
@@ -147,10 +157,57 @@ enum ImportService {
 
     // MARK: - Inner Work (Cancellation-aware)
 
+    // MARK: - Import from the Photos picker
+
+    /// The Photos door: `images` yields each picked image's bytes in pick
+    /// order and `count` is how many were picked; the loader turns them
+    /// into one page each. Transitions as the other doors do; a stream
+    /// that throws refuses the whole import with the class it threw.
+    @discardableResult
+    static func importImages(
+        _ images: AsyncThrowingStream<Data, any Error>,
+        count: Int,
+        door: ImportDoor = .photos,
+        documentState: DocumentState,
+        redactionState: RedactionState
+    ) async -> ImportOutcome {
+        guard documentState.canStartImport else { return .refused }
+
+        let returnPhase: DocumentState.ReturnPhase =
+            documentState.phaseKind == .editing ? .editing : .empty
+
+        guard documentState.transition(to: .importing) else { return .refused }
+
+        // nonisolated(unsafe): see comment in the URL variant above.
+        nonisolated(unsafe) let docState = documentState
+        nonisolated(unsafe) let redactState = redactionState
+        let outcome = ImportOutcomeBox()
+        let workTask = Task<Void, Never> { @MainActor in
+            outcome.value = await runImport(
+                source: .images(images, count: count, door: door),
+                password: nil,
+                returnPhase: returnPhase,
+                documentState: docState,
+                redactionState: redactState
+            )
+        }
+        documentState.activeImportTask = workTask
+        await withTaskCancellationHandler {
+            await workTask.value
+        } onCancel: {
+            workTask.cancel()
+        }
+        if documentState.activeImportTask == workTask {
+            documentState.activeImportTask = nil
+        }
+        return outcome.value
+    }
+
     /// What a door handed in, before the bytes are read.
     private enum ImportSource {
         case bytes(Data, declaredType: String?, door: ImportDoor)
         case file(URL, declaredType: String)
+        case images(AsyncThrowingStream<Data, any Error>, count: Int, door: ImportDoor)
     }
 
     /// Shared work body for both `importDocument` variants. Runs inside the
@@ -185,17 +242,25 @@ enum ImportService {
                     readTask.cancel()
                 }
                 payload = .bytes(data, declaredType: declaredType, door: .files)
+            case .images(let stream, let count, let door):
+                payload = .images(stream, count: count, door: door)
             }
 
-            // Size check — 50 MB practical limit based on memory budget
-            guard payload.data.count <= limits.maxBytes else {
-                throw PipelineError.importError(.tooLarge(bytesRead: payload.data.count))
+            let loader: any DocumentLoader
+            switch payload {
+            case .bytes:
+                // Size check — 50 MB practical limit based on memory budget
+                guard payload.data.count <= limits.maxBytes else {
+                    throw PipelineError.importError(.tooLarge(bytesRead: payload.data.count))
+                }
+                heldPayload = payload
+                // The bytes decide the route: a PDF or an image loader, or
+                // the unsupported-format refusal before any decode.
+                loader = try ImportRouter.route(data: payload.data)
+            case .images:
+                // Each item's bytes are checked by the loader as they arrive.
+                loader = ImageImportLoader()
             }
-            heldPayload = payload
-
-            // The bytes decide the route; an image is refused here, before
-            // any decode.
-            let loader = try ImportRouter.route(data: payload.data)
 
             // Offload all CPU-intensive parsing off MainActor.
             // Cancellation propagates from the outer `activeImportTask`
@@ -323,6 +388,32 @@ enum ImportService {
     // MARK: - Sample Document Loading
 
     /// Load a bundled sample document. Single SampleDocument.pdf in Resources/.
+    #if DEBUG
+    /// A bundled synthetic image (UITestFixtures/, Debug only) through the
+    /// image loader, for the `--loadTestImage` launch hook: the JPEG is
+    /// tried first, then the HEIC. A missing fixture fails the import as
+    /// damaged rather than silently opening nothing.
+    static func loadTestImage(
+        named name: String,
+        documentState: DocumentState,
+        redactionState: RedactionState
+    ) async {
+        let url = ["jpg", "heic"].lazy
+            .compactMap { Bundle.main.url(forResource: name, withExtension: $0) }.first
+        guard let url, let data = try? Data(contentsOf: url) else {
+            assertionFailure("Test image '\(name)' not found in bundle")
+            documentState.transition(to: .importing)
+            documentState.transition(to: .failed(error: .importError(.corrupt), returnPhase: .empty))
+            return
+        }
+        let stream = AsyncThrowingStream<Data, any Error> { continuation in
+            continuation.yield(data)
+            continuation.finish()
+        }
+        await importImages(stream, count: 1, documentState: documentState, redactionState: redactionState)
+    }
+    #endif
+
     static func loadSampleDocument(
         named name: String = "SampleDocument",
         documentState: DocumentState,

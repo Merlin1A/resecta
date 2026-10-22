@@ -13,6 +13,7 @@ struct RedactWorkspaceView: View {
     let workspace: RedactWorkspace
     @Environment(SettingsState.self) private var settingsState
     @Environment(ToastQueueManager.self) private var toastManager
+    @Environment(AppCoordinator.self) private var appCoordinator
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     // The capture/mirroring privacy shield gates the iPad page-thumbnail
     // sidebar. Thumbnails are derived from page bitmaps, so they leak the
@@ -50,16 +51,18 @@ struct RedactWorkspaceView: View {
                     checkImportToasts()
                 }
             }
-            // Drag and drop (iPad). The dropped file is read inside its
-            // transfer (size on disk first, then the bytes), so an
-            // oversized drop arrives as a refusal and never as 50 MB of
-            // memory.
+            // Drag and drop. The dropped file is read inside its transfer
+            // (size on disk first, then the bytes), so an oversized drop
+            // arrives as a refusal and never as 50 MB of memory. Import
+            // sources: Files, Photos (from Home), drag-and-drop.
             .dropDestination(for: DroppedDocument.self) { items, _ in
                 guard let dropped = items.first else { return false }
-                // Resecta opens PDF files only: an image payload is refused
-                // at the door with the unsupported-format message the Files
-                // import shows. Returning true snaps the payload back, as
-                // the gate below does on a rejection.
+                // The leading bytes decide: a PDF, a JPEG (FF D8 FF), a PNG
+                // (89 PNG) or a HEIC/HEIF (an ISO BMFF still-image brand) is
+                // admitted; any other image signature is refused at the door
+                // with the unsupported-format message the Files import
+                // shows. Returning true snaps the payload back, as the gate
+                // below does on a rejection.
                 if case .bytes(let data) = dropped.payload,
                    !ImportRouter.admitsDroppedPayload(data) {
                     enqueueImportRefusedNotPDFToast()
@@ -75,7 +78,8 @@ struct RedactWorkspaceView: View {
                 // we still return true so the system snaps the payload back
                 // rather than leaving it dangling, and we surface the precise
                 // reason via toast.
-                if let refusal = workspace.documentState.importRefusalMessage(with: workspace.redactionState) {
+                if let refusal = workspace.documentState.importRefusalMessage(
+                    with: workspace.redactionState, door: appCoordinator.openedDoor) {
                     toastManager.enqueue(refusal, severity: .warning)
                     return true
                 }
@@ -157,7 +161,7 @@ struct RedactWorkspaceView: View {
                     ContentUnavailableView(
                         "No Document",
                         systemImage: "doc",
-                        description: Text("Open a PDF to see pages here.")
+                        description: Text("Open a PDF or an image to see pages here.")
                     )
                 }
             } detail: {
@@ -192,11 +196,27 @@ struct RedactWorkspaceView: View {
         newDocument != nil && newDocument !== oldDocument
     }
 
-    /// The import-completion toasts: the text-layer notice, and for a
-    /// source that was encrypted, what the redacted copy will carry.
+    /// The import-completion toasts: the text-layer notice, for a source
+    /// that was encrypted what the redacted copy will carry, and for an
+    /// image import how its pages are read.
     private func checkImportToasts() {
         checkTextLayerToast()
         checkEncryptedSourceToast()
+        checkImageSourceToast()
+    }
+
+    /// The notice for an image import, once per import, never for a PDF:
+    /// the pages are read by text recognition and codes are not decoded.
+    /// Static so the string is pinned.
+    static func imageSourceToast(facts: ImportFacts.Summary) -> String? {
+        guard case .images = facts.origin else { return nil }
+        return "Image pages are read with on-device text recognition. Barcodes and QR codes are not read."
+    }
+
+    private func checkImageSourceToast() {
+        guard workspace.documentState.phaseKind == .editing,
+              let message = Self.imageSourceToast(facts: workspace.documentState.sourceFacts) else { return }
+        toastManager.enqueue(message, severity: .info)
     }
 
     /// Notify user when text layer detected after import.

@@ -176,7 +176,7 @@ struct DocumentEditorView: View {
             case .empty:
                 // Phase 1 redesign: `.empty` no longer renders a hero —
                 // it flashes Color.clear and bounces back to HomeView via
-                // appCoordinator.returnHome(). The 150ms debounce absorbs
+                // appCoordinator.returnHome(). One yield absorbs
                 // the transient `.empty` during workspace bootstrap
                 // (HomeView.openSampleDocument creates a workspace whose
                 // initial phase is `.empty` for a frame before
@@ -185,7 +185,7 @@ struct DocumentEditorView: View {
                 // calling returnHome().
                 Color.clear
                     .task {
-                        try? await Task.sleep(for: .milliseconds(150))
+                        await Task.yield()
                         guard Self.shouldAutoReturnHome(
                             phaseKind: documentState.phaseKind,
                             sourceDocument: documentState.sourceDocument

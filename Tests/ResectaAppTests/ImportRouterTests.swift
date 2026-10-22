@@ -3,9 +3,9 @@ import Foundation
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// The router's own contract: the formats a later loader may decode are told
-// apart from the ones none will, every image meets the unsupported-format
-// refusal today, and only `%PDF` and unknown bytes reach the PDF loader.
+// The router's own contract: JPEG, PNG and HEIC bytes take the image
+// loader, every other image signature meets the unsupported-format
+// refusal, and only `%PDF` and unknown bytes reach the PDF loader.
 
 @Suite("Import router", .tags(.importFlow))
 struct ImportRouterTests {
@@ -47,13 +47,17 @@ struct ImportRouterTests {
         }
     }
 
-    @Test("Every image kind is refused at the router as an unsupported format")
-    func imagesRefusedAtTheRouter() {
+    @Test("JPEG, PNG and HEIC take the image loader; the other image kinds are refused as unsupported")
+    func imagesAtTheRouter() throws {
         let jpeg = Data([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10])
         let png = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
         let heic = Data([0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63])
+        for data in [jpeg, png, heic] {
+            #expect(try ImportRouter.route(data: data) is ImageImportLoader)
+        }
         let gif = Data([0x47, 0x49, 0x46, 0x38, 0x39, 0x61])
-        for data in [jpeg, png, heic, gif] {
+        let avif = Data([0x00, 0x00, 0x00, 0x1C, 0x66, 0x74, 0x79, 0x70, 0x61, 0x76, 0x69, 0x66])
+        for data in [gif, avif] {
             #expect(refusalName { try ImportRouter.route(data: data) } == "unsupportedFormat")
         }
     }

@@ -28,10 +28,11 @@ Resecta is offline and single-user, so the remote attacker of most threat models
 
 ## 4. Trust boundaries
 
-- **Import.** Untrusted bytes arrive as a PDF from Files, or dropped onto an open document, and are parsed by Apple's PDFKit and Core Graphics; text recognition runs through Apple's Vision framework. At the boundary, in the order the checks run:
-  - a dropped payload that carries an image signature is declined;
+- **Import.** Untrusted bytes arrive as a PDF or an image (JPEG, PNG or HEIC) from Files, as photos from the system Photos picker, or dropped onto an open document, and are parsed by Apple's PDFKit, Core Graphics and Image I/O; text recognition runs through Apple's Vision framework. At the boundary, in the order the checks run:
+  - a dropped payload whose leading bytes carry an image signature other than JPEG, PNG or HEIC is declined;
   - a file over 50 MB is refused;
-  - the file is routed by its extension and leading bytes, then validated by parsing its content; a dropped payload that does not parse as a PDF is declined here;
+  - the file is routed by its leading bytes, then validated by parsing its content; a dropped payload that does not parse as a PDF is declined here;
+  - an image is decoded only when Image I/O reports one of the accepted types, as a single still image (for HEIC, its primary image), with pixel dimensions inside the decode limit; an animated, incomplete or oversized image is refused; larger photos are downsampled at decode; the decoded image is redrawn from its pixels into a new page at 300 pixels per inch, so embedded metadata, thumbnails, auxiliary images and a Live Photo's video are not carried into the document;
   - a PDF that needs a password to open is refused;
   - page-count and page-dimension limits apply;
   - a PDF that carries JavaScript or a launch action at the top of its catalog, in the catalog's name tree, in the open action, in the catalog's additional actions, in a page's additional actions, in an annotation's action, in a non-widget annotation's additional actions, in a form field's additional actions (off a widget), or as the script of a rendition action is refused; a PDF with XFA form data or embedded files imports with a notice that form data and attachments are not carried into the redacted copy; other carriers and other action types are not refused at import, and the rebuilt output carries none of them.
