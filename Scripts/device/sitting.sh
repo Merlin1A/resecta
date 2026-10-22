@@ -55,7 +55,8 @@ now() { date '+%Y-%m-%dT%H:%M:%S%z'; }
 # supported script interface. The human log goes beside the JSON.
 dc() {
     local json="$1"; shift
-    xcrun devicectl "$@" --json-output "$json" > "${json%.json}.log" 2>&1
+    # The JSON flag goes first: after an app's launch arguments it would reach the app.
+    xcrun devicectl --json-output "$json" "$@" > "${json%.json}.log" 2>&1
 }
 # xt ARGS… — every xctrace call.
 xt() { xcrun xctrace "$@"; }
