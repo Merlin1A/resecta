@@ -36,6 +36,17 @@ enum ZIPStateTable {
         return state(forZIPPrefix: String(zip.prefix(3)))
     }
 
+    /// Every state a full ZIP may be written with (`ZIPStateTableLoader
+    /// .states(forZIP:)`); without the loader, the fallback switch's one
+    /// prefix state. Empty means "no cross-check".
+    static func states(forZIP zip: String) -> Set<String> {
+        if let loader {
+            let states = loader.states(forZIP: zip)
+            if !states.isEmpty { return states }
+        }
+        return state(forZIPPrefix: String(zip.prefix(3))).map { [$0] } ?? []
+    }
+
     // swiftlint:disable cyclomatic_complexity function_body_length
     private static func state(forPrefixCode n: Int) -> String? {
         switch n {

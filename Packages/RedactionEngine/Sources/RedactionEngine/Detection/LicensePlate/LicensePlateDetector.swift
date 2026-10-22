@@ -40,18 +40,30 @@ struct LicensePlateDetector: FamilyDetector {
         options: [.caseInsensitive]
     )
 
-    /// A plate value as written: upper-case letters and digits only, with at
-    /// least one digit. Lower-case words after a label are prose, not a plate.
+    /// A plate value as written: upper-case letters and digits, split at most
+    /// by a hyphen or whitespace (a non-breaking space or a line break counts),
+    /// carrying a digit or an unbroken run of three or more capitals (a vanity
+    /// plate). Lower-case words after a label are prose, not a plate.
     static func isPlateValue(_ value: String) -> Bool {
         var sawDigit = false
+        var capitalRun = 0
+        var longestCapitalRun = 0
         for scalar in value.unicodeScalars {
             switch scalar {
-            case "0"..."9": sawDigit = true
-            case "A"..."Z", "-", " ", "\t": continue
-            default: return false
+            case "0"..."9":
+                sawDigit = true
+                capitalRun = 0
+            case "A"..."Z":
+                capitalRun += 1
+                longestCapitalRun = max(longestCapitalRun, capitalRun)
+            case "-":
+                capitalRun = 0
+            default:
+                guard scalar.properties.isWhitespace else { return false }
+                capitalRun = 0
             }
         }
-        return sawDigit
+        return sawDigit || longestCapitalRun >= 3
     }
 
     /// Detect license plates (labeled only). Gated by `runsLicensePlate`.

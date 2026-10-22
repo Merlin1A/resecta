@@ -7,8 +7,9 @@ import OSLog
 //
 //   * `scf_table` — 3-digit SCF prefix → 2-letter state code. Primary lookup.
 //   * `overrides` — 5-digit ZIP → 2-letter state code. Applied first for
-//     full-ZIP queries; corrects the handful of ZIPs whose state disagrees
-//     with their SCF prefix (e.g., 82063 is in CO, not WY).
+//     full-ZIP queries; names the other state for the handful of ZIPs that
+//     lie across a state line from their SCF prefix's state (e.g., 82063
+//     reads CO, its prefix WY). The address cross-check accepts either.
 //
 // If the bundle resource is missing or decoding fails, the loader throws and
 // `ZIPStateTable` falls back to its hardcoded enum (pattern mirrors
@@ -85,6 +86,18 @@ struct ZIPStateTableLoader: Sendable {
             return override
         }
         return state(forZIPPrefix: String(zip.prefix(3)))
+    }
+
+    /// Every state a full ZIP may be written with: its override state and the
+    /// state its three-digit prefix reads. An override ZIP lies across a
+    /// state line, so a mailing address may name either side ("Errol, NH
+    /// 03579" and "Errol, ME 03579"). Empty when neither table knows the ZIP.
+    func states(forZIP zip: String) -> Set<String> {
+        let five = String(zip.prefix(5))
+        var states: Set<String> = []
+        if five.count == 5, let override = overrides[five] { states.insert(override) }
+        if let prefixState = state(forZIPPrefix: String(zip.prefix(3))) { states.insert(prefixState) }
+        return states
     }
 }
 
