@@ -90,6 +90,26 @@ extension DocumentSearcher {
     /// SECURITY NOTE: Wrong normalization = fill at wrong pixel position = data leak.
     public nonisolated func boundingRect(for nsRange: NSRange, page: PDFPage) -> CGRect? {
         guard let selection = page.selection(for: nsRange) else { return nil }
+        return normalizedRect(for: selection, page: page)
+    }
+
+    /// One normalized rect per line of the range's selection
+    /// (`PDFSelection.selectionsByLine()`), each through the one rotation
+    /// home below: a match that wraps onto a second line gets a box on each
+    /// line, never one union across the gap. nil when no line has a rect
+    /// (the same refusal as `boundingRect`).
+    nonisolated func lineRects(for nsRange: NSRange, page: PDFPage) -> [CGRect]? {
+        guard let selection = page.selection(for: nsRange) else { return nil }
+        let rects = selection.selectionsByLine().compactMap { normalizedRect(for: $0, page: page) }
+        return rects.isEmpty ? nil : rects
+    }
+
+    /// The one home for the selection → normalized-rect transform: the
+    /// crop-box translate, the /Rotate mirror, the normalize and the clamp.
+    /// A per-line selection's `bounds(for:)` is absolute like its parent's,
+    /// so every rect takes this path (SECURITY: a rect built any other way
+    /// is a fill at the wrong pixel position).
+    nonisolated func normalizedRect(for selection: PDFSelection, page: PDFPage) -> CGRect? {
         let absoluteBounds = selection.bounds(for: page)
         guard !absoluteBounds.isEmpty else { return nil }
 

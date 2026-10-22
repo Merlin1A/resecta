@@ -947,7 +947,7 @@ public actor DocumentSearcher {
                 }
             ) { matchRange in
                 guard let rawRange = regexPage.rawNSRange(matchRange),
-                      let normalizedRect = boundingRect(for: rawRange, page: sendablePage.page) else {
+                      let rects = lineRects(for: rawRange, page: sendablePage.page) else {
                     return false
                 }
                 let matchedText = nsString.substring(with: matchRange)
@@ -955,16 +955,20 @@ public actor DocumentSearcher {
                     text: searchText,
                     matchNSRange: matchRange
                 )
-
-                continuation.yield(SearchResult(
-                    pageIndex: pageIndex,
-                    normalizedRect: normalizedRect,
-                    matchedText: matchedText,
-                    contextSnippet: window.snippet,
-                    source: .textLayer,
-                    term: pattern,
-                    matchRangeInSnippet: window.matchRange
-                ))
+                // One result per line the match touches (the counting rule).
+                let occurrence = rects.count > 1 ? UUID() : nil
+                for normalizedRect in rects {
+                    continuation.yield(SearchResult(
+                        pageIndex: pageIndex,
+                        normalizedRect: normalizedRect,
+                        matchedText: matchedText,
+                        contextSnippet: window.snippet,
+                        source: .textLayer,
+                        term: pattern,
+                        matchRangeInSnippet: window.matchRange,
+                        occurrenceID: occurrence
+                    ))
+                }
                 return true
             }
             totalYielded += yielded
@@ -1520,9 +1524,7 @@ public actor DocumentSearcher {
 
         // Search within OCR results
         var results: [SearchResult] = []
-        let normalizedQuery = options.normalizeUnicode
-            ? TextNormalizer.normalizeForSearch(query, caseSensitive: options.caseSensitive)
-            : (options.caseSensitive ? query : query.lowercased())
+        let normalizedQuery = SearchCore.normalizedText(query, options: options)
 
         for line in textLines {
             // Apply OCR confusable normalization BEFORE
@@ -1533,9 +1535,7 @@ public actor DocumentSearcher {
             // Manual-search per-line normalization stays in-loop — no
             // ocrNormalizedConcat writes (the PII path owns that cache).
             let ocrNormalizedText = self.ocrNormalizer.normalize(line.text)
-            let nfkcLineText = options.normalizeUnicode
-                ? TextNormalizer.normalizeForSearch(ocrNormalizedText, caseSensitive: options.caseSensitive)
-                : (options.caseSensitive ? ocrNormalizedText : ocrNormalizedText.lowercased())
+            let nfkcLineText = SearchCore.normalizedText(ocrNormalizedText, options: options)
 
             // Recall extensions on the OCR literal
             // path. The rect below is the whole LINE box (not offset-
@@ -1561,7 +1561,7 @@ public actor DocumentSearcher {
                 if options.normalizeSmartPunctuation {
                     display = TextNormalizer.normalizeSmartPunctuation(display)
                 }
-                return Array(display)
+                return Array(TextNormalizer.foldWhitespaceRuns(display))
             }()
             let displayLineText = String(displayLineChars)
 
@@ -1853,7 +1853,7 @@ public actor DocumentSearcher {
             if effectiveOptions.normalizeSmartPunctuation {
                 display = TextNormalizer.normalizeSmartPunctuation(display)
             }
-            return Array(display)
+            return Array(TextNormalizer.foldWhitespaceRuns(display))
         }()
         let displayBaseText = String(displayBaseChars)
 
@@ -1878,7 +1878,7 @@ public actor DocumentSearcher {
 
             // The rect's range on the RAW page text (`PreparedPage.rawNSRange`).
             guard let nsRange = prepared.rawNSRange(baseStart: baseStartOffset, length: baseLength) else { continue }
-            if let normalizedRect = boundingRect(for: nsRange, page: page) {
+            if let rects = lineRects(for: nsRange, page: page) {
                 // Display span re-slices from the case-preserved
                 // analog at the already-mapped base offsets; matching stays
                 // on the normalized text. The
@@ -1903,15 +1903,20 @@ public actor DocumentSearcher {
                     searchedText: searchPageText, searchedStart: matchStartOffset, searchedLength: matchLength
                 )
 
-                results.append(SearchResult(
-                    pageIndex: pageIndex,
-                    normalizedRect: normalizedRect,
-                    matchedText: matchedText,
-                    contextSnippet: window.snippet,
-                    source: .textLayer,
-                    term: term,
-                    matchRangeInSnippet: window.matchRange
-                ))
+                // One result per line the match touches (the counting rule).
+                let occurrence = rects.count > 1 ? UUID() : nil
+                for normalizedRect in rects {
+                    results.append(SearchResult(
+                        pageIndex: pageIndex,
+                        normalizedRect: normalizedRect,
+                        matchedText: matchedText,
+                        contextSnippet: window.snippet,
+                        source: .textLayer,
+                        term: term,
+                        matchRangeInSnippet: window.matchRange,
+                        occurrenceID: occurrence
+                    ))
+                }
             }
         }
 

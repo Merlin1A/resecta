@@ -58,12 +58,14 @@ struct WrappedPhraseRectTests {
         #expect(sorted.last.map { Self.band(y: 686).contains($0.normalizedRect.midY) } == true)
         #expect(hits.allSatisfy { $0.matchedText == "Jane Doe" }, "the match is the whole phrase: \(hits.map(\.matchedText))")
         #expect(hits.allSatisfy { $0.contextSnippet.contains("Jane Doe") })
+        #expect(Set(hits.compactMap(\.occurrenceID)).count == 1, "the two lines share one occurrence")
     }
 
     @Test("A wrapped phrase in Regex mode: the same per-line rects")
     func wrappedPhraseRegexMode() async throws {
         let (_, hits) = try await Self.results(Self.wrappedPage, mode: .regex(#"Jane\s+Doe"#, options: SearchOptions()))
         #expect(hits.count == 2, "\(hits.map(\.normalizedRect))")
+        #expect(Set(hits.compactMap(\.occurrenceID)).count == 1)
     }
 
     @Test("A control character between the words: one result, one rect from the J to the e")
@@ -74,6 +76,7 @@ struct WrappedPhraseRectTests {
         #expect(hits.count == 1, "\(hits.map(\.matchedText))")
         let whole = try #require(DocumentSearcher().boundingRect(for: NSRange(location: 0, length: 8), page: page))
         #expect(hits.first?.normalizedRect == whole)
+        #expect(hits.first?.occurrenceID == nil)
     }
 
     @Test("The live preview counts what the full tier returns")
@@ -85,7 +88,8 @@ struct WrappedPhraseRectTests {
                 mode: .text("Jane Doe", options: SearchOptions()), scope: .wholeDocument,
                 currentPageIndex: 0, totalPageCount: 1,
                 pageTextProvider: { index in texts[index] })
-            #expect(preview.totalCount == hits.count, "the preview count agrees with the full tier")
+            #expect(preview.totalCount == Set(hits.map { $0.occurrenceID ?? $0.id }).count,
+                    "the preview counts occurrences; the full tier counts lines of them")
         }
     }
 
