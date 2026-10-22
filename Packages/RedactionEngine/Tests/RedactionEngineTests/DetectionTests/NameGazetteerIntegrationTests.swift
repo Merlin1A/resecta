@@ -35,6 +35,30 @@ struct NameGazetteerIntegrationTests {
         #expect(rationale.signals.contains(.bloomSurnameHit))
     }
 
+    @Test("A one-edit surname misread right after a listed given name is a name; on its own it is not")
+    func fuzzySurnameAfterGivenNameIsAName() async throws {
+        guard Self.nlTaggerNamesAvailable() else {
+            TestGate.skip("[NLTagger gate] .nameType scheme unavailable on this build; skipping.")
+            return
+        }
+        let gazetteer = try #require(NameGazetteer(), "production gazetteers not bundled")
+        #expect(gazetteer.queryBoosted(candidate: "Smlth", fuzzy: true).fuzzySurnameHit)
+        let detector = PIIDetector(nameGazetteer: gazetteer)
+        for text in ["John Smlth signed the form.", "Signed: John Smlth, notary."] {
+            let names = await detector.detect(in: text).filter { $0.kind == .name }.map(\.text)
+            #expect(names.contains("Smlth"), "\(text): \(names)")
+        }
+        let alone = await detector.detect(in: "The witness Smlth arrived late.").filter { $0.kind == .name }
+        #expect(!alone.contains { $0.text == "Smlth" })
+        for street in ["5 Jefferson Ln, Madison", "615 Madison Pl, Springfield", "8816 Adams Blvd, Ashland"] {
+            let names = await detector.detect(in: street).filter { $0.kind == .name }.map(\.text)
+            #expect(!names.contains { ["Ln", "Pl", "Blvd"].contains($0) }, "\(street): \(names)")
+        }
+        #expect(NameDetector.precedingWord(in: "John  Smlth" as NSString, before: 6) == "John")
+        #expect(NameDetector.precedingWord(in: "John\nSmlth" as NSString, before: 5) == nil, "not across a line break")
+        #expect(NameDetector.precedingWord(in: "John, Smlth" as NSString, before: 6) == nil, "not across punctuation")
+    }
+
     @Test("Given + surname on bundled gazetteer produces max boost (direct queryBoosted)")
     func bundledGazetteer_givenAndSurnameBoost() throws {
         let gazetteer = try #require(NameGazetteer(), "production gazetteers not bundled")
