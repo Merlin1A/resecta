@@ -3,9 +3,10 @@ import Foundation
 @testable import ResectaApp
 
 // The engine test tree's robustness runner mirrors the import's validation
-// stages (its `importMirror`) so the host campaign reaches the refusals the
-// app does. This pin reads both sources and asserts the ordered refusal
-// classes are one list: a stage added on either side alone fails here.
+// stages (its `importMirror`, and `imageImportMirror` for the image route)
+// so the host campaign reaches the refusals the app does. These pins read
+// both sources and assert the ordered refusal classes are one list per
+// route: a stage added on either side alone fails here.
 
 @Suite("Import mirror parity", .tags(.importFlow))
 struct ImportMirrorParityTests {
@@ -22,6 +23,24 @@ struct ImportMirrorParityTests {
         let mirrorClasses = try matches(of: #"(?:errorClass: "|pageError = ")(\w+)""#, in: mirror)
 
         #expect(appClasses.count >= 6, "the loader's stages were not read: \(appClasses)")
+        #expect(appClasses == mirrorClasses, "app \(appClasses) vs mirror \(mirrorClasses)")
+    }
+
+    @Test("The image loader's ordered refusal classes equal the mirror's image route")
+    func imageRefusalClassesMatchTheMirror() throws {
+        let loader = try loadRepoFile("Sources/ResectaApp/Services/Import/ImageImportLoader.swift")
+        let route = try loadRepoFile(
+            "Packages/RedactionEngine/Tests/RedactionEngineTests/FuzzTests/ImportMirrorImageRoute.swift")
+        // The per-image stages: from the page function to the end of the file
+        // (the redraw and the page-image encode are its helpers).
+        let stages = try #require(functionText(from: "static func pageImage(", upTo: "\n}\n", in: loader + "\n}\n"))
+        let mirror = try #require(
+            functionText(from: "static func imagePageMirror(", upTo: "// MARK: - The page", in: route))
+
+        let appClasses = try matches(of: #"\.importError\(\.(\w+)"#, in: stages)
+        let mirrorClasses = try matches(of: #"ImageMirrorRefusal\("(\w+)"\)"#, in: mirror)
+
+        #expect(appClasses.count >= 8, "the image loader's stages were not read: \(appClasses)")
         #expect(appClasses == mirrorClasses, "app \(appClasses) vs mirror \(mirrorClasses)")
     }
 

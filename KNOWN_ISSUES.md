@@ -79,6 +79,13 @@ While drawing, rectangle edges align to other boxes and page guides; alignment t
 
 ---
 
+### KI-11: Barcodes and QR Codes in Images Are Not Read (Medium)
+**Affects:** Image import · Scan · verification
+
+A barcode or QR code in a photo is not read or flagged: text recognition reads printed characters, and neither Scan nor verification decodes codes. A code that carries personal data (a boarding pass, the PDF417 block on an ID card) stays readable in the redacted copy unless you draw a region over it.
+
+---
+
 ## Fixed
 
 ### KI-8: Duplicate Regions from Multiple Scan Runs (Low) — FIXED (entry moved 2026-10-01)

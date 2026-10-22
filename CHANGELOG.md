@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 - Settings: a "Rate Resecta on the App Store" row under Support opens the App Store's review page for the app.
 - Acknowledgements: the third-party data and typeface notices the app ships (the repo-root NOTICE) are bundled and readable in-app, from the first-launch gate beside the EULA and Privacy Policy and from Settings.
+- Photos and images (JPEG, PNG and HEIC) can be opened from the system Photos picker (up to 20 at a time, in the order chosen), from Files, or by a drop onto an open document; each image becomes one page of a new PDF, redrawn from its decoded pixels at 300 pixels per inch, so the image's embedded metadata is not carried into the document.
 - Double-tap the page to return to the fit zoom.
 - Page bar: a Mark Whole Page control beside the page chevrons adds one redaction region covering the page on screen, through the same path a drawn region takes — the counter reads "1 region", Undo removes it in one step, and no search term is captured from it.
 - Import: a password-protected PDF can be opened by entering its password; the import checks run on the unlocked document, and the redacted copy is not password-protected. The password is held in memory while the document is open and released when the session closes; the failed-state card beneath the password sheet reads as locked rather than damaged. A document that was encrypted — one opened with a password, or one carrying only an owner password — shows a notice at import and a caption on the Share card saying the redacted copy carries neither the password nor the original's usage restrictions.
@@ -137,6 +138,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - CI: the simulator suite runs on every pull request to `main` again, documentation-only ones included, because its honesty tests read the README, ENGINEERING, THREAT-MODEL, PRIVACY and EULA text.
 - CI: the pull-request gate also compiles the engine package's test bundle; the weekly simulator suite leaves out the 12-page searchable preflight and the two suites that call text recognition directly, which stall the hosted runner; the pre-push hook posts a `local-suites` commit status for each pushed commit it passed.
 - Detection: a date-collision rule that could never apply to a nine-digit number is removed.
+- The import robustness suite and the output allow-list test cover image sources.
 - The app's unit tests build their settings on a scratch defaults suite: the shared coordinator helpers take a fresh suite by default, and the source check that lists tests reading the shared defaults domain now fails on any such site.
 - The engine package's test copy of the app's per-page mode choice is removed; the app's tests check the production choice through the coordinator, on a right-to-left page and on every page of the bundled sample.
 - App tests: the six trapping requires in the mode-switch toast tests are throwing requires, and the hosting and transition smoke tests assert what they name; the two review-dismiss UI tests call their survival check from the test body.

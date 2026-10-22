@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import RedactionEngine
 @testable import ResectaApp
 
 // The router reads a payload's leading bytes and never the type a caller
@@ -130,10 +131,10 @@ struct ImportServiceMagicBytesTests {
         #expect(ImportRouter.kind(of: data) == .unknown)
     }
 
-    // MARK: - The drop door (PDF files only)
+    // MARK: - The drop door (PDF files and JPEG, PNG and HEIC images)
 
-    @Test("Image payloads are refused at the drop door")
-    func testImagePayloadsRefusedAtDoor() {
+    @Test("JPEG, PNG and HEIC payloads are admitted at the drop door; WEBP is refused")
+    func testImagePayloadsAtTheDoor() {
         let jpeg = Data([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10])
         let png = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
         let heic = Data([
@@ -147,10 +148,26 @@ struct ImportServiceMagicBytesTests {
             0x57, 0x45, 0x42, 0x50  // "WEBP"
         ])
 
-        #expect(!ImportRouter.admitsDroppedPayload(jpeg), "a JPEG drop must be refused")
-        #expect(!ImportRouter.admitsDroppedPayload(png), "a PNG drop must be refused")
-        #expect(!ImportRouter.admitsDroppedPayload(heic), "a HEIC drop must be refused")
+        #expect(ImportRouter.admitsDroppedPayload(jpeg), "a JPEG drop is admitted")
+        #expect(ImportRouter.admitsDroppedPayload(png), "a PNG drop is admitted")
+        #expect(ImportRouter.admitsDroppedPayload(heic), "a HEIC drop is admitted")
         #expect(!ImportRouter.admitsDroppedPayload(webp), "a WEBP drop must be refused")
+        let gif = Data([0x47, 0x49, 0x46, 0x38, 0x39, 0x61])
+        let tiff = Data([0x49, 0x49, 0x2A, 0x00, 0x08, 0x00, 0x00, 0x00])
+        let bmp = Data([0x42, 0x4D, 0x3A, 0x00, 0x00, 0x00])
+        #expect(!ImportRouter.admitsDroppedPayload(gif), "a GIF drop must be refused")
+        #expect(!ImportRouter.admitsDroppedPayload(tiff), "a TIFF drop must be refused")
+        #expect(!ImportRouter.admitsDroppedPayload(bmp), "a BMP drop must be refused")
+    }
+
+    @Test("Image payloads route to the image loader; WEBP throws before any decode")
+    func testImagePayloadsRouteToTheImageLoader() throws {
+        #expect(try ImportRouter.route(data: Data([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10])) is ImageImportLoader)
+        #expect(try ImportRouter.route(data: Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])) is ImageImportLoader)
+        let webp = Data([0x52, 0x49, 0x46, 0x46, 0x00, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50])
+        #expect(throws: PipelineError.self) { try ImportRouter.route(data: webp) }
+        let avif = Data([0x00, 0x00, 0x00, 0x1C, 0x66, 0x74, 0x79, 0x70, 0x61, 0x76, 0x69, 0x66])
+        #expect(ImportRouter.kind(of: avif) == .unsupportedImage)
     }
 
     @Test("A %PDF payload is admitted at the drop door")
