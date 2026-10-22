@@ -522,7 +522,7 @@ struct ShareRiskConfirmSheetTests {
         #expect(ShareRiskConfirmKind.failOrAttention(report).title == "Share with reported issues?")
         #expect(ShareRiskConfirmKind.incompleteWarn(report).title == "Share with incomplete checks?")
         #expect(ShareRiskConfirmKind.skipped(report).title == "Share without verification?")
-        #expect(ShareRiskConfirmKind.failOrAttention(report).listHeader == "These checks reported issues:")
+        #expect(ShareRiskConfirmKind.failOrAttention(report).listHeader == "These checks reported issues or did not run in full:")
         #expect(ShareRiskConfirmKind.incompleteWarn(report).listHeader == "These checks did not run in full:")
         #expect(ShareRiskConfirmKind.skipped(report).listHeader == nil)
     }

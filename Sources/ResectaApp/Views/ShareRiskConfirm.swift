@@ -84,7 +84,7 @@ extension DocumentEditorView {
 
     /// List headers: the FAIL/ATTENTION family's, and the incomplete-WARN
     /// family's.
-    static let shareRiskConfirmListHeader = "These checks reported issues:"
+    static let shareRiskConfirmListHeader = "These checks reported issues or did not run in full:"
     static let shareIncompleteListHeader = "These checks did not run in full:"
 
     /// One fact line per row, composed from the check's title, the outcome
@@ -98,14 +98,18 @@ extension DocumentEditorView {
     }
 
     /// At-risk item lines for the FAIL/ATTENTION confirm family: every
-    /// failed or needs-review layer, in engine order. Static so the
-    /// derivation is unit-testable without a SwiftUI host.
+    /// failed or needs-review layer, in engine order, then the same
+    /// report's could-not-verify and skipped checks — the confirmation
+    /// lists every check that did not run in full, as the published
+    /// documents say, not only the ones that reported issues. Static so
+    /// the derivation is unit-testable without a SwiftUI host.
     static func atRiskItemLines(report: VerificationReport) -> [String] {
-        report.layers.compactMap { layer in
+        let atRisk: [String] = report.layers.compactMap { layer in
             if layer.status.isFail { return confirmFactLine(layer: layer, outcome: "failed") }
             if layer.status.isAttention { return confirmFactLine(layer: layer, outcome: "needs review") }
             return nil
         }
+        return atRisk + couldNotVerifyItemLines(report: report).filter { !atRisk.contains($0) }
     }
 
     /// Item lines for the incomplete-WARN confirm family: every check that
