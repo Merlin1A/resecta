@@ -63,21 +63,21 @@ struct ShareDisabledReasonTests {
     func staleGivesStaleCopy() {
         let reason = VerificationResultsView.shareDisabledReason(
             outputExists: true, isStale: true)
-        #expect(reason == "Regions changed since this output was made — run Redact again to share.")
+        #expect(reason == "Regions changed after this PDF was made. Run\u{00A0}Redact\u{00A0}again\u{00A0}to\u{00A0}share.")
     }
 
     @Test("Missing output file → missing-file copy naming Run Redact")
     func missingFileGivesMissingCopy() {
         let reason = VerificationResultsView.shareDisabledReason(
             outputExists: false, isStale: false)
-        #expect(reason == "The output file is no longer available — run Redact again.")
+        #expect(reason == "The redacted PDF is no longer available. Run\u{00A0}Redact\u{00A0}again\u{00A0}to\u{00A0}share.")
     }
 
     @Test("Missing file AND stale → missing-file copy wins")
     func missingFileWinsOverStale() {
         let reason = VerificationResultsView.shareDisabledReason(
             outputExists: false, isStale: true)
-        #expect(reason == "The output file is no longer available — run Redact again.")
+        #expect(reason == "The redacted PDF is no longer available. Run\u{00A0}Redact\u{00A0}again\u{00A0}to\u{00A0}share.")
     }
 
     @Test("Reason is nil exactly when the derived canExport would be true")
@@ -167,7 +167,7 @@ struct FailExportGateTests {
             report: report(.attention("a"), overridden: true), acknowledged: true) == false)
     }
 
-    @Test("ATTENTION confirm's at-risk item list quotes the layer's shortDescription")
+    @Test("ATTENTION confirm's at-risk item names the check, the outcome and the page")
     func attentionAtRiskItemQuotesDiagnostic() {
         let attentionReport = VerificationReport(
             layers: [
@@ -183,9 +183,9 @@ struct FailExportGateTests {
             durationSeconds: 0
         )
         let lines = DocumentEditorView.atRiskItemLines(report: attentionReport)
-        #expect(lines == ["Text matching your redactions is still readable on page 2."])
+        #expect(lines == ["OCR Check: needs review on\u{00A0}page\u{00A0}2"])
         // Content-free: the item list never surfaces
-        // reviewTermTexts (the matched term text), only shortDescription.
+        // reviewTermTexts (the matched term text) or an engine sentence.
         #expect(!lines.joined().contains("redacted-term"))
     }
 
@@ -259,13 +259,9 @@ struct FailExportGateTests {
             report: report(.pass), acknowledged: false) == false)
     }
 
-    // The confirm sheet's at-risk item list is derived from EVERY
-    // FAIL/ATTENTION layer's shortDescription (`atRiskItemLines`), not a
-    // single quoted-and-fallback sentence — the retired
-    // `shareAnywayConfirmMessage` / `shareAnywayConfirmFallbackMessage`
-    // pinned that older single-message shape. `atRiskItemLines` distinguishes
-    // FAIL classes the same way: each layer's own shortDescription, verbatim.
-    @Test("At-risk item list quotes the L2 in-region diagnostic")
+    // The confirm sheet's at-risk item list names EVERY FAIL/ATTENTION
+    // layer (`atRiskItemLines`): its title, the outcome, its 1-based pages.
+    @Test("At-risk item list names the in-region failure's check and page")
     func atRiskItemsQuoteInRegionDiagnostic() {
         let inRegionFail = VerificationReport(
             layers: [
@@ -280,10 +276,10 @@ struct FailExportGateTests {
             durationSeconds: 0
         )
         #expect(DocumentEditorView.atRiskItemLines(report: inRegionFail)
-            == ["Readable text detected within a redacted region on 1 page(s): 1"])
+            == ["OCR Check: failed on\u{00A0}page\u{00A0}2"])
     }
 
-    @Test("At-risk item list quotes a page-count diagnostic, not the in-region sentence")
+    @Test("At-risk item list names the page-count gate by its short title")
     func atRiskItemsQuotePageCountDiagnostic() {
         let pageCountFail = VerificationReport(
             layers: [
@@ -298,11 +294,10 @@ struct FailExportGateTests {
             durationSeconds: 0
         )
         let lines = DocumentEditorView.atRiskItemLines(report: pageCountFail)
-        #expect(lines == ["Output page count does not match the source document."])
-        #expect(!lines.joined().contains("readable text within a redacted region"))
+        #expect(lines == ["Page Count: failed"])
     }
 
-    @Test("At-risk item list quotes a metadata (Layer 5) diagnostic, not the in-region sentence")
+    @Test("At-risk item list names a metadata failure with no pages")
     func atRiskItemsQuoteMetadataDiagnostic() {
         let metadataFail = VerificationReport(
             layers: [
@@ -317,8 +312,7 @@ struct FailExportGateTests {
             durationSeconds: 0
         )
         let lines = DocumentEditorView.atRiskItemLines(report: metadataFail)
-        #expect(lines == ["Document metadata contains key: Author"])
-        #expect(!lines.joined().contains("readable text within a redacted region"))
+        #expect(lines == ["Metadata Check: failed"])
     }
 
     @Test("A FAIL report with no layers (fixture-only shape) yields an empty at-risk item list, not a crash")
@@ -508,7 +502,7 @@ struct SkippedShareGateTests {
     @Test("Skip-fact line names the state (mechanism description)")
     func skipFactLineNamesState() {
         #expect(DocumentEditorView.shareRiskConfirmSkipFactLine
-            == "Verification did not run on this output.")
+            == "Verification did not run on this PDF.")
     }
 }
 
@@ -522,15 +516,15 @@ struct ShareRiskConfirmSheetTests {
 
     // MARK: - Title / header / skip line — exact copy pins
 
-    @Test("Title is exact and shared across all three confirm families")
+    @Test("Titles and list headers per confirm family")
     func titleExact() {
-        #expect(DocumentEditorView.shareRiskConfirmTitle == "Share with reported issues?")
-    }
-
-    @Test("List header exact")
-    func headerExact() {
-        #expect(DocumentEditorView.shareRiskConfirmListHeader
-            == "The verification check reported:")
+        let report = VerificationReport(layers: [], overallStatus: .fail("x"), durationSeconds: 0)
+        #expect(ShareRiskConfirmKind.failOrAttention(report).title == "Share with reported issues?")
+        #expect(ShareRiskConfirmKind.incompleteWarn(report).title == "Share with incomplete checks?")
+        #expect(ShareRiskConfirmKind.skipped(report).title == "Share without verification?")
+        #expect(ShareRiskConfirmKind.failOrAttention(report).listHeader == "These checks reported issues:")
+        #expect(ShareRiskConfirmKind.incompleteWarn(report).listHeader == "These checks did not run in full:")
+        #expect(ShareRiskConfirmKind.skipped(report).listHeader == nil)
     }
 
     @Test("Slide-control label exact")
@@ -551,7 +545,7 @@ struct ShareRiskConfirmSheetTests {
         )
     }
 
-    @Test("Item list includes only FAIL/ATTENTION layers, in layer order, shortDescription only")
+    @Test("Item list includes only FAIL/ATTENTION layers, in layer order, composed from the title")
     func itemListDerivation() {
         let mixedReport = VerificationReport(
             layers: [
@@ -566,12 +560,9 @@ struct ShareRiskConfirmSheetTests {
             overallStatus: .fail("x"), durationSeconds: 0
         )
         let lines = DocumentEditorView.atRiskItemLines(report: mixedReport)
-        #expect(lines == [
-            "Output has 2 pages; source has 3.",
-            "Unredacted text remains on page 2.",
-        ])
-        // Content-free: never the matched text
-        // (reviewTermTexts) or the detailDescription — shortDescription only.
+        #expect(lines == ["Layer: failed", "Layer: needs review"])
+        // Content-free: never the matched text (reviewTermTexts) or an
+        // engine sentence.
         let joined = lines.joined()
         #expect(!joined.contains("a-matched-secret"))
         #expect(!joined.contains("never surfaced"))
@@ -584,8 +575,7 @@ struct ShareRiskConfirmSheetTests {
             overallStatus: .fail("x"), durationSeconds: 0)
         #expect(ShareRiskConfirmKind.failOrAttention(failReport).itemLines
             == DocumentEditorView.atRiskItemLines(report: failReport))
-        #expect(ShareRiskConfirmKind.failOrAttention(failReport).itemLines
-            == ["Output has 2 pages; source has 3."])
+        #expect(ShareRiskConfirmKind.failOrAttention(failReport).itemLines == ["Layer: failed"])
 
         let couldNotVerify = LayerResult(
             name: "Layer", symbolName: "checkmark", status: .warn("w"),
@@ -596,32 +586,23 @@ struct ShareRiskConfirmSheetTests {
             overallStatus: .warn("w"), durationSeconds: 0)
         #expect(ShareRiskConfirmKind.incompleteWarn(warnReport).itemLines
             == DocumentEditorView.couldNotVerifyItemLines(report: warnReport))
-        #expect(ShareRiskConfirmKind.incompleteWarn(warnReport).itemLines
-            == ["OCR could not be run on 2 pages"])
-        // The masthead sentence the arm keeps above the list names the
-        // list's own clauses, never the skip sentence, when WARN layers exist.
-        #expect(VerificationResultsView.mastheadSubtitle(report: warnReport)
-            == "Verification completed with 1\u{00A0}could not verify · 1\u{00A0}warning. Review below before sharing.")
+        #expect(ShareRiskConfirmKind.incompleteWarn(warnReport).itemLines == ["Layer: could not verify"])
 
         let allSkipped = VerificationReport(
             layers: [layer(.skipped, shortDescription: "s"), layer(.skipped, shortDescription: "s")],
             overallStatus: .warn("w"), durationSeconds: 0)
-        #expect(ShareRiskConfirmKind.incompleteWarn(allSkipped).itemLines.isEmpty)
+        #expect(ShareRiskConfirmKind.incompleteWarn(allSkipped).itemLines == ["Layer: skipped", "Layer: skipped"])
         #expect(ShareRiskConfirmKind.skipped(VerificationReport.skipped(reason: .cancelled)).itemLines.isEmpty)
     }
 
     // MARK: - Deselected-items line — singular/plural
 
-    @Test("Singular")
+    @Test("Singular and plural, the results screen's own line")
     func deselectedLineSingular() {
-        #expect(DocumentEditorView.deselectedItemsConfirmLine(count: 1)
-            == "1 flagged item was deselected before redaction.")
-    }
-
-    @Test("Plural")
-    func deselectedLinePlural() {
-        #expect(DocumentEditorView.deselectedItemsConfirmLine(count: 3)
-            == "3 flagged items were deselected before redaction.")
+        #expect(DocumentEditorView.deselectedItemsConfirmLine(count: 1, total: 1)
+            == "You left 1 of 1 detected item unredacted.")
+        #expect(DocumentEditorView.deselectedItemsConfirmLine(count: 2, total: 9)
+            == "You left 2 of 9 detected items unredacted.")
     }
 
     // MARK: - Accessibility identifiers per confirm family
@@ -901,7 +882,7 @@ struct IncompleteWarnShareGateTests {
             report: report, acknowledged: false) == false)
     }
 
-    @Test("couldNotVerifyItemLines lists exactly the could-not-verify WARN layers, in layer order, shortDescription only")
+    @Test("couldNotVerifyItemLines lists the could-not-verify WARN and skipped layers, in layer order")
     func couldNotVerifyItemLinesDerivation() {
         let report = VerificationReport(
             layers: [
@@ -913,15 +894,14 @@ struct IncompleteWarnShareGateTests {
                 couldNotVerifyLayer("Cross-checked 1 of 2 pages — remaining pages lacked rasterization data"),
             ],
             overallStatus: .warn("Verification produced warnings"), durationSeconds: 0)
-        #expect(DocumentEditorView.couldNotVerifyItemLines(report: report) == [
-            "OCR could not be run on 2 pages",
-            "Cross-checked 1 of 2 pages — remaining pages lacked rasterization data",
-        ])
+        #expect(DocumentEditorView.couldNotVerifyItemLines(report: report)
+                == ["Layer: could not verify", "Layer: skipped", "Layer: could not verify"])
     }
 
-    @Test("couldNotVerifyItemLines is empty for the all-skipped degrade — the masthead sentence names the skips")
+    @Test("couldNotVerifyItemLines lists the skipped checks of the all-skipped degrade")
     func couldNotVerifyItemLinesEmptyForAllSkipped() {
-        #expect(DocumentEditorView.couldNotVerifyItemLines(report: incompleteWarnReport()).isEmpty)
+        #expect(DocumentEditorView.couldNotVerifyItemLines(report: incompleteWarnReport())
+                == ["Layer: skipped", "Layer: skipped"])
     }
 
     @Test("Non-WARN verdicts never need this confirm (PASS / INFO / ATTENTION / FAIL / SKIPPED)")

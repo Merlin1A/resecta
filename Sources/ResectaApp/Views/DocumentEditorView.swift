@@ -1571,10 +1571,7 @@ struct DocumentEditorView: View {
         else {
             // KI-4: File purged while backgrounded
             redactionState.outputURL = nil
-            documentState.transition(to: .failed(
-                error: .exportError(.filePurged),
-                returnPhase: .editing
-            ))
+            Self.failExportForPurgedOutput(documentState: documentState)
             return
         }
 

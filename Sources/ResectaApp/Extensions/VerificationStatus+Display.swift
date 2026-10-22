@@ -65,14 +65,18 @@ extension VerificationStatus {
 
     // MARK: - Titles
 
+    /// The status-level title — the entry flash's, and the masthead's on
+    /// every verdict but a WARN with a check that could not verify, which
+    /// the results view titles `Some Checks Incomplete` from its rows. An
+    /// INFO never aggregates; it reads as a pass. The no-break space keeps
+    /// "with Warnings" together.
     var title: String {
         switch self {
-        case .pass:      "Checks Passed"
-        case .warn:      "Completed with Notes"
-        case .info:      "Metadata Notes"
-        case .attention: "Attention Needed"
-        case .fail:      "Issues Found"
-        case .skipped:   "Verification Skipped"
+        case .pass, .info: "Checks Passed"
+        case .warn:        "Completed with\u{00A0}Warnings"
+        case .attention:   "Needs Review"
+        case .fail:        "Checks Failed"
+        case .skipped:     "Verification Skipped"
         }
     }
 

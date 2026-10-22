@@ -19,26 +19,19 @@ struct VerificationRunVerificationCardTests {
 
     // MARK: - Card copy
 
-    @Test("Card body copy is neutral for autoVerifyOff")
-    func cardBodyAutoVerifyOff() {
-        #expect(VerificationResultsView.runVerificationCardBodyText(reason: .autoVerifyOff)
-                == "Runs the post-redaction checks on this output.")
-    }
-
-    @Test("Card body copy carries urgency for cancelled and error",
-          arguments: [VerificationReport.SkipReason.cancelled, .error])
-    func cardBodyInterrupted(reason: VerificationReport.SkipReason) {
-        #expect(VerificationResultsView.runVerificationCardBodyText(reason: reason)
-                == "Verification did not finish — run the checks on this output before sharing.")
+    @Test("One card body for every skip reason; the masthead carries the reason")
+    func cardBody() {
+        #expect(VerificationResultsView.runVerificationCardBodyText
+                == "Run the checks on the redacted PDF before you share it.")
     }
 
     @Test("No outcome-promise language in the card strings and the skipped row's caption")
     func noOutcomePromiseLanguage() {
         let bannedWords = ["guaranteed", "ensures", "impossible", "guarantee", "ensure"] // LegalPhrases:safe (test data — the ban list itself)
         let allText = [
-            VerificationResultsView.runVerificationCardBodyText(reason: .autoVerifyOff),
-            VerificationResultsView.runVerificationCardBodyText(reason: .cancelled),
+            VerificationResultsView.runVerificationCardBodyText,
             VerificationRowModel.skippedCaption,
+            VerificationRowModel.skippedLead,
         ].joined(separator: " ").lowercased()
         for word in bannedWords {
             #expect(!allText.contains(word),
@@ -48,7 +41,7 @@ struct VerificationRunVerificationCardTests {
 
     // MARK: - Masthead skip-induced WARN arm
 
-    @Test("Skip-induced WARN masthead names the skips, not zero notes")
+    @Test("Skip-induced WARN masthead names the step that includes the skipped checks")
     func mastheadSkipInducedWarn() {
         let report = VerificationReport(
             layers: [
@@ -60,10 +53,11 @@ struct VerificationRunVerificationCardTests {
             durationSeconds: 0.5
         )
         #expect(VerificationResultsView.mastheadSubtitle(report: report)
-                == "Completed with 2 of 3 checks skipped — results may be incomplete.")
+                == "Run Redact again from Keep\u{00A0}Editing to include the skipped checks.")
+        #expect(VerificationResultsView.mastheadTitle(report: report) == "Some Checks Incomplete")
     }
 
-    @Test("Warn-layer WARN masthead names the warning in the list's words")
+    @Test("Warn-layer WARN masthead points at the warning")
     func mastheadWarnLayerWarn() {
         let report = VerificationReport(
             layers: [
@@ -74,13 +68,14 @@ struct VerificationRunVerificationCardTests {
             durationSeconds: 0.5
         )
         #expect(VerificationResultsView.mastheadSubtitle(report: report)
-                == "Verification completed with 1\u{00A0}warning. Review below before sharing.")
+                == "Read the warning below before you share the PDF.")
+        #expect(VerificationResultsView.mastheadTitle(report: report) == "Completed with\u{00A0}Warnings")
     }
 
-    @Test("WARN with both warn and skipped layers names the skip as could not verify")
+    @Test("WARN with both warn and skipped layers is decided by the could-not-verify rows")
     func mastheadWarnWithSkips() {
-        // A real WARN layer takes precedence — the skip arm applies only
-        // when NO row backs up a warning; the skip reads as could not verify.
+        // The could-not-verify rows decide, never the warnings: every one
+        // of them is skipped, so the sentence names the step.
         let report = VerificationReport(
             layers: [
                 makeLayer(name: "Check A", status: .warn("noise")),
@@ -90,7 +85,7 @@ struct VerificationRunVerificationCardTests {
             durationSeconds: 0.5
         )
         #expect(VerificationResultsView.mastheadSubtitle(report: report)
-                == "Verification completed with 1\u{00A0}could not verify · 1\u{00A0}warning. Review below before sharing.")
+                == "Run Redact again from Keep\u{00A0}Editing to include the skipped check.")
     }
 
     // MARK: - RedactionState retention lifecycle

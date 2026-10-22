@@ -180,19 +180,14 @@ struct VerificationResultsView: View {
 
     // MARK: - Status masthead
     //
-    // Phase 2 lock: neutral chrome — no card background; the
-    // masthead reads as part of the page, not as a contained card.
-    // Title → subtitle, no glyph — the verdict is conveyed by the
-    // title/subtitle text and the combined accessibility label below (the
-    // former 56pt status-symbol slot above the title is removed; the
-    // per-layer status glyphs in `LayerResultRow` are unchanged).
-    // PASS renders the title alone — `mastheadSubtitle`
-    // is nil on PASS, so the subtitle `Text` is not mounted at all (no
-    // empty line, no stray spacing); every other verdict keeps its line.
+    // Neutral chrome — no card background; the masthead reads as part of
+    // the page. The row-word title, then ONE sentence on every verdict
+    // that names the control to use, and one combined accessibility label
+    // that also speaks the counts.
 
     private var statusMasthead: some View {
         VStack(spacing: ResectaTokens.Spacing.sm) {
-            Text(report.overallStatus.title)
+            Text(Self.mastheadTitle(report: report))
                 .font(.largeTitle.weight(.semibold))
                 .foregroundStyle(.primary)
                 .multilineTextAlignment(.center)
@@ -203,128 +198,208 @@ struct VerificationResultsView: View {
                     .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 320)
-                    // The ATTENTION arm quotes the review terms — text the
-                    // checks found still readable in the output — so it
-                    // carries the same privacy marking as the search and
-                    // review surfaces; every other arm is mechanism copy.
-                    .privacySensitive(Self.mastheadSubtitleIsPrivacySensitive(
-                        status: report.overallStatus))
+                    // The ATTENTION sentence can quote the review terms —
+                    // text the checks found still readable in the output —
+                    // so it carries the same privacy marking as the search
+                    // and review surfaces; every other arm is mechanism copy.
+                    .privacySensitive(Self.mastheadSubtitleIsPrivacySensitive(report: report))
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(Self.mastheadAccessibilityLabel(report: report))
+        .accessibilityLabel(Self.mastheadAccessibilityLabel(
+            report: report, outputExists: outputExists, mode: runFacts.runMode))
     }
 
-    /// Combined masthead a11y label. Skipped reports get the same
-    /// reason-specific wording as the visible subtitle; every other status
-    /// keeps the status-level label.
-    static func mastheadAccessibilityLabel(report: VerificationReport) -> String {
-        guard report.overallStatus.isSkipped else {
-            return report.overallStatus.accessibilityLabel
-        }
-        return "Verification was skipped. \(skippedSubtitle(reason: report.skipReason))"
-    }
-
-    /// Reason-specific subtitle for skipped reports. The status type
-    /// cannot see the report, so the derivation lives here where the
-    /// report is available.
-    static func skippedSubtitle(reason: VerificationReport.SkipReason) -> String {
-        switch reason {
-        case .autoVerifyOff:
-            "Verification is turned off in Settings. Run Redact again with verification on, or share unverified."
-        case .cancelled:
-            "Verification was stopped before it finished. Run it again before sharing."
-        case .error:
-            "Verification could not be completed. Run it again before sharing."
-        }
-    }
-
-    /// Plain subtitle (no timing). Timing moved to the footer; the
-    /// per-page-mode summary moves into the details disclosure header.
-    /// Nil on PASS — the masthead mounts no subtitle at all.
     private var mastheadSubtitle: String? {
-        Self.mastheadSubtitle(report: report)
+        Self.mastheadSubtitle(report: report, outputExists: outputExists, mode: runFacts.runMode)
     }
 
-    /// Whether the masthead subtitle names user text. Only the ATTENTION
-    /// arm of `mastheadSubtitle(report:)` quotes the review terms; the
-    /// WARN, FAIL and skipped lines describe what the checks did. Static so
-    /// the predicate is unit-testable without a SwiftUI host.
-    static func mastheadSubtitleIsPrivacySensitive(status: VerificationStatus) -> Bool {
-        status.isAttention
+    /// The control names never break across lines.
+    private static let keepEditing = "Keep\u{00A0}Editing"
+    private static let textSearch = "text\u{00A0}search"
+    private static let runVerification = "Run\u{00A0}Verification"
+
+    /// The longest masthead sentence; the term forms fall back past it.
+    static let mastheadSentenceLimit = 70
+
+    /// The masthead title: the status-level title, except a WARN that holds
+    /// a check that could not verify (a skipped one included), which reads
+    /// `Some Checks Incomplete`.
+    static func mastheadTitle(report: VerificationReport) -> String {
+        if report.overallStatus.isWarn, partition(report).count(.couldNotVerify) > 0 {
+            return "Some Checks Incomplete"
+        }
+        return report.overallStatus.title
     }
 
-    /// Subtitle derivation, lifted to a `static` helper so the skip-induced
-    /// WARN arm is unit-testable without a SwiftUI host (mirrors
-    /// `skippedSubtitle`). Returns nil exactly when the masthead shows the
-    /// title alone (PASS, and the never-aggregated INFO for exhaustiveness);
-    /// every verdict that asks the user to do something keeps its line.
-    static func mastheadSubtitle(report: VerificationReport) -> String? {
+    /// The masthead's spoken label: the title, the counts (line 2's dots
+    /// spoken as commas) and the sentence; on SKIPPED, the title and the
+    /// sentence.
+    static func mastheadAccessibilityLabel(
+        report: VerificationReport, outputExists: Bool = true, mode: RunMode = .searchableOrUnknown
+    ) -> String {
+        let title = mastheadTitle(report: report)
+        let sentence = mastheadSubtitle(report: report, outputExists: outputExists, mode: mode) ?? ""
+        guard !report.overallStatus.isSkipped else { return "\(title). \(sentence)" }
+        let partition = partition(report)
+        var parts = ["\(title).", "\(partition.summaryLine1)."]
+        if let line2 = partition.summaryLine2 {
+            parts.append(line2.replacingOccurrences(of: " · ", with: ", ") + ".")
+        }
+        parts.append(sentence)
+        return parts.joined(separator: " ")
+    }
+
+    /// The run's mode as the SKIPPED sentences need it: a Secure run had
+    /// every page rasterized by choice (no fallback reason); anything else,
+    /// or no record of the run, reads as Searchable.
+    enum RunMode: Equatable {
+        case secure
+        case searchableOrUnknown
+
+        static func of(perPageModes: [PipelineMode],
+                       fallbackReasons: [TextLayerDetector.FallbackReason?]) -> RunMode {
+            guard !perPageModes.isEmpty,
+                  perPageModes.allSatisfy({ $0 == .secureRasterization }),
+                  !fallbackReasons.contains(where: { $0 != nil })
+            else { return .searchableOrUnknown }
+            return .secure
+        }
+    }
+
+    /// The SKIPPED sentence: the reason, then the step — `Run Verification`,
+    /// and on a Searchable (or unknown) run the full Redact that includes
+    /// the checks a verify-only run cannot complete.
+    static func skippedSubtitle(reason: VerificationReport.SkipReason, mode: RunMode = .searchableOrUnknown) -> String {
+        let cause = switch reason {
+        case .autoVerifyOff: "Off in Settings."
+        case .cancelled:     "Stopped early."
+        case .error:         "Could not finish."
+        }
+        let step = mode == .secure
+            ? "\(runVerification) below before you share the PDF."
+            : "\(runVerification), or run Redact for all checks."
+        return "\(cause) \(step)"
+    }
+
+    /// The sentence when the redacted PDF no longer exists: every arm that
+    /// names Preview or Run Verification gives way to it.
+    static let outputMissingSentence = "\(keepEditing), then run Redact again to share the PDF."
+
+    /// Whether the masthead sentence names user text: true exactly when it
+    /// quotes a review term. Static so the predicate is unit-testable
+    /// without a SwiftUI host.
+    static func mastheadSubtitleIsPrivacySensitive(report: VerificationReport) -> Bool {
+        guard report.overallStatus.isAttention else { return false }
+        return attentionSentence(report: report).quotesTerms
+    }
+
+    /// The masthead sentence, by verdict and the rows behind it. Never nil
+    /// (the optional is the shipped call sites' shape). Static so every arm
+    /// is unit-testable without a SwiftUI host.
+    static func mastheadSubtitle(
+        report: VerificationReport, outputExists: Bool = true, mode: RunMode = .searchableOrUnknown
+    ) -> String? {
+        let partition = partition(report)
         switch report.overallStatus {
-        case .pass:
-            // "All N verification checks completed without
-            // issues." (+ the informational-notes tail) is gone in both
-            // pipeline modes — "Checks Passed" carries the verdict, and the
-            // Verification Details header still reads "N of N checks
-            // passed · N informational notes" one row down. Reduced
-            // assurance never takes this arm: an INFO-only run aggregates
-            // to PASS, skips degrade the aggregate to WARN (its arm below).
-            return nil
+        case .pass, .info:
+            let notes = visibleNoteCount(partition)
+            switch notes {
+            case 0:
+                return outputExists
+                    ? "Look over the redacted PDF in Preview before you share it." : outputMissingSentence
+            case 1:  return "Read the note in Verification Details before you share the PDF."
+            default: return "Read the notes in Verification Details before you share the PDF."
+            }
         case .warn:
-            let warnCount = report.layers.filter(\.status.isWarn).count
-            // Skip-induced WARN: on the digest-less verify-only
-            // path Layers 7/9 report `.skipped` and the aggregate degrades
-            // to WARN with zero WARN layers. "Completed with 0 notes" named
-            // a note count no row backed up; name the skips instead
-            // (matches the aggregate's own diagnostic).
-            let skippedCount = report.layers.filter(\.status.isSkipped).count
-            if warnCount == 0 && skippedCount > 0 {
-                return "Completed with \(skippedCount) of \(report.layers.count) checks skipped — results may be incomplete."
+            let couldNotVerify = partition.couldNotVerify.map { report.layers[$0] }
+            if !couldNotVerify.isEmpty, couldNotVerify.allSatisfy(\.status.isSkipped) {
+                return couldNotVerify.count == 1
+                    ? "Run Redact again from \(keepEditing) to include the skipped check."
+                    : "Run Redact again from \(keepEditing) to include the skipped checks."
             }
-            // Otherwise name what the Verification Details list names, in
-            // its words: the checks that could not verify (a skip included)
-            // and the warnings, from the same partition as its header.
-            let partition = VerificationLayerPartition(layers: report.layers, perPageModes: report.perPageModes)
-            let clauses = [VerificationOutcome.couldNotVerify, .warning]
-                .compactMap { $0.headerClause(count: partition.count($0)) }
-            let named = clauses.isEmpty ? "notes" : clauses.joined(separator: " · ")
-            return "Verification completed with \(named). Review below before sharing."
-        case .info:
-            // Overall status never aggregates to .info — aggregateStatus
-            // returns .fail/.warn/.pass, or .skipped when every layer was
-            // skipped (skip-aware aggregation). Keep an arm for
-            // exhaustiveness; if ever surfaced, treat like .pass (title
-            // alone).
-            return nil
+            if !couldNotVerify.isEmpty {
+                return couldNotVerify.count == 1
+                    ? "1 check could not run in full; read it below before you share."
+                    : "\(couldNotVerify.count) checks could not run in full; read them below before you share."
+            }
+            return partition.count(.warning) == 1
+                ? "Read the warning below before you share the PDF."
+                : "Read the warnings below before you share the PDF."
         case .attention:
-            // Name the exact text once at the masthead (display-only
-            // field) — each attention row repeats it with the remediation
-            // hint. Fallback stays generic if no layer carried term texts.
-            let terms = Self.reviewTermTexts(report: report)
-            if terms.isEmpty {
-                return "Unredacted text remains — review the items below."
-            }
-            let quoted = terms.map { "'\($0)'" }.joined(separator: ", ")
-            return "Unredacted text remains: \(quoted)"
+            return attentionSentence(report: report).text
         case .fail:
-            return "Review the findings below. You can adjust regions and run redaction again, or share after reviewing."
+            return isPageCountGateRun(report)
+                ? "\(keepEditing) and run Redact again; the other checks did not run."
+                : "\(keepEditing) to fix what failed, or share after review."
         case .skipped:
-            return Self.skippedSubtitle(reason: report.skipReason)
+            guard outputExists else { return outputMissingSentence }
+            return skippedSubtitle(reason: report.skipReason, mode: mode)
         }
     }
 
-    /// Union of the report's display-only review term texts, deduplicated,
-    /// in layer order. Static so the masthead derivation is unit-testable
-    /// without a SwiftUI host (mirrors `skippedSubtitle`).
-    static func reviewTermTexts(report: VerificationReport) -> [String] {
-        var seen = Set<String>()
-        var texts: [String] = []
-        for layer in report.layers {
-            for text in layer.reviewTermTexts ?? [] where seen.insert(text).inserted {
-                texts.append(text)
-            }
+    /// The ATTENTION sentence. Term rows win over a Search Re-check row;
+    /// the term forms are tried in order and the first that fits is taken
+    /// — every term, then the first term and a count, then "the terms
+    /// below" — so a term is never cut.
+    static func attentionSentence(report: VerificationReport) -> (text: String, quotesTerms: Bool) {
+        let termRows = report.layers.filter {
+            $0.status.isAttention && VerificationRowModel.quotesReviewTerms($0.layer)
         }
-        return texts
+        let lead = "\(keepEditing), then use \(textSearch) to redact"
+        if !termRows.isEmpty {
+            let terms = reviewTermTexts(report: report)
+            let quoted = terms.map { "\u{201C}\($0)\u{201D}" }
+            var candidates: [String] = []
+            if terms.count == 1 || terms.count == 2 {
+                candidates.append("\(lead) \(VerificationRowModel.listPhrase(quoted)).")
+            }
+            if terms.count >= 2 {
+                candidates.append("\(lead) \(quoted[0]) and \(terms.count - 1) more.")
+            }
+            if let fit = candidates.first(where: { $0.count <= mastheadSentenceLimit }) {
+                return (fit, true)
+            }
+            return (terms.count > 1 ? "\(lead) the terms below." : "\(lead) the term below.", false)
+        }
+        let searches = report.layers
+            .filter { $0.status.isAttention && $0.layer == .searchRecheck }
+            .flatMap(VerificationRowModel.matchingQueryLines)
+        if !searches.isEmpty {
+            return (searches.count == 1
+                ? "\(keepEditing) and run your search again with OCR on."
+                : "\(keepEditing) and run your searches again with OCR on.", false)
+        }
+        return ("\(lead) the terms below.", false)
+    }
+
+    /// The review terms the ATTENTION sentence may quote: the needs-review
+    /// rows of the three term checks, in engine order, normalised as the
+    /// user would type them and de-duplicated case-insensitively. Static so
+    /// the masthead derivation is unit-testable without a SwiftUI host.
+    static func reviewTermTexts(report: VerificationReport) -> [String] {
+        VerificationRowModel.normalizedTerms(report.layers
+            .filter { $0.status.isAttention && VerificationRowModel.quotesReviewTerms($0.layer) }
+            .flatMap { $0.reviewTermTexts ?? [] })
+    }
+
+    /// The notes a PASS reader sees without opening anything: the Notes
+    /// section's rows, plus the notes riding in the pass cluster when the
+    /// cluster opens by default (nothing sits above it).
+    static func visibleNoteCount(_ partition: VerificationLayerPartition) -> Int {
+        partition.notes.count + (partition.isWhollyClean ? partition.clusterNoteCount : 0)
+    }
+
+    /// The page-count gate's report: its one row is the gate, so the other
+    /// checks did not run.
+    static func isPageCountGateRun(_ report: VerificationReport) -> Bool {
+        report.layers.count == 1
+            && report.layers[0].name == VerificationRowModel.pageCountGateName
+            && report.layers[0].layer == nil
+    }
+
+    private static func partition(_ report: VerificationReport) -> VerificationLayerPartition {
+        VerificationLayerPartition(layers: report.layers, perPageModes: report.perPageModes)
     }
 
     // MARK: - Run facts strip
@@ -347,6 +422,8 @@ struct VerificationResultsView: View {
         /// The degrade-failure list at the run behind this output's
         /// entry; nil when that run was not degraded.
         var degradeFailures: [String]? = nil
+        /// The run's mode, for the SKIPPED sentences.
+        var runMode: RunMode = .searchableOrUnknown
 
         /// Pure derivation from the run's own retained inputs — the two
         /// facts are read at run entry and recorded with the output, so
@@ -355,7 +432,9 @@ struct VerificationResultsView: View {
         static func derive(inputs: RedactionState.LastRunInputs?) -> RunFacts {
             RunFacts(
                 ocrSkippedPages: inputs?.ocrSkippedPages ?? [],
-                degradeFailures: inputs?.degradeFailures
+                degradeFailures: inputs?.degradeFailures,
+                runMode: RunMode.of(perPageModes: inputs?.perPageModes ?? [],
+                                    fallbackReasons: inputs?.perPageFallbackReasons ?? [])
             )
         }
     }
@@ -448,32 +527,21 @@ struct VerificationResultsView: View {
         report.overallStatus.isSkipped
     }
 
-    /// Reason-specific body copy for the Run Verification card. autoVerifyOff
-    /// is a deliberate setting (neutral copy); cancelled/error mean the run
-    /// did not finish (urgency copy).
-    static func runVerificationCardBodyText(
-        reason: VerificationReport.SkipReason
-    ) -> String {
-        switch reason {
-        case .autoVerifyOff:
-            "Runs the post-redaction checks on this output."
-        case .cancelled, .error:
-            "Verification did not finish — run the checks on this output before sharing."
-        }
-    }
+    /// Body copy for the Run Verification card — one body for every skip
+    /// reason; the masthead sentence carries the reason.
+    static let runVerificationCardBodyText =
+        "Run the checks on the redacted PDF before you share it."
 
     private var runVerificationCard: some View {
         HomeChoiceCard(
             symbol: "checkmark.shield",
             style: .subtle,
             title: "Run Verification",
-            bodyText: LocalizedStringKey(
-                Self.runVerificationCardBodyText(reason: report.skipReason)),
+            bodyText: LocalizedStringKey(Self.runVerificationCardBodyText),
             affordance: "Run Checks →",
             action: onRunVerification
         )
-        .accessibilityLabel(
-            "Run Verification. \(Self.runVerificationCardBodyText(reason: report.skipReason))")
+        .accessibilityLabel("Run Verification. \(Self.runVerificationCardBodyText)")
         .accessibilityIdentifier("runVerificationCard")
     }
 
@@ -490,7 +558,10 @@ struct VerificationResultsView: View {
 
     /// VoiceOver label for the Preview card.
     static let previewCardAccessibilityLabel =
-        "Preview Redacted Document. Open the redacted output in a read-only viewer."
+        "Preview Redacted Document. \(previewCardBodyText)"
+
+    /// Body copy for the Preview card.
+    static let previewCardBodyText = "Open the redacted PDF in a read-only viewer."
 
     /// Defense-in-depth gate for the Share card: Share is enabled
     /// exactly when a fresh, valid output exists (`canExport`). Lifted to a
@@ -507,13 +578,43 @@ struct VerificationResultsView: View {
     /// output exists to be stale against. Static so the (exists, stale) →
     /// copy mapping is unit-testable without a SwiftUI host.
     static func shareDisabledReason(outputExists: Bool, isStale: Bool) -> String? {
+        // The second sentence holds together, so a line breaks between
+        // the two sentences.
+        let step = "Run\u{00A0}Redact\u{00A0}again\u{00A0}to\u{00A0}share."
         if !outputExists {
-            return "The output file is no longer available — run Redact again."
+            return "The redacted PDF is no longer available. \(step)"
         }
         if isStale {
-            return "Regions changed since this output was made — run Redact again to share."
+            return "Regions changed after this PDF was made. \(step)"
         }
         return nil
+    }
+
+    /// The Share hint: spoken only, exactly when tapping Share opens a
+    /// confirm. It reads the live confirm predicates with their
+    /// acknowledgements — never the rows — so after a completed share,
+    /// whose acknowledgement stays spent, no hint promises a confirm.
+    static let shareConfirmHint = "Asks you to confirm before sharing."
+
+    /// Whether Share will ask for confirmation: Share is enabled and one of
+    /// the three confirm families is armed.
+    static func shareWillConfirm(
+        report: VerificationReport, canExport: Bool,
+        failAcknowledged: Bool, skippedAcknowledged: Bool, incompleteWarnAcknowledged: Bool
+    ) -> Bool {
+        canExport && (
+            DocumentEditorView.shareNeedsFailConfirm(report: report, acknowledged: failAcknowledged)
+            || DocumentEditorView.shareNeedsSkippedConfirm(report: report, acknowledged: skippedAcknowledged)
+            || DocumentEditorView.shareNeedsIncompleteWarnConfirm(
+                report: report, acknowledged: incompleteWarnAcknowledged))
+    }
+
+    private var shareWillConfirm: Bool {
+        Self.shareWillConfirm(
+            report: report, canExport: canExport,
+            failAcknowledged: documentState.failShareAcknowledged,
+            skippedAcknowledged: documentState.skippedShareAcknowledged,
+            incompleteWarnAcknowledged: documentState.incompleteWarnShareAcknowledged)
     }
 
     /// Red-tints the Share tile on ANY verification FAIL verdict. Keyed on the
@@ -571,6 +672,7 @@ struct VerificationResultsView: View {
             .disabled(Self.shareDisabled(canExport: canExport))
             .keyboardShortcut("e", modifiers: .command)
             .accessibilityLabel(Self.shareCardAccessibilityLabel)
+            .accessibilityHint(shareWillConfirm ? Self.shareConfirmHint : "")
 
             // A disabled card with no copy reads as broken; say why and what
             // to do. Rendered only when the gate actually disables Share, so
@@ -598,14 +700,18 @@ struct VerificationResultsView: View {
         }
     }
 
-    /// Keep Editing body copy states the undo
-    /// boundary where it bites — applying redactions cleared the undo
-    /// stack, so returning to the editor cannot
-    /// Cmd-Z back past the apply. Static so the a11y label and the card
-    /// speak the same string and the wording is pinned without a host.
+    /// Keep Editing body copy states the undo boundary where it bites —
+    /// Redact cleared the undo stack, so returning to the editor cannot
+    /// Cmd-Z back past it. Static so the a11y label and the card speak the
+    /// same words and the wording is pinned without a host.
     static let keepEditingBodyText =
-        "Return to the editor to adjust regions or rerun detection. "
-        + "Applying redactions cleared the undo history — use Delete Region to remove a region."
+        "Return to the editor to adjust regions, then run Redact again. "
+        + "Redact cleared undo; use Delete\u{00A0}Region instead."
+
+    /// Keep Editing's spoken label: the action, then the undo boundary.
+    static let keepEditingAccessibilityLabel =
+        "Keep Editing. Return to the editor to adjust regions, then run Redact again. "
+        + "Redact cleared undo; use Delete Region instead."
 
     private var keepEditingCard: some View {
         HomeChoiceCard(
@@ -616,7 +722,7 @@ struct VerificationResultsView: View {
             affordance: "Open Editor →",
             action: { documentState.transition(to: .editing) }
         )
-        .accessibilityLabel("Keep Editing. \(Self.keepEditingBodyText)")
+        .accessibilityLabel(Self.keepEditingAccessibilityLabel)
     }
 
     private var previewCard: some View {
@@ -635,7 +741,7 @@ struct VerificationResultsView: View {
                 symbol: "eye",
                 style: .subtle,
                 title: "Preview Redacted Document",
-                bodyText: "Open the redacted output in a read-only viewer.",
+                bodyText: LocalizedStringKey(Self.previewCardBodyText),
                 affordance: "Open Preview →"
             )
         }
@@ -680,18 +786,37 @@ struct VerificationResultsView: View {
     // MARK: - Footer
 
     private var footer: some View {
-        Group {
-            if report.durationSeconds > 0 {
-                Text("Completed in \(String(format: "%.1f", report.durationSeconds)) seconds · \(report.layers.count) checks")
-            } else {
-                Text("\(report.layers.count) checks")
-            }
-        }
+        Text(Self.completionLineText(report: report))
         .font(.footnote)
         .foregroundStyle(ResectaTokens.SemanticColor.supportText)
         .multilineTextAlignment(.center)
         .frame(maxWidth: .infinity)
         .padding(.horizontal, ResectaTokens.Spacing.sm)
+    }
+
+    /// The completion line: the duration and the number of checks, the
+    /// minutes form from 60 s; the page-count gate's report, where no check
+    /// completed, says where it stopped.
+    static func completionLineText(report: VerificationReport) -> String {
+        if isPageCountGateRun(report) { return "Stopped at the Page Count check." }
+        let n = report.layers.count
+        let checks = n == 1 ? "1 check" : "\(n) checks"
+        guard report.durationSeconds > 0 else { return checks }
+        return "Completed in \(durationText(report.durationSeconds)) · \(checks)"
+    }
+
+    /// "under 0.1 seconds" · "4.1 seconds" · "5 min 12 s" (whole seconds,
+    /// never "60 s").
+    static func durationText(_ seconds: Double) -> String {
+        if seconds < 0.1 { return "under 0.1 seconds" }
+        if seconds < 60 { return String(format: "%.1f seconds", seconds) }
+        return minutesText(seconds)
+    }
+
+    /// "5 min 12 s", from 60 s up; rounded to whole seconds.
+    static func minutesText(_ seconds: Double) -> String {
+        let total = Int(seconds.rounded())
+        return "\(total / 60) min \(total % 60) s"
     }
 
     // MARK: - Honesty disclaimer

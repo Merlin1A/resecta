@@ -76,62 +76,79 @@ extension DocumentEditorView {
         return report.layers.contains(where: CouldNotVerifyWarn.matches)
     }
 
-    /// Title for the bespoke share-risk confirm sheet. One title
-    /// across all three confirm families (FAIL/ATTENTION, SKIPPED,
-    /// incomplete-WARN); only one title is approved copy, and
-    /// re-scoping a second one is out of the sprint's timeline.
+    /// Titles for the bespoke share-risk confirm sheet, one per family:
+    /// FAIL/ATTENTION, incomplete-WARN, SKIPPED.
     static let shareRiskConfirmTitle = "Share with reported issues?"
+    static let shareIncompleteConfirmTitle = "Share with incomplete checks?"
+    static let shareSkippedConfirmTitle = "Share without verification?"
 
-    /// List header shown above the item list — the FAIL/ATTENTION confirm
-    /// family, and the incomplete-WARN family when could-not-verify layers
-    /// report (`couldNotVerifyItemLines`).
-    static let shareRiskConfirmListHeader = "The verification check reported:"
+    /// List headers: the FAIL/ATTENTION family's, and the incomplete-WARN
+    /// family's.
+    static let shareRiskConfirmListHeader = "These checks reported issues:"
+    static let shareIncompleteListHeader = "These checks did not run in full:"
+
+    /// One fact line per row, composed from the check's title, the outcome
+    /// and the 1-based pages — "Terms in Text & Bytes: needs review on page
+    /// 2" — so the sheet stays content-free: no engine sentence (one of
+    /// them names a font) and no matched text.
+    static func confirmFactLine(layer: LayerResult, outcome: String) -> String {
+        let title = VerificationRowModel.title(for: layer)
+        let location = VerificationRowModel.pageLocation(layer.pageReferences).map { " \($0)" } ?? ""
+        return "\(title): \(outcome)\(location)"
+    }
 
     /// At-risk item lines for the FAIL/ATTENTION confirm family: every
-    /// failed- or attention-flagged layer's `shortDescription` — already
-    /// content-free (page numbers / key names only, never
-    /// matched text). Replaces the retired `shareAnywayConfirmMessage`,
-    /// which quoted only the aggregate's first failing layer; this lists
-    /// every at-risk layer. Static so the derivation is unit-testable
-    /// without a SwiftUI host.
+    /// failed or needs-review layer, in engine order. Static so the
+    /// derivation is unit-testable without a SwiftUI host.
     static func atRiskItemLines(report: VerificationReport) -> [String] {
-        report.layers
-            .filter { $0.status.isFail || $0.status.isAttention }
-            .map(\.shortDescription)
+        report.layers.compactMap { layer in
+            if layer.status.isFail { return confirmFactLine(layer: layer, outcome: "failed") }
+            if layer.status.isAttention { return confirmFactLine(layer: layer, outcome: "needs review") }
+            return nil
+        }
     }
 
-    /// Item lines for the incomplete-WARN confirm family: every
-    /// could-not-verify WARN layer's `shortDescription`
-    /// (`CouldNotVerifyWarn.matches`), content-free by the same construction
-    /// as `atRiskItemLines`. Empty for the all-skipped degrade, whose
-    /// masthead sentence already names the skips. Static so the derivation
-    /// is unit-testable without a SwiftUI host.
+    /// Item lines for the incomplete-WARN confirm family: every check that
+    /// could not verify part of the output (`CouldNotVerifyWarn.matches`)
+    /// and every skipped check, in engine order — "Character Count:
+    /// skipped". Static so the derivation is unit-testable without a
+    /// SwiftUI host.
     static func couldNotVerifyItemLines(report: VerificationReport) -> [String] {
-        report.layers
-            .filter(CouldNotVerifyWarn.matches)
-            .map(\.shortDescription)
+        report.layers.compactMap { layer in
+            if layer.status.isSkipped { return "\(VerificationRowModel.title(for: layer)): skipped" }
+            if CouldNotVerifyWarn.matches(layer) {
+                return confirmFactLine(layer: layer, outcome: "could not verify")
+            }
+            return nil
+        }
     }
 
-    /// Skip-fact line for the SKIPPED confirm family. A new string — the
-    /// former `.alert`-era `shareSkippedConfirmMessage` named both the fact
-    /// and the two choices in one sentence; the sheet draws the choices as
-    /// the slide control + Go back, so this line names only the fact.
+    /// Skip-fact line for the SKIPPED confirm family; the sheet draws the
+    /// choices as the slide control + Go back, so this line names only
+    /// the fact.
     static let shareRiskConfirmSkipFactLine =
-        "Verification did not run on this output."
+        "Verification did not run on this PDF."
 
-    /// Deselected-items fact line for the confirm sheet, singular/plural.
-    /// Distinct from `VerificationResultsView.deselectionRowText(deselected:
-    /// total:)` — different wording ("flagged" not "detected", no "of M"
-    /// total) for a different surface. Static so the copy is pinned exactly.
-    static func deselectedItemsConfirmLine(count: Int) -> String {
-        count == 1
-            ? "1 flagged item was deselected before redaction."
-            : "\(count) flagged items were deselected before redaction."
+    /// Deselected-items fact line for the confirm sheet — the results
+    /// screen's own deselection line, verbatim.
+    static func deselectedItemsConfirmLine(count: Int, total: Int) -> String {
+        VerificationResultsView.deselectionRowText(deselected: count, total: total)
     }
 
     /// Engagement-control completion label (the slide track's
     /// visible + accessible text).
     static let shareRiskConfirmSlideLabel = "Slide to share anyway"
+
+    /// KI-4: the output was purged while backgrounded. `.verified →
+    /// .failed` is not a legal pair, so the failure takes the route every
+    /// other export failure takes, through `.exporting`.
+    static func failExportForPurgedOutput(documentState: DocumentState) {
+        documentState.transition(to: .exporting)
+        documentState.transition(to: .failed(
+            error: .exportError(.filePurged),
+            returnPhase: .editing
+        ))
+    }
 
     /// Test seam: overridable in tests to assert the confirm's haptic fired
     /// without CoreHaptics/hardware (mirrors the "Test seam:" convention
@@ -220,10 +237,28 @@ enum ShareRiskConfirmKind: Identifiable {
         }
     }
 
-    /// The lines the confirm sheet lists under
-    /// `DocumentEditorView.shareRiskConfirmListHeader`: the at-risk layers
-    /// for FAIL/ATTENTION, the could-not-verify layers for incomplete-WARN,
-    /// none for SKIPPED (its fact line stands alone). A pure derivation from
+    /// The sheet's title for this family.
+    var title: String {
+        switch self {
+        case .failOrAttention: DocumentEditorView.shareRiskConfirmTitle
+        case .incompleteWarn: DocumentEditorView.shareIncompleteConfirmTitle
+        case .skipped: DocumentEditorView.shareSkippedConfirmTitle
+        }
+    }
+
+    /// The list header for this family; nil for SKIPPED, whose fact line
+    /// stands alone.
+    var listHeader: String? {
+        switch self {
+        case .failOrAttention: DocumentEditorView.shareRiskConfirmListHeader
+        case .incompleteWarn: DocumentEditorView.shareIncompleteListHeader
+        case .skipped: nil
+        }
+    }
+
+    /// The lines the confirm sheet lists under `listHeader`: the at-risk
+    /// layers for FAIL/ATTENTION, the could-not-verify and skipped layers
+    /// for incomplete-WARN, none for SKIPPED (its fact line stands alone). A pure derivation from
     /// the captured report so the sheet's composition is unit-testable
     /// without a SwiftUI host.
     var itemLines: [String] {
@@ -280,8 +315,7 @@ struct ShareRiskConfirmPresentation: ViewModifier {
     }
 }
 
-/// Confirm-sheet content. Title is shared across all three families;
-/// body content is family-specific. The deselected-items line
+/// Confirm-sheet content. Title, list header and lines are per family. The deselected-items line
 /// is cross-cutting — it renders whenever `shouldShowDeselectionRow` is
 /// true, regardless of which family presented.
 struct ShareRiskConfirmSheet: View {
@@ -293,13 +327,14 @@ struct ShareRiskConfirmSheet: View {
     private var atRiskItems: [String] { kind.itemLines }
 
     /// The list header + one `Label` line per item — the FAIL/ATTENTION
-    /// arm's list, shared with the incomplete-WARN arm when could-not-verify
-    /// layers report.
+    /// and incomplete-WARN arms' list.
     @ViewBuilder
     private var itemList: some View {
-        Text(DocumentEditorView.shareRiskConfirmListHeader)
-            .font(.subheadline.weight(.medium))
-            .foregroundStyle(.secondary)
+        if let header = kind.listHeader {
+            Text(header)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.secondary)
+        }
         ForEach(Array(atRiskItems.enumerated()), id: \.offset) { _, line in
             Label {
                 Text(line).font(.subheadline)
@@ -312,7 +347,7 @@ struct ShareRiskConfirmSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: ResectaTokens.Spacing.lg) {
-            Text(DocumentEditorView.shareRiskConfirmTitle)
+            Text(kind.title)
                 .font(.title2.weight(.semibold))
                 .accessibilityAddTraits(.isHeader)
 
@@ -328,20 +363,11 @@ struct ShareRiskConfirmSheet: View {
                     case .skipped:
                         Text(DocumentEditorView.shareRiskConfirmSkipFactLine)
                             .font(.subheadline)
-                    case .incompleteWarn(let report):
-                        // Reuse the masthead's own WARN sentence verbatim —
-                        // no new string. The helper is optional only for
-                        // PASS (title-only masthead); a WARN report always
-                        // carries a line. When could-not-verify layers
-                        // report, the checks are listed beneath it in the
-                        // FAIL/ATTENTION arm's own list shape.
-                        if let line = VerificationResultsView.mastheadSubtitle(report: report) {
-                            Text(line)
-                                .font(.subheadline)
-                        }
-                        if !atRiskItems.isEmpty {
-                            itemList
-                        }
+                    case .incompleteWarn:
+                        // The checks that did not run in full, listed —
+                        // never the masthead's sentence, which points at
+                        // the results below the sheet.
+                        itemList
                     }
 
                     // The share reminder keeps its own rule — any item left
@@ -349,7 +375,7 @@ struct ShareRiskConfirmSheet: View {
                     // whichever ledger row carried the counts.
                     if let snapshot = deselectionSnapshot, snapshot.deselectedCount > 0 {
                         Text(DocumentEditorView.deselectedItemsConfirmLine(
-                            count: snapshot.deselectedCount))
+                            count: snapshot.deselectedCount, total: snapshot.totalCount))
                             .font(.subheadline)
                     }
                 }

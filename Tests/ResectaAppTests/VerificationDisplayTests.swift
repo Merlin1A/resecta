@@ -127,7 +127,7 @@ struct VerificationDisplayTests {
     @Test("WARN title says completed, never passed")
     func warnTitleAvoidsPassClaim() {
         let status = VerificationStatus.warn("w")
-        #expect(status.title == "Completed with Notes")
+        #expect(status.title == "Completed with\u{00A0}Warnings")
         let claimsPass = status.title.lowercased().contains("pass")
         #expect(claimsPass == false,
                 "\"Passed\" is reserved for the .pass verdict")
@@ -142,9 +142,8 @@ struct VerificationDisplayTests {
         let report = VerificationReport(
             layers: [], overallStatus: .fail("f"), durationSeconds: 0)
         #expect(VerificationResultsView.mastheadSubtitle(report: report)
-                == "Review the findings below. You can adjust regions and run redaction again, or share after reviewing.")
-        #expect(VerificationStatus.fail("f").title == "Issues Found",
-                "The FAIL title is pinned — the preview verdict capsule quotes it")
+                == "Keep\u{00A0}Editing to fix what failed, or share after review.")
+        #expect(VerificationStatus.fail("f").title == "Checks Failed")
     }
 
     // MARK: - Accessibility
@@ -235,7 +234,7 @@ struct VerificationDisplayTests {
 
     @Test("ATTENTION title is pinned")
     func attentionTitlePinned() {
-        #expect(VerificationStatus.attention("a").title == "Attention Needed")
+        #expect(VerificationStatus.attention("a").title == "Needs Review")
     }
 
     @Test("ATTENTION masthead subtitle names the report's review terms")
@@ -245,18 +244,18 @@ struct VerificationDisplayTests {
             status: .attention("Text matching your redactions is still readable on 2 pages: 2, 3 (2 instances)"),
             shortDescription: "", detailDescription: "",
             pageReferences: [1, 2], durationSeconds: 0,
-            reviewTermTexts: ["DELIA"])
+            reviewTermTexts: ["DELIA"], layer: .binaryStringSearch)
         let echo = LayerResult(
             name: "Operator Re-Extraction", symbolName: "shield",
             status: .attention("Text matching your redactions is readable in page 2 content (1 instance)"),
             shortDescription: "", detailDescription: "",
             pageReferences: [1], durationSeconds: 0,
-            reviewTermTexts: ["DELIA"])
+            reviewTermTexts: ["DELIA"], layer: .operatorReExtraction)
         let report = VerificationReport(
             layers: [residual, echo],
             overallStatus: .attention("x"), durationSeconds: 0)
         #expect(VerificationResultsView.mastheadSubtitle(report: report)
-                == "Unredacted text remains: 'DELIA'")
+                == "Keep\u{00A0}Editing, then use text\u{00A0}search to redact \u{201C}DELIA\u{201D}.")
         #expect(VerificationResultsView.reviewTermTexts(report: report) == ["DELIA"])
     }
 
@@ -265,7 +264,7 @@ struct VerificationDisplayTests {
         let report = VerificationReport(
             layers: [], overallStatus: .attention("x"), durationSeconds: 0)
         #expect(VerificationResultsView.mastheadSubtitle(report: report)
-                == "Unredacted text remains — review the items below.")
+                == "Keep\u{00A0}Editing, then use text\u{00A0}search to redact the terms below.")
     }
 
     @Test("Share tile tint: FAIL red, ATTENTION pink, WARN none")
@@ -297,7 +296,11 @@ struct VerificationDisplayTests {
             (.info("i"), false),
           ])
     func mastheadSubtitlePrivacyPredicate(status: VerificationStatus, expected: Bool) {
-        #expect(VerificationResultsView.mastheadSubtitleIsPrivacySensitive(status: status) == expected)
+        let row = LayerResult(name: "B", symbolName: "shield", status: status, shortDescription: "",
+                              detailDescription: "", pageReferences: nil, durationSeconds: 0,
+                              reviewTermTexts: ["DELIA"], layer: .binaryStringSearch)
+        let report = VerificationReport(layers: [row], overallStatus: status, durationSeconds: 0)
+        #expect(VerificationResultsView.mastheadSubtitleIsPrivacySensitive(report: report) == expected)
     }
 
     @Test("Row subtitle is privacy-sensitive only for an ATTENTION row that names terms")
@@ -330,36 +333,35 @@ struct VerificationDisplayTests {
                     pageReferences: nil, durationSeconds: 0)
     }
 
-    // MARK: - Masthead subtitle presence
+    // MARK: - Masthead sentence on PASS
 
-    // PASS renders the title alone in both pipeline modes — the
-    // "All N verification checks completed without issues." line (and its
-    // informational-notes tail) is gone; the Verification Details header
-    // still carries the counts. Every verdict that asks for action keeps
-    // its line. INFO never aggregates (kept nil for exhaustiveness).
-    @Test("PASS masthead has no subtitle — 5-check, 10-check, and INFO-bearing runs")
-    func passMastheadHasNoSubtitle() {
+    // PASS names Preview when no note shows, and the notes when they do;
+    // the Verification Details header still carries the counts. INFO never
+    // aggregates; it reads as a pass.
+    @Test("PASS masthead sentence — 5-check, 10-check, and INFO-bearing runs")
+    func passMastheadSentence() {
+        let clean = "Look over the redacted PDF in Preview before you share it."
         let raster = VerificationReport(
             layers: Array(repeating: layer(.pass), count: 5),
             overallStatus: .pass, durationSeconds: 1.0)
-        #expect(VerificationResultsView.mastheadSubtitle(report: raster) == nil)
-
+        #expect(VerificationResultsView.mastheadSubtitle(report: raster) == clean)
         let searchable = VerificationReport(
             layers: Array(repeating: layer(.pass), count: 10),
             overallStatus: .pass, durationSeconds: 1.0)
-        #expect(VerificationResultsView.mastheadSubtitle(report: searchable) == nil)
-
+        #expect(VerificationResultsView.mastheadSubtitle(report: searchable) == clean)
         let withNotes = VerificationReport(
             layers: [layer(.pass), layer(.pass), layer(.info("a")), layer(.info("b"))],
             overallStatus: .pass, durationSeconds: 1.0)
-        #expect(VerificationResultsView.mastheadSubtitle(report: withNotes) == nil)
+        #expect(VerificationResultsView.mastheadSubtitle(report: withNotes)
+                == "Read the notes in Verification Details before you share the PDF.")
         // The count and the notes survive one row down; a note is not a pass.
         #expect(VerificationResultsView.detailsSummaryText(for: withNotes)
                 == "2 of 4 checks passed · 2\u{00A0}notes")
 
         let info = VerificationReport(
             layers: [layer(.info("i"))], overallStatus: .info("i"), durationSeconds: 0)
-        #expect(VerificationResultsView.mastheadSubtitle(report: info) == nil)
+        #expect(VerificationResultsView.mastheadSubtitle(report: info)
+                == "Read the note in Verification Details before you share the PDF.")
     }
 
     @Test("Every non-PASS verdict keeps a masthead subtitle",
@@ -477,40 +479,35 @@ struct AttentionRowCompositionTests {
             status: .attention("Text matching your redactions is still readable on 2 pages: 2, 3 (2 instances)"),
             shortDescription: "engine short line", detailDescription: "",
             pageReferences: pages, durationSeconds: 0,
-            reviewTermTexts: terms)
+            reviewTermTexts: terms, layer: .binaryStringSearch)
     }
+
+    private let one = " It matches text you redacted. Use text\u{00A0}search to redact the rest."
 
     @Test("Single term, two pages — the PD-15 sample shape")
     func singleTermTwoPages() {
         let text = LayerResultRow.reviewRowText(termTexts: ["DELIA"], pages: [1, 2])
-        #expect(text == "'DELIA' is still readable on pages 2 and 3. "
-                + "It matches text you redacted elsewhere. "
-                + "Use text search to redact remaining instances.")
+        #expect(text == "\u{201C}DELIA\u{201D} is still readable on pages 2\u{00A0}and\u{00A0}3." + one)
     }
 
     @Test("Single term, one page")
     func singleTermOnePage() {
         let text = LayerResultRow.reviewRowText(termTexts: ["DELIA"], pages: [1])
-        #expect(text == "'DELIA' is still readable on page 2. "
-                + "It matches text you redacted elsewhere. "
-                + "Use text search to redact remaining instances.")
+        #expect(text == "\u{201C}DELIA\u{201D} is still readable on\u{00A0}page\u{00A0}2." + one)
     }
 
     @Test("Multiple terms, three pages")
     func multiTermThreePages() {
         let text = LayerResultRow.reviewRowText(
             termTexts: ["DELIA", "Hartwell"], pages: [0, 1, 4])
-        #expect(text == "'DELIA', 'Hartwell' are still readable on pages 1, 2, and 5. "
-                + "They match text you redacted elsewhere. "
-                + "Use text search to redact remaining instances.")
+        #expect(text == "\u{201C}DELIA\u{201D} and \u{201C}Hartwell\u{201D} are still readable on pages 1, "
+                + "2,\u{00A0}and\u{00A0}5. They match text you redacted. Use text\u{00A0}search to redact the rest.")
     }
 
     @Test("No page references falls back to a document-wide phrase")
     func noPages() {
         let text = LayerResultRow.reviewRowText(termTexts: ["acme"], pages: nil)
-        #expect(text == "'acme' is still readable in the document. "
-                + "It matches text you redacted elsewhere. "
-                + "Use text search to redact remaining instances.")
+        #expect(text == "\u{201C}acme\u{201D} is still readable in the PDF." + one)
     }
 
     @Test("rowSubtitleText composes for attention rows with terms")
@@ -542,8 +539,9 @@ struct AttentionRowCompositionTests {
     func spokenLabelUsesComposedText() {
         let layer = attentionLayer(terms: ["DELIA"], pages: [1, 2])
         let label = LayerResultRow.accessibilityLabel(model: .init(layer: layer, perPageModes: []), layer: layer)
-        #expect(label.contains("Binary String Search, Needs review."))
-        #expect(label.contains("'DELIA' is still readable on pages 2 and 3."))
+        #expect(label.hasPrefix("Terms in Text & Bytes, Needs review."))
+        #expect(label.contains("\u{201C}DELIA\u{201D} is still readable on pages 2\u{00A0}and\u{00A0}3."))
+        #expect(label.hasSuffix(" Pages 2 and 3."))
     }
 }
 
@@ -576,14 +574,14 @@ struct SearchRecheckQueryLineDisplayTests {
             appliedCount: 1, remainingCount: 0, route: .mixed(textPages: 0, ocrPages: 0),
             unchecked: true)
         #expect(LayerResultRow.queryLineText(refused, in: .searchRecheck)
-                == "\u{201C}(a+)+b\u{201D} · found 1 · applied 1 · not re-checked (pattern not accepted)")
+                == "\u{201C}(a+)+b\u{201D} · 1 found · 1 redacted · not re-checked (pattern not accepted)")
         let checked = SearchRecheckQueryLine(
             label: "\u{201C}Delia\u{201D}", foundCount: 2, foundHitCap: false,
             appliedCount: 2, remainingCount: 0, route: .textLayer)
-        #expect(LayerResultRow.queryLineText(checked, in: .searchRecheck) == "\u{201C}Delia\u{201D} · found 2 · applied 2 · 0 remain")
+        #expect(LayerResultRow.queryLineText(checked, in: .searchRecheck) == "\u{201C}Delia\u{201D} · 2 found · 2 redacted · 0 remaining")
     }
 
-    @Test("queryLineTexts composes label · found · applied · remain, the badges, the cap, and per-term sub-lines")
+    @Test("queryLineTexts composes label · found · redacted · remaining, the badges, the cap, and per-term sub-lines")
     func queryLineComposition() {
         let plain = SearchRecheckQueryLine(
             label: "\u{201C}Delia\u{201D}", foundCount: 9, foundHitCap: false,
@@ -603,21 +601,21 @@ struct SearchRecheckQueryLineDisplayTests {
                 .init(term: "beta", found: 4, applied: 2, remaining: 1),
             ])
 
-        #expect(LayerResultRow.queryLineText(plain, in: .searchRecheck) == "\u{201C}Delia\u{201D} · found 9 · applied 9 · 0 remain")
+        #expect(LayerResultRow.queryLineText(plain, in: .searchRecheck) == "\u{201C}Delia\u{201D} · 9 found · 9 redacted · 0 remaining")
         #expect(LayerResultRow.queryLineText(badged, in: .searchRecheck)
-                == "\u{201C}Delia\u{201D} · found 3 · applied 2 · 1 remain · case-sensitive · whole word")
+                == "\u{201C}Delia\u{201D} · 3 found · 2 redacted · 1 remaining · case-sensitive · whole word")
         #expect(LayerResultRow.queryLineText(capped, in: .searchRecheck)
-                == "\u{201C}\\d{3}-\\d{2}-\\d{4}\u{201D} · found 1,000+ · applied 12 · 3 remain")
+                == "\u{201C}\\d{3}-\\d{2}-\\d{4}\u{201D} · 1,000+ found · 12 redacted · 3 remaining")
         #expect(LayerResultRow.perTermLineTexts(plain, in: .searchRecheck).isEmpty)
         #expect(LayerResultRow.perTermLineTexts(multi, in: .searchRecheck)
-                == ["\u{201C}alpha\u{201D} · 0 remain", "\u{201C}beta\u{201D} · found 4 · applied 2 · 1 remain"])
+                == ["\u{201C}alpha\u{201D} · 0 remaining", "\u{201C}beta\u{201D} · 4 found · 2 redacted · 1 remaining"])
 
         let layer = recheckLayer(status: .pass, queryLines: [plain, multi])
         #expect(LayerResultRow.queryLineTexts(layer: layer) == [
-            "\u{201C}Delia\u{201D} · found 9 · applied 9 · 0 remain",
-            "alpha, beta, gamma +1 · found 6 · applied 4 · 1 remain",
-            "\u{201C}alpha\u{201D} · 0 remain",
-            "\u{201C}beta\u{201D} · found 4 · applied 2 · 1 remain",
+            "\u{201C}Delia\u{201D} · 9 found · 9 redacted · 0 remaining",
+            "alpha, beta, gamma +1 · 6 found · 4 redacted · 1 remaining",
+            "\u{201C}alpha\u{201D} · 0 remaining",
+            "\u{201C}beta\u{201D} · 4 found · 2 redacted · 1 remaining",
         ])
         // No lines on the INFO row and on every other layer.
         #expect(LayerResultRow.queryLineTexts(layer: recheckLayer(status: .info("x"), queryLines: nil)).isEmpty)
@@ -632,7 +630,7 @@ struct SearchRecheckQueryLineDisplayTests {
         }
     }
 
-    @Test("An attention re-check row reuses reviewRowText verbatim and still exposes its query lines")
+    @Test("An attention re-check row names its searches and still exposes its query lines")
     func attentionRowReusesReviewRowText() {
         let line = SearchRecheckQueryLine(
             label: "\u{201C}Delia\u{201D}", foundCount: 9, foundHitCap: false,
@@ -644,14 +642,11 @@ struct SearchRecheckQueryLineDisplayTests {
         // The collapsed subtitle IS the Layer-3 sentence — no copy fork.
         #expect(LayerResultRow.rowSubtitleText(layer: layer)
                 == LayerResultRow.reviewRowText(termTexts: ["Delia"], pages: [1]))
-        #expect(LayerResultRow.rowSubtitleText(layer: layer)
-                == "'Delia' is still readable on page 2. It matches text you redacted elsewhere. "
-                + "Use text search to redact remaining instances.")
         let spoken = LayerResultRow.accessibilityLabel(model: .init(layer: layer, perPageModes: []), layer: layer)
-        #expect(spoken.hasPrefix("Search Re-check, Needs review. 'Delia' is still readable on page 2."))
-        #expect(spoken.contains("1 affected page"))
+        #expect(spoken == "Search Re-check, Needs review. Your search \u{201C}Delia\u{201D} still has 1 match "
+                + "on\u{00A0}page\u{00A0}2. Page 2.")
         // The expanded detail's query line names the counts.
-        #expect(LayerResultRow.queryLineTexts(layer: layer) == ["\u{201C}Delia\u{201D} · found 9 · applied 8 · 1 remain"])
+        #expect(LayerResultRow.queryLineTexts(layer: layer) == ["\u{201C}Delia\u{201D} · 9 found · 8 redacted · 1 remaining"])
         // The masthead names the text once even when Layers 2 and 3 report
         // it too: the OCR check (both page modes) and the string search
         // thread the same review term, and the dedup is by text.
@@ -664,10 +659,11 @@ struct SearchRecheckQueryLineDisplayTests {
             name: "Binary String Search", symbolName: "shield",
             status: .attention("Text matching your redactions is still readable on 1 page: 2 (1 instance)"),
             shortDescription: "", detailDescription: "",
-            pageReferences: [1], durationSeconds: 0, reviewTermTexts: ["Delia"])
+            pageReferences: [1], durationSeconds: 0, reviewTermTexts: ["Delia"], layer: .binaryStringSearch)
         let report = VerificationReport(
             layers: [layer2, layer3, layer], overallStatus: .attention("x"), durationSeconds: 0)
-        #expect(VerificationResultsView.mastheadSubtitle(report: report) == "Unredacted text remains: 'Delia'")
+        #expect(VerificationResultsView.mastheadSubtitle(report: report)
+                == "Keep\u{00A0}Editing, then use text\u{00A0}search to redact \u{201C}Delia\u{201D}.")
         #expect(VerificationResultsView.reviewTermTexts(report: report) == ["Delia"])
         #expect(VerificationResultsView.detailsSummaryText(for: report) == "0 of 3 checks passed · 3\u{00A0}need review")
         // The OCR check's attention row reuses the same sentence — no copy
@@ -732,17 +728,17 @@ struct SearchRecheckQueryLineDisplayTests {
         let typed = scanLine(label: two.displayLabel, found: 1, applied: 1, remaining: 1, perCategory: [("Scan (", 1)])
         #expect(LayerResultRow.isScanLine(scanLine(label: "\u{201C}x\u{201D}", found: 3, applied: 3, remaining: 0), in: .detectionSweep))
         #expect(!LayerResultRow.isScanLine(typed, in: .searchRecheck))
-        #expect(LayerResultRow.perTermLineTexts(typed, in: .searchRecheck) == ["\u{201C}Scan (\u{201D} · 1 remain"],
+        #expect(LayerResultRow.perTermLineTexts(typed, in: .searchRecheck) == ["\u{201C}Scan (\u{201D} · 1 remaining"],
                 "a re-check query labelled like a scan renders its terms quoted")
     }
 
-    @Test("An applied scan's line reads found · applied · remain, with per-category sub-lines unquoted")
+    @Test("An applied scan's line reads found · redacted · remaining, with per-category sub-lines unquoted")
     func appliedScanLine() {
         let line = scanLine(
             label: "Scan (17 detectors)", found: 23, applied: 20, remaining: 3,
             perCategory: [("Name", 1), ("SSN", 2)])
-        #expect(LayerResultRow.queryLineText(line, in: .detectionSweep) == "Scan (17 detectors) · found 23 · applied 20 · 3 remain")
-        #expect(LayerResultRow.perTermLineTexts(line, in: .detectionSweep) == ["Name · 1 remain", "SSN · 2 remain"])
+        #expect(LayerResultRow.queryLineText(line, in: .detectionSweep) == "Scan (17 detectors) · 23 found · 20 redacted · 3 remaining")
+        #expect(LayerResultRow.perTermLineTexts(line, in: .detectionSweep) == ["Name · 1 remaining", "SSN · 2 remaining"])
     }
 
     @Test("The sweep's line (nothing found, nothing applied) reads what the detectors observed, never \"found 0 · applied 0\"")
@@ -761,7 +757,7 @@ struct SearchRecheckQueryLineDisplayTests {
         // An applied scan that read nothing further is not the sweep shape.
         let appliedClean = scanLine(label: "Scan (2 detectors)", found: 5, applied: 5, remaining: 0)
         #expect(!LayerResultRow.isSweepLine(appliedClean, in: .detectionSweep))
-        #expect(LayerResultRow.queryLineText(appliedClean, in: .detectionSweep) == "Scan (2 detectors) · found 5 · applied 5 · 0 remain")
+        #expect(LayerResultRow.queryLineText(appliedClean, in: .detectionSweep) == "Scan (2 detectors) · 5 found · 5 redacted · 0 remaining")
     }
 
     @Test("A Detection Sweep row exposes its lines in order — the applied scan's, then the sweep's")
@@ -777,8 +773,8 @@ struct SearchRecheckQueryLineDisplayTests {
                 scanLine(label: "Scan (17 detectors)", found: 0, applied: 0, remaining: 0),
             ])
         #expect(LayerResultRow.queryLineTexts(layer: layer) == [
-            "Scan (2 detectors) · found 23 · applied 20 · 3 remain",
-            "SSN · 3 remain",
+            "Scan (2 detectors) · 23 found · 20 redacted · 3 remaining",
+            "SSN · 3 remaining",
             "Scan (17 detectors) · nothing further",
         ])
     }

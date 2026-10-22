@@ -149,7 +149,7 @@ struct SearchRecheckPipelineTests {
 
     // MARK: - PASS
 
-    @Test("PASS end to end in Searchable: twelve layers, the re-check then the sweep last, found 2 · applied 2 · 0 remain")
+    @Test("PASS end to end in Searchable: twelve layers, the re-check then the sweep last, 2 found · 2 redacted · 0 remaining")
     func passSearchable() async throws {
         let h = try await makeHarness(
             outputPageTexts: ["Account holder page one", "Balance for page two"],
@@ -180,7 +180,7 @@ struct SearchRecheckPipelineTests {
                 appliedCount: 2, remainingCount: 0, route: .textLayer),
         ])
         #expect(LayerResultRow.queryLineTexts(layer: last)
-                == ["\u{201C}\(Self.term)\u{201D} · found 2 · applied 2 · 0 remain"])
+                == ["\u{201C}\(Self.term)\u{201D} · 2 found · 2 redacted · 0 remaining"])
         #expect(!report.layers.contains { $0.layer == .searchRecheck && $0.status.isSkipped })
         // Fixture honesty under the searchable rules: nothing FAILs; the
         // aggregate is at most the skip-induced WARN of the digest-less
@@ -237,7 +237,7 @@ struct SearchRecheckPipelineTests {
         #expect(LayerResultRow.rowSubtitleText(layer: last)
                 == LayerResultRow.reviewRowText(termTexts: [Self.term], pages: [1]))
         #expect(LayerResultRow.queryLineTexts(layer: last)
-                == ["\u{201C}\(Self.term)\u{201D} · found 2 · applied 2 · 1 remain"])
+                == ["\u{201C}\(Self.term)\u{201D} · 2 found · 2 redacted · 1 remaining"])
 
         // Layer 3 (Binary String Search) reads the same leftover from the
         // sensitive-term set — the accepted two-decoder cross-check — and
@@ -256,7 +256,7 @@ struct SearchRecheckPipelineTests {
         #expect(report.overallStatus.isAttention)
         #expect(VerificationResultsView.reviewTermTexts(report: report) == [Self.term])
         #expect(VerificationResultsView.mastheadSubtitle(report: report)
-                == "Unredacted text remains: '\(Self.term)'")
+                == "Keep\u{00A0}Editing, then use text\u{00A0}search to redact \u{201C}\(Self.term)\u{201D}.")
         #expect(VerificationResultsView.detailsSummaryText(for: report).contains("4\u{00A0}need review"),
                 "got \(VerificationResultsView.detailsSummaryText(for: report))")
     }

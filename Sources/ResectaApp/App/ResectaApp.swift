@@ -203,6 +203,28 @@ struct ResectaApp: App {
                                         .first(where: { $0.hasPrefix("--seedVerifiedReport=") })?
                                         .split(separator: "=").last,
                                        let report = VerificationDebugFixtures.all[String(name)] {
+                                        // `--seedOutput`: a copy of the loaded
+                                        // sample stands in for the redacted PDF,
+                                        // so Share, its confirm and Preview are
+                                        // live; the fixture's run inputs carry
+                                        // the mode and the run facts.
+                                        if launchArguments.contains("--seedOutput"),
+                                           let source = Bundle.main.url(
+                                               forResource: sampleName, withExtension: "pdf") {
+                                            let copy = FileManager.default.temporaryDirectory
+                                                .appendingPathComponent("seeded-output.pdf")
+                                            try? FileManager.default.removeItem(at: copy)
+                                            if (try? FileManager.default.copyItem(at: source, to: copy)) != nil {
+                                                ws.redactionState.outputURL = copy
+                                            }
+                                        }
+                                        if let run = VerificationDebugFixtures.runInputs(for: String(name)) {
+                                            ws.redactionState.recordLastRunInputs(.init(
+                                                perPageModes: run.modes, perPageFallbackReasons: run.reasons,
+                                                sensitiveTerms: SensitiveTermSet(terms: [], manualRegionsWithoutText: 0),
+                                                appliedSearches: [], deselection: nil,
+                                                ocrSkippedPages: run.ocrSkippedPages, degradeFailures: nil))
+                                        }
                                         ws.documentState.transition(to: .redacting(progress: .init(
                                             currentPage: 1, totalPages: 1, currentStep: "Seeded")))
                                         ws.documentState.transition(to: .verified(report: report))

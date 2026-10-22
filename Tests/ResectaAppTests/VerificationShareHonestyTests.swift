@@ -97,7 +97,7 @@ struct VerificationShareHonestyTests {
 
     // MARK: - (iii) Could not verify stays visible
 
-    @Test("Every could-not-verify or skipped check sits in COULD NOT VERIFY, and the summary names it")
+    @Test("Every could-not-verify or skipped check sits in Could not verify, and the summary names it")
     func couldNotVerifyStaysVisible() {
         for report in Self.reports {
             let partition = VerificationLayerPartition(layers: report.layers, perPageModes: report.perPageModes)
@@ -105,21 +105,28 @@ struct VerificationShareHonestyTests {
                 CouldNotVerifyWarn.matches(report.layers[$0]) || report.layers[$0].status.isSkipped
             }
             #expect(partition.couldNotVerify == incomplete)
-            #expect(Set(incomplete).isDisjoint(with: partition.cluster + partition.notes))
+            #expect(Set(incomplete).isDisjoint(with: partition.cluster + partition.notes + partition.nothingToCheck))
             #expect(VerificationResultsView.detailsSummaryText(for: report).contains("could not verify")
                     == !incomplete.isEmpty)
         }
     }
 
-    @Test("Source pin: the COULD NOT VERIFY group renders above the notes and the pass cluster")
+    @Test("The Could not verify group renders above the notes and the pass cluster")
     func couldNotVerifyGroupRendersAboveTheCluster() throws {
         let source = try String(contentsOf: URL(fileURLWithPath: "\(#filePath)")
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .appendingPathComponent("Sources/ResectaApp/Views/VerificationDetailsSection.swift"), encoding: .utf8)
-        let order = ["sectionHeader(\"FINDINGS\")", "sectionHeader(\"COULD NOT VERIFY\"",
-                     "sectionHeader(\"NOTES\")", "passCluster(partition)"].map { source.range(of: $0)?.lowerBound }
+        let order = ["ForEach(Self.groups(partition)", "passCluster(partition)"].map { source.range(of: $0)?.lowerBound }
         #expect(!order.contains(nil))
         #expect(order.compactMap { $0 } == order.compactMap { $0 }.sorted())
+        let layers = [Self.layer(.fail("f"), .textExtraction), Self.layer(.skipped, .characterCount),
+                      Self.layer(.info("i"), .detectionSweep, lines: [SearchRecheckQueryLine(
+                          label: "Scan (17 detectors)", foundCount: 0, foundHitCap: false, appliedCount: 0,
+                          remainingCount: 2, route: .ocr)], pages: [0]),
+                      Self.layer(.info("i"), .searchRecheck), Self.layer(.pass, .structureCheck)]
+        let partition = VerificationLayerPartition(layers: layers, perPageModes: [])
+        #expect(VerificationDetailsSection.groups(partition).map(\.header)
+                == ["Findings", "Could not verify", "Notes", "Nothing to check"])
     }
 
     // MARK: - (iv) Content-free
@@ -146,7 +153,7 @@ struct VerificationShareHonestyTests {
         let report = VerificationReport(layers: layers, overallStatus: .attention("a"), durationSeconds: 0)
         let partition = VerificationLayerPartition(layers: layers, perPageModes: [])
         var shown = [VerificationResultsView.detailsSummaryText(for: report), partition.clusterTitle,
-                     "FINDINGS", "COULD NOT VERIFY", "NOTES", "Share will ask you to confirm."]
+                     "Findings", "Could not verify", "Notes", "Nothing to check"]
         shown += DocumentEditorView.atRiskItemLines(report: report)
         shown += DocumentEditorView.couldNotVerifyItemLines(report: report)
         for layer in layers {

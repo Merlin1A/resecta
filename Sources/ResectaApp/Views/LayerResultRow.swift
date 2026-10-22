@@ -18,9 +18,13 @@ struct LayerResultRow: View {
 
     /// One item of the expanded block, in display order.
     nonisolated enum ExpandedItem: Equatable {
+        /// What to do about this row, first.
+        case lead(String)
         /// What the check reads — on every row whose caption is not
         /// already that line.
         case explainer(String)
+        /// What must be true for the check to pass, and what it does not see.
+        case rule(String)
         /// The engine's detail sentence, verbatim.
         case detail(String)
         /// The query lines and their per-term sub-lines.
@@ -211,7 +215,7 @@ struct LayerResultRow: View {
             ForEach(Array(Self.expandedItems(model: model, layer: layer, opensPages: onPageTap != nil)
                 .enumerated()), id: \.offset) { _, item in
                 switch item {
-                case .explainer(let line), .detail(let line):
+                case .lead(let line), .explainer(let line), .rule(let line), .detail(let line):
                     Text(line)
                         .font(.caption)
                         .foregroundStyle(ResectaTokens.SemanticColor.supportText)
@@ -282,16 +286,20 @@ struct LayerResultRow: View {
         }
     }
 
-    /// The expanded block's items, in order: the explainer (unless the
-    /// caption already is it — a passing row), the engine detail (never on
-    /// a skipped check, whose engine detail names a reason that does not
-    /// apply), the query lines, the page chips (when the host navigates),
-    /// the timing. The engine's short line is never repeated here.
+    /// The expanded block's items, in order: the lead lines, the explainer
+    /// (unless the caption already is it — a passing row), the rule, the
+    /// engine detail (never on a skipped check, whose engine detail names a
+    /// reason that does not apply), the query lines, the page chips (when
+    /// the host navigates), the timing. The engine's short line is never
+    /// repeated here.
     static func expandedItems(model: VerificationRowModel, layer: LayerResult,
                               opensPages: Bool) -> [ExpandedItem] {
-        var items: [ExpandedItem] = []
+        var items: [ExpandedItem] = model.lead.map(ExpandedItem.lead)
         if let explainer = model.explainer, model.caption != explainer {
             items.append(.explainer(explainer))
+        }
+        if let rule = model.rule {
+            items.append(.rule(rule))
         }
         if model.showsEngineDetail, layer.hasDetail {
             items.append(.detail(layer.detailDescription))
@@ -302,16 +310,29 @@ struct LayerResultRow: View {
         if opensPages, let pages = layer.pageReferences, !pages.isEmpty {
             items.append(.pageChips(pages))
         }
-        items.append(.timing(expandedTimingText(durationSeconds: layer.durationSeconds)))
+        items.append(.timing(expandedTimingText(durationSeconds: layer.durationSeconds, layer: layer.layer)))
         return items
     }
 
     /// The expanded row's last line. "Took under 0.1 s" for every duration
     /// below a tenth of a second (most checks finish there, and "0.0s"
-    /// read as "did not run"); otherwise one decimal, a space before the
-    /// unit. The footer keeps the run's total.
+    /// read as "did not run"); one decimal below a minute, a space before
+    /// the unit; "Took 4 min 56 s" from 60 s. The footer keeps the run's
+    /// total.
     static func expandedTimingText(durationSeconds seconds: Double) -> String {
-        seconds < 0.1 ? "Took under 0.1 s" : String(format: "Took %.1f s", seconds)
+        if seconds < 0.1 { return "Took under 0.1 s" }
+        if seconds < 60 { return String(format: "Took %.1f s", seconds) }
+        return "Took \(VerificationResultsView.minutesText(seconds))"
+    }
+
+    /// The timing line by check: the Search Re-check and the Detection Sweep
+    /// share one post pass, timed on the re-check row; the sweep row says so.
+    static func expandedTimingText(durationSeconds seconds: Double, layer: VerificationLayer?) -> String {
+        switch layer {
+        case .searchRecheck: "\(expandedTimingText(durationSeconds: seconds)), shared with Detection Sweep"
+        case .detectionSweep: "Timed with Search Re-check"
+        default: expandedTimingText(durationSeconds: seconds)
+        }
     }
 
     // MARK: - Row subtitle (attention rows name the exact text)
@@ -369,8 +390,8 @@ struct LayerResultRow: View {
     /// constant and the display pin holds it true.
     static let queryLinesArePrivacySensitive = true
 
-    /// The per-query line as displayed: "{label} · found {N} · applied {M}
-    /// · {R} remain", then the option badges ("case-sensitive", "whole
+    /// The per-query line as displayed: "{label} · {N} found · {M} redacted
+    /// · {R} remaining", then the option badges ("case-sensitive", "whole
     /// word") when set. "found 1,000+" when the original run stopped at
     /// the result cap. The label is the engine's display label (quoted
     /// query / pattern, or the multi-term form); the route is not
@@ -387,16 +408,16 @@ struct LayerResultRow: View {
         // printing "0 remain", which would read as a clear.
         let remaining = line.unchecked
             ? "not re-checked (pattern not accepted)"
-            : "\(line.remainingCount) remain"
-        var text = "\(line.label) · found \(found) · applied \(line.appliedCount) · \(remaining)"
+            : "\(line.remainingCount) remaining"
+        var text = "\(line.label) · \(found) found · \(line.appliedCount) redacted · \(remaining)"
         for badge in line.optionBadges {
             text += " · \(badge)"
         }
         return text
     }
 
-    /// A multi-term query's per-term sub-lines: "“term” · {R} remain", with
-    /// "found {n} · applied {m}" ahead of the remaining count when the
+    /// A multi-term query's per-term sub-lines: "“term” · {R} remaining",
+    /// with "{n} found · {m} redacted" ahead of the remaining count when the
     /// record carries per-term counts. Empty for single-query lines.
     static func perTermLineTexts(_ line: SearchRecheckQueryLine, in layer: VerificationLayer?) -> [String] {
         // A scan line's sub-lines are per detector category, named as the
@@ -406,14 +427,14 @@ struct LayerResultRow: View {
             return (line.perTerm ?? []).map { category in
                 sweep
                     ? "\(category.term) · \(possibleItems(category.remaining))"
-                    : "\(category.term) · \(category.remaining) remain"
+                    : "\(category.term) · \(category.remaining) remaining"
             }
         }
         return (line.perTerm ?? []).map { term in
             var text = "\u{201C}\(term.term)\u{201D}"
-            if let found = term.found { text += " · found \(found)" }
-            if let applied = term.applied { text += " · applied \(applied)" }
-            text += " · \(term.remaining) remain"
+            if let found = term.found { text += " · \(found) found" }
+            if let applied = term.applied { text += " · \(applied) redacted" }
+            text += " · \(term.remaining) remaining"
             return text
         }
     }
@@ -454,8 +475,9 @@ struct LayerResultRow: View {
     // MARK: - Spoken strings (static for unit testability)
 
     /// Row label: "{Title}, {Word}." and the caption, then the sweep's gate
-    /// (it rides the spoken label as it rides the collapsed row) and the
-    /// page count when the layer carries page references. The duration is
+    /// (it rides the spoken label as it rides the collapsed row) and, last,
+    /// the pages ("Page 2." · "Pages 1 and 3." · up to five, then a count).
+    /// Every part ends in a period. The duration is
     /// not spoken: it is not in the collapsed row, and the expanded row's
     /// timing line is its own reachable element. "Layer N" is not spoken
     /// here — grouped, the ordinals read out of sequence; the mid-run
@@ -465,8 +487,8 @@ struct LayerResultRow: View {
         if let caption = Self.rowCaptionText(layer: layer) {
             label += " \(caption)"
         }
-        if let pages = layer.pageReferences, !pages.isEmpty {
-            label += ", \(pages.count) affected page\(pages.count == 1 ? "" : "s")"
+        if let pages = VerificationRowModel.spokenPages(layer.pageReferences ?? []) {
+            label += " \(pages)"
         }
         return label
     }
@@ -475,6 +497,6 @@ struct LayerResultRow: View {
     /// there the tap is a no-op, so advertising it misleads.
     static func accessibilityHint(isExpandable: Bool, isExpanded: Bool) -> String {
         guard isExpandable else { return "" }
-        return "Tap to \(isExpanded ? "collapse" : "expand") details"
+        return isExpanded ? "Hides details" : "Shows details"
     }
 }

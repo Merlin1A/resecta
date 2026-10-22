@@ -95,7 +95,7 @@ nonisolated final class SearchRecheckUITests: XCTestCase {
         XCTAssertFalse(detectionLine.exists, "The detection-disclosure line must not render.")
         attachScreenshot(named: "search-recheck-01-checks-passed")
 
-        // Expand Verification Details (label = "Verification Details, <summary>").
+        // Expand Verification Details (label = "Verification Details. <summary>.").
         // The toggle sits at the foot of the results scroll view on this
         // device class and the rows render beneath it, below the fold, so
         // scroll it up before the tap and scroll again for the rows —
@@ -108,7 +108,7 @@ nonisolated final class SearchRecheckUITests: XCTestCase {
             NSPredicate(format: #"label BEGINSWITH "Verification Details""#)
         ).firstMatch
         XCTAssertTrue(details.waitForExistence(timeout: 10), "Verification Details toggle not found.")
-        XCTAssertEqual(details.label, "Verification Details, 7 of 7 checks passed",
+        XCTAssertEqual(details.label, "Verification Details. 7 of 7 checks passed.",
                        "Secure Rasterization runs a 7-layer check, every one passing: \(details.label)")
         details.tap()
 
@@ -180,7 +180,7 @@ nonisolated final class SearchRecheckUITests: XCTestCase {
             NSPredicate(format: #"label BEGINSWITH "Verification Details""#)
         ).firstMatch
         XCTAssertTrue(details.waitForExistence(timeout: 10), "Verification Details toggle not found.")
-        XCTAssertTrue(details.label.contains("6 of 7 checks passed · 1\u{00A0}had nothing to check"),
+        XCTAssertTrue(details.label.contains("6 of 7 checks passed. 1\u{00A0}had nothing to check."),
                       "No typed search: the re-check had nothing to check: \(details.label)")
         details.tap()
         // The idle re-check sits above the pass cluster, so the cluster

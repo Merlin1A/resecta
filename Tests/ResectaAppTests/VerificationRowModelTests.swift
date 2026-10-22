@@ -260,20 +260,20 @@ struct VerificationRowModelTests {
     static let titles: [(VerificationLayer?, String)] = [
         (.textExtraction, "Text Layer & Annotations"),
         (.ocrCheck, "OCR of Page Images"),
-        (.binaryStringSearch, "Redacted Terms in File Bytes"),
+        (.binaryStringSearch, "Terms in Text & Bytes"),
         (.structureCheck, "Active Content & Structure"),
         (.metadataCheck, "Document Metadata"),
         (.spatialVerification, "Character Positions"),
         (.characterCount, "Character Count"),
         (.fontVerification, "Monospace Fonts"),
-        (.characterLineage, "Character Sequence Hash"),
-        (.operatorReExtraction, "Redacted Terms in Content Streams"),
+        (.characterLineage, "Character Sequence"),
+        (.operatorReExtraction, "Terms in Content Streams"),
         (.searchRecheck, "Search Re-check"),
         (.detectionSweep, "Detection Sweep"),
-        (nil, "Page Count Check"),
+        (nil, "Page Count"),
     ]
 
-    @Test("Every identity has its plain-language title; no identity falls back to the engine name")
+    @Test("Every identity has its plain-language title; the page-count gate reads Page Count")
     func titleMapCoversEveryIdentity() {
         #expect(Self.titles.count == VerificationLayer.allCases.count + 1)
         for (identity, title) in Self.titles {
@@ -281,26 +281,64 @@ struct VerificationRowModelTests {
         }
     }
 
+    @Test("An identity-less row named for another check keeps its engine name")
+    func identityLessRowKeepsItsName() {
+        let row = LayerResult(name: "Binary String Search", symbolName: "shield", status: .pass,
+                              shortDescription: "x", detailDescription: "", pageReferences: nil,
+                              durationSeconds: 0)
+        #expect(VerificationRowModel.title(for: row) == "Binary String Search")
+        #expect(VerificationRowModel.rule(for: row) == nil)
+    }
+
+    static let oneLiners: [VerificationLayer: String] = [
+        .textExtraction: "Checks Rasterized-page text and markup.",
+        .ocrCheck: "Reads page images against redactions.",
+        .binaryStringSearch: "Searches text and bytes for your terms.",
+        .structureCheck: "Checks file structure for active content.",
+        .metadataCheck: "Checks metadata for leftover fields.",
+        .spatialVerification: "Measures characters against regions.",
+        .characterCount: "Compares character counts with the record.",
+        .fontVerification: "Checks fonts against Courier and Menlo.",
+        .characterLineage: "Compares kept characters with the record.",
+        .operatorReExtraction: "Searches text commands for your terms.",
+        .searchRecheck: "Re-runs your searches on the redacted PDF.",
+        .detectionSweep: "Runs the detectors on the redacted PDF.",
+    ]
+
     @Test("Every explainer is one line of at most 42 characters")
     func explainersFitOneLine() {
         for identity in VerificationLayer.allCases {
             let line = VerificationRowModel.explainer(for: identity)
+            #expect(line == Self.oneLiners[identity])
             #expect(!line.isEmpty && line.count <= 42, "\(identity): \(line.count)")
             #expect(line.hasSuffix("."))
         }
-        #expect(VerificationRowModel.explainer(for: .detectionSweep) == "Runs the detectors on the output.")
+        #expect(VerificationRowModel.explainer(for: .spatialVerification, perPageModes: [.secureRasterization])
+                == "Checks Rasterized pages for a text layer.")
+    }
+
+    @Test("Every rule is at most 110 characters; the sweep's carries no limit sentence")
+    func rulesFitTheBudget() {
+        for identity in VerificationLayer.allCases {
+            let rule = VerificationRowModel.rule(for: identity)
+            #expect(!rule.isEmpty && rule.count <= 110, "\(identity): \(rule.count)")
+        }
+        #expect(VerificationRowModel.rule(for: .detectionSweep)
+                == "The detectors must report nothing beyond the items you chose to leave.")
+        #expect(VerificationRowModel.rule(for: Self.layer(.fail("x"), identity: nil))
+                == "Compares the PDF's page count with the original's. The other checks run only when they match.")
     }
 
     @Test("The six checks that can have nothing to check say why")
     func nothingToCheckReasons() {
         let expected: [VerificationLayer: String] = [
-            .searchRecheck: "No searches were applied.",
-            .detectionSweep: "No scan was applied.",
-            .binaryStringSearch: "No redacted terms to search for.",
-            .operatorReExtraction: "No redacted terms to search for.",
-            .characterCount: "No page kept a text layer.",
-            .fontVerification: "No page kept a text layer.",
-            .characterLineage: "No page kept a text layer.",
+            .searchRecheck: "No searches to re-run.",
+            .detectionSweep: "No scan to re-run.",
+            .binaryStringSearch: "No captured text to search for.",
+            .operatorReExtraction: "No captured text to search for.",
+            .characterCount: "No Searchable pages to check.",
+            .fontVerification: "No Searchable pages to check.",
+            .characterLineage: "No Searchable pages to check.",
         ]
         for identity in VerificationLayer.allCases {
             #expect(VerificationRowModel.nothingToCheckReason(for: identity) == expected[identity])
@@ -312,12 +350,14 @@ struct VerificationRowModelTests {
         var strings = VerificationLayer.allCases.flatMap { identity in
             [VerificationRowModel.title(for: layer(.pass, identity: identity)),
              VerificationRowModel.explainer(for: identity),
+             VerificationRowModel.rule(for: identity),
              VerificationRowModel.nothingToCheckReason(for: identity) ?? ""]
         }
         strings += VerificationOutcome.allCases.map(\.word)
         strings += VerificationOutcome.allCases.compactMap { $0.headerClause(count: 2) }
-        strings += [VerificationRowModel.skippedCaption, "FINDINGS", "COULD NOT VERIFY", "NOTES",
-                    "Share will ask you to confirm."]
+        strings += [VerificationRowModel.skippedCaption, VerificationRowModel.skippedLead,
+                    VerificationRowModel.pageCountGateRule, "Findings", "Could not verify", "Notes",
+                    "Nothing to check", "Checks", "Page Count"]
         return strings.filter { !$0.isEmpty }
     }
 
@@ -338,19 +378,20 @@ struct VerificationRowModelTests {
     @Test("A passing row captions its one-liner; a row with no identity its engine line")
     func passCaption() {
         let ocr = VerificationRowModel(layer: Self.layer(.pass, identity: .ocrCheck), perPageModes: [])
-        #expect(ocr.caption == "Reads page images by OCR against regions.")
+        #expect(ocr.caption == "Reads page images against redactions.")
         let gate = VerificationRowModel(layer: Self.layer(.pass, identity: nil, short: "No issues found."),
                                         perPageModes: [])
         #expect(gate.caption == "No issues found.")
         #expect(gate.explainer == nil)
     }
 
-    @Test("A skipped check reads Could not verify, captions the remedy and hides the engine detail")
+    @Test("A skipped check reads Could not verify, captions its state, leads with its cause, hides the engine detail")
     func skippedRow() {
         for identity in [VerificationLayer.characterCount, .characterLineage] {
             let model = VerificationRowModel(layer: Self.layer(.skipped, identity: identity), perPageModes: [])
             #expect(model.outcome == .couldNotVerify)
-            #expect(model.caption == "Run Redact again to include this check.")
+            #expect(model.caption == "Skipped. No record to compare with.")
+            #expect(model.lead == ["Only a full Redact run saves that record."])
             #expect(model.showsEngineDetail == false)
         }
     }
@@ -366,17 +407,17 @@ struct VerificationRowModelTests {
         let two = Self.layer(.info("… Open Scan to review."), identity: .detectionSweep,
                              pages: [0, 2], lines: [Self.sweepLine])
         #expect(VerificationRowModel(layer: two, perPageModes: []).caption
-                == "2 possible items remain on pages 1, 3.")
+                == "2 possible items remain on pages 1\u{00A0}and\u{00A0}3.")
         let one = SearchRecheckQueryLine(label: "Scan (17 detectors)", foundCount: 0, foundHitCap: false,
                                          appliedCount: 0, remainingCount: 1, route: .ocr)
         #expect(VerificationRowModel(layer: Self.layer(.info("x"), identity: .detectionSweep, pages: [4],
                                                        lines: [one]), perPageModes: []).caption
-                == "1 possible item remains on page 5.")
+                == "1 possible item remains on\u{00A0}page\u{00A0}5.")
         let applied = SearchRecheckQueryLine(label: "Scan (17 detectors)", foundCount: 6, foundHitCap: false,
                                              appliedCount: 4, remainingCount: 2, route: .ocr)
         #expect(VerificationRowModel(layer: Self.layer(.info("x"), identity: .detectionSweep, pages: [1],
                                                        lines: [applied]), perPageModes: []).caption
-                == "Items remain on page 2.")
+                == "Further possible items remain on\u{00A0}page\u{00A0}2.")
     }
 
     @Test("A needs-review caption quotes the terms and is privacy-sensitive; no other caption is")
@@ -384,8 +425,8 @@ struct VerificationRowModelTests {
         let review = VerificationRowModel(
             layer: Self.layer(.attention("x"), identity: .binaryStringSearch, pages: [1], terms: ["Delia"]),
             perPageModes: [])
-        #expect(review.caption == "'Delia' is still readable on page 2. It matches text you redacted "
-                + "elsewhere. Use text search to redact remaining instances.")
+        #expect(review.caption == "\u{201C}Delia\u{201D} is still readable on\u{00A0}page\u{00A0}2. "
+                + "It matches text you redacted. Use text\u{00A0}search to redact the rest.")
         #expect(review.captionIsPrivacySensitive)
         for status in RowModelStatusAxis.allCases where status != .attention {
             let model = VerificationRowModel(layer: Self.layer(status.status, identity: .ocrCheck, terms: ["Delia"]),
@@ -403,14 +444,14 @@ struct VerificationRowModelTests {
         }
         let one = VerificationRowModel(layer: result(["123-45-6789"], pages: [1], fragment: true), perPageModes: [])
         #expect(one.outcome == .needsReview)
-        #expect(one.caption == "Part of '123-45-6789' is readable beside a redaction box on page 2. Adjust the box and redact again.")
+        #expect(one.caption == "Part of \u{201C}123-45-6789\u{201D} is readable beside a redaction box on\u{00A0}page\u{00A0}2. Adjust the box and redact again.")
         #expect(one.captionIsPrivacySensitive)
         let two = VerificationRowModel(layer: result(["Delia", "Hartwell"], pages: [0, 2], fragment: true), perPageModes: [])
-        #expect(two.caption == "Parts of 'Delia', 'Hartwell' are readable beside redaction boxes on pages 1 and 3. Adjust the boxes and redact again.")
+        #expect(two.caption == "Parts of \u{201C}Delia\u{201D} and \u{201C}Hartwell\u{201D} are readable beside redaction boxes on pages 1\u{00A0}and\u{00A0}3. Adjust the boxes and redact again.")
         let whole = VerificationRowModel(layer: result(["Delia"], pages: [1], fragment: false), perPageModes: [])
-        #expect(whole.caption == "'Delia' is still readable on page 2. It matches text you redacted elsewhere. Use text search to redact remaining instances.")
+        #expect(whole.caption == "\u{201C}Delia\u{201D} is still readable on\u{00A0}page\u{00A0}2. It matches text you redacted. Use text\u{00A0}search to redact the rest.")
         #expect(LayerResultRow.rowSubtitleText(layer: result(["123-45-6789"], pages: [1], fragment: true))
-                == "Part of '123-45-6789' is readable beside a redaction box on page 2. Adjust the box and redact again.")
+                == "Part of \u{201C}123-45-6789\u{201D} is readable beside a redaction box on\u{00A0}page\u{00A0}2. Adjust the box and redact again.")
         #expect(LayerResultRow.rowSubtitleIsPrivacySensitive(layer: result(["123-45-6789"], pages: [1], fragment: true)))
     }
 
@@ -418,19 +459,19 @@ struct VerificationRowModelTests {
     func spokenLabelPerOutcome() {
         let cases: [(LayerResult, [PipelineMode], String)] = [
             (Self.layer(.pass, identity: .ocrCheck), [],
-             "OCR of Page Images, Passed. Reads page images by OCR against regions."),
+             "OCR of Page Images, Passed. Reads page images against redactions."),
             (Self.layer(.pass, identity: .characterCount), [.secureRasterization],
-             "Character Count, Nothing to check. No page kept a text layer."),
+             "Character Count, Nothing to check. No Searchable pages to check."),
             (Self.layer(.info("x"), identity: .ocrCheck, short: "Fill artifact on page 1."), [],
              "OCR of Page Images, Note. Fill artifact on page 1."),
             (Self.layer(.warn("x"), identity: .structureCheck, short: "A second %%EOF."), [],
              "Active Content & Structure, Warning. A second %%EOF."),
-            (Self.layer(.warn("x"), identity: .ocrCheck, short: "OCR could not be run on 1 page.", cnv: true), [],
+            (Self.layer(.warn("x"), identity: .ocrCheck, short: "OCR could not be run on 1 page", cnv: true), [],
              "OCR of Page Images, Could not verify. OCR could not be run on 1 page."),
             (Self.layer(.attention("x"), identity: .searchRecheck, short: "Text remains."), [],
              "Search Re-check, Needs review. Text remains."),
             (Self.layer(.fail("x"), identity: nil, short: "Page count changed."), [],
-             "Page Count Check, Failed. Page count changed."),
+             "Page Count, Failed. Page count changed."),
         ]
         for (layer, modes, label) in cases {
             #expect(VerificationRowModel(layer: layer, perPageModes: modes).spokenLabel == label)
@@ -483,7 +524,7 @@ struct VerificationRowModelTests {
             .ocrCheck: layer(.warn("x"), identity: .ocrCheck, cnv: true),
             .spatialVerification: layer(.warn("x"), identity: .spatialVerification),
             .searchRecheck: idleRecheck]),
-         "8 of 12 checks passed · 1\u{00A0}needs review · 1\u{00A0}could not verify · 1\u{00A0}warning"
+         "8 of 12 checks passed · 1\u{00A0}needs review · 1\u{00A0}warning · 1\u{00A0}could not verify"
             + " · 1\u{00A0}had nothing to check"),
         (report(secureChecks, secure, .fail("x"), [.metadataCheck: layer(.fail("x"), identity: .metadataCheck)]),
          "6 of 7 checks passed · 1\u{00A0}failed"),
@@ -494,7 +535,7 @@ struct VerificationRowModelTests {
          "9 of 12 checks passed · 2\u{00A0}could not verify · 1\u{00A0}note"),
         (VerificationReport(layers: [layer(.fail("x"), identity: nil)], overallStatus: .fail("x"),
                             durationSeconds: 0),
-         "0 of 1 checks passed · 1\u{00A0}failed"),
+         "0 of 1 check passed · 1\u{00A0}failed"),
     ]
 
     @Test("The summary line counts only passing checks and names every other outcome")
@@ -505,7 +546,7 @@ struct VerificationRowModelTests {
         }
     }
 
-    @Test("Every clause, singular and plural, in severity order after the passed base")
+    @Test("Every clause, singular and plural, in screen order after the passed base")
     func clausesInOrderSingularAndPlural() {
         let one: [VerificationLayer: LayerResult] = [
             .textExtraction: Self.layer(.fail("x"), identity: .textExtraction),
@@ -517,8 +558,8 @@ struct VerificationRowModelTests {
         ]
         #expect(VerificationResultsView.detailsSummaryText(for: Self.report(Self.secureChecks, Self.secure,
                                                                             .fail("x"), one))
-                == "1 of 7 checks passed · 1\u{00A0}failed · 1\u{00A0}needs review · 1\u{00A0}could not verify"
-                + " · 1\u{00A0}warning · 1\u{00A0}note · 1\u{00A0}had nothing to check")
+                == "1 of 7 checks passed · 1\u{00A0}failed · 1\u{00A0}needs review · 1\u{00A0}warning"
+                + " · 1\u{00A0}could not verify · 1\u{00A0}note · 1\u{00A0}had nothing to check")
         let pairs: [VerificationLayer: LayerResult] = [
             .textExtraction: Self.layer(.fail("x"), identity: .textExtraction),
             .ocrCheck: Self.layer(.fail("x"), identity: .ocrCheck),
@@ -533,13 +574,13 @@ struct VerificationRowModelTests {
             .searchRecheck: Self.idleRecheck,
         ]
         #expect(VerificationResultsView.detailsSummaryText(for: Self.report(Self.all, Self.secure, .fail("x"), pairs))
-                == "0 of 12 checks passed · 2\u{00A0}failed · 2\u{00A0}need review · 2\u{00A0}could not verify"
-                + " · 2\u{00A0}warnings · 2\u{00A0}notes · 2\u{00A0}had nothing to check")
+                == "0 of 12 checks passed · 2\u{00A0}failed · 2\u{00A0}need review · 2\u{00A0}warnings"
+                + " · 2\u{00A0}could not verify · 2\u{00A0}notes · 2\u{00A0}had nothing to check")
     }
 
     // MARK: - The expanded block
 
-    @Test("The expanded block per outcome: the explainer unless the caption is it, the detail unless skipped")
+    @Test("The expanded block per outcome: the lead, the explainer unless the caption is it, the rule, the detail unless skipped")
     func expandedBlockItemsPerOutcome() {
         typealias Item = LayerResultRow.ExpandedItem
         func items(_ layer: LayerResult, _ modes: [PipelineMode] = [], pages: Bool = true) -> [Item] {
@@ -547,28 +588,89 @@ struct VerificationRowModelTests {
                                          layer: layer, opensPages: pages)
         }
         let took = Item.timing("Took under 0.1 s")
-        let ocr = Item.explainer("Reads page images by OCR against regions.")
+        let ocr = Item.explainer("Reads page images against redactions.")
+        let ocrRule = Item.rule(VerificationRowModel.rule(for: .ocrCheck))
         // Passed: the caption already is the explainer — never shown twice.
-        #expect(items(Self.layer(.pass, identity: .ocrCheck)) == [.detail("Engine detail."), took])
-        // Every other outcome opens with the explainer.
+        #expect(items(Self.layer(.pass, identity: .ocrCheck)) == [ocrRule, .detail("Engine detail."), took])
+        // Every other outcome opens with the explainer, then the rule.
         #expect(items(Self.layer(.warn("x"), identity: .ocrCheck, pages: [1]))
-                == [ocr, .detail("Engine detail."), .pageChips([1]), took])
-        #expect(items(Self.layer(.warn("x"), identity: .ocrCheck, cnv: true)) == [ocr, .detail("Engine detail."), took])
+                == [ocr, ocrRule, .detail("Engine detail."), .pageChips([1]), took])
+        #expect(items(Self.layer(.warn("x"), identity: .ocrCheck, cnv: true))
+                == [ocr, ocrRule, .detail("Engine detail."), took])
         #expect(items(Self.layer(.attention("x"), identity: .ocrCheck, pages: [0], terms: ["t"]), pages: false)
-                == [ocr, .detail("Engine detail."), took])
-        #expect(items(Self.layer(.fail("x"), identity: .ocrCheck)) == [ocr, .detail("Engine detail."), took])
-        #expect(items(Self.layer(.info("x"), identity: .ocrCheck)) == [ocr, .detail("Engine detail."), took])
+                == [ocr, ocrRule, .detail("Engine detail."), took])
+        #expect(items(Self.layer(.fail("x"), identity: .ocrCheck)) == [ocr, ocrRule, .detail("Engine detail."), took])
+        #expect(items(Self.layer(.info("x"), identity: .ocrCheck)) == [ocr, ocrRule, .detail("Engine detail."), took])
         #expect(items(Self.layer(.pass, identity: .characterCount), [.secureRasterization])
-                == [.explainer("Compares character counts with the record."), .detail("Engine detail."), took])
-        // Skipped: no engine detail (it names a reason that does not apply).
+                == [.explainer("Compares character counts with the record."),
+                    .rule(VerificationRowModel.rule(for: .characterCount)), .detail("Engine detail."), took])
+        // Skipped: the lead first; no engine detail (it names a reason that does not apply).
         #expect(items(Self.layer(.skipped, identity: .characterLineage))
-                == [.explainer("Recomputes each page's character hash."), took])
-        // The sweep note: its lines and its pages.
+                == [.lead("Only a full Redact run saves that record."),
+                    .explainer("Compares kept characters with the record."),
+                    .rule(VerificationRowModel.rule(for: .characterLineage)), took])
+        // The sweep note: its lines and its pages; its time is the re-check's.
         #expect(items(Self.sweepNote)
-                == [.explainer("Runs the detectors on the output."), .detail("Engine detail."), .queryLines,
-                    .pageChips([0, 2]), took])
-        // No identity: no explainer; the caption is the engine's line.
-        #expect(items(Self.layer(.fail("x"), identity: nil, detail: "")) == [took])
+                == [.explainer("Runs the detectors on the redacted PDF."),
+                    .rule(VerificationRowModel.rule(for: .detectionSweep)), .detail("Engine detail."),
+                    .queryLines, .pageChips([0, 2]), .timing("Timed with Search Re-check")])
+        // The page-count gate: no explainer; its rule; the caption is the engine's line.
+        #expect(items(Self.layer(.fail("x"), identity: nil, detail: ""))
+                == [.rule(VerificationRowModel.pageCountGateRule), took])
+    }
+
+    @Test("Terms in Content Streams says where its scan stopped when later pages exist")
+    func contentStreamStopLine() {
+        let row = Self.layer(.attention("x"), identity: .operatorReExtraction, pages: [1], terms: ["Delia"])
+        let modes: [PipelineMode] = [.searchableRedaction, .searchableRedaction, .searchableRedaction]
+        #expect(VerificationRowModel(layer: row, perPageModes: modes).lead
+                == ["Scanning stopped at page 2. Later pages were not searched."])
+        #expect(VerificationRowModel(layer: row, perPageModes: Array(modes.prefix(2))).lead == [])
+        #expect(VerificationRowModel(layer: row, perPageModes: []).lead == [])
+    }
+
+    @Test("Review terms are normalised: whitespace collapsed, case duplicates dropped")
+    func reviewTermsNormalised() {
+        #expect(VerificationRowModel.normalizedTerms(["Margaret  Thompson", "O'Brien\nLtd", "margaret thompson", " "])
+                == ["Margaret Thompson", "O'Brien Ltd"])
+        #expect(VerificationRowModel.reviewSentence(termTexts: ["Delia", "Fox", "Lane"], pages: [0, 1, 2])
+                == "\u{201C}Delia\u{201D}, \u{201C}Fox\u{201D}, and \u{201C}Lane\u{201D} are still readable "
+                + "on pages 1, 2,\u{00A0}and\u{00A0}3. They match text you redacted. "
+                + "Use text\u{00A0}search to redact the rest.")
+        #expect(VerificationRowModel.reviewSentence(termTexts: ["acme"], pages: nil)
+                == "\u{201C}acme\u{201D} is still readable in the PDF. It matches text you redacted. "
+                + "Use text\u{00A0}search to redact the rest.")
+    }
+
+    @Test("A Search Re-check that needs review names its searches, the matches and the pages")
+    func recheckReviewCaption() {
+        func line(_ label: String, _ remaining: Int) -> SearchRecheckQueryLine {
+            SearchRecheckQueryLine(label: label, foundCount: 4, foundHitCap: false, appliedCount: 2,
+                                   remainingCount: remaining, route: .textLayer)
+        }
+        let one = VerificationRowModel(
+            layer: Self.layer(.attention("x"), identity: .searchRecheck, pages: [1], terms: ["Delia"],
+                              lines: [line("\u{201C}Delia\u{201D}", 1), line("\u{201C}Fox\u{201D}", 0)]),
+            perPageModes: [])
+        #expect(one.caption == "Your search \u{201C}Delia\u{201D} still has 1 match on\u{00A0}page\u{00A0}2.")
+        #expect(one.lead == ["Run it again with OCR on to redact the rest."])
+        #expect(one.captionIsPrivacySensitive)
+        let two = VerificationRowModel(
+            layer: Self.layer(.attention("x"), identity: .searchRecheck, pages: [0, 1],
+                              lines: [line("\u{201C}Delia\u{201D}", 2), line("\u{201C}\\d{4}\u{201D}", 1)]),
+            perPageModes: [])
+        #expect(two.caption == "Your searches \u{201C}Delia\u{201D} and \u{201C}\\d{4}\u{201D} still have 3 matches "
+                + "on pages 1\u{00A0}and\u{00A0}2.")
+        #expect(two.lead == ["Run them again with OCR on to redact the rest."])
+    }
+
+    @Test("The spoken pages: up to five, then four and a count")
+    func spokenPages() {
+        #expect(VerificationRowModel.spokenPages([2]) == "Page 3.")
+        #expect(VerificationRowModel.spokenPages([0, 2]) == "Pages 1 and 3.")
+        #expect(VerificationRowModel.spokenPages([1, 2, 3]) == "Pages 2, 3, and 4.")
+        #expect(VerificationRowModel.spokenPages(Array(1...12)) == "Pages 2, 3, 4, 5, and 8 more.")
+        #expect(VerificationRowModel.spokenPages([]) == nil)
     }
 
     @Test("Each outcome has its outline mark")

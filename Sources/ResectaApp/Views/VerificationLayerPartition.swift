@@ -2,8 +2,8 @@ import Foundation
 import RedactionEngine
 
 /// One enumeration of a report's layers into the details disclosure's
-/// groups, top to bottom — FINDINGS (failed · needs review · warning),
-/// COULD NOT VERIFY, NOTES (a note with items remaining · nothing to check)
+/// groups, top to bottom — Findings (failed · needs review · warning),
+/// Could not verify, Notes (a note with items remaining), Nothing to check
 /// and the pass cluster (passed · a note with nothing remaining) — with the
 /// per-outcome counts the summary line prints. Each layer's outcome is
 /// `VerificationRowModel.outcome(for:perPageModes:)`. Indices are engine
@@ -16,6 +16,7 @@ nonisolated struct VerificationLayerPartition: Equatable {
     let findings: [Int]
     let couldNotVerify: [Int]
     let notes: [Int]
+    let nothingToCheck: [Int]
     let cluster: [Int]
     /// Every layer's outcome, by engine index.
     let outcomes: [VerificationOutcome]
@@ -32,12 +33,15 @@ nonisolated struct VerificationLayerPartition: Equatable {
     /// The notes that ride inside the cluster (nothing remaining).
     var clusterNoteCount: Int { cluster.count { outcomes[$0] == .note } }
     /// Nothing sits above the cluster: it opens by default.
-    var isWhollyClean: Bool { findings.isEmpty && couldNotVerify.isEmpty && notes.isEmpty }
+    var isWhollyClean: Bool {
+        findings.isEmpty && couldNotVerify.isEmpty && notes.isEmpty && nothingToCheck.isEmpty
+    }
 
     init(layers: [LayerResult], perPageModes: [PipelineMode]) {
         var findings: [Int] = []
         var couldNotVerify: [Int] = []
         var notes: [Int] = []
+        var nothingToCheck: [Int] = []
         var cluster: [Int] = []
         var outcomes: [VerificationOutcome] = []
         for (index, layer) in layers.enumerated() {
@@ -50,7 +54,7 @@ nonisolated struct VerificationLayerPartition: Equatable {
             case .couldNotVerify:
                 couldNotVerify.append(index)
             case .nothingToCheck:
-                notes.append(index)
+                nothingToCheck.append(index)
             case .note:
                 if VerificationRowModel.hasItemsRemaining(layer) {
                     notes.append(index)
@@ -64,15 +68,37 @@ nonisolated struct VerificationLayerPartition: Equatable {
         self.findings = findings
         self.couldNotVerify = couldNotVerify
         self.notes = notes
+        self.nothingToCheck = nothingToCheck
         self.cluster = cluster
         self.outcomes = outcomes
     }
 
-    /// The summary line: "{P} of {T} checks passed", then one clause per
-    /// other outcome present, in `VerificationOutcome.headerClauseOrder`.
-    var summaryText: String {
+    /// The summary's first line: "{P} of {T} checks passed" ("0 of 1 check
+    /// passed" when T = 1).
+    var summaryLine1: String {
+        "\(passedCount) of \(total) \(total == 1 ? "check" : "checks") passed"
+    }
+
+    /// The summary's second line: one clause per other outcome present, in
+    /// `VerificationOutcome.headerClauseOrder`; nil when every row passed.
+    var summaryLine2: String? {
         let clauses = VerificationOutcome.headerClauseOrder.compactMap { $0.headerClause(count: count($0)) }
-        return (["\(passedCount) of \(total) checks passed"] + clauses).joined(separator: " · ")
+        return clauses.isEmpty ? nil : clauses.joined(separator: " · ")
+    }
+
+    /// The one-line summary: line 1, then line 2's clauses.
+    var summaryText: String {
+        ([summaryLine1] + (summaryLine2.map { [$0] } ?? [])).joined(separator: " · ")
+    }
+
+    /// A group's header with its count: "Findings · 3".
+    static func sectionHeader(_ header: String, count: Int) -> String {
+        "\(header) · \(count)"
+    }
+
+    /// The header's spoken form: "Findings, 3.".
+    static func sectionHeaderSpoken(_ header: String, count: Int) -> String {
+        "\(header), \(count)."
     }
 
     /// The pass cluster's row title: "N checks passed" / "1 check passed",
@@ -81,5 +107,10 @@ nonisolated struct VerificationLayerPartition: Equatable {
         let passed = passedCount == 1 ? "1 check passed" : "\(passedCount) checks passed"
         guard let notes = VerificationOutcome.note.headerClause(count: clusterNoteCount) else { return passed }
         return "\(passed) · \(notes)"
+    }
+
+    /// The cluster's spoken title: "9 checks passed, 1 note".
+    var clusterSpokenLabel: String {
+        clusterTitle.replacingOccurrences(of: " · ", with: ", ")
     }
 }
