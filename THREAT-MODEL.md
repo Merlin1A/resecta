@@ -50,7 +50,7 @@ These are accepted platform realities, recorded so that no one mistakes a mitiga
 - **Operating-system memory handling.** Paging or swapping of process memory is the OS's business; the rasterizer's working bitmap buffers are zeroed after each page as a best-effort measure.
 - **The App Switcher snapshot store.** The overlay the app draws over itself when it leaves the foreground reduces what those snapshots can contain; a shield also covers the document during screen recording or mirroring.
 - **A one-shot screenshot** taken with the side button while the document is on screen.
-- **Network adversaries.** The app contains no network client code and makes no network requests of its own; system components it hands off to — the in-app browser sheet, Mail, the App Store review prompt — make their own. `ENGINEERING.md` describes a one-minute check of the source for network client code.
+- **Network adversaries.** The app contains no network client code and makes no network requests of its own; system components it hands off to — the in-app browser sheet, Mail, the App Store app (the Rate row in Settings opens the app's App Store page) and the App Store review prompt — make their own. `ENGINEERING.md` describes a one-minute check of the source for network client code.
 - **Human review of the output.** You are responsible for looking at the redacted document before sharing it.
 - **Third-party services and dependencies** outside this repository; the app has no third-party dependencies (its only package is its own engine; a contribution rule keeps it that way).
 
