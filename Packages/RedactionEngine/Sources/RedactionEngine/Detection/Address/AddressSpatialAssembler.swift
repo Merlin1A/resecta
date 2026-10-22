@@ -127,7 +127,7 @@ struct AddressSpatialAssembler: Sendable {
             ) else { continue }
 
             let zipString = haystack.substring(with: zipMatch.range(at: 1))
-            let scfState = ZIPStateTable.state(forZIP: zipString)
+            let zipStates = ZIPStateTable.states(forZIP: zipString)
 
             // Extract state from same line or prior lines.
             var state: String?
@@ -174,8 +174,8 @@ struct AddressSpatialAssembler: Sendable {
                 steps += 1
             }
 
-            // Reject if we have a state AND a SCF prefix but they disagree.
-            if let state, let scfState, state.uppercased() != scfState {
+            // Reject if we have a state AND the ZIP's states but none agrees.
+            if let state, !zipStates.isEmpty, !zipStates.contains(state.uppercased()) {
                 continue
             }
             // Require at least a street-looking line OR a clear state to emit.

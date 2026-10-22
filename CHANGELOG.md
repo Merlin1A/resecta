@@ -202,7 +202,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Scan: fewer name proposals on words that resemble a listed surname by only one letter; the near match still raises the score of an otherwise supported name.
 - Scan: a short account number beside its label is proposed at the balanced preset.
 - Scan: the keywords listed under 'Why this classification?' no longer change between launches.
-- Scan: on scanned pages, an address whose ZIP code belongs to a different state than its first three digits suggest is proposed.
+- Scan: on scanned pages, an address with one of the 19 listed ZIP codes that cross a state line is proposed with the state on either side of the line.
 - Scan: a label line such as 'Reg # on file' is no longer proposed as a license plate.
 - Scan: a phone number whose opening parenthesis was lost in text recognition is proposed.
 - Scan: American Express numbers printed in spaced or hyphenated 4-6-5 groups are proposed.
