@@ -200,11 +200,17 @@ M1_RE='\b(guarantee[ds]?|ensure[ds]?|impossible|find(?:s|ing)?|catch(?:es|ing)?|
 # is dropped before the match, so a comment or a PDF name such as
 # `/Subtype /Link` never counts.
 M3_TREE_RE='(?<![\w.])(?:Link|NWListener|NWBrowser|NSURLConnection|CFSocketCreate\w*|CFStreamCreate\w*|CFReadStreamCreate\w*|CFWriteStreamCreate\w*|socket|connect|getaddrinfo)\(|\bopenURL\b|UIApplication\.shared\.open\(|^\s*import Network\b|\b(?:URLSession|URLRequest|NWConnection|NWPathMonitor|WKWebView)\b'
-# The known sites, one per line: `path|symbol|reason`. A hit anywhere else
-# is an offence; a pinned site with no hit is reported (remove the pin).
-M3_TREE_PINNED='Sources/ResectaApp/Views/SettingsView.swift|Link(|the Send-feedback row opens a mailto: link, a hand-off to Mail that the threat model names'
-# Prints `line:symbol` for every whole-tree hit in one file (plain lines on
-# stdin, no git access): string literals blanked, the comment part dropped.
+# The known sites, one per line: `path|symbol|anchor|reason`. Each pin names
+# ONE site: a hit matches it when the path and the symbol are the pin's and
+# the anchor (an identifier of the call, such as its destination) appears in
+# the hit's code. A hit no pin names is an offence, and so is a pin that more
+# than one hit names — a second hand-off in a file that already has one fails
+# like a hand-off anywhere else. A pin no hit names is reported (remove it).
+M3_TREE_PINNED='Sources/ResectaApp/Views/SettingsView.swift|Link(|Links.sendFeedback|the Send Feedback row opens a mailto: link, a hand-off to Mail that the threat model names
+Sources/ResectaApp/Views/SettingsView.swift|Link(|Links.rateOnTheAppStore|the Rate row opens the App Store page of the app, a hand-off to the App Store app that the threat model names'
+# Prints `line:symbol<TAB>code` for every whole-tree hit in one file (plain
+# lines on stdin, no git access): string literals blanked, the comment part
+# dropped; `code` is that blanked line, which the pins' anchors are read in.
 m3_tree_scan() {
     PATTERN="$M3_TREE_RE" perl -e '
         my $re = qr/$ENV{PATTERN}/;
@@ -214,7 +220,28 @@ m3_tree_scan() {
             $code =~ s/"(?:[^"\\]|\\.)*"/""/g;
             my $at = index($code, "//");
             $code = substr($code, 0, $at) if $at >= 0;
-            while ($code =~ /$re/g) { print "$.:$&\n"; }
+            while ($code =~ /$re/g) { print "$.:$&\t$code\n"; }
+        }'
+}
+
+# Judges the whole-tree hits ($1: `path:line:symbol<TAB>code`, one per line)
+# against the pins ($2: `path|symbol|anchor|reason`, one per line). Prints
+# `OFFENCE <message>` for a hit no pin names, `OFFENCE <message>` for a pin
+# more than one hit names, and `STALE <path> <anchor>` for a pin no hit names.
+m3_tree_judge() {
+    HITS="$1" PINS="$2" perl -e '
+        my @pins = map { [split /\|/, $_, 4] } grep { length } split /\n/, $ENV{PINS};
+        my @count = (0) x @pins;
+        for my $h (grep { length } split /\n/, $ENV{HITS}) {
+            my ($loc, $code) = split /\t/, $h, 2;
+            my ($path, $line, $sym) = $loc =~ /^([^:]*):(\d+):(.*)$/ or next;
+            my @m = grep { $pins[$_][0] eq $path && $pins[$_][1] eq $sym && index($code // "", $pins[$_][2]) >= 0 } 0 .. $#pins;
+            if (@m) { $count[$_]++ for @m } else { print "OFFENCE $path:$line: $sym — not a pinned site\n" }
+        }
+        for my $i (0 .. $#pins) {
+            my ($p, $s, $a) = @{$pins[$i]};
+            print "OFFENCE $p: $s with $a — pinned once, found $count[$i] times\n" if $count[$i] > 1;
+            print "STALE $p $a\n" if $count[$i] == 0;
         }'
 }
 
@@ -320,6 +347,26 @@ if [ -n "$SELF_TEST" ]; then
         echo "audit-lint --self-test: M-3 whole-tree scanner OK (hits on lines 1, 3, 5, 7, 9 and 11 of 12)"
     else
         echo "audit-lint --self-test: M-3 whole-tree scanner DRIFTED — expected hits on lines 1 3 5 7 9 11, got: $(printf '%s' "$actual" | tr '\n' ' ')" >&2
+        exit 1
+    fi
+    # M-3 (whole tree) pins, one per site: the two Settings hand-offs pass;
+    # a third Link( in the same file, a second link to a pinned destination
+    # and a Link( in another file are offences; a pin with no hit is stale.
+    pins=$'S.swift|Link(|Links.sendFeedback|mail\nS.swift|Link(|Links.rateOnTheAppStore|store'
+    ok_hits=$'S.swift:1:Link(\t    Link(destination: Links.sendFeedback) {\nS.swift:5:Link(\t    Link(destination: Links.rateOnTheAppStore) {'
+    j_ok=$(m3_tree_judge "$ok_hits" "$pins")
+    j_third=$(m3_tree_judge "$ok_hits"$'\nS.swift:9:Link(\t    Link(destination: Links.website) {' "$pins")
+    j_twice=$(m3_tree_judge "$ok_hits"$'\nS.swift:9:Link(\t    Link(destination: Links.sendFeedback) {' "$pins")
+    j_other=$(m3_tree_judge "$ok_hits"$'\nT.swift:3:Link(\t    Link(destination: Links.sendFeedback) {' "$pins")
+    j_stale=$(m3_tree_judge $'S.swift:1:Link(\t    Link(destination: Links.sendFeedback) {' "$pins")
+    if [ -z "$j_ok" ] \
+       && [ "$j_third" = "OFFENCE S.swift:9: Link( — not a pinned site" ] \
+       && [ "$j_twice" = "OFFENCE S.swift: Link( with Links.sendFeedback — pinned once, found 2 times" ] \
+       && [ "$j_other" = "OFFENCE T.swift:3: Link( — not a pinned site" ] \
+       && [ "$j_stale" = "STALE S.swift Links.rateOnTheAppStore" ]; then
+        echo "audit-lint --self-test: M-3 per-site pins OK (two pinned sites pass; a third site, a second hit on a pin and another file fail; a pin with no hit is stale)"
+    else
+        echo "audit-lint --self-test: M-3 per-site pins DRIFTED — ok='$j_ok' third='$j_third' twice='$j_twice' other='$j_other' stale='$j_stale'" >&2
         exit 1
     fi
     # AL-6 against six synthetic lines: a comment citing a register id (1)
@@ -479,8 +526,9 @@ done
 # Tests/, outside both roots), is scanned with M3_TREE_RE above, in both
 # modes, so the gate holds for the whole tree on every run and not only for
 # the lines a change adds. Each hit must be a pinned site (M3_TREE_PINNED:
-# path, symbol, reason); a hit at any other site is an offence, and a pinned
-# site that no longer matches is reported so the pin is removed.
+# path, symbol, anchor, reason — one pin per site); a hit at any other site
+# or a second hit on one pin is an offence, and a pinned site that no longer
+# matches is reported so the pin is removed.
 m3_tree_hits=""
 while IFS= read -r path; do
     [ -f "$path" ] || continue
@@ -488,20 +536,12 @@ while IFS= read -r path; do
         [ -n "$hit" ] && m3_tree_hits="$m3_tree_hits$path:$hit"$'\n'
     done < <(m3_tree_scan < "$path")
 done < <(git ls-files -- 'Sources/*.swift' 'Packages/RedactionEngine/*.swift' ':(exclude)Packages/RedactionEngine/Tests/*')
-while IFS= read -r hit; do
-    [ -n "$hit" ] || continue
-    path="${hit%%:*}"; rest="${hit#*:}"; line="${rest%%:*}"; symbol="${rest#*:}"
-    pinned=0
-    while IFS='|' read -r ppath psymbol preason; do
-        [ "$ppath" = "$path" ] && [ "$psymbol" = "$symbol" ] && pinned=1
-    done <<< "$M3_TREE_PINNED"
-    [ "$pinned" -eq 1 ] || violate "M-3 networking symbol in the shipping source (whole tree): $path:$line: $symbol — not a pinned site"
-done <<< "$m3_tree_hits"
-while IFS='|' read -r ppath psymbol preason; do
-    [ -n "$ppath" ] || continue
-    printf '%s' "$m3_tree_hits" | /usr/bin/grep -F "$ppath:" | /usr/bin/grep -qF ":$psymbol" \
-        || echo "audit-lint: M-3 pinned site no longer matches ($ppath $psymbol) — remove its pin" >&2
-done <<< "$M3_TREE_PINNED"
+while IFS= read -r verdict; do
+    case "$verdict" in
+        "OFFENCE "*) violate "M-3 networking symbol in the shipping source (whole tree): ${verdict#OFFENCE }" ;;
+        "STALE "*) echo "audit-lint: M-3 pinned site no longer matches (${verdict#STALE }) — remove its pin" >&2 ;;
+    esac
+done < <(m3_tree_judge "$m3_tree_hits" "$M3_TREE_PINNED")
 
 # ── M-4 @AppStorage inside @Observable (whole-file state machine) ──────
 # Walks each staged .swift file. Tracks @Observable class bodies via brace
