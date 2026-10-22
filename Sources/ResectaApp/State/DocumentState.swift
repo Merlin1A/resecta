@@ -611,6 +611,7 @@ class DocumentState {
         redactionState.clearAll()
         documentPassword.wipe()
         sourceDocument = nil
+        ThumbnailCache.clear()   // the closed document's page images leave memory with it
         sourceFacts = ImportFacts.Summary()
         textLayerStatus = [:]
         sourceAnnotationFindings = []

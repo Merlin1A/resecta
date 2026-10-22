@@ -58,4 +58,26 @@ struct ThumbnailCacheTests {
                 reused ? "the freed address was reused; the entry's weak document is gone, so it misses" : "a different document misses")
         ThumbnailCache.clear()
     }
+
+    @Test("Start Over and a new import clear the cache, not only the sidebar's own change handler")
+    func startOverAndImportClear() async {
+        ThumbnailCache.clear()
+        let coord = makeLoadedCoordinator()
+        let document = coord.documentState.sourceDocument!
+        let image = makeThumbnail(gray: 0.3)
+        ThumbnailCache.set(image, document: document, pageIndex: 0)
+        ThumbnailCache.writeQueue.sync {}
+        #expect(ThumbnailCache.get(document: document, pageIndex: 0) === image)
+        coord.documentState.resetForStartOver(redactionState: coord.redactionState, coordinator: coord)
+        #expect(ThumbnailCache.get(document: document, pageIndex: 0) == nil, "Start Over clears the cache")
+
+        let doc = DocumentState()
+        let redaction = RedactionState()
+        let stale = makeTestPDFDocument()
+        ThumbnailCache.set(image, document: stale, pageIndex: 0)
+        ThumbnailCache.writeQueue.sync {}
+        await ImportService.importDocument(data: makeTestPDFData(), suggestedType: "pdf", documentState: doc, redactionState: redaction)
+        #expect(doc.phaseKind == .editing)
+        #expect(ThumbnailCache.get(document: stale, pageIndex: 0) == nil, "an import clears the cache")
+    }
 }

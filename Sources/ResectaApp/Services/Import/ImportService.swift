@@ -294,6 +294,7 @@ enum ImportService {
         redactionState: RedactionState
     ) {
         redactionState.clearForNewDocument()
+        ThumbnailCache.clear()   // the previous document's page images never outlive it
         documentState.sourceDocument = loaded.document.document
         documentState.sourceFacts = loaded.facts.summary
         // The password that unlocked the source stays with the session: the
