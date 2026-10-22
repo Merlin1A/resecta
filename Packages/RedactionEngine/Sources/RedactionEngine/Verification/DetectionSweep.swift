@@ -20,10 +20,12 @@ import PDFKit
 // families sit at a median of zero. The row's detail says so.
 //
 // Tier: PASS when nothing further remains (a detail sentence when the
-// remaining items are exactly the ones left unredacted), INFO with page
-// chips when something further remains, WARN could-not-verify for pages
-// the searcher could not read. Never ATTENTION — that tier stays reserved
-// for text matching an APPLIED region. Every status message is content-free
+// remaining items are exactly the ones left unredacted), ATTENTION with
+// page chips when an item remains in a category an applied scan covered
+// (the scan should have caught it), INFO with page chips when the only
+// items left are outside every applied scan's categories, WARN
+// could-not-verify for pages the searcher could not read, NOT APPLICABLE
+// when no scan was applied and no sweep requested. Every status message is content-free
 // (no matched text, no category name); category names ride only the
 // display-only `queryLines`. Nothing in this file logs.
 
@@ -69,7 +71,7 @@ struct DetectionSweep: Sendable {
         let pageReferences: [Int]?
         /// Always nil: the sweep never names text at the masthead.
         let reviewTermTexts: [String]?
-        /// Display-only per-request lines. Nil on the idle INFO.
+        /// Display-only per-request lines. Nil on the NOT APPLICABLE row.
         let queryLines: [SearchRecheckQueryLine]?
     }
 
@@ -102,7 +104,7 @@ struct DetectionSweep: Sendable {
     }
 
     private static let idle = Outcome(
-        status: .info(infoMessage), copyOverride: nil,
+        status: .notApplicable(infoMessage), copyOverride: nil,
         pageReferences: nil, reviewTermTexts: nil, queryLines: nil)
 
     // MARK: - Fold (pure)
@@ -353,11 +355,14 @@ struct DetectionSweep: Sendable {
                 queryLines: queryLines)
         }
 
+        // A leftover in a category the user's scan applied (and did not
+        // deselect) is something the scan should have caught: ATTENTION.
+        // Items only outside the applied categories stay a note.
         if hasFurther {
             let message = "\(lead) — \(furtherBody). Open Scan to review."
             let detail = joined([leadSentence, routeSentence, furtherSentence])
             return Outcome(
-                status: .info(message),
+                status: further > 0 ? .attention(message) : .info(message),
                 copyOverride: LayerCopy(short: message, detail: detail),
                 pageReferences: furtherPages,
                 reviewTermTexts: nil,

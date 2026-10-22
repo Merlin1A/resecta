@@ -95,7 +95,7 @@ extension VerificationResultsView {
     ) -> String? {
         let partition = partition(report)
         switch report.overallStatus {
-        case .pass, .info:
+        case .pass, .info, .notApplicable:
             let notes = visibleNoteCount(partition)
             switch notes {
             case 0:
@@ -249,7 +249,7 @@ struct VerificationMasthead: View {
         let tone: CountRing.Tone
         switch report.overallStatus {
         case .skipped: return .skipped
-        case .pass, .info: tone = .pass
+        case .pass, .info, .notApplicable: tone = .pass
         case .warn: tone = .warn
         case .attention: tone = .attention
         case .fail: tone = .fail

@@ -185,9 +185,21 @@ struct StatusDerivationTests {
     func infoRecheckBesidePassAggregatesPass() {
         let layers = [
             LayerResult.mock(status: .pass),
-            LayerResult.mock(status: .info(SearchRecheck.infoMessage)),
+            LayerResult.mock(status: .info("A note.")),
         ]
         let verifier = VerificationEngine()
         #expect(verifier.aggregateStatus(layers) == .pass)
+    }
+
+    @Test("NOT APPLICABLE neither passes nor lowers the verdict: it folds as if absent")
+    func notApplicableFoldsAsIfAbsent() {
+        let verifier = VerificationEngine()
+        let na = LayerResult.mock(status: .notApplicable(SearchRecheck.infoMessage))
+        #expect(verifier.aggregateStatus([LayerResult.mock(status: .pass), na]) == .pass)
+        #expect(verifier.aggregateStatus([LayerResult.mock(status: .warn("w")), na]) == .warn(""))
+        #expect(verifier.aggregateStatus([LayerResult.mock(status: .attention("a")), na]) == .attention(""))
+        #expect(verifier.aggregateStatus([LayerResult.mock(status: .fail("f")), na]).isFail)
+        #expect(verifier.aggregateStatus([LayerResult.mock(status: .skipped), na]) == .warn(""),
+                "a skip beside it is still partial: NOT APPLICABLE is not a skip")
     }
 }

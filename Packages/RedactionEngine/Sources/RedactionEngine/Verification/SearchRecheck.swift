@@ -113,7 +113,7 @@ struct SearchRecheck: Sendable {
                     : Self.coverageNotRunOutcome(noMatchFound: true)
             }
             return Outcome(
-                status: .info(Self.infoMessage), copyOverride: nil,
+                status: .notApplicable(Self.infoMessage), copyOverride: nil,
                 pageReferences: nil, reviewTermTexts: nil, queryLines: nil)
         }
         let pageCount = outputDocument.document.pageCount
@@ -207,7 +207,7 @@ struct SearchRecheck: Sendable {
     /// one check the layer had was not possible — or ran but could not read
     /// a page it had boxes on (`unreadPages`, 0-based), or ran and found no
     /// match to compare (`noMatchFound`). A WARN, so the aggregate reads
-    /// could-not-verify; never the idle INFO.
+    /// could-not-verify; never NOT APPLICABLE.
     static func coverageNotRunOutcome(unreadPages: [Int] = [], noMatchFound: Bool = false) -> Outcome {
         let message: String
         let detail: String

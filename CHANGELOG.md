@@ -65,6 +65,8 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - One wording per concept across the Search sheet and Custom Terms; the Search options' warnings and the result-cap banner use the warning color token; the saved-searches sheet has a translucent material background.
 - One-line regions can be drawn at the fit zoom: a box needs 20 on-screen points along its long side and 8 across, and a box drawn under that size is no longer enlarged by an alignment guide.
 - Alignment guides engage closer to an edge and only for regions beside the one being moved, so a box follows the finger across lines of applied regions.
+- Verification: a check that had nothing to check reports Not applicable instead of passing or adding a note — the Search Re-check and the Detection Sweep when no search or scan was applied, the two term searches when no redacted term was captured, and Character Count, Monospace Fonts and Character Sequence when every page was rasterized. A Not applicable check neither passes the document nor lowers its result.
+- Verification: the Detection Sweep reports Needs review when an item remains on the output in a category your applied scan covered and you did not leave unselected, such as an SSN in an image after an SSN scan. Before, it read as a note. An item only in a category no applied scan covered stays a note.
 
 ### Removed
 
