@@ -136,6 +136,8 @@ struct RegionCoverage: Sendable {
         /// OCR that did not run, a page it could not open, a pattern that
         /// ran out of time on it, or a pattern the safety gate refused.
         let unreadPages: [Int]
+        /// How many re-run matches on pages with boxes were compared.
+        let comparedMatches: Int
     }
 
     /// Re-run every applied request (never the run's sweep) on `source` with
@@ -199,7 +201,8 @@ struct RegionCoverage: Sendable {
         for page in matchesByPage.keys.sorted() {
             found.append(contentsOf: pageShortfalls(page: page, matches: matchesByPage[page] ?? [], boxes: regions[page] ?? []))
         }
-        return Outcome(shortfalls: found, unreadPages: unread.sorted())
+        let compared = matchesByPage.values.reduce(0) { $0 + $1.count }
+        return Outcome(shortfalls: found, unreadPages: unread.sorted(), comparedMatches: compared)
     }
 
     /// The per-request record of what the searcher said about each page.

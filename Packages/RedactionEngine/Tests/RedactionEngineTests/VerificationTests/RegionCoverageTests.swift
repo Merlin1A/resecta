@@ -326,6 +326,72 @@ struct RegionCoverageTests {
         #expect(result.pageReferences == [1])
     }
 
+    @Test("A scan-only run whose coverage check ran clean is a PASS that says what was compared, never the idle note; a scan whose matches the re-run cannot read compared nothing — could not verify; nothing applied keeps the idle note")
+    func scanOnlyCoverageRan() async throws {
+        let data = TestFixtures.textLayerPDF(text: "SSN 123-45-6789 on file")
+        let source = try #require(PDFDocument(data: data))
+        let page = try #require(source.page(at: 0))
+        let raw = try #require(page.string)
+        let rect = try #require(DocumentSearcher().boundingRect(for: (raw as NSString).range(of: "123-45-6789"), page: page))
+        let box = RedactionRegion(id: UUID(), normalizedRect: rect, source: .detectedPII(kind: .ssn))
+        let output = SendablePDFDocument(try #require(PDFDocument(data: TestFixtures.textLayerPDF(text: "SSN on file"))))
+        let scan = AppliedSearchRecord(query: AppliedSearchQuery(kind: .piiScan(categories: [.ssn]), options: SearchOptions()), foundCount: 1)
+        let applied = SearchRecheckRequest(record: scan, appliedCount: 1, appliedPages: [0])
+        let covered = try await SearchRecheck().run(
+            outputDocument: output, requests: [applied], sourceDocument: SendablePDFDocument(source), regions: [0: [box]])
+        #expect(covered.status == .pass, "got \(covered.status)")
+        #expect(covered.copyOverride?.short == "No typed searches to re-run; the applied scan's 1 match was compared with its box on the original pages — it is covered.")
+        #expect(covered.copyOverride?.detail.contains(SearchRecheck.coverageLead) == true)
+        // The same scan on an original where the re-run reads no SSN: nothing compared.
+        let blank = try #require(PDFDocument(data: TestFixtures.textLayerPDF(text: "nothing here at all")))
+        let nothing = try await SearchRecheck().run(
+            outputDocument: output, requests: [applied], sourceDocument: SendablePDFDocument(blank), regions: [0: [box]])
+        #expect(nothing.status == .warn("The re-run found none of the applied scan's matches on the original pages, so the coverage check compared nothing"), "got \(nothing.status)")
+        // Through the layer: the could-not-verify flag follows the WARN.
+        let layer = await VerificationEngine().runLayer(
+            .searchRecheck, outputDocument: output, sourcePageCount: 1, regions: [0: [box]], sensitiveTerms: [],
+            pipelineMode: .searchableRedaction, filterDigests: [nil], perPageModes: [.searchableRedaction],
+            appliedSearches: [applied], sourceDocument: SendablePDFDocument(blank))
+        #expect(layer.status.isWarn && layer.couldNotVerify)
+        // Nothing applied at all: the idle note stands (the aggregate reads it as nothing to check).
+        let sweep = SearchRecheckRequest(record: scan, appliedCount: 0, appliedPages: [], origin: .sweep)
+        let idle = try await SearchRecheck().run(outputDocument: output, requests: [sweep], sourceDocument: SendablePDFDocument(source), regions: [:])
+        #expect(idle.status == .info(SearchRecheck.infoMessage))
+    }
+
+    @Test("Independence proof: a legal-prefix name boxed one character short, as the detector sized it before its fix, reads ATTENTION from the OCR Check on the Searchable output; the whole name boxed, with a legitimate neighbouring word, does not")
+    func edgeResidueIndependenceProof() async throws {
+        // "Mr. John␠␠Smith": the collapsed name is ten characters, the raw span eleven; the short box covers "John␠␠Smit".
+        let data = TestFixtures.textLayerPDF(text: "Mr. John  Smith lives here", fontSize: 28)
+        let source = try #require(PDFDocument(data: data))
+        let page = try #require(source.page(at: 0))
+        let raw = try #require(page.string)
+        let start = (raw as NSString).range(of: "John").location
+        try #require(start != NSNotFound)
+        // PDFKit reads the two spaces back as one, so the short box is made one character short outright: "John Smit".
+        let shortRange = NSRange(location: start, length: ("John Smith" as NSString).length - 1)
+        let fullRange = NSRange(location: start, length: ("John Smith" as NSString).length)
+        let searcher = DocumentSearcher()
+        let shortRect = try #require(searcher.boundingRect(for: shortRange, page: page))
+        let fullRect = try #require(searcher.boundingRect(for: fullRange, page: page))
+        let term = SensitiveTerm(text: "John Smith")
+        func ocrCheck(_ rect: CGRect) async throws -> LayerResult {
+            let region = RedactionRegion(id: UUID(), normalizedRect: rect, source: .detectedPII(kind: .name))
+            let url = try await TestPipeline.processAndExport(data, mode: .searchableRedaction, regions: [0: [region]])
+            defer { try? FileManager.default.removeItem(at: url) }
+            let output = try #require(PDFDocument(url: url))
+            return await VerificationEngine().runLayer(
+                .ocrCheck, outputDocument: SendablePDFDocument(output), sourcePageCount: 1,
+                regions: [0: [region]], sensitiveTerms: [term], pipelineMode: .searchableRedaction,
+                filterDigests: [nil], perPageModes: [.searchableRedaction])
+        }
+        let residue = try await ocrCheck(shortRect)
+        #expect(residue.status.isAttention, "the printed 'h' beside the box must be read: got \(residue.status) — \(residue.shortDescription)")
+        #expect(residue.reviewTermTexts == ["John Smith"], "\(String(describing: residue.reviewTermTexts))")
+        let whole = try await ocrCheck(fullRect)
+        #expect(!whole.status.isAttention && !whole.status.isFail, "'lives' beside the full box is a neighbouring word: got \(whole.status) — \(whole.shortDescription)")
+    }
+
     /// The 128-bit password fixtures (RC4 R3, AES R4): their bytes re-emit
     /// encrypted, so a copy made without the password stays locked.
     static let lockedFixtures = ["r3-rc4-128.pdf", "r4-aes-128.pdf"]

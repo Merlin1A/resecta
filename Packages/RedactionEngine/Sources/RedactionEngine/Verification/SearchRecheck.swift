@@ -79,6 +79,7 @@ struct SearchRecheck: Sendable {
         // The original pages the searcher could not read for a request whose
         // boxes they carry: reported, never counted as covered.
         var unreadPages: [Int] = []
+        var comparedMatches = 0
         if let coverageSource {
             let coverage = await RegionCoverage.check(
                 source: coverageSource, requests: requests, regions: regions)
@@ -86,6 +87,7 @@ struct SearchRecheck: Sendable {
                 Shortfall(page: $0.pageIndex, displayText: requests[$0.requestIndex].record.query.displayText)
             }
             unreadPages = coverage.unreadPages
+            comparedMatches = coverage.comparedMatches
             try Task.checkCancellation()
         }
         let typed = requests.enumerated().filter { !$0.element.record.query.isScan }
@@ -99,6 +101,16 @@ struct SearchRecheck: Sendable {
             }
             if !unreadPages.isEmpty {
                 return Self.coverageNotRunOutcome(unreadPages: unreadPages)
+            }
+            // A scan was applied and the coverage check ran clean: the
+            // layer's one check ran, so the outcome is a PASS that says
+            // what was compared — never the idle note, which would say the
+            // re-check did not run. A scan whose matches the re-run cannot
+            // read on the original compared nothing: could not verify.
+            if appliedAny {
+                return comparedMatches > 0
+                    ? Self.scanCoveredOutcome(comparedMatches: comparedMatches)
+                    : Self.coverageNotRunOutcome(noMatchFound: true)
             }
             return Outcome(
                 status: .info(Self.infoMessage), copyOverride: nil,
@@ -172,15 +184,37 @@ struct SearchRecheck: Sendable {
         return "\(clause.prefix(1).uppercased())\(clause.dropFirst()) (a page too large to scan for text, one it could not open, or a pattern that ran out of time or was not accepted), so no match there was compared with its boxes."
     }
 
+    /// PASS for a run with applied scans only whose coverage check ran and
+    /// found every match covered: there is no typed search to re-run on the
+    /// output, and the one check the layer had ran. Content-free.
+    static func scanCoveredOutcome(comparedMatches n: Int) -> Outcome {
+        let short = "No typed searches to re-run; the applied scan's \(n == 1 ? "1 match was" : "\(n) matches were") compared with \(n == 1 ? "its box" : "their boxes") on the original pages — \(n == 1 ? "it is" : "all are") covered."
+        let detail = "\(Self.detailLead) \(Self.coverageLead) \(short)"
+        return Outcome(
+            status: .pass,
+            copyOverride: LayerCopy(short: short, detail: detail),
+            pageReferences: nil,
+            reviewTermTexts: nil,
+            queryLines: nil)
+    }
+
+    /// The clause for a scan whose matches the re-run did not read on the
+    /// original pages: nothing was compared, so nothing is known.
+    static let coverageNoMatchClause = "the re-run found none of the applied scan's matches on the original pages, so the coverage check compared nothing"
+
     /// WARN for a run with applied scans only whose coverage check could
     /// not run — there is no typed search to re-run on the output, and the
     /// one check the layer had was not possible — or ran but could not read
-    /// a page it had boxes on (`unreadPages`, 0-based). A WARN, so the
-    /// aggregate reads could-not-verify; never the idle INFO.
-    static func coverageNotRunOutcome(unreadPages: [Int] = []) -> Outcome {
+    /// a page it had boxes on (`unreadPages`, 0-based), or ran and found no
+    /// match to compare (`noMatchFound`). A WARN, so the aggregate reads
+    /// could-not-verify; never the idle INFO.
+    static func coverageNotRunOutcome(unreadPages: [Int] = [], noMatchFound: Bool = false) -> Outcome {
         let message: String
         let detail: String
-        if unreadPages.isEmpty {
+        if noMatchFound {
+            message = Self.coverageNoMatchClause.prefix(1).uppercased() + Self.coverageNoMatchClause.dropFirst()
+            detail = "\(Self.detailLead) \(Self.coverageLead) \(message)."
+        } else if unreadPages.isEmpty {
             message = "The original pages could not be read, so the coverage check did not run"
             detail = Self.coverageNotRunDetail
         } else {
