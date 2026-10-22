@@ -47,7 +47,7 @@ struct RunInputsTests {
     }
 
     @Test("A box past the page edge keeps its on-page part; a sliver or a box wholly off the page is dropped")
-    func boxesAtThePageEdge() {
+    func boxesAtThePageEdge() throws {
         let doc = makeMultiPagePDFDocument(pages: 1)
         let partlyOff = RedactionRegion(
             id: UUID(), normalizedRect: CGRect(x: 0.95, y: 0.2, width: 0.1, height: 0.1), source: .manual)
@@ -63,8 +63,11 @@ struct RunInputsTests {
 
         let rects = pages[0].regions.map(\.normalizedRect)
         #expect(rects.count == 1, "the sliver and the wholly off-page box are dropped: \(rects)")
-        #expect(rects.first == CGRect(x: 0.95, y: 0.2, width: 0.05, height: 0.1),
-                "the box past the edge keeps its on-page part")
+        let kept = try #require(rects.first)
+        let expected = CGRect(x: 0.95, y: 0.2, width: 0.05, height: 0.1)
+        #expect(abs(kept.minX - expected.minX) < 1e-9 && abs(kept.minY - expected.minY) < 1e-9
+                && abs(kept.width - expected.width) < 1e-9 && abs(kept.height - expected.height) < 1e-9,
+                "the box past the edge keeps its on-page part: \(kept)")
         #expect(rects.allSatisfy { $0.width > 0.001 && $0.height > 0.001 },
                 "no region reaches the pipeline below the floor after the clamp")
     }
