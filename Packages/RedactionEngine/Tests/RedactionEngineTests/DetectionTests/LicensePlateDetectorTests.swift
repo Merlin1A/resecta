@@ -23,6 +23,16 @@ struct LicensePlateDetectorTests {
         #expect(plate?.rationale?.ruleID == "licensePlate.labeled")
     }
 
+    @Test("A label followed by ordinary words is not a plate; a plate value after the label still is")
+    func labelFollowedByProseIsNotAPlate() async {
+        let onFile = await detector.detect(in: "Vehicle Reg # on file with the clerk.", doctype: .court)
+        #expect(!onFile.contains { $0.kind == .licensePlate })
+        let toBe = await detector.detect(in: "Vehicle Reg # to be assigned at pickup.", doctype: .court)
+        #expect(!toBe.contains { $0.kind == .licensePlate })
+        let plate = await detector.detect(in: "Vehicle Reg # 7ABC123 recorded at the scene.", doctype: .court)
+        #expect(plate.contains { $0.kind == .licensePlate && $0.text.hasSuffix("7ABC123") })
+    }
+
     // MARK: - Doctype gating
 
     @Test("Suppressed on medical doctype")

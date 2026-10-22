@@ -127,7 +127,7 @@ struct AddressSpatialAssembler: Sendable {
             ) else { continue }
 
             let zipString = haystack.substring(with: zipMatch.range(at: 1))
-            let scfState = ZIPStateTable.state(forZIPPrefix: String(zipString.prefix(3)))
+            let scfState = ZIPStateTable.state(forZIP: zipString)
 
             // Extract state from same line or prior lines.
             var state: String?

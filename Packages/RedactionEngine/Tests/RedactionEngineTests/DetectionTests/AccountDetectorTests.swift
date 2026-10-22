@@ -14,6 +14,19 @@ struct AccountDetectorTests {
         return detector.detect(in: ns, range: NSRange(location: 0, length: ns.length))
     }
 
+    @Test("A keyword-confirmed account meets the floor's bar, so the floor carries it over the balanced preset")
+    func keywordConfirmedAccountClearsBalanced() throws {
+        let hits = matches(in: "Account No. 12345678")
+        let raw = try #require(hits.first?.confidence)
+        #expect(raw >= ContextPosteriorFloor.keywordConfirmedRaw, "the detector's raw must reach the floor's bar: \(raw)")
+        // A posterior the learned term collapsed, re-floored through the shipped conservative cutoff.
+        let floored = ContextPosteriorFloor.apply(
+            0.0006, family: "account", raw: raw,
+            conservativeCutoff: ContextPosteriorFloor.conservativeCutoff(forWire: "account"))
+        #expect(floored >= 0.6, "balanced preset: \(floored)")
+        #expect(floored >= 0.7, "conservative preset: \(floored)")
+    }
+
     @Test("Bare digit run without context yields no match")
     func noContextRejects() {
         let results = matches(in: "Reference 123456789 on file")

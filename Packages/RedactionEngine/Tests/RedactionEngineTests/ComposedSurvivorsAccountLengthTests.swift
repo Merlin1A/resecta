@@ -19,9 +19,8 @@ import Testing
 @Suite("composedSurvivors — account digit-length floor (Site-B)")
 struct ComposedSurvivorsAccountLengthTests {
 
-    /// Keyword-confirmed account raw boost (DetectionOrchestrator absorbing-state
-    /// comment: account raw max 0.75).
-    private static let accountKeywordConfirmedRaw = 0.75
+    /// Keyword-confirmed account raw boost: the detector's own value.
+    private static let accountKeywordConfirmedRaw = AccountDetector.keywordConfirmedConfidence
 
     /// Digit lengths under test — deliberately cardinality > 1 (Option-D guard).
     private static let digitLengths = [6, 7, 8, 9, 11, 13]

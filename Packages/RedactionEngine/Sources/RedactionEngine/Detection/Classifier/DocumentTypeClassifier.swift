@@ -159,7 +159,8 @@ public struct DocumentTypeClassifier: Sendable {
             let perHit = hits.isEmpty ? 0.0 : Double(capped) / Double(hits.count)
             var classScore = Double(capped)
 
-            for hit in hits.prefix(5) {
+            // A stable order: the hit set has no order of its own.
+            for hit in hits.sorted().prefix(5) {
                 keywordContributions.append(.init(
                     keyword: hit,
                     classContributedTo: cls,
@@ -206,9 +207,10 @@ public struct DocumentTypeClassifier: Sendable {
         let primary = ranked.first?.key ?? .generic
         let runnerUp = ranked.dropFirst().first?.key
 
-        // Keep top-5 keywords by weight, primary class preferred.
+        // Keep top-5 keywords by weight, the keyword itself breaking ties so
+        // the list reads the same on every launch.
         let topKeywords = logits.keywordContributors
-            .sorted { $0.weight > $1.weight }
+            .sorted { $0.weight != $1.weight ? $0.weight > $1.weight : $0.keyword < $1.keyword }
             .prefix(5)
 
         return DoctypeResult(
@@ -252,7 +254,7 @@ public struct DocumentTypeClassifier: Sendable {
         let primaryProbability = sorted.first?.1 ?? 0.0
 
         let topKeywords = logits.keywordContributors
-            .sorted { $0.weight > $1.weight }
+            .sorted { $0.weight != $1.weight ? $0.weight > $1.weight : $0.keyword < $1.keyword }
             .prefix(5)
 
         return DoctypeExplanation(

@@ -16,6 +16,16 @@ struct ZIPStateTableLoaderTests {
         #expect(loader.state(forZIPPrefix: "787") == "TX")
     }
 
+    @Test("A full-ZIP lookup honours the shipped overrides before the prefix table")
+    func fullZIPLookupHonoursOverrides() throws {
+        let loader = try ZIPStateTableLoader()
+        #expect(loader.state(forZIPPrefix: "035") == "NH")
+        #expect(loader.state(forZIP: "03579") == "ME", "an override row wins over its prefix")
+        #expect(loader.state(forZIP: "03580") == "NH", "a ZIP with no override reads its prefix")
+        #expect(loader.state(forZIP: "03579-1234") == "ME", "ZIP+4 reads its five digits")
+        #expect(ZIPStateTable.state(forZIP: "03579") == "ME")
+    }
+
     @Test("Prefix lookup returns nil for unassigned / malformed prefixes")
     func testPrefixLookup() throws {
         let loader = try ZIPStateTableLoader()

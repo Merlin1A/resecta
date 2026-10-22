@@ -31,6 +31,47 @@ struct NameGazetteerFuzzyTests {
 
     private enum FuzzyError: Error { case goldenFilterMissing }
 
+    // MARK: - Support is exact-only
+
+    /// A small deterministic generator (a 64-bit xorshift), so the sample is
+    /// the same on every run and never the system's.
+    private struct SeededLetters {
+        var state: UInt64
+        mutating func next() -> UInt64 {
+            state ^= state << 13; state ^= state >> 7; state ^= state << 17; return state
+        }
+        mutating func word(length: Int) -> String {
+            String((0..<length).map { _ in Character(UnicodeScalar(UInt8(97 + next() % 26))) })
+        }
+    }
+
+    @Test("A one-edit neighbour of a listed surname is a boost, not support; random seven-letter words are unsupported")
+    func fuzzyHitIsBoostOnly() throws {
+        let gazetteer = try loadGazetteer()
+        var letters = SeededLetters(state: 20261002)
+        var supported = 0, fuzzyHits = 0
+        for _ in 0..<300 {
+            let word = letters.word(length: 7)
+            guard !gazetteer.contains(surname: word) else { continue }
+            let verdict = gazetteer.queryBoosted(candidate: "Delia \(word)")
+            if verdict.hadSupport { supported += 1 }
+            if verdict.fuzzySurnameHit {
+                fuzzyHits += 1
+                #expect(!verdict.hadSupport)
+                #expect(abs(verdict.boost - 0.05) < 1e-9, "the fuzzy boost stays")
+            }
+        }
+        #expect(supported == 0, "no non-member is supported: \(supported) of 300")
+        #expect(fuzzyHits > 0, "the sample reaches the fuzzy path at all")
+        // An exact member keeps its support and its own boost.
+        let exact = gazetteer.queryBoosted(candidate: "Delia Smith")
+        #expect(exact.hadSupport)
+        #expect(exact.surnameHit && !exact.fuzzySurnameHit)
+        // A hyphenated surname with one listed component is a fuzzy boost, not support.
+        let partial = gazetteer.queryBoosted(candidate: "Delia Smith-Qzvtrk")
+        #expect(partial.fuzzySurnameHit && !partial.hadSupport)
+    }
+
     // MARK: - Tests
 
     @Test("Exact match in filter yields nil from fuzzy path (caller used exact)")
