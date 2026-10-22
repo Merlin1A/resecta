@@ -509,11 +509,16 @@ struct SettingsView: View {
             Link(destination: Links.sendFeedback) {
                 Label("Send Feedback", systemImage: "envelope")
             }
+
+            Link(destination: Links.rateOnTheAppStore) {
+                Label("Rate Resecta on the App Store", systemImage: "star")
+            }
+            .accessibilityIdentifier("settingsRateLink")
         } header: {
             Label("Support", systemImage: "questionmark.circle")
         } footer: {
             // Safari warning footer
-            Text("These links open in Safari. Resecta itself makes no network connections.")
+            Text("These links open in Safari or the App Store. Resecta itself makes no network connections.")
         }
     }
 
@@ -536,6 +541,9 @@ struct SettingsView: View {
         static let eula = URL(string: "https://resecta.app/eula")!
         static let sourceCode = URL(string: "https://github.com/Merlin1A/resecta")!
         static let reportIssue = URL(string: "https://github.com/Merlin1A/resecta/issues")!
+        /// The App Store's review page for Resecta (`action=write-review`
+        /// opens it on the rating).
+        static let rateOnTheAppStore = URL(string: "https://apps.apple.com/app/id6786922787?action=write-review")!
         static let sendFeedback = URL(string: "mailto:support@resecta.app?subject=Resecta%20Feedback")!
     }
 }
