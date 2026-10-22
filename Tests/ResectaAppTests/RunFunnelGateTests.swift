@@ -52,6 +52,9 @@ struct RunFunnelGateTests {
     func selectionsRefuseTheRun() async {
         let f = fixture(region: effective)
         let search = SearchState(defaults: makeScratchDefaults().0)
+        search.results = [SearchResult(
+            pageIndex: 0, normalizedRect: CGRect(x: 0.1, y: 0.1, width: 0.2, height: 0.03),
+            matchedText: "alpha", contextSnippet: "…alpha…", source: .textLayer, term: "alpha", isSelected: true)]
         search.userModifiedSelections = true
         f.coord.redactionState.activeSearch = search
 
