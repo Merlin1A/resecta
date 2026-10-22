@@ -169,7 +169,7 @@ class Facts:
             self._diagnostic("app", fmt_string)
         message = row.get("message", ("", ""))[0]
         if fmt_string.startswith("Phase:"):
-            entry = {"t_ns": t, "level": level}
+            entry = {"t_ns": t, "level": level, "format": fmt_string}
             if allowed_text("phase", fmt_string, message):
                 entry["text"] = squash(message)
             self.log["phases"].append(entry)
