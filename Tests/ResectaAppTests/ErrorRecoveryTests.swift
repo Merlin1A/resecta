@@ -118,8 +118,9 @@ struct ErrorRecoveryTests {
     func unsupportedPageGeometryCopy() {
         let error = PipelineError.redactionError(.unsupportedPageGeometry(pageIndex: 2))
         #expect(error.localizedTitle == "Unsupported Page Geometry")
-        #expect(error.localizedRecovery.hasPrefix("Page 3 uses a page size or scale factor that is not processed."))
-        #expect(error.localizedRecovery.contains("between 10 and 5,000 points per side at the standard scale"))
+        #expect(error.localizedRecovery.hasPrefix("Page 3 uses a page size, scale factor or rotation that is not processed."))
+        #expect(error.localizedRecovery.contains("between 10 and 5,000 points per side at the standard scale, rotated by a right angle"))
+        // The description is the engine's own sentence (size and scale); the app's title and recovery name the rotation too.
         #expect(error.localizedDescription.contains("Page 3 uses a page size or scale factor"))
         for text in [error.localizedTitle, error.localizedRecovery, error.localizedDescription] {
             #expect(!text.lowercased().contains("memory"),

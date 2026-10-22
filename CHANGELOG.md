@@ -65,6 +65,11 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Done and Home reset the session through the one Start Over path, so a re-imported document no longer shows the previous document's form-field notice.
 - Home at the compact width: Cancel on the close dialog brings a presented search session back whole — its results and selections — instead of dropping it.
 - Redact and ⇧⌘R are unavailable while the search sheet holds selected matches that are not applied, with the hint "Apply or clear the selected matches first", instead of tearing the session down and dropping them.
+- Redact: a Stop that lands while the output is being finalized leaves no output file behind in the session folder.
+- The app-switcher cover sits in its own window above every presented sheet, so the Search & Redact sheet and Settings → Custom Terms are covered too.
+- The failed screen's copy for a refused page names its rotation beside the size and scale, and the advice says so.
+- The password sheet says Resecta does not store the password, and that any offer to save it is the system's own.
+- Settings: the Searchable Redaction description and the mode picker's hint state the limit the README states — text covered by a picture in the page can still enter the text layer.
 - Redact clears the undo history at the Apply seam, as the results card says; an Undo after Keep Editing no longer unlinks the built output.
 - Search sheet: the "unapplied matches cleared" toasts no longer count matches a region already covers.
 - Search sheet: the custom-term time-limit toast names neither the term nor the page, and is shown once for a scan instead of once per page.
