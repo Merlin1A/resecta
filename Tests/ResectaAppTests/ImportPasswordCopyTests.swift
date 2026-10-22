@@ -29,7 +29,7 @@ struct ImportPasswordCopyTests {
     func sheetStrings() {
         #expect(ImportPasswordFlow.title == "This document needs a password.")
         #expect(ImportPasswordFlow.body
-                == "Enter the password to open it. The password is used on this device to unlock the document and is not written to storage.")
+                == "Enter the password to open it. The password is used on this device to unlock the document; Resecta does not store it. If iOS offers to save it, that offer is the system's own Passwords feature.")
         #expect(ImportPasswordFlow.placeholder == "Password")
         #expect(ImportPasswordFlow.fieldAccessibilityLabel == "Document password")
         #expect(ImportPasswordFlow.open == "Open")

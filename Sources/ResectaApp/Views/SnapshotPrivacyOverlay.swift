@@ -46,6 +46,46 @@ struct SnapshotPrivacyOverlay: View {
     }
 }
 
+// MARK: - The cover window
+
+/// The cover's own window, above every other window of the scene. The
+/// overlay inside the root `ZStack` covers the root content only — a sheet
+/// presents above it, so the Search & Redact sheet or Settings → Custom
+/// Terms reached the app-switcher snapshot with their text. This window
+/// sits above the presentation layer (its level is above alerts), passes
+/// no touches, and is shown and hidden with the same scene-phase policy.
+final class SnapshotPrivacyWindowController {
+    private(set) var window: UIWindow?
+
+    /// Above `.alert`, so above every presentation in the main window.
+    static let level = UIWindow.Level(rawValue: UIWindow.Level.alert.rawValue + 1)
+
+    /// The scene the cover attaches to: the first connected window scene
+    /// that is not unattached.
+    static func foregroundScene() -> UIWindowScene? {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first { $0.activationState != .unattached }
+    }
+
+    func show(in scene: UIWindowScene? = foregroundScene()) {
+        guard let scene else { return }
+        if window == nil || window?.windowScene !== scene {
+            let cover = UIWindow(windowScene: scene)
+            cover.windowLevel = Self.level
+            cover.rootViewController = UIHostingController(rootView: SnapshotPrivacyOverlay())
+            cover.isUserInteractionEnabled = false
+            cover.accessibilityViewIsModal = false
+            window = cover
+        }
+        window?.isHidden = false
+    }
+
+    func hide() {
+        window?.isHidden = true
+    }
+}
+
 // MARK: - Scene-phase policy (testable seam)
 
 /// Pure-function decision helper for the snapshot-privacy overlay's

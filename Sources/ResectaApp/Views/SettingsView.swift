@@ -10,7 +10,7 @@ struct SettingsView: View {
     // constants so the contract can be pinned by unit tests without
     // rendering the form. Mirrors the `InlineWarningBanner.lineLimit(for:)`
     // pattern used for the AX5 line-cap predicate.
-    static let defaultModeAccessibilityHint = "Choose how redacted output is produced. Secure Rasterization produces image-only output with all text removed; Searchable Redaction preserves non-redacted text, except on pages whose text shows no ink."
+    static let defaultModeAccessibilityHint = "Choose how redacted output is produced. Secure Rasterization produces image-only output with all text removed; Searchable Redaction preserves non-redacted text, except on pages whose text shows no ink; text covered by a picture in the page can still enter the text layer."
     static let fillColorAccessibilityHint = "Color used to fill redacted regions in the output."
     static let verifyToggleDefaultHint = "When enabled, the app runs verification checks before you can export"
     static let verifyToggleParanoidLockedHint = "Locked on because Paranoid Mode is enabled."
@@ -198,7 +198,7 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
                     .listRowSeparator(.hidden)
             case .searchableRedaction:
-                Text("Preserves non-redacted text for search and selection. A page whose text shows no ink is exported as an image only. Available for documents with an existing text layer.")
+                Text("Preserves non-redacted text for search and selection. A page whose text shows no ink is exported as an image only; text covered by a picture in the page can still enter the text layer. Available for documents with an existing text layer.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .listRowSeparator(.hidden)
