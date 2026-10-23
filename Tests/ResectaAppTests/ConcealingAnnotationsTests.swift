@@ -53,6 +53,71 @@ struct ConcealingAnnotationsTests {
         #expect(ConcealingAnnotations.pages(in: nil, regions: [:]).isEmpty)
     }
 
+    /// A one-page scan: the SSN line rendered into the page image, no text
+    /// layer. Returns the page-space rect the line was drawn in.
+    private func scannedPage() throws -> (PDFDocument, PDFPage, CGRect) {
+        let pageRect = CGRect(x: 0, y: 0, width: 612, height: 792)
+        let image = UIGraphicsImageRenderer(size: pageRect.size).image { ctx in
+            UIColor.white.setFill()
+            ctx.fill(pageRect)
+            ("SSN 123-45-6789" as NSString).draw(
+                at: CGPoint(x: 72, y: 72), withAttributes: [.font: UIFont.systemFont(ofSize: 28)])
+        }
+        let data = UIGraphicsPDFRenderer(bounds: pageRect).pdfData { ctx in
+            ctx.beginPage()
+            image.draw(in: pageRect)
+        }
+        let document = try #require(PDFDocument(data: data))
+        let page = try #require(document.page(at: 0))
+        try #require((page.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                     "the fixture must carry no text layer")
+        // UIKit draws top-down; the PDF page is bottom-up.
+        return (document, page, CGRect(x: 64, y: 792 - 72 - 40, width: 280, height: 44))
+    }
+
+    @Test("A square over an SSN in a scanned page, which no selection reads, names its page; a box over it does not")
+    func scannedPageSquareIsNamed() throws {
+        let (document, page, line) = try scannedPage()
+        let square = PDFAnnotation(bounds: line, forType: .square, withProperties: nil)
+        square.interiorColor = .black
+        page.addAnnotation(square)
+        #expect(page.selection(for: line)?.string?.isEmpty ?? true, "the merged check read nothing here")
+        #expect(ConcealingAnnotations.pages(in: document, regions: [:], textLayerStatus: [0: .none]) == [0])
+        #expect(ConcealingAnnotations.pages(in: document, regions: [:], textLayerStatus: [0: .sparse]) == [0])
+        #expect(ConcealingAnnotations.pages(in: document, regions: [:]) == [0],
+                "a page with no status and no text reads as a scan")
+        let box = RedactionRegion(id: UUID(), normalizedRect: normalized(line.insetBy(dx: -6, dy: -6), on: page), source: .manual)
+        #expect(ConcealingAnnotations.pages(in: document, regions: [0: [box]], textLayerStatus: [0: .none]).isEmpty,
+                "a redaction box covers it")
+        // A rich page keeps the text test: a square over blank space names nothing.
+        let (textDocument, textPage, _) = try self.page()
+        textPage.addAnnotation(PDFAnnotation(bounds: CGRect(x: 300, y: 300, width: 100, height: 40), forType: .square, withProperties: nil))
+        #expect(ConcealingAnnotations.pages(in: textDocument, regions: [:], textLayerStatus: [0: .rich]).isEmpty)
+    }
+
+    @Test("On a /Rotate 90 page the annotation compares with the boxes in the displayed space the search places them in")
+    func rotatedPageComparesInDisplaySpace() throws {
+        let (document, page, bounds) = try page()
+        page.rotation = 90
+        page.addAnnotation(PDFAnnotation(bounds: bounds.insetBy(dx: -2, dy: -2), forType: .square, withProperties: nil))
+        let range = ((page.string ?? "") as NSString).range(of: "4417 1234 5678 9113")
+        let searched = try #require(DocumentSearcher().boundingRect(for: range, page: page),
+                                    "the box a search places over the match")
+        let searchBox = RedactionRegion(id: UUID(), normalizedRect: searched.insetBy(dx: -0.02, dy: -0.02), source: .manual)
+        #expect(ConcealingAnnotations.pages(in: document, regions: [0: [searchBox]]).isEmpty,
+                "the search's own box covers it on the rotated page")
+        let unrotatedBox = RedactionRegion(id: UUID(), normalizedRect: normalized(bounds.insetBy(dx: -6, dy: -6), on: page), source: .manual)
+        #expect(ConcealingAnnotations.pages(in: document, regions: [0: [unrotatedBox]]) == [0],
+                "a box at the unrotated position covers nothing the page shows there")
+        // Unrotated, the transform is the plain normalization.
+        let crop = CGRect(x: 0, y: 0, width: 612, height: 792)
+        let plain = try #require(ConcealingAnnotations.displayNormalized(
+            CGRect(x: 61.2, y: 79.2, width: 122.4, height: 39.6), crop: crop, rotation: 0))
+        for (got, want) in [(plain.minX, 0.1), (plain.minY, 0.1), (plain.width, 0.2), (plain.height, 0.05)] {
+            #expect(abs(got - want) < 1e-9, "got \(plain)")
+        }
+    }
+
     @Test("The confirm line names the pages in the row's page phrase, singular and plural; the title")
     func copy() {
         #expect(ConcealingAnnotations.confirmLine(pages: [2])
