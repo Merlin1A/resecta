@@ -86,6 +86,10 @@ struct RedactWorkspaceView: View {
                 // dispatch so a rapid double-drop doesn't race two
                 // ImportService.importDocument calls.
                 activeImportDispatch?.cancel()
+                if items.count > 1 {
+                    toastManager.enqueue(
+                        ImportService.dropOpenedFirstMessage(droppedCount: items.count), severity: .info)
+                }
                 activeImportDispatch = Task {
                     switch dropped.payload {
                     case .bytes(let data):
