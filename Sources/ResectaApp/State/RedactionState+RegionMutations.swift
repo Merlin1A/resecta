@@ -12,14 +12,37 @@ extension RedactionState {
 
     // MARK: - Region Mutations with Undo
 
-    func addRegion(_ region: RedactionRegion, page: Int, undoManager: UndoManager?) {
+    /// The undo names of the region steps, one per step: its undo and its
+    /// redo legs both read it, so Redo names the action it repeats. The
+    /// noun is the controls' own, "Region".
+    enum UndoName {
+        static let add = "Add Region"
+        static let duplicate = "Duplicate Region"
+        static let addNearbyMatch = "Add Nearby Match"
+        static let delete = "Delete Region"
+        static let deleteMany = "Delete Regions"
+        static let resize = "Resize Region"
+        static let move = "Move Region"
+        static let moveMany = "Move Regions"
+
+        /// A search apply, named by the regions it creates: "Mark N
+        /// Instances", singular at one.
+        static func mark(_ count: Int) -> String {
+            count == 1 ? "Mark 1 Instance" : "Mark \(count) Instances"
+        }
+    }
+
+    func addRegion(
+        _ region: RedactionRegion, page: Int, undoManager: UndoManager?,
+        actionName: String = UndoName.add
+    ) {
         bumpRegionVersion()
         regions[page, default: []].append(region)
         regionPageIndex[region.id] = page
         markRegionsModified()
         let regionID = region.id
-        registerUndo(undoManager, "Add Redaction") { target in
-            target.removeRegion(regionID, page: page, undoManager: undoManager)
+        registerUndo(undoManager, actionName) { target in
+            target.removeRegion(regionID, page: page, undoManager: undoManager, actionName: actionName)
         }
         // Post-add hook for the manual-draw nearby-PII
         // nudge. Only fires for `.manual` source regions — the search-
@@ -46,7 +69,10 @@ extension RedactionState {
         }
     }
 
-    func removeRegion(_ id: UUID, page: Int, undoManager: UndoManager?) {
+    func removeRegion(
+        _ id: UUID, page: Int, undoManager: UndoManager?,
+        actionName: String = UndoName.delete
+    ) {
         guard var pageRegions = regions[page],
               let index = pageRegions.firstIndex(where: { $0.id == id }) else { return }
         bumpRegionVersion()
@@ -56,8 +82,8 @@ extension RedactionState {
         regionPageIndex.removeValue(forKey: id)
         let removedMetadata = regionMetadata.removeValue(forKey: id) // Capture metadata
         markRegionsModified()
-        registerUndo(undoManager, "Delete Redaction") { target in
-            target.addRegion(removed, page: page, undoManager: undoManager)
+        registerUndo(undoManager, actionName) { target in
+            target.addRegion(removed, page: page, undoManager: undoManager, actionName: actionName)
             if let removedMetadata { // Restore metadata on undo
                 target.regionMetadata[removed.id] = removedMetadata
             }
@@ -82,7 +108,7 @@ extension RedactionState {
         pageRegions[index].normalizedRect = newRect
         regions[page] = pageRegions
         markRegionsModified()
-        registerUndo(undoManager, "Resize Redaction") { target in
+        registerUndo(undoManager, UndoName.resize) { target in
             target.resizeRegion(id, page: page, newRect: oldRect, undoManager: undoManager)
         }
         return true
@@ -102,7 +128,7 @@ extension RedactionState {
         pageRegions[index].normalizedRect = newRect
         regions[page] = pageRegions
         markRegionsModified()
-        registerUndo(undoManager, "Move Redaction") { target in
+        registerUndo(undoManager, UndoName.move) { target in
             target.moveRegion(id, page: page, newRect: oldRect, undoManager: undoManager)
         }
         return true
@@ -125,7 +151,7 @@ extension RedactionState {
         regions[page] = pageRegions
         markRegionsModified()
         let snapshot = mutableOldRects
-        registerUndo(undoManager, "Move Redactions") { target in
+        registerUndo(undoManager, UndoName.moveMany) { target in
             let restoreMoves = snapshot.map { (id: $0.id, newRect: $0.oldRect) }
             target.moveRegions(restoreMoves, page: page, undoManager: undoManager)
         }
@@ -133,7 +159,10 @@ extension RedactionState {
     }
 
     /// Batch remove multiple regions from a single page. Single undo action.
-    func removeRegions(_ ids: Set<UUID>, page: Int, undoManager: UndoManager?) {
+    func removeRegions(
+        _ ids: Set<UUID>, page: Int, undoManager: UndoManager?,
+        actionName: String = UndoName.deleteMany
+    ) {
         bumpRegionVersion()
         guard var pageRegions = regions[page] else { return }
         var mutableRemoved: [(region: RedactionRegion, metadata: RegionMetadata?)] = []
@@ -148,7 +177,7 @@ extension RedactionState {
         markRegionsModified()
         selectedRegionIDs.subtract(ids)
         let snapshot = mutableRemoved
-        registerUndo(undoManager, "Delete Redactions") { target in
+        registerUndo(undoManager, actionName) { target in
             for item in snapshot {
                 target.regions[page, default: []].append(item.region)
                 target.regionPageIndex[item.region.id] = page
@@ -161,13 +190,15 @@ extension RedactionState {
             // refresh gate observes it (the redo leg recurses into
             // `removeRegions`, which bumps at entry).
             target.bumpRegionVersion()
-            target.registerUndo(undoManager, "Delete Redactions") { target2 in
-                target2.removeRegions(ids, page: page, undoManager: undoManager)
+            target.registerUndo(undoManager, actionName) { target2 in
+                target2.removeRegions(ids, page: page, undoManager: undoManager, actionName: actionName)
             }
         }
     }
 
-    /// Delete all selected regions, grouped by page for batch undo.
+    /// Delete all selected regions, grouped by page for batch undo, as one
+    /// step named by the whole selection ("Delete Regions" for two or more,
+    /// however many pages they span).
     /// Returns affected page indices so callers can refresh overlays.
     @discardableResult
     func deleteSelected(undoManager: UndoManager?) -> Set<Int> {
@@ -181,11 +212,12 @@ extension RedactionState {
                 affectedPages.insert(page)
             }
         }
+        let name = ids.count == 1 ? UndoName.delete : UndoName.deleteMany
         for (page, pageIDs) in byPage {
             if pageIDs.count == 1, let id = pageIDs.first {
-                removeRegion(id, page: page, undoManager: undoManager)
+                removeRegion(id, page: page, undoManager: undoManager, actionName: name)
             } else {
-                removeRegions(pageIDs, page: page, undoManager: undoManager)
+                removeRegions(pageIDs, page: page, undoManager: undoManager, actionName: name)
             }
         }
         selectedRegionIDs = []
@@ -193,9 +225,8 @@ extension RedactionState {
     }
 
     /// Duplicate a region with a small offset. The copy is manual-sourced.
-    /// Routes through `addRegion` for the actual mutation but
-    /// overrides the inner action name so the iOS long-press Undo menu
-    /// reads "Duplicate Redaction" rather than the generic "Add Redaction".
+    /// Routes through `addRegion` for the actual mutation under the step
+    /// name "Duplicate Region", on both legs.
     func duplicateRegion(_ id: UUID, page: Int, undoManager: UndoManager?) {
         bumpRegionVersion()
         guard let pageRegions = regions[page],
@@ -204,10 +235,7 @@ extension RedactionState {
             source: region.normalizedRect
         )
         let copy = RedactionRegion(id: UUID(), normalizedRect: newRect, source: .manual)
-        addRegion(copy, page: page, undoManager: undoManager)
-        // Override the inner addRegion's "Add Redaction" name. UndoManager
-        // setActionName is last-write-wins on the current registration.
-        undoManager?.setActionName("Duplicate Redaction")
+        addRegion(copy, page: page, undoManager: undoManager, actionName: UndoName.duplicate)
     }
 
     /// 0.02-offset clamp for `duplicateRegion`. Normalized PDF coords are

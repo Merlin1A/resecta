@@ -515,7 +515,7 @@ class RedactionState {
             createdRegions: prepared.createdRegions,
             createdMetadata: prepared.createdMetadata,
             createdAudit: prepared.createdAudit,
-            actionName: Self.searchApplyActionName(count: selected.count),
+            actionName: UndoName.mark(prepared.appliedCount),
             undoManager: undoManager
         )
         // Capture the CAPTURED session's deselection facts at
@@ -533,13 +533,6 @@ class RedactionState {
             appliedResultIDs: prepared.appliedResultIDs,
             coveredResultIDs: prepared.coveredResultIDs
         )
-    }
-
-    /// The search origins' undo action name — the toast's verb, no document
-    /// text: "Mark N Instances", singular at one. One construction for both
-    /// origins (the bulk origin reads the singular for one result too).
-    private static func searchApplyActionName(count: Int) -> String {
-        count == 1 ? "Mark 1 Instance" : "Mark \(count) Instances"
     }
 
     /// Single-result search origin: the
@@ -597,7 +590,7 @@ class RedactionState {
             createdRegions: prepared.createdRegions,
             createdMetadata: prepared.createdMetadata,
             createdAudit: prepared.createdAudit,
-            actionName: Self.searchApplyActionName(count: 1),
+            actionName: UndoName.mark(1),
             undoManager: undoManager
         )
         pendingRunDeselection = search.deselectionSnapshotForRun()
@@ -790,11 +783,10 @@ class RedactionState {
             // re-run, so the Search Re-check never sees it.
             searchRecord: nil
         )
-        addRegion(region, page: nudge.pageIndex, undoManager: undoManager)
+        addRegion(region, page: nudge.pageIndex, undoManager: undoManager, actionName: UndoName.addNearbyMatch)
         regionMetadata[region.id] = metadata
         appliedMatchAudit[region.id] = audit
         pendingManualDrawNudge = nil
-        undoManager?.setActionName("Add Nearby Match")
         return region
     }
 
