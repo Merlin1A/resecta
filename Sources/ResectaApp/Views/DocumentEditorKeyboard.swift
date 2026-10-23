@@ -143,13 +143,12 @@ struct DocumentEditorKeyboard: ViewModifier {
         let now = Date()
         let selection = redactionState.selectedRegionIDs
         let undo = Self.nudgeContinuesRun(previous: nudgeRun, selection: selection, now: now) ? nil : undoManager
-        nudgeRun = NudgeRun(selection: selection, at: now)
-        if moves.count == 1 {
-            redactionState.moveRegion(moves[0].id, page: page,
-                                      newRect: moves[0].newRect, undoManager: undo)
-        } else {
-            redactionState.moveRegions(moves, page: page, undoManager: undo)
-        }
+        let moved = moves.count == 1
+            ? redactionState.moveRegion(moves[0].id, page: page, newRect: moves[0].newRect, undoManager: undo)
+            : redactionState.moveRegions(moves, page: page, undoManager: undo)
+        // A press held at the page edge moves nothing, so it neither starts
+        // nor extends a run: the next real move still records its step.
+        if moved { nudgeRun = NudgeRun(selection: selection, at: now) }
         return .handled
     }
 }

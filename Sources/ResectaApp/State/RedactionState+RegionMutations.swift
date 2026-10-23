@@ -64,13 +64,20 @@ extension RedactionState {
         }
     }
 
+    /// Resize a region. Like the two moves below, it is the one judge of a
+    /// no-op: a rect equal to the stored one (a tap that ends a "drag"
+    /// where it began, a nudge held at the page edge) bumps nothing,
+    /// records no step and keeps the output. Returns whether the stored
+    /// rect changed.
+    @discardableResult
     func resizeRegion(
         _ id: UUID, page: Int,
         newRect: CGRect, undoManager: UndoManager?
-    ) {
-        bumpRegionVersion()
+    ) -> Bool {
         guard var pageRegions = regions[page],
-              let index = pageRegions.firstIndex(where: { $0.id == id }) else { return }
+              let index = pageRegions.firstIndex(where: { $0.id == id }),
+              pageRegions[index].normalizedRect != newRect else { return false }
+        bumpRegionVersion()
         let oldRect = pageRegions[index].normalizedRect
         pageRegions[index].normalizedRect = newRect
         regions[page] = pageRegions
@@ -78,16 +85,19 @@ extension RedactionState {
         registerUndo(undoManager, "Resize Redaction") { target in
             target.resizeRegion(id, page: page, newRect: oldRect, undoManager: undoManager)
         }
+        return true
     }
 
     // Move region to new position. Follows resizeRegion undo pattern.
+    @discardableResult
     func moveRegion(
         _ id: UUID, page: Int,
         newRect: CGRect, undoManager: UndoManager?
-    ) {
-        bumpRegionVersion()
+    ) -> Bool {
         guard var pageRegions = regions[page],
-              let index = pageRegions.firstIndex(where: { $0.id == id }) else { return }
+              let index = pageRegions.firstIndex(where: { $0.id == id }),
+              pageRegions[index].normalizedRect != newRect else { return false }
+        bumpRegionVersion()
         let oldRect = pageRegions[index].normalizedRect
         pageRegions[index].normalizedRect = newRect
         regions[page] = pageRegions
@@ -95,18 +105,23 @@ extension RedactionState {
         registerUndo(undoManager, "Move Redaction") { target in
             target.moveRegion(id, page: page, newRect: oldRect, undoManager: undoManager)
         }
+        return true
     }
 
-    /// Batch move multiple regions on the same page. Single undo action.
-    func moveRegions(_ moves: [(id: UUID, newRect: CGRect)], page: Int, undoManager: UndoManager?) {
-        bumpRegionVersion()
-        guard var pageRegions = regions[page] else { return }
+    /// Batch move multiple regions on the same page. Single undo action
+    /// over the regions whose rect changed; none changed is a no-op.
+    @discardableResult
+    func moveRegions(_ moves: [(id: UUID, newRect: CGRect)], page: Int, undoManager: UndoManager?) -> Bool {
+        guard var pageRegions = regions[page] else { return false }
         var mutableOldRects: [(id: UUID, oldRect: CGRect)] = []
         for move in moves {
-            guard let index = pageRegions.firstIndex(where: { $0.id == move.id }) else { continue }
+            guard let index = pageRegions.firstIndex(where: { $0.id == move.id }),
+                  pageRegions[index].normalizedRect != move.newRect else { continue }
             mutableOldRects.append((move.id, pageRegions[index].normalizedRect))
             pageRegions[index].normalizedRect = move.newRect
         }
+        guard !mutableOldRects.isEmpty else { return false }
+        bumpRegionVersion()
         regions[page] = pageRegions
         markRegionsModified()
         let snapshot = mutableOldRects
@@ -114,6 +129,7 @@ extension RedactionState {
             let restoreMoves = snapshot.map { (id: $0.id, newRect: $0.oldRect) }
             target.moveRegions(restoreMoves, page: page, undoManager: undoManager)
         }
+        return true
     }
 
     /// Batch remove multiple regions from a single page. Single undo action.

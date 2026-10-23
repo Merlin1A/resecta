@@ -188,6 +188,20 @@ struct RegionMutationUndoTests {
         #expect(FileManager.default.fileExists(atPath: output.path))
     }
 
+    @Test("Each mutator reports whether it changed the stored rect")
+    func mutatorsReportAChange() {
+        let state = RedactionState()
+        let region = Self.region()
+        state.addRegion(region, page: 0, undoManager: nil)
+        let moved = region.normalizedRect.offsetBy(dx: 0.05, dy: 0)
+
+        #expect(state.moveRegion(region.id, page: 0, newRect: region.normalizedRect, undoManager: nil) == false)
+        #expect(state.moveRegions([(id: region.id, newRect: region.normalizedRect)], page: 0, undoManager: nil) == false)
+        #expect(state.resizeRegion(region.id, page: 0, newRect: region.normalizedRect, undoManager: nil) == false)
+        #expect(state.moveRegion(region.id, page: 0, newRect: moved, undoManager: nil) == true)
+        #expect(state.regions[0]?.first?.normalizedRect == moved)
+    }
+
     // MARK: - Duplicate
 
     @Test("Duplicate selects the copy")
