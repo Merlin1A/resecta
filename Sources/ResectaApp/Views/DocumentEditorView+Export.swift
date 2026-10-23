@@ -36,6 +36,43 @@ extension DocumentEditorView {
         return nil
     }
 
+    /// How long after `present` the share sheet must be up before the
+    /// export gives up on it.
+    static let shareSheetWatchdogDelay: Duration = .seconds(3)
+
+    /// Return the editor to the results after a share that will not
+    /// happen: no presenter, a sheet that never appeared, or the exporting
+    /// card's Cancel. The copy is deleted and the share-risk confirms are
+    /// re-armed as for a cancelled share, since nothing was sent. Returns
+    /// false, doing nothing, once the export has already left `.exporting`.
+    @discardableResult
+    static func abandonShare(copy: URL, report: VerificationReport, documentState: DocumentState) -> Bool {
+        guard documentState.phaseKind == .exporting else { return false }
+        try? FileManager.default.removeItem(at: copy)
+        documentState.transition(to: .verified(report: report))
+        handleShareSheetCompletion(
+            completed: false, documentState: documentState,
+            announceShared: {}, recordSuccessfulExport: {})
+        return true
+    }
+
+    /// Check once, `delay` after `present`, that the share sheet is up;
+    /// when it is not, `recover` takes the editor back to the results.
+    @discardableResult
+    static func armShareSheetWatchdog(
+        delay: Duration = shareSheetWatchdogDelay,
+        isPresented: @escaping @MainActor () -> Bool,
+        recover: @escaping @MainActor () -> Void
+    ) -> Task<Void, Never> {
+        Task { @MainActor in
+            try? await Task.sleep(for: delay)
+            if !isPresented() { recover() }
+        }
+    }
+
+    /// The notice when the share sheet cannot be shown.
+    static let shareSheetUnavailableMessage = "Unable to present the share sheet right now."
+
     /// Copy `output` to the share copy in the session's protected
     /// directory, replacing a copy an earlier share left at that URL.
     static func makeShareCopy(of output: URL, in directory: TempExportDirectory) throws -> URL {
@@ -93,6 +130,9 @@ struct DocumentEditorExportFlow {
     let requestReview: RequestReviewAction
     @Binding var shareRiskConfirmKind: ShareRiskConfirmKind?
     @Binding var shareConcealedPages: [Int]
+    /// The report the export in flight returns to; the exporting card's
+    /// Cancel reads it.
+    @Binding var exportingReport: VerificationReport?
 
     // Defense-in-depth export gate. Lifted from
     // VerificationActionBar so the bar and the Phase 2 action card share
@@ -143,6 +183,7 @@ struct DocumentEditorExportFlow {
         else { return }
 
         documentState.transition(to: .exporting)
+        exportingReport = report
 
         // The share copy sits in the per-session backup-excluded
         // subdirectory, so the name the share sheet shows comes from the
@@ -199,24 +240,31 @@ struct DocumentEditorExportFlow {
         // stranded on `.exporting` (the PipelineProgressCard overlay).
         // Use the same foreground-active filter as the audit/verification-
         // report share paths.
+        let abandon: @MainActor () -> Void = {
+            if DocumentEditorView.abandonShare(
+                copy: exportURL, report: currentReport, documentState: documentState) {
+                toastManager.enqueue(DocumentEditorView.shareSheetUnavailableMessage, severity: .warning)
+            }
+        }
         guard let topVC = MatchExportService.topViewController() else {
-            try? FileManager.default.removeItem(at: exportURL)
-            documentState.transition(to: .verified(report: currentReport))
-            // The share sheet never presented, so no send
-            // happened — re-arm exactly as a cancelled share would.
-            DocumentEditorView.handleShareSheetCompletion(
-                completed: false,
-                documentState: documentState,
-                announceShared: {},
-                recordSuccessfulExport: {}
-            )
-            toastManager.enqueue(
-                "Unable to present the share sheet right now.",
-                severity: .warning
-            )
+            abandon()
             return
         }
         activityVC.popoverPresentationController?.sourceView = topVC.view
         topVC.present(activityVC, animated: true)
+        // A present that never lands (a scene gone inactive mid-present)
+        // would otherwise leave the exporting card up with no way back.
+        DocumentEditorView.armShareSheetWatchdog(
+            isPresented: { activityVC.presentingViewController != nil },
+            recover: abandon)
+    }
+
+    /// The exporting card's Cancel: give up on the share in flight.
+    func cancelExport() {
+        guard let report = exportingReport,
+              let copy = try? coordinator.tempExportDirectory.childURL(
+                named: DocumentEditorView.shareCopyFileName)
+        else { return }
+        DocumentEditorView.abandonShare(copy: copy, report: report, documentState: documentState)
     }
 }

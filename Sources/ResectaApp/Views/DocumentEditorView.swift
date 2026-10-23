@@ -79,6 +79,7 @@ struct DocumentEditorView: View {
     // itself now says so rather than a convention across two Bools.
     @State private var shareRiskConfirmKind: ShareRiskConfirmKind?
     @State private var shareConcealedPages: [Int] = []   // ConcealingAnnotations.pages, read at the Share tap
+    @State private var exportingReport: VerificationReport?   // the export in flight returns to it
 
     // iPad hover popover state
     @State private var showHoverPopover = false
@@ -211,7 +212,7 @@ struct DocumentEditorView: View {
                           opaque: false)
                     .overlay {
                         if documentState.phaseKind != .editing {
-                            PipelineProgressCard()
+                            PipelineProgressCard(onCancelExport: exportFlow.cancelExport)
                                 .transition(.opacity)
                         }
                     }
@@ -957,7 +958,8 @@ struct DocumentEditorView: View {
             toastManager: toastManager,
             requestReview: requestReview,
             shareRiskConfirmKind: $shareRiskConfirmKind,
-            shareConcealedPages: $shareConcealedPages
+            shareConcealedPages: $shareConcealedPages,
+            exportingReport: $exportingReport
         )
     }
 

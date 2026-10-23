@@ -7,6 +7,9 @@ import SwiftUI
 
 struct PipelineProgressCard: View {
     @Environment(DocumentState.self) private var documentState
+    /// The exporting card's Cancel: the export flow gives up on the share
+    /// in flight and returns to the results.
+    var onCancelExport: () -> Void = {}
 
     var body: some View {
         ZStack {
@@ -94,6 +97,11 @@ struct PipelineProgressCard: View {
                     .controlSize(.large)
                 Text("Preparing for sharing\u{2026}")
                     .font(.headline)
+                Button("Cancel", systemImage: "xmark.circle", action: onCancelExport)
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
+                    .accessibilityIdentifier("cancelExport")
+                    .padding(.top, ResectaTokens.Spacing.sm)
             }
 
         default:
