@@ -55,7 +55,7 @@ struct RedactionStateDismissActiveSearchTests {
 
     @Test("Source pin: the purge re-run and both lifecycle resets use the shared teardown")
     func sharedTeardownIsAdopted() throws {
-        let editor = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorView.swift")
+        let editor = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorView+ScenePhase.swift")
         guard let purge = editor.range(of: "static func prepareForPurgeRerun(") else {
             Issue.record("Could not locate prepareForPurgeRerun")
             return

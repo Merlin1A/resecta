@@ -23,7 +23,6 @@ struct DocumentEditorView: View {
     @Environment(\.requestReview) private var requestReview
     // KI-4: scene-phase observer fires the proactive purge re-run toast
     // on `.background → .active`. See `onScenePhaseChange(old:new:)`.
-    @Environment(\.scenePhase) private var scenePhase
     // Capture/mirroring privacy shield. When `isShielded` is true
     // the phase-router body is replaced with `PrivacyShieldView` so the
     // canvas (.editing/.detecting/.redacting/.exporting) and verification
@@ -346,9 +345,7 @@ struct DocumentEditorView: View {
         // also fires on app-switcher and control-center transits) and only
         // when the current phase still holds an output reference. See
         // `KNOWN_ISSUES.md` KI-4.
-        .onChange(of: scenePhase) { oldPhase, newPhase in
-            handleScenePhaseChange(old: oldPhase, new: newPhase)
-        }
+        .modifier(DocumentEditorScenePhaseHandler())
         // Consolidated phase change handler (was two separate .onChange)
         .onChange(of: documentState.phaseKind) { oldKind, newKind in
             // Brief status flash for .verifying → .verified transition
@@ -1131,50 +1128,7 @@ struct DocumentEditorView: View {
         topVC.present(activityVC, animated: true)
     }
 
-    // MARK: - KI-4 Scene-phase observer
-
-    /// Toast copy for the KI-4 proactive purge re-run prompt. Mechanism-
-    /// description: names what
-    /// iOS did (reclaimed the temp file) and what the user can do (Re-run).
-    static let purgeRerunToastMessage =
-        "Pipeline output was reclaimed by iOS while the app was in the background. Tap Re-run to regenerate."
-
-    /// Pure gate predicate for the KI-4 purge re-run toast. Returns `true`
-    /// only when (a) the transition is `.background → .active`, (b) the
-    /// editor is on `.verified(report)`, and (c) the output file is missing.
-    /// Other transitions (`.inactive → .active` from the app switcher,
-    /// `.background → .inactive` mid-resume, transitions into any non-
-    /// verified phase) all return false. Static so the gate is testable
-    /// without a SwiftUI host.
-    static func shouldShowPurgeRerunToast(
-        oldPhase: ScenePhase,
-        newPhase: ScenePhase,
-        documentPhase: DocumentState.Phase,
-        outputFileExists: Bool
-    ) -> Bool {
-        guard oldPhase == .background, newPhase == .active else { return false }
-        guard case .verified = documentPhase else { return false }
-        return !outputFileExists
-    }
-
-    /// State preamble for the purge re-run action, extracted as a
-    /// static so the transition is testable without a SwiftUI host (mirrors
-    /// `shouldShowPurgeRerunToast`). The purge toast fires only from `.verified`,
-    /// but `runFullPipeline` guards `canStartPipeline` which requires
-    /// `.editing` — without this round-trip the "Re-run" button silently no-ops
-    /// and strands the user (the output is gone and Share is disabled). The
-    /// `verified -> editing` transition is legal.
-    /// activeSearch is torn down first: the Search & Redact
-    /// sheet mutates `redactionState.regions` and is incompatible with the
-    /// `.redacting` / `.verifying` phases the re-run enters.
-    @MainActor
-    static func prepareForPurgeRerun(
-        documentState: DocumentState,
-        redactionState: RedactionState
-    ) {
-        redactionState.dismissActiveSearch()
-        documentState.transition(to: .editing)
-    }
+    // MARK: - Close
 
     /// Clear the per-window `UndoManager` stack when the editor
     /// closes. SwiftUI injects one `UndoManager` per window (no `UIDocument`
@@ -1185,50 +1139,6 @@ struct DocumentEditorView: View {
     /// SwiftUI host.
     static func clearUndoStackOnClose(_ undoManager: UndoManager?) {
         undoManager?.removeAllActions()
-    }
-
-    /// Fire the KI-4 purge re-run toast when the user returns to the
-    /// foreground after iOS reclaimed the pipeline's temp output PDF.
-    /// Defense-in-depth: the `canExport` Share-button disable + the
-    /// `FailedStateView` Re-open Document Tier-2 surface remain in place.
-    private func handleScenePhaseChange(old: ScenePhase, new: ScenePhase) {
-        let outputPath = redactionState.outputURL?.path ?? ""
-        let exists = FileManager.default.fileExists(atPath: outputPath)
-        guard Self.shouldShowPurgeRerunToast(
-            oldPhase: old,
-            newPhase: new,
-            documentPhase: documentState.phase,
-            outputFileExists: exists
-        ) else { return }
-        let override = documentOverride
-        toastManager.enqueue(
-            Self.purgeRerunToastMessage,
-            severity: .warning,
-            actionLabel: "Re-run",
-            actionHandler: {
-                // Deferral pattern: ToastView's button
-                // action calls this actionHandler() and then
-                // `toastManager.dismiss(item)` — whose `withAnimation {
-                // activeToasts.removeAll }` — synchronously in the same tap.
-                // Mutating published state (the activeSearch teardown's
-                // two-property didSet, the phase transition) inside that
-                // animation transaction is the same re-entrancy class. Defer the
-                // state preamble + pipeline kick-off one runloop turn so they
-                // land after the dismiss animation; both are MainActor-isolated.
-                Task { @MainActor in
-                    // Tear down the search sheet and
-                    // round-trip `verified -> editing` so runFullPipeline's
-                    // canStartPipeline guard passes — the toast fires only from
-                    // `.verified`, where the guard would otherwise reject and
-                    // strand the user (gone output, disabled Share).
-                    Self.prepareForPurgeRerun(
-                        documentState: documentState,
-                        redactionState: redactionState
-                    )
-                    coordinator.runFullPipeline(documentOverride: override)
-                }
-            }
-        )
     }
 
     // MARK: - Keyboard Shortcuts

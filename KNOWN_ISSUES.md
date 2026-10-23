@@ -121,7 +121,7 @@ A password that contains accented Latin letters, such as ä or é, does not open
 **Affects:** Pipeline integration
 
 **Resolution:** Proactive purge re-run toast wired into
-`DocumentEditorView.handleScenePhaseChange(old:new:)`. The handler observes `\.scenePhase`; on a
+`DocumentEditorScenePhaseHandler` (`DocumentEditorView+ScenePhase.swift`). The handler observes `\.scenePhase`; on a
 `.background → .active` transition while the current phase is
 `.verified(report)`, the handler checks
 `FileManager.default.fileExists(atPath: redactionState.outputURL?.path ?? "")`
