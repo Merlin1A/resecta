@@ -644,6 +644,7 @@ class RedactionState {
                 let idsToRemove = Set(newRegions.map(\.id))
                 target.regions[page]?.removeAll { idsToRemove.contains($0.id) }
                 for id in idsToRemove { target.regionPageIndex.removeValue(forKey: id) }
+                target.selectedRegionIDs.subtract(idsToRemove)
             }
             for id in metaSnapshot.keys {
                 target.regionMetadata.removeValue(forKey: id)

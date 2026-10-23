@@ -76,7 +76,8 @@ extension RedactionState {
         guard var pageRegions = regions[page],
               let index = pageRegions.firstIndex(where: { $0.id == id }) else { return }
         bumpRegionVersion()
-        selectedRegionIDs.remove(id)
+        // A selected region comes back selected when the delete is undone.
+        let wasSelected = selectedRegionIDs.remove(id) != nil
         let removed = pageRegions.remove(at: index)
         regions[page] = pageRegions
         regionPageIndex.removeValue(forKey: id)
@@ -87,6 +88,7 @@ extension RedactionState {
             if let removedMetadata { // Restore metadata on undo
                 target.regionMetadata[removed.id] = removedMetadata
             }
+            if wasSelected { target.selectedRegionIDs.insert(removed.id) }
         }
     }
 
@@ -175,6 +177,7 @@ extension RedactionState {
         regions[page] = pageRegions
         for id in ids { regionPageIndex.removeValue(forKey: id) }
         markRegionsModified()
+        let wereSelected = selectedRegionIDs.intersection(ids)
         selectedRegionIDs.subtract(ids)
         let snapshot = mutableRemoved
         registerUndo(undoManager, actionName) { target in
@@ -186,6 +189,7 @@ extension RedactionState {
                 }
             }
             target.markRegionsModified()
+            target.selectedRegionIDs.formUnion(wereSelected)
             // Undo re-inserts the deleted regions — bump so the overlay
             // refresh gate observes it (the redo leg recurses into
             // `removeRegions`, which bumps at entry).
