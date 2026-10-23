@@ -102,4 +102,10 @@ struct DocumentEditorToolbarTests {
             contentsOf: repoRoot.appendingPathComponent(relativePath),
             encoding: .utf8)
     }
+
+    @Test("Under VoiceOver the Rectangle tool says what to use instead")
+    func rectangleVoiceOverHint() {
+        #expect(DocumentEditorToolbar.rectangleVoiceOverHint
+                == "Drawing needs direct touch. Use Search or Scan.")
+    }
 }
