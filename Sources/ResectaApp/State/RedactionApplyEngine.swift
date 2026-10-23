@@ -244,6 +244,18 @@ nonisolated func resultIsCovered(_ resultRect: CGRect, by rects: [CGRect]) -> Bo
     }
 }
 
+/// The confidence a region stores for the result it came from, for the
+/// apply and the nudge accept alike: the detector's score when the result
+/// has one, else its source's (1.0 for the text layer, the recognizer's
+/// for OCR).
+nonisolated func regionConfidence(for result: SearchResult) -> Double {
+    if let piiConfidence = result.piiConfidence { return piiConfidence }
+    return switch result.source {
+    case .textLayer: 1.0
+    case .ocr(let conf): Double(conf)
+    }
+}
+
 /// Sendable bundle returned by the detached `prepareApply` step.
 struct PreparedApply: Sendable {
     let createdRegions: [Int: [RedactionRegion]]
@@ -324,10 +336,6 @@ nonisolated func prepareApply(
         coveringRectsByPage[result.pageIndex, default: []].append(result.normalizedRect)
         appliedResultIDs.insert(result.id)
 
-        let confidence: Double = switch result.source {
-        case .textLayer: 1.0
-        case .ocr(let conf): Double(conf)
-        }
         // A PII-scan result carries its detected category —
         // stamp the region with it, so downstream surfaces (info popover,
         // long-press row, verifier term collection) see the category the
@@ -337,7 +345,7 @@ nonisolated func prepareApply(
             .map { .pii($0.piiKind) } ?? .searchMatch(term: result.term)
         createdMetadata[region.id] = RegionMetadata(
             piiKind: piiKind,
-            confidence: confidence,
+            confidence: regionConfidence(for: result),
             matchedText: result.matchedText,
             recognitionLevel: result.source == .textLayer ? .fast : .accurate
         )

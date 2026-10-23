@@ -753,17 +753,13 @@ class RedactionState {
             normalizedRect: nudge.normalizedRect,
             source: .searchMatch(term: nudge.term, rationale: nudge.rationale)
         )
-        let confidence: Double = switch nudge.source {
-        case .textLayer: 1.0
-        case .ocr(let conf): Double(conf)
-        }
         // Category stamp — mirrors `prepareApply` so a nudge-accepted
         // region stays indistinguishable from a sheet-applied region.
         let nudgeKind: DetectionResult.Kind = nudge.piiCategory
             .map { .pii($0.piiKind) } ?? .searchMatch(term: nudge.term)
         let metadata = RegionMetadata(
             piiKind: nudgeKind,
-            confidence: confidence,
+            confidence: regionConfidence(for: nudge),
             matchedText: nudge.matchedText,
             recognitionLevel: nudge.source == .textLayer ? .fast : .accurate
         )
