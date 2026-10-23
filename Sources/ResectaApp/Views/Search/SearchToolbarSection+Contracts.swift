@@ -104,11 +104,11 @@ extension SearchToolbarSection {
 
     /// Saved-regex submenu section header.
     /// UI label; not document-derived.
-    static let savedRegexSectionHeader: String = "Saved..."
+    static let savedRegexSectionHeader: String = "Saved…"
 
-    /// "Save current..." menu item label.
+    /// "Save current…" menu item label.
     /// UI action label; not document-derived.
-    static let saveCurrentRegexMenuItem: String = "Save current..."
+    static let saveCurrentRegexMenuItem: String = "Save current…"
 
     /// `Save current...` is enabled only when the user has typed a
     /// non-empty pattern AND the user-saved regex list is below the

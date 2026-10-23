@@ -26,7 +26,7 @@ struct SearchAndRedactSheetMultiTermTests {
         )
         switch outcome {
         case .rejectedTooLong(let message):
-            #expect(message == "Search term is too long. Trim to 200 characters or fewer.")
+            #expect(message == "Pattern too long (max 200 characters).")
         default:
             Issue.record("Expected .rejectedTooLong for a 201-char submission, got \(outcome)")
         }
@@ -105,7 +105,7 @@ struct SearchAndRedactSheetMultiTermTests {
         // specific failure mode.
         switch outcome {
         case .rejectedTooLong(let message):
-            #expect(message == "Search term is too long. Trim to 200 characters or fewer.")
+            #expect(message == "Pattern too long (max 200 characters).")
         default:
             Issue.record("Length check must precede duplicate check, got \(outcome)")
         }

@@ -295,7 +295,7 @@ struct DocumentEditorView: View {
                                         activeTool: activeTool
                                     )
                                 )
-                                .transition(.opacity)
+                                .allowsHitTesting(false).transition(.opacity)
                         }
                     }
 
@@ -820,7 +820,7 @@ struct DocumentEditorView: View {
     /// Caption text shown while the rectangle drawing tool is active.
     /// Mechanism description: names the active gesture so the user knows
     /// what shape the touch will produce.
-    static let drawingModeCaption = "Drawing — tap and drag"
+    static let drawingModeCaption = "Drag to draw · two fingers to scroll"
 
     /// Caption is visible only when (a) a captioned drawing tool is
     /// active (the rectangle) AND (b) the document is

@@ -22,10 +22,11 @@ struct SearchFooterSection: View {
                 // so "showing first N" stops reading as full coverage.
                 Text(Self.capBannerText(
                     resultCount: searchState.totalCount,
-                    unscannedPageCount: searchState.capUnscannedPageCount
+                    unscannedPageCount: searchState.capUnscannedPageCount,
+                    interface: searchState.searchModeType.interface
                 ))
                     .font(.caption)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(ResectaTokens.SemanticColor.warnText)
             }
             HStack {
                 // One label family for the whole surface: "M of N
@@ -117,15 +118,16 @@ struct SearchFooterSection: View {
     /// Cap-banner copy. States the truncation AND how many pages
     /// the cancelled scan never reached (0 when the cap fired on the last
     /// page, or when the count is unavailable — the truncation sentence
-    /// alone still renders). Pure function pinned by
+    /// alone still renders). A Scan has no query to refine, so its banner
+    /// drops the refine clause. Pure function pinned by
     /// `SearchFooterCapBannerTests`.
-    static func capBannerText(resultCount: Int, unscannedPageCount: Int) -> String {
+    static func capBannerText(resultCount: Int, unscannedPageCount: Int, interface: SearchInterface = .search) -> String {
         var text = "Showing first \(resultCount) results."
         if unscannedPageCount > 0 {
             let pageNoun = unscannedPageCount == 1 ? "page was" : "pages were"
             text += " \(unscannedPageCount) \(pageNoun) never scanned."
         }
-        return text + " Refine your search for more specific matches."
+        return interface == .scan ? text : text + " Refine your search for more specific matches."
     }
 
     /// Footer selection count for the unified surface: "M of N

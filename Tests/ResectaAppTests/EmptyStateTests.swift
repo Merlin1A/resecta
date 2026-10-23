@@ -391,10 +391,10 @@ struct EmptyStateTests {
     @Test("Recourse line names the three existing controls by their shipped labels")
     func piiScanZeroRecourseLineWording() {
         let copy = SearchEmptyStateCopy.piiScanZeroRecourseLine
-        #expect(copy == "To look further: re-run with different detectors (\u{21bb}), search for specific terms in Search, or change the Detection Sensitivity preset in Settings.")
+        #expect(copy == "To look further: run Scan again, search for specific terms in Search, or change the Detection Sensitivity preset in Settings.")
         #expect(copy.contains("Search"))
         #expect(copy.contains("Settings"))
-        #expect(copy.contains("\u{21bb}"))
+        #expect(!copy.contains("different detectors"), "no view chooses detectors")
     }
 
     @Test("Zero-state calibration + recourse lines are mechanism-description only")
