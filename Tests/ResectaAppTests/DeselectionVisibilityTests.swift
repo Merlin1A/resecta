@@ -154,8 +154,8 @@ struct DeselectionApplyCommitCaptureTests {
         #expect(atEntry?.deselectedCount == 1 && atEntry?.totalCount == 3)
     }
 
-    @Test("Last apply wins — a later apply overwrites the pending snapshot")
-    func lastApplyWins() async {
+    @Test("A later apply from another Scan adds its facts to the pending snapshot")
+    func applyFromAnotherScanAddsItsFacts() async {
         let redaction = RedactionState()
         redaction.activeSearch = makeScanSession(total: 5, deselected: 2)
         _ = await redaction.applyFindings(.selectedSearchResults, undoManager: nil)
@@ -165,9 +165,9 @@ struct DeselectionApplyCommitCaptureTests {
         redaction.activeSearch = makeScanSession(total: 6, deselected: 3)
         _ = await redaction.applyFindings(.selectedSearchResults, undoManager: nil)
 
-        #expect(redaction.pendingRunDeselection?.deselectedCount == 3)
-        #expect(redaction.pendingRunDeselection?.totalCount == 6,
-                "the second apply's snapshot replaces the first — no accumulation")
+        #expect(redaction.pendingRunDeselection?.deselectedCount == 5)
+        #expect(redaction.pendingRunDeselection?.totalCount == 11,
+                "the second Scan's facts join the first's")
     }
 
     @Test("clearOutput() alone does not clear the pending snapshot — it survives a pipeline cancel/retry")

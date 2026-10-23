@@ -92,18 +92,19 @@ class RedactionState {
         var deselectedCount: Int { items.count }
     }
 
-    /// The deselection facts of the search session the user
-    /// most recently *applied* results from, captured at the apply
-    /// commit (`applySelectedSearchResultsOrigin`) rather than at
+    /// The deselection facts of the search sessions the user *applied*
+    /// results from, captured at the apply commit rather than at
     /// pipeline run entry. Closes the common-path gap where the search
     /// sheet dismisses (nil-ing `activeSearch`) between the apply and the
     /// Redact tap, so `runEntryDeselectionSnapshot()` below would
     /// otherwise see no live session and ship no disclosure even though
     /// the user deliberately left results un-checked when they applied.
     ///
-    /// Lifetime: last apply wins — a later apply from a search session
-    /// (this or any other) overwrites the previous value; there is no
-    /// accumulation across applies. It survives a pipeline run
+    /// Lifetime: one part per session (`pendingRunDeselectionParts`),
+    /// merged here. A later apply from the same session replaces its
+    /// part, an apply from another Scan adds one, and a typed search,
+    /// which has no deselection facts, leaves them alone; undoing an
+    /// apply restores the parts it found. It survives a pipeline run
     /// (including cancel/fail, both of which route through
     /// `clearOutput()`) so a retry that didn't re-apply still reports
     /// the same counts — `clearOutput()` deliberately does NOT clear
@@ -112,7 +113,10 @@ class RedactionState {
     /// apply fact). It must not leak across documents, so both
     /// document-boundary resets (`clearForNewDocument()`,
     /// `clearAll()`) clear it explicitly.
-    private(set) var pendingRunDeselection: DeselectionSnapshot?
+    var pendingRunDeselection: DeselectionSnapshot? {
+        DeselectionSnapshot(merging: pendingRunDeselectionParts.map(\.snapshot))
+    }
+    private(set) var pendingRunDeselectionParts: [RunDeselectionPart] = []
 
     /// Set when any gazetteer / context-keywords loader failed to
     /// initialize for this session. Drives the persistent degrade
@@ -369,7 +373,7 @@ class RedactionState {
         // the PRIOR document; `clearOutput()` deliberately leaves them
         // alone (they survive pipeline retries), so the document boundary
         // is where they are dropped.
-        pendingRunDeselection = nil
+        pendingRunDeselectionParts = []
         // A full-document reset: no regions remain, so "regions modified
         // since verification" is logically false.
         regionsModifiedSinceVerification = false
@@ -517,24 +521,27 @@ class RedactionState {
             coveredResultIDs: prepared.coveredResultIDs
         )
         // A selection the regions already cover creates nothing, so it
-        // commits nothing: no version bump, no empty undo step.
-        guard prepared.appliedCount > 0 else { return outcome }
+        // commits nothing: no version bump, no empty undo step. Its
+        // deselection facts still join the run's, as an apply's always do.
+        guard prepared.appliedCount > 0 else {
+            pendingRunDeselectionParts = runDeselectionParts(after: search)
+            return outcome
+        }
 
+        // The CAPTURED session's deselection facts join the pending
+        // parts at the moment of commit, before the caller dismisses the
+        // sheet and nils `activeSearch` out from under a later
+        // pipeline-entry read. Derivation is unchanged — the same
+        // `deselectionSnapshotForRun()` the coverage panel and the
+        // live-session pipeline-entry path use.
         commitApply(
             createdRegions: prepared.createdRegions,
             createdMetadata: prepared.createdMetadata,
             createdAudit: prepared.createdAudit,
             actionName: UndoName.mark(prepared.appliedCount),
+            runDeselectionParts: runDeselectionParts(after: search),
             undoManager: undoManager
         )
-        // Capture the CAPTURED session's deselection facts at
-        // the moment of commit, before the caller dismisses the sheet
-        // and nils `activeSearch` out from under a later pipeline-entry
-        // read. Last apply wins: this overwrites whatever a previous
-        // apply (this session or an earlier one) left pending. Derivation
-        // is unchanged — same `deselectionSnapshotForRun()` the coverage
-        // panel and the live-session pipeline-entry path use.
-        pendingRunDeselection = search.deselectionSnapshotForRun()
         // Caller is responsible for clearing activeSearch after showing feedback.
         return outcome
     }
@@ -558,7 +565,7 @@ class RedactionState {
     /// badge, no audit entry), the same `commitApply`
     /// transaction recording the search apply-version marker,
     /// the same action-name construction in its singular form, and the
-    /// same post-commit deselection snapshot (last apply wins).
+    /// same deselection parts at the commit.
     /// One result needs no detached prepare, so nothing suspends between
     /// the mutation guard in `applyFindings` and the commit — the
     /// post-suspension re-check the bulk origin needs has no window
@@ -595,9 +602,9 @@ class RedactionState {
             createdMetadata: prepared.createdMetadata,
             createdAudit: prepared.createdAudit,
             actionName: UndoName.mark(1),
+            runDeselectionParts: runDeselectionParts(after: search),
             undoManager: undoManager
         )
-        pendingRunDeselection = search.deselectionSnapshotForRun()
         return outcome
     }
 
@@ -620,16 +627,20 @@ class RedactionState {
     /// The single write-back transaction every apply origin commits
     /// through: one `regionVersion` bump, region + reverse-index
     /// insert, metadata + audit merge, verification/output
-    /// invalidation, and ONE two-leg undo registration. Undo removes
-    /// the created regions with their metadata AND audit records in
-    /// lockstep; redo re-inserts all three.
+    /// invalidation, the run's deselection parts, and ONE two-leg undo
+    /// registration. Undo removes the created regions with their metadata
+    /// AND audit records in lockstep and gives back the deselection parts
+    /// it found; redo re-inserts all three and the parts it set.
     private func commitApply(
         createdRegions: [Int: [RedactionRegion]],
         createdMetadata: [UUID: RegionMetadata],
         createdAudit: [UUID: MatchAuditSnapshot],
         actionName: String,
+        runDeselectionParts: [RunDeselectionPart],
         undoManager: UndoManager?
     ) {
+        let partsBefore = pendingRunDeselectionParts
+        pendingRunDeselectionParts = runDeselectionParts
         regionVersion += 1
         for (page, newRegions) in createdRegions {
             regions[page, default: []].append(contentsOf: newRegions)
@@ -658,6 +669,7 @@ class RedactionState {
             }
             target.regionsModifiedSinceVerification = true
             target.clearOutput()
+            target.pendingRunDeselectionParts = partsBefore
             // The undo leg is a region mutation like any other: bump
             // `regionVersion` so the overlay refresh gate and the search
             // sheet's applied-marker `.onChange` observe the removal.
@@ -671,6 +683,7 @@ class RedactionState {
                 target2.appliedMatchAudit.merge(auditSnapshot) { _, new in new }
                 target2.regionsModifiedSinceVerification = true
                 target2.clearOutput()
+                target2.pendingRunDeselectionParts = runDeselectionParts
                 // Redo re-inserts regions — a region mutation; the bump
                 // keeps the canvas overlays refreshing. The sheet's
                 // applied markers come back with the re-inserted audit
