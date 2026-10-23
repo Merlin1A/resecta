@@ -32,12 +32,6 @@ class RedactionState {
         }
     }
 
-    /// The one Select All on Page gate (both menus, the long-press menu,
-    /// Command-A): the page holds a region not yet selected.
-    func canSelectAllOnPage(_ page: Int) -> Bool {
-        (regions[page] ?? []).contains { !selectedRegionIDs.contains($0.id) }
-    }
-
     var outputURL: URL?
 
     /// Everything verification consumed for the redaction run that
@@ -1032,53 +1026,14 @@ class RedactionState {
         hoveredRegionID = nil
     }
 
-    // MARK: - Undo Helper
+    // MARK: - Undo Helper state (`RedactionState+UndoHelper.swift`)
 
-    /// Register an undoable action. Under the app target's SE-0466 MainActor
-    /// default, `RedactionState` — and this method — are MainActor
-    /// isolated, as is `UndoManager.registerUndo` on iOS 26. The `handler` is
-    /// typed `@MainActor` because every handler body mutates MainActor region
-    /// state and re-registers the inverse action; they already executed on
-    /// MainActor via the `assumeIsolated` wrappers below, so the annotation
-    /// makes the type system agree without changing runtime behavior. The inner
-    /// `MainActor.assumeIsolated` still bridges the iOS-26
-    /// `registerUndo(withTarget:)` callback (whose handler is not statically
-    /// MainActor-typed).
     /// The pages the last Undo or Redo step changed. A step that
     /// registers once per page (a delete across pages) unions them: the
     /// first record of a step opens it, and the next main-actor turn
     /// closes it.
-    private(set) var lastUndoRedoPages: Set<Int> = []
-    @ObservationIgnored private var undoRedoStepOpen = false
-
-    private func recordUndoRedoPages(before: [Int: [RedactionRegion]]) {
-        let touched = Set(before.keys).union(regions.keys).filter { before[$0] != regions[$0] }
-        if undoRedoStepOpen {
-            lastUndoRedoPages.formUnion(touched)
-        } else {
-            lastUndoRedoPages = touched
-            undoRedoStepOpen = true
-            Task { @MainActor [weak self] in self?.undoRedoStepOpen = false }
-        }
-    }
-
-    func registerUndo(
-        _ undoManager: UndoManager?, _ actionName: String,
-        handler: @escaping @MainActor (RedactionState) -> Void
-    ) {
-        guard let undoManager else { return }
-        nonisolated(unsafe) let target = self
-        MainActor.assumeIsolated {
-            undoManager.registerUndo(withTarget: target) { target in
-                MainActor.assumeIsolated {
-                    let before = target.regions
-                    handler(target)
-                    target.recordUndoRedoPages(before: before)
-                }
-            }
-            undoManager.setActionName(actionName)
-        }
-    }
+    var lastUndoRedoPages: Set<Int> = []
+    @ObservationIgnored var undoRedoStepOpen = false
 }
 
 // MARK: - Detection-degrade copy
