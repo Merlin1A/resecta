@@ -146,18 +146,24 @@ extension RedactionOverlayView {
     /// of two or more handles overlap the touch point, the nearest
     /// handle center wins — deterministic, independent of the array
     /// order below (which previously decided ties by accident).
+    /// Two more rules. A point inside the region past every handle box's
+    /// inward reach (at most a quarter of that side) is the region's body,
+    /// for a move, even on a thin region whose boxes overlap its middle.
+    /// And with `containerBounds` (the page), a box that would cross the
+    /// page edge slides inward so all of it can be touched.
     internal static func resolveResizeHandle(
         at point: CGPoint,
         regionRect: CGRect,
         targetHandleSize: CGFloat = ResectaTokens.TouchTarget.minimum,
-        minimumHandleSize: CGFloat = 22
+        minimumHandleSize: CGFloat = 22,
+        containerBounds: CGRect? = nil
     ) -> ResizeHandle? {
         let clamped = min(
             targetHandleSize,
             max(minimumHandleSize, min(regionRect.width, regionRect.height) / 2)
         )
 
-        let handles: [(ResizeHandle, CGPoint)] = [
+        let centers: [(ResizeHandle, CGPoint)] = [
             (.topLeft,     CGPoint(x: regionRect.minX, y: regionRect.minY)),
             (.topRight,    CGPoint(x: regionRect.maxX, y: regionRect.minY)),
             (.bottomLeft,  CGPoint(x: regionRect.minX, y: regionRect.maxY)),
@@ -167,16 +173,35 @@ extension RedactionOverlayView {
             (.leftCenter,  CGPoint(x: regionRect.minX, y: regionRect.midY)),
             (.rightCenter, CGPoint(x: regionRect.maxX, y: regionRect.midY)),
         ]
-
-        let candidates = handles.filter { _, center in
-            CGRect(x: center.x - clamped / 2, y: center.y - clamped / 2,
-                   width: clamped, height: clamped).contains(point)
+        let boxes: [(handle: ResizeHandle, box: CGRect)] = centers.map { handle, center in
+            var box = CGRect(x: center.x - clamped / 2, y: center.y - clamped / 2,
+                             width: clamped, height: clamped)
+            if let page = containerBounds {
+                box.origin.x = max(page.minX, min(box.origin.x, page.maxX - clamped))
+                box.origin.y = max(page.minY, min(box.origin.y, page.maxY - clamped))
+            }
+            return (handle, box)
         }
-        return candidates.min(by: { lhs, rhs in
-            let ldx = lhs.1.x - point.x, ldy = lhs.1.y - point.y
-            let rdx = rhs.1.x - point.x, rdy = rhs.1.y - point.y
+        func box(_ handle: ResizeHandle) -> CGRect {
+            boxes.first { $0.handle == handle }?.box ?? .null
+        }
+
+        // The body zone: past each side's handle-box reach, capped at a
+        // quarter of that side.
+        let left = min(box(.leftCenter).maxX - regionRect.minX, regionRect.width / 4)
+        let right = min(regionRect.maxX - box(.rightCenter).minX, regionRect.width / 4)
+        let top = min(box(.topCenter).maxY - regionRect.minY, regionRect.height / 4)
+        let bottom = min(regionRect.maxY - box(.bottomCenter).minY, regionRect.height / 4)
+        let body = CGRect(x: regionRect.minX + left, y: regionRect.minY + top,
+                          width: regionRect.width - left - right,
+                          height: regionRect.height - top - bottom)
+        if body.width > 0, body.height > 0, body.contains(point) { return nil }
+
+        return boxes.filter { $0.box.contains(point) }.min(by: { lhs, rhs in
+            let ldx = lhs.box.midX - point.x, ldy = lhs.box.midY - point.y
+            let rdx = rhs.box.midX - point.x, rdy = rhs.box.midY - point.y
             return (ldx * ldx + ldy * ldy) < (rdx * rdx + rdy * rdy)
-        })?.0
+        })?.handle
     }
 
     /// The selected region shows and takes resize handles only while Add
@@ -195,7 +220,8 @@ extension RedactionOverlayView {
             at: point,
             regionRect: rect,
             targetHandleSize: ResectaTokens.TouchTarget.minimum * fingerScale,
-            minimumHandleSize: 22 * fingerScale
+            minimumHandleSize: 22 * fingerScale,
+            containerBounds: bounds
         )
     }
 }
