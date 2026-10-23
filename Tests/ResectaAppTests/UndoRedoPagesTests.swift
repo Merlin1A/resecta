@@ -44,4 +44,21 @@ struct UndoRedoPagesTests {
         #expect(state.regions[2]?.count == 1)
         #expect(state.lastUndoRedoPages == [0, 2])
     }
+
+    @Test("The step carries its name, and a second Undo on the same page is a new step")
+    func stepCarriesItsNameAndARepeatIsNew() async throws {
+        let state = RedactionState()
+        let mgr = makeUndoManager()
+        withUndoGroup(mgr) { state.addRegion(Self.region(y: 0.1), page: 1, undoManager: mgr) }
+        withUndoGroup(mgr) { state.addRegion(Self.region(y: 0.4), page: 1, undoManager: mgr) }
+        mgr.undo()
+        let first = state.lastUndoRedo
+        #expect(first?.pages == [1])
+        #expect(first?.name == "Add Redaction")
+        // The step closes on the next main-actor turn, as between two taps.
+        try await Task.sleep(for: .milliseconds(50))
+        mgr.undo()
+        #expect(state.lastUndoRedo?.pages == [1])
+        #expect(state.lastUndoRedo != first, "a second Undo on the same page is announced too")
+    }
 }

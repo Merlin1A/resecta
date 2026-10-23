@@ -25,6 +25,14 @@ struct EditorAnnouncementObserversTests {
         #expect(!EditorAnnouncementObservers.showsHoverPopover(hasMetadata: true, searchSheetUp: true))
     }
 
+    @Test("Undo and Redo name the step with its page, or with its page count")
+    func undoRedoAnnouncement() {
+        #expect(EditorAnnouncementObservers.undoRedoAnnouncement(
+            .init(pages: [2], name: "Add Region", serial: 1), pageCount: 5) == "Add Region, page 3 of 5")
+        #expect(EditorAnnouncementObservers.undoRedoAnnouncement(
+            .init(pages: [0, 2], name: "Delete Regions", serial: 2), pageCount: 5) == "Delete Regions, on 2 pages")
+    }
+
     @Test("The nearby-match nudge reads its copy")
     func nudgeCopy() {
         #expect(EditorAnnouncementObservers.nudgeToastMessage == "1 match nearby. Mark it too?")
