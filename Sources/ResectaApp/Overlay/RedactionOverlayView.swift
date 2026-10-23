@@ -130,39 +130,9 @@ class RedactionOverlayView: UIView {
     private var cachedGuideTargets: (horizontal: [CGFloat], vertical: [CGFloat])?
     private var cachedGuideExcludeID: UUID?
 
-    // MARK: - Snap-to-text Box State
-
-    /// OCR text-block bounding boxes for the current page, in
-    /// normalized PDF coordinates (0–1, bottom-left origin). Sourced from
-    /// the existing OCR cache via the coordinator; the rectangle-draw
-    /// snap-to-text-box assist consults this list during `touchesMoved`.
-    /// Empty when OCR has not run for the page (snap path no-ops).
-    var ocrTextBlockNormalizedRects: [CGRect] = []
-
-    /// When true, the rectangle-draw tool consults
-    /// `ocrTextBlockNormalizedRects` during drag and snaps edges within
-    /// `snapToTextTolerance = 8 / zoomScale` overlay points to the
-    /// nearest text-block edge. Default on; bound to the Settings opt-out
-    /// (`SettingsState.snapToTextEnabled`).
-    var snapToTextEnabled: Bool = true
-
-    /// Baseline snap tolerance at 1× zoom, in overlay-space points.
-    /// Active tolerance is `baseline / zoomScale` so the assist tracks
-    /// finger drift at any zoom level. Locked at 8 pt; do not tune.
-    static let snapToTextToleranceAtUnitZoom: CGFloat = 8.0
-
-    /// Visual tick segments rendered for active text-edge snaps.
-    /// Each tick is an overlay-space line from `start` to `end`. Drawn
-    /// after `drawSnapGuides` so it sits above the page but under the
-    /// rubber-band rect. Cleared in `resetDragState`.
-    struct TextSnapTick: Equatable {
-        let start: CGPoint
-        let end: CGPoint
-    }
-    var activeTextSnapTicks: [TextSnapTick] = []
+    // MARK: - Finger Scale
 
     /// Test override for the zoom scale used by
-    /// `applyTextBoxSnapping(to:)` and by
     /// `fingerScale` — i.e. every finger tolerance in the overlay. The
     /// production path walks the view hierarchy looking for a `PDFView`;
     /// tests synthesise the overlay without a parent and pin the zoom
@@ -700,14 +670,6 @@ class RedactionOverlayView: UIView {
                     handle: Self.drawSnapHandle(origin: origin, point: point),
                     excluding: nil
                 )
-                // Apply snap-to-text-box assist during new
-                // region drawing. The assist runs after the region-edge
-                // snap so a strong text-edge match overrides a weaker
-                // region-edge match; both passes share the same
-                // overlay-space coordinate system. Tolerance scales by
-                // `1/zoomScale` so the same finger drift on screen
-                // means the same number of overlay points at any zoom.
-                rect = applyTextBoxSnapping(to: rect)
                 // Clamp the rubber band to the page —
                 // mirrors the resize clamp in `updateSelectedRegionForResize`.
                 // A band entirely off-page leaves the last rect in place.
@@ -717,115 +679,6 @@ class RedactionOverlayView: UIView {
                 setNeedsDisplay()
             }
         }
-    }
-
-    // MARK: - Snap to Text-Box Assist
-
-    /// Snap rect edges to the nearest OCR text-block edge within
-    /// `snapToTextToleranceAtUnitZoom / zoomScale` overlay-space points.
-    /// Designed to align rectangle edges to text rows during drag;
-    /// returns the input rect unchanged when the assist is disabled,
-    /// when no text blocks are cached, or when no edge is in tolerance.
-    /// Populates `activeTextSnapTicks` with one tick per snapped edge so
-    /// `draw(_:)` can render a visual affordance.
-    private func applyTextBoxSnapping(to rect: CGRect) -> CGRect {
-        // Clear last frame's ticks regardless of branch — a stale tick
-        // would otherwise linger after the finger moves out of range.
-        activeTextSnapTicks = []
-        guard snapToTextEnabled, !ocrTextBlockNormalizedRects.isEmpty else {
-            return rect
-        }
-        let zoom = max(snapZoomScaleOverride ?? currentZoomScale(), 0.01)
-        let tolerance = Self.snapToTextToleranceAtUnitZoom / zoom
-
-        // Build overlay-space text-block rects once per call. Stays in
-        // overlay coords so edge comparisons match `rect`.
-        let textRects = ocrTextBlockNormalizedRects.map(pdfNormalizedToOverlay)
-
-        // Collect all candidate text edges. `xs` are left/right edges
-        // (snap targets for the rect's left/right edges); `ys` are
-        // top/bottom edges (snap targets for the rect's top/bottom).
-        var xs: [CGFloat] = []
-        var ys: [CGFloat] = []
-        xs.reserveCapacity(textRects.count * 2)
-        ys.reserveCapacity(textRects.count * 2)
-        for t in textRects {
-            xs.append(t.minX)
-            xs.append(t.maxX)
-            ys.append(t.minY)
-            ys.append(t.maxY)
-        }
-
-        var result = rect
-        var ticks: [TextSnapTick] = []
-
-        // Helper: nearest target within tolerance, else nil.
-        func nearest(_ edge: CGFloat, in targets: [CGFloat]) -> CGFloat? {
-            guard let candidate = targets.min(by: {
-                abs($0 - edge) < abs($1 - edge)
-            }) else { return nil }
-            return abs(candidate - edge) <= tolerance ? candidate : nil
-        }
-
-        // Snap left edge.
-        if let left = nearest(result.minX, in: xs) {
-            let delta = left - result.minX
-            result = CGRect(
-                x: result.minX + delta,
-                y: result.minY,
-                width: max(0, result.width - delta),
-                height: result.height
-            )
-            ticks.append(TextSnapTick(
-                start: CGPoint(x: left, y: result.minY),
-                end: CGPoint(x: left, y: result.maxY)
-            ))
-        }
-        // Snap right edge.
-        if let right = nearest(result.maxX, in: xs) {
-            let delta = right - result.maxX
-            result = CGRect(
-                x: result.minX,
-                y: result.minY,
-                width: max(0, result.width + delta),
-                height: result.height
-            )
-            ticks.append(TextSnapTick(
-                start: CGPoint(x: right, y: result.minY),
-                end: CGPoint(x: right, y: result.maxY)
-            ))
-        }
-        // Snap top edge (minY in overlay space).
-        if let top = nearest(result.minY, in: ys) {
-            let delta = top - result.minY
-            result = CGRect(
-                x: result.minX,
-                y: result.minY + delta,
-                width: result.width,
-                height: max(0, result.height - delta)
-            )
-            ticks.append(TextSnapTick(
-                start: CGPoint(x: result.minX, y: top),
-                end: CGPoint(x: result.maxX, y: top)
-            ))
-        }
-        // Snap bottom edge (maxY in overlay space).
-        if let bottom = nearest(result.maxY, in: ys) {
-            let delta = bottom - result.maxY
-            result = CGRect(
-                x: result.minX,
-                y: result.minY,
-                width: result.width,
-                height: max(0, result.height + delta)
-            )
-            ticks.append(TextSnapTick(
-                start: CGPoint(x: result.minX, y: bottom),
-                end: CGPoint(x: result.maxX, y: bottom)
-            ))
-        }
-
-        activeTextSnapTicks = ticks
-        return result
     }
 
     /// Update the selected region's position during a move drag.
@@ -989,9 +842,6 @@ class RedactionOverlayView: UIView {
         previousGuideSet = []
         cachedGuideTargets = nil
         cachedGuideExcludeID = nil
-        // Text-snap tick cleanup. Ticks are transient — they
-        // exist only while the drag is producing edge matches.
-        activeTextSnapTicks = []
         // Repaint on gesture end. The commit paths
         // run under `isActivelyDragging`, which makes the coordinator's
         // `configure` a no-op, and the later state sync sees `regions`
@@ -1210,11 +1060,6 @@ class RedactionOverlayView: UIView {
 
         // Draw active snap guide lines
         drawSnapGuides(ctx: ctx)
-
-        // Draw active text-edge snap tick marks. Tick is a small
-        // affordance — if rendering fails (e.g. zero-length segment),
-        // the rectangle drag continues regardless.
-        drawTextSnapTicks(ctx: ctx)
 
         drawInProgressShapes(ctx: ctx)
     }

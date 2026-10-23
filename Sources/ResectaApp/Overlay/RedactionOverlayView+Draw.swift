@@ -10,7 +10,7 @@ import RedactionEngine
 // the walk's ring; the in-progress shapes — rubber band,
 // marquee, the resize label), followed by the helpers those
 // segments call (polygon fill, resize handles, the type badge, the
-// dimension label, the snap guides and text-snap ticks).
+// dimension label and the snap guides).
 
 extension RedactionOverlayView {
 
@@ -400,28 +400,6 @@ extension RedactionOverlayView {
                 ctx.move(to: CGPoint(x: guide.position, y: 0))
                 ctx.addLine(to: CGPoint(x: guide.position, y: bounds.height))
             }
-        }
-        ctx.strokePath()
-        ctx.restoreGState()
-    }
-
-    /// Draw a thin tick segment for each active text-edge snap.
-    /// Visual affordance — the tick traces the snapped edge of the
-    /// in-progress rect so the user sees which edge clipped to OCR text.
-    /// Uses the existing snap-guide color so the visual vocabulary stays
-    /// uniform with the region-edge snap; 1pt line width keeps it
-    /// subordinate to the rubber-band rect.
-    func drawTextSnapTicks(ctx: CGContext) {
-        guard !activeTextSnapTicks.isEmpty else { return }
-
-        ctx.saveGState()
-        ctx.setStrokeColor(ResectaTokens.Snap.guideColor.cgColor)
-        ctx.setLineWidth(1.0)
-        ctx.setLineDash(phase: 0, lengths: [])
-
-        for tick in activeTextSnapTicks {
-            ctx.move(to: tick.start)
-            ctx.addLine(to: tick.end)
         }
         ctx.strokePath()
         ctx.restoreGState()

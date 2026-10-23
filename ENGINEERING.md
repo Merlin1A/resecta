@@ -410,9 +410,17 @@ search, rebuild, verify and export without the app's view code:
   `MatchAuditExporter`
 
 `TextSpan.words(fullyInside:polygon:on:)` returns the words of a page's text
-layer fully inside a region, in the displayed frame; at the start of each run
-the app captures a manual region's words through it, on pages with a usable
-text layer, as terms the verification pass searches for.
+layer fully inside a region, in the displayed frame. At the start of each run
+the app captures a manual region's words, on pages with a usable text layer,
+as terms the verification pass searches for. It takes the words the
+searchable redaction would touch, line by line. A region over exactly one
+word keeps that word as one bounded term. Otherwise each captured line of two
+or more words becomes one term, the page text's own span from its first word
+to its last, and each word of the line joins as a bounded term when it holds
+a digit or has four characters or more and is not on the stop list of common
+words. Lines never join across. A region covering the whole page adds no
+term, and a region on a page without a usable text layer is counted, not
+captured.
 
 These are public because a runner or the app consumes them, along with the
 types their signatures carry and whatever else the app names; everything else

@@ -36,7 +36,6 @@ struct SettingsViewResetConfirmationTests {
         settings.fillColor = .white
         settings.autoVerify = false
         settings.pipelineMode = .searchableRedaction
-        settings.snapToTextEnabled = false
 
         // Opening the dialog is purely a UI act — the underlying state
         // mutation has NOT happened yet. Simulating that: we never call
@@ -52,7 +51,6 @@ struct SettingsViewResetConfirmationTests {
         #expect(settings.fillColor == .white)
         #expect(settings.autoVerify == false)
         #expect(settings.pipelineMode == .searchableRedaction)
-        #expect(settings.snapToTextEnabled == false)
     }
 
     @Test("Cancel role leaves state untouched")
@@ -81,7 +79,6 @@ struct SettingsViewResetConfirmationTests {
         settings.fillColor = .white
         settings.autoVerify = false
         settings.pipelineMode = .searchableRedaction
-        settings.snapToTextEnabled = false
 
         // The destructive button's closure is `settingsState.resetToDefaults()`.
         // The dialog is purely a confirmation step, so the underlying
@@ -92,7 +89,6 @@ struct SettingsViewResetConfirmationTests {
         #expect(settings.fillColor == .black)
         #expect(settings.autoVerify == true)
         #expect(settings.pipelineMode == .secureRasterization)
-        #expect(settings.snapToTextEnabled == true)
     }
 
     @Test("Confirmation copy is mechanism-description (no outcome-promise phrases)")

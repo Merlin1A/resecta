@@ -44,7 +44,6 @@ struct RectangleDrawGestureTests {
         )
         overlay.isDrawingMode = drawing
         overlay.activeShapeTool = .rectangle
-        overlay.snapToTextEnabled = false
         let coordinator = RecordingCoordinator()
         overlay.coordinator = coordinator
         overlay.configure(with: regions, selectedIDs: selectedIDs)

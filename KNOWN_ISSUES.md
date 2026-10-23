@@ -75,7 +75,7 @@ page when the draw completes; no output is produced from a failed run.
 ### KI-10: Rectangle Edges Do Not Align to Text Rows (Low)
 **Affects:** Rectangle draw tool
 
-While drawing, rectangle edges align to other boxes and page guides; alignment to recognized text rows is not available in this release (the "Snap to Text Boxes" setting that described it was removed in 1.1.0).
+While drawing, rectangle edges align to other boxes and page guides; alignment to recognized text rows is not available in this release.
 
 ---
 
@@ -83,6 +83,15 @@ While drawing, rectangle edges align to other boxes and page guides; alignment t
 **Affects:** Image import · Scan · verification
 
 A barcode or QR code in a photo is not read or flagged: text recognition reads printed characters, and neither Scan nor verification decodes codes. A code that carries personal data (a boarding pass, the PDF417 block on an ID card) stays readable in the redacted copy unless you draw a region over it.
+
+---
+
+### KI-12: Some Non-ASCII Passwords Do Not Unlock a Document (Low)
+**Affects:** Import (password-protected PDFs)
+
+A password that contains accented Latin letters, such as ä or é, does not open a PDF encrypted with 128-bit or 256-bit AES, even when it is the correct password: PDFKit refuses it, and the password sheet reports that the password did not open the document. A 256-bit AES PDF whose password is written in Chinese characters opens, but Search and the page preview on that document can stop with "Could not prepare the document for search", because PDFKit returns no copy of the unlocked document for Search to read.
+
+**Workaround:** Open the PDF with its password in another app, save a copy without a password, and import that copy.
 
 ---
 

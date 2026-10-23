@@ -4,7 +4,7 @@ import CoreGraphics
 @testable import RedactionEngine
 
 // Shared canvas touch harness for `RedactionOverlayView` gesture tests
-// (`RectangleDrawGestureTests`, `SnapToTextBoxTests`).
+// (`RectangleDrawGestureTests`).
 // ONE internal copy — the pair used to live as private
 // duplicates in the two older suites.
 //

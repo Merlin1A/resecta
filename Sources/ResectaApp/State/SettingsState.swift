@@ -45,6 +45,9 @@ class SettingsState {
     /// Guards didSet during init to avoid redundant UserDefaults writes.
     private var isInitializing = true
 
+    /// Stored values of settings that no longer exist, removed on load.
+    static let retiredDefaultsKeys = ["snapToTextEnabled", "successfulExportCount"]
+
     /// The store every preference reads from and writes to. Production uses
     /// `.standard`; a test passes its own suite so parallel suites never
     /// share keys.
@@ -65,30 +68,11 @@ class SettingsState {
                 defaults.set(autoVerify, forKey: "autoVerify") }
     }
 
-    /// Count of successful exports. Used to trigger the App Store review
-    /// prompt on the 3rd successful export. UserDefaults with didSet
-    /// (the property-wrapper alternative is banned inside @Observable).
-    var successfulExportCount: Int = 0 {
-        didSet { guard !isInitializing else { return }
-                defaults.set(successfulExportCount, forKey: "successfulExportCount") }
-    }
-
     /// App-wide pipeline preference read at scan kickoff and export.
     /// `.secureRasterization` is the default fallback.
     var pipelineMode: PipelineMode = .secureRasterization {
         didSet { guard !isInitializing else { return }
                 defaults.set(pipelineMode.rawValue, forKey: "pipelineMode.v2") }
-    }
-
-    /// When true, the rectangle-draw tool snaps the in-progress
-    /// rectangle's edges to nearby OCR text-block edges within
-    /// `snapTolerance = 8 / zoomScale` overlay-space points. Default on;
-    /// opt-out toggle in Settings. Mechanism-description language: the
-    /// assist is designed to align edges
-    /// to OCR text-block boundaries; alignment is best-effort.
-    var snapToTextEnabled: Bool = true {
-        didSet { guard !isInitializing else { return }
-                defaults.set(snapToTextEnabled, forKey: "snapToTextEnabled") }
     }
 
     /// Opt-in paranoid-mode toggle.
@@ -155,7 +139,6 @@ class SettingsState {
         self.fillColor = FillColor(rawValue:
             defaults.string(forKey: "fillColor") ?? "black") ?? .black
         self.autoVerify = defaults.object(forKey: "autoVerify") as? Bool ?? true
-        self.successfulExportCount = defaults.object(forKey: "successfulExportCount") as? Int ?? 0
         let storedMode = defaults.string(forKey: "pipelineMode.v2")
         self.pipelineMode = storedMode
             .flatMap(PipelineMode.init(rawValue:)) ?? .secureRasterization
@@ -165,7 +148,10 @@ class SettingsState {
         // Idempotent removeObject-on-init (nothing writes this key
         // anymore), mirroring `SavedSearchStore.legacyDefaultsKey`.
         defaults.removeObject(forKey: "autoApplyDetections")
-        self.snapToTextEnabled = defaults.object(forKey: "snapToTextEnabled") as? Bool ?? true
+        // The snap-to-text preference and the export counter that timed the
+        // old rating prompt are retired too; their stored values go the
+        // same way.
+        for key in Self.retiredDefaultsKeys { defaults.removeObject(forKey: key) }
         self.paranoidMode = defaults.object(forKey: "paranoidMode") as? Bool ?? false
         let storedAppearance = defaults.string(forKey: "appearancePreference.v1")
         self.appearancePreference = storedAppearance
@@ -181,14 +167,7 @@ class SettingsState {
         exportDPI = 300
         fillColor = .black
         autoVerify = true
-        // successfulExportCount is intentionally NOT reset here. It is a
-        // lifetime metric that gates the StoreKit review prompt (fires once as the
-        // count crosses 2 -> 3), not a user preference. Resetting it re-arms the
-        // prompt after 3 more exports; a Settings "reset to defaults" should not
-        // re-trigger the review request (Apple's OS-side rate limit bounds the
-        // exposure, but the disclosure dialog does not mention re-arming).
         pipelineMode = .secureRasterization
-        snapToTextEnabled = true
         paranoidMode = false
         appearancePreference = .system
         detectionPreset = .balanced
