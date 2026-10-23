@@ -23,13 +23,6 @@ struct PDFDocumentView: UIViewRepresentable {
     /// continues to work whether the toggle is on or off.
     var isMultiSelectActive: Bool
 
-    /// Rectangle-draw snap-to-text-box assist toggle. Propagated to
-    /// every active overlay so the in-progress rectangle drag is
-    /// nudged to align with OCR text-block edges within tolerance.
-    /// Defaults to true; opt-out lives in Settings
-    /// (`SettingsState.snapToTextEnabled`).
-    var snapToTextEnabled: Bool = true
-
     // `shouldRectScroll` and `readabilityTargetScale` — the framing math
     // — live in `CanvasFraming.swift` beside the centring point.
 
@@ -148,10 +141,6 @@ struct PDFDocumentView: UIViewRepresentable {
         )
         // Propagate "Select More" toggle state to overlays.
         coordinator.updateMultiSelectMode(isEditing && isMultiSelectActive)
-        // Propagate snap-to-text-box toggle to overlays so the
-        // rectangle drag handler observes the current Settings value
-        // even when toggled mid-session.
-        coordinator.updateSnapToTextEnabled(snapToTextEnabled)
 
         // Refresh overlays only when regions or selection actually changed
         coordinator.refreshAllOverlaysIfNeeded()

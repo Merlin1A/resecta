@@ -80,17 +80,6 @@ class SettingsState {
                 defaults.set(pipelineMode.rawValue, forKey: "pipelineMode.v2") }
     }
 
-    /// When true, the rectangle-draw tool snaps the in-progress
-    /// rectangle's edges to nearby OCR text-block edges within
-    /// `snapTolerance = 8 / zoomScale` overlay-space points. Default on;
-    /// opt-out toggle in Settings. Mechanism-description language: the
-    /// assist is designed to align edges
-    /// to OCR text-block boundaries; alignment is best-effort.
-    var snapToTextEnabled: Bool = true {
-        didSet { guard !isInitializing else { return }
-                defaults.set(snapToTextEnabled, forKey: "snapToTextEnabled") }
-    }
-
     /// Opt-in paranoid-mode toggle.
     /// Off by default. When on, the app applies two behavior overrides
     /// (numbered #1/#2 at their call sites): pipeline mode is forced to
@@ -165,7 +154,6 @@ class SettingsState {
         // Idempotent removeObject-on-init (nothing writes this key
         // anymore), mirroring `SavedSearchStore.legacyDefaultsKey`.
         defaults.removeObject(forKey: "autoApplyDetections")
-        self.snapToTextEnabled = defaults.object(forKey: "snapToTextEnabled") as? Bool ?? true
         self.paranoidMode = defaults.object(forKey: "paranoidMode") as? Bool ?? false
         let storedAppearance = defaults.string(forKey: "appearancePreference.v1")
         self.appearancePreference = storedAppearance
@@ -188,7 +176,6 @@ class SettingsState {
         // re-trigger the review request (Apple's OS-side rate limit bounds the
         // exposure, but the disclosure dialog does not mention re-arming).
         pipelineMode = .secureRasterization
-        snapToTextEnabled = true
         paranoidMode = false
         appearancePreference = .system
         detectionPreset = .balanced

@@ -174,10 +174,6 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
         overlay.isDrawingMode = isDrawingMode
         overlay.activeShapeTool = activeShapeTool
         overlay.isMultiSelectActive = isMultiSelectActive
-        // Inherit current snap toggle. Without this a page that
-        // first appears mid-session would default-on, ignoring a user
-        // who had already toggled the assist off.
-        overlay.snapToTextEnabled = snapToTextEnabled
 
         let regions = redactionState?.regions[pageIndex] ?? []
         let searchHighlights = redactionState?.activeSearch?.resultsByPage[pageIndex] ?? []
@@ -413,17 +409,6 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
         activeShapeTool = tool
         for (_, overlay) in activeOverlays {
             overlay.activeShapeTool = tool
-        }
-    }
-
-    /// Snap-to-text-box toggle propagated from Settings. Stored
-    /// so newly-attached overlays inherit the current value, and pushed
-    /// into all active overlays whenever the user flips the toggle.
-    private var snapToTextEnabled: Bool = true
-    func updateSnapToTextEnabled(_ enabled: Bool) {
-        snapToTextEnabled = enabled
-        for (_, overlay) in activeOverlays {
-            overlay.snapToTextEnabled = enabled
         }
     }
 

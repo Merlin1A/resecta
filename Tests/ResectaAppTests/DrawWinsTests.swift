@@ -15,8 +15,8 @@ import Foundation
 //   SCREEN-POINT THRESHOLDS: every finger tolerance is divided
 //   by the live zoom (`fingerScale`), pinned through the
 //   `snapZoomScaleOverride` seam.
-//   The inert "Snap to Text Boxes" Settings toggle is gone;
-//   the machinery stays (`SnapToTextBoxTests`).
+//   The inert "Snap to Text Boxes" Settings toggle and its machinery
+//   are gone.
 //
 // Geometry: a 400×400 overlay, so 1 overlay pt = 0.0025 normalized. The
 // fixture region is the centred 200×200 square (overlay 100…300 × 100…300);
@@ -44,7 +44,6 @@ struct DrawWinsTests {
         )
         overlay.isDrawingMode = drawing
         overlay.activeShapeTool = .rectangle
-        overlay.snapToTextEnabled = false
         overlay.snapZoomScaleOverride = zoom
         let coordinator = RecordingCoordinator()
         overlay.coordinator = coordinator
@@ -272,9 +271,6 @@ struct DrawWinsTests {
     func testSnapToggleRemovedFromSettings() throws {
         let source = try loadRepoFile("Sources/ResectaApp/Views/SettingsView.swift")
         #expect(!source.contains("Snap to Text Boxes"), "the toggle title must not appear")
-        #expect(!source.contains("settingsState.snapToTextEnabled"),
-                "no Settings binding to the dark snap-to-text flag")
-        #expect(source.contains("snap-to-text UI was removed in 1.1.0"), "the revival note stays at the site")
     }
 
     @Test("The editor's Add to Selection toggle exits the Rectangle tool and tool entry clears the toggle (source pin)")

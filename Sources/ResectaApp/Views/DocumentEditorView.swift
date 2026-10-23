@@ -205,8 +205,7 @@ struct DocumentEditorView: View {
                 PDFDocumentView(
                     isDrawingMode: activeTool != nil,
                     activeShapeTool: Self.shapeTool(for: activeTool),
-                    isMultiSelectActive: isMultiSelectActive,
-                    snapToTextEnabled: settingsState.snapToTextEnabled
+                    isMultiSelectActive: isMultiSelectActive
                 )
                     .disabled(documentState.phaseKind != .editing)
                     .blur(radius: documentState.phaseKind != .editing ? 3 : 0,
