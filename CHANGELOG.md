@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ### Changed
 
+- A light haptic on adding or resizing a region.
 - Share: when annotations in the original document — a black box, a stamp, an unapplied redaction mark — cover text that no redaction box covers, the share confirmation names those pages before the file is shared, whatever the verification result. Annotations are not part of the page image, so that text is visible in the exported file. On a scanned page, where the printed text is in the page image, any such annotation that no redaction box covers is named; on a rotated page an annotation is compared with the boxes as the page is shown.
 - The App Store rating prompt asks once per app version, after the first share of a document whose checks passed, instead of after the third export.
 - Share: when annotations in the original document — a black box, a stamp, an unapplied redaction mark — cover text that no redaction box covers, the share confirmation names those pages before the file is shared, whatever the verification result. Annotations are not part of the page image, so that text is visible in the exported file.
@@ -70,6 +71,13 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Document canvas: with a hardware keyboard, Select All then Copy (⌘A, ⌘C) no longer places the document's text on the system pasteboard. The canvas view refuses the copy, cut, paste, select and select-all actions and builds its menu without the edit, look-up, learn and share groups; in 1.2.0 that keyboard path copied the whole document's text with no selection shown.
 ### Fixed
 
+- Dragging a group of regions past the page edge keeps their spacing.
+- A thin selected region keeps a central zone that moves it, and with Add to Selection on a tap on a neighbouring region selects it instead of resizing.
+- Resizing a thin region from a side handle no longer grows its height; dragging a handle past the opposite edge flips the box instead of mirroring it.
+- A resize interrupted by the system restores the region's previous size.
+- Long-pressing a region lifts only that region into the menu preview.
+- A box too small to keep shows a notice saying so, not only a VoiceOver announcement.
+- A handle on the page edge keeps its full touch target.
 - Editor: a different document replacing the open one turns the draw tool and Add to Selection off, so neither carries into the new document.
 - Editor: Delete from a region's long-press menu or its VoiceOver action is its own Undo step, so redoing an earlier apply no longer brings the deleted region back, and the other selected regions stay selected.
 - A document dropped over an open one starts without the previous document's matched text and region notes, as a document opened from the home screen does.
