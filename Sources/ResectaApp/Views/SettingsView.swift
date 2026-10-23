@@ -317,13 +317,6 @@ struct SettingsView: View {
             .pickerStyle(.menu)
             .accessibilityHint("Choose how much evidence is required before a PII item is flagged for review")
 
-            // The snap-to-text UI was removed in 1.1.0: the
-            // assist has no OCR feed in production — revival = wire
-            // `RedactionOverlayView.ocrTextBlockNormalizedRects`, then
-            // restore the snap-to-text Toggle here.
-            // `SettingsState.snapToTextEnabled` and the overlay machinery
-            // stay compiled and tested.
-
             // Always-flag / never-flag custom keyword lists.
             NavigationLink("Custom Terms") {
                 CustomTermsView()

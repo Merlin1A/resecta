@@ -58,6 +58,19 @@ enum ImportPasswordFlow {
     /// documents shows beneath the wrong-password line.
     static func showsCertificateHint(attempts: Int) -> Bool { attempts >= 3 }
 
+    /// Whether a typed password holds a letter outside ASCII (an accented
+    /// Latin letter, for one): the system reader can refuse such a
+    /// password even when it is the right one.
+    static func hasNonASCIILetter(_ password: String) -> Bool {
+        password.unicodeScalars.contains { !$0.isASCII && $0.properties.isAlphabetic }
+    }
+
+    /// The accented-letter hint shows beside the wrong-password line when
+    /// the refused password held a letter outside ASCII.
+    static func showsNonASCIIHint(lastOutcome: LockedImportHold.Outcome, refusedHadNonASCIILetter: Bool) -> Bool {
+        lastOutcome == .wrongPassword && refusedHadNonASCIILetter
+    }
+
     /// The phase Cancel (and the terminal OK) returns to: the same transition
     /// the failed card's primary action derives for a password refusal.
     static func cancelPhase(returnPhase: DocumentState.ReturnPhase) -> DocumentState.Phase {
@@ -80,6 +93,7 @@ enum ImportPasswordFlow {
     static let ok = "OK"
     static let wrongPassword = "That password did not open the document."
     static let certificateHint = "A document protected by a certificate or by another app's protection scheme, rather than a password, does not open in Resecta."
+    static let nonASCIIHint = "A password with accented letters, such as ä or é, may not open this document in Resecta, even when it is correct."
     static let cannotOpen = "The password was accepted, but the document could not be read in full with it, so it was not opened."
 }
 
@@ -93,6 +107,10 @@ struct ImportPasswordSheet: View {
     let isSubmitting: Bool
 
     @State private var password = ""
+    /// Whether the last submitted password held a letter outside ASCII —
+    /// the one fact the accented-letter hint needs; the password itself
+    /// is never kept.
+    @State private var submittedHadNonASCIILetter = false
     @FocusState private var fieldFocused: Bool
 
     private var terminal: Bool { hold.lastOutcome == .cannotOpen }
@@ -140,6 +158,14 @@ struct ImportPasswordSheet: View {
                     .foregroundStyle(ResectaTokens.SemanticColor.failText)
                     .accessibilityAddTraits(.isHeader)
                     .accessibilityIdentifier("importPasswordError")
+                }
+
+                if !terminal, ImportPasswordFlow.showsNonASCIIHint(
+                    lastOutcome: hold.lastOutcome, refusedHadNonASCIILetter: submittedHadNonASCIILetter) {
+                    Text(ImportPasswordFlow.nonASCIIHint)
+                        .font(.footnote)
+                        .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+                        .accessibilityIdentifier("importPasswordNonASCIIHint")
                 }
 
                 if !terminal, ImportPasswordFlow.showsCertificateHint(attempts: hold.attempts) {
@@ -210,6 +236,7 @@ struct ImportPasswordSheet: View {
     private func submit() {
         guard !password.isEmpty, !isSubmitting else { return }
         let typed = password
+        submittedHadNonASCIILetter = ImportPasswordFlow.hasNonASCIILetter(typed)
         password = ""
         onSubmit(typed)
     }
