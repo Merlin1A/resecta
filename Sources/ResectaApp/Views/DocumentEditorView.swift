@@ -46,7 +46,6 @@ struct DocumentEditorView: View {
     @State private var dismissTask: Task<Void, Never>?
 
     // Batch delete confirmation
-    @State private var showBatchDeleteConfirmation = false
 
     // Done confirmation for the verification results screen.
     // Lifted from VerificationActionBar when Done moved into the top-left
@@ -573,30 +572,6 @@ struct DocumentEditorView: View {
                     .presentationCompactAdaptation(.popover)
             }
         }
-        // Batch delete confirmation (mechanism-description language)
-        // Dialog-grammar normalization — sentence-case
-        // question title, bare-verb destructive button.
-        .confirmationDialog(
-            DocumentEditorView.batchDeleteDialogTitle(
-                regionCount: redactionState.selectedRegionIDs.count),
-            isPresented: $showBatchDeleteConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button("Delete", role: .destructive) {
-                deleteSelectedRegions()
-            }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            // Page-span line names how many pages the deletion
-            // spans so the user can reckon scope before confirming.
-            Text(DocumentEditorView.batchDeleteDialogMessage(
-                regionCount: redactionState.selectedRegionIDs.count,
-                pageCount: DocumentEditorView.selectedPageCount(
-                    selectedIDs: redactionState.selectedRegionIDs,
-                    pageLookup: redactionState.pageIndex(for:)
-                )
-            ))
-        }
         // Destructive-action confirmation symmetry for
         // the verification-results Done. Same pattern as the Redact /
         // Delete N Regions / Pre-Export / Override-FAIL dialogs. Copy is
@@ -711,7 +686,7 @@ struct DocumentEditorView: View {
             coordinator: coordinator, horizontalSizeClass: horizontalSizeClass,
             undoManager: undoManager,
             activeTool: $activeTool, isMultiSelectActive: $isMultiSelectActive,
-            showBatchDeleteConfirmation: $showBatchDeleteConfirmation, showSettings: $showSettings,
+            showSettings: $showSettings,
             documentOverride: documentOverride, redactButtonDisabled: redactButtonDisabled,
             redactButtonHint: redactButtonHint, handleHomeTap: handleHomeTap,
             homeButton: AnyView(homeButton), pipelineModePicker: AnyView(pipelineModePicker),
@@ -779,40 +754,6 @@ struct DocumentEditorView: View {
 
     private func deleteSelectedRegions() {
         redactionState.deleteSelected(undoManager: undoManager)
-    }
-
-    // MARK: - Batch delete dialog page-span helpers
-
-    /// Page count spanned by a selection set. Looks each ID up via the
-    /// caller-provided closure so the helper is testable without a full
-    /// RedactionState.
-    static func selectedPageCount(
-        selectedIDs: Set<UUID>,
-        pageLookup: (UUID) -> Int?
-    ) -> Int {
-        Set(selectedIDs.compactMap(pageLookup)).count
-    }
-
-    /// Message body for the batch-delete confirmation dialog. Names the
-    /// page-span so the user reckons scope before confirming. Singulars
-    /// switch to "region" / "page" so the count grammar reads naturally.
-    static func batchDeleteDialogMessage(
-        regionCount: Int,
-        pageCount: Int
-    ) -> String {
-        let regionLabel = regionCount == 1 ? "region" : "regions"
-        let pageLabel = pageCount == 1 ? "page" : "pages"
-        return "Deleting \(regionCount) \(regionLabel) across "
-            + "\(pageCount) \(pageLabel).\n"
-            + "This removes the selected redaction regions. Use Undo to restore them."
-    }
-
-    /// Dialog-grammar normalization — sentence-case
-    /// question title, singular-aware. The destructive button is now
-    /// bare "Delete" (dominant grammar for this dialog family); the
-    /// title alone carries the count.
-    static func batchDeleteDialogTitle(regionCount: Int) -> String {
-        regionCount == 1 ? "Delete 1 region?" : "Delete \(regionCount) regions?"
     }
 
     // MARK: - Drawing-mode caption helpers

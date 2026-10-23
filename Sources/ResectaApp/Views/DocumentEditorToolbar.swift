@@ -19,7 +19,6 @@ struct DocumentEditorToolbar {
     let undoManager: UndoManager?
     @Binding var activeTool: DocumentEditorView.DrawingTool?
     @Binding var isMultiSelectActive: Bool
-    @Binding var showBatchDeleteConfirmation: Bool
     @Binding var showSettings: Bool
     let documentOverride: PipelineMode?
     let redactButtonDisabled: Bool
@@ -259,24 +258,18 @@ struct DocumentEditorToolbar {
     private var deleteButton: some View {
         let count = redactionState.selectedRegionIDs.count
         if count > 0 {
-            Button(deleteButtonLabel, systemImage: "trash") {
-                // Batch delete confirmation for multi-selection
-                if count > 1 {
-                    showBatchDeleteConfirmation = true
-                } else {
-                    deleteSelectedRegions()
-                }
-            }
+            // Deletes at once, any count: one Undo step restores them all.
+            Button(deleteButtonLabel, systemImage: "trash") { deleteSelectedRegions() }
             .tint(.red)
-            .keyboardShortcut(.delete, modifiers: [])
+            // Command-Delete: a bare Delete key belongs to the text field it edits.
+            .keyboardShortcut(.delete, modifiers: [.command])
         }
     }
 
     // "More" menu that bundles batch operations on the active
     // selection. Visible only when `selectedRegionIDs.isEmpty == false`,
     // gated by `batchOpsMenuShouldShow(selectedCount:)`. "Delete Selected"
-    // routes through the existing `showBatchDeleteConfirmation` dialog
-    // so the page-span message applies to this entry too.
+    // deletes at once, like the toolbar's Delete; Undo restores them.
     @ViewBuilder
     private var batchOpsMenu: some View {
         let selectedCount = redactionState.selectedRegionIDs.count
@@ -292,7 +285,7 @@ struct DocumentEditorToolbar {
                     redactionState.selectedRegionIDs = []
                 }
                 Button(role: .destructive) {
-                    showBatchDeleteConfirmation = true
+                    deleteSelectedRegions()
                 } label: {
                     Label("Delete Selected", systemImage: "trash")
                 }

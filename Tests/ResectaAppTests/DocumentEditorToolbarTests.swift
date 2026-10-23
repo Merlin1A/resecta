@@ -16,7 +16,7 @@ struct DocumentEditorToolbarTests {
             documentState: coordinator.documentState, redactionState: coordinator.redactionState,
             coordinator: coordinator, horizontalSizeClass: .compact, undoManager: nil,
             activeTool: .constant(nil), isMultiSelectActive: .constant(false),
-            showBatchDeleteConfirmation: .constant(false), showSettings: .constant(false),
+            showSettings: .constant(false),
             documentOverride: nil, redactButtonDisabled: true, redactButtonHint: "",
             handleHomeTap: {}, homeButton: AnyView(EmptyView()), pipelineModePicker: AnyView(EmptyView()),
             deleteSelectedRegions: {}
@@ -42,7 +42,7 @@ struct DocumentEditorToolbarTests {
             coordinator: coordinator, horizontalSizeClass: .compact, undoManager: nil,
             activeTool: Binding(get: { tool }, set: { tool = $0 }),
             isMultiSelectActive: Binding(get: { addToSelection }, set: { addToSelection = $0 }),
-            showBatchDeleteConfirmation: .constant(false), showSettings: .constant(false),
+            showSettings: .constant(false),
             documentOverride: nil, redactButtonDisabled: true, redactButtonHint: "",
             handleHomeTap: {}, homeButton: AnyView(EmptyView()), pipelineModePicker: AnyView(EmptyView()),
             deleteSelectedRegions: {}
