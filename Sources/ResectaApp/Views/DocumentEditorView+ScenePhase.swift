@@ -34,23 +34,24 @@ extension DocumentEditorView {
         return !outputFileExists
     }
 
-    /// State preamble for the purge re-run action, extracted as a
+    /// State preamble for a re-run from the results, extracted as a
     /// static so the transition is testable without a SwiftUI host (mirrors
-    /// `shouldShowPurgeRerunToast`). The purge toast fires only from `.verified`,
-    /// but `runFullPipeline` guards `canStartPipeline` which requires
-    /// `.editing` — without this round-trip the "Re-run" button silently no-ops
-    /// and strands the user (the output is gone and Share is disabled). The
-    /// `verified -> editing` transition is legal.
-    /// activeSearch is torn down first: the Search & Redact
-    /// sheet mutates `redactionState.regions` and is incompatible with the
-    /// `.redacting` / `.verifying` phases the re-run enters.
+    /// `shouldShowPurgeRerunToast`). `runFullPipeline` starts only when
+    /// `redactRefusal(with:)` returns nil, and it reads `.verified` as busy,
+    /// so the preamble moves `.verified` back to `.editing`; without it the
+    /// purge toast's "Re-run" silently no-ops and strands the user (the
+    /// output is gone and Share is disabled). Any other phase is left as it
+    /// is (`.editing -> .editing` is not a legal transition). A live Search
+    /// session is left for the run's refusal to read; `runFullPipeline`
+    /// tears it down once its guard passes.
     @MainActor
     static func prepareForPurgeRerun(
         documentState: DocumentState,
         redactionState: RedactionState
     ) {
-        redactionState.dismissActiveSearch()
-        documentState.transition(to: .editing)
+        if case .verified = documentState.phase {
+            documentState.transition(to: .editing)
+        }
     }
 }
 

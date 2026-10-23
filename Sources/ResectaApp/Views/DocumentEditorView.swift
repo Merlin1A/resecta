@@ -398,8 +398,8 @@ struct DocumentEditorView: View {
         // highest-precedence active source. The slot sits ABOVE the phase
         // switch, so a live session would ride over every phase;
         // The Apply seam keeps it out of the pipeline phases by tearing the
-        // session down at the Apply seam (`runFullPipeline`)
-        // and on the purge re-run (`prepareForPurgeRerun`).
+        // session down at the Apply seam (`runFullPipeline`), the one funnel
+        // every run goes through, the purge re-run included.
         .sheet(item: Binding<ActiveSheet?>(
             get: {
                 if let searchState = redactionState.activeSearch { return .search(searchState) }
