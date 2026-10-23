@@ -33,6 +33,24 @@ struct DocumentEditorKeyboard: ViewModifier {
     @Environment(\.undoManager) private var undoManager
     @Binding var activeTool: DocumentEditorView.DrawingTool?
     @Binding var isMultiSelectActive: Bool
+    /// The nudge run in progress: its selection and its last key press.
+    @State private var nudgeRun: NudgeRun?
+
+    struct NudgeRun: Equatable {
+        let selection: Set<UUID>
+        let at: Date
+    }
+
+    /// How long after one nudge the next still belongs to its run.
+    static let nudgeRunWindow: TimeInterval = 1.0
+
+    /// A nudge continues the run, and registers no undo step of its own,
+    /// when it moves the same selection within the window: the run's first
+    /// step undoes to where the run began and redoes to where it ended.
+    static func nudgeContinuesRun(previous: NudgeRun?, selection: Set<UUID>, now: Date) -> Bool {
+        guard let previous else { return false }
+        return previous.selection == selection && now.timeIntervalSince(previous.at) < nudgeRunWindow
+    }
 
     func body(content: Content) -> some View {
         content.onKeyPress(phases: .down, action: handleKeyPress)
@@ -119,11 +137,15 @@ struct DocumentEditorKeyboard: ViewModifier {
             return (id: id, newRect: rect)
         }
         guard !moves.isEmpty else { return .ignored }
+        let now = Date()
+        let selection = redactionState.selectedRegionIDs
+        let undo = Self.nudgeContinuesRun(previous: nudgeRun, selection: selection, now: now) ? nil : undoManager
+        nudgeRun = NudgeRun(selection: selection, at: now)
         if moves.count == 1 {
             redactionState.moveRegion(moves[0].id, page: page,
-                                      newRect: moves[0].newRect, undoManager: undoManager)
+                                      newRect: moves[0].newRect, undoManager: undo)
         } else {
-            redactionState.moveRegions(moves, page: page, undoManager: undoManager)
+            redactionState.moveRegions(moves, page: page, undoManager: undo)
         }
         return .handled
     }
