@@ -101,7 +101,7 @@ struct RedactionRegionDisplayTests {
                 break
             }
         }
-        return pii.map { .pii($0) } + [.face, .searchMatch(term: "term")]
+        return pii.map { .pii($0) } + [.searchMatch(term: "term")]
     }()
 
     @Test("RegionMetadata's kind tables mirror DetectionKind+Display for every kind")

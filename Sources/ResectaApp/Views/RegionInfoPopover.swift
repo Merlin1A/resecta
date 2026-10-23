@@ -99,7 +99,6 @@ struct RegionInfoPopover: View {
     private var kindColor: Color {
         switch metadata.piiKind {
         case .pii: ResectaTokens.SemanticColor.badgePII
-        case .face: ResectaTokens.SemanticColor.badgeFace
         case .searchMatch: Color(uiColor: .systemGreen)
         }
     }

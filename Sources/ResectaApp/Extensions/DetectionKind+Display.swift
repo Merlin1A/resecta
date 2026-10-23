@@ -31,7 +31,6 @@ extension DetectionResult.Kind {
             case .licensePlate: "LP"
             case .other: "PII"
             }
-        case .face: "Face"
         case .searchMatch: "Find"
         }
     }
@@ -61,7 +60,6 @@ extension DetectionResult.Kind {
             case .licensePlate: "License Plate"
             case .other: "Personal Information"
             }
-        case .face: "Detected Face"
         case .searchMatch: "Search Match"
         }
     }
