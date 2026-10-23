@@ -177,6 +177,119 @@ nonisolated final class UXFixesUITests: XCTestCase {
         XCTAssertTrue(dismiss.exists, "Cancel keeps the sheet up.")
     }
 
+    // MARK: - The editor's chrome
+
+    /// Two selected regions → "Delete 2 Regions" deletes both at once, with
+    /// no confirmation anywhere in the tree, and ONE Undo brings both back.
+    func testDeletingTwoSelectedRegionsIsImmediateAndOneUndo() {
+        launchSampleInEditor()
+        enterDrawMode()
+        drag(from: CGVector(dx: 0.25, dy: 0.45), to: CGVector(dx: 0.50, dy: 0.55))
+        XCTAssertTrue(waitForRegionCount(1), "The first box never drew; page bar read \(currentRegionCount()).")
+        drag(from: CGVector(dx: 0.55, dy: 0.28), to: CGVector(dx: 0.80, dy: 0.40))
+        XCTAssertTrue(waitForRegionCount(2), "The second box never drew; page bar read \(currentRegionCount()).")
+        leaveDrawMode()
+
+        openOverflowAndTap(label: "Select Regions", identifier: "Select Regions")
+        let selectAll = app.buttons["Select All on Page"].firstMatch
+        XCTAssertTrue(selectAll.waitForExistence(timeout: 5), "Select All on Page never appeared.")
+        selectAll.tap()
+        openOverflowAndTap(label: "Delete 2 Regions", identifier: "Delete 2 Regions")
+
+        XCTAssertTrue(
+            waitForRegionCount(0),
+            "Delete 2 Regions must delete both at once; page bar read \(currentRegionCount())."
+        )
+        XCTAssertFalse(app.staticTexts["Delete 2 regions?"].exists, "No confirmation may stand between the tap and the delete.")
+        XCTAssertFalse(app.alerts.firstMatch.exists, "No alert in the tree.")
+        XCTAssertFalse(app.sheets.firstMatch.exists, "No action sheet in the tree.")
+        attachScreenshot(named: "ux-delete-two-immediate")
+
+        tapUndo()
+        XCTAssertTrue(
+            waitForRegionCount(2),
+            "One Undo must bring both regions back; page bar read \(currentRegionCount())."
+        )
+    }
+
+    /// With the Search sheet parked, Settings opens, and closing it brings
+    /// the parked strip back.
+    func testSettingsOverTheParkedSheetBringsTheStripBack() {
+        app.launchArguments = [
+            "--uitesting", "--loadTestDocument", "--multipageDoc",
+            "--openSearchSheet", "--searchDetent=compact",
+        ]
+        app.launch()
+        XCTAssertTrue(compactFloatStrip.waitForExistence(timeout: 30), "The sheet never parked at the compact float.")
+
+        openSettingsFromEditor()
+        let heading = app.navigationBars["Settings"]
+        XCTAssertTrue(heading.waitForExistence(timeout: 10), "Settings must open over the parked Search sheet.")
+        attachScreenshot(named: "ux-settings-over-parked-sheet")
+        heading.buttons["Done"].tap()
+        XCTAssertTrue(heading.waitForNonExistence(timeout: 10), "Done must close Settings.")
+        XCTAssertTrue(compactFloatStrip.waitForExistence(timeout: 10), "Closing Settings must bring the parked strip back.")
+    }
+
+    /// A session closed while parked does not leave the next Search session
+    /// parked: the new one opens at medium.
+    func testNewSearchSessionOpensAtMediumAfterAParkedClose() throws {
+        app.launchArguments = ["--uitesting", "--loadTestDocument", "--multipageDoc", "--openSearchSheet"]
+        app.launch()
+        let dismiss = app.buttons["searchDismissButton"]
+        XCTAssertTrue(dismiss.waitForExistence(timeout: 30), "The sheet never presented under --openSearchSheet.")
+
+        for _ in 0..<2 where !compactFloatStrip.exists {
+            window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+                .press(forDuration: 0.1, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.97)))
+            sleep(2)
+        }
+        XCTAssertTrue(compactFloatStrip.waitForExistence(timeout: 10), "The sheet did not park at the compact float.")
+
+        compactFloatStrip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .press(forDuration: 0.1, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 1.0)))
+        guard compactFloatStrip.waitForNonExistence(timeout: 10) else {
+            throw XCTSkip("The parked sheet did not swipe away on this simulator; the reopen leg moves to the probe sim's hand pass.")
+        }
+
+        let search = app.buttons["searchRedact"]
+        XCTAssertTrue(waitForEnabled(search, timeout: 10), "Search never re-enabled after the sheet closed.")
+        search.tap()
+        XCTAssertTrue(dismiss.waitForExistence(timeout: 10), "A new Search session must open at the medium height, not parked.")
+        XCTAssertFalse(compactFloatStrip.exists, "The new session must not open parked.")
+        attachScreenshot(named: "ux-new-search-at-medium")
+    }
+
+    /// Add to Selection turned on over a page with a region turns off when
+    /// the page in view has none: a visible exit, not a silent mode.
+    func testAddToSelectionTurnsOffOnAnEmptyPage() {
+        app.launchArguments = ["--uitesting", "--loadTestDocument", "--multipageDoc"]
+        app.launch()
+        XCTAssertTrue(app.buttons["drawTool"].waitForExistence(timeout: 30), "The editor never appeared.")
+        enterDrawMode()
+        drag(from: CGVector(dx: 0.25, dy: 0.45), to: CGVector(dx: 0.50, dy: 0.55))
+        XCTAssertTrue(waitForRegionCount(1), "The box never drew on page 1; page bar read \(currentRegionCount()).")
+
+        openOverflowAndTap(label: "Add to Selection", identifier: "selectMoreToggle")
+        XCTAssertEqual(addToSelectionRow(), .on, "precondition: Add to Selection reads On over page 1")
+
+        let next = app.buttons["pageNavNext"]
+        XCTAssertTrue(next.waitForExistence(timeout: 10) && next.isHittable, "The page bar's next control is not reachable.")
+        next.tap()
+        XCTAssertTrue(waitForRegionCount(0), "Page 2 must hold no region.")
+
+        // The row may hide on a page with no region: read it there when it
+        // is served, else back on page 1. Either way it must read Off.
+        var row = addToSelectionRow()
+        if row == .absent {
+            app.buttons["pageNavPrevious"].tap()
+            XCTAssertTrue(waitForRegionCount(1), "Back on page 1 the box must show again.")
+            row = addToSelectionRow()
+        }
+        XCTAssertEqual(row, .off, "Add to Selection must turn off on a page with no region.")
+        attachScreenshot(named: "ux-add-to-selection-off-on-empty-page")
+    }
+
 }
 
 // MARK: - Editor driving
@@ -257,6 +370,102 @@ private extension UXFixesUITests {
             withVelocity: .slow,
             thenHoldForDuration: 0.2
         )
+    }
+
+    nonisolated var compactFloatStrip: XCUIElement {
+        app.descendants(matching: .any).matching(identifier: "compactFloatStrip").firstMatch
+    }
+
+    nonisolated func leaveDrawMode() {
+        let tool = app.buttons["drawTool"]
+        for _ in 0..<3 {
+            tool.tap()
+            if waitForToolValue("Tap to enter drawing mode", timeout: 6) { return }
+        }
+        XCTFail("The Rectangle tool did not leave drawing mode after three taps.")
+    }
+
+    /// One finger between two window-normalized points.
+    nonisolated func drag(from start: CGVector, to end: CGVector) {
+        window.coordinate(withNormalizedOffset: start)
+            .press(forDuration: 0.05, thenDragTo: window.coordinate(withNormalizedOffset: end))
+    }
+
+    nonisolated func waitForRegionCount(_ count: Int, timeout: TimeInterval = 8) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if currentRegionCount() == count { return true }
+            usleep(250_000)
+        }
+        return currentRegionCount() == count
+    }
+
+    nonisolated func waitForEnabled(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if element.exists, element.isEnabled { return true }
+            usleep(250_000)
+        }
+        return element.exists && element.isEnabled
+    }
+
+    /// Open the "…" menu and tap an item: label first (identifiers do not
+    /// reliably reach the system menu), identifier second.
+    nonisolated func openOverflowAndTap(label: String, identifier: String) {
+        let overflow = app.buttons["OverflowBarButtonItem"]
+        XCTAssertTrue(overflow.waitForExistence(timeout: 10), "Toolbar overflow button never appeared.")
+        overflow.tap()
+        let byLabel = app.buttons[label].firstMatch
+        if byLabel.waitForExistence(timeout: 5) {
+            byLabel.tap()
+            return
+        }
+        let byIdentifier = app.buttons[identifier].firstMatch
+        XCTAssertTrue(
+            byIdentifier.waitForExistence(timeout: 5),
+            "\(label) never appeared in the overflow menu (neither the label nor \(identifier) resolved)."
+        )
+        byIdentifier.tap()
+    }
+
+    /// Undo on the trailing bar, or through the overflow where the bar folds.
+    nonisolated func tapUndo() {
+        let undo = app.buttons["Undo"].firstMatch
+        if undo.waitForExistence(timeout: 5), undo.isHittable {
+            undo.tap()
+            return
+        }
+        openOverflowAndTap(label: "Undo", identifier: "Undo")
+    }
+
+    /// The gear on the trailing bar, or Settings through the overflow.
+    nonisolated func openSettingsFromEditor() {
+        let gear = app.buttons["settings-button"].firstMatch
+        if gear.waitForExistence(timeout: 5), gear.isHittable {
+            gear.tap()
+            return
+        }
+        openOverflowAndTap(label: "Settings", identifier: "settings-button")
+    }
+
+    nonisolated enum AddToSelectionRow {
+        case on, off, absent
+    }
+
+    /// Open the overflow, read the Add to Selection row, close the menu.
+    nonisolated func addToSelectionRow() -> AddToSelectionRow {
+        let overflow = app.buttons["OverflowBarButtonItem"]
+        XCTAssertTrue(overflow.waitForExistence(timeout: 10), "Toolbar overflow button never appeared.")
+        overflow.tap()
+        defer { window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.08)).tap() }
+        let byIdentifier = app.descendants(matching: .any).matching(identifier: "selectMoreToggle").firstMatch
+        let byLabel = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH 'Add to Selection'"))
+            .firstMatch
+        let row = byIdentifier.waitForExistence(timeout: 3) ? byIdentifier : byLabel
+        guard row.waitForExistence(timeout: 2) else { return .absent }
+        let value = (row.value as? String) ?? ""
+        return value.hasPrefix("On") || value == "1" || row.isSelected ? .on : .off
     }
 
     /// The page bar's region count for the current page — 0 when it shows none.
