@@ -29,7 +29,7 @@ class RedactionOverlayView: UIView {
     /// selection rather than replacing the selection. iPhone parity for
     /// the iPad Shift+tap path — both routes converge on
     /// `coordinator?.toggleRegionSelection(_:)`.
-    var isMultiSelectActive: Bool = false
+    var isMultiSelectActive: Bool = false { didSet { setNeedsDisplay() } }  // the handles show only while off
 
     var regions: [RedactionRegion] = []
     var selectedIDs: Set<UUID> = []
@@ -80,7 +80,7 @@ class RedactionOverlayView: UIView {
     /// True during active touch-drag operations. When true,
     /// configure(with:selectedID:) is a no-op to prevent mid-drag
     /// state reset from updateUIView.
-    private(set) var isActivelyDragging: Bool = false
+    var isActivelyDragging: Bool = false
 
     // MARK: - Move State
 
@@ -88,9 +88,11 @@ class RedactionOverlayView: UIView {
     var isDraggingExistingRegion: Bool = false
     /// Offset from touch point to the region's overlay-space origin, preserving
     /// the grab point so the region doesn't jump to center on the finger.
-    private var dragOffset: CGSize = .zero
+    var dragOffset: CGSize = .zero
     /// Normalized rect captured before a move begins, for cancel restoration.
-    private var preDragNormalizedRect: CGRect?
+    var preDragNormalizedRect: CGRect?
+    /// Normalized rect captured when a resize begins: the drag's anchor and the cancel's restore.
+    var preResizeNormalizedRect: CGRect?
     /// Primary touch reference recorded at touchesBegan. Secondary
     /// touches (e.g., a finger landing during a Pencil drag) are ignored
     /// while a gesture is in flight to prevent corruption of
@@ -106,11 +108,11 @@ class RedactionOverlayView: UIView {
     /// context menu duration — feels more responsive on iPad.
     private static let longPressDuration: TimeInterval = 0.35
     /// True when dragging multiple selected regions as a group.
-    private var isGroupMoving: Bool = false
+    var isGroupMoving: Bool = false
     /// Pre-drag normalized rects for all regions in the group move, for cancel restoration.
-    private var preDragGroupRects: [UUID: CGRect] = [:]
+    var preDragGroupRects: [UUID: CGRect] = [:]
     /// Touch start point for computing group move delta.
-    private var groupMoveStart: CGPoint?
+    var groupMoveStart: CGPoint?
 
     // MARK: - Snap State
 
@@ -160,11 +162,11 @@ class RedactionOverlayView: UIView {
     // (which prevents drag start); this rejects valid drags that produce too-small regions.
     static let minimumCommittedRegionSize: CGFloat = 20.0
 
-    // VoiceOver announcement when the committed rect falls below
-    // `minimumCommittedRegionSize` on either axis. Names the 20pt floor so the
-    // listener can target the dimension. Pinned by CanvasPolishBundleTests.
+    // The notice when the committed rect falls below
+    // `minimumCommittedRegionSize` on either axis: on screen and spoken. It
+    // names the remedy, not the floor, since the floor is in screen points.
     static let subThresholdRejectionAnnouncement =
-        "Region too small. Minimum is 20 by 20 points."
+        "Region too small. Zoom in to draw a smaller region."
 
     // Polish helpers + adaptive-stroke constants live in
     // the sibling extension file `RedactionOverlayView+CanvasPolish.swift`:
@@ -242,7 +244,7 @@ class RedactionOverlayView: UIView {
     }()
 
     /// Haptic for move commit ("stamp placed" metaphor).
-    private lazy var moveCommitFeedback: UIImpactFeedbackGenerator = {
+    lazy var moveCommitFeedback: UIImpactFeedbackGenerator = {
         let gen = UIImpactFeedbackGenerator(style: .medium)
         gen.prepare()
         return gen
@@ -433,6 +435,7 @@ class RedactionOverlayView: UIView {
         // Priority 1: Resize handle of selected region
         if let handle = hitTestResizeHandle(at: point) {
             activeResizeHandle = handle
+            preResizeNormalizedRect = selectedID.flatMap { id in regions.first { $0.id == id }?.normalizedRect }
             isActivelyDragging = true
             return
         }
@@ -516,19 +519,6 @@ class RedactionOverlayView: UIView {
 
     // MARK: - Move Helpers
 
-    /// Begin a move drag on an already-selected region.
-    private func beginMove(for region: RedactionRegion, at point: CGPoint) {
-        let viewRect = pdfNormalizedToOverlay(region.normalizedRect)
-        dragOffset = CGSize(
-            width: point.x - viewRect.origin.x,
-            height: point.y - viewRect.origin.y
-        )
-        preDragNormalizedRect = region.normalizedRect
-        isDraggingExistingRegion = true
-        isActivelyDragging = true
-        moveCommitFeedback.prepare()
-    }
-
     /// Long-press timer fired — select the region and begin move.
     private func longPressTimerFired() {
         guard let candidateID = longPressCandidateID,
@@ -541,35 +531,6 @@ class RedactionOverlayView: UIView {
         coordinator?.selectRegion(candidateID)
         beginMove(for: region, at: origin)
         setNeedsDisplay()
-    }
-
-    /// Begin a group move of all selected regions.
-    private func beginGroupMove(at point: CGPoint) {
-        preDragGroupRects = [:]
-        for region in regions where selectedIDs.contains(region.id) {
-            preDragGroupRects[region.id] = region.normalizedRect
-        }
-        groupMoveStart = point
-        isGroupMoving = true
-        isActivelyDragging = true
-        moveCommitFeedback.prepare()
-    }
-
-    /// Update all selected regions' positions during a group move.
-    private func updateGroupMove(to point: CGPoint) {
-        guard let start = groupMoveStart else { return }
-        let dx = point.x - start.x
-        let dy = point.y - start.y
-
-        for i in regions.indices where selectedIDs.contains(regions[i].id) {
-            guard let originalNorm = preDragGroupRects[regions[i].id] else { continue }
-            let originalOverlay = pdfNormalizedToOverlay(originalNorm)
-            var moved = originalOverlay.offsetBy(dx: dx, dy: dy)
-            // Clamp to overlay bounds
-            moved.origin.x = max(0, min(moved.origin.x, bounds.width - moved.width))
-            moved.origin.y = max(0, min(moved.origin.y, bounds.height - moved.height))
-            regions[i].normalizedRect = overlayToPDFNormalized(moved)
-        }
     }
 
     private func cancelLongPress() {
@@ -663,40 +624,6 @@ class RedactionOverlayView: UIView {
         }
     }
 
-    /// Update the selected region's position during a move drag.
-    private func updateSelectedRegionForMove(to point: CGPoint) {
-        guard let selectedID,
-              let idx = regions.firstIndex(where: { $0.id == selectedID })
-        else { return }
-
-        // Capture old rect for dirty-region invalidation
-        let oldOverlayRect = pdfNormalizedToOverlay(regions[idx].normalizedRect)
-        let regionSize = oldOverlayRect.size
-
-        // Clamp the touch into overlay bounds first, then
-        // derive the region origin from (clamped touch) - dragOffset.
-        // Keeps the grab point under the finger up to the overlay edge
-        // and handles the region-bigger-than-overlay edge case at one site.
-        let newOrigin = Self.clampedDragOrigin(
-            touchPoint: point,
-            dragOffset: dragOffset,
-            regionSize: regionSize,
-            overlaySize: bounds.size
-        )
-
-        var newRect = CGRect(origin: newOrigin, size: regionSize)
-
-        // Apply snap guides during move
-        newRect = snapEngine.applySnapping(to: newRect, excluding: selectedID, in: snapPage)
-
-        regions[idx].normalizedRect = overlayToPDFNormalized(newRect)
-
-        // Dirty-rect optimization: only invalidate old + new rect area (+ margin for shadow/handles)
-        let margin: CGFloat = 20
-        let dirtyRect = oldOverlayRect.union(newRect).insetBy(dx: -margin, dy: -margin)
-        setNeedsDisplay(dirtyRect)
-    }
-
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
         // A secondary finger's lift must not end — or reset — the primary's
         // gesture. Checked BEFORE the defer on purpose.
@@ -748,6 +675,7 @@ class RedactionOverlayView: UIView {
         // Commit resize
         if activeResizeHandle != nil, let id = selectedID,
            let region = regions.first(where: { $0.id == id }) {
+            moveCommitFeedback.impactOccurred(intensity: 0.4)  // a light tick: the resize landed
             coordinator?.commitResize(id, page: pageIndex,
                                       newRect: region.normalizedRect,
                                       undoManager: window?.undoManager)
@@ -771,6 +699,7 @@ class RedactionOverlayView: UIView {
             normalizedRect: normalizedRect,
             source: .manual
         )
+        moveCommitFeedback.impactOccurred(intensity: 0.4)  // a light tick: the box landed
         coordinator?.addRegion(region, page: pageIndex, undoManager: window?.undoManager)
         // VoiceOver announcement on region commit
         UIAccessibility.post(notification: .announcement, argument: "Region added")
@@ -792,10 +721,10 @@ class RedactionOverlayView: UIView {
            let idx = regions.firstIndex(where: { $0.id == selectedID }) {
             // Restore pre-move position
             regions[idx].normalizedRect = preDragNormalizedRect
-        }
-        if activeResizeHandle != nil {
-            // Undo the in-progress resize by re-configuring from state
-            coordinator?.refreshOverlay(for: pageIndex)
+        } else if activeResizeHandle != nil, let preResizeNormalizedRect, let selectedID,
+                  let idx = regions.firstIndex(where: { $0.id == selectedID }) {
+            // Restore the pre-resize rect (nothing was committed)
+            regions[idx].normalizedRect = preResizeNormalizedRect
         }
         resetDragState()
         setNeedsDisplay()
@@ -814,6 +743,7 @@ class RedactionOverlayView: UIView {
         isDraggingExistingRegion = false
         dragOffset = .zero
         preDragNormalizedRect = nil
+        preResizeNormalizedRect = nil
         cancelLongPress()
         // Group move cleanup
         isGroupMoving = false
@@ -834,12 +764,13 @@ class RedactionOverlayView: UIView {
     private func rejectSubThresholdRegion(_ rect: CGRect) {
         rejectionFeedback.impactOccurred(intensity: 0.3)
 
-        // VoiceOver announcement. Mechanism-description string
-        // names the 20pt floor so the user knows what dimension to target.
-        UIAccessibility.post(
-            notification: .announcement,
-            argument: RedactionOverlayView.subThresholdRejectionAnnouncement
-        )
+        // The notice on screen (a toast VoiceOver also reads); the spoken
+        // announcement alone when no toast queue is attached.
+        if coordinator?.noteRegionTooSmall() != true {
+            UIAccessibility.post(
+                notification: .announcement,
+                argument: RedactionOverlayView.subThresholdRejectionAnnouncement)
+        }
 
         // Visual: create a temporary view that shrinks to center and fades out
         let rejectView = UIView(frame: rect)

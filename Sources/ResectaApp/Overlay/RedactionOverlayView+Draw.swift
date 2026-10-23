@@ -87,7 +87,7 @@ extension RedactionOverlayView {
             }
 
             // Resize handles for selected region (suppressed during move)
-            if isSelected && !isBeingMoved {
+            if isSelected && !isBeingMoved && resizeHandlesActive {
                 drawResizeHandles(ctx: ctx, rect: drawRect)
             }
         }

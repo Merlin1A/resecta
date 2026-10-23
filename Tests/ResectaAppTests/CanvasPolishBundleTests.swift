@@ -13,24 +13,26 @@ struct CanvasPolishBundleTests {
 
     // MARK: - Sub-threshold VoiceOver string
 
-    @Test("Sub-threshold rejection VoiceOver names the 20pt floor")
-    func subThresholdAnnouncementNamesTheFloor() {
-        // Mechanism-description string: tells the listener what the
-        // minimum dimension is so the next attempt can target it. The
-        // prior copy ("Draw a larger area.") left the threshold implicit.
+    @Test("Sub-threshold rejection names the remedy, not the floor")
+    func subThresholdAnnouncementNamesTheRemedy() {
+        // The floor is in screen points, so a number in the copy is wrong
+        // at any zoom but 1×; the copy says what to do instead.
         #expect(
             RedactionOverlayView.subThresholdRejectionAnnouncement
-            == "Region too small. Minimum is 20 by 20 points."
+            == "Region too small. Zoom in to draw a smaller region."
         )
+        #expect(RedactionOverlayView.subThresholdRejectionAnnouncement
+            .range(of: #"\d"#, options: .regularExpression) == nil)
     }
 
-    @Test("Announcement string is in lock-step with the 20pt constant")
-    func announcementMatchesMinimumConstant() {
-        // If the floor moves, the announcement must move with it. The
-        // numeric `20` in the string is hard-coded today; this test
-        // surfaces the coupling so a future bump renames both at once.
-        #expect(RedactionOverlayView.minimumCommittedRegionSize == 20.0)
-        #expect(RedactionOverlayView.subThresholdRejectionAnnouncement.contains("20"))
+    @Test("The too-small notice reaches the toast queue through the coordinator")
+    func tooSmallNoticeGoesThroughTheCoordinator() {
+        let coordinator = PDFViewCoordinator()
+        #expect(coordinator.noteRegionTooSmall() == false, "no queue attached: the overlay speaks it")
+        let toasts = ToastQueueManager()
+        coordinator.toastManager = toasts
+        #expect(coordinator.noteRegionTooSmall())
+        #expect(toasts.activeToasts.map(\.message) == [RedactionOverlayView.subThresholdRejectionAnnouncement])
     }
 
     // MARK: - Batch-delete dialog page-span

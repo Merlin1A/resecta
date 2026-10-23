@@ -301,6 +301,15 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
         }
     }
 
+    /// Post the too-small draw's notice as a toast. False when no toast
+    /// queue is attached, so the overlay speaks it instead.
+    @discardableResult
+    func noteRegionTooSmall() -> Bool {
+        guard let toastManager else { return false }
+        toastManager.enqueue(RedactionOverlayView.subThresholdRejectionAnnouncement, severity: .info)
+        return true
+    }
+
     /// Delete a specific region by ID: the long-press menu's Delete and
     /// the VoiceOver custom action. It registers on the window's undo
     /// manager, the one the canvas gestures use, so the delete is its own
