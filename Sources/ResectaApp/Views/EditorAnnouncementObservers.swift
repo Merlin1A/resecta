@@ -16,6 +16,15 @@ struct EditorAnnouncementObservers: ViewModifier {
     @State private var showHoverPopover = false
     @State private var hoveredMetadata: RegionMetadata?
 
+    /// The spoken line after Undo or Redo: the step's name with the page it
+    /// changed, or with the number of pages for a step across pages.
+    static func undoRedoAnnouncement(_ step: RedactionState.UndoRedoStep, pageCount: Int) -> String {
+        guard step.pages.count == 1, let page = step.pages.first else {
+            return "\(step.name), on \(step.pages.count) pages"
+        }
+        return "\(step.name), page \(page + 1) of \(pageCount)"
+    }
+
     /// The nearby-match nudge's toast and its action.
     static let nudgeToastMessage = "1 match nearby. Mark it too?"
     static let nudgeToastActionLabel = "Mark"
@@ -57,12 +66,12 @@ struct EditorAnnouncementObservers: ViewModifier {
                     newCount: new.selected, regionsRemoved: new.regions < old.regions)).post()
             }
             // After Undo or Redo, show the first page the step changed and
-            // say which page it is.
-            .onChange(of: redactionState.lastUndoRedoPages) { _, pages in
-                guard let page = pages.min(), documentState.phaseKind == .editing else { return }
+            // name the step with its page.
+            .onChange(of: redactionState.lastUndoRedo) { _, step in
+                guard let step, let page = step.pages.min(), documentState.phaseKind == .editing else { return }
                 if page != documentState.currentPageIndex { documentState.currentPageIndex = page }
                 AccessibilityNotification.Announcement(
-                    "Page \(page + 1) of \(documentState.pageCount)").post()
+                    Self.undoRedoAnnouncement(step, pageCount: documentState.pageCount)).post()
             }
             // iPad hover popover — observe hoveredRegionID on RedactionState
             .onChange(of: redactionState.hoveredRegionID) { _, newID in

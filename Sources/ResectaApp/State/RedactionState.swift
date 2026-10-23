@@ -1028,11 +1028,12 @@ class RedactionState {
 
     // MARK: - Undo Helper state (`RedactionState+UndoHelper.swift`)
 
-    /// The pages the last Undo or Redo step changed. A step that
-    /// registers once per page (a delete across pages) unions them: the
-    /// first record of a step opens it, and the next main-actor turn
+    /// The last Undo or Redo step: the pages it changed, its name and a
+    /// serial, so a repeat on the same page is a change too. A step that
+    /// registers once per page (a delete across pages) unions its pages:
+    /// the first record of a step opens it, and the next main-actor turn
     /// closes it.
-    var lastUndoRedoPages: Set<Int> = []
+    var lastUndoRedo: UndoRedoStep?
     @ObservationIgnored var undoRedoStepOpen = false
 }
 

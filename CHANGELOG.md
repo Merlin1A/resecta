@@ -85,7 +85,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - VoiceOver announces region deletes.
 - A new Search or Scan session opens at the medium height, whatever height the last session ended at.
 - Add to Selection turns off on Esc and when the page has no regions; the overflow row shows its on/off state.
-- Undo and Redo show the page they change.
+- Undo and Redo show the page they change, and VoiceOver names the step with its page.
 - The region hover popover no longer opens while the Search sheet is up.
 - A Search or Scan that stops at the 1,000-result cap now shows the cap banner and the unscanned page count on the run that reached it.
 - A match skipped as already covered no longer reads "Applied" after the covering region is deleted or undone.
