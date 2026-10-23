@@ -46,13 +46,33 @@ extension DocumentEditorView {
     /// re-armed as for a cancelled share, since nothing was sent. Returns
     /// false, doing nothing, once the export has already left `.exporting`.
     @discardableResult
-    static func abandonShare(copy: URL, report: VerificationReport, documentState: DocumentState) -> Bool {
+    static func abandonShare(
+        copy: URL, report: VerificationReport, attempt: UUID, documentState: DocumentState
+    ) -> Bool {
         guard documentState.phaseKind == .exporting else { return false }
+        return finishShare(
+            completed: false, copy: copy, report: report, attempt: attempt,
+            documentState: documentState, announceShared: {}, recordSuccessfulExport: {})
+    }
+
+    /// End share `attempt`: delete its copy, return to the results with its
+    /// report, then re-arm or announce (`handleShareSheetCompletion`). The
+    /// share sheet's completion and `abandonShare` both end here.
+    @discardableResult
+    static func finishShare(
+        completed: Bool, copy: URL, report: VerificationReport, attempt: UUID,
+        documentState: DocumentState,
+        announceShared: () -> Void, recordSuccessfulExport: () -> Void
+    ) -> Bool {
+        documentState.liveShareAttempt = nil
         try? FileManager.default.removeItem(at: copy)
         documentState.transition(to: .verified(report: report))
+        // Order matters: the transition above restores the report onto
+        // `.verified` FIRST, then re-arm/announce reads or mutates that
+        // live phase.
         handleShareSheetCompletion(
-            completed: false, documentState: documentState,
-            announceShared: {}, recordSuccessfulExport: {})
+            completed: completed, documentState: documentState,
+            announceShared: announceShared, recordSuccessfulExport: recordSuccessfulExport)
         return true
     }
 
@@ -210,17 +230,14 @@ struct DocumentEditorExportFlow {
             applicationActivities: nil
         )
 
-        // Capture report for return transition
+        // Capture report for return transition, and this share's token.
         let currentReport = report
+        let attempt = UUID()
+        documentState.liveShareAttempt = attempt
         activityVC.completionWithItemsHandler = { _, completed, _, _ in
-            try? FileManager.default.removeItem(at: exportURL)
-            documentState.transition(to: .verified(report: currentReport))
-            // Order matters: the transition above restores the
-            // captured report onto `.verified` FIRST, then re-arm/announce
-            // reads or mutates that live phase.
-            DocumentEditorView.handleShareSheetCompletion(
-                completed: completed,
-                documentState: documentState,
+            DocumentEditorView.finishShare(
+                completed: completed, copy: exportURL, report: currentReport,
+                attempt: attempt, documentState: documentState,
                 announceShared: {
                     toastManager.enqueue(
                         DocumentEditorView.sharedAcknowledgmentToast,
@@ -242,7 +259,7 @@ struct DocumentEditorExportFlow {
         // report share paths.
         let abandon: @MainActor () -> Void = {
             if DocumentEditorView.abandonShare(
-                copy: exportURL, report: currentReport, documentState: documentState) {
+                copy: exportURL, report: currentReport, attempt: attempt, documentState: documentState) {
                 toastManager.enqueue(DocumentEditorView.shareSheetUnavailableMessage, severity: .warning)
             }
         }
@@ -262,9 +279,11 @@ struct DocumentEditorExportFlow {
     /// The exporting card's Cancel: give up on the share in flight.
     func cancelExport() {
         guard let report = exportingReport,
+              let attempt = documentState.liveShareAttempt,
               let copy = try? coordinator.tempExportDirectory.childURL(
                 named: DocumentEditorView.shareCopyFileName)
         else { return }
-        DocumentEditorView.abandonShare(copy: copy, report: report, documentState: documentState)
+        DocumentEditorView.abandonShare(
+            copy: copy, report: report, attempt: attempt, documentState: documentState)
     }
 }
