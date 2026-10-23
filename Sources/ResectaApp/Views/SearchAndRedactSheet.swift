@@ -925,36 +925,6 @@ struct SearchAndRedactSheet: View {
         searchState.setLivePreviewRects(rects)
     }
 
-    // MARK: - Dismiss (conditional dismiss)
-
-    /// Dismiss-confirmation copy — the single source of truth for both
-    /// the production `.confirmationDialog` and the copy-pin banned-word
-    /// sweep (`SearchSheetDismissRuleTests`), so a copy rename can't
-    /// drift past the sweep. Covers both result origins; the message
-    /// names the concrete loss — selected matches that will not be
-    /// applied — rather than a generic "not saved".
-    static let dismissTitle = "Discard selections?"
-    static let dismissMessage = "Selected matches will not be applied to the document."
-
-    /// Shared dismiss path for the direct (untouched) and confirmed
-    /// (touched) routes: a live selection is deselected in-place.
-    /// `afterConfirmation` suppresses the loss-naming toasts — the
-    /// dialog already named the drop, and dialog + toast on one dismiss
-    /// would double-message.
-    func performDismiss(afterConfirmation: Bool) {
-        if searchState.selectedCount > 0 {
-            let snapshot = Self.currentSelectionSnapshot(in: searchState)
-            Self.clearSelection(in: searchState, snapshot: snapshot)
-        } else if !afterConfirmation,
-                  let message = Self.dismissClearedMessage(for: searchState) {
-            // A 0-selected dismissal names what the close drops when
-            // unapplied matches exist so the loss isn't silent. The
-            // toast manager outlives the sheet.
-            toastManager.enqueue(message, severity: .info)
-        }
-        redactionState.activeSearch = nil
-    }
-
     // MARK: - the unified degrade rule Degrade banner
 
     /// Unified degrade-banner rule: Scan always surfaces a degraded
