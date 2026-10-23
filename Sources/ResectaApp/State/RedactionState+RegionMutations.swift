@@ -230,7 +230,8 @@ extension RedactionState {
 
     /// Duplicate a region with a small offset. The copy is manual-sourced.
     /// Routes through `addRegion` for the actual mutation under the step
-    /// name "Duplicate Region", on both legs.
+    /// name "Duplicate Region", on both legs, and selects the copy, the
+    /// region the user acts on next.
     func duplicateRegion(_ id: UUID, page: Int, undoManager: UndoManager?) {
         bumpRegionVersion()
         guard let pageRegions = regions[page],
@@ -240,6 +241,7 @@ extension RedactionState {
         )
         let copy = RedactionRegion(id: UUID(), normalizedRect: newRect, source: .manual)
         addRegion(copy, page: page, undoManager: undoManager, actionName: UndoName.duplicate)
+        selectedRegionIDs = [copy.id]
     }
 
     /// 0.02-offset clamp for `duplicateRegion`. Normalized PDF coords are
