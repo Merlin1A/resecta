@@ -1199,16 +1199,14 @@ final class SearchState: Identifiable {
     func appendResult(_ result: SearchResult, run: Int? = nil) {
         if let run, run != runToken { return }
         if results.count + pendingResults.count >= DocumentSearcher.maxResults {
-            resultsAtCap = true
-            // Snapshot how many pages the cancelled scan will
-            // never reach, so the footer can report the remainder rather
-            // than presenting the first-N results as full coverage.
-            capUnscannedPageCount = max(0, totalPages - currentSearchPage)
-            flushPendingResults()
-            cancelSearchWithoutAwait()
+            markCapReached()  // a result past the cap is dropped
             return
         }
         pendingResults.append((run: runToken, result: result))
+        if results.count + pendingResults.count >= DocumentSearcher.maxResults {
+            markCapReached()  // the result that reaches the cap is kept
+            return
+        }
         if pendingResults.count >= Self.batchFlushSize {
             flushPendingResults()
         } else if flushTask == nil {
@@ -1218,6 +1216,17 @@ final class SearchState: Identifiable {
                 self?.flushPendingResults()
             }
         }
+    }
+
+    /// The run reached the engine's result cap: mark it, snapshot how many
+    /// pages the cancelled scan will never reach (so the footer reports
+    /// the remainder rather than presenting the first N results as full
+    /// coverage), publish what is buffered and stop the scan.
+    private func markCapReached() {
+        resultsAtCap = true
+        capUnscannedPageCount = max(0, totalPages - currentSearchPage)
+        flushPendingResults()
+        cancelSearchWithoutAwait()
     }
 
     /// Flush buffered results into the published array. Single version
