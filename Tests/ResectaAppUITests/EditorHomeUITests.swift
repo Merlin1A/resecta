@@ -12,8 +12,8 @@ import XCTest
 /// XCUITest, no `@testable import`):
 ///  - T1 idle: `--loadTestDocument` → overflow → Home → HomeView, no
 ///    dialog, editor chrome gone.
-///  - The leg with work: a search for "Amount" (`--openSearchSheet
-///    --searchQuery=Amount`) → Select All → Apply (regions exist)
+///  - The leg with work: a search for "Sample" (`--openSearchSheet
+///    --searchQuery=Sample`) → Select All → Apply (regions exist)
 ///    → overflow → Home → dialog → back out (Cancel row, or a tap
 ///    outside the iOS 26 popover) keeps the editor → overflow → Home →
 ///    Close → HomeView.
@@ -64,7 +64,7 @@ nonisolated final class EditorHomeUITests: XCTestCase {
     /// T2 — session with applied regions: Home routes through the shared
     /// close dialog; backing out keeps the editor, Close returns home.
     func testHomeWithRegionsConfirmsThroughSharedCloseDialog() {
-        app.launchArguments = ["--uitesting", "--loadTestDocument", "--openSearchSheet", "--searchQuery=Amount"]
+        app.launchArguments = ["--uitesting", "--loadTestDocument", "--openSearchSheet", "--searchQuery=Sample"]
         app.launch()
         awaitSearchAndApplyAll()
 

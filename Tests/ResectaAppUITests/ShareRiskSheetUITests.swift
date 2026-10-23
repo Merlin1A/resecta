@@ -55,7 +55,7 @@ nonisolated final class ShareRiskSheetUITests: XCTestCase {
         setVerifyBeforeExport(on: false)
 
         app.terminate()
-        app.launchArguments = ["--uitesting", "--loadTestDocument", "--openSearchSheet", "--searchQuery=Amount"]
+        app.launchArguments = ["--uitesting", "--loadTestDocument", "--openSearchSheet", "--searchQuery=Sample"]
         app.launch()
 
         awaitSearchAndApplyAll()
@@ -210,7 +210,7 @@ nonisolated final class ShareRiskSheetUITests: XCTestCase {
 
     private func assertShareRiskSheetPresented() {
         XCTAssertTrue(
-            app.staticTexts["Share with reported issues?"].waitForExistence(timeout: 10),
+            app.staticTexts["Share without verification?"].waitForExistence(timeout: 10),
             "Share-risk confirm sheet title never appeared."
         )
         XCTAssertTrue(

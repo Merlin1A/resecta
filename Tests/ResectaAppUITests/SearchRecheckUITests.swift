@@ -145,9 +145,9 @@ nonisolated final class SearchRecheckUITests: XCTestCase {
                       "The editor's Rectangle tool never appeared — check the --loadTestDocument launch hook.")
         drawTool.tap()
         let window = app.windows.firstMatch
-        window.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.30))
+        window.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.55))
             .press(forDuration: 0.05,
-                   thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.70, dy: 0.36)))
+                   thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.70, dy: 0.62)))
         drawTool.tap()
 
         let overflow = app.buttons["OverflowBarButtonItem"]
@@ -171,8 +171,8 @@ nonisolated final class SearchRecheckUITests: XCTestCase {
         XCTAssertTrue(results.waitForExistence(timeout: 10), "Results scroll view not found.")
         let masthead = app.descendants(matching: .any)["verificationMasthead"]
         XCTAssertTrue(masthead.waitForExistence(timeout: 10), "The results headline not found.")
-        XCTAssertTrue(masthead.label.contains("6 of 7 checks passed. 1\u{00A0}had nothing to check."),
-                      "No typed search: the re-check had nothing to check: \(masthead.label)")
+        XCTAssertTrue(masthead.label.contains("5 of 7 checks passed. 2\u{00A0}had nothing to check."),
+                      "No typed search and no captured term: the re-check and the term check had nothing to check: \(masthead.label)")
         results.swipeUp()
         // The idle re-check sits above the pass cluster, so the cluster
         // starts collapsed: open it to reach the sweep's row.
