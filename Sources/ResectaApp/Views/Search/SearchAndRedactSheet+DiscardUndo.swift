@@ -101,21 +101,24 @@ extension SearchAndRedactSheet {
         }
     }
 
-    /// Shared dismiss path for the direct (untouched) and confirmed
-    /// (touched) routes: a live selection is deselected in-place.
-    /// `afterConfirmation` suppresses the loss-naming toasts — the
-    /// dialog already named the drop, and dialog + toast on one dismiss
-    /// would double-message.
+    /// The notice a dismissal posts: the unapplied matches it clears,
+    /// with or without a selection on board, unless the confirmation
+    /// already named the drop (a dialog and a toast on one dismiss would
+    /// say it twice).
+    static func dismissalNotice(afterConfirmation: Bool, in searchState: SearchState) -> String? {
+        afterConfirmation ? nil : dismissClearedMessage(for: searchState)
+    }
+
+    /// Shared dismiss path for the direct and confirmed routes: the
+    /// notice (the toast manager outlives the sheet), a live selection
+    /// deselected in place, then the session dropped.
     func performDismiss(afterConfirmation: Bool) {
+        if let message = Self.dismissalNotice(afterConfirmation: afterConfirmation, in: searchState) {
+            toastManager.enqueue(message, severity: .info)
+        }
         if searchState.selectedCount > 0 {
             let snapshot = Self.currentSelectionSnapshot(in: searchState)
             Self.clearSelection(in: searchState, snapshot: snapshot)
-        } else if !afterConfirmation,
-                  let message = Self.dismissClearedMessage(for: searchState) {
-            // A 0-selected dismissal names what the close drops when
-            // unapplied matches exist so the loss isn't silent. The
-            // toast manager outlives the sheet.
-            toastManager.enqueue(message, severity: .info)
         }
         redactionState.activeSearch = nil
     }
