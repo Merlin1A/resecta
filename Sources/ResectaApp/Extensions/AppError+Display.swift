@@ -95,7 +95,7 @@ extension PipelineError {
                 // throws with the file's own (smaller) count, so the page
                 // sentence is the one that is true then.
                 bytes > ImportLimits.standard.maxBytes
-                    ? "This file is approximately \(bytes / (1024 * 1024)) MB. Try a smaller document or reduce the page count."
+                    ? "This file is approximately \(bytes / (1024 * 1024)) MB. Try a smaller file: a PDF with fewer pages, or a smaller image."
                     : "This document has more than \(ImportLimits.standard.maxPages) pages. Try a document with fewer pages."
             case .unsupportedFormat:
                 "Resecta works with PDF files and JPEG, PNG and HEIC images. Other formats are not supported."

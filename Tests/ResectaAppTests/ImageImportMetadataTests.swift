@@ -82,7 +82,12 @@ struct ImageImportMetadataTests {
                 #expect(keys.subtracting(encoderInjectedExifKeys).isEmpty, "\(label): Exif keys \(keys.sorted())")
             }
             let source = try #require(CGImageSourceCreateWithData(stream as CFData, nil))
-            #expect(CGImageSourceCopyAuxiliaryDataInfoAtIndex(source, 0, kCGImageAuxiliaryDataTypeDisparity) == nil, "\(label): a disparity image")
+            for (aux, name) in [(kCGImageAuxiliaryDataTypeDisparity, "a disparity image"),
+                                (kCGImageAuxiliaryDataTypeDepth, "a depth image"),
+                                (kCGImageAuxiliaryDataTypePortraitEffectsMatte, "a portrait matte"),
+                                (kCGImageAuxiliaryDataTypeHDRGainMap, "an HDR gain map")] {
+                #expect(CGImageSourceCopyAuxiliaryDataInfoAtIndex(source, 0, aux) == nil, "\(label): \(name)")
+            }
         }
     }
 
@@ -150,9 +155,11 @@ struct ImageImportMetadataTests {
 
     // MARK: - The exported file
 
-    @Test("The Secure export of an imported photo carries no source probe and only the technical Exif trio")
-    func exportCarriesNoSourceProbe() async throws {
-        let loaded = try await ImageImportLoaderTests.load(ImageFixtures.jpegWithProbes())
+    @Test("The Secure export of an imported photo carries no source probe and only the technical Exif trio",
+          arguments: ["JPEG", "HEIC"])
+    func exportCarriesNoSourceProbe(format: String) async throws {
+        let source = format == "HEIC" ? try Self.heicFixture() : ImageFixtures.jpegWithProbes()
+        let loaded = try await ImageImportLoaderTests.load(source)
         let page = try #require(loaded.document.document.page(at: 0))
         let region = RedactionRegion(id: UUID(), normalizedRect: CGRect(x: 0.2, y: 0.4, width: 0.6, height: 0.2), source: .manual)
         let pageData = PDFPageData(
@@ -166,6 +173,6 @@ struct ImageImportMetadataTests {
         try await recon.begin(firstPageSize: result.pageOutput.size)
         try await recon.appendPage(result.pageOutput)
         await recon.finalize()
-        try Self.assertClean(try Data(contentsOf: tempURL), label: "export")
+        try Self.assertClean(try Data(contentsOf: tempURL), label: "\(format) export")
     }
 }
