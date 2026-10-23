@@ -198,6 +198,40 @@ struct RegexSearchOCRFallbackTests {
         #expect(results.count <= DocumentSearcher.maxResults,
                 "expected ≤ \(DocumentSearcher.maxResults) results; got \(results.count)")
     }
+
+    @Test("Regex OCR fallback boxes every Vision line a match overlaps")
+    func regexMatchAcrossTwoObservationsBoxesBothLines() async throws {
+        // The label and the number are separate recognised lines; the
+        // pattern's \s* crosses the line feed between them. The one result
+        // must carry a rect spanning both lines' rects (plus the pad), not
+        // the label's line alone.
+        let doc = try #require(PDFDocument(data: TestFixtures.imageOnlyPDF()))
+        let labelRect = CGRect(x: 0.10, y: 0.40, width: 0.12, height: 0.04)
+        let numberRect = CGRect(x: 0.10, y: 0.44, width: 0.20, height: 0.04)
+        let searcher = DocumentSearcher()
+        await searcher._testSeedOCRLines(
+            [stubLine("MRN:", rect: labelRect), stubLine("4417723", rect: numberRect)],
+            forPageIndex: 0
+        )
+
+        let stream = searcher.search(
+            SendablePDFDocument(doc),
+            mode: .regex(#"MRN:?\s*\d{7}"#, options: SearchOptions(includeOCR: true)),
+            progress: { _, _ in }
+        )
+        var results: [SearchResult] = []
+        for await result in stream { results.append(result) }
+
+        #expect(results.count == 1, "one match across the two lines; got \(results.map(\.matchedText))")
+        let hit = try #require(results.first)
+        #expect(hit.matchedText.contains("4417723"))
+        let page = try #require(doc.page(at: 0))
+        let expected = DocumentSearcher.paddedNormalizedRect(labelRect.union(numberRect), in: page)
+        #expect(hit.normalizedRect.minY <= expected.minY + 0.0005 && hit.normalizedRect.maxY >= expected.maxY - 0.0005,
+                "the box spans both lines: \(hit.normalizedRect) vs \(expected)")
+        #expect(hit.normalizedRect.maxX >= expected.maxX - 0.0005,
+                "the box reaches the number line's right edge: \(hit.normalizedRect) vs \(expected)")
+    }
 }
 
 /// Thread-safe collector for timeout sink callbacks.

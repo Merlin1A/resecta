@@ -74,11 +74,13 @@ extension DocumentSearcher {
     }
 
     /// The compile options the session's search options call for: the
-    /// case-insensitive flag when Case-sensitive is off; none without
-    /// options (the validation-only callers) or with it on.
+    /// anchors match at every line (a user typing `^Total$` means the line,
+    /// not the page) and, when Case-sensitive is off, the case-insensitive
+    /// flag; the validation-only callers (no options) and a case-sensitive
+    /// session compile with the line anchors alone.
     static func regexCompileOptions(_ options: SearchOptions?) -> NSRegularExpression.Options {
-        guard let options, !options.caseSensitive else { return [] }
-        return [.caseInsensitive]
+        guard let options, !options.caseSensitive else { return [.anchorsMatchLines] }
+        return [.anchorsMatchLines, .caseInsensitive]
     }
 }
 

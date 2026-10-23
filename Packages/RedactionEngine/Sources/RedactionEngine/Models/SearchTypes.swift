@@ -291,6 +291,10 @@ public struct SearchResult: Sendable, Identifiable, Equatable {
     /// for hand-built values (fixtures, older callers), where the app
     /// falls back to the first verbatim occurrence of `matchedText`.
     public let matchRangeInSnippet: Range<Int>?
+    /// The match this result is one line of. A match that wraps onto a
+    /// second line is emitted once per line it touches, each result with its
+    /// own rect and the same `occurrenceID`; nil for every other result.
+    public let occurrenceID: UUID?
 
     public init(
         id: UUID = UUID(),
@@ -304,7 +308,8 @@ public struct SearchResult: Sendable, Identifiable, Equatable {
         piiCategory: PIICategory? = nil,
         piiConfidence: Double? = nil,
         rationale: MatchRationale? = nil,
-        matchRangeInSnippet: Range<Int>? = nil
+        matchRangeInSnippet: Range<Int>? = nil,
+        occurrenceID: UUID? = nil
     ) {
         self.id = id
         self.pageIndex = pageIndex
@@ -318,6 +323,7 @@ public struct SearchResult: Sendable, Identifiable, Equatable {
         self.piiConfidence = piiConfidence
         self.rationale = rationale
         self.matchRangeInSnippet = matchRangeInSnippet
+        self.occurrenceID = occurrenceID
     }
 }
 
