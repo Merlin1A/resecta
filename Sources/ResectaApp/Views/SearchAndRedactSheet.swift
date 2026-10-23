@@ -93,14 +93,10 @@ struct SearchAndRedactSheet: View {
     /// Internal (not private): the apply handlers live in the
     /// `+Trigger` extension file.
     @State var isApplying = false
-    // Conditional dismiss: Dismiss is conditional on user selection work: an
-    // untouched sheet closes in one tap (a live machine-made selection
-    // is deselected in-place on the way
-    // out); once the USER has modified selections this session
-    // (`searchState.userModifiedSelections`), Dismiss routes through a
-    // confirmation dialog. Under
-    // all-deselected arrival, every live selection is deliberate opt-in
-    // work, so a one-tap-always dismiss would silently discard it. See
+    // Conditional dismiss: while the session holds selected matches no
+    // live region covers (`DocumentState.hasUnappliedSelections`, read
+    // from the rows, not from who ticked them), Dismiss routes through a
+    // confirmation dialog; otherwise it closes in one tap. See
     // `SearchAndRedactSheet+DiscardUndo.swift` for the selection helpers
     // and the dismissal message (untouched path only — the dialog
     // already names the drop on the other).

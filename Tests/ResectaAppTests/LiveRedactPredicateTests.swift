@@ -46,7 +46,6 @@ struct LiveRedactPredicateTests {
         #expect(documentState.redactRefusal(with: redactionState) == .selectedMatches)
 
         search.toggleSelectAll()
-        search.userModifiedSelections = true   // the footer's gesture arms the tracker
         #expect(search.results.allSatisfy { !$0.isSelected }, "Deselect All")
 
         #expect(!DocumentState.hasUnappliedSelections(redactionState))
@@ -86,7 +85,6 @@ struct LiveRedactPredicateTests {
         coord.redactionState.addRegion(region, page: 0, undoManager: nil)
         let search = SearchState(defaults: makeScratchDefaults().0)
         search.results = [makeResult(y: 0.1)]
-        search.userModifiedSelections = true
         coord.redactionState.activeSearch = search
 
         coord.runFullPipeline(documentOverride: .secureRasterization)

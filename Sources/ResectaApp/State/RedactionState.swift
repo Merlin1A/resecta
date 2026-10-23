@@ -680,10 +680,7 @@ class RedactionState {
         guard let search = activeSearch else { return nil }
 
         let selected = search.results.filter(\.isSelected)
-        guard !selected.isEmpty else {
-            search.userModifiedSelections = false
-            return .zero
-        }
+        guard !selected.isEmpty else { return .zero }
 
         // Snapshot existing rects per page so the overlap test can run
         // off-MainActor without re-entering actor state.
@@ -725,12 +722,6 @@ class RedactionState {
         // is unchanged — same `deselectionSnapshotForRun()` the coverage
         // panel and the live-session pipeline-entry path use.
         pendingRunDeselection = search.deselectionSnapshotForRun()
-        // Reset the CAPTURED session's tracker — the one this apply ran
-        // against — not whatever `activeSearch` points at after the
-        // prepare suspension (a dismissed-and-reopened sheet must not
-        // inherit a stale apply's reset).
-        search.userModifiedSelections = false
-
         // Caller is responsible for clearing activeSearch after showing feedback.
         return ApplyOutcome(
             applied: prepared.appliedCount,
@@ -773,8 +764,8 @@ class RedactionState {
     /// here. Two differences by design: a covered result creates
     /// nothing, so it commits nothing (no version bump, no empty undo
     /// step — an inert apply must not signal a region mutation); and
-    /// this is a PARTIAL commit — the remaining selections are still
-    /// live work — so the conditional-dismiss tracker stays set (the
+    /// this is a PARTIAL commit — the remaining selections stay live
+    /// work, which the dismiss rule reads from the rows (the
     /// entity-group rule).
     func applySearchResultOrigin(
         id: UUID,

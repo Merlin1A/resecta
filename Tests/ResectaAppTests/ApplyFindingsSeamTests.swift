@@ -172,20 +172,6 @@ struct ApplySeamSearchOriginTests {
         #expect(outcome == nil)
     }
 
-    @Test("The seam owns the conditional-dismiss tracker reset for the search origin")
-    func trackerResetOwnedBySeam() async {
-        let state = RedactionState()
-        let search = SearchState()
-        search.results = [makeSearchResult()]
-        search.userModifiedSelections = true
-        state.activeSearch = search
-
-        _ = await state.applyFindings(.selectedSearchResults, undoManager: nil)
-
-        #expect(search.userModifiedSelections == false,
-                "committed selections reset the tracker inside the path")
-    }
-
     @Test("A PII Scan apply returns the created count the Marked notice reports")
     func piiScanApplyFeedsMarkedNotice() async {
         let state = RedactionState()
@@ -543,7 +529,6 @@ struct ApplySeamSingleResultOriginTests {
         let state = RedactionState()
         let search = SearchState()
         search.results = [makeSearchResult()]
-        search.userModifiedSelections = true
         state.activeSearch = search
         let versionBefore = state.regionVersion
 
@@ -554,7 +539,6 @@ struct ApplySeamSingleResultOriginTests {
         #expect(state.regionMetadata.isEmpty)
         #expect(state.appliedMatchAudit.isEmpty)
         #expect(state.regionVersion == versionBefore)
-        #expect(search.userModifiedSelections == true, "a refusal touches no session state")
     }
 
     @Test("No active search refuses")
@@ -563,22 +547,5 @@ struct ApplySeamSingleResultOriginTests {
         let outcome = await state.applyFindings(.searchResult(id: UUID()), undoManager: nil)
         #expect(outcome == nil)
         #expect(state.regions.isEmpty)
-    }
-
-    @Test("A partial commit keeps the conditional-dismiss tracker set (the entity-group rule)")
-    func partialCommitKeepsTracker() async {
-        let state = RedactionState()
-        let search = SearchState()
-        let first = makeSearchResult(y: 0.1)
-        let second = makeSearchResult(y: 0.6, matchedText: "987-65-4321")
-        search.results = [first, second]
-        search.userModifiedSelections = true
-        state.activeSearch = search
-
-        let outcome = await state.applyFindings(.searchResult(id: first.id), undoManager: nil)
-
-        #expect(outcome?.applied == 1)
-        #expect(search.userModifiedSelections == true,
-                "the other selections are still live work — the tracker stays set")
     }
 }

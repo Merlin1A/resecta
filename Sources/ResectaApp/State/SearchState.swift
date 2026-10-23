@@ -1104,7 +1104,6 @@ final class SearchState: Identifiable {
         recentMultiTermSets = []
         activeSearchTask?.cancel()
         activeSearchTask = nil
-        userModifiedSelections = false
         pendingAutoRunScan = false
         priorScanFingerprints = nil
         navigationScope = .wholeDocument
@@ -1176,21 +1175,6 @@ final class SearchState: Identifiable {
     func index(of id: UUID) -> Int? {
         results.firstIndex(where: { $0.id == id })
     }
-
-    /// Conditional dismiss: whether the USER has modified selections this sheet
-    /// session, for either result origin. Gates the sheet's Dismiss:
-    /// untouched → one tap; touched → confirmation dialog (the triage
-    /// sheet's donor rule, generalized to the whole surface).
-    ///
-    /// Written `true` only at user-gesture sites (row circle, footer
-    /// Select All, Select-Where, keyboard space toggle) — NEVER by programmatic
-    /// selection writes: saved-search
-    /// recall, and the mode-switch undo restore don't count as user
-    /// selection work. Reset by a successful apply (the modified
-    /// selections were committed — a post-apply Dismiss confirming
-    /// "selections will not be saved" would be false) and by `clear()`
-    /// on session teardown.
-    var userModifiedSelections: Bool = false
 
     /// True while the Home close dialog holds this session parked: the
     /// sheet's teardown then spares it, so Cancel re-presents it whole.
