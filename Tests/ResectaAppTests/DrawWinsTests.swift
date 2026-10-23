@@ -284,9 +284,9 @@ struct DrawWinsTests {
 
     @Test("applyResizeSnapping posts the 'Aligned to guide' VoiceOver announcement like applySnapping — the draw path snaps through it too (source pin)")
     func testResizeSnapAnnouncesGuideAlignment() throws {
-        let source = try loadRepoFile("Sources/ResectaApp/Overlay/RedactionOverlayView.swift")
+        let source = try loadRepoFile("Sources/ResectaApp/Overlay/SnapGuideEngine.swift")
         guard let start = source.range(of: "func applyResizeSnapping("),
-              let end = source.range(of: "// MARK: - Handle Animation",
+              let end = source.range(of: "// MARK: - Reset",
                                      range: start.upperBound..<source.endIndex)
         else {
             Issue.record("Could not locate applyResizeSnapping")

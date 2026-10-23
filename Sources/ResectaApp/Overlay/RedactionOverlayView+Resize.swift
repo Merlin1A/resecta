@@ -52,7 +52,7 @@ extension RedactionOverlayView {
         newRect.size.height = max(abs(newRect.size.height), resizeFloor)
 
         // Apply snap guides to moving edges during resize
-        newRect = applyResizeSnapping(to: newRect, handle: handle, excluding: selectedID)
+        newRect = snapEngine.applyResizeSnapping(to: newRect, handle: handle, excluding: selectedID, in: snapPage)
 
         // Clamp to overlay bounds
         newRect = newRect.intersection(bounds)

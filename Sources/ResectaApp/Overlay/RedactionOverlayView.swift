@@ -114,21 +114,9 @@ class RedactionOverlayView: UIView {
 
     // MARK: - Snap State
 
-    /// A snap guide line to draw during interaction.
-    struct SnapGuide: Equatable {
-        let position: CGFloat
-        let isHorizontal: Bool  // true = horizontal line at Y position
-    }
-
-    /// Currently active snap guides, populated during drag/resize/move.
-    var activeGuides: [SnapGuide] = []
-    /// Track previous guide count for haptic firing (only on new guide appearance).
-    private var previousGuideSet: Set<CGFloat> = []
-
-    /// Cached snap guide targets for the current drag session.
-    /// Computed once on first use after drag begins, invalidated on drag end.
-    private var cachedGuideTargets: (horizontal: [CGFloat], vertical: [CGFloat])?
-    private var cachedGuideExcludeID: UUID?
+    /// The snap guides: the targets, the active guides the draw pass
+    /// strokes, the haptic and the announcement (`SnapGuideEngine`).
+    let snapEngine = SnapGuideEngine()
 
     // MARK: - Finger Scale
 
@@ -150,13 +138,6 @@ class RedactionOverlayView: UIView {
     var fingerScale: CGFloat {
         1 / max(snapZoomScaleOverride ?? currentZoomScale(), 0.01)
     }
-
-    /// Haptic for snap alignment — fires when a new guide activates.
-    private lazy var snapFeedback: UIImpactFeedbackGenerator = {
-        let gen = UIImpactFeedbackGenerator(style: .rigid)
-        gen.prepare()
-        return gen
-    }()
 
     // MARK: - Handle Animation State
 
@@ -235,7 +216,7 @@ class RedactionOverlayView: UIView {
     // Resize handle that models the finger's corner while a new rectangle
     // is being drawn: the drag origin is the anchored
     // corner, so only the two edges under the finger move — and snap —
-    // through `applyResizeSnapping`. Ties (dx == 0 / dy == 0) fall to the
+    // through `SnapGuideEngine.applyResizeSnapping`. Ties (dx == 0 / dy == 0) fall to the
     // bottom/right side, matching the rect the drag produces. Pure so
     // `RectangleDrawGestureTests` can pin the quadrant table without a
     // UITouch host.
@@ -665,10 +646,11 @@ class RedactionOverlayView: UIView {
                 // Apply snap guides during new region drawing — anchored
                 // edges: only the two edges under the finger
                 // snap; the origin corner is invariant by construction.
-                rect = applyResizeSnapping(
+                rect = snapEngine.applyResizeSnapping(
                     to: rect,
                     handle: Self.drawSnapHandle(origin: origin, point: point),
-                    excluding: nil
+                    excluding: nil,
+                    in: snapPage
                 )
                 // Clamp the rubber band to the page —
                 // mirrors the resize clamp in `updateSelectedRegionForResize`.
@@ -705,7 +687,7 @@ class RedactionOverlayView: UIView {
         var newRect = CGRect(origin: newOrigin, size: regionSize)
 
         // Apply snap guides during move
-        newRect = applySnapping(to: newRect, excluding: selectedID)
+        newRect = snapEngine.applySnapping(to: newRect, excluding: selectedID, in: snapPage)
 
         regions[idx].normalizedRect = overlayToPDFNormalized(newRect)
 
@@ -838,10 +820,7 @@ class RedactionOverlayView: UIView {
         preDragGroupRects = [:]
         groupMoveStart = nil
         // Snap state cleanup
-        activeGuides = []
-        previousGuideSet = []
-        cachedGuideTargets = nil
-        cachedGuideExcludeID = nil
+        snapEngine.reset()
         // Repaint on gesture end. The commit paths
         // run under `isActivelyDragging`, which makes the coordinator's
         // `configure` a no-op, and the later state sync sees `regions`
@@ -953,164 +932,16 @@ class RedactionOverlayView: UIView {
         )
     }
 
-    // MARK: - Snap Engine
+    // MARK: - Snap Page
 
-    /// Collect all snap guide positions from other regions, page margins, and page center.
-    /// `excluding` omits the region being moved/drawn so it doesn't snap to itself.
-    private func collectGuideTargets(excluding excludeID: UUID?) -> (horizontal: [CGFloat], vertical: [CGFloat]) {
-        // Return cached targets if available and exclude ID matches.
-        // Safe because regions cannot change during a drag (isActivelyDragging blocks configure).
-        if let cached = cachedGuideTargets, cachedGuideExcludeID == excludeID {
-            return cached
-        }
-
-        var hTargets: [CGFloat] = []
-        var vTargets: [CGFloat] = []
-
-        // Other region edges and centers
-        for region in regions where region.id != excludeID {
-            let rect = pdfNormalizedToOverlay(region.normalizedRect)
-            hTargets.append(contentsOf: [rect.minY, rect.midY, rect.maxY])
-            vTargets.append(contentsOf: [rect.minX, rect.midX, rect.maxX])
-        }
-
-        // Page margins (16pt inset)
-        let margin = ResectaTokens.Snap.pageMarginInset
-        hTargets.append(contentsOf: [margin, bounds.height - margin])
-        vTargets.append(contentsOf: [margin, bounds.width - margin])
-
-        // Page center lines
-        hTargets.append(bounds.height / 2)
-        vTargets.append(bounds.width / 2)
-
-        cachedGuideTargets = (hTargets, vTargets)
-        cachedGuideExcludeID = excludeID
-        return (hTargets, vTargets)
-    }
-
-    /// Apply snapping to a rect. Returns the adjusted rect; populates `activeGuides`.
-    /// Fires snap haptic when new guides appear.
-    private func applySnapping(to rect: CGRect, excluding excludeID: UUID?) -> CGRect {
-        let threshold = ResectaTokens.Snap.proximityThreshold * fingerScale
-        let (hTargets, vTargets) = collectGuideTargets(excluding: excludeID)
-
-        var result = rect
-        var guides: [SnapGuide] = []
-        var snappedPositions: Set<CGFloat> = []
-
-        // Horizontal snapping (Y positions): top edge, center, bottom edge
-        let yEdges: [(CGFloat, (CGFloat) -> CGFloat)] = [
-            (result.minY, { dy in result.origin.y += dy; return result.minY }),
-            (result.midY, { dy in result.origin.y += dy; return result.midY }),
-            (result.maxY, { dy in result.origin.y += dy; return result.maxY }),
-        ]
-        for (edgeY, _) in yEdges {
-            if let nearest = hTargets.min(by: { abs($0 - edgeY) < abs($1 - edgeY) }),
-               abs(nearest - edgeY) <= threshold {
-                let dy = nearest - edgeY
-                result.origin.y += dy
-                guides.append(SnapGuide(position: nearest, isHorizontal: true))
-                snappedPositions.insert(nearest)
-                break  // Only snap one horizontal edge per frame
-            }
-        }
-
-        // Vertical snapping (X positions): left edge, center, right edge
-        let xEdges: [(CGFloat, (CGFloat) -> CGFloat)] = [
-            (result.minX, { dx in result.origin.x += dx; return result.minX }),
-            (result.midX, { dx in result.origin.x += dx; return result.midX }),
-            (result.maxX, { dx in result.origin.x += dx; return result.maxX }),
-        ]
-        for (edgeX, _) in xEdges {
-            if let nearest = vTargets.min(by: { abs($0 - edgeX) < abs($1 - edgeX) }),
-               abs(nearest - edgeX) <= threshold {
-                let dx = nearest - edgeX
-                result.origin.x += dx
-                guides.append(SnapGuide(position: nearest, isHorizontal: false))
-                snappedPositions.insert(nearest)
-                break  // Only snap one vertical edge per frame
-            }
-        }
-
-        // Fire haptic only when new guides appear
-        let newPositions = snappedPositions.subtracting(previousGuideSet)
-        if !newPositions.isEmpty {
-            snapFeedback.impactOccurred(intensity: 0.4)
-            // VoiceOver announcement — gated to avoid throttling during drag
-            if UIAccessibility.isVoiceOverRunning {
-                UIAccessibility.post(notification: .announcement,
-                                     argument: "Aligned to guide")
-            }
-        }
-        previousGuideSet = snappedPositions
-        activeGuides = guides
-
-        return result
-    }
-
-    /// Apply snapping to a resize operation. Only snaps the edges that are being moved.
-    func applyResizeSnapping(to rect: CGRect, handle: ResizeHandle, excluding excludeID: UUID?) -> CGRect {
-        let threshold = ResectaTokens.Snap.proximityThreshold * fingerScale
-        let (hTargets, vTargets) = collectGuideTargets(excluding: excludeID)
-
-        var result = rect
-        var guides: [SnapGuide] = []
-        var snappedPositions: Set<CGFloat> = []
-
-        // Determine which edges move for this handle
-        let movesTop = [.topLeft, .topRight, .topCenter].contains(handle)
-        let movesBottom = [.bottomLeft, .bottomRight, .bottomCenter].contains(handle)
-        let movesLeft = [.topLeft, .bottomLeft, .leftCenter].contains(handle)
-        let movesRight = [.topRight, .bottomRight, .rightCenter].contains(handle)
-
-        // Snap moving horizontal edges
-        if movesTop, let nearest = hTargets.min(by: { abs($0 - result.minY) < abs($1 - result.minY) }),
-           abs(nearest - result.minY) <= threshold {
-            let dy = nearest - result.minY
-            result.origin.y += dy
-            result.size.height -= dy
-            guides.append(SnapGuide(position: nearest, isHorizontal: true))
-            snappedPositions.insert(nearest)
-        }
-        if movesBottom, let nearest = hTargets.min(by: { abs($0 - result.maxY) < abs($1 - result.maxY) }),
-           abs(nearest - result.maxY) <= threshold {
-            result.size.height += nearest - result.maxY
-            guides.append(SnapGuide(position: nearest, isHorizontal: true))
-            snappedPositions.insert(nearest)
-        }
-
-        // Snap moving vertical edges
-        if movesLeft, let nearest = vTargets.min(by: { abs($0 - result.minX) < abs($1 - result.minX) }),
-           abs(nearest - result.minX) <= threshold {
-            let dx = nearest - result.minX
-            result.origin.x += dx
-            result.size.width -= dx
-            guides.append(SnapGuide(position: nearest, isHorizontal: false))
-            snappedPositions.insert(nearest)
-        }
-        if movesRight, let nearest = vTargets.min(by: { abs($0 - result.maxX) < abs($1 - result.maxX) }),
-           abs(nearest - result.maxX) <= threshold {
-            result.size.width += nearest - result.maxX
-            guides.append(SnapGuide(position: nearest, isHorizontal: false))
-            snappedPositions.insert(nearest)
-        }
-
-        let newPositions = snappedPositions.subtracting(previousGuideSet)
-        if !newPositions.isEmpty {
-            snapFeedback.impactOccurred(intensity: 0.4)
-            // VoiceOver announcement — gated to avoid throttling during
-            // drag. The draw path snaps through here:
-            // same announcement the move path's `applySnapping`
-            // posts, so drawing and resizing both report guide alignment.
-            if UIAccessibility.isVoiceOverRunning {
-                UIAccessibility.post(notification: .announcement,
-                                     argument: "Aligned to guide")
-            }
-        }
-        previousGuideSet = snappedPositions
-        activeGuides = guides
-
-        return result
+    /// The page the snap engine reads on each call.
+    var snapPage: SnapGuideEngine.Page {
+        SnapGuideEngine.Page(
+            regions: regions,
+            bounds: bounds,
+            fingerScale: fingerScale,
+            toOverlay: pdfNormalizedToOverlay
+        )
     }
 
     // MARK: - Handle Animation
