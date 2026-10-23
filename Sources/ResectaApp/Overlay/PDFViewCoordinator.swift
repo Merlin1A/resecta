@@ -99,16 +99,6 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
                       let currentPage = pdfView.currentPage,
                       let doc = pdfView.document else { return }
                 let index = doc.index(for: currentPage)
-                // Page-change mid-polygon discards the
-                // in-progress vertex list on every overlay so the bottom
-                // capsule cannot describe vertices laid on a page the
-                // user has scrolled away from. Runs BEFORE the page-index
-                // write so observers see the discard before the new page.
-                if let self, self.activeShapeTool == .polygon {
-                    for (_, overlay) in self.activeOverlays {
-                        overlay.discardInProgressPolygon()
-                    }
-                }
                 // The selection keeps only the regions on the page in
                 // view, so a delete or a nudge never reaches a region the
                 // user cannot see. Runs on every notice: the page bar
@@ -418,36 +408,12 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
         }
     }
 
-    /// Propagate the active shape tool to every overlay. Changing
-    /// tools discards any in-progress polygon vertex list (the user's
-    /// intent for the previous tool's shape is lost on tool switch).
+    /// Propagate the active shape tool to every overlay.
     func updateActiveShapeTool(_ tool: RedactionOverlayView.ShapeTool) {
-        let changed = activeShapeTool != tool
         activeShapeTool = tool
         for (_, overlay) in activeOverlays {
             overlay.activeShapeTool = tool
-            if changed { overlay.discardInProgressPolygon() }
         }
-    }
-
-    /// Commit the in-progress polygon on the visible-page
-    /// overlay. Routed from the SwiftUI "Close polygon" button on the
-    /// bottom hint capsule. No-op if the visible page has no active
-    /// overlay (e.g., page off-screen) or the overlay's vertex count is
-    /// below the 3-vertex floor — the overlay enforces both invariants.
-    func commitInProgressPolygon() {
-        let pageIndex = documentState?.currentPageIndex ?? 0
-        guard let overlay = activeOverlays[pageIndex] else { return }
-        overlay.commitInProgressPolygon()
-    }
-
-    /// Discard the in-progress polygon on the visible-page
-    /// overlay. Routed from the SwiftUI "Cancel" button on the bottom
-    /// hint capsule AND from the Escape-key handler.
-    func cancelInProgressPolygon() {
-        let pageIndex = documentState?.currentPageIndex ?? 0
-        guard let overlay = activeOverlays[pageIndex] else { return }
-        overlay.discardInProgressPolygon()
     }
 
     /// Snap-to-text-box toggle propagated from Settings. Stored

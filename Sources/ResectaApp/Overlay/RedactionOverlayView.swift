@@ -20,11 +20,8 @@ class RedactionOverlayView: UIView {
 
     /// Shape produced when drawing is active. `.rectangle` (default)
     /// keeps the existing rubber-band drag → rectangle commit path.
-    /// `.polygon` builds a vertex list on each tap; double-tap closes the
-    /// loop and commits.
     enum ShapeTool: Equatable {
         case rectangle
-        case polygon
     }
     var activeShapeTool: ShapeTool = .rectangle
 
@@ -85,31 +82,6 @@ class RedactionOverlayView: UIView {
     /// state reset from updateUIView.
     private(set) var isActivelyDragging: Bool = false
 
-    // MARK: - Polygon Drawing State
-
-    /// Vertices accumulated for the in-progress
-    /// polygon, in overlay-space points. Each tap appends; a tap inside
-    /// `polygonCloseRadius` of `polygonVertices[0]` once `count >= 3`
-    /// closes the loop and commits via `commitPolygonRegion`. Cleared on
-    /// commit, `discardInProgressPolygon`, and `removeFromSuperview`.
-    var polygonVertices: [CGPoint] = []
-
-    /// Overlay-space radius around `polygonVertices[0]`
-    /// that closes the polygon when tapped (count >= 3). 18 pt sits
-    /// between the 22 pt resize-handle hit area and the 8 pt vertex dot
-    /// — large enough to be a comfortable tap target without overlapping
-    /// a neighbouring vertex on a tight polygon.
-    static let polygonCloseRadius: CGFloat = 18.0
-    /// Diameter of the stroked close-target ring drawn
-    /// around the first vertex once `polygonVertices.count >= 3`. 16 pt
-    /// is 2× the standard vertex dot, making the close target visibly
-    /// distinct from a mid-polygon vertex.
-    static let firstVertexRingDiameter: CGFloat = 16.0
-    /// Baseline dedup tolerance for polygon taps near
-    /// the previous vertex, in overlay-space points at 1× zoom. Active
-    /// tolerance is `baseline / zoomScale`.
-    static let polygonVertexDeduplicationDistance: CGFloat = 2.0
-
     // MARK: - Move State
 
     /// True when the user is dragging an existing region to a new position.
@@ -121,7 +93,7 @@ class RedactionOverlayView: UIView {
     private var preDragNormalizedRect: CGRect?
     /// Primary touch reference recorded at touchesBegan. Secondary
     /// touches (e.g., a finger landing during a Pencil drag) are ignored
-    /// while a gesture is in flight to prevent corruption of polygon /
+    /// while a gesture is in flight to prevent corruption of
     /// marquee state. Cleared in resetDragState.
     private var primaryTouch: UITouch?
     /// Long-press timer for selecting + moving unselected regions.
@@ -503,51 +475,6 @@ class RedactionOverlayView: UIView {
                 // VoiceOver announcement for drawing-in-progress
                 UIAccessibility.post(notification: .announcement,
                                      argument: "Drawing region")
-            case .polygon:
-                // Tap-on-first-vertex close model. Three
-                // branches, in priority order:
-                //   (a) close — count >= 3 AND tap within
-                //       `polygonCloseRadius` of `polygonVertices[0]`.
-                //   (b) dedup — tap within `polygonVertexDeduplicationDistance
-                //       / zoomScale` of the previous vertex (silent drop +
-                //       soft haptic). Compared against the previous vertex
-                //       only so a non-adjacent vertex can sit close to an
-                //       earlier one if the user intends it.
-                //   (c) append — record vertex, mirror count onto observer,
-                //       announce.
-                isActivelyDragging = false
-                if polygonVertices.count >= 3,
-                   let first = polygonVertices.first {
-                    let dx = point.x - first.x
-                    let dy = point.y - first.y
-                    if (dx * dx + dy * dy)
-                        <= Self.polygonCloseRadius * Self.polygonCloseRadius {
-                        commitPolygonRegion(vertices: polygonVertices)
-                        polygonVertices = []
-                        coordinator?.redactionState?.inProgressPolygonVertexCount = 0
-                        setNeedsDisplay()
-                        break
-                    }
-                }
-                if let last = polygonVertices.last {
-                    let dx = point.x - last.x
-                    let dy = point.y - last.y
-                    let tolerance =
-                        Self.polygonVertexDeduplicationDistance
-                        / currentZoomScale()
-                    if (dx * dx + dy * dy) <= tolerance * tolerance {
-                        rejectionFeedback.impactOccurred(intensity: 0.3)
-                        break
-                    }
-                }
-                polygonVertices.append(point)
-                coordinator?.redactionState?.inProgressPolygonVertexCount =
-                    polygonVertices.count
-                setNeedsDisplay()
-                UIAccessibility.post(
-                    notification: .announcement,
-                    argument: "Polygon vertex \(polygonVertices.count)"
-                )
             }
             return
         }
@@ -617,7 +544,7 @@ class RedactionOverlayView: UIView {
         }
     }
 
-    // MARK: - Polygon Helpers
+    // MARK: - Zoom
 
     /// Current zoom scale on the enclosing `PDFView`, used to scale the
     /// zoom-dependent tolerances. Walks up the
@@ -634,70 +561,6 @@ class RedactionOverlayView: UIView {
             view = view?.superview
         }
         return 1.0
-    }
-
-    /// Commit an in-progress polygon as a `RedactionRegion`.
-    /// Builds normalized vertices and the corresponding bounding rect,
-    /// then routes through the existing `addRegion(_:page:undoManager:)`
-    /// path so undo / observer wiring is uniform with the rectangle path.
-    ///
-    /// Minimum size: the vertex set's bounding box, measured in overlay
-    /// points before normalization, must reach `minimumRegionSize` on both
-    /// axes — the same floor the rectangle tool's resize path applies,
-    /// scaled by `fingerScale` so it is a screen-point tolerance. A
-    /// thinner polygon is rejected with the rectangle path's haptic and
-    /// nothing is committed; every caller discards the in-progress
-    /// geometry afterwards.
-    private func commitPolygonRegion(vertices: [CGPoint]) {
-        guard vertices.count >= 3 else { return }
-        let overlayBounds = Self.boundingBox(of: vertices)
-        let sizeFloor = Self.minimumRegionSize * fingerScale
-        if overlayBounds.width < sizeFloor || overlayBounds.height < sizeFloor {
-            rejectionFeedback.impactOccurred(intensity: 0.3)
-            return
-        }
-        let normalizedVerts = vertices.map(overlayPointToNormalized)
-        let bounds = Self.boundingBox(of: normalizedVerts)
-        let region = RedactionRegion(
-            id: UUID(),
-            normalizedRect: bounds,
-            source: .manual,
-            vertices: normalizedVerts
-        )
-        coordinator?.addRegion(region, page: pageIndex, undoManager: window?.undoManager)
-        UIAccessibility.post(notification: .announcement, argument: "Polygon region added")
-    }
-
-    /// Axis-aligned bounding box of a point set (zero-size when the set is
-    /// empty). Used for the polygon commit's size floor in overlay points
-    /// and for the committed region's normalized rect.
-    private static func boundingBox(of points: [CGPoint]) -> CGRect {
-        var minX = CGFloat.greatestFiniteMagnitude
-        var minY = CGFloat.greatestFiniteMagnitude
-        var maxX = -CGFloat.greatestFiniteMagnitude
-        var maxY = -CGFloat.greatestFiniteMagnitude
-        for v in points {
-            if v.x < minX { minX = v.x }
-            if v.x > maxX { maxX = v.x }
-            if v.y < minY { minY = v.y }
-            if v.y > maxY { maxY = v.y }
-        }
-        guard !points.isEmpty else { return .zero }
-        return CGRect(
-            x: minX, y: minY,
-            width: max(0, maxX - minX),
-            height: max(0, maxY - minY)
-        )
-    }
-
-    /// Convert a single point in overlay-space to normalized PDF
-    /// coordinates (0–1, bottom-left origin). Mirrors
-    /// `overlayToPDFNormalized` for a rect but for a single CGPoint.
-    private func overlayPointToNormalized(_ point: CGPoint) -> CGPoint {
-        let w = bounds.width
-        let h = bounds.height
-        guard w > 0, h > 0 else { return .zero }
-        return CGPoint(x: point.x / w, y: 1.0 - point.y / h)
     }
 
     // MARK: - Move Helpers
@@ -1056,13 +919,6 @@ class RedactionOverlayView: UIView {
             return
         }
 
-        // Polygon tool — touch-up after a single tap is a no-op
-        // (the vertex was already appended in touchesBegan). No commit
-        // here; commit happens on double-tap.
-        if isDrawingMode && activeShapeTool == .polygon {
-            return
-        }
-
         // Commit new region
         guard let rect = currentDragRect else { return }
 
@@ -1106,10 +962,6 @@ class RedactionOverlayView: UIView {
             // Undo the in-progress resize by re-configuring from state
             coordinator?.refreshOverlay(for: pageIndex)
         }
-        // A system-level cancel during a polygon discards
-        // the in-progress shape — the user's intent was lost, do not
-        // commit half a polygon.
-        discardInProgressPolygon()
         resetDragState()
         setNeedsDisplay()
     }
@@ -1146,32 +998,6 @@ class RedactionOverlayView: UIView {
         // unchanged (the overlay already holds the final rect) — so this
         // is the only repaint that erases a rejected rubber band, its
         // label and guides, or drops the lifted look after a move/resize.
-        setNeedsDisplay()
-    }
-
-    /// Clear the in-progress polygon vertex list. Call when the
-    /// user switches tool, taps outside the overlay, or presses Escape.
-    /// `touchesCancelled` triggers this so a system-level cancel discards
-    /// the in-progress polygon. Also zeros the observer field on
-    /// `RedactionState` so the bottom capsule resets to the count-0 string.
-    func discardInProgressPolygon() {
-        polygonVertices = []
-        coordinator?.redactionState?.inProgressPolygonVertexCount = 0
-        setNeedsDisplay()
-    }
-
-    /// Commit the in-progress polygon when the user taps
-    /// the SwiftUI "Close polygon" button. Routed by
-    /// `PDFViewCoordinator.commitInProgressPolygon`. Silent no-op when
-    /// below the 3-vertex floor — the button surface is disabled there,
-    /// and the floor is also enforced inside `commitPolygonRegion`, so
-    /// the guard here is belt-and-braces against a button-press / state
-    /// mutation race.
-    func commitInProgressPolygon() {
-        guard polygonVertices.count >= 3 else { return }
-        commitPolygonRegion(vertices: polygonVertices)
-        polygonVertices = []
-        coordinator?.redactionState?.inProgressPolygonVertexCount = 0
         setNeedsDisplay()
     }
 
@@ -1643,12 +1469,6 @@ class RedactionOverlayView: UIView {
         // PDFView's overlay-recycling can drop the view mid-long-press; the
         // scheduled Timer otherwise retains itself on the runloop until fire.
         cancelLongPress()
-        // Drop in-progress polygon vertices when the
-        // overlay is recycled or the editor closes mid-polygon. The
-        // per-overlay vertex list dies with the view, but the shared
-        // `inProgressPolygonVertexCount` on `RedactionState` would
-        // otherwise leak the stale count into the next overlay's capsule.
-        discardInProgressPolygon()
         super.removeFromSuperview()
     }
 

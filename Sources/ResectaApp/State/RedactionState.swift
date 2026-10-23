@@ -212,12 +212,6 @@ class RedactionState {
     /// — no second interaction is added.
     var pendingCanvasRationaleRequest: UUID?
 
-    /// Live vertex count of the in-progress polygon on the
-    /// active overlay. Drives the bottom-capsule caption + Close/Cancel
-    /// buttons without reaching into the UIKit overlay. Reset on commit,
-    /// discard, or tool switch.
-    var inProgressPolygonVertexCount: Int = 0
-
     // --- Region Metadata ---
 
     /// Metadata for auto-detected regions, keyed by the RedactionRegion.id created
