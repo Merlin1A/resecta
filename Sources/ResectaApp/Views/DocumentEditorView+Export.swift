@@ -44,7 +44,8 @@ extension DocumentEditorView {
     /// happen: no presenter, a sheet that never appeared, or the exporting
     /// card's Cancel. The copy is deleted and the share-risk confirms are
     /// re-armed as for a cancelled share, since nothing was sent. Returns
-    /// false, doing nothing, once the export has already left `.exporting`.
+    /// false, doing nothing, once the export has left `.exporting` or when
+    /// `attempt` is not the share in flight (an earlier share's watchdog).
     @discardableResult
     static func abandonShare(
         copy: URL, report: VerificationReport, attempt: UUID, documentState: DocumentState
@@ -57,13 +58,16 @@ extension DocumentEditorView {
 
     /// End share `attempt`: delete its copy, return to the results with its
     /// report, then re-arm or announce (`handleShareSheetCompletion`). The
-    /// share sheet's completion and `abandonShare` both end here.
+    /// share sheet's completion and `abandonShare` both end here. Only the
+    /// share in flight ends: every share writes the copy at one path, so an
+    /// earlier share's late call would delete the next share's copy.
     @discardableResult
     static func finishShare(
         completed: Bool, copy: URL, report: VerificationReport, attempt: UUID,
         documentState: DocumentState,
         announceShared: () -> Void, recordSuccessfulExport: () -> Void
     ) -> Bool {
+        guard documentState.liveShareAttempt == attempt else { return false }
         documentState.liveShareAttempt = nil
         try? FileManager.default.removeItem(at: copy)
         documentState.transition(to: .verified(report: report))
@@ -85,7 +89,8 @@ extension DocumentEditorView {
         recover: @escaping @MainActor () -> Void
     ) -> Task<Void, Never> {
         Task { @MainActor in
-            try? await Task.sleep(for: delay)
+            // A cancelled watchdog ends here instead of recovering at once.
+            do { try await Task.sleep(for: delay) } catch { return }
             if !isPresented() { recover() }
         }
     }
