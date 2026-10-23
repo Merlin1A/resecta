@@ -96,6 +96,87 @@ nonisolated final class UXFixesUITests: XCTestCase {
         attachScreenshot(named: "ux-too-small-notice")
     }
 
+    // MARK: - The sheet's own exits
+
+    /// Escape at the medium detent closes the Search sheet. A simulator
+    /// that delivers no hardware key at all records the leg for the device
+    /// pass instead of failing it: the hidden "k" shortcut (next match) is
+    /// the control that tells an undelivered key from an ignored one.
+    func testEscapeAtMediumDismissesTheSheet() throws {
+        launchSearchAtMedium()
+        let dismiss = app.buttons["searchDismissButton"]
+        XCTAssertTrue(dismiss.exists, "The sheet must be up at the medium detent.")
+
+        app.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
+        if dismiss.waitForNonExistence(timeout: 5) {
+            attachScreenshot(named: "ux-escape-dismissed")
+            return
+        }
+
+        let counter = app.staticTexts
+            .matching(NSPredicate(format: "label BEGINSWITH 'Result '"))
+            .firstMatch
+        let before = counter.exists ? counter.label : nil
+        app.typeKey("k", modifierFlags: [])
+        let deadline = Date().addingTimeInterval(5)
+        var keyArrived = false
+        while Date() < deadline {
+            if counter.exists, counter.label != before {
+                keyArrived = true
+                break
+            }
+            usleep(250_000)
+        }
+        attachScreenshot(named: "ux-escape-sheet-still-up")
+        guard keyArrived else {
+            throw XCTSkip(
+                "The simulator delivered no hardware key (the k control did not step the walk either); the Escape leg is recorded for the device pass."
+            )
+        }
+        XCTFail("Escape at the medium detent left the Search sheet up, while hardware keys do reach the sheet (k stepped the walk).")
+    }
+
+    /// The apply notice sits clear of the footer: Select All stays
+    /// reachable while it shows.
+    func testFooterSelectAllStaysHittableUnderTheApplyNotice() {
+        launchSearchAtMedium()
+        let selectAll = app.buttons["footerSelectAllButton"]
+        XCTAssertTrue(selectAll.waitForExistence(timeout: 10), "The footer's Select All never appeared.")
+        selectAll.tap()
+        let apply = app.buttons["searchApplyButton"]
+        XCTAssertTrue(apply.waitForExistence(timeout: 5), "Apply button not found.")
+        apply.tap()
+
+        let notice = app.staticTexts
+            .matching(NSPredicate(format: "label BEGINSWITH 'Marked '"))
+            .firstMatch
+        XCTAssertTrue(notice.waitForExistence(timeout: 10), "The apply notice never appeared.")
+        XCTAssertTrue(selectAll.isHittable, "The footer's Select All must stay reachable while the apply notice shows.")
+        attachScreenshot(named: "ux-footer-under-apply-notice")
+    }
+
+    /// Dismiss over ticked, unapplied matches asks in an alert with exactly
+    /// one Cancel, and Cancel keeps the sheet.
+    func testDiscardConfirmIsAnAlertWithOneCancel() {
+        launchSearchAtMedium()
+        let selectAll = app.buttons["footerSelectAllButton"]
+        XCTAssertTrue(selectAll.waitForExistence(timeout: 10), "The footer's Select All never appeared.")
+        selectAll.tap()
+        let dismiss = app.buttons["searchDismissButton"]
+        dismiss.tap()
+
+        let alert = app.alerts["Discard selections?"]
+        XCTAssertTrue(alert.waitForExistence(timeout: 10), "Dismiss over unapplied selections must ask in an alert.")
+        let cancels = alert.buttons.matching(NSPredicate(format: "label == 'Cancel'"))
+        XCTAssertEqual(cancels.count, 1, "The Discard confirm must offer exactly one Cancel.")
+        XCTAssertTrue(alert.buttons["Discard"].exists, "The confirm keeps its Discard action.")
+        attachScreenshot(named: "ux-discard-alert-one-cancel")
+
+        cancels.firstMatch.tap()
+        XCTAssertTrue(alert.waitForNonExistence(timeout: 5), "Cancel must close the confirm.")
+        XCTAssertTrue(dismiss.exists, "Cancel keeps the sheet up.")
+    }
+
 }
 
 // MARK: - Editor driving
@@ -108,6 +189,20 @@ nonisolated final class UXFixesUITests: XCTestCase {
 private extension UXFixesUITests {
 
     nonisolated var window: XCUIElement { app.windows.firstMatch }
+
+    /// The 23-page fixture with the Search sheet up at the medium detent,
+    /// a typed query run and its results in.
+    nonisolated func launchSearchAtMedium() {
+        app.launchArguments = [
+            "--uitesting", "--loadTestDocument", "--multipageDoc",
+            "--openSearchSheet", "--searchQuery=Amount", "--searchDetent=medium",
+        ]
+        app.launch()
+        XCTAssertTrue(
+            app.buttons["resultNavNext"].waitForExistence(timeout: 30),
+            "The seeded query returned nothing or the sheet never presented."
+        )
+    }
 
     /// Home → "Try the Sample" → the editor on page 1 of the 3-page sample,
     /// once the text-layer toast has cleared so no drag lands on it.
