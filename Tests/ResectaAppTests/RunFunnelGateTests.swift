@@ -107,4 +107,56 @@ struct RunFunnelGateTests {
         #expect(f.undo.canUndo)
         f.coord.documentState.activePipelineTask = nil
     }
+
+    // MARK: - The purge Re-run after Keep Editing
+
+    // The purge toast fires on the results screen; Keep Editing can return
+    // to the editor before its Re-run is tapped. The preamble moves the
+    // phase only from `.verified` and leaves the search session for the
+    // funnel to judge, so a touched, unapplied selection refuses the run
+    // like the Redact button does, and is never dismissed on the way in.
+
+    @Test("Keep Editing, then the purge Re-run with a touched unapplied selection: refused with the hint, the selection kept")
+    func purgeRerunAfterKeepEditingRefusesAndKeepsTheSelection() async {
+        let f = fixture(region: effective)
+        f.coord.documentState.phase = .verified(report: VerificationDebugFixtures.secureAllPass)
+        // Keep Editing: the verified to editing edge.
+        f.coord.documentState.transition(to: .editing)
+        let search = SearchState(defaults: makeScratchDefaults().0)
+        search.results = [SearchResult(
+            pageIndex: 0, normalizedRect: CGRect(x: 0.1, y: 0.1, width: 0.2, height: 0.03),
+            matchedText: "alpha", contextSnippet: "…alpha…", source: .textLayer, term: "alpha", isSelected: true)]
+        search.userModifiedSelections = true
+        f.coord.redactionState.activeSearch = search
+
+        // The purge toast's Re-run, as the scene-phase handler runs it.
+        DocumentEditorView.prepareForPurgeRerun(
+            documentState: f.coord.documentState, redactionState: f.coord.redactionState)
+        f.coord.runFullPipeline(documentOverride: .secureRasterization)
+        let started = f.coord.documentState.activePipelineTask != nil
+        await settle(f.coord)
+
+        #expect(!started)
+        #expect(f.coord.documentState.phaseKind == .editing)
+        #expect(f.coord.redactionState.activeSearch === search,
+                "the preamble leaves the session for the funnel to judge")
+        #expect(search.results.first?.isSelected == true)
+        #expect(search.userModifiedSelections)
+        #expect(f.toasts.activeToasts.map(\.message) == [DocumentState.RedactRefusal.selectedMatches.hint])
+    }
+
+    @Test("The purge Re-run from the results screen still starts the run")
+    func purgeRerunFromTheResultsScreenStartsTheRun() async {
+        let f = fixture(region: effective)
+        f.coord.documentState.phase = .verified(report: VerificationDebugFixtures.secureAllPass)
+
+        DocumentEditorView.prepareForPurgeRerun(
+            documentState: f.coord.documentState, redactionState: f.coord.redactionState)
+        f.coord.runFullPipeline(documentOverride: .secureRasterization)
+        let started = f.coord.documentState.activePipelineTask != nil
+        await settle(f.coord)
+
+        #expect(started)
+        #expect(f.toasts.activeToasts.isEmpty)
+    }
 }
