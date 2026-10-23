@@ -20,7 +20,7 @@ struct PDFDocumentView: UIViewRepresentable {
     var isDrawingMode: Bool
 
     /// Which shape the active drawing tool produces (rectangle,
-    /// polygon, freeform). Ignored when `isDrawingMode == false`.
+    /// polygon). Ignored when `isDrawingMode == false`.
     var activeShapeTool: RedactionOverlayView.ShapeTool = .rectangle
 
     /// iPhone "Select More" toolbar toggle. While on, a tap on a

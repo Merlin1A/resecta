@@ -102,14 +102,10 @@ struct DocumentEditorView: View {
         /// Tap-to-vertex polygon. Double-tap closes the loop and
         /// commits via `coordinator?.addRegion(_:page:undoManager:)`.
         case polygon
-        /// Continuous-touch freeform stroke. On touch-up, the raw
-        /// touch path is simplified via Douglas-Peucker to ≤ 32 vertices
-        /// (tolerance 2 pt × 1/zoomScale) before commit.
-        case freeform
     }
 
-    /// V1.0 ships rectangle + tap-to-redact only; the polygon and freeform
-    /// draw-tool toolbar entries are gated off behind this flag. Flip it to
+    /// V1.0 ships rectangle + tap-to-redact only; the polygon
+    /// draw-tool toolbar entry is gated off behind this flag. Flip it to
     /// `true` to re-enable their UI — the drawing engine, canvas overlay,
     /// gesture state machine, and their full test suites are intentionally
     /// preserved and stay compiled and green, so revival is a one-line flip.
@@ -138,7 +134,6 @@ struct DocumentEditorView: View {
         switch tool {
         case .none, .some(.rectangle): return .rectangle
         case .some(.polygon): return .polygon
-        case .some(.freeform): return .freeform
         }
     }
 
@@ -766,11 +761,11 @@ struct DocumentEditorView: View {
             .accessibilityValue(activeTool == .rectangle
                                 ? "Drawing mode active" : "Tap to enter drawing mode")
 
-            // V1.0: the polygon + freeform draw tools are gated off for
+            // V1.0: the polygon draw tool is gated off for
             // launch; see `advancedDrawToolsEnabled`. The engine, overlay,
             // and tests are preserved, and the downstream hint-capsule /
             // Escape branches stay inert because `activeTool` can no longer
-            // become `.polygon` / `.freeform` while the buttons are hidden.
+            // become `.polygon` while the button is hidden.
             if Self.advancedDrawToolsEnabled {
                 // Polygon tool — tap-to-vertex. Close
                 // the loop by tapping the first vertex (a ring appears
@@ -788,17 +783,6 @@ struct DocumentEditorView: View {
                 .accessibilityValue(activeTool == .polygon
                                     ? "Polygon drawing mode active"
                                     : "Tap to enter polygon drawing mode")
-
-                // Freeform tool — continuous-touch path simplified to
-                // ≤ 32 vertices on touch-up.
-                Button("Freeform", systemImage: "scribble") {
-                    activeTool = activeTool == .freeform ? nil : .freeform
-                }
-                .tint(activeTool == .freeform ? ResectaTokens.BrandTeal.tint : nil)
-                .accessibilityIdentifier("freeformTool")
-                .accessibilityValue(activeTool == .freeform
-                                    ? "Freeform drawing mode active"
-                                    : "Tap to enter freeform drawing mode")
             }
 
             // Two peer entry points into the one search-and-scan sheet

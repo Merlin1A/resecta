@@ -8,7 +8,7 @@ import RedactionEngine
 // are the three methods below, each drawn exactly as the body drew them
 // (the committed regions; the search layer — live preview, highlights,
 // the walk's ring; the in-progress shapes — rubber band, polygon,
-// freeform, marquee, the resize label), followed by the helpers those
+// marquee, the resize label), followed by the helpers those
 // segments call (polygon fill, resize handles, the type badge, the
 // dimension label, the snap guides and text-snap ticks).
 
@@ -148,7 +148,7 @@ extension RedactionOverlayView {
     }
 
     /// The in-progress shapes — the rubber band, the polygon under
-    /// construction, the freeform stroke, the lasso marquee and the
+    /// construction, the lasso marquee and the
     /// resize dimension label — the last segment of `draw(_:)`.
     func drawInProgressShapes(ctx: CGContext) {
         // Draw in-progress rubber-band rectangle
@@ -216,22 +216,6 @@ extension RedactionOverlayView {
                 ctx.setLineDash(phase: 0, lengths: [])
                 ctx.strokeEllipse(in: ringRect)
             }
-            ctx.restoreGState()
-        }
-
-        // In-progress freeform stroke. Stroke the polyline only —
-        // the closed fill happens at commit so the user sees the live
-        // path as a stroke and not a filling shape.
-        if freeformPath.count >= 2 {
-            ctx.saveGState()
-            ctx.setStrokeColor(UIColor.systemBlue.cgColor)
-            ctx.setLineWidth(2.0)
-            ctx.setLineDash(phase: 0, lengths: [])
-            ctx.move(to: freeformPath[0])
-            for p in freeformPath.dropFirst() {
-                ctx.addLine(to: p)
-            }
-            ctx.strokePath()
             ctx.restoreGState()
         }
 

@@ -21,13 +21,10 @@ class RedactionOverlayView: UIView {
     /// Shape produced when drawing is active. `.rectangle` (default)
     /// keeps the existing rubber-band drag → rectangle commit path.
     /// `.polygon` builds a vertex list on each tap; double-tap closes the
-    /// loop and commits. `.freeform` accumulates touch points during a
-    /// continuous drag and on touch-up runs Douglas-Peucker simplification
-    /// to ≤ 32 vertices (tolerance 2 pt × 1/zoomScale).
+    /// loop and commits.
     enum ShapeTool: Equatable {
         case rectangle
         case polygon
-        case freeform
     }
     var activeShapeTool: ShapeTool = .rectangle
 
@@ -88,7 +85,7 @@ class RedactionOverlayView: UIView {
     /// state reset from updateUIView.
     private(set) var isActivelyDragging: Bool = false
 
-    // MARK: - Polygon / Freeform Drawing State
+    // MARK: - Polygon Drawing State
 
     /// Vertices accumulated for the in-progress
     /// polygon, in overlay-space points. Each tap appends; a tap inside
@@ -110,29 +107,8 @@ class RedactionOverlayView: UIView {
     static let firstVertexRingDiameter: CGFloat = 16.0
     /// Baseline dedup tolerance for polygon taps near
     /// the previous vertex, in overlay-space points at 1× zoom. Active
-    /// tolerance is `baseline / zoomScale` (same scaling rule as
-    /// `freeformDouglasPeuckerToleranceAtUnitZoom`). 2 pt matches the
-    /// freeform baseline so the rejected-near-duplicate band is the
-    /// same magnitude both routes use.
+    /// tolerance is `baseline / zoomScale`.
     static let polygonVertexDeduplicationDistance: CGFloat = 2.0
-
-    /// Live touch path for the freeform tool, in overlay-space
-    /// points. Accumulated in `touchesMoved`; simplified via
-    /// Douglas-Peucker in `touchesEnded` before commit.
-    var freeformPath: [CGPoint] = []
-    /// Zoom scale captured at the start of a freeform drag — used
-    /// to scale Douglas-Peucker tolerance by `1/zoomScale`. Defaults to
-    /// 1.0 when no enclosing PDFView exists in the view hierarchy.
-    private var freeformZoomScale: CGFloat = 1.0
-    /// Tolerance baseline at zoom 1×. Multiplied by `1/zoomScale`
-    /// to produce the active tolerance — so a finger drift at 2× zoom is
-    /// treated as half a point of real geometry. Locked at 2 pt; do not
-    /// tune.
-    static let freeformDouglasPeuckerToleranceAtUnitZoom: CGFloat = 2.0
-    /// Hard cap on simplified vertex count. Polygon storage is
-    /// O(vertices) in the schema; capping the count keeps verify cost
-    /// bounded. Locked at 32; do not raise.
-    static let maxPolygonVertices: Int = 32
 
     // MARK: - Move State
 
@@ -572,14 +548,6 @@ class RedactionOverlayView: UIView {
                     notification: .announcement,
                     argument: "Polygon vertex \(polygonVertices.count)"
                 )
-            case .freeform:
-                freeformPath = [point]
-                freeformZoomScale = currentZoomScale()
-                isActivelyDragging = true
-                UIAccessibility.post(
-                    notification: .announcement,
-                    argument: "Drawing freeform region"
-                )
             }
             return
         }
@@ -649,14 +617,14 @@ class RedactionOverlayView: UIView {
         }
     }
 
-    // MARK: - Polygon / Freeform Helpers
+    // MARK: - Polygon Helpers
 
     /// Current zoom scale on the enclosing `PDFView`, used to scale the
-    /// Douglas-Peucker tolerance for the freeform tool. Walks up the
+    /// zoom-dependent tolerances. Walks up the
     /// view hierarchy to locate the `PDFView`; defaults to 1.0 when no
     /// PDFView ancestor exists (test surfaces synthesise the overlay
     /// without a PDFView parent — the unit-zoom default keeps the
-    /// simplification under test deterministic).
+    /// tolerances under test deterministic).
     private func currentZoomScale() -> CGFloat {
         var view: UIView? = self
         while view != nil {
@@ -679,8 +647,7 @@ class RedactionOverlayView: UIView {
     /// scaled by `fingerScale` so it is a screen-point tolerance. A
     /// thinner polygon is rejected with the rectangle path's haptic and
     /// nothing is committed; every caller discards the in-progress
-    /// geometry afterwards. The freeform tool commits through this same
-    /// path, so the floor covers it too.
+    /// geometry afterwards.
     private func commitPolygonRegion(vertices: [CGPoint]) {
         guard vertices.count >= 3 else { return }
         let overlayBounds = Self.boundingBox(of: vertices)
@@ -731,108 +698,6 @@ class RedactionOverlayView: UIView {
         let h = bounds.height
         guard w > 0, h > 0 else { return .zero }
         return CGPoint(x: point.x / w, y: 1.0 - point.y / h)
-    }
-
-    /// Douglas-Peucker simplification on `points` with tolerance
-    /// `epsilon` (overlay-space points). Returns a simplified polyline
-    /// preserving the first and last points. Used by the freeform tool
-    /// to reduce raw touch streams (typically 100+ points) to
-    /// ≤ `maxPolygonVertices` vertices.
-    ///
-    /// If the initial pass produces more than `maxVertices` points, the
-    /// tolerance is doubled and the algorithm re-runs until the count
-    /// fits. This is the locked simplification strategy;
-    /// the per-iteration doubling is a deterministic backoff that
-    /// converges in ≤ 10 iterations for any realistic touch stream.
-    static func simplifyDouglasPeucker(
-        _ points: [CGPoint],
-        epsilon: CGFloat,
-        maxVertices: Int = maxPolygonVertices
-    ) -> [CGPoint] {
-        guard points.count > 2 else { return points }
-        var eps = max(epsilon, 0.0001)
-        var iterations = 0
-        while iterations < 16 {
-            let simplified = douglasPeuckerStep(points, epsilon: eps)
-            if simplified.count <= maxVertices {
-                return simplified
-            }
-            eps *= 2
-            iterations += 1
-        }
-        // Hard fallback: uniformly subsample.
-        return uniformSubsample(points, target: maxVertices)
-    }
-
-    private static func douglasPeuckerStep(
-        _ points: [CGPoint], epsilon: CGFloat
-    ) -> [CGPoint] {
-        guard points.count > 2 else { return points }
-        var keep = [Bool](repeating: false, count: points.count)
-        keep[0] = true
-        keep[points.count - 1] = true
-        douglasPeuckerRecurse(
-            points: points, start: 0, end: points.count - 1,
-            epsilon: epsilon, keep: &keep
-        )
-        return zip(points, keep).compactMap { $1 ? $0 : nil }
-    }
-
-    private static func douglasPeuckerRecurse(
-        points: [CGPoint], start: Int, end: Int,
-        epsilon: CGFloat, keep: inout [Bool]
-    ) {
-        guard end > start + 1 else { return }
-        let a = points[start]
-        let b = points[end]
-        var maxDist: CGFloat = 0
-        var maxIndex = start
-        for i in (start + 1)..<end {
-            let d = perpendicularDistance(point: points[i], a: a, b: b)
-            if d > maxDist {
-                maxDist = d
-                maxIndex = i
-            }
-        }
-        if maxDist > epsilon {
-            keep[maxIndex] = true
-            douglasPeuckerRecurse(
-                points: points, start: start, end: maxIndex,
-                epsilon: epsilon, keep: &keep
-            )
-            douglasPeuckerRecurse(
-                points: points, start: maxIndex, end: end,
-                epsilon: epsilon, keep: &keep
-            )
-        }
-    }
-
-    private static func perpendicularDistance(
-        point p: CGPoint, a: CGPoint, b: CGPoint
-    ) -> CGFloat {
-        let dx = b.x - a.x
-        let dy = b.y - a.y
-        let lenSq = dx * dx + dy * dy
-        guard lenSq > 0 else {
-            let ddx = p.x - a.x
-            let ddy = p.y - a.y
-            return (ddx * ddx + ddy * ddy).squareRoot()
-        }
-        // |(b - a) × (a - p)| / |b - a|
-        let numer = abs(dy * p.x - dx * p.y + b.x * a.y - b.y * a.x)
-        return numer / lenSq.squareRoot()
-    }
-
-    private static func uniformSubsample(_ points: [CGPoint], target: Int) -> [CGPoint] {
-        guard points.count > target, target >= 2 else { return points }
-        var result: [CGPoint] = []
-        result.reserveCapacity(target)
-        let step = Double(points.count - 1) / Double(target - 1)
-        for i in 0..<target {
-            let idx = Int((Double(i) * step).rounded())
-            result.append(points[min(idx, points.count - 1)])
-        }
-        return result
     }
 
     // MARK: - Move Helpers
@@ -948,22 +813,6 @@ class RedactionOverlayView: UIView {
                 height: abs(point.y - origin.y)
             )
             setNeedsDisplay()
-        } else if isDrawingMode && activeShapeTool == .freeform
-                  && !freeformPath.isEmpty {
-            // Accumulate freeform stroke points. Collapse near-
-            // duplicate points (< 1 pt apart) to keep the raw stream
-            // bounded — even at 240 Hz a sub-pixel append is wasted work.
-            if let last = freeformPath.last {
-                let dxp = point.x - last.x
-                let dyp = point.y - last.y
-                if dxp * dxp + dyp * dyp > 1 {
-                    freeformPath.append(point)
-                    setNeedsDisplay()
-                }
-            } else {
-                freeformPath.append(point)
-                setNeedsDisplay()
-            }
         } else if let origin = dragOrigin {
             // Draw new region — the 8-pt start gate applies only until the
             // first over-threshold move; after that the band tracks the
@@ -1207,22 +1056,6 @@ class RedactionOverlayView: UIView {
             return
         }
 
-        // Commit freeform stroke. Simplify via Douglas-Peucker
-        // first; tolerance scales by 1/zoomScale. Need at least 3 unique
-        // points for a closed polygon — short streaks are dropped.
-        if isDrawingMode && activeShapeTool == .freeform && !freeformPath.isEmpty {
-            let tolerance =
-                Self.freeformDouglasPeuckerToleranceAtUnitZoom
-                / max(freeformZoomScale, 0.01)
-            let simplified = Self.simplifyDouglasPeucker(
-                freeformPath, epsilon: tolerance
-            )
-            if simplified.count >= 3 {
-                commitPolygonRegion(vertices: simplified)
-            }
-            return
-        }
-
         // Polygon tool — touch-up after a single tap is a no-op
         // (the vertex was already appended in touchesBegan). No commit
         // here; commit happens on double-tap.
@@ -1273,7 +1106,7 @@ class RedactionOverlayView: UIView {
             // Undo the in-progress resize by re-configuring from state
             coordinator?.refreshOverlay(for: pageIndex)
         }
-        // A system-level cancel during polygon/freeform discards
+        // A system-level cancel during a polygon discards
         // the in-progress shape — the user's intent was lost, do not
         // commit half a polygon.
         discardInProgressPolygon()
@@ -1307,12 +1140,6 @@ class RedactionOverlayView: UIView {
         // Text-snap tick cleanup. Ticks are transient — they
         // exist only while the drag is producing edge matches.
         activeTextSnapTicks = []
-        // Freeform stroke cleanup. NOTE: polygonVertices is
-        // intentionally NOT reset here — polygon tap-to-vertex
-        // accumulates across multiple touch sequences and only resets
-        // on commit, escape, or tool deactivation.
-        freeformPath = []
-        freeformZoomScale = 1.0
         // Repaint on gesture end. The commit paths
         // run under `isActivelyDragging`, which makes the coordinator's
         // `configure` a no-op, and the later state sync sees `regions`

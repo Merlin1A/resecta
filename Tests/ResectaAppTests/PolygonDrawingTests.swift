@@ -4,102 +4,27 @@ import CoreGraphics
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// Polygon + freeform drawing gesture tests.
+// Polygon drawing gesture tests.
 //
 // The polygon tool collects vertices on each tap; once `count >= 3`,
 // a tap inside `polygonCloseRadius` of the first vertex closes the
 // loop and commits a `RedactionRegion` with non-nil `vertices`. A tap
 // within `polygonVertexDeduplicationDistance / zoomScale` of the
-// previous vertex is silently rejected. The freeform tool accumulates
-// touch points during a drag; on touch-up, Douglas-Peucker simplifies
-// the raw stream to ≤ 32 vertices (tolerance 2 pt × 1/zoomScale).
-// Both routes commit through `coordinator?.addRegion(_:page:undoManager:)`
+// previous vertex is silently rejected. The polygon commits through
+// `coordinator?.addRegion(_:page:undoManager:)`
 // — the same path the rectangle tool uses — so undo + observers are
 // uniform across shapes.
 //
-// SECURITY: regions committed via polygon/freeform must always carry
+// SECURITY: regions committed via the polygon must always carry
 // the `vertices` array. The engine consults `vertices` to choose
 // polygon-vs-rect fill / verify; a polygon that lands with
 // `vertices == nil` would silently fall back to bounding-box redaction
 // — a quiet under-redaction. The "tapSequenceBuildsVertices" test
-// pins the vertex count; the freeform tests pin the simplification.
+// pins the vertex count.
 
-@Suite("Polygon + Freeform Drawing")
+@Suite("Polygon Drawing")
 @MainActor
 struct PolygonDrawingTests {
-
-    // MARK: - Douglas-Peucker simplification
-
-    @Test("Long touch stream simplifies to ≤ 32 vertices")
-    func testFreeformSimplifiesTo32Vertices() {
-        // Synthesize a 300-point touch stream tracing a circle. At
-        // tolerance 2 pt the simplifier should collapse this to a
-        // small handful of vertices; at any reasonable tolerance the
-        // count must be ≤ 32.
-        var stream: [CGPoint] = []
-        let count = 300
-        let cx: CGFloat = 200
-        let cy: CGFloat = 200
-        let r: CGFloat = 100
-        for i in 0..<count {
-            let theta = (CGFloat(i) / CGFloat(count)) * 2 * .pi
-            stream.append(CGPoint(
-                x: cx + r * cos(theta),
-                y: cy + r * sin(theta)
-            ))
-        }
-        let simplified = RedactionOverlayView.simplifyDouglasPeucker(
-            stream, epsilon: 2.0
-        )
-        #expect(simplified.count <= RedactionOverlayView.maxPolygonVertices,
-                "simplified=\(simplified.count) must be ≤ \(RedactionOverlayView.maxPolygonVertices)")
-        #expect(simplified.count >= 3,
-                "simplified=\(simplified.count) must be at least 3 to form a polygon")
-    }
-
-    @Test("Tolerance at 1× is 2 pt; at 0.5× zoom is 4 pt; at 2× zoom is 1 pt")
-    func testFreeformToleranceScalesWithZoom() {
-        // The active tolerance is `baseline / zoomScale`. Pin the math
-        // at three locked scales.
-        let baseline = RedactionOverlayView.freeformDouglasPeuckerToleranceAtUnitZoom
-        #expect(baseline == 2.0)
-        let halfZoom: CGFloat = 0.5
-        let doubleZoom: CGFloat = 2.0
-        let oneZoom: CGFloat = 1.0
-        #expect(baseline / oneZoom == 2.0)
-        #expect(baseline / halfZoom == 4.0)
-        #expect(baseline / doubleZoom == 1.0)
-    }
-
-    @Test("Simplifying a near-straight zig-zag drops mid points")
-    func testDouglasPeuckerDropsMidPoints() {
-        // Three collinear points: simplification with tolerance > 0
-        // must keep only the endpoints.
-        let line = [
-            CGPoint(x: 0, y: 0),
-            CGPoint(x: 50, y: 0),
-            CGPoint(x: 100, y: 0),
-        ]
-        let simplified = RedactionOverlayView.simplifyDouglasPeucker(
-            line, epsilon: 1.0
-        )
-        #expect(simplified.count == 2)
-    }
-
-    @Test("Simplifying a sharp triangle keeps the apex")
-    func testDouglasPeuckerKeepsSharpFeatures() {
-        // Two endpoints + a tall apex that exceeds the tolerance must
-        // survive simplification.
-        let triangle = [
-            CGPoint(x: 0, y: 0),
-            CGPoint(x: 50, y: 100),  // 100 pt off the baseline
-            CGPoint(x: 100, y: 0),
-        ]
-        let simplified = RedactionOverlayView.simplifyDouglasPeucker(
-            triangle, epsilon: 2.0
-        )
-        #expect(simplified.count == 3)
-    }
 
     // MARK: - Shape tool mapping
 
@@ -108,7 +33,6 @@ struct PolygonDrawingTests {
         #expect(DocumentEditorView.shapeTool(for: nil) == .rectangle)
         #expect(DocumentEditorView.shapeTool(for: .rectangle) == .rectangle)
         #expect(DocumentEditorView.shapeTool(for: .polygon) == .polygon)
-        #expect(DocumentEditorView.shapeTool(for: .freeform) == .freeform)
     }
 
     // MARK: - Polygon caption (pure function)
@@ -125,8 +49,6 @@ struct PolygonDrawingTests {
             activeTool: .rectangle, vertexCount: 3) == nil)
         #expect(DocumentEditorView.polygonCaption(
             activeTool: nil, vertexCount: 0) == nil)
-        #expect(DocumentEditorView.polygonCaption(
-            activeTool: .freeform, vertexCount: 5) == nil)
     }
 
     @Test("polygonCaption at count 0 invites the first vertex")
@@ -326,7 +248,7 @@ struct PolygonDrawingTests {
 
     @Test("Polygon dedup tolerance scales with zoom: 2 pt at 1×, 4 pt at 0.5×, 1 pt at 2×")
     func testPolygonDedupToleranceScalesWithZoom() {
-        // Mirror `testFreeformToleranceScalesWithZoom`: active tolerance
+        // Active tolerance
         // is `baseline / zoomScale`. Pin the math at three locked
         // scales so a future refactor of the baseline constant has to
         // own the regression.
