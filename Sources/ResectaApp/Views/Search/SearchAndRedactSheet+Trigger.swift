@@ -51,6 +51,8 @@ extension SearchAndRedactSheet {
         searchDebounceTask = Task {
             try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled else { return }
+            // Typing refines the query; its run names no cleared matches.
+            searchState.skipNextRerunNotice = true
             triggerSearch()
         }
     }
@@ -179,7 +181,7 @@ extension SearchAndRedactSheet {
         // results land, surfacing the Coverage Report diff line.
         searchState.captureFingerprintsBeforeScan()
         let unapplied = searchState.skipNextRerunNotice ? 0 : Self.unappliedMatchCount(in: searchState)
-        searchState.skipNextRerunNotice = false  // a recall names its own drop
+        searchState.skipNextRerunNotice = false  // one shot (a recall, or an as-you-type run)
         searchState.clearResults()
         if let message = Self.rerunClearedMessage(unappliedCount: unapplied) { toastManager.enqueue(message, severity: .info) }
         // The token this run's results and progress hops carry: a

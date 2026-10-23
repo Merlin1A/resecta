@@ -41,8 +41,8 @@ final class SearchState: Identifiable {
     /// `appliedSearchRecord()` so the record reproduces the run.
     var lastRunScanConfiguration: ScanRunConfiguration?
 
-    /// One shot: the next run posts no re-run notice (a saved-search
-    /// recall names the matches it clears itself). Reset by that run.
+    /// One shot: the next run posts no re-run notice (a recall names its own
+    /// drop; an as-you-type run refines the query). Reset by that run.
     var skipNextRerunNotice = false
 
     /// One-shot arm for the toolbar Scan button's one-tap contract:
