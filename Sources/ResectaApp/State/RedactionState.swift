@@ -510,6 +510,15 @@ class RedactionState {
         if let documentState, !documentState.canMutateRegions {
             return nil
         }
+        let outcome = ApplyOutcome(
+            applied: prepared.appliedCount,
+            skippedOverlaps: prepared.skippedOverlaps,
+            appliedResultIDs: prepared.appliedResultIDs,
+            coveredResultIDs: prepared.coveredResultIDs
+        )
+        // A selection the regions already cover creates nothing, so it
+        // commits nothing: no version bump, no empty undo step.
+        guard prepared.appliedCount > 0 else { return outcome }
 
         commitApply(
             createdRegions: prepared.createdRegions,
@@ -527,12 +536,7 @@ class RedactionState {
         // panel and the live-session pipeline-entry path use.
         pendingRunDeselection = search.deselectionSnapshotForRun()
         // Caller is responsible for clearing activeSearch after showing feedback.
-        return ApplyOutcome(
-            applied: prepared.appliedCount,
-            skippedOverlaps: prepared.skippedOverlaps,
-            appliedResultIDs: prepared.appliedResultIDs,
-            coveredResultIDs: prepared.coveredResultIDs
-        )
+        return outcome
     }
 
     /// Single-result search origin: the
@@ -558,11 +562,11 @@ class RedactionState {
     /// One result needs no detached prepare, so nothing suspends between
     /// the mutation guard in `applyFindings` and the commit — the
     /// post-suspension re-check the bulk origin needs has no window
-    /// here. Two differences by design: a covered result creates
-    /// nothing, so it commits nothing (no version bump, no empty undo
-    /// step — an inert apply must not signal a region mutation); and
-    /// this is a PARTIAL commit — the remaining selections stay live
-    /// work, which the dismiss rule reads from the rows (the
+    /// here. As in the bulk origin, a covered result creates nothing,
+    /// so it commits nothing (no version bump, no empty undo step — an
+    /// inert apply must not signal a region mutation). One difference by
+    /// design: this is a PARTIAL commit — the remaining selections stay
+    /// live work, which the dismiss rule reads from the rows (the
     /// entity-group rule).
     func applySearchResultOrigin(
         id: UUID,
