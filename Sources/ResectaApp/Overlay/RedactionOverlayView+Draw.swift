@@ -7,8 +7,8 @@ import RedactionEngine
 // context, the dirty-rect clip and the ORDER; its body's three segments
 // are the three methods below, each drawn exactly as the body drew them
 // (the committed regions; the search layer — live preview, highlights,
-// the walk's ring; the in-progress shapes — rubber band, polygon,
-// freeform, marquee, the resize label), followed by the helpers those
+// the walk's ring; the in-progress shapes — rubber band,
+// marquee, the resize label), followed by the helpers those
 // segments call (polygon fill, resize handles, the type badge, the
 // dimension label, the snap guides and text-snap ticks).
 
@@ -147,8 +147,7 @@ extension RedactionOverlayView {
         }
     }
 
-    /// The in-progress shapes — the rubber band, the polygon under
-    /// construction, the freeform stroke, the lasso marquee and the
+    /// The in-progress shapes — the rubber band, the lasso marquee and the
     /// resize dimension label — the last segment of `draw(_:)`.
     func drawInProgressShapes(ctx: CGContext) {
         // Draw in-progress rubber-band rectangle
@@ -161,78 +160,6 @@ extension RedactionOverlayView {
             ctx.drawPath(using: .fillStroke)
             // Dimension label during drawing
             drawDimensionLabel(ctx: ctx, rect: dragRect)
-        }
-
-        // Dashed close-preview + first-vertex close ring.
-        // Render edges between collected vertices and small dots at each
-        // vertex so the user can see where their taps landed. Once
-        // `count >= 3`, also stroke a dashed segment from the last
-        // vertex back to the first and ring the first vertex so the
-        // close target is visible.
-        if !polygonVertices.isEmpty {
-            ctx.saveGState()
-            ctx.setStrokeColor(UIColor.systemBlue.cgColor)
-            ctx.setFillColor(UIColor.systemBlue.withAlphaComponent(0.15).cgColor)
-            ctx.setLineWidth(2.0)
-            ctx.setLineDash(phase: 0, lengths: [])
-
-            if polygonVertices.count >= 2 {
-                ctx.move(to: polygonVertices[0])
-                for v in polygonVertices.dropFirst() {
-                    ctx.addLine(to: v)
-                }
-                ctx.strokePath()
-            }
-
-            if polygonVertices.count >= 3,
-               let first = polygonVertices.first,
-               let last = polygonVertices.last {
-                ctx.saveGState()
-                ctx.setStrokeColor(
-                    UIColor.systemBlue.withAlphaComponent(0.5).cgColor
-                )
-                ctx.setLineDash(phase: 0, lengths: [6, 3])
-                ctx.move(to: last)
-                ctx.addLine(to: first)
-                ctx.strokePath()
-                ctx.restoreGState()
-            }
-
-            for v in polygonVertices {
-                let dotRect = CGRect(x: v.x - 4, y: v.y - 4, width: 8, height: 8)
-                ctx.setFillColor(UIColor.systemBlue.cgColor)
-                ctx.fillEllipse(in: dotRect)
-            }
-
-            if polygonVertices.count >= 3, let first = polygonVertices.first {
-                let radius = Self.firstVertexRingDiameter / 2
-                let ringRect = CGRect(
-                    x: first.x - radius, y: first.y - radius,
-                    width: Self.firstVertexRingDiameter,
-                    height: Self.firstVertexRingDiameter
-                )
-                ctx.setStrokeColor(UIColor.systemBlue.cgColor)
-                ctx.setLineWidth(2.0)
-                ctx.setLineDash(phase: 0, lengths: [])
-                ctx.strokeEllipse(in: ringRect)
-            }
-            ctx.restoreGState()
-        }
-
-        // In-progress freeform stroke. Stroke the polyline only —
-        // the closed fill happens at commit so the user sees the live
-        // path as a stroke and not a filling shape.
-        if freeformPath.count >= 2 {
-            ctx.saveGState()
-            ctx.setStrokeColor(UIColor.systemBlue.cgColor)
-            ctx.setLineWidth(2.0)
-            ctx.setLineDash(phase: 0, lengths: [])
-            ctx.move(to: freeformPath[0])
-            for p in freeformPath.dropFirst() {
-                ctx.addLine(to: p)
-            }
-            ctx.strokePath()
-            ctx.restoreGState()
         }
 
         // Draw in-progress lasso marquee. Distinguished from the
