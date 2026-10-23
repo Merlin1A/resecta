@@ -495,7 +495,8 @@ class RedactionState {
                 results: resultsSnapshot,
                 appliedIDs: appliedSnapshot,
                 suppressed: manualDrawNudgeSuppressedForSession,
-                proximityNormalized: RedactionState.manualDrawNudgeProximityNormalized
+                proximityNormalized: RedactionState.manualDrawNudgeProximityNormalized,
+                coveringRects: regions[page]?.map(\.normalizedRect) ?? []
             ) {
                 pendingManualDrawNudge = match
             }
@@ -1021,12 +1022,11 @@ class RedactionState {
     ///   qualify — the nudge is specifically about PII discovery).
     /// - `result.id` is NOT in `appliedIDs` — the user has not already
     ///   redacted this match through the apply flow.
-    /// - The result's normalized rect does NOT overlap the new region
-    ///   by > 80 %; an overlap that large means the user already drew
-    ///   over the candidate, and prompting them to "add" it again
-    ///   would be redundant. The 80 % gate matches
-    ///   the search-origin apply's skip-on-overlap rule so both
-    ///   surfaces use the same overlap arithmetic.
+    /// - No region covers the result (`resultIsCovered`): not the new
+    ///   region and none of `coveringRects`, the page's other live
+    ///   regions. A covered name is already redacted, and prompting the
+    ///   user to "add" it again would be redundant. The apply's
+    ///   skip-on-overlap reads the same rule.
     /// - Edge-to-edge normalized distance ≤ `proximityNormalized`.
     /// Bypassed entirely when `suppressed` is true so a session-
     /// suppressed user never re-incurs the per-result scan cost.
@@ -1038,7 +1038,8 @@ class RedactionState {
         results: [SearchResult],
         appliedIDs: Set<UUID>,
         suppressed: Bool,
-        proximityNormalized: CGFloat
+        proximityNormalized: CGFloat,
+        coveringRects: [CGRect] = []
     ) -> SearchResult? {
         guard !suppressed else { return nil }
         guard !results.isEmpty else { return nil }
@@ -1048,14 +1049,7 @@ class RedactionState {
             guard result.piiCategory != nil else { continue }
             guard !appliedIDs.contains(result.id) else { continue }
             let resultRect = result.normalizedRect
-            let intersection = addedRect.intersection(resultRect)
-            if !intersection.isNull {
-                let overlapArea = intersection.width * intersection.height
-                let resultArea = resultRect.width * resultRect.height
-                if resultArea > 0 && overlapArea / resultArea > 0.8 {
-                    continue
-                }
-            }
+            if resultIsCovered(resultRect, by: [addedRect] + coveringRects) { continue }
             let dx = max(0, max(addedRect.minX - resultRect.maxX,
                                 resultRect.minX - addedRect.maxX))
             let dy = max(0, max(addedRect.minY - resultRect.maxY,

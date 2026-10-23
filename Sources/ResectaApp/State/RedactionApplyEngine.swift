@@ -150,6 +150,16 @@ extension RedactionState {
 
 // MARK: - Apply prepare helper
 
+/// The one coverage rule the apply's skip and the draw nudge share: a
+/// result is covered when a single rect overlaps more than 80 % of its area.
+nonisolated func resultIsCovered(_ resultRect: CGRect, by rects: [CGRect]) -> Bool {
+    let resultArea = resultRect.width * resultRect.height
+    return resultArea > 0 && rects.contains { rect in
+        let overlap = resultRect.intersection(rect)
+        return !overlap.isNull && overlap.width * overlap.height / resultArea > 0.8
+    }
+}
+
 /// Sendable bundle returned by the detached `prepareApply` step.
 struct PreparedApply: Sendable {
     let createdRegions: [Int: [RedactionRegion]]
@@ -207,16 +217,8 @@ nonisolated func prepareApply(
     var coveredResultIDs: Set<UUID> = []
 
     for result in selected {
-        // Skip results that overlap > 80% with existing regions.
-        let existingRects = existingRectsByPage[result.pageIndex] ?? []
-        let overlaps = existingRects.contains { existing in
-            let intersection = result.normalizedRect.intersection(existing)
-            guard !intersection.isNull else { return false }
-            let overlapArea = intersection.width * intersection.height
-            let resultArea = result.normalizedRect.width * result.normalizedRect.height
-            return resultArea > 0 && overlapArea / resultArea > 0.8
-        }
-        if overlaps {
+        // Skip results an existing region already covers.
+        if resultIsCovered(result.normalizedRect, by: existingRectsByPage[result.pageIndex] ?? []) {
             skippedOverlaps += 1
             coveredResultIDs.insert(result.id)
             continue
