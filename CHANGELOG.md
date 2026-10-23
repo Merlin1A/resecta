@@ -47,6 +47,9 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - The workspace's in-editor file importer and its "Replace the open document?" dialog, which nothing could present (the drop target stays), and the second sample packet bundled with no screen that opened it.
 - The paused-detection resume path.
 - The unreachable face, barcode and signature detection code.
+- The detection review that nothing staged any more: its list in the Scan interface, its walk and counter, the cross-page grouping, the banner's Review button, and the long-press menu over recognized words that opened a pre-selected search.
+- Settings: the "Reset Detection History" row and the on-device accept and reject counts it cleared; only the removed review recorded them, and no scan read them.
+- The Pencil circle-to-select on the search results; the app runs on iPhone, where no Pencil touch arrives.
 
 ### Security
 
@@ -141,6 +144,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ### Internal
 
+- Stubs the deleted detection run left behind: an always-zero apply count, a recognition level nothing read, a cached region count only tests read, and comments that named the run.
 - CI: the simulator suite runs on every pull request to `main` again, documentation-only ones included, because its honesty tests read the README, ENGINEERING, THREAT-MODEL, PRIVACY and EULA text.
 - CI: the pull-request gate also compiles the engine package's test bundle; the weekly simulator suite leaves out the 12-page searchable preflight and the two suites that call text recognition directly, which stall the hosted runner; the pre-push hook posts a `local-suites` commit status for each pushed commit it passed.
 - Detection: a date-collision rule that could never apply to a nine-digit number is removed.
