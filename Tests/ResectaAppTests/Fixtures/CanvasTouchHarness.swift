@@ -4,7 +4,7 @@ import CoreGraphics
 @testable import RedactionEngine
 
 // Shared canvas touch harness for `RedactionOverlayView` gesture tests
-// (`RectangleDrawGestureTests`, `SnapToTextBoxTests`, `PolygonDrawingTests`).
+// (`RectangleDrawGestureTests`, `SnapToTextBoxTests`).
 // ONE internal copy — the pair used to live as private
 // duplicates in the two older suites.
 //
@@ -69,11 +69,9 @@ final class RecordingCoordinator: PDFViewCoordinator {
     override func updateActiveShapeTool(
         _ tool: RedactionOverlayView.ShapeTool
     ) {
-        let changed = activeShapeTool != tool
         activeShapeTool = tool
         for overlay in testOverlays {
             overlay.activeShapeTool = tool
-            if changed { overlay.discardInProgressPolygon() }
         }
     }
 }

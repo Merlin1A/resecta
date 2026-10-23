@@ -320,4 +320,10 @@ struct RectangleDrawGestureTests {
         #expect(marqueeCoordinator.lassoCommits.count == 1, "tool off: the marquee still runs")
         #expect(marqueeCoordinator.addedRegions.isEmpty)
     }
+
+    @Test("The editor's tool maps to the rectangle shape, and no tool reads as the rectangle")
+    func drawingToolMapsToRectangle() {
+        #expect(DocumentEditorView.shapeTool(for: nil) == .rectangle)
+        #expect(DocumentEditorView.shapeTool(for: .rectangle) == .rectangle)
+    }
 }

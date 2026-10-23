@@ -99,21 +99,7 @@ struct DocumentEditorView: View {
 
     enum DrawingTool {
         case rectangle
-        /// Tap-to-vertex polygon. Double-tap closes the loop and
-        /// commits via `coordinator?.addRegion(_:page:undoManager:)`.
-        case polygon
-        /// Continuous-touch freeform stroke. On touch-up, the raw
-        /// touch path is simplified via Douglas-Peucker to ≤ 32 vertices
-        /// (tolerance 2 pt × 1/zoomScale) before commit.
-        case freeform
     }
-
-    /// V1.0 ships rectangle + tap-to-redact only; the polygon and freeform
-    /// draw-tool toolbar entries are gated off behind this flag. Flip it to
-    /// `true` to re-enable their UI — the drawing engine, canvas overlay,
-    /// gesture state machine, and their full test suites are intentionally
-    /// preserved and stay compiled and green, so revival is a one-line flip.
-    private static let advancedDrawToolsEnabled = false
 
     /// P1.3: single sheet slot for the editor. Precedence search >
     /// rationale is enforced by the binding's getter so two
@@ -137,8 +123,6 @@ struct DocumentEditorView: View {
     static func shapeTool(for tool: DrawingTool?) -> RedactionOverlayView.ShapeTool {
         switch tool {
         case .none, .some(.rectangle): return .rectangle
-        case .some(.polygon): return .polygon
-        case .some(.freeform): return .freeform
         }
     }
 
@@ -288,38 +272,19 @@ struct DocumentEditorView: View {
                     // Run Verification card; see `handleRunVerificationTap`.)
                     // Drawing-mode caption — subtle
                     // banner names the active gesture for the rectangle
-                    // tool, and for the polygon tool also surfaces the
-                    // in-progress vertex count and Cancel / Close polygon
-                    // buttons.
+                    // tool.
                     .overlay(alignment: .bottom) {
                         if DocumentEditorView.drawingModeCaptionShouldShow(
                             activeTool: activeTool,
                             phaseKind: documentState.phaseKind
                         ),
                            let caption = DocumentEditorView.activeDrawingCaption(
-                            activeTool: activeTool,
-                            polygonVertexCount: redactionState
-                                .inProgressPolygonVertexCount
+                            activeTool: activeTool
                            ) {
                             HStack(spacing: ResectaTokens.Spacing.md) {
                                 Text(caption)
                                     .font(.caption.weight(.medium))
                                     .foregroundStyle(.secondary)
-                                if activeTool == .polygon,
-                                   redactionState.inProgressPolygonVertexCount >= 1 {
-                                    Button("Cancel") {
-                                        coordinator.cancelInProgressPolygon()
-                                    }
-                                    .font(.caption.weight(.medium))
-                                    .accessibilityIdentifier("cancelPolygonButton")
-                                    if redactionState.inProgressPolygonVertexCount >= 3 {
-                                        Button("Close polygon") {
-                                            coordinator.commitInProgressPolygon()
-                                        }
-                                        .font(.caption.weight(.medium))
-                                        .accessibilityIdentifier("closePolygonButton")
-                                    }
-                                }
                             }
                                 .padding(.horizontal, ResectaTokens.Spacing.md)
                                 .padding(.vertical, ResectaTokens.Spacing.xs)
@@ -328,9 +293,7 @@ struct DocumentEditorView: View {
                                 .accessibilityElement(children: .contain)
                                 .accessibilityLabel(
                                     DocumentEditorView.captionAccessibilityLabel(
-                                        activeTool: activeTool,
-                                        polygonVertexCount: redactionState
-                                            .inProgressPolygonVertexCount
+                                        activeTool: activeTool
                                     )
                                 )
                                 .transition(.opacity)
@@ -749,8 +712,7 @@ struct DocumentEditorView: View {
             // and signal "active" via .tint only. A wider active glyph (the former
             // rectangle.dashed.badge.checkmark / scribble.variable) grows the leading
             // ToolbarItemGroup past the bar width and collapses the whole group into the
-            // system "…" overflow menu. Polygon keeps hexagon/hexagon.fill — fill variants
-            // share advance width, so that selected cue is width-safe.
+            // system "…" overflow menu.
             Button("Rectangle", systemImage: "rectangle.dashed") {
                 // Draw wins: entering the tool drops the
                 // selection and the Add-to-Selection toggle so the next
@@ -765,41 +727,6 @@ struct DocumentEditorView: View {
             .accessibilityIdentifier("drawTool")
             .accessibilityValue(activeTool == .rectangle
                                 ? "Drawing mode active" : "Tap to enter drawing mode")
-
-            // V1.0: the polygon + freeform draw tools are gated off for
-            // launch; see `advancedDrawToolsEnabled`. The engine, overlay,
-            // and tests are preserved, and the downstream hint-capsule /
-            // Escape branches stay inert because `activeTool` can no longer
-            // become `.polygon` / `.freeform` while the buttons are hidden.
-            if Self.advancedDrawToolsEnabled {
-                // Polygon tool — tap-to-vertex. Close
-                // the loop by tapping the first vertex (a ring appears
-                // around it once count ≥ 3) or by tapping "Close polygon"
-                // in the bottom hint capsule. "Cancel" in the same capsule
-                // discards the in-progress vertex list; Escape does the
-                // same.
-                Button("Polygon", systemImage: activeTool == .polygon
-                       ? "hexagon.fill"
-                       : "hexagon") {
-                    activeTool = activeTool == .polygon ? nil : .polygon
-                }
-                .tint(activeTool == .polygon ? ResectaTokens.BrandTeal.tint : nil)
-                .accessibilityIdentifier("polygonTool")
-                .accessibilityValue(activeTool == .polygon
-                                    ? "Polygon drawing mode active"
-                                    : "Tap to enter polygon drawing mode")
-
-                // Freeform tool — continuous-touch path simplified to
-                // ≤ 32 vertices on touch-up.
-                Button("Freeform", systemImage: "scribble") {
-                    activeTool = activeTool == .freeform ? nil : .freeform
-                }
-                .tint(activeTool == .freeform ? ResectaTokens.BrandTeal.tint : nil)
-                .accessibilityIdentifier("freeformTool")
-                .accessibilityValue(activeTool == .freeform
-                                    ? "Freeform drawing mode active"
-                                    : "Tap to enter freeform drawing mode")
-            }
 
             // Two peer entry points into the one search-and-scan sheet
             // (two interfaces over one chassis). Both open the same
@@ -1191,28 +1118,8 @@ struct DocumentEditorView: View {
     /// what shape the touch will produce.
     static let drawingModeCaption = "Drawing — tap and drag"
 
-    /// Caption text shown while the polygon tool is
-    /// active, keyed on the in-progress vertex count. Three buckets
-    /// match the close-mechanism floors:
-    ///   - count 0   → invite first vertex
-    ///   - count 1-2 → name the 3-vertex close floor
-    ///   - count ≥ 3 → name the tap-on-first-vertex close action
-    /// Returns nil when the active tool is not the polygon — the caption
-    /// overlay then routes through the rectangle caption (or hides).
-    static func polygonCaption(
-        activeTool: DrawingTool?,
-        vertexCount: Int
-    ) -> String? {
-        guard activeTool == .polygon else { return nil }
-        switch vertexCount {
-        case 0: return "Tap to add vertices."
-        case 1, 2: return "Tap to add vertices. Need 3 to close."
-        default: return "Tap the first vertex to close."
-        }
-    }
-
     /// Caption is visible only when (a) a captioned drawing tool is
-    /// active (rectangle or polygon) AND (b) the document is
+    /// active (the rectangle) AND (b) the document is
     /// in the editing phase. Other phases blur the canvas underneath
     /// their own progress UI, so the caption would be stale.
     /// Pure static behind the Rectangle button: on ENTRY
@@ -1229,7 +1136,7 @@ struct DocumentEditorView: View {
         phaseKind: DocumentState.PhaseKind
     ) -> Bool {
         guard phaseKind == .editing else { return false }
-        return activeTool == .rectangle || activeTool == .polygon
+        return activeTool == .rectangle
     }
 
     /// Results-screen card: which pipeline the Run Verification
@@ -1274,44 +1181,29 @@ struct DocumentEditorView: View {
     }
 
     /// Pick the caption string for whichever drawing tool is
-    /// active. Centralises the rectangle / polygon branch so the
-    /// `.overlay` block and the accessibility label read the same
-    /// string. Returns nil when no captioned tool is active.
+    /// active, so the `.overlay` block and the accessibility label read
+    /// the same string. Returns nil when no captioned tool is active.
     static func activeDrawingCaption(
-        activeTool: DrawingTool?,
-        polygonVertexCount: Int
+        activeTool: DrawingTool?
     ) -> String? {
         switch activeTool {
         case .rectangle: return drawingModeCaption
-        case .polygon: return polygonCaption(activeTool: activeTool,
-                                             vertexCount: polygonVertexCount)
         default: return nil
         }
     }
 
     /// VoiceOver label for the bottom hint capsule. Mirrors the
     /// visible caption so sighted and VoiceOver users hear the same
-    /// mechanism description, with the polygon Cancel / Close buttons
-    /// named when present (the buttons carry their own labels via
-    /// `accessibilityElement(children: .contain)`, but the container
-    /// label gives the listener orientation before they dive in).
+    /// mechanism description.
     static func captionAccessibilityLabel(
-        activeTool: DrawingTool?,
-        polygonVertexCount: Int
+        activeTool: DrawingTool?
     ) -> String {
         guard let caption = activeDrawingCaption(
-            activeTool: activeTool,
-            polygonVertexCount: polygonVertexCount
+            activeTool: activeTool
         ) else {
             return ""
         }
-        guard activeTool == .polygon, polygonVertexCount >= 1 else {
-            return caption
-        }
-        if polygonVertexCount >= 3 {
-            return caption + " Cancel and Close polygon buttons available."
-        }
-        return caption + " Cancel button available."
+        return caption
     }
 
     // Pipeline mode picker (per-document override)
@@ -1677,17 +1569,6 @@ struct DocumentEditorView: View {
         guard documentState.phaseKind == .editing else { return .ignored }
         if !redactionState.selectedRegionIDs.isEmpty {
             redactionState.selectedRegionIDs = []
-            return .handled
-        }
-        // With the polygon tool active and at least
-        // one vertex laid, Escape discards the in-progress vertex list
-        // without dropping the tool itself — matches the Cancel button
-        // in the bottom hint capsule. Must precede the `activeTool !=
-        // nil` branch below, which would otherwise swallow the polygon
-        // case and switch tools to nil.
-        if activeTool == .polygon,
-           redactionState.inProgressPolygonVertexCount > 0 {
-            coordinator.cancelInProgressPolygon()
             return .handled
         }
         if activeTool != nil {

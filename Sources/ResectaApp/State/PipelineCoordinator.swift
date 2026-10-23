@@ -202,35 +202,6 @@ final class PipelineCoordinator: @unchecked Sendable {
         tempExportDirectory.tearDown()
     }
 
-    // MARK: - Polygon bridge
-
-    /// Weak back-pointer to the active `PDFViewCoordinator`,
-    /// set from `PDFDocumentView.makeCoordinator` / `updateUIView` so
-    /// SwiftUI buttons rooted at `PipelineCoordinator` can drive the
-    /// polygon commit / cancel hooks that live on the UIKit-side
-    /// coordinator. Weak: `PDFDocumentView`'s representable owns the
-    /// PDFView coordinator's lifetime; we only borrow the reference
-    /// for the duration of a user gesture.
-    weak var pdfViewCoordinator: PDFViewCoordinator?
-
-    /// Forwards to `PDFViewCoordinator.commitInProgressPolygon`,
-    /// which locates the visible-page overlay and routes the in-progress
-    /// vertex list through `commitPolygonRegion`. Silent no-op when no
-    /// PDF view coordinator is bound (e.g., editor not mounted) or when
-    /// the active overlay has fewer than 3 vertices.
-    @MainActor
-    func commitInProgressPolygon() {
-        pdfViewCoordinator?.commitInProgressPolygon()
-    }
-
-    /// Forwards to `PDFViewCoordinator.cancelInProgressPolygon`,
-    /// which discards the in-progress vertex list on the visible-page
-    /// overlay. Silent no-op when no PDF view coordinator is bound.
-    @MainActor
-    func cancelInProgressPolygon() {
-        pdfViewCoordinator?.cancelInProgressPolygon()
-    }
-
     // MARK: - Full Pipeline
 
     /// Run the complete Redact → Verify → Results pipeline.

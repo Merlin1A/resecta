@@ -10,17 +10,12 @@ struct PDFDocumentView: UIViewRepresentable {
     @Environment(DocumentState.self) private var documentState
     @Environment(RedactionState.self) private var redactionState
     @Environment(ToastQueueManager.self) private var toastManager
-    // Registers the PDFViewCoordinator back-pointer so SwiftUI buttons
-    // on PipelineCoordinator (Cancel / Close polygon in the bottom hint
-    // capsule) can reach the polygon commit / cancel hooks that live on
-    // the UIKit-side coordinator.
-    @Environment(PipelineCoordinator.self) private var pipelineCoordinator
 
     /// Whether any drawing tool is active. Controls new-region creation.
     var isDrawingMode: Bool
 
-    /// Which shape the active drawing tool produces (rectangle,
-    /// polygon, freeform). Ignored when `isDrawingMode == false`.
+    /// Which shape the active drawing tool produces (the rectangle).
+    /// Ignored when `isDrawingMode == false`.
     var activeShapeTool: RedactionOverlayView.ShapeTool = .rectangle
 
     /// iPhone "Select More" toolbar toggle. While on, a tap on a
@@ -43,10 +38,6 @@ struct PDFDocumentView: UIViewRepresentable {
         coordinator.documentState = documentState
         coordinator.redactionState = redactionState
         coordinator.toastManager = toastManager
-        // Hands the PDFViewCoordinator up to PipelineCoordinator so
-        // SwiftUI polygon Cancel / Close buttons can forward through
-        // the existing `@Environment(PipelineCoordinator.self)` handle.
-        pipelineCoordinator.pdfViewCoordinator = coordinator
         return coordinator
     }
 
@@ -147,16 +138,11 @@ struct PDFDocumentView: UIViewRepresentable {
         // Propagate state to coordinator
         coordinator.redactionState = redactionState
         coordinator.toastManager = toastManager
-        // Re-stamp the back-pointer in case PipelineCoordinator outlived
-        // a prior PDFViewCoordinator and the bridge needs to re-bind to
-        // the current one (defensive — the weak ref otherwise nils
-        // through reassignment).
-        pipelineCoordinator.pdfViewCoordinator = coordinator
         let isEditing = documentState.phaseKind == .editing
         coordinator.updateDrawingMode(isEditing, isDrawing: isEditing && isDrawingMode)
         // Propagate the active shape tool. Reset to .rectangle when
-        // drawing is off so the overlay does not retain stale state
-        // (e.g., polygon vertices) after the toolbar tool deactivates.
+        // drawing is off so the overlay does not retain a stale tool
+        // after the toolbar tool deactivates.
         coordinator.updateActiveShapeTool(
             isEditing && isDrawingMode ? activeShapeTool : .rectangle
         )
