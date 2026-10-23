@@ -61,6 +61,27 @@ struct ToastQueueManagerTests {
         #expect(mgr.activeBottomToasts.first?.message == "First")
     }
 
+    @Test("A run start's drop removes the region-edit toasts, shown or queued, and keeps the rest")
+    func dropRegionEditActionsKeepsOtherToasts() async throws {
+        let mgr = ToastQueueManager()
+        mgr.enqueue("1 match nearby. Add to selection?", actionLabel: "Add", editsRegions: true) {}
+        mgr.enqueue("Saved", severity: .info)
+        mgr.enqueue("2 matches nearby. Add to selection?", actionLabel: "Add", editsRegions: true) {}
+
+        mgr.dropRegionEditActions()
+
+        #expect(mgr.activeToasts.isEmpty, "the shown region-edit toast is dropped")
+        // The queue drains after the 0.3 s gap: only the plain toast is left.
+        for _ in 0..<100 {
+            if mgr.activeBottomToasts.count == 1 { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(mgr.activeBottomToasts.map { $0.message } == ["Saved"])
+        mgr.dismiss(mgr.activeBottomToasts[0])
+        try await Task.sleep(for: .milliseconds(450))
+        #expect(mgr.activeToasts.isEmpty, "the queued region-edit toast never shows")
+    }
+
     @Test("Manual dismiss removes the active toast and drains the queue after 0.3 s gap")
     func dismissDrainsQueue() async throws {
         let mgr = ToastQueueManager()
@@ -179,5 +200,14 @@ struct ToastQueueManagerTests {
                 == "Marked 19 (9 already covered). Not redacted until you tap Redact.")
         #expect(CommitFeedback.markedMessage(applied: 3)
                 == "Marked 3 for redaction. Not redacted until you tap Redact.")
+    }
+
+    @Test("The Marked notice reports an all-covered apply and stays silent on a no-op")
+    func markedMessageAllCoveredAndNoOp() {
+        // Nothing new appeared, so the notice says why.
+        #expect(CommitFeedback.markedMessage(applied: 0, alreadyCovered: 4)
+                == "Marked 0 (4 already covered). Not redacted until you tap Redact.")
+        // Nothing created and nothing skipped: no toast at all.
+        #expect(CommitFeedback.markedMessage(applied: 0) == nil)
     }
 }
