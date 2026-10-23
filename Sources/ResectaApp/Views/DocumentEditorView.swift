@@ -426,9 +426,14 @@ struct DocumentEditorView: View {
                     // re-check guard prevents a double-dismiss if a concurrent
                     // path cleared the state across the one-frame window (the
                     // get: closure above may re-query during it).
-                    if redactionState.activeSearch != nil {
+                    // A system dismissal (a swipe or a scrim tap) skips the
+                    // sheet's own Dismiss, so the notice naming the dropped
+                    // matches is read here, from the session about to go.
+                    if let session = redactionState.activeSearch {
+                        let notice = SearchAndRedactSheet.dismissClearedMessage(for: session)
                         Task { @MainActor in
                             guard redactionState.activeSearch != nil else { return }
+                            if let notice { toastManager.enqueue(notice, severity: .info) }
                             redactionState.activeSearch = nil
                         }
                     } else if redactionState.pendingCanvasRationaleRequest != nil {

@@ -956,10 +956,7 @@ struct SearchAndRedactSheet: View {
             let snapshot = Self.currentSelectionSnapshot(in: searchState)
             Self.clearSelection(in: searchState, snapshot: snapshot)
         } else if !afterConfirmation,
-                  let message = Self.dismissClearedMessage(
-                      unappliedCount: Self.unappliedMatchCount(in: searchState),
-                      interface: searchState.searchModeType.interface
-                  ) {
+                  let message = Self.dismissClearedMessage(for: searchState) {
             // A 0-selected dismissal names what the close drops when
             // unapplied matches exist so the loss isn't silent. The
             // toast manager outlives the sheet.
