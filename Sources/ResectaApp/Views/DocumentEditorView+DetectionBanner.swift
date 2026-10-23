@@ -61,15 +61,16 @@ extension DocumentEditorView {
         _ record: RedactionState.DetectionRunRecord?
     ) {
         dismissSummaryTask?.cancel()
-        guard let record else {
-            // Document closed / replaced — drop the stale banner.
+        guard let record,
+              let model = Self.detectionBannerModel(
+                  outcome: record.outcome,
+                  scanSummary: record.scanSummary)
+        else {
+            // Document closed / replaced, or a record with nothing to
+            // report — drop the stale banner.
             detectionBanner = nil
             return
         }
-        let model = Self.detectionBannerModel(
-            outcome: record.outcome,
-            scanSummary: record.scanSummary,
-        )
         withAnimation { detectionBanner = model }
         if model.autoDismisses {
             dismissSummaryTask = Task {
@@ -96,26 +97,24 @@ extension DocumentEditorView {
 
     /// Pure banner-model builder covering every `DetectionRunRecord`
     /// outcome. Scan-interface records carry their counts in
-    /// `scanSummary` (their results live in the sheet's list).
+    /// `scanSummary` (their results live in the sheet's list); both run
+    /// writers pass one, and a staged record without counts has nothing
+    /// to report, so it builds no banner.
     static func detectionBannerModel(
         outcome: RedactionState.DetectionRunRecord.Outcome,
         scanSummary: RedactionState.DetectionRunRecord.ScanRunSummary?
-    ) -> DetectionBannerModel {
+    ) -> DetectionBannerModel? {
         switch outcome {
         case .staged:
             // Scan-interface run: counts come from the record itself.
             // No Review action — the results are (or were) on screen in
             // the sheet, and a dismissed sheet's results are cleared by
             // design (re-running the scan restores them).
-            if let scanSummary {
-                let n = scanSummary.foundCount
-                let p = scanSummary.pageCount
-                return DetectionBannerModel(
-                    message: "Scan found \(n) item\(n == 1 ? "" : "s") across \(p) page\(p == 1 ? "" : "s")",
-                    autoDismisses: true, isWarning: false)
-            }
+            guard let scanSummary else { return nil }
+            let n = scanSummary.foundCount
+            let p = scanSummary.pageCount
             return DetectionBannerModel(
-                message: "Detection finished \u{2014} results were staged for review",
+                message: "Scan found \(n) item\(n == 1 ? "" : "s") across \(p) page\(p == 1 ? "" : "s")",
                 autoDismisses: true, isWarning: false)
 
         case .nothingFound(let pageCount):
@@ -134,7 +133,7 @@ extension DocumentEditorView {
 // MARK: - Detection Summary Banner
 
 /// Inline banner recording how the last detection run ended:
-/// found-and-staged, auto-applied, nothing found, or failed. The warning
+/// items found, nothing found, or failed. The warning
 /// variants swap the icon; layout and styling are shared.
 private struct DetectionSummaryBanner: View {
     let model: DocumentEditorView.DetectionBannerModel
