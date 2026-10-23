@@ -180,4 +180,13 @@ struct ToastQueueManagerTests {
         #expect(CommitFeedback.markedMessage(applied: 3)
                 == "Marked 3 for redaction. Not redacted until you tap Redact.")
     }
+
+    @Test("The Marked notice reports an all-covered apply and stays silent on a no-op")
+    func markedMessageAllCoveredAndNoOp() {
+        // Nothing new appeared, so the notice says why.
+        #expect(CommitFeedback.markedMessage(applied: 0, alreadyCovered: 4)
+                == "Marked 0 (4 already covered). Not redacted until you tap Redact.")
+        // Nothing created and nothing skipped: no toast at all.
+        #expect(CommitFeedback.markedMessage(applied: 0) == nil)
+    }
 }

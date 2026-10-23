@@ -194,16 +194,25 @@ final class SettingsStateTests {
         #expect(state.pipelineMode == .searchableRedaction)
     }
 
-    // MARK: - Retired auto-apply preference (stale-key cleanup)
+    // MARK: - Retired preferences (stale-key cleanup)
 
     @Test("Init removes the retired autoApplyDetections key")
     func initRemovesRetiredAutoApplyKey() {
-        // A value persisted by an earlier build. The setting is gone —
-        // every detection run stages for review — so init removes the
-        // stale key rather than hydrating it.
+        // A value persisted by an earlier build. The setting is gone,
+        // so init removes the stale key rather than hydrating it.
         defaults.set(true, forKey: "autoApplyDetections")
         _ = SettingsState(defaults: defaults)
         #expect(defaults.object(forKey: "autoApplyDetections") == nil)
+    }
+
+    @Test("Init removes the retired per-category detection counts")
+    func initRemovesRetiredPriorsKey() {
+        // The shape an earlier build saved: category wire name →
+        // accept/reject counts. Nothing reads it any more, and the
+        // preference store goes into device backups.
+        defaults.set(["email": ["alpha": 3.0, "beta": 1.0]], forKey: "perCategoryPriors.v1")
+        _ = SettingsState(defaults: defaults)
+        #expect(defaults.object(forKey: "perCategoryPriors.v1") == nil)
     }
 
     @Test("Retired-key cleanup is idempotent across inits")
@@ -211,6 +220,7 @@ final class SettingsStateTests {
         _ = SettingsState(defaults: defaults)
         _ = SettingsState(defaults: defaults)
         #expect(defaults.object(forKey: "autoApplyDetections") == nil)
+        #expect(defaults.object(forKey: "perCategoryPriors.v1") == nil)
     }
 
     // MARK: - resetToDefaults
