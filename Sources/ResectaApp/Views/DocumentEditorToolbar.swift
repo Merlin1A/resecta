@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import PDFKit
 import RedactionEngine
 
@@ -34,6 +35,9 @@ struct DocumentEditorToolbar {
     /// The one reset of the canvas tools: the draw tool off and Add to
     /// Selection off. The editor calls it when a different document
     /// replaces the open one, so neither carries into the new document.
+    /// The Rectangle tool's hint while VoiceOver is running.
+    static let rectangleVoiceOverHint = "Drawing needs direct touch. Use Search or Scan."
+
     func resetCanvasTools() {
         activeTool = nil
         isMultiSelectActive = false
@@ -72,6 +76,9 @@ struct DocumentEditorToolbar {
             .accessibilityIdentifier("drawTool")
             .accessibilityValue(activeTool == .rectangle
                                 ? "Drawing mode active" : "Tap to enter drawing mode")
+            // A drag cannot draw under VoiceOver: the tool is off, and says why.
+            .disabled(UIAccessibility.isVoiceOverRunning)
+            .accessibilityHint(UIAccessibility.isVoiceOverRunning ? Self.rectangleVoiceOverHint : "")
 
             // Two peer entry points into the one search-and-scan sheet
             // (two interfaces over one chassis). Both open the same
