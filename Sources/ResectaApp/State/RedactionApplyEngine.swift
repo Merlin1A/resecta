@@ -37,7 +37,7 @@ extension RedactionState {
         /// Regions actually created (overlap skips excluded).
         let applied: Int
         /// Search origin only: selected results skipped for >80%
-        /// overlap with an existing region. Skipped results earn no
+        /// overlap with an existing or just-created region. Skipped results earn no
         /// applied badge and no audit entry.
         let skippedOverlaps: Int
         /// Search origin only: the `SearchResult.id`s that produced a
@@ -256,8 +256,8 @@ struct PreparedApply: Sendable {
     /// sheet's `appliedResultIDs` union (the green "applied" badge state)
     /// matches the audit-backed set instead of the full selection.
     let appliedResultIDs: Set<UUID>
-    /// The `SearchResult.id`s dedup-SKIPPED for >80% overlap
-    /// with an existing region. These are kept out of
+    /// The `SearchResult.id`s dedup-SKIPPED for >80% overlap with an
+    /// existing region or one this pass created. These are kept out of
     /// `appliedResultIDs` (no badge, no audit entry); the sheet unions
     /// them into `SearchState.coveredResultIDs` so `selectionFullyApplied`
     /// can gray Apply on a fully covered selection.
@@ -267,7 +267,7 @@ struct PreparedApply: Sendable {
 /// Pure-function detached prepare step for the search origin of
 /// `RedactionState.applyFindings`.
 /// Runs the overlap rejection against a snapshot of existing region
-/// rects per page and constructs the per-result region / metadata /
+/// rects per page, grown by each region the pass creates, and constructs the per-result region / metadata /
 /// audit-snapshot trio. No actor state is read; the result is re-merged
 /// on MainActor by the caller. File-level (not a static method) so the
 /// detached task body captures no implicit `Self`, which keeps the
@@ -299,10 +299,13 @@ nonisolated func prepareApply(
     var skippedOverlaps = 0
     var appliedResultIDs: Set<UUID> = []
     var coveredResultIDs: Set<UUID> = []
+    // The covering rects grow with each region this pass creates, so two
+    // results over the same text make one region.
+    var coveringRectsByPage = existingRectsByPage
 
     for result in selected {
-        // Skip results an existing region already covers.
-        if resultIsCovered(result.normalizedRect, by: existingRectsByPage[result.pageIndex] ?? []) {
+        // Skip results an existing or just-created region already covers.
+        if resultIsCovered(result.normalizedRect, by: coveringRectsByPage[result.pageIndex] ?? []) {
             skippedOverlaps += 1
             coveredResultIDs.insert(result.id)
             continue
@@ -318,6 +321,7 @@ nonisolated func prepareApply(
             source: .searchMatch(term: result.term, rationale: result.rationale)
         )
         createdRegions[result.pageIndex, default: []].append(region)
+        coveringRectsByPage[result.pageIndex, default: []].append(result.normalizedRect)
         appliedResultIDs.insert(result.id)
 
         let confidence: Double = switch result.source {
