@@ -66,7 +66,11 @@ extension NameDetector {
                     ? ""
                     : window.trimmingCharacters(in: trimSet)
 
-                // Extract first 1-3 capitalized words
+                // Extract first 1-3 capitalized words. `split` drops the
+                // empty pieces between consecutive spaces, so the joined
+                // `name` is the single-spaced reading used for the stop-token
+                // check only; the match's range and text come from the raw
+                // span below.
                 let words = afterText.split(separator: " ", maxSplits: 3)
                 let nameWords = words.prefix(while: { word in
                     guard let first = word.first else { return false }
@@ -75,7 +79,7 @@ extension NameDetector {
                 let name = nameWords.joined(separator: " ")
                 // An empty assembly or a stop token standing alone after the
                 // prefix is not a name; the scan moves on to the next prefix hit.
-                if !nameWords.isEmpty, !Self.nameStopTokens.contains(name) {
+                if let lastWord = nameWords.last, !Self.nameStopTokens.contains(name) {
                     // `afterText` was trimmed of leading punctuation/
                     // whitespace, but `afterPrefix` still points at the first
                     // trimmed char, so the name range was left-shifted by the
@@ -91,8 +95,20 @@ extension NameDetector {
                     let nameStart = firstNonTrim.location != NSNotFound
                         ? firstNonTrim.location
                         : afterPrefix
-                    let nameRange = NSRange(location: nameStart, length: (name as NSString).length)
-                    results.append(PIIMatch(text: name, range: nameRange, kind: .name,
+                    // The range covers the RAW span, from the name's start to
+                    // the end of the last kept word in `nsText`. `afterText`
+                    // begins at that same start (both drop the same leading
+                    // trim), so the span's UTF-16 length is the offset of the
+                    // last word's end inside it. The joined `name` is one
+                    // unit shorter per extra space between the words, and a
+                    // range of its length leaves the name's last characters
+                    // outside the box; the match's text is the raw substring
+                    // so the two agree.
+                    let rawLength = afterText.utf16.distance(
+                        from: afterText.utf16.startIndex, to: lastWord.endIndex)
+                    let nameRange = NSRange(location: nameStart, length: rawLength)
+                    results.append(PIIMatch(text: nsText.substring(with: nameRange),
+                                           range: nameRange, kind: .name,
                                            confidence: 0.65))
                 }
 

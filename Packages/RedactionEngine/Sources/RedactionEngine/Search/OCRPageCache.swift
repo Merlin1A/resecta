@@ -12,7 +12,8 @@ struct OCRPageCache {
     static let maxEntries = 50
 
     /// A page's normalized PII-scan input: the confusable-corrected lines
-    /// joined with "\n" and, per line, its offset into that concatenation.
+    /// joined with "\n" and, per line, its offset into that concatenation in
+    /// UTF-16 units (the unit of the detector's `NSRange`s).
     /// The PII path (`scanPagePIIViaOCR`) reads this cache; user text search
     /// (`searchPageViaOCR`) reads the verbatim lines. The normalizer runs
     /// once per page at cache-miss time; cached results stay authoritative.
