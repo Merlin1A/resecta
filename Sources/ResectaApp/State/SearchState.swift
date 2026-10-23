@@ -193,6 +193,16 @@ final class SearchState: Identifiable {
 
     /// Post-scan filter: only show results matching these categories (nil = show all).
     var piiCategoryFilter: Set<PIICategory>? = nil {
+        didSet {
+            if piiCategoryFilter == nil { customTermMatchesInFilter = false }
+            invalidateFilterCaches()
+        }
+    }
+
+    /// With a category filter active, whether custom-term matches (no
+    /// detector category) stay listed: the Scan's "Custom" chip. Cleared
+    /// with the filter.
+    var customTermMatchesInFilter = false {
         didSet { invalidateFilterCaches() }
     }
 
@@ -560,6 +570,12 @@ final class SearchState: Identifiable {
         resultsByCategory.mapValues(\.count)
     }
 
+    /// Custom-term matches in the session: results with no detector
+    /// category (the "Custom" chip's count).
+    var customTermMatchCount: Int {
+        results.lazy.filter { $0.piiCategory == nil }.count
+    }
+
     /// Whether any PII results exist (controls PII filter UI visibility).
     var hasPIIResults: Bool {
         results.contains { $0.piiCategory != nil }
@@ -649,6 +665,7 @@ final class SearchState: Identifiable {
             source: sourceFilter,
             minOCRConfidence: minimumOCRConfidence,
             piiCategoryFilter: piiCategoryFilter,
+            customTermMatchesInFilter: customTermMatchesInFilter,
             sortOrder: sortOrder,
             appliedResultIDs: appliedResultIDs,
             appliedFilter: appliedFilter
@@ -660,6 +677,7 @@ final class SearchState: Identifiable {
         let source: SourceFilter
         let minOCRConfidence: Float
         let piiCategoryFilter: Set<PIICategory>?
+        let customTermMatchesInFilter: Bool
         let sortOrder: ResultSortOrder
         let appliedResultIDs: Set<UUID>
         let appliedFilter: AppliedFilter
@@ -680,8 +698,12 @@ final class SearchState: Identifiable {
                 guard conf >= minimumOCRConfidence else { return false }
             }
             // PII category filter
-            if let categoryFilter = piiCategoryFilter, let cat = result.piiCategory {
-                guard categoryFilter.contains(cat) else { return false }
+            if let categoryFilter = piiCategoryFilter {
+                if let cat = result.piiCategory {
+                    guard categoryFilter.contains(cat) else { return false }
+                } else {
+                    guard customTermMatchesInFilter else { return false }
+                }
             }
             // The PII confidence post-filter is retired with the
             // per-run Confidence slider — every above-threshold result
