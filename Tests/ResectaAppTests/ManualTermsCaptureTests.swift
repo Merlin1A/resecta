@@ -13,7 +13,7 @@ import RedactionEngine
 // substring term plus its single tokens boundary-required; a single-word
 // region as that one boundary-required token. Regions on pages whose text
 // layer is not rich are counted, not captured (Layer 3 names them);
-// whole-page regions are skipped (the whole-page rule); every other origin is untouched.
+// whole-page regions add no term and are counted (the whole-page rule); every other origin is untouched.
 // The page's words are read once per page and filtered per region by the
 // primitive's rule; the primitive itself is the oracle for that filter.
 
@@ -97,7 +97,7 @@ struct ManualTermsCaptureTests {
         #expect(set.manualRegionsWithoutText == 1)
     }
 
-    @Test("A whole-page region adds no term and is not counted, on any page")
+    @Test("A whole-page region adds no term and is counted, on any page")
     func wholePageRegionIsSkipped() throws {
         let doc = Self.textPDF()
         let whole = Self.manual(CGRect(x: 0, y: 0, width: 1, height: 1))
@@ -106,7 +106,7 @@ struct ManualTermsCaptureTests {
             let set = PipelineCoordinator.sensitiveTermSet(
                 applied: [], manualRegions: [0: [whole, nearlyWhole]], in: doc, textLayerStatus: [0: status])
             #expect(set.terms.isEmpty, "\(status)")
-            #expect(set.manualRegionsWithoutText == 0, "\(status)")
+            #expect(set.manualRegionsWithoutText == 2, "both are counted: \(status)")
         }
     }
 

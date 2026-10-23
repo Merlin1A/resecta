@@ -19,31 +19,38 @@ enum VerificationCorpusStopWords {
         "mine", "ours", "your", "yours", "hers", "they", "them", "their",
         "theirs", "whom", "whose", "which", "what", "where", "when",
         // auxiliaries
-        "were", "been", "being", "have", "having", "does", "doing", "will",
+        "were", "been", "being", "have", "having", "does", "doing",
         "would", "shall", "should", "could", "might", "must",
         // conjunctions and adverbs
         "then", "else", "because", "although", "though", "while", "whether",
-        "unless", "also", "only", "just", "more", "most", "less", "than",
+        "unless", "also", "only", "just", "most", "less", "than",
         "here", "there", "very",
         // the common nouns of forms and statements
-        "account", "number", "name", "date", "page", "pages", "total",
+        "account", "number", "name", "date", "pages", "total",
         "amount", "address", "phone", "email", "city", "state", "code",
-        "country", "street", "item", "items", "order", "invoice", "balance",
+        "country", "item", "items", "order", "invoice", "balance",
         "payment", "type", "form", "line", "note", "notes", "time", "month",
         "year", "title", "first", "last", "file", "document", "section",
         "part", "reference", "data", "value", "list", "table", "column",
-        "field", "label", "status", "subtotal", "rate", "unit", "units",
-        "price", "quantity", "description", "details", "signature", "copy",
+        "label", "status", "subtotal", "rate", "units",
+        "quantity", "description", "details", "signature", "copy",
         "original", "draft", "final", "attachment",
     ]
 
     /// The admission rule for one token of a multi-word run: kept when it
-    /// carries a digit; else kept when it has four or more scalars and is
-    /// not listed.
+    /// carries a digit; else kept when it is a capitalized word of two or
+    /// three letters (a short surname: Lee, Kim, Ng — the first scalar
+    /// uppercase, the rest lowercase; an all-caps IBM or a lowercase "an"
+    /// is not) and is not listed; else kept when it has four or more
+    /// scalars and is not listed.
     static func admits(_ token: String) -> Bool {
-        if token.unicodeScalars.contains(where: { CharacterSet.decimalDigits.contains($0) }) {
+        let scalars = Array(token.unicodeScalars)
+        if scalars.contains(where: { CharacterSet.decimalDigits.contains($0) }) {
             return true
         }
-        return token.unicodeScalars.count >= 4 && !words.contains(token.lowercased())
+        let shortCapitalized = (2...3).contains(scalars.count)
+            && CharacterSet.uppercaseLetters.contains(scalars[0])
+            && scalars.dropFirst().allSatisfy { CharacterSet.lowercaseLetters.contains($0) }
+        return (shortCapitalized || scalars.count >= 4) && !words.contains(token.lowercased())
     }
 }
