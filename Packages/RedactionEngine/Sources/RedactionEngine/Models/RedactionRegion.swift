@@ -19,35 +19,23 @@ import Foundation
 /// `DecodingError.keyNotFound` for the missing optional key — pinned by
 /// `RedactionRegionRationaleTests.missingRationaleKeyDecodesAsNil`.
 ///
-/// `vertices: [CGPoint]?` is a top-level optional field
-/// on the struct (not on the `Source` enum). For a top-level struct optional
-/// field, synthesized struct Codable already decodes a missing key as `nil`
-/// — the custom Codable shape on the `Source` enum above applies only to its
-/// optional associated value, where synthesized Codable would throw
-/// `DecodingError.keyNotFound`. The struct's synthesized Codable stays.
-/// Pinned by `RedactionRegionPolygonTests.testMissingVerticesKeyDecodesAsNil`.
+/// A region is a rectangle. A serialized region from an earlier version that
+/// carries a `vertices` key still decodes: the struct's synthesized Codable
+/// ignores the key, and the region is its bounding rectangle, which covers
+/// at least the area the polygon covered.
 public struct RedactionRegion: Sendable, Identifiable, Equatable, Codable {
     public let id: UUID
     public var normalizedRect: CGRect  // 0–1, bottom-left origin
     public let source: Source
 
-    /// Polygon vertices in normalized PDF coordinates (0–1, bottom-left
-    /// origin). When non-nil, the region is rendered as a filled polygon
-    /// (even-odd rule) and `normalizedRect` is the polygon's bounding box.
-    /// Cap of 32 vertices is enforced upstream by Douglas-Peucker simplification
-    /// in `RedactionOverlayView`. When nil, the region is a rectangle.
-    public let vertices: [CGPoint]?
-
     public init(
         id: UUID,
         normalizedRect: CGRect,
-        source: Source,
-        vertices: [CGPoint]? = nil
+        source: Source
     ) {
         self.id = id
         self.normalizedRect = normalizedRect
         self.source = source
-        self.vertices = vertices
     }
 
     public enum Source: Sendable, Equatable, Codable {

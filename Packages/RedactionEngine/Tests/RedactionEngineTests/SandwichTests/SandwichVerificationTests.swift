@@ -26,7 +26,7 @@ struct SandwichVerificationTests {
 
         let result = try await verifier.verifySpatialExclusion(
             outputPage: page,
-            regionShapes: [RegionShape(expandedBounds: redactionRect, polygonVertices: nil)]
+            regionShapes: [RegionShape(expandedBounds: redactionRect)]
         )
         #expect(result == .pass)
     }
@@ -48,7 +48,7 @@ struct SandwichVerificationTests {
 
         let result = try await verifier.verifySpatialExclusion(
             outputPage: page,
-            regionShapes: [RegionShape(expandedBounds: redactionRect, polygonVertices: nil)]
+            regionShapes: [RegionShape(expandedBounds: redactionRect)]
         )
         #expect(result == .fail(""),
                 "Spatial verification should FAIL when text overlaps redaction region")
@@ -95,8 +95,7 @@ struct SandwichVerificationTests {
         let result = try await verifier.verifySpatialExclusion(
             outputPage: page,
             regionShapes: [RegionShape(
-                expandedBounds: CGRect(x: 0, y: 0, width: 612, height: 792),
-                polygonVertices: nil)]
+                expandedBounds: CGRect(x: 0, y: 0, width: 612, height: 792))]
         )
         #expect(result == .pass)
     }
@@ -399,8 +398,7 @@ struct SandwichVerificationTests {
     func nilSelectionUnitCountedAsUnmeasured() async throws {
         let page = NilSelectionPage(text: "A")
         let region = RegionShape(
-            expandedBounds: CGRect(x: 100, y: 100, width: 50, height: 20),
-            polygonVertices: nil)
+            expandedBounds: CGRect(x: 100, y: 100, width: 50, height: 20))
         let outcome = try await verifier.spatialExclusionOutcome(
             outputPage: page, regionShapes: [region], pageIndex: 3)
         #expect(outcome.status.isWarn,
@@ -417,8 +415,7 @@ struct SandwichVerificationTests {
     func nilSelectionWhitespaceNotCounted() async throws {
         let page = NilSelectionPage(text: " ")
         let region = RegionShape(
-            expandedBounds: CGRect(x: 100, y: 100, width: 50, height: 20),
-            polygonVertices: nil)
+            expandedBounds: CGRect(x: 100, y: 100, width: 50, height: 20))
         let outcome = try await verifier.spatialExclusionOutcome(
             outputPage: page, regionShapes: [region])
         #expect(outcome.status == .pass, "got \(outcome.status)")
@@ -670,7 +667,7 @@ struct SandwichVerificationTests {
             outputPage: page,
             regionShapes: [RegionShape(
                 expandedBounds: over.insetBy(dx: -safetyMarginPoints, dy: -safetyMarginPoints),
-                polygonVertices: nil, bounds: over)])
+                bounds: over)])
         #expect(fail.isFail, "a region over a vertical run's glyph must FAIL; got \(fail)")
 
         // A region clipping only the glyph's leading X edge (the font's
@@ -680,7 +677,7 @@ struct SandwichVerificationTests {
             outputPage: page,
             regionShapes: [RegionShape(
                 expandedBounds: clip.insetBy(dx: -safetyMarginPoints, dy: -safetyMarginPoints),
-                polygonVertices: nil, bounds: clip)])
+                bounds: clip)])
         #expect(!graze.isFail, "an edge clip on a vertical run is a graze, not an in-region FAIL; got \(graze)")
     }
 }

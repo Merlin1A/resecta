@@ -477,7 +477,7 @@ struct TextLayerReconstructorTests {
         let filtered = FilterResult(surviving: entries, totalCharacters: 20, excludedCount: 11)
         let shapes = [RegionShape(
             expandedBounds: region.insetBy(dx: -safetyMarginPoints, dy: -safetyMarginPoints),
-            polygonVertices: nil, bounds: region)]
+            bounds: region)]
         let validated = TextLayerReconstructor.validateSurvivors(
             filtered, regionShapes: shapes, frame: .unrotated(width: 612))
         #expect(validated.dropped == 1)
@@ -514,7 +514,7 @@ struct TextLayerReconstructorTests {
         let rect = t(region)
         let shapes = [RegionShape(
             expandedBounds: rect.insetBy(dx: -safetyMarginPoints, dy: -safetyMarginPoints),
-            polygonVertices: nil, bounds: rect)]
+            bounds: rect)]
         let filtered = FilterResult(surviving: rotated, totalCharacters: 20, excludedCount: 11)
         let v = TextLayerReconstructor.validateSurvivors(
             filtered, regionShapes: shapes,
@@ -523,28 +523,6 @@ struct TextLayerReconstructorTests {
                 && !v.result.surviving.contains { $0.character == ":" },
                 "rotation \(rotation): the rule drops exactly the colon (got \(v.dropped))")
         #expect(v.result.excludedCount == 12 && v.result.totalCharacters == 20)
-    }
-
-    @Test("drawn-cell rule: a polygon region is tested as the polygon, not its bounding box")
-    func drawnCellRulePolygonUsesThePolygon() {
-        let (entries, region) = Self.narrowLabelBand()
-        // A triangle inside the region's bounding box whose interior lies far
-        // right of the colon's drawn centre (x ≈ 115.05).
-        let farTriangle = [CGPoint(x: 150, y: 500), CGPoint(x: 160, y: 500), CGPoint(x: 160, y: 510)]
-        let triangle = RegionShape(
-            expandedBounds: region.insetBy(dx: -3, dy: -3),
-            polygonVertices: farTriangle, bounds: region)
-        #expect(TextLayerReconstructor.inRegionDrawnGlyphIndices(
-            entries: entries, pageWidth: 612, regionShapes: [triangle]).isEmpty,
-                "a centre inside the bounding box but outside the polygon is outside the region")
-        let rectAsPolygon = [
-            CGPoint(x: region.minX, y: region.minY), CGPoint(x: region.maxX, y: region.minY),
-            CGPoint(x: region.maxX, y: region.maxY), CGPoint(x: region.minX, y: region.maxY)]
-        let rectShape = RegionShape(
-            expandedBounds: region.insetBy(dx: -3, dy: -3),
-            polygonVertices: rectAsPolygon, bounds: region)
-        #expect(TextLayerReconstructor.inRegionDrawnGlyphIndices(
-            entries: entries, pageWidth: 612, regionShapes: [rectShape]) == IndexSet(integer: 4))
     }
 
     @Test("drawn-cell rule: identity on the committed packet and a rotated page; provenance covers every entry once",

@@ -34,8 +34,7 @@ struct RegionCoverage: Sendable {
 
     /// The sampling grid over a match rect: columns along the line, rows
     /// across it. Coverage by the UNION of the page's boxes, so two boxes
-    /// that share one match are read together; a polygon box counts only
-    /// its own interior (the rect is its bounding box).
+    /// that share one match are read together.
     static let gridColumns = 48
     static let gridRows = 6
 
@@ -56,9 +55,7 @@ struct RegionCoverage: Sendable {
     }
 
     private static func contains(_ point: CGPoint, _ region: RedactionRegion) -> Bool {
-        guard region.normalizedRect.contains(point) else { return false }
-        guard let vertices = region.vertices, vertices.count >= 3 else { return true }
-        return pointInPolygon(point, vertices: vertices)
+        region.normalizedRect.contains(point)
     }
 
     /// Re-run every applied request (never the run's sweep) on `source` with

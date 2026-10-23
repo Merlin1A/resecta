@@ -87,12 +87,11 @@ struct PageFrame: Sendable, Equatable {
             stringIndex: entry.stringIndex, lineIndex: entry.lineIndex)
     }
 
-    /// A region shape with its rects and polygon carried into the source
-    /// frame (a rigid map: the expanded halo stays the halo).
+    /// A region shape with its rects carried into the source frame (a rigid
+    /// map: the expanded halo stays the halo).
     func sourceShape(_ shape: RegionShape) -> RegionShape {
         RegionShape(
             expandedBounds: sourceRect(shape.expandedBounds),
-            polygonVertices: shape.polygonVertices?.map(sourcePoint),
             bounds: sourceRect(shape.bounds))
     }
 }

@@ -65,7 +65,6 @@ struct EnginePublicSurfaceTests {
         )
         _ = searcher.boundingRect(for: NSRange(location: 0, length: 1), page: pdfPage)
         _ = TextSpan.words(fullyInside: .zero, on: pdfPage)
-        _ = TextSpan.words(fullyInside: .zero, polygon: [], on: pdfPage)
         await searcher.setThresholdVector(nil)
         await searcher.setUserTerms(nil)
         await searcher.setOverlapSink(nil)

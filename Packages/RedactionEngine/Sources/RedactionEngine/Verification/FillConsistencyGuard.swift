@@ -189,35 +189,16 @@ extension VerificationEngine {
     /// so calibration is "wrong" — but readable ink there has high dynamic range
     /// (a strong outlier vs whatever colour is calibrated), so the outlier floor
     /// keeps it regardless. `static` for direct unit testing.
-    ///
-    /// For a POLYGON region (`vertices` ≥ 3, normalized space) the rect
-    /// interior is NOT all fill — a concave shape's inset bbox mixes fill with
-    /// preserved page background, and the averaged "fill" then reads the bar's
-    /// own pixels as contrast. The probe instead anchors at the polygon's area
-    /// centroid and shrinks until it sits fully inside the polygon
-    /// (`polygonCalibrationProbe`); when no interior rect emerges, fall back to
-    /// the bbox inset — wrong calibration there stays fail-safe exactly as the
-    /// paint-miss case above.
     static func calibrateFillColor(
         region: CGRect,
-        vertices: [CGPoint]? = nil,
         rgba: UnsafePointer<UInt8>,
         width: Int,
         height: Int,
         bytesPerRow: Int
     ) -> (r: CGFloat, g: CGFloat, b: CGFloat)? {
-        let probe: CGRect
-        if let vertices, vertices.count >= 3,
-           let polygonProbe = polygonCalibrationProbe(
-               vertices: vertices, bbox: region,
-               marginX: fillSampleInsetPixels / CGFloat(width),
-               marginY: fillSampleInsetPixels / CGFloat(height)) {
-            probe = polygonProbe
-        } else {
-            let inset = region.insetBy(dx: region.width * fillCalibrationInset,
-                                       dy: region.height * fillCalibrationInset)
-            probe = (inset.isNull || inset.isEmpty || inset.width <= 0 || inset.height <= 0) ? region : inset
-        }
+        let inset = region.insetBy(dx: region.width * fillCalibrationInset,
+                                   dy: region.height * fillCalibrationInset)
+        let probe = (inset.isNull || inset.isEmpty || inset.width <= 0 || inset.height <= 0) ? region : inset
         let x0 = max(0, Int(probe.minX * CGFloat(width)))
         let x1 = min(width, Int(probe.maxX * CGFloat(width)))
         let y0 = max(0, Int((1 - probe.maxY) * CGFloat(height)))   // BL → top-down
@@ -234,39 +215,6 @@ extension VerificationEngine {
         }
         guard n > 0 else { return nil }
         return (CGFloat(sr / n / 255), CGFloat(sg / n / 255), CGFloat(sb / n / 255))
-    }
-
-    /// Probe rect for calibrating a POLYGON region's fill colour, in
-    /// normalized space. Anchored at the polygon's area centroid, starting at
-    /// the same interior share the rect probe uses (1 − 2·`fillCalibrationInset`
-    /// per side of the bbox) and halving until the rect — grown by the ringing
-    /// margin so the sampled pixels keep their distance from the polygon edges,
-    /// mirroring `fillSampleInsetPixels` — sits fully inside the polygon.
-    /// Returns nil when no interior rect emerges within four attempts (centroid
-    /// outside a U-shape's interior, degenerate area): the caller then falls
-    /// back to the bbox-inset probe, whose wrong calibration is fail-safe
-    /// (outlier/recall floors keep readable ink regardless).
-    static func polygonCalibrationProbe(
-        vertices: [CGPoint],
-        bbox: CGRect,
-        marginX: CGFloat,
-        marginY: CGFloat
-    ) -> CGRect? {
-        guard let centroid = polygonCentroid(vertices) else { return nil }
-        var scale: CGFloat = 1 - 2 * fillCalibrationInset
-        for _ in 0..<4 {
-            let candidate = CGRect(
-                x: centroid.x - bbox.width * scale / 2,
-                y: centroid.y - bbox.height * scale / 2,
-                width: bbox.width * scale,
-                height: bbox.height * scale)
-            let grown = candidate.insetBy(dx: -marginX, dy: -marginY)
-            if rectFullyInsidePolygon(grown, vertices: vertices) {
-                return candidate
-            }
-            scale /= 2
-        }
-        return nil
     }
 
     /// Part A: attach a per-box, full-RGB `BoxFillSample` to each hit, index-
@@ -293,14 +241,11 @@ extension VerificationEngine {
         let rgba = data.assumingMemoryBound(to: UInt8.self)
         let bytesPerRow = ctx.bytesPerRow
 
-        // Self-calibrate each region's fill colour once. A polygon
-        // region's probe anchors inside the polygon (its bbox interior mixes
-        // fill with preserved page background); the SAMPLE rect below stays
-        // box ∩ region-rect — only the calibration probe moves (decision
-        // pre-made 2026-07-05; Option A semantics unchanged).
+        // Self-calibrate each region's fill colour once; the SAMPLE rect
+        // below is box ∩ region-rect (Option A).
         let calibrated: [(rect: CGRect, fill: (r: CGFloat, g: CGFloat, b: CGFloat))] =
             regions.compactMap { region in
-                calibrateFillColor(region: region.normalizedRect, vertices: region.vertices,
+                calibrateFillColor(region: region.normalizedRect,
                                    rgba: rgba,
                                    width: width, height: height, bytesPerRow: bytesPerRow)
                     .map { (region.normalizedRect, $0) }

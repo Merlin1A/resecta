@@ -679,8 +679,7 @@ struct AdversarialSearchableVerificationTests {
         let result = try await sandwichVerifier.verifySpatialExclusion(
             outputPage: page,
             regionShapes: [RegionShape(
-                expandedBounds: CGRect(x: 0, y: 0, width: 1, height: 1),
-                polygonVertices: nil)],
+                expandedBounds: CGRect(x: 0, y: 0, width: 1, height: 1))],
             pageIndex: 0
         )
         #expect(result.isFail,

@@ -59,20 +59,10 @@ struct FilterResult: Sendable {
     }
 }
 
-// MARK: - Polygon Geometry
+// MARK: - Region shapes
 
-/// A redaction region in PDF-point-space, carrying both the safety-margin-
-/// expanded bounding rect and an optional polygon path. The character
-/// filter consults the rect for the fast Y-range pre-filter (still O(log m
-/// + k)) and falls back to the polygon test only on candidates that pass
-/// the bounding-box overlap. Rectangle regions have `polygonVertices ==
-/// nil`; polygon regions still carry the bounding rect so the pre-filter
-/// works uniformly across both shapes.
-///
-/// This is the engine-internal shape consumed by `filterCharacters`.
-/// Callers in the coordinator convert `RedactionRegion` to this shape via
-/// `RegionShape.fromRegion(_:pageRect:)` so the conversion happens once per
-/// page instead of per character.
+/// A redaction region in PDF-point-space: the safety-margin-expanded rect
+/// the Y-range pre-filter sorts on, and the un-expanded rect.
 ///
 /// `bounds` is the UN-expanded region rect — the unconditional
 /// exclusion floor and the line-band gate both test against it, while
@@ -81,216 +71,13 @@ struct FilterResult: Sendable {
 /// the shape behaves as it did before the line-aware split.
 struct RegionShape: Sendable {
     let expandedBounds: CGRect
-    public let polygonVertices: [CGPoint]?
-    /// The region's un-expanded bounding rect (no safety margin). For
-    /// polygon regions this is the polygon's bounding rect.
+    /// The region's un-expanded rect (no safety margin).
     public let bounds: CGRect
 
-    public init(expandedBounds: CGRect, polygonVertices: [CGPoint]?,
-                bounds: CGRect? = nil) {
+    public init(expandedBounds: CGRect, bounds: CGRect? = nil) {
         self.expandedBounds = expandedBounds
-        self.polygonVertices = polygonVertices
         self.bounds = bounds ?? expandedBounds
     }
-}
-
-/// Even-odd point-in-polygon test. Vertices are in the same coordinate
-/// system as `point`. Used by `filterCharacters` to confirm overlap when
-/// a character bounding box passes the polygon's expanded bounding rect.
-///
-/// SECURITY: returns `true` if the centre lies inside the polygon. The
-/// caller pairs this with the bounding-box pre-filter so a character whose
-/// centre is outside the polygon but whose bounds still graze the polygon
-/// edge is excluded — over-redaction is safe, under-redaction is a breach.
-@inlinable
-public func pointInPolygon(_ point: CGPoint, vertices: [CGPoint]) -> Bool {
-    guard vertices.count >= 3 else { return false }
-    var inside = false
-    let n = vertices.count
-    var j = n - 1
-    for i in 0..<n {
-        let vi = vertices[i]
-        let vj = vertices[j]
-        if (vi.y > point.y) != (vj.y > point.y) {
-            let dy = vi.y - vj.y
-            if dy != 0 {
-                let xIntersect = vj.x + (point.y - vj.y) * (vi.x - vj.x) / dy
-                if point.x < xIntersect {
-                    inside.toggle()
-                }
-            }
-        }
-        j = i
-    }
-    return inside
-}
-
-/// Even-odd point-in-polygon test (ray cast), matching the even-odd
-/// convention `rectIntersectsPolygon` uses for region polygons.
-func polygonContainsPoint(
-    _ point: CGPoint, vertices: [CGPoint]
-) -> Bool {
-    guard vertices.count >= 3 else { return false }
-    var inside = false
-    var j = vertices.count - 1
-    for i in 0..<vertices.count {
-        let a = vertices[i]
-        let b = vertices[j]
-        if (a.y > point.y) != (b.y > point.y),
-           point.x < (b.x - a.x) * (point.y - a.y) / (b.y - a.y) + a.x {
-            inside.toggle()
-        }
-        j = i
-    }
-    return inside
-}
-
-/// Rect-polygon overlap. True iff the rect either contains any polygon
-/// vertex, or any rect corner lies inside the polygon, or any rect edge
-/// intersects any polygon edge. Used for the polygon-aware character
-/// filter — the rect is the character bounds, the polygon is the
-/// safety-margin-expanded redaction.
-///
-/// SECURITY: keep this conservative. When in doubt, prefer to return
-/// `true` (over-redaction is safe; under-redaction is a breach).
-/// We do not attempt to detect "polygon strictly contains
-/// rect" separately because vertex-in-rect or rect-corner-in-polygon
-/// already cover that case for any polygon whose interior touches a rect
-/// corner; pathological zero-area characters degrade safely to centre
-/// inclusion.
-@inlinable
-func rectIntersectsPolygon(_ rect: CGRect, vertices: [CGPoint]) -> Bool {
-    guard vertices.count >= 3 else { return false }
-    // Fast reject on disjoint bounding rects of the polygon and the rect.
-    var minX = CGFloat.greatestFiniteMagnitude
-    var minY = CGFloat.greatestFiniteMagnitude
-    var maxX = -CGFloat.greatestFiniteMagnitude
-    var maxY = -CGFloat.greatestFiniteMagnitude
-    for v in vertices {
-        if v.x < minX { minX = v.x }
-        if v.x > maxX { maxX = v.x }
-        if v.y < minY { minY = v.y }
-        if v.y > maxY { maxY = v.y }
-    }
-    let polyBounds = CGRect(x: minX, y: minY,
-                            width: maxX - minX, height: maxY - minY)
-    guard rect.intersects(polyBounds) else { return false }
-
-    // Check any vertex inside the rect.
-    for v in vertices where rect.contains(v) {
-        return true
-    }
-    // Check any rect corner inside the polygon.
-    let corners = [
-        CGPoint(x: rect.minX, y: rect.minY),
-        CGPoint(x: rect.maxX, y: rect.minY),
-        CGPoint(x: rect.minX, y: rect.maxY),
-        CGPoint(x: rect.maxX, y: rect.maxY),
-    ]
-    for c in corners where pointInPolygon(c, vertices: vertices) {
-        return true
-    }
-    // Edge-edge crossings. Standard segment-intersection test.
-    let rectEdges: [(CGPoint, CGPoint)] = [
-        (corners[0], corners[1]),
-        (corners[1], corners[3]),
-        (corners[3], corners[2]),
-        (corners[2], corners[0]),
-    ]
-    let n = vertices.count
-    var j = n - 1
-    for i in 0..<n {
-        let polyEdge = (vertices[j], vertices[i])
-        for r in rectEdges {
-            if segmentsIntersect(polyEdge.0, polyEdge.1, r.0, r.1) {
-                return true
-            }
-        }
-        j = i
-    }
-    return false
-}
-
-/// True iff the rect lies entirely inside the polygon: every rect corner is
-/// inside, no polygon vertex is inside the rect, and no polygon edge crosses
-/// a rect edge (a concave notch cutting through the interior). Used by the
-/// verifier's fill-calibration probe to anchor a sample rect in the
-/// polygon's interior. Conservative in the OPPOSITE direction from
-/// `rectIntersectsPolygon`: when in doubt, return `false` — the caller falls
-/// back to a bounding-rect probe whose wrong calibration stays fail-safe
-/// (the verifier's outlier/recall floors keep readable ink regardless).
-@inlinable
-func rectFullyInsidePolygon(_ rect: CGRect, vertices: [CGPoint]) -> Bool {
-    guard vertices.count >= 3 else { return false }
-    let corners = [
-        CGPoint(x: rect.minX, y: rect.minY),
-        CGPoint(x: rect.maxX, y: rect.minY),
-        CGPoint(x: rect.minX, y: rect.maxY),
-        CGPoint(x: rect.maxX, y: rect.maxY),
-    ]
-    for c in corners where !pointInPolygon(c, vertices: vertices) {
-        return false
-    }
-    // With all four corners inside, only a vertex inside the rect or an
-    // edge-edge crossing can still put part of the rect outside.
-    for v in vertices where rect.contains(v) {
-        return false
-    }
-    let rectEdges: [(CGPoint, CGPoint)] = [
-        (corners[0], corners[1]),
-        (corners[1], corners[3]),
-        (corners[3], corners[2]),
-        (corners[2], corners[0]),
-    ]
-    let n = vertices.count
-    var j = n - 1
-    for i in 0..<n {
-        let polyEdge = (vertices[j], vertices[i])
-        for r in rectEdges {
-            if segmentsIntersect(polyEdge.0, polyEdge.1, r.0, r.1) {
-                return false
-            }
-        }
-        j = i
-    }
-    return true
-}
-
-/// Area centroid (shoelace) of a simple polygon, in the vertices' own
-/// coordinate system; nil when the signed area is (near-)zero — a degenerate
-/// polygon has no interior to anchor a probe in. For a concave polygon the
-/// centroid can fall OUTSIDE the interior (a U-shape's notch); callers must
-/// pair it with an interior test such as `rectFullyInsidePolygon`.
-@inlinable
-func polygonCentroid(_ vertices: [CGPoint]) -> CGPoint? {
-    guard vertices.count >= 3 else { return nil }
-    var area2: CGFloat = 0
-    var cx: CGFloat = 0
-    var cy: CGFloat = 0
-    var j = vertices.count - 1
-    for i in 0..<vertices.count {
-        let cross = vertices[j].x * vertices[i].y - vertices[i].x * vertices[j].y
-        area2 += cross
-        cx += (vertices[j].x + vertices[i].x) * cross
-        cy += (vertices[j].y + vertices[i].y) * cross
-        j = i
-    }
-    guard abs(area2) > 1e-9 else { return nil }
-    return CGPoint(x: cx / (3 * area2), y: cy / (3 * area2))
-}
-
-@inlinable
-internal func segmentsIntersect(
-    _ a: CGPoint, _ b: CGPoint, _ c: CGPoint, _ d: CGPoint
-) -> Bool {
-    func orient(_ p: CGPoint, _ q: CGPoint, _ r: CGPoint) -> CGFloat {
-        (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y)
-    }
-    let o1 = orient(a, b, c)
-    let o2 = orient(a, b, d)
-    let o3 = orient(c, d, a)
-    let o4 = orient(c, d, b)
-    return (o1 > 0) != (o2 > 0) && (o3 > 0) != (o4 > 0)
 }
 
 /// Union rect of the bounds of all characters sharing each `lineIndex` —
@@ -360,74 +147,14 @@ func filterCharacters(
     }
 }
 
-/// Polygon-aware filter. Same security contract as the rectangle
-/// overload: the two-tier exclusion — an unconditional 0pt floor
-/// against the un-expanded shape, plus the safety-margin halo gated on
-/// the region's un-expanded rect intersecting the character's line band.
-/// The Y-range pre-filter on bounding rects survives — every shape
-/// carries its expanded bounding rect, so the `O(log m + k)` pre-filter
-/// is identical. For shapes that carry a polygon, `rectIntersectsPolygon`
-/// confirms each tier's overlap is not just a corner of the bounding
-/// rect; the halo tier keeps the H2 Minkowski char-expansion mechanics.
-///
-/// Rectangle regions pass through with no
-/// behaviour change; polygon regions consult `vertices` for the final
-/// intersection. Conservative — when in doubt, exclude.
-@concurrent
-func filterCharacters(
-    characters: [CharacterInfo],
-    regionShapes: [RegionShape]
-) async throws -> FilterResult {
-    // Sort by expandedBounds.minY for the binary-search pre-filter.
-    return try filterCharactersWalk(
-        characters: characters, regions: regionShapes,
-        sortKey: { $0.expandedBounds.minY },
-        expandedBounds: { $0.expandedBounds }, unexpandedBounds: { $0.bounds }
-    ) { char, shape, haloApplies in
-        if let vertices = shape.polygonVertices {
-            // Tier (a) — 0pt floor: un-expanded char vs un-expanded
-            // polygon (the expanded bounding rect is a cheap pre-gate,
-            // a superset of the polygon).
-            if char.bounds.intersects(shape.expandedBounds),
-               rectIntersectsPolygon(char.bounds, vertices: vertices) {
-                return true
-            }
-            // Tier (b) — halo. Expand the character bounds by
-            // safetyMarginPoints (instead of expanding the polygon
-            // vertices) so the boundary halo applies uniformly.
-            // Minkowski-sum identity: `char ∩ (P ⊕ disk) ≡ (char ⊕ disk) ∩ P`
-            // for a symmetric disk (here, the L∞ square of radius
-            // safetyMarginPoints). Vertices come UN-expanded
-            // from PageRasterizer; expanding the char produces the same
-            // set of excluded characters a vertex offset would, without
-            // the edge-normal / concave-corner pitfalls.
-            guard haloApplies else { return false }
-            let expandedChar = char.bounds.insetBy(
-                dx: -safetyMarginPoints, dy: -safetyMarginPoints
-            )
-            guard expandedChar.intersects(shape.expandedBounds) else { return false }
-            return rectIntersectsPolygon(expandedChar, vertices: vertices)
-        } else {
-            // Rect-only regions have safetyMarginPoints baked into
-            // expandedBounds, so both tiers test the un-expanded char
-            // (no double halo).
-            guard char.bounds.intersects(shape.expandedBounds) else { return false }
-            // Tier (a) — unconditional floor at the un-expanded rect.
-            if char.bounds.intersects(shape.bounds) { return true }
-            // Tier (b) — halo within band-intersecting lines.
-            return haloApplies
-        }
-    }
-}
-
 // MARK: - The shared filter walk
 
-/// The walk both `filterCharacters` overloads share: the regions sorted by
+/// The walk `filterCharacters` runs: the regions sorted by
 /// the caller's key, the Y-range pre-filter (a binary search over the sorted
 /// regions' expanded minY against each character's maxY, so the inner loop
 /// is O(log m + k) for the k Y-overlapping regions), the per-character
-/// cooperative cancellation and the line-band halo gate. Only the innermost
-/// tier test differs between the overloads and is passed in: it reads the
+/// cooperative cancellation and the line-band halo gate. The innermost
+/// tier test is passed in: it reads the
 /// character, the candidate region and whether the halo applies on this
 /// character's line, and says whether the character is excluded. Survivors
 /// keep their input order; the security invariant (any-overlap exclusion)

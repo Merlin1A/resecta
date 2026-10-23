@@ -132,9 +132,8 @@ struct SandwichVerification: Sendable {
     /// Called from the @concurrent runLayer() context — inherits caller isolation.
     /// Not marked @concurrent itself to avoid PDFPage sending errors.
     ///
-    /// Polygon-aware overload. Each `RegionShape` carries the
-    /// safety-margin-expanded bounding rect, the un-expanded rect, and an
-    /// optional polygon.
+    /// Each `RegionShape` carries the safety-margin-expanded rect and the
+    /// un-expanded rect.
     ///
     /// Written contract (mirroring the character filter):
     /// no non-whitespace synthetic character's GLYPH-CORE box may

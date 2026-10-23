@@ -156,33 +156,12 @@ extension SandwichVerification {
                 let core = coreBoxes[k]
                 let band = bandRects[unitBands[k]] ?? core
                 for shape in regionShapes {
-                    let overlaps: Bool
-                    if let vertices = shape.polygonVertices {
-                        // Tier (a) — 0pt floor: glyph-core box vs
-                        // un-expanded polygon (expanded rect pre-gates).
-                        if core.intersects(shape.expandedBounds),
-                           rectIntersectsPolygon(core, vertices: vertices) {
-                            overlaps = true
-                        } else if shape.bounds.intersects(band) {
-                            // Tier (b) — halo with the filter's Minkowski
-                            // char-expansion mechanics, within
-                            // band-intersecting lines.
-                            let expandedChar = core.insetBy(
-                                dx: -safetyMarginPoints, dy: -safetyMarginPoints
-                            )
-                            overlaps = expandedChar.intersects(shape.expandedBounds)
-                                && rectIntersectsPolygon(expandedChar, vertices: vertices)
-                        } else {
-                            overlaps = false
-                        }
-                    } else {
-                        // Tier (a) floor at the un-expanded rect; tier (b)
-                        // halo at the expanded rect within band-intersecting
-                        // lines.
-                        overlaps = core.intersects(shape.bounds)
-                            || (core.intersects(shape.expandedBounds)
-                                && shape.bounds.intersects(band))
-                    }
+                    // Tier (a) floor at the un-expanded rect; tier (b)
+                    // halo at the expanded rect within band-intersecting
+                    // lines.
+                    let overlaps = core.intersects(shape.bounds)
+                        || (core.intersects(shape.expandedBounds)
+                            && shape.bounds.intersects(band))
                     if overlaps {
                         // Classify by the glyph-core CENTER against the
                         // un-expanded region. Center inside → the character
@@ -198,14 +177,7 @@ extension SandwichVerification {
                         // and nothing else — the read-back offset is not
                         // user copy.
                         let center = CGPoint(x: core.midX, y: core.midY)
-                        let centerInRegion: Bool
-                        if let vertices = shape.polygonVertices {
-                            centerInRegion = polygonContainsPoint(
-                                center, vertices: vertices)
-                        } else {
-                            centerInRegion = shape.bounds.contains(center)
-                        }
-                        if centerInRegion {
+                        if shape.bounds.contains(center) {
                             return .fail(
                                 "A character overlaps a redacted area on page \(pageIndex + 1)"
                             )
