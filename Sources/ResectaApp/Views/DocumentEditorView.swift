@@ -691,7 +691,7 @@ struct DocumentEditorView: View {
             coordinator: coordinator, horizontalSizeClass: horizontalSizeClass,
             undoManager: undoManager,
             activeTool: $activeTool, isMultiSelectActive: $isMultiSelectActive,
-            showSettings: $showSettings,
+            showSettings: $showSettings, searchSheetDetent: $searchSheetDetent,
             documentOverride: documentOverride, redactButtonDisabled: redactButtonDisabled,
             redactButtonHint: redactButtonHint, handleHomeTap: handleHomeTap,
             homeButton: AnyView(homeButton), pipelineModePicker: AnyView(pipelineModePicker),

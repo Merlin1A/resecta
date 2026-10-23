@@ -20,6 +20,8 @@ struct DocumentEditorToolbar {
     @Binding var activeTool: DocumentEditorView.DrawingTool?
     @Binding var isMultiSelectActive: Bool
     @Binding var showSettings: Bool
+    /// The search sheet's detent: every Scan or Search entry opens at medium.
+    @Binding var searchSheetDetent: PresentationDetent
     let documentOverride: PipelineMode?
     let redactButtonDisabled: Bool
     let redactButtonHint: String
@@ -84,6 +86,7 @@ struct DocumentEditorToolbar {
                 let state = SearchState()
                 state.searchModeType = .piiScan
                 state.pendingAutoRunScan = true
+                searchSheetDetent = .medium
                 redactionState.activeSearch = state
             }
             .disabled(documentState.phaseKind != .editing
@@ -96,6 +99,7 @@ struct DocumentEditorToolbar {
             // [Search] opens the literal-search interface. A fresh
             // SearchState defaults to `.text` — the Search side.
             Button("Search", systemImage: "magnifyingglass") {
+                searchSheetDetent = .medium
                 redactionState.activeSearch = SearchState()
             }
             .disabled(documentState.phaseKind != .editing
