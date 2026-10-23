@@ -125,6 +125,14 @@ public struct SearchPreviewResult: Sendable, Equatable {
     public let saturated: Bool
     public let regexInvalid: Bool
     public let currentPageMatches: [NSRange]
+    /// The visible page's matches as ranges in the raw page text
+    /// (`PDFPage.string`): the ranges the full search places its boxes
+    /// from, through the same page map. `currentPageMatches` is in the
+    /// searched text's coordinates, which shift on a page whose text the
+    /// search normalizes (a ligature, a wide character); a highlight drawn
+    /// from these ranges sits where Apply's box will. A match the map cannot
+    /// place is left out, as the full search leaves it out.
+    public let currentPageRawRanges: [NSRange]
     /// Why a `.regex` preview is empty when `regexInvalid` is set: the
     /// safety gate's typed reason or the engine's compile error text.
     /// nil for every other result.
@@ -136,6 +144,7 @@ public struct SearchPreviewResult: Sendable, Equatable {
         saturated: Bool,
         regexInvalid: Bool,
         currentPageMatches: [NSRange],
+        currentPageRawRanges: [NSRange] = [],
         regexRejection: String? = nil
     ) {
         self.scope = scope
@@ -143,6 +152,7 @@ public struct SearchPreviewResult: Sendable, Equatable {
         self.saturated = saturated
         self.regexInvalid = regexInvalid
         self.currentPageMatches = currentPageMatches
+        self.currentPageRawRanges = currentPageRawRanges
         self.regexRejection = regexRejection
     }
 
@@ -152,6 +162,7 @@ public struct SearchPreviewResult: Sendable, Equatable {
             && lhs.saturated == rhs.saturated
             && lhs.regexInvalid == rhs.regexInvalid
             && lhs.currentPageMatches == rhs.currentPageMatches
+            && lhs.currentPageRawRanges == rhs.currentPageRawRanges
             && lhs.regexRejection == rhs.regexRejection
     }
 }

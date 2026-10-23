@@ -600,6 +600,7 @@ public actor DocumentSearcher {
     ) async -> SearchPreviewResult {
         var totalCount = 0
         var currentPageMatches: [NSRange] = []
+        var currentPageRawRanges: [NSRange] = []
         var saturated = false
 
         for pageIndex in pageRange {
@@ -609,7 +610,7 @@ public actor DocumentSearcher {
             guard SearchCore.textLayerIsSearchable(textLayerStatus[pageIndex]) else { continue }
             guard let pageText = await pageTextProvider(pageIndex), !pageText.isEmpty else { continue }
 
-            let searchText = SearchCore.regexSearchText(pageText, options: options)
+            let regexPage = SearchCore.regexPage(pageText, options: options)
             let isVisiblePage = (pageIndex == currentPageIndex)
             let startTime = ContinuousClock.now
             let effectiveTimeout: Duration =
@@ -619,7 +620,7 @@ public actor DocumentSearcher {
             // `searchRegex`); the preview counts every surviving match and
             // keeps the visible page's ranges up to the highlight cap.
             let (count, stoppedAtCap) = SearchCore.enumerateRegexMatches(
-                in: searchText, regex: regex,
+                in: regexPage.text, regex: regex,
                 wholeWord: options.wholeWord, unconvertibleRangePasses: true,
                 cap: Self.maxPreviewMatches - totalCount,
                 timeout: effectiveTimeout, startTime: startTime,
@@ -630,6 +631,7 @@ public actor DocumentSearcher {
             ) { matchRange in
                 if isVisiblePage && currentPageMatches.count < Self.maxCurrentPageHighlights {
                     currentPageMatches.append(matchRange)
+                    if let raw = regexPage.rawNSRange(matchRange) { currentPageRawRanges.append(raw) }
                 }
                 return true
             }
@@ -647,7 +649,8 @@ public actor DocumentSearcher {
             totalCount: totalCount,
             saturated: saturated,
             regexInvalid: false,
-            currentPageMatches: currentPageMatches
+            currentPageMatches: currentPageMatches,
+            currentPageRawRanges: currentPageRawRanges
         )
     }
 
@@ -663,6 +666,7 @@ public actor DocumentSearcher {
     ) async -> SearchPreviewResult {
         var totalCount = 0
         var currentPageMatches: [NSRange] = []
+        var currentPageRawRanges: [NSRange] = []
         var saturated = false
 
         // AND mode (multi-term conjunction) counts a page only when every
@@ -685,16 +689,16 @@ public actor DocumentSearcher {
             guard SearchCore.textLayerIsSearchable(textLayerStatus[pageIndex]) else { continue }
             guard let pageText = await pageTextProvider(pageIndex), !pageText.isEmpty else { continue }
 
-            // The same normalization and extension pipeline as
-            // `findTextMatches`, so preview counts agree with the full search;
-            // the preview does not detect CJK. Emitted ranges are mapped back
-            // to base coordinates before they reach the highlight-rect
-            // resolver (leak-class otherwise).
+            // `findTextMatches`'s normalization and extensions, so the counts
+            // agree with the full search (the preview does not detect CJK);
+            // each visible match is emitted in base coordinates and, raw,
+            // through the full search's page map.
             let page = SearchCore.preparePage(pageText, options: options)
             let isVisiblePage = (pageIndex == currentPageIndex)
 
             var pageCount = 0
             var pageMatches: [NSRange] = []
+            var pageRawRanges: [NSRange] = []
             var everyTermMatched = true
 
             for term in normalizedTerms where !term.isEmpty {
@@ -712,12 +716,8 @@ public actor DocumentSearcher {
                 for span in spans {
                     pageCount += 1
                     if isVisiblePage && currentPageMatches.count + pageMatches.count < Self.maxCurrentPageHighlights {
-                        // Base coordinates when a length-changing extension is
-                        // active (Character-offset convention, same as
-                        // `findTextMatches`); the searched range otherwise.
-                        let emitRange = span.base.map { NSRange(location: $0.lowerBound, length: $0.count) }
-                            ?? span.searchedRange
-                        pageMatches.append(emitRange)
+                        pageMatches.append(span.previewRange)
+                        if let raw = page.rawNSRange(of: span) { pageRawRanges.append(raw) }
                     }
                 }
                 if spans.isEmpty { everyTermMatched = false }
@@ -728,6 +728,7 @@ public actor DocumentSearcher {
             if !conjunction || everyTermMatched || saturated {
                 totalCount += pageCount
                 currentPageMatches.append(contentsOf: pageMatches)
+                currentPageRawRanges.append(contentsOf: pageRawRanges)
             }
             if saturated { break }
         }
@@ -737,7 +738,8 @@ public actor DocumentSearcher {
             totalCount: totalCount,
             saturated: saturated,
             regexInvalid: false,
-            currentPageMatches: currentPageMatches
+            currentPageMatches: currentPageMatches,
+            currentPageRawRanges: currentPageRawRanges
         )
     }
 
@@ -1834,16 +1836,12 @@ public actor DocumentSearcher {
             cap: nil
         )
         for span in spans {
-            // Offsets measured on the searched (most-transformed) text; the
-            // base span is the remapped one under an offset map, else the
-            // searched offsets themselves.
+            // Offsets on the searched (most-transformed) text, and the base span.
             let matchStartOffset = span.searchedCharacters.lowerBound
             let matchLength = span.searchedCharacters.count
-            let baseStartOffset = span.base?.lowerBound ?? matchStartOffset
-            let baseLength = span.base?.count ?? matchLength
-
-            // The rect's range on the RAW page text (`PreparedPage.rawNSRange`).
-            guard let nsRange = prepared.rawNSRange(baseStart: baseStartOffset, length: baseLength) else { continue }
+            let (baseStartOffset, baseLength) = span.baseOffsets
+            // The rect's range on the RAW page text.
+            guard let nsRange = prepared.rawNSRange(of: span) else { continue }
             if let rects = lineRects(for: nsRange, page: page) {
                 // Display span re-slices from the case-preserved
                 // analog at the already-mapped base offsets; matching stays

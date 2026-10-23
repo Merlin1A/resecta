@@ -284,6 +284,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Engine: the public surface is reduced to the document-runner API and what the app and its tests name; 103 more declarations become `internal` (access level only).
 - A Mac-side recorder for attended runs on a physical device: per-step Instruments capture, crash-report and container-attribute facts, PDF checks and a filled record (`Scripts/device/`).
 - Engine: unused detection model members, the learned-prior surface-form dictionary and the unused exact-match search option are removed.
+- Engine: the search preview also reports its visible-page matches as ranges in the raw page text, through the map the full search places its boxes from.
 
 ## [1.2.0] — 2026-09-29
 
