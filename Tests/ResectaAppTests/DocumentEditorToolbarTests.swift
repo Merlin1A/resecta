@@ -31,4 +31,49 @@ struct DocumentEditorToolbarTests {
         coordinator.redactionState.selectedRegionIDs = [UUID(), UUID()]
         #expect(toolbar(for: coordinator).deleteButtonLabel == "Delete 2 Regions")
     }
+
+    @Test("Resetting the canvas tools turns the draw tool and Add to Selection off")
+    func resetCanvasToolsTurnsBothOff() {
+        let coordinator = makeCoordinator()
+        var tool: DocumentEditorView.DrawingTool? = .rectangle
+        var addToSelection = true
+        let toolbar = DocumentEditorToolbar(
+            documentState: coordinator.documentState, redactionState: coordinator.redactionState,
+            coordinator: coordinator, horizontalSizeClass: .compact, undoManager: nil,
+            activeTool: Binding(get: { tool }, set: { tool = $0 }),
+            isMultiSelectActive: Binding(get: { addToSelection }, set: { addToSelection = $0 }),
+            showBatchDeleteConfirmation: .constant(false), showSettings: .constant(false),
+            documentOverride: nil, redactButtonDisabled: true, redactButtonHint: "",
+            handleHomeTap: {}, homeButton: AnyView(EmptyView()), pipelineModePicker: AnyView(EmptyView()),
+            deleteSelectedRegions: {}
+        )
+        toolbar.resetCanvasTools()
+        #expect(tool == nil)
+        #expect(addToSelection == false)
+    }
+
+    @Test("The editor resets the canvas tools when a different document replaces the open one (source pin)")
+    func editorResetsToolsOnDocumentSwap() throws {
+        let source = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorView.swift")
+        guard let observer = source.range(of: ".onChange(of: documentState.sourceDocument) { oldDocument, newDocument in") else {
+            Issue.record("The editor observes no document swap")
+            return
+        }
+        let window = source[observer.upperBound...].prefix(300)
+        #expect(window.contains("RedactWorkspaceView.isDocumentSwap(from: oldDocument, to: newDocument)"))
+        #expect(window.contains("editorToolbar.resetCanvasTools()"))
+    }
+
+    /// Mirrors `HonestySurfacesTests.loadRepoFile`.
+    private func loadRepoFile(
+        _ relativePath: String, from file: StaticString = #filePath
+    ) throws -> String {
+        let repoRoot = URL(fileURLWithPath: "\(file)")
+            .deletingLastPathComponent()   // Tests/ResectaAppTests
+            .deletingLastPathComponent()   // Tests
+            .deletingLastPathComponent()   // <repo root>
+        return try String(
+            contentsOf: repoRoot.appendingPathComponent(relativePath),
+            encoding: .utf8)
+    }
 }

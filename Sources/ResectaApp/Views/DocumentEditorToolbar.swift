@@ -29,6 +29,14 @@ struct DocumentEditorToolbar {
     let pipelineModePicker: AnyView
     let deleteSelectedRegions: () -> Void
 
+    /// The one reset of the canvas tools: the draw tool off and Add to
+    /// Selection off. The editor calls it when a different document
+    /// replaces the open one, so neither carries into the new document.
+    func resetCanvasTools() {
+        activeTool = nil
+        isMultiSelectActive = false
+    }
+
     // MARK: - Toolbar Leading Items
 
     /// Routine actions render neutral — the group's

@@ -691,6 +691,14 @@ struct DocumentEditorView: View {
         }
         .navigationTitle(documentTitle)
         .navigationBarTitleDisplayMode(.inline)
+        // A different document replacing the open one turns the canvas
+        // tools off (the same swap the workspace observes for the undo
+        // stack and the toasts).
+        .onChange(of: documentState.sourceDocument) { oldDocument, newDocument in
+            if RedactWorkspaceView.isDocumentSwap(from: oldDocument, to: newDocument) {
+                editorToolbar.resetCanvasTools()
+            }
+        }
     }
 
     /// The toolbar TYPE over this editor's state, bindings and actions.
