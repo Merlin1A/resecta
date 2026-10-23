@@ -32,9 +32,12 @@ extension RedactionState {
         }
     }
 
+    /// Add a region. `fresh` is false for a region that is not a new
+    /// drawing (a Duplicate's copy, the undo of a delete): only a fresh
+    /// one offers the nearby-match nudge.
     func addRegion(
         _ region: RedactionRegion, page: Int, undoManager: UndoManager?,
-        actionName: String = UndoName.add
+        actionName: String = UndoName.add, fresh: Bool = true
     ) {
         bumpRegionVersion()
         regions[page, default: []].append(region)
@@ -50,7 +53,7 @@ extension RedactionState {
         // origin of nudge candidates, so we deliberately skip it to
         // avoid recursive toast spam. The predicate handles all other
         // filtering (proximity, applied-IDs, category, suppression).
-        if case .manual = region.source,
+        if fresh, case .manual = region.source,
            let search = activeSearch,
            !manualDrawNudgeSuppressedForSession {
             let resultsSnapshot = MainActor.assumeIsolated { search.results }
@@ -84,7 +87,7 @@ extension RedactionState {
         let removedMetadata = regionMetadata.removeValue(forKey: id) // Capture metadata
         markRegionsModified()
         registerUndo(undoManager, actionName) { target in
-            target.addRegion(removed, page: page, undoManager: undoManager, actionName: actionName)
+            target.addRegion(removed, page: page, undoManager: undoManager, actionName: actionName, fresh: false)
             if let removedMetadata { // Restore metadata on undo
                 target.regionMetadata[removed.id] = removedMetadata
             }
@@ -240,7 +243,7 @@ extension RedactionState {
             source: region.normalizedRect
         )
         let copy = RedactionRegion(id: UUID(), normalizedRect: newRect, source: .manual)
-        addRegion(copy, page: page, undoManager: undoManager, actionName: UndoName.duplicate)
+        addRegion(copy, page: page, undoManager: undoManager, actionName: UndoName.duplicate, fresh: false)
         selectedRegionIDs = [copy.id]
     }
 
