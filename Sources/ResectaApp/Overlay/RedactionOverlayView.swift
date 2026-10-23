@@ -162,11 +162,11 @@ class RedactionOverlayView: UIView {
     // (which prevents drag start); this rejects valid drags that produce too-small regions.
     static let minimumCommittedRegionSize: CGFloat = 20.0
 
-    // VoiceOver announcement when the committed rect falls below
-    // `minimumCommittedRegionSize` on either axis. Names the 20pt floor so the
-    // listener can target the dimension. Pinned by CanvasPolishBundleTests.
+    // The notice when the committed rect falls below
+    // `minimumCommittedRegionSize` on either axis: on screen and spoken. It
+    // names the remedy, not the floor, since the floor is in screen points.
     static let subThresholdRejectionAnnouncement =
-        "Region too small. Minimum is 20 by 20 points."
+        "Region too small. Zoom in to draw a smaller region."
 
     // Polish helpers + adaptive-stroke constants live in
     // the sibling extension file `RedactionOverlayView+CanvasPolish.swift`:
@@ -762,12 +762,13 @@ class RedactionOverlayView: UIView {
     private func rejectSubThresholdRegion(_ rect: CGRect) {
         rejectionFeedback.impactOccurred(intensity: 0.3)
 
-        // VoiceOver announcement. Mechanism-description string
-        // names the 20pt floor so the user knows what dimension to target.
-        UIAccessibility.post(
-            notification: .announcement,
-            argument: RedactionOverlayView.subThresholdRejectionAnnouncement
-        )
+        // The notice on screen (a toast VoiceOver also reads); the spoken
+        // announcement alone when no toast queue is attached.
+        if coordinator?.noteRegionTooSmall() != true {
+            UIAccessibility.post(
+                notification: .announcement,
+                argument: RedactionOverlayView.subThresholdRejectionAnnouncement)
+        }
 
         // Visual: create a temporary view that shrinks to center and fades out
         let rejectView = UIView(frame: rect)
