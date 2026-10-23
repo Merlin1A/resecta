@@ -46,6 +46,20 @@ struct RegionDuplicateMenuTests {
         #expect(abs(clamped.minY - 0.0) < 1e-9)
     }
 
+    @Test("A copy with no room for the offset on an axis steps the other way, so it never lands on its source")
+    func edgeCopyStepsTheOtherWay() {
+        let right = RedactionState.duplicateOffsetClamp(source: CGRect(x: 0.95, y: 0.5, width: 0.05, height: 0.1))
+        #expect(abs(right.minX - 0.93) < 1e-9)
+        #expect(abs(right.minY - 0.48) < 1e-9)
+        let edge = RedactionState.duplicateOffsetClamp(source: CGRect(x: 0.1, y: 0.01, width: 0.1, height: 0.05))
+        #expect(abs(edge.minX - 0.12) < 1e-9)
+        #expect(abs(edge.minY - 0.03) < 1e-9)
+        // A region that fills an axis has no room either way and keeps
+        // its place on it.
+        let full = RedactionState.duplicateOffsetClamp(source: CGRect(x: 0, y: 0, width: 1, height: 1))
+        #expect(full == CGRect(x: 0, y: 0, width: 1, height: 1))
+    }
+
     @Test("Right-edge clamp output stays within the unit square")
     func clampOutputStaysInUnitSquare() {
         // Sweep a battery of rect shapes; for each, maxX must not
