@@ -290,6 +290,21 @@ struct ManualDrawNudgeTests {
         #expect(state.manualDrawNudgeSuppressedForSession == false)
     }
 
+    @Test("Accept after the search session closed still adds the match as an applied region")
+    func acceptWithoutALiveSessionAddsTheRegion() {
+        let state = RedactionState()
+        // The toast outlives the sheet: the session is gone when the
+        // Add button is tapped. The nudge carries everything the region
+        // needs (its rect, term and rationale).
+        let nudge = Self.piiResult(rect: CGRect(x: 0.18, y: 0.10, width: 0.05, height: 0.02))
+        state.pendingManualDrawNudge = nudge
+        let region = state.acceptManualDrawNudge(nudge, undoManager: nil)
+        #expect(region != nil, "today the accept refuses without a live session")
+        #expect(state.regions[nudge.pageIndex]?.count == 1)
+        #expect(state.liveAppliedSearchResultIDs == [nudge.id])
+        #expect(state.pendingManualDrawNudge == nil)
+    }
+
     @Test("markManualDrawNudgeSuppressed sets the flag and clears the pending nudge")
     func markSuppressedSetsFlagAndClears() {
         let state = RedactionState()
