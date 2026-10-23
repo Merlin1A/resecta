@@ -718,8 +718,6 @@ extension SearchAndRedactSheet {
                 undoManager: undoManager,
                 documentState: documentState
             ) else { return }
-            searchState.appliedResultIDs.formUnion(outcome.appliedResultIDs)
-            searchState.coveredResultIDs.formUnion(outcome.coveredResultIDs)
             if let message = CommitFeedback.markedMessage(
                 applied: outcome.applied,
                 alreadyCovered: outcome.skippedOverlaps

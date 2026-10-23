@@ -267,14 +267,14 @@ struct ManualDrawNudgeTests {
         #expect(lookup?.ruleID == "ssn.state-machine.v2")
     }
 
-    @Test("Accept path inserts the result ID into appliedResultIDs")
+    @Test("Accept path makes the result an applied one")
     func acceptUpdatesAppliedResultIDs() {
         let state = RedactionState()
         let search = SearchState()
         state.activeSearch = search
         let nudge = Self.piiResult(rect: CGRect(x: 0.18, y: 0.10, width: 0.05, height: 0.02))
         _ = state.acceptManualDrawNudge(nudge, undoManager: nil)
-        #expect(search.appliedResultIDs.contains(nudge.id))
+        #expect(state.liveAppliedSearchResultIDs.contains(nudge.id))
     }
 
     @Test("Accept path clears pendingManualDrawNudge without setting suppression")

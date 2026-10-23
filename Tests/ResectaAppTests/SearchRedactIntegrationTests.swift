@@ -279,7 +279,8 @@ struct SearchRedactIntegrationTests {
             Issue.record("apply returned nil")
             return
         }
-        search.appliedResultIDs.formUnion(outcome.appliedResultIDs)
+        _ = outcome
+        redactionState.refreshSearchMarkers(on: search)
 
         #expect(search.appliedResultIDs == [resultB.id])
         #expect(!search.appliedResultIDs.contains(resultA.id))
@@ -312,9 +313,8 @@ struct SearchRedactIntegrationTests {
         #expect(outcome.applied == 0)
         #expect(outcome.skippedOverlaps == 1)
         #expect(outcome.coveredResultIDs == [resultA.id])
-        // Sheet flow: union both ledgers.
-        search.appliedResultIDs.formUnion(outcome.appliedResultIDs)
-        search.coveredResultIDs.formUnion(outcome.coveredResultIDs)
+        // Sheet flow: the markers derive from the live regions.
+        redactionState.refreshSearchMarkers(on: search)
 
         // No badge for the covered row …
         #expect(!search.appliedResultIDs.contains(resultA.id))

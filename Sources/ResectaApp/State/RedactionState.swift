@@ -15,14 +15,6 @@ class RedactionState {
     /// Enables O(1) dirty checking in PDFViewCoordinator overlay refresh.
     private(set) var regionVersion: Int = 0
 
-    /// The `regionVersion` value produced by the most recent
-    /// search-origin apply write-back. The Search & Redact sheet compares
-    /// the new `regionVersion` against this to skip clearing applied
-    /// markers for the apply that created them (vs a real undo/redo). The
-    /// `-1` sentinel never collides with a real `regionVersion` (which
-    /// starts at 0 and only increments).
-    private(set) var lastAppliedSearchRegionVersion: Int = -1
-
     /// Multi-region selection set. Single selection is the common case.
     var selectedRegionIDs: Set<UUID> = []
 
@@ -723,7 +715,6 @@ class RedactionState {
             createdMetadata: prepared.createdMetadata,
             createdAudit: prepared.createdAudit,
             actionName: Self.searchApplyActionName(count: selected.count),
-            recordsSearchApplyVersion: true,
             undoManager: undoManager
         )
         // Capture the CAPTURED session's deselection facts at
@@ -812,7 +803,6 @@ class RedactionState {
             createdMetadata: prepared.createdMetadata,
             createdAudit: prepared.createdAudit,
             actionName: Self.searchApplyActionName(count: 1),
-            recordsSearchApplyVersion: true,
             undoManager: undoManager
         )
         pendingRunDeselection = search.deselectionSnapshotForRun()
@@ -841,25 +831,14 @@ class RedactionState {
     /// invalidation, and ONE two-leg undo registration. Undo removes
     /// the created regions with their metadata AND audit records in
     /// lockstep; redo re-inserts all three.
-    ///
-    /// `recordsSearchApplyVersion` is set by the search origin only: it
-    /// records the produced `regionVersion` so the sheet's
-    /// applied-marker handler can tell this apply's own bump apart from
-    /// a real undo/redo bump. Captures N+1 (the post-increment value)
-    /// atomically within this MainActor write-back — no suspension runs
-    /// before the caller returns.
     private func commitApply(
         createdRegions: [Int: [RedactionRegion]],
         createdMetadata: [UUID: RegionMetadata],
         createdAudit: [UUID: MatchAuditSnapshot],
         actionName: String,
-        recordsSearchApplyVersion: Bool,
         undoManager: UndoManager?
     ) {
         regionVersion += 1
-        if recordsSearchApplyVersion {
-            lastAppliedSearchRegionVersion = regionVersion
-        }
         for (page, newRegions) in createdRegions {
             regions[page, default: []].append(contentsOf: newRegions)
             for region in newRegions { regionPageIndex[region.id] = page }
@@ -889,9 +868,6 @@ class RedactionState {
             // The undo leg is a region mutation like any other: bump
             // `regionVersion` so the overlay refresh gate and the search
             // sheet's applied-marker `.onChange` observe the removal.
-            // `lastAppliedSearchRegionVersion` stays at the forward
-            // apply's value, so the marker handler reads this bump as a
-            // real undo rather than the apply's own.
             target.regionVersion += 1
             target.registerUndo(undoManager, actionName) { target2 in
                 for (page, newRegions) in snapshot {
@@ -904,9 +880,9 @@ class RedactionState {
                 target2.clearOutput()
                 // Redo re-inserts regions — a region mutation; the bump
                 // keeps the canvas overlays refreshing. The sheet's
-                // applied markers stay cleared (conservative: the
-                // re-inserted regions read as coverage, so a re-apply
-                // over them no-ops as "already covered").
+                // applied markers come back with the re-inserted audit
+                // (`derivedSearchMarkers(for:)`), and a re-apply over the
+                // regions no-ops as "already covered".
                 target2.regionVersion += 1
             }
         }
@@ -970,12 +946,11 @@ class RedactionState {
     /// at toast enqueue (the enqueue path clears `pendingManualDrawNudge`).
     /// Routes through `addRegion` for the standard undo / region-version /
     /// page-index mutations, and mirrors the search-origin apply's
-    /// per-result side effects (regionMetadata + audit snapshot, plus the
-    /// sheet's `appliedResultIDs` marker while a session is open). The
-    /// toast outlives the sheet, so the accept needs no live session; it
-    /// also outlives a run start, so the accept refuses while the
-    /// pipeline owns the regions (`!canMutateRegions`), as `applyFindings`
-    /// does. The suppression flag is NOT set on accept — the user is
+    /// per-result side effects (regionMetadata + audit snapshot; the
+    /// sheet's markers derive from that audit). The toast outlives the
+    /// sheet, so the accept needs no live session; it also outlives a run
+    /// start, so the accept refuses while the pipeline owns the regions
+    /// (`!canMutateRegions`), as `applyFindings` does. The suppression flag is NOT set on accept — the user is
     /// engaged; the toast-enqueue path sets it.
     @discardableResult
     func acceptManualDrawNudge(
@@ -1023,9 +998,6 @@ class RedactionState {
         addRegion(region, page: nudge.pageIndex, undoManager: undoManager)
         regionMetadata[region.id] = metadata
         appliedMatchAudit[region.id] = audit
-        if let search = activeSearch {
-            MainActor.assumeIsolated { search.appliedResultIDs.insert(nudge.id) }
-        }
         pendingManualDrawNudge = nil
         undoManager?.setActionName("Add Nearby Match")
         return region

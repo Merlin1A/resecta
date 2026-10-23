@@ -449,20 +449,14 @@ struct SearchAndRedactSheet: View {
                 scheduleLivePreview: scheduleLivePreviewIfApplicable
             )
         }
-        // Clear stale applied markers when regions change (undo/redo), but
-        // NOT for the apply that just created them: the search-origin apply bumps
-        // regionVersion in the same MainActor tick as the appliedResultIDs
-        // union, so this handler cannot otherwise tell that bump apart from a
-        // real undo/redo. The decision is factored into the pure, testable
-        // `shouldClearAppliedMarkers(...)` helper.
-        .onChange(of: redactionState.regionVersion) { _, newVersion in
-            if Self.shouldClearAppliedMarkers(
-                newVersion: newVersion,
-                lastAppliedVersion: redactionState.lastAppliedSearchRegionVersion,
-                isEmpty: searchState.appliedResultIDs.isEmpty
-            ) {
-                searchState.appliedResultIDs.removeAll()
-            }
+        // The applied and covered markers are derived from the live
+        // regions (`refreshSearchMarkers(on:)`) whenever the regions or the
+        // results change, so they are never wiped by an unrelated edit.
+        .onChange(of: redactionState.regionVersion, initial: true) { _, _ in
+            redactionState.refreshSearchMarkers(on: searchState)
+        }
+        .onChange(of: searchState.results.count) { _, _ in
+            redactionState.refreshSearchMarkers(on: searchState)
         }
         // At the medium detent the fixed chrome above the results list
         // consumes nearly the full sheet height, so arriving results
@@ -1072,21 +1066,6 @@ struct SearchAndRedactSheet: View {
         currentDetent: PresentationDetent
     ) -> Bool {
         wasEmpty && !isEmpty && currentDetent == .medium
-    }
-
-    // Pure decision used by the `regionVersion` onChange handler,
-    // factored out so it is unit-testable without driving the SwiftUI render
-    // cycle. Returns false for the apply's own bump (`newVersion` equals the
-    // version that apply recorded) so the just-applied markers persist;
-    // returns true for a real undo/redo bump (any other version) when there
-    // are markers to drop.
-    static func shouldClearAppliedMarkers(
-        newVersion: Int,
-        lastAppliedVersion: Int,
-        isEmpty: Bool
-    ) -> Bool {
-        if newVersion == lastAppliedVersion { return false }
-        return !isEmpty
     }
 
     // MARK: - Save current regex
