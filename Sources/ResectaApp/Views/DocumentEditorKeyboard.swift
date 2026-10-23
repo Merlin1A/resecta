@@ -32,6 +32,7 @@ struct DocumentEditorKeyboard: ViewModifier {
     @Environment(RedactionState.self) private var redactionState
     @Environment(\.undoManager) private var undoManager
     @Binding var activeTool: DocumentEditorView.DrawingTool?
+    @Binding var isMultiSelectActive: Bool
 
     func body(content: Content) -> some View {
         content.onKeyPress(phases: .down, action: handleKeyPress)
@@ -76,6 +77,10 @@ struct DocumentEditorKeyboard: ViewModifier {
         }
         if activeTool != nil {
             activeTool = nil
+            return .handled
+        }
+        if isMultiSelectActive {
+            isMultiSelectActive = false
             return .handled
         }
         return .ignored

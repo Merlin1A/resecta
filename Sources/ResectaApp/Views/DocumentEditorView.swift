@@ -625,7 +625,12 @@ struct DocumentEditorView: View {
             coordinator.undoManager = undoManager
         }
         // Keyboard shortcuts for editing, handled by one modifier
-        .modifier(DocumentEditorKeyboard(activeTool: $activeTool))
+        .modifier(DocumentEditorKeyboard(activeTool: $activeTool, isMultiSelectActive: $isMultiSelectActive))
+        // Add to Selection turns off on a page with no regions (its row
+        // unmounts there), through the one tool-and-toggle reset.
+        .onChange(of: redactionState.regions[documentState.currentPageIndex]?.isEmpty ?? true) { _, empty in
+            if empty, isMultiSelectActive { editorToolbar.resetCanvasTools() }
+        }
         // Page navigation bar on iPhone only (editing
         // phase). Extracted to a small helper
         // property so the compact-float inset math stays out of this

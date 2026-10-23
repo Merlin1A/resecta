@@ -299,32 +299,25 @@ struct DocumentEditorToolbar {
     // "Select More" toolbar toggle. While on, a tap on a region
     // adds to selection rather than replacing it — iPhone parity for
     // the iPad Shift+tap path. Visible only when the current page has
-    // regions to select. Count surfaces in the label so the user sees
-    // the running selection size without opening a separate badge.
+    // regions to select; it turns off on a page with none.
     @ViewBuilder
     private var selectMoreToggle: some View {
         let page = documentState.currentPageIndex
-        let pageRegionCount = redactionState.regions[page]?.count ?? 0
-        let selectedCount = redactionState.selectedRegionIDs.count
-        if pageRegionCount > 0 {
-            Button {
-                isMultiSelectActive.toggle()
-                // Mutual exclusion with the Rectangle tool:
-                // whichever was activated last wins.
-                if isMultiSelectActive { activeTool = nil }
-            } label: {
-                Label(
-                    RedactionOverlayView.selectMoreToggleLabel(selectedCount: selectedCount),
-                    systemImage: isMultiSelectActive
-                        ? "checkmark.square.fill"
-                        : "checkmark.square"
-                )
+        if (redactionState.regions[page]?.count ?? 0) > 0 {
+            // A Toggle row: its own On/Off state is the value VoiceOver
+            // reads. Mutual exclusion with the Rectangle tool: whichever
+            // was turned on last wins.
+            Toggle(isOn: Binding(
+                get: { isMultiSelectActive },
+                set: { on in
+                    isMultiSelectActive = on
+                    if on { activeTool = nil }
+                }
+            )) {
+                Label(RedactionOverlayView.selectMoreToggleTitle, systemImage: "checkmark.square")
             }
-            .tint(isMultiSelectActive ? ResectaTokens.BrandTeal.tint : nil)
+            .tint(ResectaTokens.BrandTeal.tint)
             .accessibilityIdentifier("selectMoreToggle")
-            .accessibilityValue(isMultiSelectActive
-                                ? "On. Tapping a region adds it to the selection."
-                                : "Off. Tapping a region replaces the selection.")
         }
     }
 
