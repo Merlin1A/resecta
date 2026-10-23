@@ -350,19 +350,30 @@ struct ShareRiskConfirmPresentation: ViewModifier {
     /// (`ConcealingAnnotations.pages`), read at the Share tap.
     var concealedPages: [Int] = []
 
+    /// The confirmed family, held from the confirm until the sheet has
+    /// gone. The export presents the system share sheet from the top view
+    /// controller; started while this sheet is still up, it is presented
+    /// on this sheet and dismissed with it, so it never shows and the
+    /// editor is left on "Preparing for sharing…".
+    @State private var confirmed: ShareRiskConfirmKind?
+
     func body(content: Content) -> some View {
         content
-            .sheet(item: $kind) { activeKind in
+            .sheet(item: $kind, onDismiss: {
+                guard let confirmedKind = confirmed else { return }
+                confirmed = nil
+                DocumentEditorView.completeShareRiskConfirm(
+                    kind: confirmedKind,
+                    documentState: documentState,
+                    beginExport: beginExport
+                )
+            }) { activeKind in
                 ShareRiskConfirmSheet(
                     kind: activeKind,
                     deselectionSnapshot: deselectionSnapshot,
                     concealedPages: concealedPages,
                     onConfirm: {
-                        DocumentEditorView.completeShareRiskConfirm(
-                            kind: activeKind,
-                            documentState: documentState,
-                            beginExport: beginExport
-                        )
+                        confirmed = activeKind
                         kind = nil
                     },
                     onCancel: { kind = nil }
