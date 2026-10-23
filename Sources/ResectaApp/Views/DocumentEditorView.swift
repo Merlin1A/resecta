@@ -1280,7 +1280,7 @@ struct DocumentEditorView: View {
     private var previewAvailable: Bool { outputFileExists }
 
     private func handleExportTap(report: VerificationReport) {
-        shareConcealedPages = ConcealingAnnotations.pages(in: documentState.sourceDocument, regions: redactionState.regions)
+        shareConcealedPages = ConcealingAnnotations.pages(in: documentState.sourceDocument, regions: redactionState.regions, textLayerStatus: documentState.textLayerStatus)
         if let kind = Self.shareConfirmKind(report: report, documentState: documentState, concealedPages: shareConcealedPages) {
             shareRiskConfirmKind = kind
             return
