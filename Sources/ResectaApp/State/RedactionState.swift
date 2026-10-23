@@ -401,6 +401,8 @@ class RedactionState {
         manualDrawNudgeSuppressedForSession = false
         pendingManualDrawNudge = nil
         regionPageIndex.removeAll()
+        regionMetadata = [:]
+        appliedMatchAudit = [:] // holds matched text: never crosses documents
     }
 
     /// Clear pre-redaction text extraction buffer on success path.
@@ -1298,9 +1300,6 @@ class RedactionState {
     func clearAll() {
         resetDocumentSession()
         hoveredRegionID = nil
-        regionMetadata = [:]
-        // Audit is per-document-session only; never leaks across docs.
-        appliedMatchAudit = [:]
     }
 
     // MARK: - Undo Helper
