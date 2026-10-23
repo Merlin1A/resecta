@@ -126,6 +126,25 @@ struct CoordinatorCommitGuardTests {
         return (window, view)
     }
 
+    @Test("An arrow nudge at the page edge records no step")
+    func arrowNudgeAtThePageEdgeIsANoOp() {
+        let state = RedactionState()
+        let region = RedactionRegion(
+            id: UUID(),
+            normalizedRect: CGRect(x: 0.70, y: 0.10, width: 0.30, height: 0.05),
+            source: .manual
+        )
+        state.addRegion(region, page: 0, undoManager: nil)
+        let undoManager = UndoManager()
+        let version = state.regionVersion
+        let step = DocumentEditorView.nudgeDelta(pageSize: CGSize(width: 612, height: 792))
+        let nudged = DocumentEditorView.nudgedRect(region.normalizedRect, dx: step.dx, dy: 0)
+        #expect(nudged == region.normalizedRect, "the clamp holds the region at the right edge")
+        state.moveRegion(region.id, page: 0, newRect: nudged, undoManager: undoManager)
+        #expect(undoManager.canUndo == false)
+        #expect(state.regionVersion == version)
+    }
+
     @Test("A page change keeps only the selected regions on the page in view")
     func pageChangeKeepsOnlyTheVisiblePageSelection() {
         let (coordinator, state, firstPageRegion) = seeded()
