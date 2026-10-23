@@ -89,7 +89,7 @@ A barcode or QR code in a photo is not read or flagged: text recognition reads p
 ### KI-12: Some Non-ASCII Passwords Do Not Unlock a Document (Low)
 **Affects:** Import (password-protected PDFs)
 
-A password that contains accented Latin letters, such as ä or é, does not open a PDF encrypted with 128-bit or 256-bit AES, even when it is the correct password: PDFKit refuses it, and the password sheet reports that the password did not open the document. A 256-bit AES PDF whose password is written in Chinese characters opens, but Search on that document can stop with "Could not prepare the document for search", because PDFKit returns no copy of the unlocked document for Search to read.
+A password that contains accented Latin letters, such as ä or é, does not open a PDF encrypted with 128-bit or 256-bit AES, even when it is the correct password: PDFKit refuses it, and the password sheet reports that the password did not open the document. A 256-bit AES PDF whose password is written in Chinese characters opens, but Search and the page preview on that document can stop with "Could not prepare the document for search", because PDFKit returns no copy of the unlocked document for Search to read.
 
 **Workaround:** Open the PDF with its password in another app, save a copy without a password, and import that copy.
 
