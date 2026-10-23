@@ -84,7 +84,7 @@ struct DocumentEditorKeyboard: ViewModifier {
     private func handleSelectAllKey() -> KeyPress.Result {
         guard documentState.phaseKind == .editing else { return .ignored }
         let page = documentState.currentPageIndex
-        guard let pageRegions = redactionState.regions[page], !pageRegions.isEmpty else { return .ignored }
+        guard redactionState.canSelectAllOnPage(page), let pageRegions = redactionState.regions[page] else { return .ignored }
         redactionState.selectedRegionIDs = Set(pageRegions.map(\.id))
         return .handled
     }

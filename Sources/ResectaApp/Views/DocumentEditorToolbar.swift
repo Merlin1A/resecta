@@ -280,7 +280,7 @@ struct DocumentEditorToolbar {
                 Button("Select All on Page", systemImage: "checkmark.circle") {
                     redactionState.selectedRegionIDs = Set(pageRegions.map(\.id))
                 }
-                .disabled(selectedCount == pageRegions.count)
+                .disabled(!redactionState.canSelectAllOnPage(page))
                 Button("Deselect", systemImage: "xmark.circle") {
                     redactionState.selectedRegionIDs = []
                 }
@@ -340,7 +340,7 @@ struct DocumentEditorToolbar {
                     redactionState.selectedRegionIDs = Set(
                         (redactionState.regions[page] ?? []).map(\.id))
                 }
-                .disabled(selectedCount == pageRegionCount)
+                .disabled(!redactionState.canSelectAllOnPage(page))
                 if selectedCount > 0 {
                     Button("Deselect All", systemImage: "xmark.circle") {
                         redactionState.selectedRegionIDs = []
