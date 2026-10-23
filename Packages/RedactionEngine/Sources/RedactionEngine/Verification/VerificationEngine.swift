@@ -85,8 +85,9 @@ public struct VerificationEngine: Sendable {
     /// empty ⇒ that layer reports INFO. Called on its own, each of those two
     /// runs its own pass over the output; the orchestrator runs ONE pass for
     /// both and hands it in through the internal overload.
-    /// `manualRegionsWithoutText` (manual regions on pages with no text
-    /// layer to read) is Layer 3's alone: its clean line names them.
+    /// `manualRegionsWithoutText` (manual regions that added no term: a
+    /// whole-page region, or one on a page with no text layer to read) is
+    /// Layer 3's alone: its clean line names them.
     @concurrent
     public func runLayer(
         _ layer: VerificationLayer,
@@ -206,7 +207,7 @@ public struct VerificationEngine: Sendable {
                 layerPageReferences = pages2
                 layerReviewTerms = terms2
                 couldNotVerify = cnv2
-                // Manual regions on pages with no text layer: the clean line gains one sentence.
+                // Manual regions that added no term (whole-page, or no text layer): the clean line gains one sentence.
                 copyOverride = Self.manualRegionsWithoutTextCopy(status, count: manualRegionsWithoutText)
             case .structureCheck:
                 let (s, pages, cnv3) = try runLayer4Structural(doc)

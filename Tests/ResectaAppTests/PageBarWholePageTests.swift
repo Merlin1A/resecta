@@ -149,7 +149,7 @@ struct PageBarWholePageTests {
         let set = PipelineCoordinator.sensitiveTermSet(
             applied: [], manualRegions: redactionState.regions, in: document, textLayerStatus: [0: .rich])
         #expect(set.terms.isEmpty, "a whole-page region names no term: \(set.terms.map(\.text))")
-        #expect(set.manualRegionsWithoutText == 0, "nor is it counted as a region without text")
+        #expect(set.manualRegionsWithoutText == 1, "and it is counted with the regions the string search could not capture")
     }
 
     @Test("A live search result on the page raises no nearby-match nudge: the region covers it rather than neighbouring it")

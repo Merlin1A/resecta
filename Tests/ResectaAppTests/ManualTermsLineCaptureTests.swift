@@ -109,12 +109,25 @@ struct ManualTermsLineCaptureTests {
         #expect(Self.capture(doc, [Self.padded(the)]) == ["the": true])
         let ann = try #require(words.first { $0.text == "Ann" }?.rect)
         let lee = try #require(words.last { $0.text == "Lee" }?.rect)
-        #expect(Self.capture(doc, [Self.padded(ann.union(lee))]) == ["Ann Lee": false],
-                "three-scalar tokens of a run stay out")
+        #expect(Self.capture(doc, [Self.padded(ann.union(lee))]) == ["Ann Lee": false, "Ann": true, "Lee": true],
+                "capitalized three-scalar tokens of a run stand alone, bounded")
         let jose = try #require(words.first { $0.text == "José" }?.rect)
         let account = try #require(words.last { $0.text == "Account" }?.rect)
         #expect(Self.capture(doc, [Self.padded(jose.union(account))]) == ["José the Account": false, "José": true],
                 "four scalars in, the stop-listed tokens out")
+    }
+
+    @Test("A short capitalized word of a run stands alone; an all-caps or lowercase short word does not")
+    func shortCapitalizedWords() throws {
+        let doc = Self.textPDF()
+        let words = try Self.words(doc)
+        let box = try Self.lineBox(words, line: "IBM")
+        let terms = Self.capture(doc, [Self.padded(box)])
+        #expect(terms["Bo Lee IBM Ann Lee"] == false, "the span: \(terms.keys.sorted())")
+        #expect(terms["Bo"] == true && terms["Lee"] == true && terms["Ann"] == true, "short surnames, bounded")
+        #expect(terms["IBM"] == nil, "an all-caps short word stays out of a run")
+        let jose = try Self.lineBox(words, line: "José")
+        #expect(Self.capture(doc, [Self.padded(jose)])["the"] == nil, "a lowercase short word stays out of a run")
     }
 
     @Test("Lines never join across; no hyphen join")
@@ -153,11 +166,18 @@ struct ManualTermsLineCaptureTests {
 
     @Test("The stop list: its count, lowercase, four scalars or more; the admission rule")
     func stopListPins() {
-        #expect(ManualTermStopWords.words.count == 151)
+        #expect(ManualTermStopWords.words.count == 144)
+        for nameLike in ["Will", "Page", "Price", "Field", "Street", "More", "Unit"] {
+            #expect(ManualTermStopWords.admits(nameLike), "\(nameLike): a word that is also a name is not listed")
+        }
         #expect(ManualTermStopWords.words.allSatisfy { $0 == $0.lowercased() && $0.unicodeScalars.count >= 4 })
         #expect(!ManualTermStopWords.admits("Account"))
         #expect(!ManualTermStopWords.admits("ACCOUNT"))
-        #expect(!ManualTermStopWords.admits("Lee"))
+        #expect(ManualTermStopWords.admits("Lee") && ManualTermStopWords.admits("Ng") && ManualTermStopWords.admits("Kim"),
+                "a capitalized word of two or three letters, a short surname, stands alone")
+        #expect(!ManualTermStopWords.admits("IBM") && !ManualTermStopWords.admits("the") && !ManualTermStopWords.admits("an"),
+                "an all-caps or lowercase short word does not")
+        #expect(!ManualTermStopWords.admits("A") && !ManualTermStopWords.admits("I"), "one letter never")
         #expect(ManualTermStopWords.admits("Smith"))
         #expect(ManualTermStopWords.admits("José"))
         #expect(ManualTermStopWords.admits("A1"))

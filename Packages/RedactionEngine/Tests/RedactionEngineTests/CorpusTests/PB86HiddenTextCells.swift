@@ -58,8 +58,10 @@ extension VerificationCorpusRunnerTests {
 
     /// The engine-factory hidden-text probe grid: the four original hidden classes ×
     /// covered/uncovered, the three optional-content forms × covered/uncovered,
-    /// the crop-box page (uncovered only: the hidden line is off the page), and
-    /// the three faint-ink pages × covered/uncovered.
+    /// the two forms that hide content without an `/OFF` entry (a duplicate
+    /// `/ON`; a membership dictionary) × covered/uncovered, the crop-box page
+    /// (uncovered only: the hidden line is off the page), and the three
+    /// faint-ink pages × covered/uncovered.
     /// Regions are fixed normalized boxes over the factories' known geometry
     /// (RawPDFBuilder anchor/hidden Td positions; ctLineDraw NATO column;
     /// ocgHiddenLayerPDF's 72,720 line).
@@ -107,6 +109,8 @@ extension VerificationCorpusRunnerTests {
         let bso = TestFixtures.ocgBaseStateOffPDF()
         let inh = TestFixtures.ocgInheritedResourcesPDF()
         let xob = TestFixtures.ocgFormXObjectPDF()
+        let dup = TestFixtures.ocgDuplicateOnPDF()
+        let ocmd = TestFixtures.ocgMembershipDictionaryPDF()
         let crop = TestFixtures.offCropBoxTextPDF()
         let nearWhite = TestFixtures.nearWhiteTextPDF()
         let lowAlpha = TestFixtures.lowAlphaTextPDF()
@@ -193,6 +197,29 @@ extension VerificationCorpusRunnerTests {
                   notes: "region over the visible anchor only; the form XObject's line is untouched"),
              rows("pb86-ocg-form-xobject", set: "pb86-uncovered",
                   cls: "ocg_form_xobject", covered: [], uncovered: ["PLANT-ENGXOB-01"])),
+            // Two forms that hide content without an /OFF entry: an OFF base
+            // state whose /ON list names one group twice and the other never,
+            // and a membership dictionary (/P /AllOff) while every group is on.
+            (cell("pb86-ocg-duplicate-on", dup, set: "pb86-covered",
+                  seeds: hiddenRegion, terms: ["PLANT-ENGDUP-01"],
+                  notes: "region over the line an OFF base state hides when the /ON list names one group twice and the other never"),
+             rows("pb86-ocg-duplicate-on", set: "pb86-covered",
+                  cls: "ocg_duplicate_on", covered: ["PLANT-ENGDUP-01"], uncovered: [])),
+            (cell("pb86-ocg-duplicate-on", dup, set: "pb86-uncovered",
+                  seeds: anchorRegion, terms: ["DUP VISIBLE ANCHOR LINE"],
+                  notes: "region over the visible anchor only; the duplicate-/ON hidden line is untouched"),
+             rows("pb86-ocg-duplicate-on", set: "pb86-uncovered",
+                  cls: "ocg_duplicate_on", covered: [], uncovered: ["PLANT-ENGDUP-01"])),
+            (cell("pb86-ocg-membership-dictionary", ocmd, set: "pb86-covered",
+                  seeds: hiddenRegion, terms: ["PLANT-ENGOCMD-01"],
+                  notes: "region over the line a membership dictionary (/P /AllOff) hides while every group is on"),
+             rows("pb86-ocg-membership-dictionary", set: "pb86-covered",
+                  cls: "ocg_membership_dictionary", covered: ["PLANT-ENGOCMD-01"], uncovered: [])),
+            (cell("pb86-ocg-membership-dictionary", ocmd, set: "pb86-uncovered",
+                  seeds: anchorRegion, terms: ["OCMD VISIBLE ANCHOR LINE"],
+                  notes: "region over the visible anchor only; the membership-dictionary line is untouched"),
+             rows("pb86-ocg-membership-dictionary", set: "pb86-uncovered",
+                  cls: "ocg_membership_dictionary", covered: [], uncovered: ["PLANT-ENGOCMD-01"])),
             (cell("pb86-off-crop", crop, set: "pb86-uncovered",
                   seeds: cropAnchorRegion, terms: ["CROP VISIBLE ANCHOR LINE"],
                   notes: "region over the visible anchor; the line outside the crop box cannot be covered by any region — the pure re-exposure probe"),
