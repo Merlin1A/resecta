@@ -675,6 +675,7 @@ class RedactionOverlayView: UIView {
         // Commit resize
         if activeResizeHandle != nil, let id = selectedID,
            let region = regions.first(where: { $0.id == id }) {
+            moveCommitFeedback.impactOccurred(intensity: 0.4)  // a light tick: the resize landed
             coordinator?.commitResize(id, page: pageIndex,
                                       newRect: region.normalizedRect,
                                       undoManager: window?.undoManager)
@@ -698,6 +699,7 @@ class RedactionOverlayView: UIView {
             normalizedRect: normalizedRect,
             source: .manual
         )
+        moveCommitFeedback.impactOccurred(intensity: 0.4)  // a light tick: the box landed
         coordinator?.addRegion(region, page: pageIndex, undoManager: window?.undoManager)
         // VoiceOver announcement on region commit
         UIAccessibility.post(notification: .announcement, argument: "Region added")
