@@ -21,7 +21,7 @@ struct ErrorRecoveryTests {
     @Test("A byte-cap refusal keeps the size sentence with a true figure")
     func byteCapRefusalKeepsTheSize() {
         let text = PipelineError.importError(.tooLarge(bytesRead: 60 * 1024 * 1024)).localizedRecovery
-        #expect(text == "This file is approximately 60 MB. Try a smaller document or reduce the page count.")
+        #expect(text == "This file is approximately 60 MB. Try a smaller file: a PDF with fewer pages, or a smaller image.")
     }
 
     // MARK: - Failed State Transitions
