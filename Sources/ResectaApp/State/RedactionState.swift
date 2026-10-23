@@ -1073,9 +1073,11 @@ class RedactionState {
     /// rationale continuity is preserved because the new region's
     /// `Source.searchMatch(term:rationale:)` carries `nudge.rationale`
     /// verbatim. Side-effects mirror the search-origin apply's
-    /// per-result branch (regionMetadata + audit snapshot +
-    /// appliedResultIDs membership) so a nudge-accepted region looks
-    /// indistinguishable from a sheet-applied region on the canvas.
+    /// per-result branch (regionMetadata + audit snapshot, plus the
+    /// sheet's `appliedResultIDs` marker while a session is open) so a
+    /// nudge-accepted region looks like a sheet-applied one. The toast
+    /// outlives the sheet, and the nudge carries everything the region
+    /// needs, so the accept never requires a live session.
     /// The suppression flag is NOT set on accept — the user is
     /// engaged; the toast-enqueue path sets it.
     @discardableResult
@@ -1083,10 +1085,6 @@ class RedactionState {
         _ nudge: SearchResult,
         undoManager: UndoManager?
     ) -> RedactionRegion? {
-        guard let search = activeSearch else {
-            pendingManualDrawNudge = nil
-            return nil
-        }
         let region = RedactionRegion(
             id: UUID(),
             normalizedRect: nudge.normalizedRect,
@@ -1126,8 +1124,8 @@ class RedactionState {
         addRegion(region, page: nudge.pageIndex, undoManager: undoManager)
         regionMetadata[region.id] = metadata
         appliedMatchAudit[region.id] = audit
-        MainActor.assumeIsolated {
-            search.appliedResultIDs.insert(nudge.id)
+        if let search = activeSearch {
+            MainActor.assumeIsolated { search.appliedResultIDs.insert(nudge.id) }
         }
         pendingManualDrawNudge = nil
         undoManager?.setActionName("Add Nearby Match")
