@@ -100,11 +100,10 @@ struct DocumentEditorScenePhaseHandler: ViewModifier {
                 // state preamble + pipeline kick-off one runloop turn so they
                 // land after the dismiss animation; both are MainActor-isolated.
                 Task { @MainActor in
-                    // Tear down the search sheet and
-                    // round-trip `verified -> editing` so runFullPipeline's
-                    // canStartPipeline guard passes — the toast fires only from
-                    // `.verified`, where the guard would otherwise reject and
-                    // strand the user (gone output, disabled Share).
+                    // Move `verified -> editing` so runFullPipeline's start
+                    // guard (`redactRefusal(with:)`) does not read the
+                    // results as busy and strand the user (gone output,
+                    // disabled Share); the toast fires only from `.verified`.
                     DocumentEditorView.prepareForPurgeRerun(
                         documentState: documentState,
                         redactionState: redactionState

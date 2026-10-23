@@ -854,9 +854,8 @@ struct DocumentEditorView: View {
     /// Clears the background-pause flag (the ContentView scene handler sets
     /// it on the verified-arm cancel; nothing else consumes it for the
     /// skipped case) and routes per `runVerificationRoute`. The full-pipeline
-    /// leg round-trips the phase through `.editing` first — `runFullPipeline`
-    /// guards `canStartPipeline`, which rejects `.verified` (the KI-4
-    /// purge re-run precedent).
+    /// leg takes the purge re-run's preamble first: `runFullPipeline`'s start
+    /// guard (`redactRefusal(with:)`) reads `.verified` as busy.
     private func handleRunVerificationTap() {
         dismissBannerTask?.cancel()
         documentState.wasPausedByBackground = false
