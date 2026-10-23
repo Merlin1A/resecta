@@ -52,6 +52,10 @@ final class SearchState: Identifiable {
     /// `appliedSearchRecord()` so the record reproduces the run.
     var lastRunScanConfiguration: ScanRunConfiguration?
 
+    /// One shot: the next run posts no re-run notice (a saved-search
+    /// recall names the matches it clears itself). Reset by that run.
+    var skipNextRerunNotice = false
+
     /// One-shot arm for the toolbar Scan button's one-tap contract:
     /// the button sets this before presenting the sheet, and the
     /// sheet's `.onAppear` consumes it exactly once to fire the run.

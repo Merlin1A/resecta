@@ -70,6 +70,14 @@ extension SearchAndRedactSheet {
         return "\(noun) closed — \(unappliedCount) unapplied match\(suffix) cleared."
     }
 
+    /// The notice a re-run posts when it clears unapplied matches with the
+    /// previous results; nil when none were unapplied.
+    static func rerunClearedMessage(unappliedCount: Int) -> String? {
+        guard unappliedCount > 0 else { return nil }
+        let suffix = unappliedCount == 1 ? "" : "es"
+        return "Search re-run — \(unappliedCount) unapplied match\(suffix) cleared."
+    }
+
     /// The notice read from a live session: what every dismissal that
     /// drops the session posts, the sheet's own Dismiss and a system
     /// dismissal (a swipe or a scrim tap) the editor's sheet binding sees.

@@ -178,7 +178,10 @@ extension SearchAndRedactSheet {
         // `diffSinceLastScan()` reads this snapshot once the new scan's
         // results land, surfacing the Coverage Report diff line.
         searchState.captureFingerprintsBeforeScan()
+        let unapplied = searchState.skipNextRerunNotice ? 0 : Self.unappliedMatchCount(in: searchState)
+        searchState.skipNextRerunNotice = false  // a recall names its own drop
         searchState.clearResults()
+        if let message = Self.rerunClearedMessage(unappliedCount: unapplied) { toastManager.enqueue(message, severity: .info) }
         // The token this run's results and progress hops carry: a
         // cancelled predecessor still draining its stream is told
         // apart by it and dropped, so its late batch can never land
@@ -771,6 +774,7 @@ extension SearchAndRedactSheet {
         activeModal = nil
         let dropped = Self.unappliedMatchCount(in: searchState)
         SavedSearchListSheet.apply(saved, to: searchState)
+        searchState.skipNextRerunNotice = true
         triggerSearch()
         if let message = Self.recallClearedMessage(unappliedCount: dropped) {
             toastManager.enqueue(message, severity: .info)
