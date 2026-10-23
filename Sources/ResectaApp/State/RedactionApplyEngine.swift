@@ -2,14 +2,15 @@ import Foundation
 import RedactionEngine
 
 // Apply's one home: the one apply seam (`applyFindings` and the two types
-// it speaks in), the gate that runs applies one at a time, and the
-// detached prepare step the search origin runs off the MainActor. Moved
-// out of `RedactionState.swift` along its `// MARK: - The one apply seam`,
-// `// MARK: - Apply serialization` and `// MARK: - Apply prepare helper`
-// seams. The search origins, the shared commit and the manual-draw nudge
-// stay in `RedactionState.swift`: they write state only that file may
-// write. The gate's two stored flags stay there too (an extension adds
-// no storage) and are read from here.
+// it speaks in), the gate that runs applies one at a time, the lasso's
+// batch apply, and the detached prepare step the search origin runs off
+// the MainActor. Moved out of `RedactionState.swift` along its
+// `// MARK: - The one apply seam`, `// MARK: - Apply serialization`,
+// `// MARK: - Lasso Multi-Select Batch Apply` and
+// `// MARK: - Apply prepare helper` seams. The search origins, the shared
+// commit and the manual-draw nudge stay in `RedactionState.swift`: they
+// write state only that file may write. The gate's two stored flags stay
+// there too (an extension adds no storage) and are read from here.
 
 extension RedactionState {
 
@@ -145,6 +146,94 @@ extension RedactionState {
         } else {
             applyWaiters.removeFirst().resume()
         }
+    }
+
+    // MARK: - Lasso Multi-Select Batch Apply
+
+    /// Maximum number of regions a single lasso-marquee apply may select.
+    /// Defensive cap against accidental select-all on huge documents; the
+    /// truncation surfaces as a `.warning` toast so the user can re-target.
+    static let lassoSelectionCap: Int = 500
+
+    /// User-facing toast text shown when a lasso marquee would select
+    /// more regions than `lassoSelectionCap` permits. Mechanism-description
+    /// language — "Selection limited to 500 regions"
+    /// names the truncation observably without making a promise claim.
+    static let lassoSelectionCapToastMessage: String =
+        "Selection limited to \(lassoSelectionCap) regions"
+
+    /// Apply a precomputed batch of regions as the new multi-select set.
+    ///
+    /// Peer to `applyFindings` — distinct shipping unit. Where
+    /// `applyFindings` creates new regions from either result origin,
+    /// `applyBatch` selects already-resident regions: the
+    /// caller has resolved a rect-marquee against `regions` and produced
+    /// the intersecting subset.
+    ///
+    /// Mirrors the `commitApply` undo-grouping pattern:
+    /// the entire selection mutation is one undoable step so a follow-on
+    /// batch-delete via `deleteSelected` collapses into a second single
+    /// undo step (one `undoManager.undo()` per user-visible action).
+    ///
+    /// Enforces the 500-region cap (`lassoSelectionCap`) inside this
+    /// method so any caller route — the overlay marquee path today,
+    /// hypothetical future select-all-by-detector routes — inherits the
+    /// same defense automatically. On truncation, posts a `.warning`
+    /// toast via the caller-provided `toastManager`; severity is
+    /// intentionally `.warning` (not `.error`) because overflow is an
+    /// expected outcome on large documents, not a fault state.
+    ///
+    /// - Parameters:
+    ///   - regions: Regions to mark selected. Order is preserved across
+    ///     the truncation — the first `lassoSelectionCap` entries are
+    ///     kept; later entries are dropped silently after the toast.
+    ///   - undoManager: Optional UndoManager for grouping the selection
+    ///     mutation as a single undo step. Nil disables undo support
+    ///     (test seam).
+    ///   - toastManager: Optional ToastQueueManager for surfacing the
+    ///     overflow toast. Nil disables the toast surfacing (test seam).
+    /// - Returns: A tuple naming the count actually selected and a flag
+    ///   recording whether the cap truncated the input. Both fields are
+    ///   available without inspecting the toast manager so tests can
+    ///   assert on the truncation contract directly.
+    @MainActor
+    @discardableResult
+    func applyBatch(
+        _ regions: [RedactionRegion],
+        undoManager: UndoManager?,
+        toastManager: ToastQueueManager? = nil
+    ) -> (selected: Int, truncated: Bool) {
+        let truncated = regions.count > Self.lassoSelectionCap
+        let kept = truncated
+            ? Array(regions.prefix(Self.lassoSelectionCap))
+            : regions
+        let newSelection = Set(kept.map(\.id))
+
+        let previousSelection = selectedRegionIDs
+        selectedRegionIDs = newSelection
+
+        // Undo: restore the prior selection set in one step, then a
+        // redo step that re-applies the truncated selection. Mirrors
+        // commitApply's two-leg register/re-register pattern
+        // so redo after undo lands the same selection
+        // (rather than the original, untruncated input).
+        let snapshot = newSelection
+        let priorSnapshot = previousSelection
+        registerUndo(undoManager, "Select Regions") { target in
+            target.selectedRegionIDs = priorSnapshot
+            target.registerUndo(undoManager, "Select Regions") { target2 in
+                target2.selectedRegionIDs = snapshot
+            }
+        }
+
+        if truncated {
+            toastManager?.enqueue(
+                Self.lassoSelectionCapToastMessage,
+                severity: .warning
+            )
+        }
+
+        return (selected: newSelection.count, truncated: truncated)
     }
 }
 
