@@ -91,6 +91,16 @@ extension SearchAndRedactSheet {
     static let dismissTitle = "Discard selections?"
     static let dismissMessage = "Selected matches will not be applied to the document."
 
+    /// Escape's dismiss, the Dismiss button's rule: ask first while the
+    /// session holds selected matches no live region covers, else close.
+    func requestDismiss() {
+        if DocumentState.hasUnappliedSelections(redactionState) {
+            showDismissConfirmation = true
+        } else {
+            performDismiss(afterConfirmation: false)
+        }
+    }
+
     /// Shared dismiss path for the direct (untouched) and confirmed
     /// (touched) routes: a live selection is deselected in-place.
     /// `afterConfirmation` suppresses the loss-naming toasts — the
