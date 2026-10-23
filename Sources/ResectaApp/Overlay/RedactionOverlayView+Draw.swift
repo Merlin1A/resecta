@@ -385,14 +385,14 @@ extension RedactionOverlayView {
 
     /// Draw active snap guide lines spanning the full overlay.
     func drawSnapGuides(ctx: CGContext) {
-        guard !activeGuides.isEmpty else { return }
+        guard !snapEngine.activeGuides.isEmpty else { return }
 
         ctx.saveGState()
         ctx.setStrokeColor(ResectaTokens.Snap.guideColor.cgColor)
         ctx.setLineWidth(ResectaTokens.Snap.guideLineWidth)
         ctx.setLineDash(phase: 0, lengths: [])
 
-        for guide in activeGuides {
+        for guide in snapEngine.activeGuides {
             if guide.isHorizontal {
                 ctx.move(to: CGPoint(x: 0, y: guide.position))
                 ctx.addLine(to: CGPoint(x: bounds.width, y: guide.position))

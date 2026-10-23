@@ -80,9 +80,9 @@ extension SearchState {
     }
 
     /// The per-mode empty-state discriminator from this session's
-    /// shape — the results list's own read (`WU20Strings.context`).
-    var emptyStateContext: WU20Strings.EmptyContext {
-        WU20Strings.context(
+    /// shape — the results list's own read (`SearchEmptyStateCopy.context`).
+    var emptyStateContext: SearchEmptyStateCopy.EmptyContext {
+        SearchEmptyStateCopy.context(
             mode: searchModeType,
             queryText: queryText,
             multiTermTerms: searchTerms,

@@ -209,4 +209,25 @@ struct RedactionStateAuditTests {
         state.clearAll()
         #expect(state.appliedMatchAudit.isEmpty)
     }
+
+    // MARK: - clearForNewDocument
+
+    @Test("clearForNewDocument empties the audit and the region metadata")
+    func clearForNewDocumentWipesAuditAndMetadata() async {
+        let state = RedactionState()
+        let search = SearchState()
+        search.results = [makeResult()]
+        state.activeSearch = search
+        _ = await state.applyFindings(.selectedSearchResults, undoManager: nil)
+        #expect(!state.appliedMatchAudit.isEmpty, "precondition: the apply wrote its audit")
+        #expect(!state.regionMetadata.isEmpty, "precondition: the apply wrote its metadata")
+
+        // A replacement document (a drop over an open one): the previous
+        // document's matched text must not ride into the next one.
+        state.clearForNewDocument()
+        #expect(state.appliedMatchAudit.isEmpty,
+                "today only clearAll() wipes the audit; resetDocumentSession() does not")
+        #expect(state.regionMetadata.isEmpty)
+        #expect(state.appliedMatchAuditSnapshots.isEmpty)
+    }
 }

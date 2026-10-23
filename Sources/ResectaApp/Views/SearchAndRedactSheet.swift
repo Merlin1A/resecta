@@ -438,32 +438,16 @@ struct SearchAndRedactSheet: View {
             // unapplied count is likewise read against the LIVE results.
             let snapshot = Self.modeSwitchSnapshot(
                 of: searchState, previousMode: plan.previousMode)
-            let unappliedCount = Self.unappliedMatchCount(in: searchState)
-            for step in plan.steps {
-                switch step {
-                case .cancelSearchWithoutAwait:
-                    searchState.cancelSearchWithoutAwait()
-                case .clearResults:
-                    searchState.clearResults()
-                case .resetFilters:
-                    searchState.piiCategoryFilter = nil
-                    searchState.sortOrder = .discoveryOrder
-                case .enqueueUndoToast:
-                    Self.enqueueModeSwitchUndoToast(
-                        on: toastManager,
-                        redactionState: redactionState,
-                        snapshot: snapshot,
-                        isProgrammatic: isProgrammatic,
-                        unappliedCount: unappliedCount
-                    )
-                case .resetProgrammaticFlag:
-                    searchState.isProgrammaticModeChange = false
-                case .clearLivePreview:
-                    searchState.clearLivePreview()
-                case .scheduleLivePreview:
-                    scheduleLivePreviewIfApplicable()
-                }
-            }
+            Self.applyModeSwitchSteps(
+                plan,
+                to: searchState,
+                toastManager: toastManager,
+                redactionState: redactionState,
+                snapshot: snapshot,
+                isProgrammatic: isProgrammatic,
+                unappliedCount: Self.unappliedMatchCount(in: searchState),
+                scheduleLivePreview: scheduleLivePreviewIfApplicable
+            )
         }
         // Clear stale applied markers when regions change (undo/redo), but
         // NOT for the apply that just created them: the search-origin apply bumps
@@ -972,10 +956,7 @@ struct SearchAndRedactSheet: View {
             let snapshot = Self.currentSelectionSnapshot(in: searchState)
             Self.clearSelection(in: searchState, snapshot: snapshot)
         } else if !afterConfirmation,
-                  let message = Self.dismissClearedMessage(
-                      unappliedCount: Self.unappliedMatchCount(in: searchState),
-                      interface: searchState.searchModeType.interface
-                  ) {
+                  let message = Self.dismissClearedMessage(for: searchState) {
             // A 0-selected dismissal names what the close drops when
             // unapplied matches exist so the loss isn't silent. The
             // toast manager outlives the sheet.

@@ -94,7 +94,25 @@ struct DiscardUndoToastTests {
         #expect(SearchAndRedactSheet.dismissClearedMessage(unappliedCount: 0, interface: .scan) == nil)
     }
 
-    // MARK: - Fixtures
+    // MARK: - The notice a dropped session posts
+
+    // Every dismissal that drops a live session posts the same notice: the
+    // sheet's own Dismiss, and a system dismissal (a swipe or a scrim tap)
+    // the editor's sheet binding sees, read from the session about to go.
+
+    @Test("A session holding unapplied matches names them in the dismissal notice")
+    func sessionNoticeNamesTheUnappliedMatches() {
+        let state = SearchState()
+        state.results = [makeResult(), makeResult()]
+        #expect(SearchAndRedactSheet.dismissClearedMessage(for: state)
+                == "Search closed — 2 unapplied matches cleared.")
+    }
+
+    @Test("A session with nothing unapplied posts no notice")
+    func emptySessionPostsNoNotice() {
+        #expect(SearchAndRedactSheet.dismissClearedMessage(for: SearchState()) == nil)
+    }
+
 
     private func makeResult() -> SearchResult {
         SearchResult(

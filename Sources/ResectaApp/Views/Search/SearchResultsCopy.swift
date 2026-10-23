@@ -334,8 +334,3 @@ enum SearchEmptyStateCopy {
     static let showAllButton = "Show All"
     static let filteredOutDescription = "Your active filters hide all candidates. Adjust source, confidence, or category filters to see results."
 }
-
-// `SearchState+WalkSummary.swift` reads the empty-state discriminator
-// under the catalog's former name (`emptyStateContext`); the alias keeps
-// that caller compiling until its own file is next touched.
-typealias WU20Strings = SearchEmptyStateCopy

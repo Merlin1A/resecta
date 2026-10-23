@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ### Added
 
+- Editor: the iPhone overflow menu offers Mark Whole Page for the page in view, on one-page documents too, through the page bar's own action.
 - Password sheet: when a refused password holds an accented letter, a line beneath the refusal says such a password may not open the document in Resecta even when it is correct (Known Issues KI-12).
 - Settings: a "Rate Resecta on the App Store" row under Support opens the App Store's review page for the app.
 - Acknowledgements: the third-party data and typeface notices the app ships (the repo-root NOTICE) are bundled and readable in-app, from the first-launch gate beside the EULA and Privacy Policy and from Settings.
@@ -69,6 +70,11 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Document canvas: with a hardware keyboard, Select All then Copy (⌘A, ⌘C) no longer places the document's text on the system pasteboard. The canvas view refuses the copy, cut, paste, select and select-all actions and builds its menu without the edit, look-up, learn and share groups; in 1.2.0 that keyboard path copied the whole document's text with no selection shown.
 ### Fixed
 
+- Editor: a different document replacing the open one turns the draw tool and Add to Selection off, so neither carries into the new document.
+- Editor: Delete from a region's long-press menu or its VoiceOver action is its own Undo step, so redoing an earlier apply no longer brings the deleted region back, and the other selected regions stay selected.
+- A document dropped over an open one starts without the previous document's matched text and region notes, as a document opened from the home screen does.
+- The purge Re-run tapped after Keep Editing is judged like Redact: with selected matches not applied it is refused with the same hint and the selections stay, instead of the search being dropped.
+- Search sheet: closing an untouched sheet with a swipe or a tap above it names the unapplied matches it clears, as its Dismiss button does.
 - Verification results: when a run applied a scan and no typed search, the Search Re-check row reads the check's own line saying what the coverage check compared, instead of the re-run explainer; and the fragment row counts its boxes by the terms it names, not by the pages.
 - Verification: on a password-protected document with 128-bit encryption, the Search Re-check's coverage check now reads the original pages unlocked with the session's password. Before, it read a copy that stayed locked, found no matches and passed. When the original pages cannot be read, the check now reports "could not verify" instead of passing; and the OCR Check reports the start or the end of a redacted term read beside a box on a page that also carries a fill artifact, with the results row naming the term and the box as the remedy.
 - Verification: the Search Re-check also re-runs each applied search and scan on the original page and fails when a redaction box leaves part of a match uncovered, and the OCR Check reports the start or the end of a redacted term read beside a box. Before, a box placed off its text by one or more characters passed every check while the uncovered characters stayed printed on the page: the rebuilt text layer dropped them, the text-reading checks read that layer, and the OCR Check read only the box.

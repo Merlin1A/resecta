@@ -275,7 +275,7 @@ struct DrawWinsTests {
 
     @Test("The editor's Add to Selection toggle exits the Rectangle tool and tool entry clears the toggle (source pin)")
     func testEditorMutualExclusionSourcePin() throws {
-        let source = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorView.swift")
+        let source = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorToolbar.swift")
         #expect(source.contains("if isMultiSelectActive { activeTool = nil }"))
         #expect(source.contains("DocumentEditorView.drawToolEntryEffects(entering: entering)"))
     }
@@ -284,9 +284,9 @@ struct DrawWinsTests {
 
     @Test("applyResizeSnapping posts the 'Aligned to guide' VoiceOver announcement like applySnapping — the draw path snaps through it too (source pin)")
     func testResizeSnapAnnouncesGuideAlignment() throws {
-        let source = try loadRepoFile("Sources/ResectaApp/Overlay/RedactionOverlayView.swift")
-        guard let start = source.range(of: "private func applyResizeSnapping("),
-              let end = source.range(of: "// MARK: - Handle Animation",
+        let source = try loadRepoFile("Sources/ResectaApp/Overlay/SnapGuideEngine.swift")
+        guard let start = source.range(of: "func applyResizeSnapping("),
+              let end = source.range(of: "// MARK: - Reset",
                                      range: start.upperBound..<source.endIndex)
         else {
             Issue.record("Could not locate applyResizeSnapping")

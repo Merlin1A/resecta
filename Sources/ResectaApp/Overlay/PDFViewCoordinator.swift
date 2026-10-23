@@ -301,10 +301,12 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
         }
     }
 
-    /// Delete a specific region by ID (used by VoiceOver custom action).
+    /// Delete a specific region by ID: the long-press menu's Delete and
+    /// the VoiceOver custom action. It registers on the window's undo
+    /// manager, the one the canvas gestures use, so the delete is its own
+    /// undoable step; the rest of a multi-selection stays selected.
     func deleteRegion(_ id: UUID, page: Int) {
-        redactionState?.removeRegion(id, page: page, undoManager: nil)
-        redactionState?.selectedRegionID = nil
+        redactionState?.removeRegion(id, page: page, undoManager: pdfView?.window?.undoManager)
         refreshOverlay(for: page)
         UIAccessibility.post(notification: .announcement, argument: Self.commitAnnouncement(.deleted))
     }

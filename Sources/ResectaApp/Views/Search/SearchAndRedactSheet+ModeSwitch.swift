@@ -137,6 +137,48 @@ extension SearchAndRedactSheet {
         return ModeSwitchPlan(previousMode: previousMode, steps: steps)
     }
 
+    /// Apply a plan's steps in order. Every input is explicit: the session
+    /// the steps clear, the toast queue and redaction state the undo toast
+    /// needs, the snapshot and unapplied count the hub read before the
+    /// clear, and the sheet's live-preview scheduler.
+    @MainActor
+    static func applyModeSwitchSteps(
+        _ plan: ModeSwitchPlan,
+        to searchState: SearchState,
+        toastManager: ToastQueueManager,
+        redactionState: RedactionState,
+        snapshot: ModeSwitchSnapshot,
+        isProgrammatic: Bool,
+        unappliedCount: Int,
+        scheduleLivePreview: () -> Void
+    ) {
+        for step in plan.steps {
+            switch step {
+            case .cancelSearchWithoutAwait:
+                searchState.cancelSearchWithoutAwait()
+            case .clearResults:
+                searchState.clearResults()
+            case .resetFilters:
+                searchState.piiCategoryFilter = nil
+                searchState.sortOrder = .discoveryOrder
+            case .enqueueUndoToast:
+                enqueueModeSwitchUndoToast(
+                    on: toastManager,
+                    redactionState: redactionState,
+                    snapshot: snapshot,
+                    isProgrammatic: isProgrammatic,
+                    unappliedCount: unappliedCount
+                )
+            case .resetProgrammaticFlag:
+                searchState.isProgrammaticModeChange = false
+            case .clearLivePreview:
+                searchState.clearLivePreview()
+            case .scheduleLivePreview:
+                scheduleLivePreview()
+            }
+        }
+    }
+
     /// Enqueue the post-clear undo toast when the gate admits it
     /// (user-initiated transition AND the clear dropped at least one
     /// result). The message names the unapplied count when unapplied

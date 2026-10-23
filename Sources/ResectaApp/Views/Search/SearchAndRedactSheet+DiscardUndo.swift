@@ -69,4 +69,14 @@ extension SearchAndRedactSheet {
         let suffix = unappliedCount == 1 ? "" : "es"
         return "\(noun) closed — \(unappliedCount) unapplied match\(suffix) cleared."
     }
+
+    /// The notice read from a live session: what every dismissal that
+    /// drops the session posts, the sheet's own Dismiss and a system
+    /// dismissal (a swipe or a scrim tap) the editor's sheet binding sees.
+    static func dismissClearedMessage(for searchState: SearchState) -> String? {
+        dismissClearedMessage(
+            unappliedCount: unappliedMatchCount(in: searchState),
+            interface: searchState.searchModeType.interface
+        )
+    }
 }

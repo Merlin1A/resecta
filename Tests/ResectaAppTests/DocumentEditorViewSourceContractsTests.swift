@@ -41,7 +41,7 @@ struct DocumentEditorViewSourceContractsTests {
 
     @Test("The three toolbar groups render neutral")
     func toolbarGroupsCarryNeutralTint() throws {
-        let source = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorView.swift")
+        let source = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorToolbar.swift")
         let occurrences = source.components(separatedBy: ".tint(.primary)").count - 1
         #expect(occurrences == 3,
                 "expected 3 neutral-tint toolbar groups (leading, trailing, secondaryAction); found \(occurrences)")
@@ -49,7 +49,7 @@ struct DocumentEditorViewSourceContractsTests {
 
     @Test("The Redact button is the one designated emphasis action")
     func redactButtonCarriesBrandTint() throws {
-        let source = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorView.swift")
+        let source = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorToolbar.swift")
         guard let buttonRange = source.range(of: "Button(\"Redact\", systemImage: \"scissors\")") else {
             Issue.record("Could not locate the Redact button")
             return
@@ -74,11 +74,12 @@ struct DocumentEditorViewSourceContractsTests {
     @Test("1.1.0 Home swap — the file-import entry is gone and Home leads the overflow group")
     func homeLeadsSecondaryActionGroup() throws {
         let source = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorView.swift")
+            + loadRepoFile("Sources/ResectaApp/Views/DocumentEditorToolbar.swift")
         #expect(!source.contains("Open Document"),
                 "the editor's former file-import entry must not return (opening a file is HomeView's job)")
         #expect(!source.contains("openDocumentButton"),
                 "the retired property must stay deleted with its mount")
-        guard let groupStart = source.range(of: "private var secondaryActionToolbarItems: some View {"),
+        guard let groupStart = source.range(of: "var secondaryActionToolbarItems: some View {"),
               let groupEnd = source.range(of: ".tint(.primary)",
                                           range: groupStart.upperBound..<source.endIndex)
         else {

@@ -23,7 +23,6 @@ struct DocumentEditorView: View {
     @Environment(\.requestReview) private var requestReview
     // KI-4: scene-phase observer fires the proactive purge re-run toast
     // on `.background → .active`. See `onScenePhaseChange(old:new:)`.
-    @Environment(\.scenePhase) private var scenePhase
     // Capture/mirroring privacy shield. When `isShielded` is true
     // the phase-router body is replaced with `PrivacyShieldView` so the
     // canvas (.editing/.detecting/.redacting/.exporting) and verification
@@ -346,9 +345,7 @@ struct DocumentEditorView: View {
         // also fires on app-switcher and control-center transits) and only
         // when the current phase still holds an output reference. See
         // `KNOWN_ISSUES.md` KI-4.
-        .onChange(of: scenePhase) { oldPhase, newPhase in
-            handleScenePhaseChange(old: oldPhase, new: newPhase)
-        }
+        .modifier(DocumentEditorScenePhaseHandler())
         // Consolidated phase change handler (was two separate .onChange)
         .onChange(of: documentState.phaseKind) { oldKind, newKind in
             // Brief status flash for .verifying → .verified transition
@@ -401,8 +398,8 @@ struct DocumentEditorView: View {
         // highest-precedence active source. The slot sits ABOVE the phase
         // switch, so a live session would ride over every phase;
         // The Apply seam keeps it out of the pipeline phases by tearing the
-        // session down at the Apply seam (`runFullPipeline`)
-        // and on the purge re-run (`prepareForPurgeRerun`).
+        // session down at the Apply seam (`runFullPipeline`), the one funnel
+        // every run goes through, the purge re-run included.
         .sheet(item: Binding<ActiveSheet?>(
             get: {
                 if let searchState = redactionState.activeSearch { return .search(searchState) }
@@ -429,9 +426,14 @@ struct DocumentEditorView: View {
                     // re-check guard prevents a double-dismiss if a concurrent
                     // path cleared the state across the one-frame window (the
                     // get: closure above may re-query during it).
-                    if redactionState.activeSearch != nil {
+                    // A system dismissal (a swipe or a scrim tap) skips the
+                    // sheet's own Dismiss, so the notice naming the dropped
+                    // matches is read here, from the session about to go.
+                    if let session = redactionState.activeSearch {
+                        let notice = SearchAndRedactSheet.dismissClearedMessage(for: session)
                         Task { @MainActor in
                             guard redactionState.activeSearch != nil else { return }
+                            if let notice { toastManager.enqueue(notice, severity: .info) }
                             redactionState.activeSearch = nil
                         }
                     } else if redactionState.pendingCanvasRationaleRequest != nil {
@@ -646,8 +648,8 @@ struct DocumentEditorView: View {
             coordinator.toastManager = toastManager
             coordinator.undoManager = undoManager
         }
-        // Keyboard shortcuts for editing — handled via single onKeyPress to reduce body complexity
-        .onKeyPress(phases: .down, action: handleKeyPress)
+        // Keyboard shortcuts for editing, handled by one modifier
+        .modifier(DocumentEditorKeyboard(activeTool: $activeTool))
         // Page navigation bar on iPhone only (editing
         // phase). Extracted to a small helper
         // property so the compact-float inset math stays out of this
@@ -669,7 +671,7 @@ struct DocumentEditorView: View {
         .toolbar {
             // Leading items
             ToolbarItemGroup(placement: .topBarLeading) {
-                leadingToolbarItems
+                editorToolbar.leadingToolbarItems
             }
 
             // Trailing items. The Redact button is the ONE designated
@@ -678,273 +680,42 @@ struct DocumentEditorView: View {
             // the multi-select toggle's active-teal-or-nil pairing are
             // untouched per-element overrides.
             ToolbarItemGroup(placement: .topBarTrailing) {
-                trailingToolbarItems
+                editorToolbar.trailingToolbarItems
             }
 
             // Editing secondary actions (iPhone overflow menu)
             // Undo/redo moved to trailing toolbar for visibility
             if documentState.phaseKind == .editing, horizontalSizeClass == .compact {
                 ToolbarItemGroup(placement: .secondaryAction) {
-                    secondaryActionToolbarItems
+                    editorToolbar.secondaryActionToolbarItems
                 }
             }
         }
         .navigationTitle(documentTitle)
         .navigationBarTitleDisplayMode(.inline)
-    }
-
-    // MARK: - Toolbar Leading Items
-
-    /// Routine actions render neutral — the group's
-    /// ambient tint is `.primary`, applied here (inside the property,
-    /// not at the `.toolbar {}` call site — see the comment above). Per-
-    /// element overrides (the draw tools' `.tint(active ? BrandTeal.tint
-    /// : nil)`) still win: `nil` now inherits this neutral instead of
-    /// the root's brand teal, so only the ACTIVE tool stays teal.
-    @ViewBuilder
-    private var leadingToolbarItems: some View {
-        Group {
-        switch documentState.phaseKind {
-        case .editing:
-            // Drawing tools.
-            // iPhone nav-bar overflow: keep a CONSTANT-width glyph per draw tool
-            // and signal "active" via .tint only. A wider active glyph (the former
-            // rectangle.dashed.badge.checkmark / scribble.variable) grows the leading
-            // ToolbarItemGroup past the bar width and collapses the whole group into the
-            // system "…" overflow menu.
-            Button("Rectangle", systemImage: "rectangle.dashed") {
-                // Draw wins: entering the tool drops the
-                // selection and the Add-to-Selection toggle so the next
-                // drag draws instead of resizing or marquee-selecting.
-                let entering = activeTool != .rectangle
-                activeTool = entering ? .rectangle : nil
-                let effects = DocumentEditorView.drawToolEntryEffects(entering: entering)
-                if effects.clearSelection { redactionState.selectedRegionIDs = [] }
-                if effects.disableMultiSelect { isMultiSelectActive = false }
+        // A different document replacing the open one turns the canvas
+        // tools off (the same swap the workspace observes for the undo
+        // stack and the toasts).
+        .onChange(of: documentState.sourceDocument) { oldDocument, newDocument in
+            if RedactWorkspaceView.isDocumentSwap(from: oldDocument, to: newDocument) {
+                editorToolbar.resetCanvasTools()
             }
-            .tint(activeTool == .rectangle ? ResectaTokens.BrandTeal.tint : nil)
-            .accessibilityIdentifier("drawTool")
-            .accessibilityValue(activeTool == .rectangle
-                                ? "Drawing mode active" : "Tap to enter drawing mode")
-
-            // Two peer entry points into the one search-and-scan sheet
-            // (two interfaces over one chassis). Both open the same
-            // sheet pre-switched to the tapped interface; they replace
-            // the former Auto-Detect menu + Search & Redact button.
-            //
-            // [Scan] keeps the one-tap contract: the tap arms a
-            // one-shot auto-run flag the sheet consumes on appear, so
-            // one tap opens the sheet AND runs a full scan with no
-            // second confirm. The run is trigger-driven from there
-            // (chips / options configure the NEXT run).
-            Button("Scan", systemImage: "doc.viewfinder") {
-                let state = SearchState()
-                state.searchModeType = .piiScan
-                state.pendingAutoRunScan = true
-                redactionState.activeSearch = state
-            }
-            .disabled(documentState.phaseKind != .editing
-                      || redactionState.activeSearch != nil)
-            // Identifier is PLUMBING and carries over from the
-            // Auto-Detect entry this button renames — UI tests anchor
-            // on it, and it is deliberately not the display string.
-            .accessibilityIdentifier("autoDetect")
-
-            // [Search] opens the literal-search interface. A fresh
-            // SearchState defaults to `.text` — the Search side.
-            Button("Search", systemImage: "magnifyingglass") {
-                redactionState.activeSearch = SearchState()
-            }
-            .disabled(documentState.phaseKind != .editing
-                      || redactionState.activeSearch != nil)
-            .keyboardShortcut("f", modifiers: .command)
-            .accessibilityIdentifier("searchRedact")
-        case .verified:
-            // Home lives top-left on the verification results screen
-            // (the former Done label/glyph became Home — the same
-            // `house` glyph as the editor's overflow entry). The action is
-            // the Done teardown, lifted from VerificationActionBar when the
-            // bottom bar was removed; the confirmation dialog (pinned
-            // by VerificationActionBarDoneConfirmationTests)
-            // still gates sessions that carry drawn regions. Identifier
-            // kept (plumbing). Routed through
-            // `handleHomeTap()` so a sheet that is somehow still presented
-            // on this screen takes the park-then-dialog route
-            // instead of the refused second presentation (a staged review
-            // cannot be pending after an Apply, so the confirm gate
-            // resolves to `hasDrawnRegions` here as before).
-            Button("Home", systemImage: "house") {
-                handleHomeTap()
-            }
-            .accessibilityIdentifier("verificationDoneButton")
-        default:
-            EmptyView()
-        }
-        }
-        .tint(.primary)
-    }
-
-    // MARK: - Toolbar Trailing Items
-
-    /// Same neutral-group rule as `leadingToolbarItems`
-    /// above.
-    @ViewBuilder
-    private var trailingToolbarItems: some View {
-        Group {
-        switch documentState.phaseKind {
-        case .editing:
-            // Undo/redo always visible (both iPhone and iPad)
-            undoRedoButtons
-
-            // iPad: additional edit actions visible in toolbar
-            if horizontalSizeClass == .regular {
-                selectionMenu
-                selectMoreToggle
-                deleteButton
-                batchOpsMenu
-                pipelineModePicker
-            }
-
-            // Redact button — always visible. This is the ONE
-            // designated emphasis action in this toolbar — explicit
-            // brand tint so it stands out against the neutral group.
-            Button("Redact", systemImage: "scissors") {
-                coordinator.runFullPipeline(documentOverride: documentOverride)
-            }
-            .tint(ResectaTokens.BrandTeal.tint)
-            // The gate (`+RedactGate`): effective regions, the pipeline-start
-            // predicate, no selected-but-unapplied matches. The shortcut
-            // inherits `.disabled`.
-            .disabled(redactButtonDisabled)
-            .keyboardShortcut("r", modifiers: [.command, .shift])
-            .accessibilityIdentifier("redactButton")
-            .accessibilityHint(redactButtonHint)
-
-            settingsButton
-
-        case .detecting, .redacting:
-            // Single cancel button
-            Button("Stop Processing", systemImage: "stop.circle") {
-                documentState.cancelActivePipeline(redactionState: redactionState)
-            }
-            .accessibilityIdentifier("stopProcessing")
-            .accessibilityHint("Stops processing. Your document is preserved.")
-
-        case .verifying:
-            // Single cancel button
-            Button("Stop Verification", systemImage: "stop.circle") {
-                documentState.cancelActivePipeline(redactionState: redactionState)
-            }
-            .accessibilityIdentifier("stopProcessing")
-            .accessibilityHint("Stops processing. Your document is preserved.")
-
-        default:
-            // .verified, .failed — settings gear only.
-            // `.empty` flashes Color.clear and auto-returns home
-            // (Phase 1 redesign) — this trailing branch is unreachable
-            // for that phase but kept as a defense-in-depth fallback
-            // during the 150ms debounce window.
-            settingsButton
-        }
-        }
-        .tint(.primary)
-    }
-
-    @ViewBuilder
-    private var settingsButton: some View {
-        Button("Settings", systemImage: "gearshape") {
-            showSettings = true
-        }
-        .accessibilityIdentifier("settings-button")
-    }
-
-    /// iPhone overflow menu — same neutral-group rule.
-    /// Extracted to its own property (mirrors `leadingToolbarItems` /
-    /// `trailingToolbarItems`) so the tint is isolated from the
-    /// `.toolbar {}` result-builder closure.
-    @ViewBuilder
-    private var secondaryActionToolbarItems: some View {
-        Group {
-            homeButton
-            selectionMenu
-            selectMoreToggle
-            deleteButton
-            batchOpsMenu
-            pipelineModePicker
-        }
-        .tint(.primary)
-    }
-
-    // MARK: - Toolbar Components
-
-    @ViewBuilder
-    private var undoRedoButtons: some View {
-        Button("Undo", systemImage: "arrow.uturn.backward") {
-            undoManager?.undo()
-        }
-        .disabled(!(undoManager?.canUndo ?? false))
-        .keyboardShortcut("z", modifiers: .command)
-
-        Button("Redo", systemImage: "arrow.uturn.forward") {
-            undoManager?.redo()
-        }
-        .disabled(!(undoManager?.canRedo ?? false))
-        .keyboardShortcut("z", modifiers: [.command, .shift])
-    }
-
-    @ViewBuilder
-    private var deleteButton: some View {
-        let count = redactionState.selectedRegionIDs.count
-        if count > 0 {
-            Button(deleteButtonLabel, systemImage: "trash") {
-                // Batch delete confirmation for multi-selection
-                if count > 1 {
-                    showBatchDeleteConfirmation = true
-                } else {
-                    deleteSelectedRegions()
-                }
-            }
-            .tint(.red)
-            .keyboardShortcut(.delete, modifiers: [])
         }
     }
 
-    // "More" menu that bundles batch operations on the active
-    // selection. Visible only when `selectedRegionIDs.isEmpty == false`,
-    // gated by `batchOpsMenuShouldShow(selectedCount:)`. "Delete Selected"
-    // routes through the existing `showBatchDeleteConfirmation` dialog
-    // so the page-span message applies to this entry too.
-    @ViewBuilder
-    private var batchOpsMenu: some View {
-        let selectedCount = redactionState.selectedRegionIDs.count
-        if DocumentEditorView.batchOpsMenuShouldShow(selectedCount: selectedCount) {
-            let page = documentState.currentPageIndex
-            let pageRegions = redactionState.regions[page] ?? []
-            Menu {
-                Button("Select All on Page", systemImage: "checkmark.circle") {
-                    redactionState.selectedRegionIDs = Set(pageRegions.map(\.id))
-                }
-                .disabled(selectedCount == pageRegions.count)
-                Button("Deselect", systemImage: "xmark.circle") {
-                    redactionState.selectedRegionIDs = []
-                }
-                Button(role: .destructive) {
-                    showBatchDeleteConfirmation = true
-                } label: {
-                    Label("Delete Selected", systemImage: "trash")
-                }
-            } label: {
-                Label("More", systemImage: "ellipsis.circle")
-            }
-            .accessibilityIdentifier("canvasBatchOpsMenu")
-        }
-    }
-
-    /// Visibility predicate. The "More" menu surfaces only when at
-    /// least one region is selected. Pure function so the gate is testable
-    /// without a SwiftUI host.
-    static func batchOpsMenuShouldShow(selectedCount: Int) -> Bool {
-        selectedCount > 0
+    /// The toolbar TYPE over this editor's state, bindings and actions.
+    private var editorToolbar: DocumentEditorToolbar {
+        DocumentEditorToolbar(
+            documentState: documentState, redactionState: redactionState,
+            coordinator: coordinator, horizontalSizeClass: horizontalSizeClass,
+            undoManager: undoManager,
+            activeTool: $activeTool, isMultiSelectActive: $isMultiSelectActive,
+            showBatchDeleteConfirmation: $showBatchDeleteConfirmation, showSettings: $showSettings,
+            documentOverride: documentOverride, redactButtonDisabled: redactButtonDisabled,
+            redactButtonHint: redactButtonHint, handleHomeTap: handleHomeTap,
+            homeButton: AnyView(homeButton), pipelineModePicker: AnyView(pipelineModePicker),
+            deleteSelectedRegions: deleteSelectedRegions
+        )
     }
 
     /// Phase 1 redesign: gate for the `.empty`-case auto-return-home.
@@ -959,68 +730,6 @@ struct DocumentEditorView: View {
         sourceDocument: PDFDocument?
     ) -> Bool {
         phaseKind == .empty && sourceDocument == nil
-    }
-
-    // "Select More" toolbar toggle. While on, a tap on a region
-    // adds to selection rather than replacing it — iPhone parity for
-    // the iPad Shift+tap path. Visible only when the current page has
-    // regions to select. Count surfaces in the label so the user sees
-    // the running selection size without opening a separate badge.
-    @ViewBuilder
-    private var selectMoreToggle: some View {
-        let page = documentState.currentPageIndex
-        let pageRegionCount = redactionState.regions[page]?.count ?? 0
-        let selectedCount = redactionState.selectedRegionIDs.count
-        if pageRegionCount > 0 {
-            Button {
-                isMultiSelectActive.toggle()
-                // Mutual exclusion with the Rectangle tool:
-                // whichever was activated last wins.
-                if isMultiSelectActive { activeTool = nil }
-            } label: {
-                Label(
-                    RedactionOverlayView.selectMoreToggleLabel(selectedCount: selectedCount),
-                    systemImage: isMultiSelectActive
-                        ? "checkmark.square.fill"
-                        : "checkmark.square"
-                )
-            }
-            .tint(isMultiSelectActive ? ResectaTokens.BrandTeal.tint : nil)
-            .accessibilityIdentifier("selectMoreToggle")
-            .accessibilityValue(isMultiSelectActive
-                                ? "On. Tapping a region adds it to the selection."
-                                : "Off. Tapping a region replaces the selection.")
-        }
-    }
-
-    // Select All / Deselect All menu — touch-accessible on both platforms
-    @ViewBuilder
-    private var selectionMenu: some View {
-        let page = documentState.currentPageIndex
-        let pageRegionCount = redactionState.regions[page]?.count ?? 0
-        let selectedCount = redactionState.selectedRegionIDs.count
-        if pageRegionCount > 0 {
-            Menu {
-                Button("Select All on Page", systemImage: "checkmark.circle") {
-                    redactionState.selectedRegionIDs = Set(
-                        (redactionState.regions[page] ?? []).map(\.id))
-                }
-                .disabled(selectedCount == pageRegionCount)
-                if selectedCount > 0 {
-                    Button("Deselect All", systemImage: "xmark.circle") {
-                        redactionState.selectedRegionIDs = []
-                    }
-                }
-            } label: {
-                // Verb-object menu label (was the bare noun
-                // "Selection").
-                // The off state is a none-selected STATE
-                // indicator, not an action icon — plain "circle"
-                // instead of the unfilled checkmark glyph.
-                Label("Select Regions", systemImage: selectedCount > 0
-                      ? "checkmark.circle.fill" : "circle")
-            }
-        }
     }
 
     /// Page navigation bar on iPhone only (editing phase) — or the bare
@@ -1065,11 +774,6 @@ struct DocumentEditorView: View {
             phase: documentState.phaseKind,
             hugHeight: CompactFloatDetent.hug(for: dynamicTypeSize)
         )
-    }
-
-    private var deleteButtonLabel: String {
-        let count = redactionState.selectedRegionIDs.count
-        return count > 1 ? "Delete \(count) Regions" : "Delete Region"
     }
 
     private func deleteSelectedRegions() {
@@ -1155,9 +859,8 @@ struct DocumentEditorView: View {
     /// Clears the background-pause flag (the ContentView scene handler sets
     /// it on the verified-arm cancel; nothing else consumes it for the
     /// skipped case) and routes per `runVerificationRoute`. The full-pipeline
-    /// leg round-trips the phase through `.editing` first — `runFullPipeline`
-    /// guards `canStartPipeline`, which rejects `.verified` (the KI-4
-    /// purge re-run precedent).
+    /// leg takes the purge re-run's preamble first: `runFullPipeline`'s start
+    /// guard (`redactRefusal(with:)`) reads `.verified` as busy.
     private func handleRunVerificationTap() {
         dismissBannerTask?.cancel()
         documentState.wasPausedByBackground = false
@@ -1429,50 +1132,7 @@ struct DocumentEditorView: View {
         topVC.present(activityVC, animated: true)
     }
 
-    // MARK: - KI-4 Scene-phase observer
-
-    /// Toast copy for the KI-4 proactive purge re-run prompt. Mechanism-
-    /// description: names what
-    /// iOS did (reclaimed the temp file) and what the user can do (Re-run).
-    static let purgeRerunToastMessage =
-        "Pipeline output was reclaimed by iOS while the app was in the background. Tap Re-run to regenerate."
-
-    /// Pure gate predicate for the KI-4 purge re-run toast. Returns `true`
-    /// only when (a) the transition is `.background → .active`, (b) the
-    /// editor is on `.verified(report)`, and (c) the output file is missing.
-    /// Other transitions (`.inactive → .active` from the app switcher,
-    /// `.background → .inactive` mid-resume, transitions into any non-
-    /// verified phase) all return false. Static so the gate is testable
-    /// without a SwiftUI host.
-    static func shouldShowPurgeRerunToast(
-        oldPhase: ScenePhase,
-        newPhase: ScenePhase,
-        documentPhase: DocumentState.Phase,
-        outputFileExists: Bool
-    ) -> Bool {
-        guard oldPhase == .background, newPhase == .active else { return false }
-        guard case .verified = documentPhase else { return false }
-        return !outputFileExists
-    }
-
-    /// State preamble for the purge re-run action, extracted as a
-    /// static so the transition is testable without a SwiftUI host (mirrors
-    /// `shouldShowPurgeRerunToast`). The purge toast fires only from `.verified`,
-    /// but `runFullPipeline` guards `canStartPipeline` which requires
-    /// `.editing` — without this round-trip the "Re-run" button silently no-ops
-    /// and strands the user (the output is gone and Share is disabled). The
-    /// `verified -> editing` transition is legal.
-    /// activeSearch is torn down first: the Search & Redact
-    /// sheet mutates `redactionState.regions` and is incompatible with the
-    /// `.redacting` / `.verifying` phases the re-run enters.
-    @MainActor
-    static func prepareForPurgeRerun(
-        documentState: DocumentState,
-        redactionState: RedactionState
-    ) {
-        redactionState.dismissActiveSearch()
-        documentState.transition(to: .editing)
-    }
+    // MARK: - Close
 
     /// Clear the per-window `UndoManager` stack when the editor
     /// closes. SwiftUI injects one `UndoManager` per window (no `UIDocument`
@@ -1483,151 +1143,6 @@ struct DocumentEditorView: View {
     /// SwiftUI host.
     static func clearUndoStackOnClose(_ undoManager: UndoManager?) {
         undoManager?.removeAllActions()
-    }
-
-    /// Fire the KI-4 purge re-run toast when the user returns to the
-    /// foreground after iOS reclaimed the pipeline's temp output PDF.
-    /// Defense-in-depth: the `canExport` Share-button disable + the
-    /// `FailedStateView` Re-open Document Tier-2 surface remain in place.
-    private func handleScenePhaseChange(old: ScenePhase, new: ScenePhase) {
-        let outputPath = redactionState.outputURL?.path ?? ""
-        let exists = FileManager.default.fileExists(atPath: outputPath)
-        guard Self.shouldShowPurgeRerunToast(
-            oldPhase: old,
-            newPhase: new,
-            documentPhase: documentState.phase,
-            outputFileExists: exists
-        ) else { return }
-        let override = documentOverride
-        toastManager.enqueue(
-            Self.purgeRerunToastMessage,
-            severity: .warning,
-            actionLabel: "Re-run",
-            actionHandler: {
-                // Deferral pattern: ToastView's button
-                // action calls this actionHandler() and then
-                // `toastManager.dismiss(item)` — whose `withAnimation {
-                // activeToasts.removeAll }` — synchronously in the same tap.
-                // Mutating published state (the activeSearch teardown's
-                // two-property didSet, the phase transition) inside that
-                // animation transaction is the same re-entrancy class. Defer the
-                // state preamble + pipeline kick-off one runloop turn so they
-                // land after the dismiss animation; both are MainActor-isolated.
-                Task { @MainActor in
-                    // Tear down the search sheet and
-                    // round-trip `verified -> editing` so runFullPipeline's
-                    // canStartPipeline guard passes — the toast fires only from
-                    // `.verified`, where the guard would otherwise reject and
-                    // strand the user (gone output, disabled Share).
-                    Self.prepareForPurgeRerun(
-                        documentState: documentState,
-                        redactionState: redactionState
-                    )
-                    coordinator.runFullPipeline(documentOverride: override)
-                }
-            }
-        )
-    }
-
-    // MARK: - Keyboard Shortcuts
-
-    private func handleKeyPress(_ press: KeyPress) -> KeyPress.Result {
-        // Keyboard-shortcut entry point honors the
-        // phase gate. The `phaseKind == .editing` guard mirrors the
-        // `canStartPipeline` / `canMutateRegions` discipline so a
-        // mid-pipeline arrow / Escape / Cmd-A press cannot mutate
-        // `redactionState.regions` while `.detecting / .redacting /
-        // .verifying` owns it. Every key-handler delegate
-        // (handleEscapeKey, handleSelectAllKey, nudgeSelection)
-        // re-asserts the same guard for defense-in-depth. Spot-check
-        // passed — no behavioral change needed.
-        guard documentState.phaseKind == .editing else { return .ignored }
-
-        switch press.key {
-        case .escape:
-            return handleEscapeKey()
-        case .upArrow:
-            return nudgeSelection(dx: 0, dy: -nudgeDelta.dy)
-        case .downArrow:
-            return nudgeSelection(dx: 0, dy: nudgeDelta.dy)
-        case .leftArrow:
-            return nudgeSelection(dx: -nudgeDelta.dx, dy: 0)
-        case .rightArrow:
-            return nudgeSelection(dx: nudgeDelta.dx, dy: 0)
-        default:
-            if press.characters == "a", press.modifiers.contains(.command) {
-                return handleSelectAllKey()
-            }
-            return .ignored
-        }
-    }
-
-    private func handleEscapeKey() -> KeyPress.Result {
-        guard documentState.phaseKind == .editing else { return .ignored }
-        if !redactionState.selectedRegionIDs.isEmpty {
-            redactionState.selectedRegionIDs = []
-            return .handled
-        }
-        if activeTool != nil {
-            activeTool = nil
-            return .handled
-        }
-        return .ignored
-    }
-
-    private func handleSelectAllKey() -> KeyPress.Result {
-        guard documentState.phaseKind == .editing else { return .ignored }
-        let page = documentState.currentPageIndex
-        guard let pageRegions = redactionState.regions[page], !pageRegions.isEmpty else { return .ignored }
-        redactionState.selectedRegionIDs = Set(pageRegions.map(\.id))
-        return .handled
-    }
-
-    // MARK: - Keyboard Nudge
-
-    /// Nudge amount in normalized coordinates: ONE PDF point on the
-    /// current page, i.e. 1/pageWidth × 1/pageHeight from
-    /// the page's crop box; the pre-1.1.0 0.0025 stands in when no page
-    /// geometry is available.
-    static let nudgeFallback: CGFloat = 0.0025
-
-    static func nudgeDelta(pageSize: CGSize?) -> (dx: CGFloat, dy: CGFloat) {
-        guard let size = pageSize, size.width > 0, size.height > 0 else {
-            return (dx: nudgeFallback, dy: nudgeFallback)
-        }
-        return (dx: 1 / size.width, dy: 1 / size.height)
-    }
-
-    private var nudgeDelta: (dx: CGFloat, dy: CGFloat) {
-        let page = documentState.currentPageIndex
-        let size = documentState.sourceDocument?.page(at: page)?.bounds(for: .cropBox).size
-        return DocumentEditorView.nudgeDelta(pageSize: size)
-    }
-
-    private func nudgeSelection(dx: CGFloat, dy: CGFloat) -> KeyPress.Result {
-        guard documentState.phaseKind == .editing,
-              !redactionState.selectedRegionIDs.isEmpty else { return .ignored }
-        let page = documentState.currentPageIndex
-        let moves: [(id: UUID, newRect: CGRect)] = redactionState.selectedRegionIDs.compactMap { id in
-            guard let regions = redactionState.regions[page],
-                  let region = regions.first(where: { $0.id == id }) else { return nil }
-            var rect = region.normalizedRect
-            rect.origin.x += dx
-            // PDF Y is bottom-left, so up arrow (negative dy in screen) = positive in PDF
-            rect.origin.y -= dy
-            // Clamp to 0–1
-            rect.origin.x = max(0, min(rect.origin.x, 1 - rect.width))
-            rect.origin.y = max(0, min(rect.origin.y, 1 - rect.height))
-            return (id: id, newRect: rect)
-        }
-        guard !moves.isEmpty else { return .ignored }
-        if moves.count == 1 {
-            redactionState.moveRegion(moves[0].id, page: page,
-                                      newRect: moves[0].newRect, undoManager: undoManager)
-        } else {
-            redactionState.moveRegions(moves, page: page, undoManager: undoManager)
-        }
-        return .handled
     }
 
     // MARK: - Computed Properties

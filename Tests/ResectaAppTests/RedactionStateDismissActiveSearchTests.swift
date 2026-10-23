@@ -8,8 +8,8 @@ import Foundation
 // compact float over the progress card, the results screen and its pushes,
 // and Keep Editing comes back with Scan / Search disabled. The shared
 // teardown (`dismissActiveSearch()`) now runs in `runFullPipeline` right
-// after its start guard, and the purge re-run, `clearAll()` and
-// `clearForNewDocument()` use the same helper. Pinned here without a
+// after its start guard, which the purge re-run also goes through, and
+// `clearAll()` and `clearForNewDocument()` use the same helper. Pinned here without a
 // SwiftUI host: the helper's behaviour and the seams that call it.
 @Suite("RedactionState dismissActiveSearch")
 @MainActor
@@ -53,14 +53,17 @@ struct RedactionStateDismissActiveSearchTests {
                 "no other activeSearch write rides the run's prologue")
     }
 
-    @Test("Source pin: the purge re-run and both lifecycle resets use the shared teardown")
+    @Test("Source pin: the purge re-run leaves the teardown to the run, and both lifecycle resets use the shared teardown")
     func sharedTeardownIsAdopted() throws {
-        let editor = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorView.swift")
-        guard let purge = editor.range(of: "static func prepareForPurgeRerun(") else {
+        let editor = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorView+ScenePhase.swift")
+        guard let purge = editor.range(of: "static func prepareForPurgeRerun("),
+              let end = editor.range(of: "\n    }\n", range: purge.upperBound..<editor.endIndex)
+        else {
             Issue.record("Could not locate prepareForPurgeRerun")
             return
         }
-        #expect(editor[purge.upperBound...].prefix(300).contains("redactionState.dismissActiveSearch()"))
+        #expect(!editor[purge.upperBound..<end.lowerBound].contains("dismissActiveSearch()"),
+                "the preamble leaves the session to the run's start guard; runFullPipeline tears it down")
 
         let state = try loadRepoFile("Sources/ResectaApp/State/RedactionState.swift")
         let uses = state.components(separatedBy: "dismissActiveSearch()").count - 1
@@ -73,7 +76,7 @@ struct RedactionStateDismissActiveSearchTests {
 
     @Test("Source pin: the results-screen Home routes through handleHomeTap")
     func verifiedHomeRoutesThroughHandleHomeTap() throws {
-        let editor = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorView.swift")
+        let editor = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorToolbar.swift")
         guard let id = editor.range(of: ".accessibilityIdentifier(\"verificationDoneButton\")") else {
             Issue.record("Could not locate verificationDoneButton")
             return
