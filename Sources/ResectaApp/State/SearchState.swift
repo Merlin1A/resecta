@@ -20,24 +20,13 @@ final class SearchState: Identifiable {
 
     /// Injected at init; defaults to `.standard`. @ObservationIgnored so
     /// the macro does not wrap the concrete UserDefaults reference.
-    @ObservationIgnored private let defaults: UserDefaults
+    @ObservationIgnored let defaults: UserDefaults
 
     // MARK: - Last-used filter shape
 
-    /// Codable bag of the three filter fields that restore across sheet
-    /// sessions. `appliedFilter` is intentionally excluded — it is
-    /// document-specific.
-    struct LastSearchFilterShape: Codable, Sendable {
-        var sourceFilter: SourceFilter
-        var minimumOCRConfidence: Float
-        var sortOrder: ResultSortOrder
-    }
-
-    private static let lastFilterKey = "search.lastFilter.v1"
-
     /// Task reference for debounced filter persistence; cancel before
     /// scheduling a new one (mirrors the flushTask idiom).
-    @ObservationIgnored private var filterFlushTask: Task<Void, Never>?
+    @ObservationIgnored var filterFlushTask: Task<Void, Never>?
 
     // MARK: - Search Configuration
 
@@ -838,32 +827,6 @@ final class SearchState: Identifiable {
         }
     }
 
-    // MARK: - Filter flush (debounced 500 ms)
-
-    /// Schedule a debounced write of the current filter shape to
-    /// UserDefaults. Cancels any pending write (mirrors flushTask
-    /// idiom) so a slider drag does not write on every tick.
-    private func scheduleFilterFlush() {
-        filterFlushTask?.cancel()
-        filterFlushTask = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(500))
-            guard !Task.isCancelled, let self else { return }
-            self.flushFilterShape()
-        }
-    }
-
-    /// Write the current filter shape to UserDefaults synchronously.
-    private func flushFilterShape() {
-        let shape = LastSearchFilterShape(
-            sourceFilter: sourceFilter,
-            minimumOCRConfidence: minimumOCRConfidence,
-            sortOrder: sortOrder
-        )
-        if let data = try? JSONEncoder().encode(shape) {
-            defaults.set(data, forKey: Self.lastFilterKey)
-        }
-    }
-
     // MARK: - Init (UserDefaults seam)
 
     /// Designated init. Hydrates the last-used filter shape from
@@ -873,8 +836,7 @@ final class SearchState: Identifiable {
         self.defaults = defaults
 
         // Last-used filter — fail-closed JSON decode → property defaults
-        if let data = defaults.data(forKey: Self.lastFilterKey),
-           let shape = try? JSONDecoder().decode(LastSearchFilterShape.self, from: data) {
+        if let shape = Self.storedFilterShape(in: defaults) {
             self.sourceFilter         = shape.sourceFilter
             self.minimumOCRConfidence = shape.minimumOCRConfidence
             self.sortOrder            = shape.sortOrder
