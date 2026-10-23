@@ -56,7 +56,7 @@ struct CanvasBatchOpsMenuTests {
                 ),
                 source: .manual
             )
-            state.regions[page, default: []].append(region)
+            state.addRegion(region, page: page, undoManager: nil)
             ids.append(region.id)
         }
         return ids
