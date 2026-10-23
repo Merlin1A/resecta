@@ -37,13 +37,11 @@ struct SearchCoreTests {
     func cjkDetection() {
         var options = SearchOptions()
         options.wholeWord = true
-        options.exactMatch = true
         let japanese = String(repeating: "東京都千代田区の契約書です。", count: 8)
         let english = String(repeating: "The quick brown fox jumps over the lazy dog. ", count: 8)
 
         let detected = SearchCore.effectiveOptions(options, pageText: japanese, detectCJK: true)
         #expect(detected.wholeWord == false)
-        #expect(detected.exactMatch == false)
 
         let preview = SearchCore.effectiveOptions(options, pageText: japanese, detectCJK: false)
         #expect(preview == options)

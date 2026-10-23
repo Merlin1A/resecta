@@ -87,16 +87,21 @@ struct SearchGroundTruthRunnerTests {
         return (try JSONDecoder().decode(QueryFile.self, from: data), sha)
     }
 
-    static func makeOptions(_ dict: [String: Bool]) throws -> SearchOptions {
+    /// The bank's `exactMatch` toggle names the exact-match search option the
+    /// engine no longer has. The engine read it as whole word on the text,
+    /// multi-term and recognized-text paths and ignored it in regex mode, so
+    /// it folds into `wholeWord` for every mode but regex and the cells read
+    /// as before.
+    static func makeOptions(_ dict: [String: Bool], mode: String) throws -> SearchOptions {
         func flag(_ name: String) throws -> Bool {
             try #require(dict[name] as Bool?, "vector missing toggle \(name)")
         }
+        let exact = try flag("exactMatch")
         return SearchOptions(
             caseSensitive: try flag("caseSensitive"),
-            wholeWord: try flag("wholeWord"),
+            wholeWord: try flag("wholeWord") || (exact && mode != "regex"),
             includeOCR: try flag("includeOCR"),
             normalizeUnicode: try flag("normalizeUnicode"),
-            exactMatch: try flag("exactMatch"),
             stripDigitSeparators: try flag("stripDigitSeparators"),
             normalizeSmartPunctuation: try flag("normalizeSmartPunctuation"),
             foldDiacritics: try flag("foldDiacritics"),
@@ -322,7 +327,7 @@ struct SearchGroundTruthRunnerTests {
 
         for query in file.queries {
             for vector in file.vectors {
-                let options = try makeOptions(vector.options)
+                let options = try makeOptions(vector.options, mode: query.mode)
                 let mode = try makeMode(query, options: options)
                 let tally = CellTally()
                 await searcher.setScannedRegionNotAnalyzedSink { tally.addNotAnalyzed($0) }

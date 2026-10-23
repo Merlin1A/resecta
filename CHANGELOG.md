@@ -206,6 +206,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - The rectangle and polygon character filters share one sort, search and cancellation skeleton.
 - Engine: the public surface is reduced to the document-runner API and what the app and its tests name; 103 more declarations become `internal` (access level only).
 - A Mac-side recorder for attended runs on a physical device: per-step Instruments capture, crash-report and container-attribute facts, PDF checks and a filled record (`Scripts/device/`).
+- Engine: unused detection model members, the learned-prior surface-form dictionary and the unused exact-match search option are removed.
 
 ## [1.2.0] — 2026-09-29
 
