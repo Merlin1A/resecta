@@ -457,15 +457,28 @@ private extension UXFixesUITests {
         let overflow = app.buttons["OverflowBarButtonItem"]
         XCTAssertTrue(overflow.waitForExistence(timeout: 10), "Toolbar overflow button never appeared.")
         overflow.tap()
-        defer { window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.08)).tap() }
         let byIdentifier = app.descendants(matching: .any).matching(identifier: "selectMoreToggle").firstMatch
         let byLabel = app.descendants(matching: .any)
             .matching(NSPredicate(format: "label BEGINSWITH 'Add to Selection'"))
             .firstMatch
+        defer { closeOverflowMenu(rows: [byIdentifier, byLabel]) }
         let row = byIdentifier.waitForExistence(timeout: 3) ? byIdentifier : byLabel
         guard row.waitForExistence(timeout: 2) else { return .absent }
         let value = (row.value as? String) ?? ""
         return value.hasPrefix("On") || value == "1" || row.isSelected ? .on : .off
+    }
+
+    /// Close the overflow menu by tapping the page bar's counter, a label
+    /// with no action of its own, so the tap cannot change editor state; a
+    /// tap on the toolbar's blank strip can leave the menu up. The menu's
+    /// rows must be gone before the test goes on.
+    nonisolated func closeOverflowMenu(rows: [XCUIElement]) {
+        let counter = app.descendants(matching: .any).matching(identifier: "pageNavCounter").firstMatch
+        XCTAssertTrue(counter.waitForExistence(timeout: 5), "The page bar's counter never appeared.")
+        counter.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        for row in rows {
+            XCTAssertTrue(row.waitForNonExistence(timeout: 5), "The overflow menu did not close.")
+        }
     }
 
     /// The page bar's region count for the current page — 0 when it shows none.
