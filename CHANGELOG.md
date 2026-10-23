@@ -14,7 +14,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Acknowledgements: the third-party data and typeface notices the app ships (the repo-root NOTICE) are bundled and readable in-app, from the first-launch gate beside the EULA and Privacy Policy and from Settings.
 - Photos and images (JPEG, PNG and HEIC) can be opened from the system Photos picker (up to 20 at a time, in the order chosen), from Files, or by a drop onto an open document; each image becomes one page of a new PDF, redrawn from its decoded pixels at 300 pixels per inch, so the image's embedded metadata is not carried into the document.
 - Double-tap the page to return to the fit zoom.
-- Page bar: a Mark Whole Page control beside the page chevrons adds one redaction region covering the page on screen, through the same path a drawn region takes — the counter reads "1 region", Undo removes it in one step, and no search term is captured from it.
+- Page bar: Mark Whole Page covers the page on screen with one region, through the same path a drawn region takes, and no search term is captured from it; on a marked page the control reads Unmark Whole Page and removes it, each way one undo step, and it keeps its place when the count changes; it is hidden on a one-page document, where the … menu keeps it. Marking a page that is already marked, from the bar or the menu, adds nothing.
 - Import: a password-protected PDF can be opened by entering its password; the import checks run on the unlocked document, and the redacted copy is not password-protected. The password is held in memory while the document is open and released when the session closes; the failed-state card beneath the password sheet reads as locked rather than damaged. A document that was encrypted — one opened with a password, or one carrying only an owner password — shows a notice at import and a caption on the Share card saying the redacted copy carries neither the password nor the original's usage restrictions.
 
 ### Changed
@@ -22,6 +22,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Undo and Redo name region steps with the controls' word, Region (Add Region, Duplicate Region, Delete Regions, Move Region, Resize Region), and Redo names the action it repeats.
 - A search apply's undo step is named by the regions it creates, not counting results already covered.
 - Duplicate selects the copy.
+- A one-page document shows the page bar with its region count; the page arrows are hidden there. The counter reads "0 regions" on a page with none, drawn and spoken.
 - The "match nearby" notice says Mark, matching the Marked N notice.
 - With VoiceOver on, the Rectangle tool is disabled with a hint pointing to Search and Scan.
 - Deleting several selected regions no longer asks first, from the toolbar or the selection menu; one Undo restores them.

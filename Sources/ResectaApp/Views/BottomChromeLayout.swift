@@ -26,8 +26,9 @@ struct ParkedChromeLayout: Equatable {
     static let pageBarClearance: CGFloat =
         ResectaTokens.TouchTarget.minimum + 2 * ResectaTokens.Spacing.sm
 
-    /// Whether the iPhone page bar mounts: compact width, more than one
-    /// page, the editing phase — parked or not.
+    /// Whether the iPhone page bar mounts: compact width, a document
+    /// open (one page included, for its region count), the editing
+    /// phase — parked or not.
     let showsPageBar: Bool
     /// The bottom safe-area inset under the page bar, or the bare inset
     /// when no bar mounts: the hug while the sheet is parked, else 0.
@@ -55,7 +56,7 @@ struct ParkedChromeLayout: Equatable {
         hugHeight: CGFloat
     ) {
         let parked = sheetPresented && detent == .compactFloat
-        let barEligible = sizeClass == .compact && pageCount > 1 && phase == .editing
+        let barEligible = sizeClass == .compact && pageCount >= 1 && phase == .editing
         // `walkLive` no longer gates the bar; the input stays so the
         // model's callers and its truth table read every chrome input.
         showsPageBar = barEligible
