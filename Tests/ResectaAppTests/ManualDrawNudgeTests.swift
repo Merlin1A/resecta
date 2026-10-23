@@ -290,6 +290,21 @@ struct ManualDrawNudgeTests {
         #expect(state.manualDrawNudgeSuppressedForSession == false)
     }
 
+    @Test("Accept after the search session closed still adds the match as an applied region")
+    func acceptWithoutALiveSessionAddsTheRegion() {
+        let state = RedactionState()
+        // The toast outlives the sheet: the session is gone when the
+        // Add button is tapped. The nudge carries everything the region
+        // needs (its rect, term and rationale).
+        let nudge = Self.piiResult(rect: CGRect(x: 0.18, y: 0.10, width: 0.05, height: 0.02))
+        state.pendingManualDrawNudge = nudge
+        let region = state.acceptManualDrawNudge(nudge, undoManager: nil)
+        #expect(region != nil, "today the accept refuses without a live session")
+        #expect(state.regions[nudge.pageIndex]?.count == 1)
+        #expect(state.liveAppliedSearchResultIDs == [nudge.id])
+        #expect(state.pendingManualDrawNudge == nil)
+    }
+
     @Test("markManualDrawNudgeSuppressed sets the flag and clears the pending nudge")
     func markSuppressedSetsFlagAndClears() {
         let state = RedactionState()
@@ -339,6 +354,66 @@ struct ManualDrawNudgeTests {
             source: .searchMatch(term: "ssn", rationale: nil)
         )
         state.addRegion(nonManual, page: 0, undoManager: nil)
+        #expect(state.pendingManualDrawNudge == nil)
+    }
+
+    // MARK: - Covered matches
+
+    @Test("A name another region already covers does not nudge when a region is drawn beside it")
+    func coveredMatchSkippedWhenDrawingBeside() {
+        let state = RedactionState()
+        let search = SearchState()
+        let name = Self.piiResult(rect: CGRect(x: 0.18, y: 0.10, width: 0.05, height: 0.02))
+        search.results = [name]
+        state.activeSearch = search
+        // The user draws over the name first: the new region covers it,
+        // so that draw is silent (the self-overlap skip).
+        let cover = Self.manualRegion(at: CGRect(x: 0.17, y: 0.09, width: 0.07, height: 0.04))
+        state.addRegion(cover, page: 0, undoManager: nil)
+        #expect(state.pendingManualDrawNudge == nil, "precondition: drawing over the name is silent")
+
+        // Then a region beside it: 0.03 from the name, clear of `cover`.
+        let beside = Self.manualRegion(at: CGRect(x: 0.10, y: 0.10, width: 0.05, height: 0.02))
+        state.addRegion(beside, page: 0, undoManager: nil)
+        #expect(state.pendingManualDrawNudge == nil,
+                "today the nudge offers the name: the predicate tests only the NEW region's overlap")
+    }
+
+    @Test("A name no region covers still nudges when a region is drawn beside it")
+    func uncoveredMatchStillNudges() {
+        let state = RedactionState()
+        let search = SearchState()
+        let name = Self.piiResult(rect: CGRect(x: 0.18, y: 0.10, width: 0.05, height: 0.02))
+        search.results = [name]
+        state.activeSearch = search
+        // A region elsewhere on the page that does not cover the name.
+        let elsewhere = Self.manualRegion(at: CGRect(x: 0.60, y: 0.60, width: 0.10, height: 0.04))
+        state.addRegion(elsewhere, page: 0, undoManager: nil)
+        state.pendingManualDrawNudge = nil
+
+        let beside = Self.manualRegion(at: CGRect(x: 0.10, y: 0.10, width: 0.05, height: 0.02))
+        state.addRegion(beside, page: 0, undoManager: nil)
+        #expect(state.pendingManualDrawNudge?.id == name.id)
+    }
+
+    @Test("The apply and the nudge share one coverage rule: a covered name is covered for both")
+    func applyAndNudgeAgreeOnCoverage() async {
+        let state = RedactionState()
+        let search = SearchState()
+        let name = Self.piiResult(rect: CGRect(x: 0.18, y: 0.10, width: 0.05, height: 0.02))
+        search.results = [name]
+        state.activeSearch = search
+        let cover = Self.manualRegion(at: CGRect(x: 0.17, y: 0.09, width: 0.07, height: 0.04))
+        state.addRegion(cover, page: 0, undoManager: nil)
+
+        // The strip's Apply on the covered name: dedup-skipped as covered.
+        let outcome = await state.applyFindings(.searchResult(id: name.id), undoManager: nil)
+        #expect(outcome?.coveredResultIDs == [name.id])
+        #expect(outcome?.applied == 0)
+
+        // The nudge reads the same rule for a draw beside it.
+        let beside = Self.manualRegion(at: CGRect(x: 0.10, y: 0.10, width: 0.05, height: 0.02))
+        state.addRegion(beside, page: 0, undoManager: nil)
         #expect(state.pendingManualDrawNudge == nil)
     }
 }
