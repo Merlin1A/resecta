@@ -14,9 +14,7 @@ import SwiftUI
 // the update cycle was tried first and explicitly REJECTED — it did not fix
 // the crash.
 //
-// The shipped UI test (DetectionTriageDismissUITests) exercises the crash PATH
-// (tap Dismiss → assert the app survived) but does not pin the STRUCTURAL
-// property that prevents it. This suite is that structural guard: ToastView
+// This suite is the structural guard for that crash: ToastView
 // must receive its ToastQueueManager as a stored `let`, never via
 // `@Environment(ToastQueueManager.self)`. A regression that re-adds the
 // environment read fails here — and, because the memberwise initializer would

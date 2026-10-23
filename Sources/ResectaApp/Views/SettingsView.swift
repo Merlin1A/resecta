@@ -28,11 +28,6 @@ struct SettingsView: View {
     // document is loaded). When nil the banner never renders, matching the
     // "no pipeline can be in flight without a document" contract.
     @Environment(DocumentState.self) private var documentState: DocumentState?
-    // Optional for the same reason as DocumentState:
-    // Settings opens from HomeView with no workspace. Used by the Reset
-    // Detection History affordance to also wipe the live in-memory priors
-    // (otherwise clearAll would re-save the old history at document close).
-    @Environment(RedactionState.self) private var redactionState: RedactionState?
     @Environment(\.dismiss) private var dismiss
 
     @State private var safariURL: URL?
@@ -45,9 +40,6 @@ struct SettingsView: View {
     // affected by `resetToDefaults()`; the dialog copy names that so
     // the user knows what is and isn't in scope.
     @State private var showResetConfirmation = false
-    /// Reset Detection History confirms before dropping the
-    /// persisted priors, mirroring the sibling Reset-to-Defaults dialog.
-    @State private var showResetHistoryConfirmation = false
 
     /// True while a pipeline run is mid-flight. The companion
     /// settings snapshot in `PipelineCoordinator` already locks the run's
@@ -324,32 +316,6 @@ struct SettingsView: View {
             }
             .pickerStyle(.menu)
             .accessibilityHint("Choose how much evidence is required before a PII item is flagged for review")
-
-            // Drop the persisted accept/reject
-            // history (and the live document's in-memory copy when a
-            // workspace is open) so priors return to the uniform default.
-            Button("Reset Detection History", role: .destructive) {
-                showResetHistoryConfirmation = true
-            }
-            .accessibilityHint("Clears the on-device record of accepted and rejected detections used to weight future scans")
-            .accessibilityIdentifier("resetDetectionHistoryButton")
-            // Destructive confirm mirroring the
-            // Reset-to-Defaults dialog below. Copy is
-            // mechanism-description language only.
-            .confirmationDialog(
-                "Reset detection history?",
-                isPresented: $showResetHistoryConfirmation,
-                titleVisibility: .visible
-            ) {
-                Button("Reset", role: .destructive) {
-                    RedactionState.clearPersistedPriors()
-                    redactionState?.priors = PerCategoryPriors()
-                }
-                .accessibilityIdentifier("resetDetectionHistoryConfirm")
-                Button("Cancel", role: .cancel) { }
-            } message: {
-                Text("The on-device record of accepted and rejected detections is cleared. Future scans start from the uniform default weighting.")
-            }
 
             // The snap-to-text UI was removed in 1.1.0: the
             // assist has no OCR feed in production — revival = wire

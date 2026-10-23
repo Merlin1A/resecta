@@ -10,9 +10,9 @@ import CoreGraphics
 @MainActor
 struct RegionManagerTests {
 
-    // MARK: - Effective Region Count
+    // MARK: - Effective regions
 
-    @Test("effectiveRegionCount filters sub-threshold regions")
+    @Test("hasEffectiveRegions ignores sub-threshold regions")
     func effectiveCountFiltering() {
         let state = RedactionState()
         let tinyRegion = RedactionRegion(
@@ -26,11 +26,10 @@ struct RegionManagerTests {
             source: .manual
         )
         state.regions[0] = [tinyRegion, normalRegion]
-        #expect(state.effectiveRegionCount == 1)
         #expect(state.hasEffectiveRegions == true)
     }
 
-    @Test("effectiveRegionCount is zero when all regions are sub-threshold")
+    @Test("hasEffectiveRegions is false when all regions are sub-threshold")
     func effectiveCountAllTiny() {
         let state = RedactionState()
         state.regions[0] = [
@@ -38,7 +37,6 @@ struct RegionManagerTests {
                 normalizedRect: CGRect(x: 0, y: 0, width: 0.0001, height: 0.0001),
                 source: .manual)
         ]
-        #expect(state.effectiveRegionCount == 0)
         #expect(state.hasEffectiveRegions == false)
     }
 
@@ -171,51 +169,20 @@ struct RegionManagerTests {
         #expect(state.regions[0]?.first?.normalizedRect == originalRect)
     }
 
-    // MARK: - Batch Apply Detection Results
+    // MARK: - Apply
 
-    /// Stage `results` in the review with every entry accepted, then
-    /// apply through the staged-review origin — the one detection apply
-    /// path (the former raw-map origin had no production caller).
-    private func applyStagedDetections(
-        _ results: [Int: [DetectionResult]], on state: RedactionState,
-        undoManager: UndoManager?
+    /// One selected search result on page 0, applied through the search
+    /// origin of the one apply path.
+    private func applySearchResult(
+        on state: RedactionState, undoManager: UndoManager?
     ) async {
-        state.pendingTriage = results
-        for detection in results.values.flatMap({ $0 }) {
-            state.triageSelections[detection.id] = true
-        }
-        await state.applyFindings(.stagedDetections, undoManager: undoManager)
-    }
-
-    @Test("Staged-review apply adds regions for multiple pages")
-    func batchApply() async {
-        let state = RedactionState()
-        let det0 = DetectionResult(
-            normalizedRect: CGRect(x: 0.1, y: 0.2, width: 0.3, height: 0.4),
-            kind: .pii(.ssn), confidence: 0.95)
-        let det1 = DetectionResult(
-            normalizedRect: CGRect(x: 0.5, y: 0.5, width: 0.2, height: 0.1),
-            kind: .face, confidence: 0.88)
-        await applyStagedDetections([0: [det0], 1: [det1]], on: state, undoManager: nil)
-        #expect(state.regions[0]?.count == 1)
-        #expect(state.regions[1]?.count == 1)
-        #expect(state.regions[0]?.first?.source == .detectedPII(kind: .ssn))
-        #expect(state.regions[1]?.first?.source == .detectedFace)
-    }
-
-    @Test("Staged-review apply undo removes all batch regions")
-    func batchApplyUndo() async {
-        let state = RedactionState()
-        let undoManager = makeUndoManager()
-        let det = DetectionResult(
-            normalizedRect: CGRect(x: 0.1, y: 0.2, width: 0.3, height: 0.4),
-            kind: .pii(.ssn), confidence: 0.95)
-        undoManager.beginUndoGrouping()
-        await applyStagedDetections([0: [det]], on: state, undoManager: undoManager)
-        undoManager.endUndoGrouping()
-        #expect(state.regions[0]?.count == 1)
-        undoManager.undo()
-        #expect(state.regions[0]?.isEmpty != false)
+        let search = SearchState()
+        search.results = [SearchResult(
+            pageIndex: 0, normalizedRect: CGRect(x: 0.1, y: 0.2, width: 0.3, height: 0.4),
+            matchedText: "123-45-6789", contextSnippet: "…123-45-6789…", source: .textLayer,
+            term: "123-45-6789", isSelected: true)]
+        state.activeSearch = search
+        await state.applyFindings(.selectedSearchResults, undoManager: undoManager)
     }
 
     // MARK: - Output URL Clearing
@@ -372,10 +339,7 @@ struct RegionManagerTests {
         let state = RedactionState()
         let url = try seedOutput(state)
         defer { try? FileManager.default.removeItem(at: url) }
-        let det = DetectionResult(
-            normalizedRect: CGRect(x: 0.1, y: 0.2, width: 0.3, height: 0.4),
-            kind: .pii(.ssn), confidence: 0.95)
-        await applyStagedDetections([0: [det]], on: state, undoManager: nil)
+        await applySearchResult(on: state, undoManager: nil)
         #expect(state.regions[0]?.count == 1)
         expectOutputUnlinked(state, url, "apply")
     }
@@ -411,11 +375,8 @@ struct RegionManagerTests {
     func applyUndoRedoUnlinkOutput() async throws {
         let state = RedactionState()
         let undoManager = makeUndoManager()
-        let det = DetectionResult(
-            normalizedRect: CGRect(x: 0.1, y: 0.2, width: 0.3, height: 0.4),
-            kind: .pii(.ssn), confidence: 0.95)
         undoManager.beginUndoGrouping()
-        await applyStagedDetections([0: [det]], on: state, undoManager: undoManager)
+        await applySearchResult(on: state, undoManager: undoManager)
         undoManager.endUndoGrouping()
         #expect(state.regions[0]?.count == 1)
 
@@ -446,86 +407,9 @@ struct RegionManagerTests {
         state.clearForNewDocument()
 
         #expect(state.regions.isEmpty || state.regions.values.allSatisfy { $0.isEmpty })
-        #expect(state.detectionResults.isEmpty)
         #expect(state.selectedRegionID == nil)
         #expect(state.outputURL == nil)
         #expect(state.isVerificationStale == false)
-    }
-
-    @Test("effectiveRegionCount sums across pages")
-    func regionCountMultiPage() {
-        let state = RedactionState()
-        state.addRegion(makeRegion(), page: 0, undoManager: nil)
-        state.addRegion(makeRegion(), page: 0, undoManager: nil)
-        state.addRegion(makeRegion(), page: 1, undoManager: nil)
-        #expect(state.effectiveRegionCount == 3)
-    }
-
-    @Test("Staged-review apply creates regions with correct source types")
-    func applyDetectionResultsCreatesCorrectSources() async {
-        let state = RedactionState()
-        let ssn = DetectionResult(
-            normalizedRect: CGRect(x: 0.1, y: 0.2, width: 0.3, height: 0.04),
-            kind: .pii(.creditCard), confidence: 0.9)
-        let face = DetectionResult(
-            normalizedRect: CGRect(x: 0.5, y: 0.5, width: 0.2, height: 0.2),
-            kind: .face, confidence: 0.85)
-        await applyStagedDetections([0: [ssn, face]], on: state, undoManager: nil)
-        #expect(state.regions[0]?.count == 2)
-        #expect(state.regions[0]?[0].source == .detectedPII(kind: .creditCard))
-        #expect(state.regions[0]?[1].source == .detectedFace)
-    }
-
-    // MARK: - Triage
-
-    @Test("Staged-review apply creates regions and metadata, undo/redo lifecycle")
-    func triageApplyUndoMetadata() async {
-        let state = RedactionState()
-        let undoManager = makeUndoManager()
-        let detection = DetectionResult.mock(kind: .pii(.ssn), matchedText: "123-45-6789")
-        state.pendingTriage = [0: [detection]]
-        state.triageSelections = [detection.id: true]
-
-        undoManager.beginUndoGrouping()
-        await state.applyFindings(.stagedDetections, undoManager: undoManager)
-        undoManager.endUndoGrouping()
-        let regionID = state.regions[0]!.first!.id
-        #expect(state.regionMetadata[regionID] != nil)
-        #expect(state.regionMetadata[regionID]?.matchedText == "123-45-6789")
-        #expect(state.pendingTriage == nil)
-        #expect(state.triageSelections.isEmpty)
-
-        undoManager.undo()
-        #expect(state.regions[0]?.isEmpty ?? true)
-        #expect(state.regionMetadata[regionID] == nil)
-
-        undoManager.redo()
-        #expect(state.regions[0]?.count == 1)
-        #expect(state.regionMetadata[regionID] != nil)
-    }
-
-    @Test("Staged-review apply filters rejected detections")
-    func triageFiltersRejected() async {
-        let state = RedactionState()
-        let accepted = DetectionResult.mock(kind: .pii(.ssn))
-        let rejected = DetectionResult.mock(kind: .pii(.email))
-        state.pendingTriage = [0: [accepted, rejected]]
-        state.triageSelections = [accepted.id: true, rejected.id: false]
-
-        await state.applyFindings(.stagedDetections, undoManager: nil)
-        #expect(state.regions[0]?.count == 1)
-        #expect(state.regionMetadata.count == 1)
-    }
-
-    @Test("dismissTriage clears pending state without applying")
-    func dismissTriageClearsState() {
-        let state = RedactionState()
-        state.pendingTriage = [0: [.mock()]]
-        state.triageSelections = [UUID(): true]
-
-        state.dismissTriage()
-        #expect(state.pendingTriage == nil)
-        #expect(state.triageSelections.isEmpty)
     }
 
     // MARK: - Remove Region Metadata Cleanup
@@ -558,19 +442,13 @@ struct RegionManagerTests {
     func clearAllResetsState() {
         let state = RedactionState()
         state.regions = [0: [.mock()]]
-        state.detectionResults = [0: [.mock()]]
         state.selectedRegionID = UUID()
-        state.pendingTriage = [0: [.mock()]]
-        state.triageSelections = [UUID(): true]
         state.regionMetadata = [UUID(): .mock()]
         state.outputURL = URL(fileURLWithPath: "/tmp/test.pdf")
 
         state.clearAll()
         #expect(state.regions.isEmpty)
-        #expect(state.detectionResults.isEmpty)
         #expect(state.selectedRegionID == nil)
-        #expect(state.pendingTriage == nil)
-        #expect(state.triageSelections.isEmpty)
         #expect(state.regionMetadata.isEmpty)
         #expect(state.outputURL == nil)
     }

@@ -51,8 +51,7 @@ struct LiveRedactPredicateTests {
 
         #expect(!DocumentState.hasUnappliedSelections(redactionState))
         #expect(!DocumentEditorView.homeNeedsCloseConfirm(
-            hasDrawnRegions: false, hasPendingTriage: false,
-            hasUnappliedSelections: DocumentState.hasUnappliedSelections(redactionState)))
+            hasDrawnRegions: false, hasUnappliedSelections: DocumentState.hasUnappliedSelections(redactionState)))
         #expect(documentState.redactRefusal(with: redactionState) == nil)
     }
 

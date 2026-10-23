@@ -13,10 +13,8 @@ import SwiftUI
 //   Apply, and re-running the search restores it, so nothing
 //   irreversible is dropped — no confirmation is needed.
 // - Confirm route: when `hasUnappliedSelections` is
-//   true — the user modified selections this session
-//   (`userModifiedSelections`), OR the session carries an
-//   auto-selected set from the magic-wand preselect flow that has never
-//   been reviewed (`hasUnreviewedPreselection`) — Dismiss instead raises
+//   true — a selected result no live applied region covers — Dismiss
+//   instead raises
 //   the "Discard selections?" `.confirmationDialog`
 //   (`SearchAndRedactSheet.dismissTitle` / `.dismissMessage`); only a
 //   confirmed tap calls through with `afterConfirmation: true`.
@@ -52,12 +50,6 @@ extension SearchAndRedactSheet {
     /// affordance label (mechanism-description for the action it
     /// triggers). Shared with the mode-switch undo toast.
     static let discardUndoActionLabel: String = "Undo"
-
-    /// Toast-punctuation outlier: the retired triage
-    /// review's info trace that staged findings were dropped on an
-    /// unconfirmed 0-selected dismiss. Was missing the sentence-final
-    /// period every other toast in this family carries.
-    static let detectionResultsDismissedToast = "Detection results dismissed."
 
     /// Message for the dismiss decision point. Dismiss with 0
     /// selected closes instantly by construction; when the session

@@ -175,8 +175,7 @@ struct VerificationResultsView: View {
 
     /// Pinned line builders + line-order assembly.
     enum RunFactsStrip {
-        /// 0-indexed input (mirrors
-        /// `ScanReviewSection.ocrSkipBannerHeadline`); 1-based page
+        /// 0-indexed input; 1-based page
         /// numbers via `SearchResultsSection.formatPageList`.
         static func ocrSkipLine(pages: [Int]) -> String {
             let oneBased = pages.sorted().map { $0 + 1 }

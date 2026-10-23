@@ -19,7 +19,7 @@ import XCTest
 /// launches, so each test deletes its rows up front (leftover tolerance)
 /// and again on exit.
 ///
-/// nonisolated for the same reason as `DetectionTriageDismissUITests`: an
+/// nonisolated for the same reason as `ShareRiskSheetUITests`: an
 /// XCUITest drives a separate process and touches no @MainActor app state;
 /// under the SE-0466 MainActor-default flip the lifecycle overrides would
 /// otherwise mismatch XCTestCase's nonisolated ObjC lifecycle methods.

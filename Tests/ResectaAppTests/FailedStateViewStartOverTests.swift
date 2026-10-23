@@ -52,12 +52,10 @@ struct FailedStateViewStartOverTests {
         documentState.transition(to: .failed(error: .importError(.corrupt),
                                              returnPhase: .editing))
 
-        // Worst case: a failure mid-flight has left regions, detections,
-        // triage selections, and the sourceDocument in memory.
+        // Worst case: a failure mid-flight has left regions and the
+        // sourceDocument in memory.
         documentState.sourceDocument = pdf
         redactionState.regions = makeRegions(count: 4)
-        redactionState.detectionResults = [0: [DetectionResult.mock()]]
-        redactionState.triageSelections[UUID()] = true
 
         // Call the production teardown. This was previously an inline
         // copy of the `performStartOver()` body — a copy that no test could
@@ -68,12 +66,6 @@ struct FailedStateViewStartOverTests {
         // Regions cleared.
         #expect(redactionState.regions.isEmpty,
                 "Start Over must clear all regions")
-        // Detection results cleared (clearAll() side effect).
-        #expect(redactionState.detectionResults.isEmpty,
-                "Start Over must clear detection results")
-        // Triage selections cleared (clearAll() side effect).
-        #expect(redactionState.triageSelections.isEmpty,
-                "Start Over must clear triage selections")
         // sourceDocument cleared — the core regression fix.
         #expect(documentState.sourceDocument == nil,
                 "Start Over must drop sourceDocument reference")

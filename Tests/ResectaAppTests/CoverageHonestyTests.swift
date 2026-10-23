@@ -127,33 +127,6 @@ struct OCRSkipBannerTests {
     }
 }
 
-// MARK: - Detect-leg banner
-
-@Suite("Review OCR skip banner (detect leg)")
-@MainActor
-struct DetectionTriageOCRSkipBannerTests {
-
-    @Test("Headline pluralizes and renders 1-based page numbers")
-    func headlinePluralizationAndNumbering() {
-        let single = ScanReviewSection.ocrSkipBannerHeadline(pages: [0])
-        #expect(single.contains("Page 1 is"))
-        #expect(single.contains("that page"))
-
-        let multiple = ScanReviewSection.ocrSkipBannerHeadline(pages: [1, 3, 7])
-        #expect(multiple.contains("Pages 2, 4, and 8 are"))
-        #expect(multiple.contains("those pages"))
-        #expect(multiple.contains("not checked"))
-    }
-
-    @Test("clearForNewDocument drops the skip-page set")
-    func clearForNewDocumentDropsSkips() {
-        let state = RedactionState()
-        state.ocrPixelCapSkippedPages = [1, 4]
-        state.clearForNewDocument()
-        #expect(state.ocrPixelCapSkippedPages.isEmpty)
-    }
-}
-
 // MARK: - Mode-switch preview residue
 
 @Suite("Mode-switch preview residue", .tags(.search))

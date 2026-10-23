@@ -10,7 +10,6 @@ private let logger = Logger(subsystem: "com.resecta.app", category: "state")
 @Observable
 class RedactionState {
     var regions: [Int: [RedactionRegion]] = [:]          // pageIndex → regions
-    var detectionResults: [Int: [DetectionResult]] = [:]  // pageIndex → detections
 
     /// Monotonic counter incremented on every region mutation.
     /// Enables O(1) dirty checking in PDFViewCoordinator overlay refresh.
@@ -152,32 +151,9 @@ class RedactionState {
     /// Populated during the extraction phase; nil for Secure Rasterization.
     var textExtractionBuffer: [Int: [CharacterInfo]]? = nil
 
-    // --- Triage Support ---
-
-    /// Staged detections awaiting user review. Non-nil presents the
-    /// review inside the search sheet's Scan interface (the
-    /// `DocumentEditorView` bridge opens/switches the one sheet).
-    /// Populated by runDetectionPipeline() on every detection run —
-    /// every run is reviewed (the auto-apply path retired with its
-    /// setting).
-    /// Cleared when the user accepts (applies selected findings) or dismisses (discards).
-    /// Structure: pageIndex → array of DetectionResult.
-    var pendingTriage: [Int: [DetectionResult]]? = nil
-
-    /// Per-detection acceptance state during review. Review-first
-    /// arrival: staged detections arrive with NOTHING selected, and an
-    /// ABSENT id reads as NOT accepted everywhere — the one apply path
-    /// promotes only explicit `true` entries. Producers stage with an
-    /// empty map; no per-id arrival entries are required. (The former
-    /// explicit-entry producer contract and its normalization belt
-    /// existed only for the retired absent-reads-accepted fallback.)
-    /// Key: DetectionResult.id. Value: true = accepted, false = rejected.
-    var triageSelections: [UUID: Bool] = [:]
-
-    /// Record of how the most recent detection run ended, for
-    /// BOTH run origins: pipeline detection runs (staged for triage)
-    /// and the sheet's Scan-interface runs (results listed in-sheet).
-    /// Written on every run exit path (staged, nothing found, failed)
+    /// Record of how the most recent Scan-interface run ended (results
+    /// listed in-sheet). Written on every run exit path (staged, nothing
+    /// found, failed)
     /// and read by `DocumentEditorView` to drive the detection summary
     /// banner — zero/failed runs previously surfaced only as transient
     /// toasts. `run` increments per record so two identical consecutive
@@ -185,9 +161,8 @@ class RedactionState {
     /// Session-scoped; cleared on new-document import.
     struct DetectionRunRecord: Equatable {
         enum Outcome: Equatable {
-            /// Findings staged for user review — triage for pipeline
-            /// runs, the in-sheet result list for Scan-interface runs.
-            /// Nothing is applied until the user selects and applies.
+            /// Findings listed in-sheet for review. Nothing is applied
+            /// until the user selects and applies.
             case staged
             /// The run completed and flagged nothing.
             case nothingFound(pageCount: Int)
@@ -195,8 +170,7 @@ class RedactionState {
             case failed
         }
         /// Present for Scan-interface (in-sheet) runs: the counts the
-        /// banner reports. Pipeline runs leave it nil and the banner
-        /// derives its counts from `pendingTriage`.
+        /// banner reports.
         struct ScanRunSummary: Equatable {
             let foundCount: Int
             let pageCount: Int
@@ -205,9 +179,8 @@ class RedactionState {
         let outcome: Outcome
         let scanSummary: ScanRunSummary?
         /// Pages whose raster exceeded the OCR pixel caps
-        /// during the run this record describes (pipeline:
-        /// `ocrPixelCapSkippedPages`; Scan-interface:
-        /// `SearchState.ocrSkippedPages`), snapshotted at record time so
+        /// during the run this record describes
+        /// (`SearchState.ocrSkippedPages`), snapshotted at record time so
         /// the verification screen reads a stable value instead of a
         /// live session set the sheet later clears.
         var ocrSkippedPages: Set<Int> = []
@@ -217,18 +190,8 @@ class RedactionState {
     }
     var lastDetectionRun: DetectionRunRecord? = nil
 
-    /// True once any pending detection from the current
-    /// run has been promoted to a region (sheet-level "Apply N" or a
-    /// group apply). Gates the summary banner's "Review" re-entry action:
-    /// re-staging `detectionResults` after a promotion would stage the
-    /// already-promoted detections a second time. Reset by
-    /// `recordDetectionRun` and on new-document import.
-    var triagePromotionOccurred: Bool = false
-
-    /// Writer for `lastDetectionRun` — bumps the run counter and resets
-    /// the per-run promotion flag. `scanSummary` is passed by the
-    /// Scan-interface run path only; the pipeline writer sites use the
-    /// default and the banner reads `pendingTriage` for their counts.
+    /// Writer for `lastDetectionRun` — bumps the run counter.
+    /// `scanSummary` is passed by the Scan-interface run path.
     func recordDetectionRun(
         _ outcome: DetectionRunRecord.Outcome,
         scanSummary: DetectionRunRecord.ScanRunSummary? = nil,
@@ -238,7 +201,6 @@ class RedactionState {
             run: (lastDetectionRun?.run ?? 0) + 1, outcome: outcome,
             scanSummary: scanSummary, ocrSkippedPages: ocrSkippedPages,
             degradeFailures: autoDetectionDegraded ? autoDetectionDegradeFailures : nil)
-        triagePromotionOccurred = false
     }
 
     /// Canvas-side "View rationale" request. Set
@@ -270,114 +232,6 @@ class RedactionState {
     /// (c) Metadata survives undo/redo because it keys on the stable region UUID.
     var regionMetadata: [UUID: RegionMetadata] = [:]
 
-    // --- Priors + surface-form propagation ---
-
-    /// Per-category Beta priors. Updated on triage accept/reject. Passed by
-    /// value into `DetectionOrchestrator.detectPage(...)` per page, merged
-    /// back here at yield.
-    ///
-    /// Priors now PERSIST across
-    /// document sessions — hydrated at WORKSPACE creation (RedactWorkspace
-    /// init; a bare `RedactionState()` stays inert so tests are isolated),
-    /// saved (then rehydrated) by clearAll() so the next document starts
-    /// with the accumulated triage history. The stored payload is
-    /// per-category accept/reject counts only: behavioral curation
-    /// metadata, never document content, values, or timestamps. Streaks
-    /// are session-scoped and reset on restore.
-    var priors: PerCategoryPriors = PerCategoryPriors()
-
-    // MARK: - priors persistence
-
-    /// Versioned storage key; a format change bumps to v2 and ignores v1.
-    static let priorsStorageKey = "perCategoryPriors.v1"
-
-    /// Persistence target for the clearAll() save/rehydrate hook.
-    /// `.standard` in production; tests inject a scratch suite so the
-    /// shared test-host defaults stay clean.
-    @ObservationIgnored var priorsDefaults: UserDefaults = .standard
-
-    /// Encode alpha/beta per category into a plain plist-safe dictionary
-    /// (`[String: [String: Double]]`) — no Codable struct crossing the
-    /// @Observable boundary per the design. Streaks are not stored.
-    static func savePriors(_ priors: PerCategoryPriors, defaults: UserDefaults = .standard) {
-        var payload: [String: [String: Double]] = [:]
-        for (category, beta) in priors.byCategory {
-            payload[category.rawValue] = ["alpha": beta.alpha, "beta": beta.beta]
-        }
-        defaults.set(payload, forKey: priorsStorageKey)
-    }
-
-    /// Fail-closed hydration: a missing key or any malformed entry
-    /// degrades to the uniform Beta(1,1) default for that category.
-    /// Values are clamped to the G10 invariants (α, β ≥ 1; ESS ≤ 50) so
-    /// a tampered plist cannot poison scoring; streaks reset on restore
-    /// (cross-session streak continuation is not meaningful).
-    static func loadPriors(defaults: UserDefaults = .standard) -> PerCategoryPriors {
-        guard let payload = defaults.dictionary(forKey: priorsStorageKey)
-                as? [String: [String: Double]] else {
-            return PerCategoryPriors()
-        }
-        var byCategory: [PIICategory: PerCategoryPriors.Beta] = [:]
-        for (rawValue, values) in payload {
-            guard let category = PIICategory(rawValue: rawValue),
-                  let alpha = values["alpha"], let beta = values["beta"],
-                  alpha.isFinite, beta.isFinite else { continue }
-            var clampedAlpha = max(1.0, alpha)
-            var clampedBeta = max(1.0, beta)
-            let total = clampedAlpha + clampedBeta
-            if total > 50 {
-                let scale = 50 / total
-                clampedAlpha = max(1.0, clampedAlpha * scale)
-                clampedBeta = max(1.0, clampedBeta * scale)
-            }
-            byCategory[category] = PerCategoryPriors.Beta(
-                alpha: clampedAlpha, beta: clampedBeta, streakDir: 0, streakLen: 0
-            )
-        }
-        return PerCategoryPriors(byCategory: byCategory)
-    }
-
-    /// "Reset Detection History" affordance: drop the
-    /// persisted history. Callers with a live instance should also reset
-    /// the in-memory `priors` so clearAll() cannot re-save the old state.
-    static func clearPersistedPriors(defaults: UserDefaults = .standard) {
-        defaults.removeObject(forKey: priorsStorageKey)
-    }
-
-    /// Exact-match surface-form dictionary (e.g., "Dr. Jane Smith" → accepted).
-    /// Enables A7 short-circuit: later pages with the same surface skip re-scoring.
-    /// Cleared by clearAll().
-    var surfaceForms: SurfaceFormDictionary = SurfaceFormDictionary()
-
-    /// Per-page classification diagnostic for the G5 "Why this classification?"
-    /// panel in the triage sheet. In-memory only — never logged, never persisted.
-    /// Released on clearAll().
-    var pageDiagnostics: [Int: ClassificationDiagnostic] = [:]
-
-    /// Pages whose raster exceeded the OCR pixel caps during the
-    /// detection run, so Vision OCR never ran there (page-level
-    /// `PageDetectionResult.ocrProvenance` reports `.pixelCapExceeded`).
-    /// Populated by `PipelineCoordinator.runDetectionPipeline`; consumed
-    /// by the triage sheet's OCR-skip banner so the user learns those
-    /// pages' image content was not text-scanned. In-memory only,
-    /// document-derived; cleared with `pageDiagnostics`.
-    var ocrPixelCapSkippedPages: Set<Int> = []
-
-    /// DetectionResult IDs whose matched name belongs to a bare-surname cluster
-    /// with ≥ 15 ambiguous entries. Populated post-clustering in
-    /// PipelineCoordinator.runDetectionPipeline; consumed by the review rows
-    /// to show the inline "Common surname — verify context" hint. Cleared by clearAll().
-    var ambiguousSurnameDetectionIDs: Set<UUID> = []
-
-    /// Cross-page entity groups produced by the post-loop
-    /// clustering step in `PipelineCoordinator.runDetectionPipeline`.
-    /// Each group bundles every `DetectionResult` whose `matchedText`
-    /// normalizes to the same canonical form within the same PII
-    /// category. Drives the "Grouped" view mode in `ScanReviewSection`;
-    /// `applyFindings(.entityGroup(_:))` consumes a member to atomically
-    /// accept the entire group. Cleared by clearAll().
-    var crossPageEntityGroups: [CrossPageEntityGroup] = []
-
     // Active search session.
     // Non-nil triggers search sheet presentation. Ephemeral — never persisted.
     //
@@ -407,14 +261,6 @@ class RedactionState {
     /// The surface is a toast — NOT a new canvas long-press
     /// action — so the canvas density cap stays at 6 menu items.
     var pendingManualDrawNudge: SearchResult?
-
-    /// Pending magic-wand search request. Set by
-    /// `RedactionOverlayView.contextMenuInteraction` when the user taps
-    /// "Select all instances" on a long-pressed OCR word; observed by
-    /// `DocumentEditorView` via `.onChange(of:)` to open / re-use the
-    /// `SearchAndRedactSheet` pre-filled with an exact-match query.
-    /// Cleared by the host after dispatch.
-    var pendingMagicWandRequest: MagicWandSearchRequest?
 
     /// Per-search-session suppression flag. Set after
     /// the first nudge is enqueued so the user sees at most one toast
@@ -478,17 +324,6 @@ class RedactionState {
     /// Security-relevant: stale verification is a data-leakage vector.
     private(set) var regionsModifiedSinceVerification = false
 
-    // MARK: - Performance Caches
-
-    /// Cached effective region count — invalidated on any region mutation.
-    /// Avoids O(n) reduce+filter on every view body evaluation.
-    /// @ObservationIgnored: `effectiveRegionCount` writes this on a cache
-    /// miss; a registrar-wrapped write during a SwiftUI body evaluation
-    /// re-enters the observation graph and SIGABRTs (same pattern as the
-    /// SearchState filter caches). Views tracking `effectiveRegionCount`
-    /// still update via the observed `regions` read inside the getter.
-    @ObservationIgnored private var _cachedEffectiveCount: Int?
-
     /// Reverse index: region UUID → page index. O(1) lookup instead of O(n×m) scan.
     private var regionPageIndex: [UUID: Int] = [:]
 
@@ -496,23 +331,6 @@ class RedactionState {
     /// This is the ONLY public path for setting the flag to false.
     func markVerificationCurrent() {
         regionsModifiedSinceVerification = false
-    }
-
-    /// Count of regions surviving the minimum-dimension filter (> 0.001 on both axes).
-    /// Raw region count includes sub-threshold regions that produce no visible fill.
-    /// Cached — invalidated on region mutations, computed lazily on access.
-    var effectiveRegionCount: Int {
-        // Read the observed `regions` BEFORE the cache check: with the cache
-        // var @ObservationIgnored, this read is what registers the tracking
-        // dependency, so a cache-hit access still re-evaluates when regions
-        // mutate. O(1) — binds the dictionary, no traversal.
-        let regions = self.regions
-        if let cached = _cachedEffectiveCount { return cached }
-        let count = regions.values.reduce(0) { $0 + $1.count(where: {
-            $0.normalizedRect.width > 0.001 && $0.normalizedRect.height > 0.001
-        })}
-        _cachedEffectiveCount = count
-        return count
     }
 
     /// True when at least one region survives the minimum-dimension filter.
@@ -533,11 +351,6 @@ class RedactionState {
     /// Find the page index containing a given region ID. O(1) via reverse index.
     func pageIndex(for regionID: UUID) -> Int? {
         regionPageIndex[regionID]
-    }
-
-    /// Invalidate cached counts after any region mutation.
-    private func invalidateRegionCaches() {
-        _cachedEffectiveCount = nil
     }
 
     // MARK: - Cleanup
@@ -575,35 +388,24 @@ class RedactionState {
         // since verification" is logically false.
         regionsModifiedSinceVerification = false
         regions = [:]
-        detectionResults = [:]
         selectedRegionIDs = []
         // Cancel and drop any in-flight search so its sheet does not
         // linger into the next document (the `activeSearch` didSet does
         // not itself cancel the search task).
         dismissActiveSearch()
-        // `pendingTriage` / `triageSelections` carry detections whose
-        // page/coordinate data belong to the PRIOR document; left
-        // un-cleared, an Accept in a stranded review would stamp
-        // wrong-coordinate regions onto the next document.
-        pendingTriage = nil
-        triageSelections = [:]
-        // The detection-run record + promotion flag would describe a run
+        // The detection-run record would describe a run
         // that never happened on the next document.
         lastDetectionRun = nil
-        triagePromotionOccurred = false
         // A stale region UUID must not present a blank rationale sheet
         // over the next document.
         pendingCanvasRationaleRequest = nil
-        ocrPixelCapSkippedPages = []
-        // The manual-draw nudge state and any pending magic-wand request
-        // never carry across documents. The `activeSearch` didSet above
+        // The manual-draw nudge state
+        // never carries across documents. The `activeSearch` didSet above
         // already resets the nudge flag; the explicit reset keeps the
         // contract for a caller that clears state without crossing that
         // boundary.
         manualDrawNudgeSuppressedForSession = false
         pendingManualDrawNudge = nil
-        pendingMagicWandRequest = nil
-        invalidateRegionCaches()
         regionPageIndex.removeAll()
     }
 
@@ -674,7 +476,6 @@ class RedactionState {
         regionVersion += 1
         regions[page, default: []].append(region)
         regionPageIndex[region.id] = page
-        invalidateRegionCaches()
         regionsModifiedSinceVerification = true
         clearOutput()
         let regionID = region.id
@@ -712,7 +513,6 @@ class RedactionState {
         let removed = pageRegions.remove(at: index)
         regions[page] = pageRegions
         regionPageIndex.removeValue(forKey: id)
-        invalidateRegionCaches()
         let removedMetadata = regionMetadata.removeValue(forKey: id) // Capture metadata
         regionsModifiedSinceVerification = true
         clearOutput()
@@ -734,7 +534,6 @@ class RedactionState {
         let oldRect = pageRegions[index].normalizedRect
         pageRegions[index].normalizedRect = newRect
         regions[page] = pageRegions
-        invalidateRegionCaches()
         regionsModifiedSinceVerification = true
         clearOutput()
         registerUndo(undoManager, "Resize Redaction") { target in
@@ -753,7 +552,6 @@ class RedactionState {
         let oldRect = pageRegions[index].normalizedRect
         pageRegions[index].normalizedRect = newRect
         regions[page] = pageRegions
-        invalidateRegionCaches()
         regionsModifiedSinceVerification = true
         clearOutput()
         registerUndo(undoManager, "Move Redaction") { target in
@@ -772,7 +570,6 @@ class RedactionState {
             pageRegions[index].normalizedRect = move.newRect
         }
         regions[page] = pageRegions
-        invalidateRegionCaches()
         regionsModifiedSinceVerification = true
         clearOutput()
         let snapshot = mutableOldRects
@@ -795,7 +592,6 @@ class RedactionState {
         }
         regions[page] = pageRegions
         for id in ids { regionPageIndex.removeValue(forKey: id) }
-        invalidateRegionCaches()
         regionsModifiedSinceVerification = true
         clearOutput()
         selectedRegionIDs.subtract(ids)
@@ -808,7 +604,6 @@ class RedactionState {
                     target.regionMetadata[item.region.id] = meta
                 }
             }
-            target.invalidateRegionCaches()
             target.regionsModifiedSinceVerification = true
             target.clearOutput()
             // Undo re-inserts the deleted regions — bump so the overlay
@@ -886,13 +681,6 @@ class RedactionState {
         /// The selected rows of `activeSearch.results` — the search
         /// side and the Scan interface's in-sheet run results.
         case selectedSearchResults
-        /// The staged detection review: every explicit-true entry in
-        /// `triageSelections` across `pendingTriage`.
-        case stagedDetections
-        /// Every member of one cross-page entity group still pending in
-        /// the review. Selection state is not consulted — accepting the
-        /// group IS the selection gesture.
-        case entityGroup(CrossPageEntityGroup)
         /// One result of `activeSearch.results`, addressed by id — the
         /// compact handle's per-item Apply. Selection state is not
         /// consulted: the tap IS the accept for that one result.
@@ -906,8 +694,7 @@ class RedactionState {
     /// commit-toast copy (`CommitFeedback`), which reports regions
     /// actually created — never the raw detection or selection total.
     struct ApplyOutcome: Equatable {
-        /// Regions actually created (signature candidates and overlap
-        /// skips excluded).
+        /// Regions actually created (overlap skips excluded).
         let applied: Int
         /// Search origin only: selected results skipped for >80%
         /// overlap with an existing region. Skipped results earn no
@@ -920,13 +707,10 @@ class RedactionState {
         /// dedup-skipped as already covered. No badge, no audit entry
         /// — consumed only by the Apply-graying gate.
         var coveredResultIDs: Set<UUID> = []
-        /// Detection-map origin only: detections routed to the review
-        /// instead of applied.
-        let signatureCandidates: Int
 
         static let zero = ApplyOutcome(
             applied: 0, skippedOverlaps: 0,
-            appliedResultIDs: [], signatureCandidates: 0)
+            appliedResultIDs: [])
     }
 
     /// The one apply path for BOTH result origins. Every origin creates
@@ -969,29 +753,14 @@ class RedactionState {
             return nil
         }
         // The conditional-dismiss tracker reset is owned by this path:
-        // the search and staged-review origins reset it on every
-        // non-refused outcome (they resolve the session's whole
-        // selection context); a group promotion is a partial commit —
-        // the remaining review selections are still live work, so the
-        // tracker stays set for them — and so is a single-result apply
-        // from the compact handle. Each branch resets the session it
-        // actually applied against.
+        // the search origin resets it on every non-refused outcome (it
+        // resolves the session's whole selection context); a
+        // single-result apply from the compact handle leaves it set.
+        // Each branch resets the session it actually applied against.
         switch origin {
         case .selectedSearchResults:
             return await applySelectedSearchResultsOrigin(
                 undoManager: undoManager, documentState: documentState)
-        case .stagedDetections:
-            let outcome = applyStagedDetectionsOrigin(undoManager: undoManager)
-            if outcome != nil {
-                activeSearch?.userModifiedSelections = false
-                // A full staged-review apply resolves the whole
-                // search sheet's selection context, same as the search
-                // origin above.
-                activeSearch?.hasUnreviewedPreselection = false
-            }
-            return outcome
-        case .entityGroup(let group):
-            return applyEntityGroupOrigin(group, undoManager: undoManager)
         case .searchResult(let id):
             return applySearchResultOrigin(id: id, undoManager: undoManager)
         }
@@ -1063,12 +832,6 @@ class RedactionState {
         let selected = search.results.filter(\.isSelected)
         guard !selected.isEmpty else {
             search.userModifiedSelections = false
-            // An apply with nothing selected still resolves the
-            // session's selection context (either it never carried a
-            // preselect, or the user reviewed and deselected every
-            // preselected result before tapping Apply); either way there
-            // is nothing unreviewed left to protect.
-            search.hasUnreviewedPreselection = false
             return .zero
         }
 
@@ -1102,7 +865,6 @@ class RedactionState {
             createdMetadata: prepared.createdMetadata,
             createdAudit: prepared.createdAudit,
             actionName: Self.searchApplyActionName(count: selected.count),
-            priorsRestore: nil,
             recordsSearchApplyVersion: true,
             undoManager: undoManager
         )
@@ -1119,18 +881,13 @@ class RedactionState {
         // prepare suspension (a dismissed-and-reopened sheet must not
         // inherit a stale apply's reset).
         search.userModifiedSelections = false
-        // The applied selections (preselected or not) were just
-        // committed; nothing unreviewed remains to protect from a silent
-        // dismiss.
-        search.hasUnreviewedPreselection = false
 
         // Caller is responsible for clearing activeSearch after showing feedback.
         return ApplyOutcome(
             applied: prepared.appliedCount,
             skippedOverlaps: prepared.skippedOverlaps,
             appliedResultIDs: prepared.appliedResultIDs,
-            coveredResultIDs: prepared.coveredResultIDs,
-            signatureCandidates: 0
+            coveredResultIDs: prepared.coveredResultIDs
         )
     }
 
@@ -1188,8 +945,7 @@ class RedactionState {
             applied: prepared.appliedCount,
             skippedOverlaps: prepared.skippedOverlaps,
             appliedResultIDs: prepared.appliedResultIDs,
-            coveredResultIDs: prepared.coveredResultIDs,
-            signatureCandidates: 0
+            coveredResultIDs: prepared.coveredResultIDs
         )
         guard prepared.appliedCount > 0 else { return outcome }
 
@@ -1198,173 +954,11 @@ class RedactionState {
             createdMetadata: prepared.createdMetadata,
             createdAudit: prepared.createdAudit,
             actionName: Self.searchApplyActionName(count: 1),
-            priorsRestore: nil,
             recordsSearchApplyVersion: true,
             undoManager: undoManager
         )
         pendingRunDeselection = search.deselectionSnapshotForRun()
         return outcome
-    }
-
-    // MARK: - Detection origins (staged review, entity group)
-
-    /// Staged-detections origin: promotes explicit-true selections and
-    /// records accept AND reject decisions into `priors` +
-    /// `surfaceForms` (both inform). An ABSENT selection id reads as
-    /// NOT accepted — the review-first arrival default — so only work
-    /// the user opted into becomes a region. Resolves the review either
-    /// way; undo removes the applied regions with their metadata +
-    /// audit records and restores the recorded decisions, but does not
-    /// reopen the review (re-running detection rebuilds it).
-    private func applyStagedDetectionsOrigin(
-        undoManager: UndoManager?
-    ) -> ApplyOutcome? {
-        guard let pending = pendingTriage else { return .zero }
-
-        let priorsSnapshot = priors
-        let surfaceFormsSnapshot = surfaceForms
-        let appliedAt = Date()
-
-        for (_, results) in pending {
-            for detection in results {
-                let accepted = triageSelections[detection.id] ?? false
-                if case .pii(let piiKind) = detection.kind,
-                   let category = PIICategory(piiKind: piiKind) {
-                    priors = priors.updated(
-                        category: category,
-                        decision: accepted ? .accepted : .rejected
-                    )
-                }
-                if let matched = detection.matchedText, !matched.isEmpty {
-                    surfaceForms = surfaceForms.recording(
-                        matched,
-                        decision: accepted ? .accepted : .rejected
-                    )
-                }
-            }
-        }
-
-        // The accepted detections in review order; the pair for each is
-        // built by the one detection prepare step.
-        let accepted: [(page: Int, detection: DetectionResult)] = pending.flatMap { page, results in
-            results.filter { triageSelections[$0.id] ?? false }.map { (page: page, detection: $0) }
-        }
-        let prepared = prepareApply(
-            detections: accepted,
-            ambiguousSurnameDetectionIDs: ambiguousSurnameDetectionIDs,
-            appliedAt: appliedAt
-        )
-
-        // The review resolves whether or not anything was promoted. It
-        // is deliberately NOT captured in the undo closure — undoing
-        // the apply removes the regions but does not reopen the review.
-        pendingTriage = nil
-        triageSelections = [:]
-        let createdCount = prepared.appliedCount
-        if createdCount > 0 { triagePromotionOccurred = true }
-
-        commitApply(
-            createdRegions: prepared.createdRegions,
-            createdMetadata: prepared.createdMetadata,
-            createdAudit: prepared.createdAudit,
-            actionName: "Apply Detections",
-            priorsRestore: (priors: priorsSnapshot, surfaceForms: surfaceFormsSnapshot),
-            recordsSearchApplyVersion: false,
-            undoManager: undoManager
-        )
-
-        return ApplyOutcome(
-            applied: createdCount, skippedOverlaps: 0,
-            appliedResultIDs: [], signatureCandidates: 0)
-    }
-
-    /// Entity-group origin: promotes every member of the group still
-    /// pending in the review as one atomic undo step, records their
-    /// accepted decisions here (the members bypass the staged-review
-    /// bookkeeping loop from now on), and prunes them from the review
-    /// so the next full apply cannot double-create and the toolbar
-    /// count stays honest. Members no longer pending are
-    /// skipped silently; non-member detections stay pending for the
-    /// normal review flow. If the prune empties the review, it closes —
-    /// the same end state as a full apply.
-    private func applyEntityGroupOrigin(
-        _ group: CrossPageEntityGroup,
-        undoManager: UndoManager?
-    ) -> ApplyOutcome? {
-        guard let pending = pendingTriage else { return .zero }
-
-        // (detectionID → (page, detection)) lookup over pendingTriage
-        // so the group's members resolve without rescanning each page.
-        var lookup: [UUID: (page: Int, detection: DetectionResult)] = [:]
-        for (page, results) in pending {
-            for result in results {
-                lookup[result.id] = (page: page, detection: result)
-            }
-        }
-
-        // The members still pending, in the group's order; the pair for
-        // each is built by the one detection prepare step.
-        let hits = group.detectionIDs.compactMap { lookup[$0] }
-        let appliedDetections = hits.map(\.detection)
-        let appliedIDs = Set(appliedDetections.map(\.id))
-        let memberIDs = Set(group.detectionIDs)
-        let appliedAt = Date()
-        let prepared = prepareApply(
-            detections: hits,
-            ambiguousSurnameDetectionIDs: ambiguousSurnameDetectionIDs,
-            appliedAt: appliedAt
-        )
-        let appliedCount = appliedDetections.count
-
-        guard appliedCount > 0 else { return .zero }
-
-        let priorsSnapshot = priors
-        let surfaceFormsSnapshot = surfaceForms
-
-        // Promoted members bypass the staged-review bookkeeping loop
-        // from here on (they are pruned below), so record their
-        // accepted decision at the point of promotion.
-        for detection in appliedDetections {
-            if case .pii(let piiKind) = detection.kind,
-               let category = PIICategory(piiKind: piiKind) {
-                priors = priors.updated(category: category, decision: .accepted)
-            }
-            if let matched = detection.matchedText, !matched.isEmpty {
-                surfaceForms = surfaceForms.recording(matched, decision: .accepted)
-            }
-        }
-
-        // Prune the promoted members from `pendingTriage` and
-        // drop their selection entries. Leaving them pending meant the
-        // next full apply re-created a region for every member.
-        var remaining = pending
-        for (page, results) in remaining {
-            remaining[page] = results.filter { !appliedIDs.contains($0.id) }
-        }
-        remaining = remaining.filter { !$0.value.isEmpty }
-        pendingTriage = remaining.isEmpty ? nil : remaining
-        for id in memberIDs { triageSelections.removeValue(forKey: id) }
-        triagePromotionOccurred = true
-
-        commitApply(
-            createdRegions: prepared.createdRegions,
-            createdMetadata: prepared.createdMetadata,
-            createdAudit: prepared.createdAudit,
-            actionName: "Redact Entity Group",
-            priorsRestore: (priors: priorsSnapshot, surfaceForms: surfaceFormsSnapshot),
-            recordsSearchApplyVersion: false,
-            undoManager: undoManager
-        )
-
-        return ApplyOutcome(
-            applied: appliedCount, skippedOverlaps: 0,
-            appliedResultIDs: [], signatureCandidates: 0)
-    }
-
-    /// Dismiss triage without applying any results.
-    func dismissTriage() {
-        pendingTriage = nil
-        triageSelections = [:]
     }
 
     /// Tear the live Search & Redact
@@ -1385,27 +979,22 @@ class RedactionState {
 
     /// The single write-back transaction every apply origin commits
     /// through: one `regionVersion` bump, region + reverse-index
-    /// insert, metadata + audit merge, cache/verification/output
+    /// insert, metadata + audit merge, verification/output
     /// invalidation, and ONE two-leg undo registration. Undo removes
     /// the created regions with their metadata AND audit records in
-    /// lockstep, restoring the recorded priors + surface forms when the
-    /// origin snapshotted them; redo re-inserts all three without
-    /// re-recording decisions.
+    /// lockstep; redo re-inserts all three.
     ///
     /// `recordsSearchApplyVersion` is set by the search origin only: it
     /// records the produced `regionVersion` so the sheet's
     /// applied-marker handler can tell this apply's own bump apart from
     /// a real undo/redo bump. Captures N+1 (the post-increment value)
     /// atomically within this MainActor write-back — no suspension runs
-    /// before the caller returns. Detection-origin applies deliberately
-    /// do NOT record it: their bumps clear stale search-applied markers
-    /// like any other region mutation.
+    /// before the caller returns.
     private func commitApply(
         createdRegions: [Int: [RedactionRegion]],
         createdMetadata: [UUID: RegionMetadata],
         createdAudit: [UUID: MatchAuditSnapshot],
         actionName: String,
-        priorsRestore: (priors: PerCategoryPriors, surfaceForms: SurfaceFormDictionary)?,
         recordsSearchApplyVersion: Bool,
         undoManager: UndoManager?
     ) {
@@ -1419,7 +1008,6 @@ class RedactionState {
         }
         regionMetadata.merge(createdMetadata) { _, new in new }
         appliedMatchAudit.merge(createdAudit) { _, new in new }
-        invalidateRegionCaches()
         regionsModifiedSinceVerification = true
         clearOutput()
 
@@ -1438,12 +1026,6 @@ class RedactionState {
             for id in auditSnapshot.keys {
                 target.appliedMatchAudit.removeValue(forKey: id)
             }
-            if let priorsRestore {
-                // Restore the recorded decisions on undo.
-                target.priors = priorsRestore.priors
-                target.surfaceForms = priorsRestore.surfaceForms
-            }
-            target.invalidateRegionCaches()
             target.regionsModifiedSinceVerification = true
             target.clearOutput()
             // The undo leg is a region mutation like any other: bump
@@ -1460,7 +1042,6 @@ class RedactionState {
                 }
                 target2.regionMetadata.merge(metaSnapshot) { _, new in new }
                 target2.appliedMatchAudit.merge(auditSnapshot) { _, new in new }
-                target2.invalidateRegionCaches()
                 target2.regionsModifiedSinceVerification = true
                 target2.clearOutput()
                 // Redo re-inserts regions — a region mutation; the bump
@@ -1714,7 +1295,7 @@ class RedactionState {
 
     /// Reset all state when the document is closed or a new document is imported.
     /// Must be called on .editing → .empty and .editing → .importing transitions.
-    /// Extends clearOutput() to also clear regions, detections, triage state, and
+    /// Extends clearOutput() to also clear regions and
     /// metadata — preventing PII (matchedText) from persisting in memory across documents.
     /// The teardown itself is `resetDocumentSession()` (shared with
     /// `clearForNewDocument()`); the statements below are the ones only a
@@ -1725,18 +1306,6 @@ class RedactionState {
         regionMetadata = [:]
         // Audit is per-document-session only; never leaks across docs.
         appliedMatchAudit = [:]
-        // Wipe surface forms, per-page
-        // classification diagnostics, and ambiguous-surname flags on close.
-        // Priors are saved BEFORE the wipe (the wipe
-        // would otherwise store an empty history) and rehydrated from the
-        // just-written payload so the next document in this app session
-        // starts with the accumulated triage history, streaks reset.
-        Self.savePriors(priors, defaults: priorsDefaults)
-        priors = Self.loadPriors(defaults: priorsDefaults)
-        surfaceForms = SurfaceFormDictionary()
-        pageDiagnostics = [:]
-        ambiguousSurnameDetectionIDs = []
-        crossPageEntityGroups = []
     }
 
     // MARK: - Undo Helper
@@ -1896,57 +1465,6 @@ nonisolated func prepareApply(
         skippedOverlaps: skippedOverlaps,
         appliedResultIDs: appliedResultIDs,
         coveredResultIDs: coveredResultIDs
-    )
-}
-
-/// The detection origins' prepare step — the staged review, an entity
-/// group, a raw detection map — the ONE place a detection's region /
-/// `RegionMetadata` / `MatchAuditSnapshot` trio is built (the search
-/// origins' overload above builds the search trio). Every detection
-/// handed in becomes a region: the origins decide WHICH detections
-/// (accepted, member, non-signature) and in what order; no overlap test
-/// runs here, as none ever did on these origins. `createdRegions`
-/// groups the regions by page in the order given, so a page's regions
-/// commit in the order its detections were listed.
-///
-/// `nonisolated` like its sibling: a pure function over Sendable
-/// values, called synchronously on the MainActor by every detection
-/// origin (no suspension is added).
-nonisolated func prepareApply(
-    detections: [(page: Int, detection: DetectionResult)],
-    ambiguousSurnameDetectionIDs: Set<UUID>,
-    appliedAt: Date
-) -> PreparedApply {
-    var createdRegions: [Int: [RedactionRegion]] = [:]
-    var createdMetadata: [UUID: RegionMetadata] = [:]
-    var createdAudit: [UUID: MatchAuditSnapshot] = [:]
-    for (page, detection) in detections {
-        let region = detection.toRegion()
-        createdRegions[page, default: []].append(region)
-        // Preserve the ambiguity flag onto the region's metadata so
-        // the canvas and detail view can still surface it after review.
-        createdMetadata[region.id] = RegionMetadata(
-            piiKind: detection.kind,
-            confidence: detection.confidence,
-            matchedText: detection.matchedText,
-            recognitionLevel: detection.recognitionLevel,
-            isAmbiguousSurname: ambiguousSurnameDetectionIDs.contains(detection.id)
-        )
-        createdAudit[region.id] = MatchAuditSnapshot(
-            detection: detection,
-            pageIndex: page,
-            regionID: region.id,
-            appliedAt: appliedAt
-        )
-    }
-    return PreparedApply(
-        createdRegions: createdRegions,
-        createdMetadata: createdMetadata,
-        createdAudit: createdAudit,
-        appliedCount: createdRegions.values.reduce(0) { $0 + $1.count },
-        skippedOverlaps: 0,
-        appliedResultIDs: [],
-        coveredResultIDs: []
     )
 }
 

@@ -69,8 +69,6 @@ struct RedactionStateDismissActiveSearchTests {
         // the doc comments that name the helper are not calls.
         let resets = state.components(separatedBy: "\n        resetDocumentSession()\n").count - 1
         #expect(resets == 2, "clearForNewDocument + clearAll each call the one teardown (read \(resets))")
-        #expect(!state.contains("MainActor.assumeIsolated { search?.cancelSearchWithoutAwait() }\n        pendingTriage"),
-                "clearAll no longer inlines the teardown")
     }
 
     @Test("Source pin: the results-screen Home routes through handleHomeTap")

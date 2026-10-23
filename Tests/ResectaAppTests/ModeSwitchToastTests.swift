@@ -256,32 +256,6 @@ struct ModeSwitchToastTests {
         #expect(presented.results.map(\.id) == [r1.id])
     }
 
-    @Test("Undo no-ops while a detection review is pending")
-    func undoNoOpsDuringPendingReview() async throws {
-        let manager = ToastQueueManager()
-        let rs = RedactionState()
-        let original = SearchState()
-        original.results = [makeResult(page: 0)]
-
-        let snapshot = SearchAndRedactSheet.modeSwitchSnapshot(of: original, previousMode: .text)
-        SearchAndRedactSheet.enqueueModeSwitchUndoToast(
-            on: manager,
-            redactionState: rs,
-            snapshot: snapshot,
-            isProgrammatic: false,
-            unappliedCount: 1
-        )
-        // A pending review owns the surface.
-        rs.pendingTriage = [:]
-
-        let toast = try #require(manager.activeToasts.first)
-        toast.actionHandler?()
-        await Task.yield()
-
-        #expect(rs.activeSearch == nil,
-                "the restore must not mint/present a session under a pending review")
-    }
-
     @Test("Undo no-ops gracefully after the RedactionState is gone")
     func undoNoOpsAfterRedactionStateDeallocated() async throws {
         let manager = ToastQueueManager()

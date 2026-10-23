@@ -7,9 +7,9 @@ import SwiftUI
 // the medium+ search bar mounts the same builder, and the ids ride it.
 //
 // The strip is one row of full-size controls under the grabber
-// (`CompactFloatDetent`, hug 101): the per-item Apply capsule (Select on
-// the review origin) and the ‹ › pair with its counter. The page bar
-// steps aside beneath it while either walk is live; the canvas ring and
+// (`CompactFloatDetent`, hug 101): the per-item Apply capsule and the
+// ‹ › pair with its counter. The page bar
+// steps aside beneath it while the walk is live; the canvas ring and
 // the k/N counter are the orientation. With no walk the row carries the
 // interface title alone. What the current match IS — kind · page · text
 // — is VoiceOver's to read, as the Apply / Select button's value
@@ -112,24 +112,5 @@ extension SearchAndRedactSheet {
         Text(searchState.searchModeType.interface.displayName)
             .font(.headline)
             .lineLimit(1)
-    }
-
-    // MARK: - The review walk's counter
-
-    /// The k/N counter for the review walk — the search counter's plain
-    /// form (the walk covers every staged detection; no filter to
-    /// respect) with the same label; nothing before the first step.
-    /// Mounted by the hub's `resultNavCounter` while the review owns
-    /// the Scan interface.
-    @ViewBuilder
-    func reviewWalkCounter(site: ResultNavSite) -> some View {
-        let walk = liveReviewWalk
-        if let index = walk.currentIndex {
-            Text("\(index + 1)/\(walk.count)")
-                .font(site.counterFont)
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
-                .accessibilityLabel("Result \(index + 1) of \(walk.count)")
-        }
     }
 }

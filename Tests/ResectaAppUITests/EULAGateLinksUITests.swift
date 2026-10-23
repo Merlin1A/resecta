@@ -14,7 +14,7 @@ import XCTest
 /// each test starts from a virgin gate regardless of what earlier suites did
 /// to the shared simulator app container.
 // nonisolated: XCUITest driving a separate process, no @MainActor app state —
-// same SE-0466 posture as DetectionTriageDismissUITests.
+// same SE-0466 posture as ShareRiskSheetUITests.
 nonisolated final class EULAGateLinksUITests: XCTestCase {
 
     private var app: XCUIApplication!

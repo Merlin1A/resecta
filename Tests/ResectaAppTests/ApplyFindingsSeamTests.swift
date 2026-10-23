@@ -10,16 +10,11 @@ import RedactionEngine
 // `MatchAuditSnapshot` with `regionID` populated — with one two-leg
 // undo implementation underneath.
 //
-// Five contract families pinned here:
+// The contract families pinned here:
 //   1. Search-origin preservation — the outputs the pre-seam search
 //      apply produced, produced identically by the seam.
-//   2. Detection-origin audit parity — the records the detection side
-//      never wrote, now written truthfully: fields the origin lacks
-//      (query term, `MatchRationale`, per-word OCR confidence) stay
-//      nil rather than carrying invented values.
 //   3. One undo implementation — undo removes regions + metadata +
-//      audit in lockstep and restores recorded decisions; redo
-//      re-inserts all three without re-recording decisions.
+//      audit in lockstep; redo re-inserts all three.
 //   4. The mutation re-guard — every origin refuses to mutate while
 //      the pipeline owns `regions`, re-checked inside the action.
 //   5. The single-result origin — the compact handle's
@@ -192,246 +187,11 @@ struct ApplySeamSearchOriginTests {
     }
 }
 
-// MARK: - 2. Detection-origin audit parity
-
-@Suite("Apply seam — detection-origin audit parity")
-@MainActor
-struct ApplySeamDetectionOriginTests {
-
-    @Test("Staged-review apply writes metadata AND audit per created region")
-    func stagedApplyWritesBothRecords() async {
-        let state = RedactionState()
-        let ocrDetection = makeDetection(page: 0)
-        let textLayerDetection = makeDetection(
-            page: 2, kind: .pii(.email), matchedText: "j@x.com",
-            provenance: DetectionResult.Provenance(ocrSkipped: true, ocrSkipReason: .coverageHighEnough))
-        state.pendingTriage = [0: [ocrDetection], 2: [textLayerDetection]]
-        state.triageSelections = [ocrDetection.id: true, textLayerDetection.id: true]
-
-        let outcome = await state.applyFindings(.stagedDetections, undoManager: nil)
-
-        #expect(outcome?.applied == 2)
-        let allRegions = state.regions.values.flatMap { $0 }
-        #expect(allRegions.count == 2)
-        for region in allRegions {
-            #expect(state.regionMetadata[region.id] != nil,
-                    "every created region carries metadata")
-            let audit = state.appliedMatchAudit[region.id]
-            #expect(audit != nil, "every created region carries an audit record")
-            #expect(audit?.origin == .scan)
-            #expect(audit?.regionID == region.id,
-                    "regionID is populated for the scan origin too")
-            #expect(audit?.term == nil,
-                    "a detection run has no query term — nil, never invented")
-            #expect(audit?.rationale == nil,
-                    "DetectionResult carries no MatchRationale — nil, never invented")
-        }
-
-        // Source truthfulness: provenance-recorded text-layer production
-        // carries through; an OCR-ran page has no per-word OCR
-        // confidence at this granularity, so the field stays nil.
-        let page0Audit = state.regions[0].flatMap { $0.first }
-            .flatMap { state.appliedMatchAudit[$0.id] }
-        let page2Audit = state.regions[2].flatMap { $0.first }
-            .flatMap { state.appliedMatchAudit[$0.id] }
-        #expect(page0Audit?.source == nil)
-        #expect(page0Audit?.piiConfidence == ocrDetection.confidence)
-        #expect(page0Audit?.matchedText == ocrDetection.matchedText)
-        #expect(page2Audit?.source == .textLayer)
-        #expect(page2Audit?.piiCategory == .email)
-    }
-
-    @Test("Group apply writes audit records for every promoted member")
-    func groupApplyWritesAudit() async {
-        let state = RedactionState()
-        let a = makeDetection(page: 1, kind: .pii(.name), matchedText: "John Doe")
-        let b = makeDetection(page: 3, kind: .pii(.name), matchedText: "John Doe")
-        state.pendingTriage = [1: [a], 3: [b]]
-        let groups = CrossPageEntityGroup.clusters(from: state.pendingTriage ?? [:])
-        guard let group = groups.first else {
-            Issue.record("expected the John Doe cluster")
-            return
-        }
-
-        let outcome = await state.applyFindings(.entityGroup(group), undoManager: nil)
-
-        #expect(outcome?.applied == 2)
-        #expect(state.appliedMatchAudit.count == 2)
-        for region in state.regions.values.flatMap({ $0 }) {
-            #expect(state.appliedMatchAudit[region.id]?.origin == .scan)
-            #expect(state.appliedMatchAudit[region.id]?.regionID == region.id)
-        }
-    }
-
-    @Test("A face detection's audit record tolerates absent text and pairs its PII fields")
-    func faceDetectionAuditHasNilText() async {
-        let state = RedactionState()
-        let face = makeDetection(page: 0, kind: .face, matchedText: nil)
-        state.pendingTriage = [0: [face]]
-        state.triageSelections = [face.id: true]
-
-        _ = await state.applyFindings(.stagedDetections, undoManager: nil)
-
-        let audit = state.appliedMatchAudit.values.first
-        #expect(audit != nil)
-        #expect(audit?.matchedText == nil)
-        #expect(audit?.piiCategory == nil)
-        #expect(audit?.piiConfidence == nil,
-                "a face detector's confidence is not a PII confidence — the pair stays nil together")
-        // The raw confidence still travels on the region's metadata.
-        let regionID = state.regions[0]?.first?.id
-        #expect(regionID.flatMap { state.regionMetadata[$0] }?.confidence == 0.9)
-    }
-
-    @Test("Detection-origin applies never record the search apply-version marker")
-    func detectionOriginSkipsMarker() async {
-        let state = RedactionState()
-        let detection = makeDetection()
-        state.pendingTriage = [0: [detection]]
-        state.triageSelections = [detection.id: true]
-
-        _ = await state.applyFindings(.stagedDetections, undoManager: nil)
-
-        #expect(state.lastAppliedSearchRegionVersion == -1,
-                "the applied-marker discrimination belongs to the search origin only")
-        #expect(state.regionVersion > 0)
-    }
-
-    @Test("Staged apply resets the dismiss tracker; a group apply keeps it set")
-    func trackerRuleByOrigin() async {
-        let state = RedactionState()
-        let search = SearchState()
-        state.activeSearch = search
-
-        let a = makeDetection(page: 1, kind: .pii(.name), matchedText: "John Doe")
-        let b = makeDetection(page: 3, kind: .pii(.name), matchedText: "John Doe")
-        let c = makeDetection(page: 0, kind: .pii(.email), matchedText: "j@x.com")
-        state.pendingTriage = [0: [c], 1: [a], 3: [b]]
-        let groups = CrossPageEntityGroup.clusters(from: state.pendingTriage ?? [:])
-        guard let group = groups.first else {
-            Issue.record("expected the John Doe cluster")
-            return
-        }
-
-        // A group promotion is a partial commit — the remaining review
-        // selections are still live work.
-        search.userModifiedSelections = true
-        _ = await state.applyFindings(.entityGroup(group), undoManager: nil)
-        #expect(search.userModifiedSelections == true)
-
-        // The full staged apply resolves the selection context.
-        state.triageSelections[c.id] = true
-        _ = await state.applyFindings(.stagedDetections, undoManager: nil)
-        #expect(search.userModifiedSelections == false)
-    }
-}
-
 // MARK: - 3. One undo implementation
 
 @Suite("Apply seam — one undo implementation")
 @MainActor
 struct ApplySeamUndoTests {
-
-    @Test("Staged-apply undo removes regions + metadata + audit and restores decisions; redo re-inserts without re-recording")
-    func stagedUndoRedoLockstep() async {
-        let state = RedactionState()
-        let undo = UndoManager()
-        undo.groupsByEvent = false
-        let detection = makeDetection()
-        state.pendingTriage = [0: [detection]]
-        state.triageSelections = [detection.id: true]
-
-        undo.beginUndoGrouping()
-        _ = await state.applyFindings(.stagedDetections, undoManager: undo)
-        undo.endUndoGrouping()
-
-        guard let regionID = state.regions[0]?.first?.id else {
-            Issue.record("no region created")
-            return
-        }
-        #expect(state.regionMetadata[regionID] != nil)
-        #expect(state.appliedMatchAudit[regionID] != nil)
-        #expect(state.priors.mean(.ssn) > 0.5)
-        #expect(state.surfaceForms.lookup("123-45-6789") == .accepted)
-
-        let versionAfterApply = state.regionVersion
-        undo.undo()
-        #expect(state.regions[0]?.isEmpty ?? true)
-        #expect(state.regionMetadata[regionID] == nil)
-        #expect(state.appliedMatchAudit[regionID] == nil,
-                "audit entries drop in lockstep with their regions")
-        #expect(state.priors.mean(.ssn) == 0.5, "recorded decisions restore on undo")
-        #expect(state.surfaceForms.lookup("123-45-6789") == nil)
-        #expect(state.pendingTriage == nil, "undo does not reopen the review")
-        #expect(state.regionVersion > versionAfterApply,
-                "the undo leg bumps regionVersion — the canvas overlay refresh gate and the sheet's applied-marker clear both key on it")
-
-        let versionAfterUndo = state.regionVersion
-        undo.redo()
-        #expect(state.regions[0]?.count == 1)
-        #expect(state.regionMetadata[regionID] != nil)
-        #expect(state.appliedMatchAudit[regionID] != nil)
-        #expect(state.priors.mean(.ssn) == 0.5,
-                "redo re-inserts the artifacts without re-recording decisions — carried semantics")
-        #expect(state.regionVersion > versionAfterUndo,
-                "the redo leg is a region mutation too")
-    }
-
-    @Test("Group-apply undo restores decisions and drops all three artifact sets")
-    func groupUndoParity() async {
-        let state = RedactionState()
-        let undo = UndoManager()
-        undo.groupsByEvent = false
-        let a = makeDetection(page: 1, kind: .pii(.name), matchedText: "John Doe")
-        let b = makeDetection(page: 3, kind: .pii(.name), matchedText: "John Doe")
-        state.pendingTriage = [1: [a], 3: [b]]
-        let groups = CrossPageEntityGroup.clusters(from: state.pendingTriage ?? [:])
-        guard let group = groups.first else {
-            Issue.record("expected the John Doe cluster")
-            return
-        }
-
-        undo.beginUndoGrouping()
-        _ = await state.applyFindings(.entityGroup(group), undoManager: undo)
-        undo.endUndoGrouping()
-        #expect(state.priors.mean(.name) > 0.5)
-        #expect(state.appliedMatchAudit.count == 2)
-
-        undo.undo()
-        #expect(state.priors.mean(.name) == 0.5)
-        #expect(state.regions.values.flatMap { $0 }.isEmpty)
-        #expect(state.regionMetadata.isEmpty)
-        #expect(state.appliedMatchAudit.isEmpty)
-    }
-
-    @Test("Search-apply undo leaves priors untouched — no decision snapshot for that origin")
-    func searchUndoDoesNotTouchPriors() async {
-        let state = RedactionState()
-        let undo = UndoManager()
-        undo.groupsByEvent = false
-        // Seed a non-default prior so an accidental restore would move it.
-        state.priors = state.priors.updated(category: .ssn, decision: .accepted)
-        let priorMean = state.priors.mean(.ssn)
-
-        let search = SearchState()
-        search.results = [makeSearchResult()]
-        state.activeSearch = search
-
-        undo.beginUndoGrouping()
-        _ = await state.applyFindings(.selectedSearchResults, undoManager: undo)
-        undo.endUndoGrouping()
-        let versionAfterApply = state.regionVersion
-        undo.undo()
-
-        #expect(state.priors.mean(.ssn) == priorMean,
-                "the search origin records no decisions, so undo restores none")
-        #expect(state.regions.values.flatMap { $0 }.isEmpty)
-        #expect(state.appliedMatchAudit.isEmpty)
-        #expect(state.regionVersion > versionAfterApply,
-                "search-origin undo bumps past the recorded apply version so `shouldClearAppliedMarkers` can distinguish it from the apply's own bump")
-        #expect(state.regionVersion != state.lastAppliedSearchRegionVersion,
-                "the marker handler reads this inequality as a real undo")
-    }
 
     @Test("The applied-search stamp rides the lockstep undo: gone on undo, back on redo, byte-equal")
     func searchRecordRidesLockstepUndo() async {
@@ -510,40 +270,6 @@ struct ApplySeamReGuardTests {
             .selectedSearchResults, undoManager: nil, documentState: doc)
         #expect(searchOutcome == nil)
         #expect(searchState.regions.isEmpty)
-
-        // Staged-review origin: the review must survive the refusal
-        // untouched — a refused apply must not resolve it.
-        let stagedState = RedactionState()
-        let detection = makeDetection()
-        stagedState.pendingTriage = [0: [detection]]
-        stagedState.triageSelections = [detection.id: true]
-        let stagedOutcome = await stagedState.applyFindings(
-            .stagedDetections, undoManager: nil, documentState: doc)
-        #expect(stagedOutcome == nil)
-        #expect(stagedState.regions.isEmpty)
-        #expect(stagedState.pendingTriage != nil,
-                "a refused apply leaves the review pending")
-        #expect(stagedState.triageSelections[detection.id] == true,
-                "a refused apply preserves the user's selections")
-        #expect(stagedState.priors.mean(.ssn) == 0.5,
-                "a refused apply records no decisions")
-
-        // Group origin.
-        let groupState = RedactionState()
-        let a = makeDetection(page: 1, kind: .pii(.name), matchedText: "John Doe")
-        let b = makeDetection(page: 3, kind: .pii(.name), matchedText: "John Doe")
-        groupState.pendingTriage = [1: [a], 3: [b]]
-        let groups = CrossPageEntityGroup.clusters(from: groupState.pendingTriage ?? [:])
-        guard let group = groups.first else {
-            Issue.record("expected the John Doe cluster")
-            return
-        }
-        let groupOutcome = await groupState.applyFindings(
-            .entityGroup(group), undoManager: nil, documentState: doc)
-        #expect(groupOutcome == nil)
-        #expect(groupState.regions.isEmpty)
-        #expect(groupState.pendingTriage?.values.flatMap { $0 }.count == 2,
-                "a refused group apply prunes nothing")
     }
 
     @Test("A permissive documentState admits the apply (the guard reads live phase)")
@@ -553,12 +279,12 @@ struct ApplySeamReGuardTests {
         #expect(doc.canMutateRegions)
 
         let state = RedactionState()
-        let detection = makeDetection()
-        state.pendingTriage = [0: [detection]]
-        state.triageSelections = [detection.id: true]
+        let search = SearchState()
+        search.results = [makeSearchResult()]
+        state.activeSearch = search
 
         let outcome = await state.applyFindings(
-            .stagedDetections, undoManager: nil, documentState: doc)
+            .selectedSearchResults, undoManager: nil, documentState: doc)
         #expect(outcome?.applied == 1)
     }
 }
@@ -836,7 +562,6 @@ struct ApplySeamSingleResultOriginTests {
         let second = makeSearchResult(y: 0.6, matchedText: "987-65-4321")
         search.results = [first, second]
         search.userModifiedSelections = true
-        search.hasUnreviewedPreselection = true
         state.activeSearch = search
 
         let outcome = await state.applyFindings(.searchResult(id: first.id), undoManager: nil)
@@ -844,6 +569,5 @@ struct ApplySeamSingleResultOriginTests {
         #expect(outcome?.applied == 1)
         #expect(search.userModifiedSelections == true,
                 "the other selections are still live work — the tracker stays set")
-        #expect(search.hasUnreviewedPreselection == true)
     }
 }

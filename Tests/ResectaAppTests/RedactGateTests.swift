@@ -42,10 +42,6 @@ struct RedactGateTests {
             pageIndex: 0, normalizedRect: CGRect(x: 0.1, y: 0.1, width: 0.2, height: 0.03),
             matchedText: "alpha", contextSnippet: "…alpha…", source: .textLayer, term: "alpha", isSelected: true)]
         #expect(documentState.redactRefusal(with: redactionState) == .selectedMatches, "a selected row no region covers")
-        let preselected = SearchState(defaults: makeScratchDefaults().0)
-        preselected.hasUnreviewedPreselection = true
-        redactionState.activeSearch = preselected
-        #expect(documentState.redactRefusal(with: redactionState) == .selectedMatches)
     }
 
     @Test("Every gate refuses alone")

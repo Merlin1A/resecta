@@ -411,18 +411,14 @@ struct ImportServiceTests {
 
     // MARK: - Import clears stale review state
 
-    /// A successful import runs `clearForNewDocument()`, which must drop the
-    /// prior document's pending detection-review state so a replacement never
-    /// inherits triage selections (wrong-coordinate stamping), a
-    /// stale degraded banner, or a blank rationale sheet.
-    @Test("Import clears pending triage, selections, degraded flag, rationale request")
-    func testImportClearsPendingTriage() async {
+    /// A successful import runs `clearForNewDocument()`, so a replacement
+    /// never inherits a stale degraded banner or a blank rationale sheet.
+    @Test("Import clears the degraded flag and the rationale request")
+    func testImportClearsStaleSessionState() async {
         let doc = DocumentState()
         let redaction = RedactionState()
         doc.phase = .editing
-        // Stale review state left over from a prior document.
-        redaction.pendingTriage = [0: [DetectionResult.mock()]]
-        redaction.triageSelections = [UUID(): true]
+        // Stale session state left over from a prior document.
         redaction.autoDetectionDegraded = true
         redaction.pendingCanvasRationaleRequest = UUID()
 
@@ -431,34 +427,8 @@ struct ImportServiceTests {
             documentState: doc, redactionState: redaction)
 
         #expect(doc.phaseKind == .editing)
-        #expect(redaction.pendingTriage == nil)
-        #expect(redaction.triageSelections.isEmpty)
         #expect(redaction.autoDetectionDegraded == false)
         #expect(redaction.pendingCanvasRationaleRequest == nil)
-    }
-
-    /// The drag-drop import path consults the composed `canStartImport(with:)`
-    /// gate (the file/photo pickers stage the D12 confirmation instead). The
-    /// gate must reject while a detection review is pending, while leaving the
-    /// document-only `canStartImport` property ignorant of `RedactionState`.
-    @Test("Drop-path import gate rejects while a detection review is pending")
-    func testDropHandlerRejectsDuringTriage() {
-        let doc = DocumentState()
-        let redaction = RedactionState()
-        doc.phase = .editing
-
-        // No triage → admitted.
-        #expect(doc.canStartImport(with: redaction) == true)
-
-        // Pending triage → rejected; document-only gate stays true (ignorant).
-        redaction.pendingTriage = [0: [DetectionResult.mock()]]
-        #expect(doc.canStartImport(with: redaction) == false)
-        #expect(doc.canStartImport == true)
-
-        // A phase that forbids import → rejected regardless of triage.
-        redaction.pendingTriage = nil
-        doc.phase = .importing
-        #expect(doc.canStartImport(with: redaction) == false)
     }
 
     // MARK: - The outcome

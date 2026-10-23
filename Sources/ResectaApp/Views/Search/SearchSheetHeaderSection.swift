@@ -30,10 +30,9 @@ struct SearchSheetHeaderSection: View {
     /// `navigationTitle` (the former "Search & Redact" umbrella
     /// retired with the two-interface split).
     let title: String
-    /// Live count on the Apply label — the review origin's accepted
-    /// count or the search origin's selected count.
+    /// Live count on the Apply label — the search origin's selected count.
     let applyCount: Int
-    /// Both origins' gates (zero count, in-flight apply, pipeline
+    /// The gates (zero count, in-flight apply, pipeline
     /// region ownership, fully-applied selection) are computed at the
     /// hub, where all the inputs are visible.
     let applyDisabled: Bool
@@ -138,31 +137,22 @@ extension SearchAndRedactSheet {
         VStack(spacing: 0) {
             SearchSheetHeaderSection(
                 title: searchState.searchModeType.interface.displayName,
-                applyCount: isReviewActive
-                    ? reviewAcceptedCount : searchState.selectedCount,
+                applyCount: searchState.selectedCount,
                 // Also disabled while the pipeline owns
                 // `redactionState.regions` so the mark write-back
                 // transaction cannot interleave with
                 // `.detecting / .redacting / .verifying`.
-                applyDisabled: isReviewActive
-                    ? (reviewAcceptedCount == 0
-                       || !documentState.canMutateRegions)
-                    : (searchState.selectedCount == 0
-                       || isApplying
-                       || !documentState.canMutateRegions
-                       // An all-applied selection can only no-op
-                       // through the overlap guard — gray the
-                       // button instead of offering a "Marked 0"
-                       // round-trip.
-                       || searchState.selectionFullyApplied),
+                applyDisabled: searchState.selectedCount == 0
+                    || isApplying
+                    || !documentState.canMutateRegions
+                    // An all-applied selection can only no-op
+                    // through the overlap guard — gray the
+                    // button instead of offering a "Marked 0"
+                    // round-trip.
+                    || searchState.selectionFullyApplied,
                 onDismiss: {
                     // Conditional dismiss: route through the dialog
-                    // when the USER has modified selections this
-                    // session, OR when this session received
-                    // an auto-selected set (magic-wand preselect) that
-                    // has not yet been reviewed — a never-reviewed
-                    // preselect no longer drops silently on the way
-                    // out. An untouched, non-preselected sheet still
+                    // while a selection is unapplied. Otherwise the sheet still
                     // dismisses directly so the common no-op case adds
                     // no friction.
                     if DocumentState.hasUnappliedSelections(redactionState) {
@@ -172,15 +162,9 @@ extension SearchAndRedactSheet {
                     }
                 },
                 onApply: {
-                    // Both routes promote through the one
-                    // `applyFindings` path — an active review as
-                    // the staged-detections origin, otherwise the
-                    // selected search results.
-                    if isReviewActive {
-                        applyReviewFindings()
-                    } else {
-                        applySelectedSearchResults()
-                    }
+                    // The selected search results promote through
+                    // the one `applyFindings` path.
+                    applySelectedSearchResults()
                 }
             )
 
@@ -205,20 +189,8 @@ extension SearchAndRedactSheet {
             // framing only: never "scanned" / "covered" /
             // "clear" wording — the builder below is the only copy
             // for this line. Search reads the UNFILTERED result set
-            // (document-wide distribution, not the filtered view);
-            // Scan review reads the staged detections.
-            if isReviewActive {
-                let reviewPages = ScanReviewSection.flattenedFindings(
-                    redactionState.pendingTriage
-                ).map(\.page)
-                if Self.shouldShowPagesWithHitsLine(
-                    hasCompletedRun: true,
-                    resultCount: reviewPages.count,
-                    atCap: false
-                ) {
-                    pagesWithHitsLineView(pagesWithHits: Self.distinctPageCount(reviewPages))
-                }
-            } else if Self.shouldShowPagesWithHitsLine(
+            // (document-wide distribution, not the filtered view).
+            if Self.shouldShowPagesWithHitsLine(
                 hasCompletedRun: searchState.hasCompletedRunSinceClear,
                 resultCount: searchState.results.count,
                 atCap: searchState.resultsAtCap
@@ -270,8 +242,7 @@ extension SearchAndRedactSheet {
     }
 
     /// Distinct-page count for a list of page indices — the same
-    /// derivation whether the source is Search's unfiltered results or
-    /// Scan review's staged detections.
+    /// derivation over Search's unfiltered results.
     static func distinctPageCount(_ pageIndices: [Int]) -> Int {
         Set(pageIndices).count
     }

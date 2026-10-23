@@ -2,12 +2,12 @@ import SwiftUI
 import RedactionEngine
 
 // Shared display properties for DetectionResult.Kind.
-// Used by ScanReviewSection (kind filter chips, review-row badges).
+// Used by `RegionMetadata` (the canvas badge and the region's full name).
 
 extension DetectionResult.Kind {
 
-    /// Short badge label for compact display (filter chips, row badges,
-    /// the canvas badge through `RegionMetadata`).
+    /// Short badge label for compact display (the canvas badge through
+    /// `RegionMetadata`).
     nonisolated var badge: String {
         switch self {
         case .pii(let k):
@@ -63,46 +63,6 @@ extension DetectionResult.Kind {
             }
         case .face: "Detected Face"
         case .searchMatch: "Search Match"
-        }
-    }
-
-    /// Stable sort order for filter chip display.
-    var sortOrder: Int {
-        switch self {
-        case .pii(let k):
-            switch k {
-            case .ssn: 0
-            case .creditCard: 1
-            case .name: 2
-            case .email: 3
-            case .phone: 4
-            case .address: 5
-            case .ein: 6
-            case .itin: 7
-            case .driversLicense: 8
-            case .passport: 9
-            case .medicalRecord: 10
-            case .npi: 11
-            case .dea: 12
-            case .dateOfBirth: 13
-            case .account: 14
-            // Financial cluster: chip sits beside Account.
-            case .routingNumber: 15
-            case .licensePlate: 16
-            case .other: 19
-            }
-        case .face: 20
-        case .searchMatch: 21
-        }
-    }
-
-    /// Badge background color for the detection kind.
-    var badgeColor: Color {
-        // UIColor.system* for accessibility increased-contrast compatibility.
-        switch self {
-        case .pii: Color(uiColor: .systemOrange)
-        case .face: Color(uiColor: .systemPurple)
-        case .searchMatch: Color(uiColor: .systemGreen)
         }
     }
 }

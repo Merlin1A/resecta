@@ -13,11 +13,7 @@ import RedactionEngine
 // stays in the merged a11y label for parity with it, while the
 // quantities themselves live in `MatchRationaleSheet`, reached through
 // the Details button the chevron expansion reveals beneath the full
-// window. The leading confidence bar, the applied marker, and the 46-pt
-// selection circle keep the shared-family idiom of `FindingRow`, which
-// this row no longer mounts: the scan-review origin still renders
-// through `FindingRow` unchanged — that surface is frozen this release.
-// The pure display contracts (badges, tiers, tooltips, rationale
+// window. The pure display contracts (badges, tiers, tooltips, rationale
 // summaries) other surfaces and tests consume sit in
 // `SearchResultRow+Contracts.swift`.
 //
@@ -210,8 +206,7 @@ struct SearchResultRow: View {
         }
     }
 
-    /// The one selection circle the family shares — the `FindingRow`
-    /// chassis idiom verbatim: a 46-pt floor on BOTH axes framed on
+    /// The row's selection circle: a 46-pt floor on BOTH axes framed on
     /// the whole button plus `contentShape`, haptic on toggle.
     private var selectionCircle: some View {
         Button {

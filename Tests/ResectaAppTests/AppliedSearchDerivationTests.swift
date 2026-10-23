@@ -198,23 +198,12 @@ struct AppliedSearchDerivationTests {
         #expect(typedRequest.deselected.isEmpty, "a typed search has nothing to subtract")
     }
 
-    @Test("Exclusions: nil-record search snapshots, detection-origin entries and manual regions never join")
+    @Test("Exclusions: nil-record search snapshots and manual regions never join")
     func exclusions() {
         var regions: [Int: [RedactionRegion]] = [:]
         var audit: [UUID: MatchAuditSnapshot] = [:]
         // A nudge-accepted row: search origin, no record.
         searchRegion(page: 0, record: nil, term: "PII Scan", into: &regions, audit: &audit)
-        // Detection origin (the staged review): the builder stamps nil by
-        // construction.
-        let detection = DetectionResult.mock(kind: .pii(.ssn), matchedText: "123-45-6789")
-        let scanRegion = RedactionRegion(
-            id: UUID(), normalizedRect: detection.normalizedRect,
-            source: .detectedPII(kind: .ssn, rationale: nil))
-        regions[0, default: []].append(scanRegion)
-        let scanSnapshot = MatchAuditSnapshot(
-            detection: detection, pageIndex: 0, regionID: scanRegion.id, appliedAt: Self.baseDate)
-        #expect(scanSnapshot.searchRecord == nil, "the detection builder never carries a record")
-        audit[scanRegion.id] = scanSnapshot
         // Manual: no audit entry at all.
         regions[1, default: []].append(RedactionRegion.mock())
 

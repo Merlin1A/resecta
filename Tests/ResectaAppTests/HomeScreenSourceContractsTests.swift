@@ -108,9 +108,9 @@ struct HomeScreenSourceContractsTests {
     func refusalNamesThePhotosButton() {
         let documentState = DocumentState()
         documentState.phase = .failed(error: .importError(.unsupportedFormat), returnPhase: .empty)
-        #expect(documentState.importRefusalMessage(with: RedactionState(), door: .photos)
+        #expect(documentState.importRefusalMessage(door: .photos)
                 == "Cannot import from this screen. Tap Choose Other Photos first.")
-        #expect(documentState.importRefusalMessage(with: RedactionState(), door: .files)
+        #expect(documentState.importRefusalMessage(door: .files)
                 == "Cannot import from this screen. Tap Choose Another File first.")
     }
 

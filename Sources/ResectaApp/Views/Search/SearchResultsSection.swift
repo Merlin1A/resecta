@@ -53,29 +53,6 @@ struct SearchResultsSection: View {
     /// can be re-anchored later.
     @State private var pendingAnchorID: UUID?
 
-    /// Per-row frames in the shared
-    /// `PencilCircleSelectCoordinateSpace.name` coordinate space.
-    /// Populated by each row's `.trackRowFrameForPencilSelect(id:)`
-    /// modifier via the `RowFramesPreferenceKey`; consumed by the
-    /// `pencilCircleSelect` overlay at gesture-end time to compute
-    /// which rows the closed loop enclosed. The gesture is
-    /// Pencil-only — finger drags
-    /// fall through to the List's native scroll path.
-    @State private var rowFrames: [UUID: CGRect] = [:]
-
-    /// Row-frame tracking is gated on a live Pencil
-    /// stroke. Ungated, every row's GeometryReader re-fired the
-    /// preference aggregation + a section-dirtying `rowFrames` write on
-    /// every scrolled pixel — a Pencil-only feature taxing every finger
-    /// scroll. The overlay's recognizer flips this on `.began` and
-    /// clears it on `.ended`/`.cancelled`/`.failed`; rows mount their
-    /// GeometryReaders only while it is true, so frames are captured at
-    /// stroke start (a render pass resolves well inside the hundreds of
-    /// milliseconds a physical loop takes) and stay current through the
-    /// stroke. While false — all scroll time — the preference loop does
-    /// not exist.
-    @State private var isPencilSelectStrokeActive: Bool = false
-
     /// Reduce Motion gate for any animation introduced
     /// by the saturation banner (currently a no-op — the banner appears
     /// inside the existing show/hide branching of `livePreviewRow`).
@@ -275,7 +252,6 @@ struct SearchResultsSection: View {
 
     /// Inner `List` body extracted from
     /// `resultsList` so the surrounding modifiers
-    /// (`.coordinateSpace`, `.onPreferenceChange`, `.pencilCircleSelect`)
     /// can compose without ballooning the type-checker budget on the
     /// already-large `resultsList` builder.
     @ViewBuilder
@@ -350,39 +326,7 @@ struct SearchResultsSection: View {
             if let id = searchState.currentResult?.id { pendingAnchorID = id }
         }
 
-        // Pencil circle-to-select. The named
-        // coordinate space scopes per-row geometry into the List
-        // boundary so the Pencil overlay reads frames in the same
-        // space as the gesture path. `.onPreferenceChange` collects
-        // per-row frames written via `.trackRowFrameForPencilSelect`
-        // into `rowFrames`; the overlay consumes that map at
-        // gesture-end via `enclosedRowIDs(loop:rowFrames:)`. The
-        // gesture is Pencil-only (filtered by
-        // `allowedTouchTypes` on the recognizer); finger drags pass
-        // through to the List's native scroll. Tracking runs
-        // only while `isPencilSelectStrokeActive` — the recognizer's
-        // stroke lifecycle drives the gate via
-        // `onStrokeActiveChanged`. The
-        // `#available(iOS 26, *)` gate inside
-        // `PencilCircleSelectModifier` insulates future iOS-version
-        // gesture-API swaps.
         inner
-            .coordinateSpace(name: PencilCircleSelectCoordinateSpace.name)
-            .onPreferenceChange(RowFramesPreferenceKey.self) { newFrames in
-                rowFrames = newFrames
-            }
-            .pencilCircleSelect(
-                rowFrames: rowFrames,
-                onStrokeActiveChanged: { isPencilSelectStrokeActive = $0 }
-            ) { enclosed in
-                for id in enclosed {
-                    searchState.toggleSelection(for: id)
-                }
-                // Conditional dismiss: a Pencil circle-select is user selection work.
-                if !enclosed.isEmpty {
-                    searchState.userModifiedSelections = true
-                }
-            }
             // At the medium detent the list's viewport
             // can shrink to a sliver; without clipping, row content
             // painted past the list frame under the footer — a
@@ -478,10 +422,6 @@ struct SearchResultsSection: View {
         }
 
         row
-            .trackRowFrameForPencilSelect(
-                id: result.id,
-                isActive: isPencilSelectStrokeActive
-            )
     }
 
     // MARK: - Empty State

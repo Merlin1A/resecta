@@ -172,20 +172,15 @@ struct ResectaApp: App {
                         .environment(appCoordinator)
                         .environment(screenCaptureMonitor)
                         // DEBUG launch-argument hooks (test-document load,
-                        // triage seeding, search-sheet presentation, capture
+                        // search-sheet presentation, capture
                         // simulation). The orphan-temp sweep moved to
                         // a ZStack-level `.task` so it fires
                         // regardless of the EULA gate.
                         .task {
                             #if DEBUG
-                            // `--seedTriage` implies the test-document load so
-                            // the editor (DocumentEditorView) and its single
-                            // `.sheet(item:)` slot are mounted before the mock
-                            // triage state is seeded.
                             let launchArguments = CommandLine.arguments
                             if launchArguments.contains("--loadTestDocument")
                                 || Self.testImageName(for: launchArguments) != nil
-                                || launchArguments.contains("--seedTriage")
                                 || launchArguments.contains("--openSearchSheet")
                                 || launchArguments.contains("--openSavedSearches")
                                 || launchArguments.contains(where: { $0.hasPrefix("--seedVerifiedReport=") }) {
@@ -193,11 +188,8 @@ struct ResectaApp: App {
                                 if case .redact(let ws) = appCoordinator.activeWorkspace {
                                     // `--multipageDoc` swaps the single-page
                                     // sample for a bundled multi-page fixture
-                                    // so the triage → Dismiss path runs with a
-                                    // real paginated document behind the sheet
-                                    // (the editor's page-strip layout, which
-                                    // the Dismiss toast's synchronous graph
-                                    // flush re-resolves, differs by page count);
+                                    // so a UI test runs with a real paginated
+                                    // document behind the sheet;
                                     // `--linkDoc` loads the one-page link
                                     // fixture. See `fixtureArgMap`.
                                     let sampleName = Self.testDocumentName(
@@ -216,18 +208,6 @@ struct ResectaApp: App {
                                             named: sampleName,
                                             documentState: ws.documentState,
                                             redactionState: ws.redactionState)
-                                    }
-                                    // DEBUG review repro hook: seed mock
-                                    // detections so the unified review (the
-                                    // search sheet's Scan interface) presents
-                                    // on the Simulator without running
-                                    // on-device detection (which the sim
-                                    // cannot service). The editor's
-                                    // `pendingTriage` bridge opens the sheet
-                                    // pre-switched to Scan. Arg name carried
-                                    // from the triage era — test plumbing.
-                                    if launchArguments.contains("--seedTriage") {
-                                        ws.redactionState.seedDebugTriage()
                                     }
                                     // `--seedVerifiedReport=<name>`: the results
                                     // screen on a forged report

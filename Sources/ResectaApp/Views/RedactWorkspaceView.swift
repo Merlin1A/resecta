@@ -68,18 +68,15 @@ struct RedactWorkspaceView: View {
                     enqueueImportRefusedNotPDFToast()
                     return true
                 }
-                // Reject drops while the pipeline is active, a detection
-                // review is open, or the results or error screen is up. A
-                // drop replaces an open document with no confirmation, so it
-                // consults the composed `canStartImport(with:)` gate directly
-                // — a stranded triage sheet over a replacement document could
-                // stamp the prior document's page-coordinate regions onto the
-                // new one. The drop handler returns true on accept; on reject
+                // Reject drops while the pipeline is active or the results
+                // or error screen is up. A drop replaces an open document
+                // with no confirmation, so it consults the import gate
+                // directly. The drop handler returns true on accept; on reject
                 // we still return true so the system snaps the payload back
                 // rather than leaving it dangling, and we surface the precise
                 // reason via toast.
                 if let refusal = workspace.documentState.importRefusalMessage(
-                    with: workspace.redactionState, door: appCoordinator.openedDoor) {
+                    door: appCoordinator.openedDoor) {
                     toastManager.enqueue(refusal, severity: .warning)
                     return true
                 }
@@ -129,12 +126,6 @@ struct RedactWorkspaceView: View {
             .sheet(isPresented: $showSettings) {
                 SettingsView()
                     .environment(settingsState)
-                    // Reset Detection History also
-                    // wipes the live document's in-memory priors — inject
-                    // explicitly (mirrors the settingsState line) so the
-                    // sheet does not depend on inheriting the outer
-                    // workspace environment.
-                    .environment(workspace.redactionState)
                     .presentationDetents([.medium, .large])
             }
             // Environment injection — satisfies @Environment reads in

@@ -280,9 +280,6 @@ final class SearchState: Identifiable {
     /// (`deselectedCount`), so the two surfaces read from one
     /// definition and cannot disagree. Nil for plain-text sessions or
     /// before a scan lands — the results screen renders nothing then.
-    /// Detection-triage rejections (`RedactionState.triageSelections`)
-    /// are NOT counted: the panel's counter never included them, and its
-    /// selection state is discarded on triage apply/dismiss.
     func deselectionSnapshotForRun() -> RedactionState.DeselectionSnapshot? {
         guard searchModeType == .piiScan, lastCoverageReport != nil else {
             return nil
@@ -1093,11 +1090,9 @@ final class SearchState: Identifiable {
     /// The fields only a sheet dismiss / full reset drops — a re-run
     /// (`clearResults()`) leaves every one of them standing: the query
     /// and the multi-term inputs, the recall ring, the in-flight task,
-    /// the three per-sheet-session trackers (the magic-wand pre-select,
-    /// the touched-selections and unreviewed-preselection dismiss gates),
-    /// an armed-but-unconsumed auto-run (normally consumed by the
-    /// sheet's `.onAppear` before any teardown can run), the exactMatch
-    /// option (back to the default substring match), the intra-session
+    /// the touched-selections dismiss gate, an armed-but-unconsumed
+    /// auto-run (normally consumed by the sheet's `.onAppear` before any
+    /// teardown can run), the intra-session
     /// diff snapshot (asymmetric with `clearResults()` by design — see
     /// `priorScanFingerprints`), the navigation scope and the pending
     /// filter write, flushed before the session tears down.
@@ -1109,11 +1104,8 @@ final class SearchState: Identifiable {
         recentMultiTermSets = []
         activeSearchTask?.cancel()
         activeSearchTask = nil
-        preselectIncomingResults = false
         userModifiedSelections = false
-        hasUnreviewedPreselection = false
         pendingAutoRunScan = false
-        options.exactMatch = false
         priorScanFingerprints = nil
         navigationScope = .wholeDocument
         filterFlushTask?.cancel()
@@ -1185,46 +1177,20 @@ final class SearchState: Identifiable {
         results.firstIndex(where: { $0.id == id })
     }
 
-    /// When set by the magic-wand entry point, every result
-    /// landing via `appendResult` is auto-selected so the user can apply
-    /// with one tap. Reset by `triggerSearch` after kickoff so a later
-    /// non-magic-wand search in the same session goes back to the
-    /// default selection shape. Pinned by `MagicWandUITests`.
-    var preselectIncomingResults: Bool = false
-
     /// Conditional dismiss: whether the USER has modified selections this sheet
     /// session, for either result origin. Gates the sheet's Dismiss:
     /// untouched → one tap; touched → confirmation dialog (the triage
     /// sheet's donor rule, generalized to the whole surface).
     ///
     /// Written `true` only at user-gesture sites (row circle, footer
-    /// Select All, Select-Where, keyboard space toggle, Pencil circle
-    /// select, review-row equivalents) — NEVER by programmatic
-    /// selection writes: the magic-wand arrival preselect, saved-search
+    /// Select All, Select-Where, keyboard space toggle) — NEVER by programmatic
+    /// selection writes: saved-search
     /// recall, and the mode-switch undo restore don't count as user
     /// selection work. Reset by a successful apply (the modified
     /// selections were committed — a post-apply Dismiss confirming
     /// "selections will not be saved" would be false) and by `clear()`
     /// on session teardown.
     var userModifiedSelections: Bool = false
-
-    /// Whether this session actually received results that
-    /// arrived pre-selected (the magic-wand `preselectIncomingResults`
-    /// flow, `appendResult` below) not yet resolved. A SEPARATE fact from
-    /// `userModifiedSelections`: that tracker means "the user touched
-    /// selections," and a magic-wand session that arrives with
-    /// everything auto-selected and is dismissed untouched would
-    /// otherwise read as untouched — a stray swipe or Dismiss silently
-    /// discards the whole auto-selected set with no confirmation. Written
-    /// `true` only when `appendResult` consumes `preselectIncomingResults`
-    /// for a streamed result. Reset rules mirror `userModifiedSelections`:
-    /// a successful apply resets it (the preselected set was committed —
-    /// see `RedactionState.applySelectedSearchResultsOrigin` /
-    /// `applyFindings(.stagedDetections)`), the review-arrival re-target
-    /// resets it (`DocumentEditorView.presentReviewInScanInterface`, a
-    /// fresh all-deselected context), and `clear()` resets it on session
-    /// teardown. See `hasUnappliedSelections(liveApplied:)`.
-    var hasUnreviewedPreselection: Bool = false
 
     /// True while the Home close dialog holds this session parked: the
     /// sheet's teardown then spares it, so Cancel re-presents it whole.
@@ -1234,9 +1200,9 @@ final class SearchState: Identifiable {
     var parkedDocument: UUID?
 
     /// Selections not yet applied, from the rows (never a gesture tracker): a selected result no live applied
-    /// region covers (`liveApplied` = `RedactionState.liveAppliedSearchResultIDs`; covered counts as applied), or an unreviewed preselect.
+    /// region covers (`liveApplied` = `RedactionState.liveAppliedSearchResultIDs`; covered counts as applied).
     func hasUnappliedSelections(liveApplied: Set<UUID>) -> Bool {
-        hasUnreviewedPreselection || results.contains { $0.isSelected && !liveApplied.contains($0.id) && !coveredResultIDs.contains($0.id) }
+        results.contains { $0.isSelected && !liveApplied.contains($0.id) && !coveredResultIDs.contains($0.id) }
     }
 
     /// Buffer a result from the search stream. Flushed in batches
@@ -1258,19 +1224,7 @@ final class SearchState: Identifiable {
             cancelSearchWithoutAwait()
             return
         }
-        var stored = result
-        // Magic-wand pre-fills the sheet then asks the engine
-        // to run; engine `SearchResult.isSelected` defaults to `false`.
-        // Flipping the flag here keeps the engine API untouched while
-        // delivering the "all instances selected by default" UX.
-        if preselectIncomingResults {
-            stored.isSelected = true
-            // This session actually received an auto-selected
-            // result; arm the dismiss-confirmation tracker so it cannot
-            // be silently swiped away unreviewed.
-            hasUnreviewedPreselection = true
-        }
-        pendingResults.append((run: runToken, result: stored))
+        pendingResults.append((run: runToken, result: result))
         if pendingResults.count >= Self.batchFlushSize {
             flushPendingResults()
         } else if flushTask == nil {

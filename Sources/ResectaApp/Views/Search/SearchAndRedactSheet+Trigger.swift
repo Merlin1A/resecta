@@ -73,12 +73,6 @@ extension SearchAndRedactSheet {
     }
 
     func triggerSearch() {
-        // Belt: no run may start while staged detections await
-        // review — the review owns the Scan surface until resolved
-        // (Apply / Dismiss). Every trigger site is already parked
-        // during a review (run button hidden, recall disabled, auto-run
-        // unarmed); this guard is defense-in-depth for future callers.
-        guard redactionState.pendingTriage == nil else { return }
         // Single-flight: setup below spans real suspension points
         // (cancel-await, detached document copy) before
         // `activeSearchTask` is assigned. Overlapping callers — rapid
@@ -463,11 +457,6 @@ extension SearchAndRedactSheet {
         // empty-state discriminator from "not run yet" to a
         // genuine result verdict.
         searchState.hasCompletedRunSinceClear = true
-        // Magic-wand pre-select flag is single-use:
-        // applies to the matches this scan emits, then resets
-        // so a follow-up search from the same sheet session
-        // doesn't carry magic-wand semantics forward.
-        searchState.preselectIncomingResults = false
         searchState.isSearching = false
 
         if prepared.isPIIScan {
@@ -680,8 +669,7 @@ extension SearchAndRedactSheet {
 
     /// The one search-origin apply: the toolbar Apply, the Return
     /// shortcut and the compact handle's per-item Apply all run through
-    /// it (the review origin, `applyReviewFindings`, stays its own
-    /// path). `origin` is resolved by the caller BEFORE the await — the
+    /// it. `origin` is resolved by the caller BEFORE the await — the
     /// per-item path captures the current match's id at call time; the
     /// walk or a re-flush can move `currentResult` while the apply waits
     /// its turn, and the seam refuses a stale id with zero mutations.

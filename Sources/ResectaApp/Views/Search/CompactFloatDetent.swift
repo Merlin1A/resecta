@@ -26,9 +26,7 @@ import SwiftUI
 //
 // History: 60 (the title-only handle) → 72 (the ‹ › cluster) → 80 (the
 // per-item Apply) → 108 (a match line + full-size controls; 120 at
-// accessibility sizes) → 108 unchanged when the staged detection review
-// took the same handle (the review walk: the pair, the counter, Select
-// in the Apply slot — `ReviewWalk`) → 101 when the match line was
+// accessibility sizes) → 101 when the match line was
 // retired (2026-09-28): the row alone, the smallest attached hug.
 //
 // The pure-function `compactHeight(maxDetentValue:)` helper isolates

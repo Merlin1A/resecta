@@ -3,7 +3,6 @@ import PDFKit
 import PDFKitGuard
 import os
 import RedactionEngine
-import Vision  // VNRequestTextRecognitionLevel for lastUsedRecognitionLevel
 
 // Log only phase kind (enum case names) as .public.
 // Never log document content, file paths, or redaction coordinates.
@@ -208,7 +207,7 @@ class DocumentState {
     var activeImportTask: Task<Void, Never>?
 
     /// UUID stamp owned by the active pipeline Task.
-    /// Set at Task dispatch in `runFullPipeline` / `runDetectionPipeline`,
+    /// Set at Task dispatch in `runFullPipeline`,
     /// nilled in the Task's defer/error-recovery blocks only when it matches.
     /// This guards against the cancel-then-restart race where an older
     /// Task's error-recovery block would clear the NEW run's outputURL /
@@ -275,13 +274,6 @@ class DocumentState {
     /// the global setting); every new document and Start Over clear it.
     var documentOverride: PipelineMode?
 
-    /// Recognition level of the most recent Auto-Detect run,
-    /// recorded by `runDetectionPipeline`. A detect-pause resume re-uses it so
-    /// the re-run matches the level the user originally chose (fallback
-    /// `.accurate` when nil). A PROPERTY addition only — mirrors
-    /// `lastUsedPipelineMode`; the Phase enum and transition table are untouched.
-    var lastUsedRecognitionLevel: VNRequestTextRecognitionLevel?
-
     /// True if at least one page has a rich text layer.
     var hasAnyTextLayer: Bool {
         textLayerStatus.values.contains(.rich)
@@ -317,35 +309,10 @@ class DocumentState {
         }
     }
 
-    /// Import gate combining the document-only `canStartImport`
-    /// predicate with `RedactionState.pendingTriage`. Mirrors
-    /// `canStartPipeline(with:)`: the triage-pending flag lives on
-    /// `RedactionState`, so `canStartImport` stays ignorant of it and call
-    /// sites that hold both states compose the full predicate here. A pending
-    /// detection-review sheet belongs to the CURRENT document; admitting a
-    /// replacement underneath it would let an Accept stamp the prior document's
-    /// page-coordinate regions onto the new one (data integrity). The drag-drop
-    /// path is the sole importer that bypasses the import-while-editing
-    /// confirmation, so it consults this composed gate directly.
-    func canStartImport(with redactionState: RedactionState) -> Bool {
-        canStartImport && redactionState.pendingTriage == nil
-    }
-
     /// True when the full Redact-pipeline can be initiated. Requires
     /// `.editing` phase with no active pipeline task already running.
-    /// The triage-sheet half of this predicate lives in `canStartPipeline(with:)`
-    /// because the triage-pending flag lives on `RedactionState`; this
-    /// computed property is the document-only half so call sites that
-    /// already hold both states can compose the full predicate.
     var canStartPipeline: Bool {
         phaseKind == .editing && activePipelineTask == nil
-    }
-
-    /// Full Redact-pipeline gate combining the document-only predicate
-    /// with the `RedactionState.pendingTriage` check. The Redact
-    /// button is disabled while the triage sheet is up.
-    func canStartPipeline(with redactionState: RedactionState) -> Bool {
-        canStartPipeline && redactionState.pendingTriage == nil
     }
 
     /// Why Redact may not start now. The button, ⇧⌘R and the run funnel
@@ -379,7 +346,7 @@ class DocumentState {
     func redactRefusal(with redactionState: RedactionState) -> RedactRefusal? {
         if Self.hasUnappliedSelections(redactionState) { return .selectedMatches }
         if !redactionState.hasEffectiveRegions { return .noRegions }
-        if !canStartPipeline(with: redactionState) { return .busy }
+        if !canStartPipeline { return .busy }
         return nil
     }
 
@@ -403,14 +370,6 @@ class DocumentState {
     static let importBlockedDuringPipelineMessage =
         "Cannot import while processing. Try again after the current step finishes."
 
-    /// Toast copy for a drag-drop import declined because a detection
-    /// review is open for the current document (the drop path bypasses the
-    /// import-while-editing confirmation that the file picker stages).
-    /// Mechanism-description language — names
-    /// what the app declined to do plus a recovery hint.
-    static let importBlockedDuringTriageMessage =
-        "Cannot import while reviewing detections. Apply or dismiss them first."
-
     /// Toast copy for a drop on the results or error screen, which admit no
     /// import: what the app declined to do plus the way back that screen
     /// offers, by its button's own title.
@@ -421,11 +380,10 @@ class DocumentState {
     /// The results screen's way back to the editor.
     static let keepEditingTitle = "Keep Editing"
 
-    /// The notice for a refused drop, or nil when the import may start: a
-    /// pending review, the results or error screen, else a run in progress.
-    func importRefusalMessage(with redactionState: RedactionState, door: ImportDoor? = nil) -> String? {
-        if canStartImport(with: redactionState) { return nil }
-        if canStartImport { return Self.importBlockedDuringTriageMessage }
+    /// The notice for a refused drop, or nil when the import may start:
+    /// the results or error screen, else a run in progress.
+    func importRefusalMessage(door: ImportDoor? = nil) -> String? {
+        if canStartImport { return nil }
         switch phase {
         case .verified:
             return Self.importBlockedOnThisScreenMessage(wayBack: Self.keepEditingTitle)

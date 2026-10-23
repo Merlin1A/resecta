@@ -11,7 +11,7 @@ import SwiftUI
 // + result-nav cluster + per-item Apply; every OTHER control lives at
 // medium+, and the canvas owns interaction below the sheet. The button
 // carries the current match — kind, page, text (`WalkSummary`) — as its
-// accessibility value on both origins: the page shows the mark, so the
+// accessibility value: the page shows the mark, so the
 // strip draws nothing for it, and VoiceOver hears it here. The Apply
 // marks ONLY the walk's current match: one draft
 // region through the one `applyFindings` seam — the single-result
@@ -21,22 +21,12 @@ import SwiftUI
 // stays parked, the phase stays `.editing`, focus does not move; the
 // button reads applied (disabled) and the user chevrons on; Undo
 // restores it. Implicit accept — the checkbox neither gates nor is
-// required (the wand / nudge precedent). No confirm dialog: the mark
+// required (the nudge precedent). No confirm dialog: the mark
 // is undoable and toasted (no second presentation at
 // compact). No keyboard shortcut — Return keeps its all-selected
 // semantics. The parked sheet is drawn at 0.96 (the attached regime,
 // `CompactFloatDetent`), so the 46-pt layout floor serves 44.2 pt
 // effective.
-//
-// On the review origin — the staged detection review owning the Scan
-// interface — the same slot holds SELECT, the row checkbox's sibling:
-// one tap marks the review walk's current row selected (the
-// `triageSelections` entry the checkbox drives; "Selected" reads back
-// on the wash and stays tappable, the next tap deselects), and the
-// header's "Apply N" commits, as it always did. No region is created
-// from the strip on this origin, so nothing to undo and no toast; the
-// haptic is the checkbox's. The id is the same; the label switches
-// with the origin.
 
 extension SearchAndRedactSheet {
 
@@ -54,7 +44,7 @@ extension SearchAndRedactSheet {
         ParkedChromeLayout(
             sheetPresented: sheetPresented,
             detent: selectedDetent,
-            walkLive: searchState.isWalkLive(reviewPending: redactionState.pendingTriage != nil),
+            walkLive: searchState.isWalkLive,
             pageCount: documentState.pageCount,
             sizeClass: horizontalSizeClass,
             phase: documentState.phaseKind,
@@ -76,20 +66,8 @@ extension SearchAndRedactSheet {
     /// disabled (the detent-layout leg reads the disabled → enabled
     /// round-trip through it); the a11y label reads "Apply" then
     /// "Applied". The label's inset is the medium spacing token; the strip adds the
-    /// leading inset. On the review origin the slot mounts
-    /// `reviewSelectButton` instead.
+    /// leading inset.
     func applyCurrentResultButton() -> some View {
-        Group {
-            if isReviewActive {
-                reviewSelectButton()
-            } else {
-                searchApplyButton()
-            }
-        }
-    }
-
-    /// The search origin's builder — the capsule / ✓ "Applied" pair.
-    private func searchApplyButton() -> some View {
         Group {
             if applyCurrentResultApplied {
                 Button(action: applyCurrentResult) {
@@ -131,59 +109,11 @@ extension SearchAndRedactSheet {
         applied ? AppliedFilter.applied.rawValue : "Apply"
     }
 
-    // MARK: - Per-item Select (the review origin)
-
-    /// The review origin's sibling of the Apply capsule: "Select" on the
-    /// same fill, or ✓ "Selected" on the wash — enabled either way (the
-    /// second tap deselects), the selected trait for VoiceOver and the
-    /// checkbox's haptic; dimmed with no current row (before the first
-    /// step). The same identifier, the origin's own label; identifier
-    /// BEFORE `.disabled` as on the search origin.
-    private func reviewSelectButton() -> some View {
-        let selected = reviewCurrentSelected
-        return Group {
-            if selected {
-                Button(action: toggleReviewCurrentSelection) {
-                    Label("Selected", systemImage: "checkmark")
-                        .font(.headline)
-                        .padding(.horizontal, ResectaTokens.Spacing.md)
-                        .frame(minHeight: ResectaTokens.TouchTarget.minimum)
-                        .background(CircularIconButtonStyle.wash, in: Capsule())
-                        .contentShape(Rectangle())
-                }
-            } else {
-                Button(action: toggleReviewCurrentSelection) {
-                    Text("Select")
-                        .font(.headline)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, ResectaTokens.Spacing.md)
-                        .frame(minHeight: ResectaTokens.TouchTarget.minimum)
-                        .background(ResectaTokens.BrandTeal.fill, in: Capsule())
-                        .contentShape(Rectangle())
-                }
-            }
-        }
-        .buttonStyle(.capsulePress)
-        .sensoryFeedback(.selection, trigger: selected)
-        .accessibilityLabel("Select")
-        .accessibilityValue(walkAccessibilityValue)
-        .accessibilityHint("Selects the current detection for redaction; tap again to deselect.")
-        .accessibilityAddTraits(selected ? .isSelected : [])
-        .accessibilityIdentifier("applyCurrentResultButton")
-        .disabled(liveReviewWalk.current == nil)
-    }
-
     // MARK: - The current match, for VoiceOver
 
-    /// The walk's current match: the review walk's row while the staged
-    /// review owns the Scan interface, else the search walk's current
-    /// result; nil before the first step.
+    /// The walk's current match: the search walk's current result; nil
+    /// before the first step.
     private var currentWalkSummary: WalkSummary? {
-        if isReviewActive {
-            return liveReviewWalk.current.map {
-                WalkSummary(item: $0, pageCount: documentState.pageCount)
-            }
-        }
         return searchState.currentResult.map {
             searchState.walkSummary(for: $0, pageCount: documentState.pageCount)
         }
@@ -192,21 +122,6 @@ extension SearchAndRedactSheet {
     /// The button's value — kind, page, text — or nothing with no current.
     private var walkAccessibilityValue: String {
         currentWalkSummary?.accessibilityValue ?? ""
-    }
-
-    /// The review walk's current row is selected — the checkbox's read
-    /// (an absent id is not selected).
-    private var reviewCurrentSelected: Bool {
-        guard let id = liveReviewWalk.currentID else { return false }
-        return redactionState.triageSelections[id] ?? false
-    }
-
-    /// The checkbox's write for the current row, plus the conditional-
-    /// dismiss mark the checkbox makes (a toggle is user selection work).
-    private func toggleReviewCurrentSelection() {
-        guard let id = liveReviewWalk.currentID else { return }
-        ReviewWalk.toggleSelection(of: id, in: &redactionState.triageSelections)
-        searchState.userModifiedSelections = true
     }
 
     // MARK: - The search origin's reads

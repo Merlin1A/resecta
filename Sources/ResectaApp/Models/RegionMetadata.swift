@@ -21,11 +21,6 @@ nonisolated struct RegionMetadata: Sendable {
     /// The OCR recognition level used for this detection.
     let recognitionLevel: DetectionResult.RecognitionLevel
 
-    /// Set to true when this region is part of an ambiguous
-    /// bare-surname cluster (≥15 entities, no disambiguating first-initial).
-    /// Set by the staged-review path's clustering.
-    var isAmbiguousSurname: Bool = false
-
     /// Abbreviated label for canvas badge (max 4 characters).
     /// Cached at init — all inputs are `let`, so the value never changes.
     let badgeLabel: String
@@ -37,13 +32,11 @@ nonisolated struct RegionMetadata: Sendable {
     let accessibilityDescription: String
 
     init(piiKind: DetectionResult.Kind, confidence: Double,
-         matchedText: String?, recognitionLevel: DetectionResult.RecognitionLevel,
-         isAmbiguousSurname: Bool = false) {
+         matchedText: String?, recognitionLevel: DetectionResult.RecognitionLevel) {
         self.piiKind = piiKind
         self.confidence = confidence
         self.matchedText = matchedText
         self.recognitionLevel = recognitionLevel
-        self.isAmbiguousSurname = isAmbiguousSurname
 
         self.badgeLabel = piiKind.badge
 
