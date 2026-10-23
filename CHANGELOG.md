@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ### Changed
 
+- The App Store rating prompt asks once per app version, after the first share of a document whose checks passed, instead of after the third export.
 - Share: when annotations in the original document — a black box, a stamp, an unapplied redaction mark — cover text that no redaction box covers, the share confirmation names those pages before the file is shared, whatever the verification result. Annotations are not part of the page image, so that text is visible in the exported file.
 - Verification results: the outcome titles follow the check list's words: Attention Needed reads Needs Review, Issues Found reads Checks Failed, and Completed with Notes reads Completed with Warnings, or Some Checks Incomplete when a check could not run in full.
 - Home: the app's mark replaces the document glyph; the import entries are cards and Try the Sample a shorter row, centred on the screen, without link lines. VoiceOver reads each entry's title and description with a hint, the masthead as a heading and the trust words as one line; under Reduce Motion a press shades the card instead of shrinking it, and under Reduce Transparency the cards are opaque. The first-launch agreement fades into the home screen and keeps I Agree pinned while its text scrolls beneath; the app-switcher placeholder shows the mark on the home screen's grey; the verification progress screen's trust words read as one line.

@@ -229,14 +229,4 @@ final class SettingsStateTests {
         #expect(state.pipelineMode == .secureRasterization)
     }
 
-    @Test("resetToDefaults preserves successfulExportCount (lifetime review-gate metric)")
-    func resetPreservesSuccessfulExportCount() {
-        let state = SettingsState(defaults: defaults)
-        state.successfulExportCount = 5
-        state.resetToDefaults()
-        // The count gates the StoreKit review prompt (fires once as it
-        // crosses 2 -> 3). It is a lifetime metric, not a preference, so a
-        // Settings reset must not zero it and re-arm the prompt.
-        #expect(state.successfulExportCount == 5)
-    }
 }

@@ -65,14 +65,6 @@ class SettingsState {
                 defaults.set(autoVerify, forKey: "autoVerify") }
     }
 
-    /// Count of successful exports. Used to trigger the App Store review
-    /// prompt on the 3rd successful export. UserDefaults with didSet
-    /// (the property-wrapper alternative is banned inside @Observable).
-    var successfulExportCount: Int = 0 {
-        didSet { guard !isInitializing else { return }
-                defaults.set(successfulExportCount, forKey: "successfulExportCount") }
-    }
-
     /// App-wide pipeline preference read at scan kickoff and export.
     /// `.secureRasterization` is the default fallback.
     var pipelineMode: PipelineMode = .secureRasterization {
@@ -144,7 +136,6 @@ class SettingsState {
         self.fillColor = FillColor(rawValue:
             defaults.string(forKey: "fillColor") ?? "black") ?? .black
         self.autoVerify = defaults.object(forKey: "autoVerify") as? Bool ?? true
-        self.successfulExportCount = defaults.object(forKey: "successfulExportCount") as? Int ?? 0
         let storedMode = defaults.string(forKey: "pipelineMode.v2")
         self.pipelineMode = storedMode
             .flatMap(PipelineMode.init(rawValue:)) ?? .secureRasterization
@@ -169,12 +160,6 @@ class SettingsState {
         exportDPI = 300
         fillColor = .black
         autoVerify = true
-        // successfulExportCount is intentionally NOT reset here. It is a
-        // lifetime metric that gates the StoreKit review prompt (fires once as the
-        // count crosses 2 -> 3), not a user preference. Resetting it re-arms the
-        // prompt after 3 more exports; a Settings "reset to defaults" should not
-        // re-trigger the review request (Apple's OS-side rate limit bounds the
-        // exposure, but the disclosure dialog does not mention re-arming).
         pipelineMode = .secureRasterization
         paranoidMode = false
         appearancePreference = .system

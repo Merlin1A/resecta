@@ -1304,9 +1304,8 @@ struct DocumentEditorView: View {
     /// are spent only for a send that actually happened, so a cancelled
     /// attempt re-arms all three (`DocumentState.rearmShareRiskConfirms()`)
     /// for the next Share tap on the same report. `completed ==
-    /// true` announces the share and then records it — the
-    /// `successfulExportCount` bump / App Store review-request check,
-    /// unchanged from the prior inline body — leaving the confirms spent
+    /// true` announces the share and then records it — the App Store
+    /// review-request check (`ReviewPromptGate`) — leaving the confirms spent
     /// for this report; a fresh report re-arms via `transition(to:)`'s
     /// reset instead of this function.
     static func handleShareSheetCompletion(
@@ -1396,8 +1395,7 @@ struct DocumentEditorView: View {
                         severity: .success)
                 },
                 recordSuccessfulExport: {
-                    settingsState.successfulExportCount += 1
-                    if settingsState.successfulExportCount == 3 {
+                    if ReviewPromptGate.standard.shouldAsk(afterSharing: currentReport.overallStatus) {
                         Task { @MainActor in requestReview() }
                     }
                 }
