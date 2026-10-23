@@ -133,8 +133,14 @@ extension RedactionOverlayView {
         })?.0
     }
 
+    /// The selected region shows and takes resize handles only while Add
+    /// to Selection is off: with it on, a tap anywhere on a region adds or
+    /// removes that region, never starts a resize.
+    var resizeHandlesActive: Bool { !isMultiSelectActive }
+
     func hitTestResizeHandle(at point: CGPoint) -> ResizeHandle? {
-        guard let selectedID,
+        guard resizeHandlesActive,
+              let selectedID,
               let region = regions.first(where: { $0.id == selectedID })
         else { return nil }
 

@@ -29,7 +29,7 @@ class RedactionOverlayView: UIView {
     /// selection rather than replacing the selection. iPhone parity for
     /// the iPad Shift+tap path — both routes converge on
     /// `coordinator?.toggleRegionSelection(_:)`.
-    var isMultiSelectActive: Bool = false
+    var isMultiSelectActive: Bool = false { didSet { setNeedsDisplay() } }  // the handles show only while off
 
     var regions: [RedactionRegion] = []
     var selectedIDs: Set<UUID> = []
