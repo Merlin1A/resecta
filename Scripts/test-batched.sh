@@ -49,13 +49,25 @@
 #                          batch in turn.
 #   TEST_BATCHED_VERDICT_DIR  when set, the run's verdict files (below) are
 #                          also copied to <dir>/<run dir name>/.
+#   TEST_BATCHED_BOOT_SETTLE_SECS  seconds of idle after the simulator
+#                          reports booted, before the first batch (default
+#                          15). A test host launched into a simulator still
+#                          coming up hangs before its first test.
 #
 # Exit codes:
 #   0  all reds (if any) are on the exclusion list, no incomplete batches
 #   1  at least one red outside the exclusion list (offenders printed)
-#   2  no gating reds, but >=1 invocation wedged or hit a test-host launch
-#      refusal twice — those suites are unverified, coverage incomplete;
+#   2  no gating reds, but >=1 invocation wedged, or hit a test-host launch
+#      refusal or a launch hang twice — those suites are unverified,
+#      coverage incomplete;
 #      also when TEST_BATCHED_SIM_UDID is unset (nothing ran)
+#
+# A launch hang — the watchdog fires before the log shows any suite or
+# test-run start line, so the test host never came up and no test ran — is
+# simulator infrastructure: the invocation runs once more on the same
+# simulator after the recovery's reboot and is listed as launch-retried, not
+# counted as a wedge. A second launch hang is a wedge. An invocation that
+# started a test and then hung is a wedge, never retried.
 #
 # Recovery after a wedge is scoped to this run: the run's own xcodebuild and
 # its descendants are killed, then only $TEST_BATCHED_SIM_UDID is shut down
@@ -101,6 +113,9 @@ STALL_SECS="${TEST_BATCHED_STALL_SECS:-180}"   # kill if the log stops growing t
 RECOVERY="${TEST_BATCHED_RECOVERY:-reboot}"    # reboot | erase (see the header)
 EXCLUDE="${TEST_BATCHED_EXCLUDE:-}"            # suites not run on this runtime (see the header)
 BOOT_WAIT_SECS=300     # how long the recovery waits for the simulator to report booted
+BOOT_SETTLE_SECS="${TEST_BATCHED_BOOT_SETTLE_SECS:-15}"   # idle after boot, before the first batch
+POLL_SECS=10           # the watchdog's poll interval
+LAUNCH_MARKER="^Test Suite '|^◇ Test run started"   # the test host came up: a suite or the test run started
 LOAD_WARN=8            # 1-min load average warning threshold
 LOG_CAP_BYTES=20000000 # per-batch filtered-log size bound
 
@@ -171,6 +186,7 @@ write_verdict() { # verdict summary-line...
     TBV_CLEAN="${START_CLEAN:-}" TBV_STARTED="${STARTED:-}" \
     TBV_TESTS="${TOT_TESTS:-}" TBV_SUITES="${TOT_SUITES:-}" TBV_FAILED="${TOT_FAILED:-}" \
     TBV_KNOWN="${TOT_KNOWN:-}" TBV_WEDGED="${WEDGED:-}" TBV_EXCLUDED="${#EXCLUDED[@]}" \
+    TBV_LAUNCH_RETRIED="${LAUNCH_RETRIED:-}" \
     TBV_COPY_DIR="${TEST_BATCHED_VERDICT_DIR:-}" \
     python3 - "$@" <<'PYEOF' || true
 import datetime, json, os, re, shutil, subprocess, sys, uuid
@@ -231,7 +247,8 @@ try:
         "engine_tree": engine_tree,
         "counts": {"tests": num("TBV_TESTS"), "suites": num("TBV_SUITES"),
                    "failed": num("TBV_FAILED"), "known_issues": num("TBV_KNOWN"),
-                   "wedged": num("TBV_WEDGED"), "excluded": num("TBV_EXCLUDED")},
+                   "wedged": num("TBV_WEDGED"), "excluded": num("TBV_EXCLUDED"),
+                   "launch_retried": num("TBV_LAUNCH_RETRIED")},
         "sim": sim_info(e.get("TBV_SIM_UDID", "")),
         "xcode_build": m.group(1) if m else None,
         "dd": e.get("TBV_DD") or None,
@@ -354,7 +371,7 @@ need = ("source scheme verdict head head_end tree tracked_clean_start tracked_cl
         "counts sim xcode_build dd run_dir nonce summary_lines started ended").split()
 missing = [k for k in need if k not in d]
 missing += ["sim." + k for k in ("udid", "runtime_version", "runtime_build") if k not in d.get("sim", {})]
-missing += ["counts." + k for k in ("tests", "suites", "failed", "known_issues", "wedged", "excluded")
+missing += ["counts." + k for k in ("tests", "suites", "failed", "known_issues", "wedged", "excluded", "launch_retried")
             if k not in d.get("counts", {})]
 assert not missing, missing
 assert d["source"] == "test-batched.sh" and d["verdict"] == "PASS" and d["counts"]["tests"] == 3
@@ -364,6 +381,52 @@ assert open(os.path.join(t, "copy", "run", "verdict.json")).read() == open(os.pa
 PYEOF
     rm -rf "$tdir"
     if [ "$n" -eq 0 ]; then echo "self-test: write_verdict precedes the build-failure and verdict exits; a dry call writes every field OK"; else fails=1; fi
+    # 9. A launch hang (the watchdog fires before any suite or test-run start
+    #    line) runs once more after the recovery and is listed launch-retried,
+    #    not wedged; a second launch hang is a wedge; an invocation that
+    #    started a test and then hung is a wedge with no retry. Driven through
+    #    run_invocation with a stub xcodebuild (the Nth call plays the Nth
+    #    word of the plan) and a stub xcrun on PATH; nothing real is launched.
+    n=0
+    tdir="$(mktemp -d "${TMPDIR:-/tmp}/test-batched-selftest.XXXXXX")"
+    mkdir -p "$tdir/bin"
+    cat > "$tdir/bin/xcodebuild" <<'STUB'
+#!/bin/bash
+n=$(( $(cat "$TB_STUB_DIR/calls" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$TB_STUB_DIR/calls"
+xc=""; while [ $# -gt 0 ]; do [ "$1" = "-resultBundlePath" ] && xc="$2"; shift; done
+set -- $TB_STUB_PLAN; shift $((n - 1)); what="${1:-pass}"
+echo "Writing result bundle at path:"
+case "$what" in
+    hang) exec sleep 600 ;;
+    midhang) echo "Test Suite 'Selected tests' started at now."; echo "◇ Test run started."; exec sleep 600 ;;
+    *) echo "Test Suite 'Selected tests' started at now."; echo "◇ Test run started."; mkdir -p "$xc"; exit 0 ;;
+esac
+STUB
+    printf '#!/bin/bash\nexit 0\n' > "$tdir/bin/xcrun"
+    chmod +x "$tdir/bin/xcodebuild" "$tdir/bin/xcrun"
+    tb_case() { # plan → "state retry wedged calls" of one invocation
+        rm -rf "$tdir/run" "$tdir/calls"; mkdir -p "$tdir/run"
+        PATH="$tdir/bin:$PATH" TB_STUB_DIR="$tdir" TB_STUB_PLAN="$1" bash -c '
+            eval "$(sed -n -e "/^descendants()/,/^}/p" -e "/^recover_sim()/,/^}/p" -e "/^run_invocation()/,/^}/p" "$1")"
+            eval "$(/usr/bin/grep -E "^LAUNCH_MARKER=" "$1")"
+            GREP=/usr/bin/grep; SCHEME=S; DEST=id=SELF-TEST; DD="$2/dd"; TEST_TARGET=T; RUN_DIR="$2/run"
+            LOG_CAP_BYTES=100000; TIMEOUT_MINS=15; STALL_SECS=2; POLL_SECS=1; BOOT_WAIT_SECS=5; RECOVERY=reboot
+            SIM_UDID=SELF-TEST; WEDGED=0; FAILURES_FILE="$2/run/failures.txt"; : > "$FAILURES_FILE"
+            R_LABEL=(); R_NSUITES=(); R_TESTS=(); R_PASSED=(); R_FAILED=(); R_SKIPPED=()
+            R_KNOWN=(); R_STATE=(); R_SECS=(); R_XCRESULT=(); R_MODE=(); R_RETRY=()
+            parse_xcresult() { echo "COUNTS 1 1 0 0 0"; }
+            run_invocation b1 gating SuiteA >/dev/null 2>&1
+            echo "${R_STATE[0]} ${R_RETRY[0]:-none} $WEDGED $(cat "$2/calls")"
+        ' _ "$me" "$tdir"
+    }
+    got="$(tb_case "hang pass")"
+    [ "$got" = "completed launch-retried 0 2" ] || { echo "self-test: a launch hang then a pass expected 'completed launch-retried 0 2', got '$got'" >&2; n=1; }
+    got="$(tb_case "hang hang")"
+    [ "$got" = "wedged launch-retried 1 2" ] || { echo "self-test: two launch hangs expected 'wedged launch-retried 1 2', got '$got'" >&2; n=1; }
+    got="$(tb_case "midhang pass")"
+    [ "$got" = "wedged none 1 1" ] || { echo "self-test: a hang after a test started expected 'wedged none 1 1', got '$got'" >&2; n=1; }
+    rm -rf "$tdir"
+    if [ "$n" -eq 0 ]; then echo "self-test: a launch hang is retried once (launch-retried, not a wedge); a second launch hang and a mid-run hang are wedges OK"; else fails=1; fi
     [ "$fails" -eq 0 ] && { echo "self-test: PASS"; exit 0; }
     echo "self-test: FAIL" >&2; exit 1
 }
@@ -518,9 +581,30 @@ recover_sim() { # xcodebuild-pid — this run's process tree and this run's simu
     echo "  recovery: simulator $SIM_UDID booted again ($((SECONDS - t0))s)" >&2
 }
 
+# Before the first batch: the simulator booted — `bootstatus -b` boots a shut
+# down one and returns when its boot has finished, SpringBoard included —
+# then a short idle, so batch 1 never launches its test host into a
+# simulator still coming up. The recovery after a wedge boots and waits too.
+settle_sim() {
+    local t0=$SECONDS bp
+    xcrun simctl bootstatus "$SIM_UDID" -b >/dev/null 2>&1 &
+    bp=$!
+    while kill -0 "$bp" 2>/dev/null; do
+        if [ $((SECONDS - t0)) -ge "$BOOT_WAIT_SECS" ]; then
+            echo "  settle: simulator $SIM_UDID did not report booted within ${BOOT_WAIT_SECS}s; continuing" >&2
+            kill "$bp" 2>/dev/null || true
+            break
+        fi
+        sleep 2
+    done
+    wait "$bp" 2>/dev/null || true
+    [ "$BOOT_SETTLE_SECS" -gt 0 ] && sleep "$BOOT_SETTLE_SECS"
+    echo "settle: simulator $SIM_UDID booted, ${BOOT_SETTLE_SECS}s idle before the first batch ($((SECONDS - t0))s)"
+}
+
 # Results accumulated as parallel indexed arrays (bash 3.2 — no assoc arrays).
 R_LABEL=(); R_NSUITES=(); R_TESTS=(); R_PASSED=(); R_FAILED=(); R_SKIPPED=()
-R_KNOWN=(); R_STATE=(); R_SECS=(); R_XCRESULT=(); R_MODE=()
+R_KNOWN=(); R_STATE=(); R_SECS=(); R_XCRESULT=(); R_MODE=(); R_RETRY=()
 FAILURES_FILE="$RUN_DIR/failures.txt"; : > "$FAILURES_FILE"
 WEDGED=0
 
@@ -549,7 +633,7 @@ run_invocation() { # label mode suite...
     local args=() s
     for s in "$@"; do args+=("-only-testing:$TEST_TARGET/$s"); done
 
-    local attempt=1 state log xc start now
+    local attempt=1 state log xc start now retried=""
     while :; do
         local tag="$label"
         [ "$attempt" -gt 1 ] && tag="$label-r$attempt"
@@ -564,7 +648,7 @@ run_invocation() { # label mode suite...
         local pid=$!
         lastsize=0; lastprogress="$start"
         while kill -0 "$pid" 2>/dev/null; do
-            sleep 10
+            sleep "$POLL_SECS"
             now="$(date +%s)"
             size="$(stat -f%z "$raw" 2>/dev/null || echo 0)"
             if [ "$size" != "$lastsize" ]; then lastsize="$size"; lastprogress="$now"; fi
@@ -577,10 +661,15 @@ run_invocation() { # label mode suite...
                 state="wedged"; break
             fi
         done
-        if [ "$state" = "wedged" ]; then
+        # The watchdog fired before any suite or test-run start line: the test
+        # host never came up (a launch hang, handled below).
+        if [ "$state" = "wedged" ] && ! $GREP -qE "$LAUNCH_MARKER" "$raw" 2>/dev/null; then
+            state="launch-hang"
+        fi
+        if [ "$state" = "wedged" ] || [ "$state" = "launch-hang" ]; then
             recover_sim "$pid"
             wait "$pid" 2>/dev/null || true
-            WEDGED=$((WEDGED + 1))
+            [ "$state" = "wedged" ] && WEDGED=$((WEDGED + 1))
         else
             wait "$pid" || true   # nonzero on test failure — counted via xcresult
         fi
@@ -590,6 +679,20 @@ run_invocation() { # label mode suite...
         { $GREP -v 'attributedStringScaled' "$raw" 2>/dev/null || true; } \
             | tail -c "$LOG_CAP_BYTES" > "$log" || true
         rm -f "$raw"
+
+        # A launch hang is simulator infrastructure: no suite ran. Run it once
+        # more on the same simulator, which the recovery just rebooted, and
+        # list it as launch-retried; a second launch hang is a wedge.
+        if [ "$state" = "launch-hang" ]; then
+            if [ "$attempt" -eq 1 ]; then
+                echo "  LAUNCH HANG (no test started — sim infra, no suite ran): retrying once" >&2
+                retried="launch-retried"
+                attempt=2
+                continue
+            fi
+            state="wedged"
+            WEDGED=$((WEDGED + 1))
+        fi
 
         # A test-host install/launch refusal (SBMainWorkspace "Busy" /
         # "Application failed preflight checks") is simulator infrastructure,
@@ -626,9 +729,9 @@ run_invocation() { # label mode suite...
     R_LABEL+=("$label"); R_NSUITES+=("$nsuites"); R_TESTS+=("$1")
     R_PASSED+=("$2"); R_FAILED+=("$3"); R_SKIPPED+=("$4"); R_KNOWN+=("$5")
     R_STATE+=("$state"); R_SECS+=("$((now - start))")
-    R_XCRESULT+=("$xc"); R_MODE+=("$mode")
+    R_XCRESULT+=("$xc"); R_MODE+=("$mode"); R_RETRY+=("$retried")
 
-    echo "  $label: state=$state tests=$1 passed=$2 failed=$3 skipped=$4 known-issues=$5 (${R_SECS[${#R_SECS[@]}-1]}s)"
+    echo "  $label: state=$state tests=$1 passed=$2 failed=$3 skipped=$4 known-issues=$5 (${R_SECS[${#R_SECS[@]}-1]}s)${retried:+ $retried}"
     echo "  xcresult: $xc"
     if [ "$mode" = "report-only" ] && [ "$3" != "0" ] && [ "$3" != "-1" ]; then
         echo "  REPORT-ONLY red — never gates locally; read it by hand"
@@ -637,6 +740,7 @@ run_invocation() { # label mode suite...
 
 NBATCH=$(( (${#BATCHABLE[@]} + BATCH_SIZE - 1) / BATCH_SIZE ))
 echo "running $NBATCH batches of <=$BATCH_SIZE suites, then ${#ALONE[@]} perf-alone suite(s)"
+settle_sim
 
 i=0
 b=1
@@ -664,7 +768,7 @@ fi
 
 echo ""
 echo "── summary ($SCHEME) ──────────────────────────────────────────────"
-TOT_TESTS=0; TOT_FAILED=0; TOT_KNOWN=0; TOT_SUITES=0; WEDGED_LABELS=""
+TOT_TESTS=0; TOT_FAILED=0; TOT_KNOWN=0; TOT_SUITES=0; WEDGED_LABELS=""; RETRIED_LABELS=""; LAUNCH_RETRIED=0
 j=0
 while [ "$j" -lt "${#R_LABEL[@]}" ]; do
     printf '%-32s %-12s suites=%-3s tests=%-5s failed=%-3s known=%-3s %ss\n' \
@@ -677,6 +781,9 @@ while [ "$j" -lt "${#R_LABEL[@]}" ]; do
         [ "${R_FAILED[$j]}" != "-1" ] && TOT_FAILED=$((TOT_FAILED + R_FAILED[j]))
     fi
     [ "${R_STATE[$j]}" != "completed" ] && WEDGED_LABELS="$WEDGED_LABELS ${R_LABEL[$j]}(${R_STATE[$j]})"
+    if [ -n "${R_RETRY[$j]}" ]; then
+        RETRIED_LABELS="$RETRIED_LABELS ${R_LABEL[$j]}"; LAUNCH_RETRIED=$((LAUNCH_RETRIED + 1))
+    fi
     j=$((j + 1))
 done
 
@@ -702,6 +809,7 @@ echo "$TOTALS_LINE"
 [ -n "$EXCUSED" ] && echo "non-gating reds (perf-alone or on the exclusion list — never gate locally):$EXCUSED"
 [ -s "$FAILURES_FILE" ] && { echo "failure detail:"; sed 's/^/  /' "$FAILURES_FILE"; }
 [ -n "$WEDGED_LABELS" ] && echo "incomplete invocations (suites NOT verified — re-run or salvage):$WEDGED_LABELS"
+[ -n "$RETRIED_LABELS" ] && echo "launch-retried invocations (a launch hang, run once more after a reboot; not wedges):$RETRIED_LABELS"
 
 if [ -n "$OFFENDERS" ]; then
     echo "OFFENDERS:$OFFENDERS"
