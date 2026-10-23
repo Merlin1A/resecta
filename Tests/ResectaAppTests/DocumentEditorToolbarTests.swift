@@ -16,10 +16,10 @@ struct DocumentEditorToolbarTests {
             documentState: coordinator.documentState, redactionState: coordinator.redactionState,
             coordinator: coordinator, horizontalSizeClass: .compact, undoManager: nil,
             activeTool: .constant(nil), isMultiSelectActive: .constant(false),
-            showSettings: .constant(false), searchSheetDetent: .constant(.medium),
+            searchSheetDetent: .constant(.medium),
             documentOverride: nil, redactButtonDisabled: true, redactButtonHint: "",
             handleHomeTap: {}, homeButton: AnyView(EmptyView()), pipelineModePicker: AnyView(EmptyView()),
-            deleteSelectedRegions: {}
+            deleteSelectedRegions: {}, openSettings: {}
         )
     }
 
@@ -42,10 +42,10 @@ struct DocumentEditorToolbarTests {
             coordinator: coordinator, horizontalSizeClass: .compact, undoManager: nil,
             activeTool: Binding(get: { tool }, set: { tool = $0 }),
             isMultiSelectActive: Binding(get: { addToSelection }, set: { addToSelection = $0 }),
-            showSettings: .constant(false), searchSheetDetent: .constant(.medium),
+            searchSheetDetent: .constant(.medium),
             documentOverride: nil, redactButtonDisabled: true, redactButtonHint: "",
             handleHomeTap: {}, homeButton: AnyView(EmptyView()), pipelineModePicker: AnyView(EmptyView()),
-            deleteSelectedRegions: {}
+            deleteSelectedRegions: {}, openSettings: {}
         )
         toolbar.resetCanvasTools()
         #expect(tool == nil)

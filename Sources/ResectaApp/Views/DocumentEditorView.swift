@@ -63,6 +63,7 @@ struct DocumentEditorView: View {
     /// this flag; the slot's `onDismiss` presents the dialog once the sheet
     /// is actually down. A second Home tap during the park is absorbed.
     @State var homeCloseAwaitsSheetDismissal = false
+    @State var settingsAwaitsSheetDismissal = false  // Settings opens once the parked sheet is down
 
     /// A search session parked for the close dialog, kept whole for Cancel
     /// (`restoreParkedSearchIfNeeded()`); Close drops it with the session.
@@ -445,6 +446,10 @@ struct DocumentEditorView: View {
                 }
             }
         ), onDismiss: {
+            if settingsAwaitsSheetDismissal {  // parked for Settings: open it now
+                settingsAwaitsSheetDismissal = false
+                showSettings = true
+            }
             // A sheet parked by `handleHomeTap()` hands off to the
             // close dialog here, once its presentation is actually down.
             guard homeCloseAwaitsSheetDismissal else { return }
@@ -626,6 +631,7 @@ struct DocumentEditorView: View {
         }
         // Keyboard shortcuts for editing, handled by one modifier
         .modifier(DocumentEditorKeyboard(activeTool: $activeTool, isMultiSelectActive: $isMultiSelectActive))
+        .onChange(of: showSettings) { _, shown in if !shown { restoreParkedSearchIfNeeded() } }
         // Add to Selection turns off on a page with no regions (its row
         // unmounts there), through the one tool-and-toggle reset.
         .onChange(of: redactionState.regions[documentState.currentPageIndex]?.isEmpty ?? true) { _, empty in
@@ -691,11 +697,11 @@ struct DocumentEditorView: View {
             coordinator: coordinator, horizontalSizeClass: horizontalSizeClass,
             undoManager: undoManager,
             activeTool: $activeTool, isMultiSelectActive: $isMultiSelectActive,
-            showSettings: $showSettings, searchSheetDetent: $searchSheetDetent,
+            searchSheetDetent: $searchSheetDetent,
             documentOverride: documentOverride, redactButtonDisabled: redactButtonDisabled,
             redactButtonHint: redactButtonHint, handleHomeTap: handleHomeTap,
             homeButton: AnyView(homeButton), pipelineModePicker: AnyView(pipelineModePicker),
-            deleteSelectedRegions: deleteSelectedRegions
+            deleteSelectedRegions: deleteSelectedRegions, openSettings: openSettings
         )
     }
 

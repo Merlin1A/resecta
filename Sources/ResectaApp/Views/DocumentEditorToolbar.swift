@@ -19,7 +19,6 @@ struct DocumentEditorToolbar {
     let undoManager: UndoManager?
     @Binding var activeTool: DocumentEditorView.DrawingTool?
     @Binding var isMultiSelectActive: Bool
-    @Binding var showSettings: Bool
     /// The search sheet's detent: every Scan or Search entry opens at medium.
     @Binding var searchSheetDetent: PresentationDetent
     let documentOverride: PipelineMode?
@@ -29,6 +28,8 @@ struct DocumentEditorToolbar {
     let homeButton: AnyView
     let pipelineModePicker: AnyView
     let deleteSelectedRegions: () -> Void
+    /// Settings, parking the search sheet first when it is up.
+    let openSettings: () -> Void
 
     /// The one reset of the canvas tools: the draw tool off and Add to
     /// Selection off. The editor calls it when a different document
@@ -200,7 +201,7 @@ struct DocumentEditorToolbar {
     @ViewBuilder
     private var settingsButton: some View {
         Button("Settings", systemImage: "gearshape") {
-            showSettings = true
+            openSettings()
         }
         .accessibilityIdentifier("settings-button")
     }
