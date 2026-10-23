@@ -122,16 +122,6 @@ class RedactionState {
     /// `clearAll()`) clear it explicitly.
     private(set) var pendingRunDeselection: DeselectionSnapshot?
 
-    /// The snapshot pipeline entry should record for this run:
-    /// the apply-commit snapshot when one is pending (the common path —
-    /// see `pendingRunDeselection`), falling back to the live search
-    /// session's snapshot when nothing is pending (today's behavior,
-    /// unchanged: a manual-draw-only session or a run started before any
-    /// apply still reads the live `activeSearch`).
-    func runEntryDeselectionSnapshot() -> DeselectionSnapshot? {
-        pendingRunDeselection ?? activeSearch?.deselectionSnapshotForRun()
-    }
-
     /// Set when any gazetteer / context-keywords loader failed to
     /// initialize for this session. Drives the persistent degrade
     /// banner on the search sheet's Scan interface and gates
