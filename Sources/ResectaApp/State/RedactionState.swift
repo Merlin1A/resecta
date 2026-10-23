@@ -238,7 +238,7 @@ class RedactionState {
     /// within `manualDrawNudgeProximityNormalized` of the new region
     /// that has NOT been applied or suppressed for this session.
     /// Observed by `DocumentEditorView` via `.onChange(of:)` to enqueue
-    /// the non-modal "Add to selection?" toast. Cleared after enqueue
+    /// the non-modal "Mark it too?" toast. Cleared after enqueue
     /// (and on any `activeSearch` transition per the didSet above).
     /// The surface is a toast — NOT a new canvas long-press
     /// action — so the canvas density cap stays at 6 menu items.

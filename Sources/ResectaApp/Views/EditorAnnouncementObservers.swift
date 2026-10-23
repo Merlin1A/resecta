@@ -16,23 +16,50 @@ struct EditorAnnouncementObservers: ViewModifier {
     @State private var showHoverPopover = false
     @State private var hoveredMetadata: RegionMetadata?
 
+    /// The nearby-match nudge's toast and its action.
+    static let nudgeToastMessage = "1 match nearby. Mark it too?"
+    static let nudgeToastActionLabel = "Mark"
+
+    /// The spoken line for a selection change; a delete names itself with
+    /// the coordinator's one delete announcement.
+    static func selectionAnnouncement(newCount: Int, regionsRemoved: Bool) -> String {
+        if regionsRemoved { return PDFViewCoordinator.commitAnnouncement(.deleted) }
+        switch newCount {
+        case 0: return "Selection cleared"
+        case 1: return "1 region selected"
+        default: return "\(newCount) regions selected"
+        }
+    }
+
+    /// The hover popover opens for a region with metadata, never over the
+    /// search sheet.
+    static func showsHoverPopover(hasMetadata: Bool, searchSheetUp: Bool) -> Bool {
+        hasMetadata && !searchSheetUp
+    }
+
+    /// The selection size and the document's region count, observed
+    /// together so a selection drop that removed regions reads as a delete.
+    private struct SelectionFacts: Equatable {
+        let selected: Int
+        let regions: Int
+    }
+
     func body(content: Content) -> some View {
         content
             // VoiceOver announcement on selection count change
-            .onChange(of: redactionState.selectedRegionIDs.count) { oldCount, newCount in
-                guard UIAccessibility.isVoiceOverRunning,
+            .onChange(of: SelectionFacts(
+                selected: redactionState.selectedRegionIDs.count,
+                regions: redactionState.regions.values.reduce(0) { $0 + $1.count }
+            )) { old, new in
+                guard new.selected != old.selected, UIAccessibility.isVoiceOverRunning,
                       documentState.phaseKind == .editing else { return }
-                let announcement: String
-                switch newCount {
-                case 0:  announcement = "Selection cleared"
-                case 1:  announcement = "1 region selected"
-                default: announcement = "\(newCount) regions selected"
-                }
-                AccessibilityNotification.Announcement(announcement).post()
+                AccessibilityNotification.Announcement(Self.selectionAnnouncement(
+                    newCount: new.selected, regionsRemoved: new.regions < old.regions)).post()
             }
             // iPad hover popover — observe hoveredRegionID on RedactionState
             .onChange(of: redactionState.hoveredRegionID) { _, newID in
-                if let id = newID, let metadata = redactionState.regionMetadata[id] {
+                if let id = newID, let metadata = redactionState.regionMetadata[id],
+                   Self.showsHoverPopover(hasMetadata: true, searchSheetUp: redactionState.activeSearch != nil) {
                     hoveredMetadata = metadata
                     showHoverPopover = true
                 } else {
@@ -54,9 +81,9 @@ struct EditorAnnouncementObservers: ViewModifier {
                 guard let nudge = redactionState.pendingManualDrawNudge else { return }
                 let capturedNudge = nudge
                 toastManager.enqueue(
-                    "1 match nearby. Add to selection?",
+                    Self.nudgeToastMessage,
                     severity: .info,
-                    actionLabel: "Add",
+                    actionLabel: Self.nudgeToastActionLabel,
                     editsRegions: true,
                     actionHandler: { [weak redactionState, weak undoManager, weak documentState] in
                         guard let state = redactionState else { return }
