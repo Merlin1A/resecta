@@ -45,6 +45,9 @@ class SettingsState {
     /// Guards didSet during init to avoid redundant UserDefaults writes.
     private var isInitializing = true
 
+    /// Stored values of settings that no longer exist, removed on load.
+    static let retiredDefaultsKeys = ["snapToTextEnabled", "successfulExportCount"]
+
     /// The store every preference reads from and writes to. Production uses
     /// `.standard`; a test passes its own suite so parallel suites never
     /// share keys.
@@ -145,6 +148,10 @@ class SettingsState {
         // Idempotent removeObject-on-init (nothing writes this key
         // anymore), mirroring `SavedSearchStore.legacyDefaultsKey`.
         defaults.removeObject(forKey: "autoApplyDetections")
+        // The snap-to-text preference and the export counter that timed the
+        // old rating prompt are retired too; their stored values go the
+        // same way.
+        for key in Self.retiredDefaultsKeys { defaults.removeObject(forKey: key) }
         self.paranoidMode = defaults.object(forKey: "paranoidMode") as? Bool ?? false
         let storedAppearance = defaults.string(forKey: "appearancePreference.v1")
         self.appearancePreference = storedAppearance
