@@ -185,6 +185,26 @@ struct ApplySeamSearchOriginTests {
         #expect(search.userModifiedSelections == false,
                 "committed selections reset the tracker inside the path")
     }
+
+    @Test("A PII Scan apply returns the created count the Marked notice reports")
+    func piiScanApplyFeedsMarkedNotice() async {
+        let state = RedactionState()
+        let search = SearchState()
+        search.searchModeType = .piiScan
+        search.results = (0..<3).map { i in
+            makeSearchResult(y: 0.1 + 0.1 * Double(i), matchedText: "match-\(i)")
+        }
+        state.activeSearch = search
+
+        let outcome = await state.applyFindings(.selectedSearchResults, undoManager: nil)
+
+        #expect(outcome?.applied == 3)
+        #expect(outcome?.skippedOverlaps == 0)
+        #expect(CommitFeedback.markedMessage(
+            applied: outcome?.applied ?? 0,
+            alreadyCovered: outcome?.skippedOverlaps ?? 0)
+            == "Marked 3 for redaction. Not redacted until you tap Redact.")
+    }
 }
 
 // MARK: - 3. One undo implementation

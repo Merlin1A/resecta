@@ -192,6 +192,7 @@ struct TransitionTests {
             (DocumentState.PhaseKind.empty, DocumentState.PhaseKind.editing),
             (.editing, .editing),           // No self-transition for editing
             (.editing, .verified),           // Must go through redacting
+            (.editing, .failed),             // Only a running phase can fail
             (.editing, .exporting),          // Must go through verified
             (.verified, .redacting),         // Must return to editing first
             (.importing, .importing),        // No self-transition for importing
