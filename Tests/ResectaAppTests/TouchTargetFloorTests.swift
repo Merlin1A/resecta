@@ -61,7 +61,8 @@ struct TouchTargetFloorTests {
             "Sources/ResectaApp/Views/Search/SearchAndRedactSheet+CompactStrip.swift",
             "Sources/ResectaApp/Views/Search/SearchSheetHeaderSection.swift",
             "Sources/ResectaApp/Views/Search/SearchFooterSection.swift",
-            "Sources/ResectaApp/Overlay/RedactionOverlayView.swift",
+            // The resize-handle hit test, carved out of the overlay hub.
+            "Sources/ResectaApp/Overlay/RedactionOverlayView+Resize.swift",
         ]
         for path in sites {
             let source = try loadRepoFile(path)
