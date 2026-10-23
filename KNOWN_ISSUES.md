@@ -75,7 +75,7 @@ page when the draw completes; no output is produced from a failed run.
 ### KI-10: Rectangle Edges Do Not Align to Text Rows (Low)
 **Affects:** Rectangle draw tool
 
-While drawing, rectangle edges align to other boxes and page guides; alignment to recognized text rows is not available in this release (the "Snap to Text Boxes" setting that described it was removed in 1.1.0).
+While drawing, rectangle edges align to other boxes and page guides; alignment to recognized text rows is not available in this release.
 
 ---
 
