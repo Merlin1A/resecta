@@ -105,6 +105,7 @@ struct SearchAndRedactSheet: View {
     // established +Trigger pattern; internal is the smallest
     // visibility that compiles).
     @State var showDismissConfirmation = false
+    @State private var footerHeight: CGFloat = 0  // the toast host sits above the footer
     @State private var duplicateTermMessage: String?
     @FocusState private var isSearchFieldFocused: Bool
     // `appliedResultIDs` lives on `SearchState`. View-side reads/writes go
@@ -206,6 +207,7 @@ struct SearchAndRedactSheet: View {
                     SearchFooterSection(
                         searchState: searchState,
                     )
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { footerHeight = $0 }
                 }
             }
         }
@@ -314,6 +316,9 @@ struct SearchAndRedactSheet: View {
             // reopen): the raised keyboard would cover the very
             // document the float exists to expose.
             isSearchFieldFocused = selectedDetent != .compactFloat
+            // Both toast hosts clear the sheet from its first frame, not
+            // only after a detent change (a sticky compact reopen).
+            toastManager.bottomClearance = toastBottomClearance(sheetPresented: true)
             // One-tap contract: the toolbar Scan button armed a
             // one-shot flag before presenting. Consume it exactly once
             // here — this is the sole trigger for the auto-run.
@@ -517,7 +522,9 @@ struct SearchAndRedactSheet: View {
                         .onTapGesture { toastManager.dismiss(item) }
                 }
             }
-            .padding(.bottom, ResectaTokens.Spacing.xl + toastManager.bottomClearance)
+            .padding(.bottom, ResectaTokens.Spacing.xl + Self.sheetToastLift(
+                clearance: toastManager.bottomClearance, footerHeight: footerHeight,
+                footerShown: searchState.filteredCount > 0))
             .animation(
                 ResectaTokens.Anim.resolved(ResectaTokens.Anim.toastIn, reduceMotion: reduceMotion),
                 value: toastManager.toastVersion
