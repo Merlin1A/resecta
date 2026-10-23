@@ -15,6 +15,38 @@ import RedactionEngine
 
 extension DocumentEditorView {
 
+    // MARK: - The export source and the share copy
+
+    /// The share copy's one name. It carries no export time and no part of
+    /// the source document's name, so the file a recipient sees says
+    /// nothing about when or from what it was made.
+    static let shareCopyFileName = "redacted.pdf"
+
+    /// The redacted output the export reads: its URL while the file is on
+    /// disk. When iOS reclaimed it in the background (Known Issues KI-4),
+    /// the output is discarded the way every discard clears it
+    /// (`clearOutput()`, which drops the run's recorded inputs with it) and
+    /// the export fails as purged, returning to editing.
+    static func exportSource(redactionState: RedactionState, documentState: DocumentState) -> URL? {
+        if let url = redactionState.outputURL, FileManager.default.fileExists(atPath: url.path) {
+            return url
+        }
+        redactionState.clearOutput()
+        failExportForPurgedOutput(documentState: documentState)
+        return nil
+    }
+
+    /// Copy `output` to the share copy in the session's protected
+    /// directory, replacing a copy an earlier share left at that URL.
+    static func makeShareCopy(of output: URL, in directory: TempExportDirectory) throws -> URL {
+        let copy = try directory.childURL(named: shareCopyFileName)
+        if FileManager.default.fileExists(atPath: copy.path) {
+            try FileManager.default.removeItem(at: copy)
+        }
+        try FileManager.default.copyItem(at: output, to: copy)
+        return copy
+    }
+
     // MARK: - Post-share acknowledgment + re-arm
 
     /// Toast enqueued when the share sheet reports the document was
@@ -105,44 +137,20 @@ struct DocumentEditorExportFlow {
         beginExport(report: report)
     }
 
-    // DateFormatter is expensive to create; reuse a static instance.
-    private static let exportFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd_HH-mm-ss"
-        return f
-    }()
-
     func beginExport(report: VerificationReport) {
-        guard let outputURL = redactionState.outputURL,
-              FileManager.default.fileExists(atPath: outputURL.path)
-        else {
-            // KI-4: File purged while backgrounded
-            redactionState.outputURL = nil
-            DocumentEditorView.failExportForPurgedOutput(documentState: documentState)
-            return
-        }
+        guard let outputURL = DocumentEditorView.exportSource(
+            redactionState: redactionState, documentState: documentState)
+        else { return }
 
         documentState.transition(to: .exporting)
 
-        // Timestamped filename, no original name (could be sensitive)
-        let exportName = "redacted_\(Self.exportFormatter.string(from: Date())).pdf"
-        // Place the share-export copy inside the per-session
-        // backup-excluded subdirectory so the user-facing filename surfaces
-        // in the share sheet from the same protected location as the
-        // pipeline output.
+        // The share copy sits in the per-session backup-excluded
+        // subdirectory, so the name the share sheet shows comes from the
+        // same protected location as the pipeline output.
         let exportURL: URL
         do {
-            exportURL = try coordinator.tempExportDirectory.childURL(named: exportName)
-        } catch { // LegalPhrases:safe
-            documentState.transition(to: .failed(
-                error: .exportError(.writeFailed),
-                returnPhase: .verified(report: report)
-            ))
-            return
-        }
-
-        do {
-            try FileManager.default.copyItem(at: outputURL, to: exportURL)
+            exportURL = try DocumentEditorView.makeShareCopy(
+                of: outputURL, in: coordinator.tempExportDirectory)
         } catch {
             documentState.transition(to: .failed(
                 error: .exportError(.writeFailed),
