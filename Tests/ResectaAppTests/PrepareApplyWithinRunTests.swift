@@ -97,11 +97,11 @@ struct PrepareApplyWithinRunTests {
         state.addRegion(RedactionRegion.mock(rect: result.normalizedRect), page: 0, undoManager: nil)
         state.activeSearch = textSession([result], defaults: defaults)
         let version = state.regionVersion
-        let mgr = makeUndoManager()
+        // An event-grouped manager, as the app's: an explicit group would
+        // close empty and still read as undoable.
+        let mgr = UndoManager()
 
-        mgr.beginUndoGrouping()
         let outcome = await state.applyFindings(.selectedSearchResults, undoManager: mgr)
-        mgr.endUndoGrouping()
 
         #expect(outcome?.applied == 0)
         #expect(outcome?.skippedOverlaps == 1)

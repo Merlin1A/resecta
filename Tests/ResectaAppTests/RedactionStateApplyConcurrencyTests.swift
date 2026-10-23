@@ -26,7 +26,7 @@ struct RedactionStateApplyConcurrencyTests {
         var results: [SearchResult] = []
         for page in 0..<5 {
             for i in 0..<100 {
-                let yOffset = 0.001 * Double(i)
+                let yOffset = 0.006 * Double(i)  // 0.005 tall: neighbours never overlap
                 results.append(SearchResult(
                     pageIndex: page,
                     normalizedRect: CGRect(x: 0.1, y: 0.001 + yOffset, width: 0.05, height: 0.005),
