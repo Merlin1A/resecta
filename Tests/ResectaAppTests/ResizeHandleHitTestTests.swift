@@ -173,4 +173,23 @@ struct ResizeHandleHitTestTests {
             ) == nil
         )
     }
+
+    // MARK: - Thin regions and page edges
+
+    @Test("A thin region's centre is its body, not a handle")
+    func thinRegionCentreIsTheBody() {
+        let rect = CGRect(x: 0, y: 0, width: 120, height: 8)
+        #expect(RedactionOverlayView.resolveResizeHandle(
+            at: CGPoint(x: 60, y: 4), regionRect: rect) == nil)
+    }
+
+    @Test("A region at the page edge keeps a whole handle box inside the page")
+    func edgeHandleBoxShiftsInward() {
+        // A 200-pt region against the left edge: its left-centre box would
+        // straddle x = 0, half off the page; inside the page it spans 0…46.
+        let rect = CGRect(x: 0, y: 100, width: 200, height: 200)
+        let page = CGRect(x: 0, y: 0, width: 400, height: 400)
+        #expect(RedactionOverlayView.resolveResizeHandle(
+            at: CGPoint(x: 30, y: 200), regionRect: rect, containerBounds: page) == .leftCenter)
+    }
 }

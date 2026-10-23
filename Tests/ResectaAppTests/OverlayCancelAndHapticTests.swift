@@ -198,4 +198,33 @@ struct OverlayCancelAndHapticTests {
                        "the selected region's rect")
         #expect(canvas.state.regionVersion == version, "no resize is committed")
     }
+
+    // MARK: - Group move at the page edge
+
+    @Test("A group move stopped by the page edge keeps the spacing between its regions")
+    func groupMoveAtTheEdgeKeepsTheSpacing() {
+        // A at the left edge (overlay 0…100 × 160…240), B beside it
+        // (150…250 × 160…240); both selected.
+        let a = RedactionRegion.mock(rect: CGRect(x: 0, y: 0.4, width: 0.25, height: 0.2))
+        let b = RedactionRegion.mock(rect: CGRect(x: 0.375, y: 0.4, width: 0.25, height: 0.2))
+        let canvas = makeCanvas(regions: [a, b], selectedIDs: [a.id, b.id])
+
+        // Drag A 150 pt further left than the edge allows.
+        let touch = press(canvas.overlay, at: CGPoint(x: 50, y: 200),
+                          through: [CGPoint(x: -100, y: 200)])
+        canvas.overlay.touchesEnded([touch], with: nil)
+
+        expectSameRect(storedRect(a.id, in: canvas.state), a.normalizedRect, "A, held by the edge")
+        expectSameRect(storedRect(b.id, in: canvas.state), b.normalizedRect,
+                       "B keeps its distance from A")
+    }
+
+    // MARK: - The long-press preview
+
+    @Test("The overlay supplies the long-press menu's highlight preview")
+    func contextMenuSuppliesAHighlightPreview() {
+        let overlay = RedactionOverlayView(frame: CGRect(origin: .zero, size: Self.overlaySize))
+        #expect(overlay.responds(to: NSSelectorFromString(
+            "contextMenuInteraction:previewForHighlightingMenuWithConfiguration:")))
+    }
 }
