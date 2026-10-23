@@ -51,6 +51,8 @@ extension SearchAndRedactSheet {
         searchDebounceTask = Task {
             try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled else { return }
+            // Typing refines the query; its run names no cleared matches.
+            searchState.skipNextRerunNotice = true
             triggerSearch()
         }
     }
@@ -178,7 +180,10 @@ extension SearchAndRedactSheet {
         // `diffSinceLastScan()` reads this snapshot once the new scan's
         // results land, surfacing the Coverage Report diff line.
         searchState.captureFingerprintsBeforeScan()
+        let unapplied = searchState.skipNextRerunNotice ? 0 : Self.unappliedMatchCount(in: searchState)
+        searchState.skipNextRerunNotice = false  // one shot (a recall, or an as-you-type run)
         searchState.clearResults()
+        if let message = Self.rerunClearedMessage(unappliedCount: unapplied) { toastManager.enqueue(message, severity: .info) }
         // The token this run's results and progress hops carry: a
         // cancelled predecessor still draining its stream is told
         // apart by it and dropped, so its late batch can never land
@@ -693,8 +698,8 @@ extension SearchAndRedactSheet {
     /// `CommitFeedback` builder so the count stays in lockstep with the
     /// review-apply toasts (nil for a no-op apply, so a held shortcut
     /// against an all-overlap selection emits no "Marked 0" message;
-    /// `toastManager.enqueue` coalesces duplicates). The
-    /// conditional-dismiss tracker reset is owned by the apply path.
+    /// `toastManager.enqueue` coalesces duplicates). The sheet's
+    /// markers derive from the live regions after the apply.
     /// (Lives here with `triggerSearch()` per the M-6 hub-cap
     /// decomposition — the run-orchestration family stays together;
     /// internal, not private, because the hub view's toolbar and the
@@ -718,8 +723,6 @@ extension SearchAndRedactSheet {
                 undoManager: undoManager,
                 documentState: documentState
             ) else { return }
-            searchState.appliedResultIDs.formUnion(outcome.appliedResultIDs)
-            searchState.coveredResultIDs.formUnion(outcome.coveredResultIDs)
             if let message = CommitFeedback.markedMessage(
                 applied: outcome.applied,
                 alreadyCovered: outcome.skippedOverlaps
@@ -773,6 +776,7 @@ extension SearchAndRedactSheet {
         activeModal = nil
         let dropped = Self.unappliedMatchCount(in: searchState)
         SavedSearchListSheet.apply(saved, to: searchState)
+        searchState.skipNextRerunNotice = true
         triggerSearch()
         if let message = Self.recallClearedMessage(unappliedCount: dropped) {
             toastManager.enqueue(message, severity: .info)

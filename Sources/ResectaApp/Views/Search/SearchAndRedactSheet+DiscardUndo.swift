@@ -3,7 +3,7 @@ import SwiftUI
 // Dismissal helpers for the search sheet's Dismiss control.
 //
 // The live contract has TWO branches, both landing on the
-// shared `performDismiss(afterConfirmation:)` (SearchAndRedactSheet.swift)
+// shared `performDismiss(afterConfirmation:)` (below, with the dismiss copy)
 // that this file's `currentSelectionSnapshot` / `clearSelection` helpers
 // underpin:
 //
@@ -70,6 +70,14 @@ extension SearchAndRedactSheet {
         return "\(noun) closed — \(unappliedCount) unapplied match\(suffix) cleared."
     }
 
+    /// The notice a re-run posts when it clears unapplied matches with the
+    /// previous results; nil when none were unapplied.
+    static func rerunClearedMessage(unappliedCount: Int) -> String? {
+        guard unappliedCount > 0 else { return nil }
+        let suffix = unappliedCount == 1 ? "" : "es"
+        return "Search re-run — \(unappliedCount) unapplied match\(suffix) cleared."
+    }
+
     /// The notice read from a live session: what every dismissal that
     /// drops the session posts, the sheet's own Dismiss and a system
     /// dismissal (a swipe or a scrim tap) the editor's sheet binding sees.
@@ -78,5 +86,48 @@ extension SearchAndRedactSheet {
             unappliedCount: unappliedMatchCount(in: searchState),
             interface: searchState.searchModeType.interface
         )
+    }
+
+    // MARK: - Dismiss (conditional dismiss)
+
+    /// Dismiss-confirmation copy — the single source of truth for both
+    /// the production `.alert` and the copy-pin banned-word
+    /// sweep (`SearchSheetDismissRuleTests`), so a copy rename can't
+    /// drift past the sweep. Covers both result origins; the message
+    /// names the concrete loss — selected matches that will not be
+    /// applied — rather than a generic "not saved".
+    static let dismissTitle = "Discard selections?"
+    static let dismissMessage = "Selected matches will not be applied to the document."
+
+    /// Escape's dismiss, the Dismiss button's rule: ask first while the
+    /// session holds selected matches no live region covers, else close.
+    func requestDismiss() {
+        if DocumentState.hasUnappliedSelections(redactionState) {
+            showDismissConfirmation = true
+        } else {
+            performDismiss(afterConfirmation: false)
+        }
+    }
+
+    /// The notice a dismissal posts: the unapplied matches it clears,
+    /// with or without a selection on board, unless the confirmation
+    /// already named the drop (a dialog and a toast on one dismiss would
+    /// say it twice).
+    static func dismissalNotice(afterConfirmation: Bool, in searchState: SearchState) -> String? {
+        afterConfirmation ? nil : dismissClearedMessage(for: searchState)
+    }
+
+    /// Shared dismiss path for the direct and confirmed routes: the
+    /// notice (the toast manager outlives the sheet), a live selection
+    /// deselected in place, then the session dropped.
+    func performDismiss(afterConfirmation: Bool) {
+        if let message = Self.dismissalNotice(afterConfirmation: afterConfirmation, in: searchState) {
+            toastManager.enqueue(message, severity: .info)
+        }
+        if searchState.selectedCount > 0 {
+            let snapshot = Self.currentSelectionSnapshot(in: searchState)
+            Self.clearSelection(in: searchState, snapshot: snapshot)
+        }
+        redactionState.activeSearch = nil
     }
 }

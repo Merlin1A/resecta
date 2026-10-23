@@ -76,8 +76,6 @@ struct SearchFooterSection: View {
         let allSelected = searchState.selectedFilteredCount == searchState.filteredCount
         let action: () -> Void = {
             searchState.toggleSelectAll()
-            // Conditional dismiss: footer bulk selection is user selection work.
-            searchState.userModifiedSelections = true
         }
         // Closure-label form so the floor can sit on
         // the label; `Text(...)` reproduces the exact

@@ -93,14 +93,10 @@ struct SearchAndRedactSheet: View {
     /// Internal (not private): the apply handlers live in the
     /// `+Trigger` extension file.
     @State var isApplying = false
-    // Conditional dismiss: Dismiss is conditional on user selection work: an
-    // untouched sheet closes in one tap (a live machine-made selection
-    // is deselected in-place on the way
-    // out); once the USER has modified selections this session
-    // (`searchState.userModifiedSelections`), Dismiss routes through a
-    // confirmation dialog. Under
-    // all-deselected arrival, every live selection is deliberate opt-in
-    // work, so a one-tap-always dismiss would silently discard it. See
+    // Conditional dismiss: while the session holds selected matches no
+    // live region covers (`DocumentState.hasUnappliedSelections`, read
+    // from the rows, not from who ticked them), Dismiss routes through a
+    // confirmation dialog; otherwise it closes in one tap. See
     // `SearchAndRedactSheet+DiscardUndo.swift` for the selection helpers
     // and the dismissal message (untouched path only — the dialog
     // already names the drop on the other).
@@ -109,6 +105,7 @@ struct SearchAndRedactSheet: View {
     // established +Trigger pattern; internal is the smallest
     // visibility that compiles).
     @State var showDismissConfirmation = false
+    @State private var footerHeight: CGFloat = 0  // the toast host sits above the footer
     @State private var duplicateTermMessage: String?
     @FocusState private var isSearchFieldFocused: Bool
     // `appliedResultIDs` lives on `SearchState`. View-side reads/writes go
@@ -210,6 +207,7 @@ struct SearchAndRedactSheet: View {
                     SearchFooterSection(
                         searchState: searchState,
                     )
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { footerHeight = $0 }
                 }
             }
         }
@@ -218,11 +216,11 @@ struct SearchAndRedactSheet: View {
         // Attached to the content Group (not the outer modifier chain)
         // to stay inside the type-checker budget beside the
         // audit-export dialog.
-        .confirmationDialog(
-            Self.dismissTitle,
-            isPresented: $showDismissConfirmation,
-            titleVisibility: .visible
-        ) {
+        .onKeyPress(.escape) {
+            requestDismiss()
+            return .handled
+        }
+        .alert(Self.dismissTitle, isPresented: $showDismissConfirmation) {
             Button("Discard", role: .destructive) {
                 performDismiss(afterConfirmation: true)
             }
@@ -318,6 +316,9 @@ struct SearchAndRedactSheet: View {
             // reopen): the raised keyboard would cover the very
             // document the float exists to expose.
             isSearchFieldFocused = selectedDetent != .compactFloat
+            // Both toast hosts clear the sheet from its first frame, not
+            // only after a detent change (a sticky compact reopen).
+            toastManager.bottomClearance = toastBottomClearance(sheetPresented: true)
             // One-tap contract: the toolbar Scan button armed a
             // one-shot flag before presenting. Consume it exactly once
             // here — this is the sole trigger for the auto-run.
@@ -449,20 +450,14 @@ struct SearchAndRedactSheet: View {
                 scheduleLivePreview: scheduleLivePreviewIfApplicable
             )
         }
-        // Clear stale applied markers when regions change (undo/redo), but
-        // NOT for the apply that just created them: the search-origin apply bumps
-        // regionVersion in the same MainActor tick as the appliedResultIDs
-        // union, so this handler cannot otherwise tell that bump apart from a
-        // real undo/redo. The decision is factored into the pure, testable
-        // `shouldClearAppliedMarkers(...)` helper.
-        .onChange(of: redactionState.regionVersion) { _, newVersion in
-            if Self.shouldClearAppliedMarkers(
-                newVersion: newVersion,
-                lastAppliedVersion: redactionState.lastAppliedSearchRegionVersion,
-                isEmpty: searchState.appliedResultIDs.isEmpty
-            ) {
-                searchState.appliedResultIDs.removeAll()
-            }
+        // The applied and covered markers are derived from the live
+        // regions (`refreshSearchMarkers(on:)`) whenever the regions or the
+        // results change, so they are never wiped by an unrelated edit.
+        .onChange(of: redactionState.regionVersion, initial: true) { _, _ in
+            redactionState.refreshSearchMarkers(on: searchState)
+        }
+        .onChange(of: searchState.results.count) { _, _ in
+            redactionState.refreshSearchMarkers(on: searchState)
         }
         // At the medium detent the fixed chrome above the results list
         // consumes nearly the full sheet height, so arriving results
@@ -527,7 +522,9 @@ struct SearchAndRedactSheet: View {
                         .onTapGesture { toastManager.dismiss(item) }
                 }
             }
-            .padding(.bottom, ResectaTokens.Spacing.xl + toastManager.bottomClearance)
+            .padding(.bottom, ResectaTokens.Spacing.xl + Self.sheetToastLift(
+                clearance: toastManager.bottomClearance, footerHeight: footerHeight,
+                footerShown: searchState.filteredCount > 0))
             .animation(
                 ResectaTokens.Anim.resolved(ResectaTokens.Anim.toastIn, reduceMotion: reduceMotion),
                 value: toastManager.toastVersion
@@ -935,36 +932,6 @@ struct SearchAndRedactSheet: View {
         searchState.setLivePreviewRects(rects)
     }
 
-    // MARK: - Dismiss (conditional dismiss)
-
-    /// Dismiss-confirmation copy — the single source of truth for both
-    /// the production `.confirmationDialog` and the copy-pin banned-word
-    /// sweep (`SearchSheetDismissRuleTests`), so a copy rename can't
-    /// drift past the sweep. Covers both result origins; the message
-    /// names the concrete loss — selected matches that will not be
-    /// applied — rather than a generic "not saved".
-    static let dismissTitle = "Discard selections?"
-    static let dismissMessage = "Selected matches will not be applied to the document."
-
-    /// Shared dismiss path for the direct (untouched) and confirmed
-    /// (touched) routes: a live selection is deselected in-place.
-    /// `afterConfirmation` suppresses the loss-naming toasts — the
-    /// dialog already named the drop, and dialog + toast on one dismiss
-    /// would double-message.
-    func performDismiss(afterConfirmation: Bool) {
-        if searchState.selectedCount > 0 {
-            let snapshot = Self.currentSelectionSnapshot(in: searchState)
-            Self.clearSelection(in: searchState, snapshot: snapshot)
-        } else if !afterConfirmation,
-                  let message = Self.dismissClearedMessage(for: searchState) {
-            // A 0-selected dismissal names what the close drops when
-            // unapplied matches exist so the loss isn't silent. The
-            // toast manager outlives the sheet.
-            toastManager.enqueue(message, severity: .info)
-        }
-        redactionState.activeSearch = nil
-    }
-
     // MARK: - the unified degrade rule Degrade banner
 
     /// Unified degrade-banner rule: Scan always surfaces a degraded
@@ -1072,21 +1039,6 @@ struct SearchAndRedactSheet: View {
         currentDetent: PresentationDetent
     ) -> Bool {
         wasEmpty && !isEmpty && currentDetent == .medium
-    }
-
-    // Pure decision used by the `regionVersion` onChange handler,
-    // factored out so it is unit-testable without driving the SwiftUI render
-    // cycle. Returns false for the apply's own bump (`newVersion` equals the
-    // version that apply recorded) so the just-applied markers persist;
-    // returns true for a real undo/redo bump (any other version) when there
-    // are markers to drop.
-    static func shouldClearAppliedMarkers(
-        newVersion: Int,
-        lastAppliedVersion: Int,
-        isEmpty: Bool
-    ) -> Bool {
-        if newVersion == lastAppliedVersion { return false }
-        return !isEmpty
     }
 
     // MARK: - Save current regex

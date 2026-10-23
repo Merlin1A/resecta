@@ -113,6 +113,38 @@ struct DiscardUndoToastTests {
         #expect(SearchAndRedactSheet.dismissClearedMessage(for: SearchState()) == nil)
     }
 
+    // MARK: - The dismissal notice whenever matches are dropped
+
+    @Test("A one-tap dismiss with an applied selection still names the unapplied matches it clears")
+    func noticeWithASelectionOnBoard() {
+        let state = SearchState()
+        var applied = makeResult()
+        applied.isSelected = true
+        state.results = [applied, makeResult()]
+        state.appliedResultIDs = [applied.id]
+        #expect(SearchAndRedactSheet.dismissalNotice(afterConfirmation: false, in: state)
+                == "Search closed — 1 unapplied match cleared.")
+    }
+
+    @Test("After the confirmation no notice repeats the dialog")
+    func noNoticeAfterTheConfirmation() {
+        let state = SearchState()
+        state.results = [makeResult()]
+        #expect(SearchAndRedactSheet.dismissalNotice(afterConfirmation: true, in: state) == nil)
+    }
+
+    // MARK: - A re-run's notice
+
+    @Test("A re-run names the unapplied matches it clears, and says nothing when none")
+    func rerunNamesTheClearedMatches() {
+        #expect(SearchAndRedactSheet.rerunClearedMessage(unappliedCount: 3)
+                == "Search re-run — 3 unapplied matches cleared.")
+        #expect(SearchAndRedactSheet.rerunClearedMessage(unappliedCount: 1)
+                == "Search re-run — 1 unapplied match cleared.")
+        #expect(SearchAndRedactSheet.rerunClearedMessage(unappliedCount: 0) == nil)
+    }
+
+    // MARK: - Fixtures
 
     private func makeResult() -> SearchResult {
         SearchResult(

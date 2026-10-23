@@ -214,8 +214,6 @@ struct SearchResultsSection: View {
 
             Button {
                 searchState.toggleSelectionForCurrentMatch()
-                // Conditional dismiss: the space-key toggle is user selection work.
-                searchState.userModifiedSelections = true
             } label: { EmptyView() }
                 .accessibilityLabel("Toggle selection for current match")
                 .keyboardShortcut(" ", modifiers: [])
@@ -370,7 +368,6 @@ struct SearchResultsSection: View {
             },
             set: { _ in
                 searchState.toggleSelection(for: id)
-                searchState.userModifiedSelections = true
             }
         )
     }

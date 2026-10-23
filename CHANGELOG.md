@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ### Changed
 
+- The Discard selections confirmation is an alert with a Cancel button.
 - A light haptic on adding or resizing a region.
 - Share: when annotations in the original document — a black box, a stamp, an unapplied redaction mark — cover text that no redaction box covers, the share confirmation names those pages before the file is shared, whatever the verification result. Annotations are not part of the page image, so that text is visible in the exported file. On a scanned page, where the printed text is in the page image, any such annotation that no redaction box covers is named; on a rotated page an annotation is compared with the boxes as the page is shown.
 - The App Store rating prompt asks once per app version, after the first share of a document whose checks passed, instead of after the third export.
@@ -74,6 +75,15 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Document canvas: with a hardware keyboard, Select All then Copy (⌘A, ⌘C) no longer places the document's text on the system pasteboard. The canvas view refuses the copy, cut, paste, select and select-all actions and builds its menu without the edit, look-up, learn and share groups; in 1.2.0 that keyboard path copied the whole document's text with no selection shown.
 ### Fixed
 
+- A Search or Scan that stops at the 1,000-result cap now shows the cap banner and the unscanned page count on the run that reached it.
+- A match skipped as already covered no longer reads "Applied" after the covering region is deleted or undone.
+- The applied-search record stamps the options the run used, not the options changed afterwards.
+- The in-sheet notice no longer covers the "M of N selected" footer.
+- Re-running a search shows how many unapplied matches the re-run cleared.
+- Custom-term matches get their own Scan chip and are excluded while another category filter is active.
+- A re-Scan shows which results an existing region already covers.
+- Dismiss with selected matches still names the unapplied matches it clears.
+- Esc closes the Search sheet at the medium and large heights.
 - Dragging a group of regions past the page edge keeps their spacing.
 - A thin selected region keeps a central zone that moves it, and with Add to Selection on a tap on a neighbouring region selects it instead of resizing.
 - Resizing a thin region from a side handle no longer grows its height; dragging a handle past the opposite edge flips the box instead of mirroring it.

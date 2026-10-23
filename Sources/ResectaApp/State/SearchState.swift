@@ -20,24 +20,13 @@ final class SearchState: Identifiable {
 
     /// Injected at init; defaults to `.standard`. @ObservationIgnored so
     /// the macro does not wrap the concrete UserDefaults reference.
-    @ObservationIgnored private let defaults: UserDefaults
+    @ObservationIgnored let defaults: UserDefaults
 
     // MARK: - Last-used filter shape
 
-    /// Codable bag of the three filter fields that restore across sheet
-    /// sessions. `appliedFilter` is intentionally excluded — it is
-    /// document-specific.
-    struct LastSearchFilterShape: Codable, Sendable {
-        var sourceFilter: SourceFilter
-        var minimumOCRConfidence: Float
-        var sortOrder: ResultSortOrder
-    }
-
-    private static let lastFilterKey = "search.lastFilter.v1"
-
     /// Task reference for debounced filter persistence; cancel before
     /// scheduling a new one (mirrors the flushTask idiom).
-    @ObservationIgnored private var filterFlushTask: Task<Void, Never>?
+    @ObservationIgnored var filterFlushTask: Task<Void, Never>?
 
     // MARK: - Search Configuration
 
@@ -51,6 +40,10 @@ final class SearchState: Identifiable {
     /// `SearchAndRedactSheet+Trigger.prepareSearchRun()`, read by
     /// `appliedSearchRecord()` so the record reproduces the run.
     var lastRunScanConfiguration: ScanRunConfiguration?
+
+    /// One shot: the next run posts no re-run notice (a recall names its own
+    /// drop; an as-you-type run refines the query). Reset by that run.
+    var skipNextRerunNotice = false
 
     /// One-shot arm for the toolbar Scan button's one-tap contract:
     /// the button sets this before presenting the sheet, and the
@@ -189,6 +182,16 @@ final class SearchState: Identifiable {
 
     /// Post-scan filter: only show results matching these categories (nil = show all).
     var piiCategoryFilter: Set<PIICategory>? = nil {
+        didSet {
+            if piiCategoryFilter == nil { customTermMatchesInFilter = false }
+            invalidateFilterCaches()
+        }
+    }
+
+    /// With a category filter active, whether custom-term matches (no
+    /// detector category) stay listed: the Scan's "Custom" chip. Cleared
+    /// with the filter.
+    var customTermMatchesInFilter = false {
         didSet { invalidateFilterCaches() }
     }
 
@@ -556,6 +559,12 @@ final class SearchState: Identifiable {
         resultsByCategory.mapValues(\.count)
     }
 
+    /// Custom-term matches in the session: results with no detector
+    /// category (the "Custom" chip's count).
+    var customTermMatchCount: Int {
+        results.lazy.filter { $0.piiCategory == nil }.count
+    }
+
     /// Whether any PII results exist (controls PII filter UI visibility).
     var hasPIIResults: Bool {
         results.contains { $0.piiCategory != nil }
@@ -645,6 +654,7 @@ final class SearchState: Identifiable {
             source: sourceFilter,
             minOCRConfidence: minimumOCRConfidence,
             piiCategoryFilter: piiCategoryFilter,
+            customTermMatchesInFilter: customTermMatchesInFilter,
             sortOrder: sortOrder,
             appliedResultIDs: appliedResultIDs,
             appliedFilter: appliedFilter
@@ -656,6 +666,7 @@ final class SearchState: Identifiable {
         let source: SourceFilter
         let minOCRConfidence: Float
         let piiCategoryFilter: Set<PIICategory>?
+        let customTermMatchesInFilter: Bool
         let sortOrder: ResultSortOrder
         let appliedResultIDs: Set<UUID>
         let appliedFilter: AppliedFilter
@@ -676,8 +687,12 @@ final class SearchState: Identifiable {
                 guard conf >= minimumOCRConfidence else { return false }
             }
             // PII category filter
-            if let categoryFilter = piiCategoryFilter, let cat = result.piiCategory {
-                guard categoryFilter.contains(cat) else { return false }
+            if let categoryFilter = piiCategoryFilter {
+                if let cat = result.piiCategory {
+                    guard categoryFilter.contains(cat) else { return false }
+                } else {
+                    guard customTermMatchesInFilter else { return false }
+                }
             }
             // The PII confidence post-filter is retired with the
             // per-run Confidence slider — every above-threshold result
@@ -812,32 +827,6 @@ final class SearchState: Identifiable {
         }
     }
 
-    // MARK: - Filter flush (debounced 500 ms)
-
-    /// Schedule a debounced write of the current filter shape to
-    /// UserDefaults. Cancels any pending write (mirrors flushTask
-    /// idiom) so a slider drag does not write on every tick.
-    private func scheduleFilterFlush() {
-        filterFlushTask?.cancel()
-        filterFlushTask = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(500))
-            guard !Task.isCancelled, let self else { return }
-            self.flushFilterShape()
-        }
-    }
-
-    /// Write the current filter shape to UserDefaults synchronously.
-    private func flushFilterShape() {
-        let shape = LastSearchFilterShape(
-            sourceFilter: sourceFilter,
-            minimumOCRConfidence: minimumOCRConfidence,
-            sortOrder: sortOrder
-        )
-        if let data = try? JSONEncoder().encode(shape) {
-            defaults.set(data, forKey: Self.lastFilterKey)
-        }
-    }
-
     // MARK: - Init (UserDefaults seam)
 
     /// Designated init. Hydrates the last-used filter shape from
@@ -847,8 +836,7 @@ final class SearchState: Identifiable {
         self.defaults = defaults
 
         // Last-used filter — fail-closed JSON decode → property defaults
-        if let data = defaults.data(forKey: Self.lastFilterKey),
-           let shape = try? JSONDecoder().decode(LastSearchFilterShape.self, from: data) {
+        if let shape = Self.storedFilterShape(in: defaults) {
             self.sourceFilter         = shape.sourceFilter
             self.minimumOCRConfidence = shape.minimumOCRConfidence
             self.sortOrder            = shape.sortOrder
@@ -889,8 +877,13 @@ final class SearchState: Identifiable {
     /// passes to `appendResult(_:run:)`. Called after `clearResults()`.
     func beginRun() -> Int {
         runToken += 1
+        lastRunOptions = options
         return runToken
     }
+
+    /// The options the current run started with, which the applied
+    /// record names (`appliedSearchRecord()`); nil before any run.
+    private(set) var lastRunOptions: SearchOptions?
 
     // MARK: - Result Navigation
 
@@ -1104,7 +1097,6 @@ final class SearchState: Identifiable {
         recentMultiTermSets = []
         activeSearchTask?.cancel()
         activeSearchTask = nil
-        userModifiedSelections = false
         pendingAutoRunScan = false
         priorScanFingerprints = nil
         navigationScope = .wholeDocument
@@ -1177,21 +1169,6 @@ final class SearchState: Identifiable {
         results.firstIndex(where: { $0.id == id })
     }
 
-    /// Conditional dismiss: whether the USER has modified selections this sheet
-    /// session, for either result origin. Gates the sheet's Dismiss:
-    /// untouched → one tap; touched → confirmation dialog (the triage
-    /// sheet's donor rule, generalized to the whole surface).
-    ///
-    /// Written `true` only at user-gesture sites (row circle, footer
-    /// Select All, Select-Where, keyboard space toggle) — NEVER by programmatic
-    /// selection writes: saved-search
-    /// recall, and the mode-switch undo restore don't count as user
-    /// selection work. Reset by a successful apply (the modified
-    /// selections were committed — a post-apply Dismiss confirming
-    /// "selections will not be saved" would be false) and by `clear()`
-    /// on session teardown.
-    var userModifiedSelections: Bool = false
-
     /// True while the Home close dialog holds this session parked: the
     /// sheet's teardown then spares it, so Cancel re-presents it whole.
     var parkedForHomeClose: Bool = false
@@ -1215,16 +1192,14 @@ final class SearchState: Identifiable {
     func appendResult(_ result: SearchResult, run: Int? = nil) {
         if let run, run != runToken { return }
         if results.count + pendingResults.count >= DocumentSearcher.maxResults {
-            resultsAtCap = true
-            // Snapshot how many pages the cancelled scan will
-            // never reach, so the footer can report the remainder rather
-            // than presenting the first-N results as full coverage.
-            capUnscannedPageCount = max(0, totalPages - currentSearchPage)
-            flushPendingResults()
-            cancelSearchWithoutAwait()
+            markCapReached()  // a result past the cap is dropped
             return
         }
         pendingResults.append((run: runToken, result: result))
+        if results.count + pendingResults.count >= DocumentSearcher.maxResults {
+            markCapReached()  // the result that reaches the cap is kept
+            return
+        }
         if pendingResults.count >= Self.batchFlushSize {
             flushPendingResults()
         } else if flushTask == nil {
@@ -1234,6 +1209,17 @@ final class SearchState: Identifiable {
                 self?.flushPendingResults()
             }
         }
+    }
+
+    /// The run reached the engine's result cap: mark it, snapshot how many
+    /// pages the cancelled scan will never reach (so the footer reports
+    /// the remainder rather than presenting the first N results as full
+    /// coverage), publish what is buffered and stop the scan.
+    private func markCapReached() {
+        resultsAtCap = true
+        capUnscannedPageCount = max(0, totalPages - currentSearchPage)
+        flushPendingResults()
+        cancelSearchWithoutAwait()
     }
 
     /// Flush buffered results into the published array. Single version

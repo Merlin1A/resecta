@@ -1,4 +1,5 @@
 import Foundation
+import RedactionEngine
 
 // The join between the applied-match audit and the live regions: which
 // search results are applied NOW. The sheet's `appliedResultIDs` is a
@@ -32,5 +33,27 @@ extension RedactionState {
         return DeselectionSnapshot(
             items: snapshot.items.filter { !applied.contains($0.id) },
             totalCount: snapshot.totalCount)
+    }
+
+    /// The sheet's markers, derived from the live document: the results
+    /// whose applied region is live, and the results a live region covers
+    /// (`resultIsCovered`, the apply's own skip rule). Never stored apart
+    /// from the regions, so an unrelated edit cannot wipe a marker and an
+    /// undo or a redo moves it with its region.
+    func derivedSearchMarkers(for results: [SearchResult]) -> (applied: Set<UUID>, covered: Set<UUID>) {
+        let applied = liveAppliedSearchResultIDs.intersection(results.map(\.id))
+        var covered: Set<UUID> = []
+        for result in results where !applied.contains(result.id) {
+            let rects = regions[result.pageIndex]?.map(\.normalizedRect) ?? []
+            if resultIsCovered(result.normalizedRect, by: rects) { covered.insert(result.id) }
+        }
+        return (applied, covered)
+    }
+
+    /// Write the derived markers onto `search`, only where they changed.
+    func refreshSearchMarkers(on search: SearchState) {
+        let markers = derivedSearchMarkers(for: search.results)
+        if search.appliedResultIDs != markers.applied { search.appliedResultIDs = markers.applied }
+        if search.coveredResultIDs != markers.covered { search.coveredResultIDs = markers.covered }
     }
 }

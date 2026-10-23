@@ -4,24 +4,10 @@ import CoreGraphics
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// Conditional dismiss: the sheet-level Dismiss rule, generalized from the retired
-// triage sheet's donor contract: Dismiss is CONDITIONAL on
-// whether the USER has modified selections this sheet session, for
-// either result origin. Untouched → one tap (no friction; machine-made
-// selections drop silently as before). Touched → a confirmation dialog.
-//
-// The contract reduces to pinned predicates this suite anchors:
-//
-//   1. `SearchState.userModifiedSelections` starts false; the Dismiss
-//      button reads it as the gate (false → bypass, true → confirm).
-//   2. USER selection gestures flip it (row circle, footer Select All,
-//      Select-Where, keyboard space toggle, review-row equivalents).
-//   3. Programmatic selection writes do NOT flip it (mode-switch
-//      undo restore).
-//   4. A successful apply RESETS it — the modified selections were
-//      committed, so a post-apply Dismiss has nothing unsaved to
-//      confirm.
-//   5. Session teardown (`clear()`) resets it.
+// The sheet-level Dismiss rule: Dismiss asks first while the session holds
+// selected matches that no live region covers, read from the rows
+// (`SearchState.hasUnappliedSelections(liveApplied:)`, the rule Redact and
+// Home read too), whoever ticked them; otherwise it closes in one tap.
 
 @Suite("Search sheet Dismiss rule (conditional dismiss)")
 @MainActor
@@ -39,64 +25,42 @@ struct SearchSheetDismissRuleTests {
         )
     }
 
-    // MARK: - Gate
+    // MARK: - The rule
 
-    @Test("Tracker defaults false — untouched sheet bypasses the dialog")
-    func trackerDefaultsFalse() {
-        let state = SearchState()
-        #expect(state.userModifiedSelections == false,
-                "a fresh session must read untouched")
-        // The toolbar Dismiss reads:
-        //   if userModifiedSelections { showDialog } else { performDismiss() }
-        let willRouteThroughDialog = state.userModifiedSelections
-        #expect(willRouteThroughDialog == false)
+    @Test("A fresh session closes in one tap")
+    func freshSessionClosesInOneTap() {
+        #expect(SearchState().hasUnappliedSelections(liveApplied: []) == false)
     }
 
-    @Test("Touched tracker routes Dismiss through the dialog")
-    func touchedRoutesThroughDialog() {
+    @Test("A selected, unapplied match makes Dismiss ask")
+    func selectedUnappliedAsks() {
         let state = SearchState()
-        state.userModifiedSelections = true
-        #expect(state.userModifiedSelections == true,
-                "flag true must route through the confirmation dialog")
+        state.results = [makeResult(selected: true)]
+        #expect(state.hasUnappliedSelections(liveApplied: []))
     }
 
-    // MARK: - Programmatic writes do NOT count
-
-    @Test("Mode-switch undo restore does not touch the tracker")
-    func modeSwitchRestoreIsNotUserWork() {
+    @Test("A selected match whose region is live does not")
+    func appliedSelectionDoesNotAsk() throws {
         let state = SearchState()
-        let snapshot = SearchAndRedactSheet.ModeSwitchSnapshot(
-            mode: .text,
-            results: [makeResult(selected: true)],
-            appliedResultIDs: [],
-            piiCategoryFilter: nil,
-            sortOrder: .discoveryOrder,
-            appliedFilter: .all
-        )
-        SearchAndRedactSheet.restoreModeSwitchSnapshot(snapshot, in: state)
-        #expect(state.results.count == 1)
-        #expect(state.userModifiedSelections == false,
-                "a programmatic restore is not user selection work")
+        let result = makeResult(selected: true)
+        state.results = [result]
+        #expect(state.hasUnappliedSelections(liveApplied: [result.id]) == false)
     }
 
-    @Test("SearchState.setSelection itself never flips the tracker (gesture sites own the flip)")
-    func setSelectionAloneDoesNotFlip() {
+    @Test("A programmatic selection counts like a tapped one: the rule reads the rows")
+    func programmaticSelectionCounts() {
         let state = SearchState()
         state.results = [makeResult()]
         state.setSelection { _ in true }
-        #expect(state.results.first?.isSelected == true)
-        #expect(state.userModifiedSelections == false,
-                "the state method is shared by user + programmatic paths; the flip lives at the gesture sites")
+        #expect(state.hasUnappliedSelections(liveApplied: []))
     }
 
-    // MARK: - Resets
-
-    @Test("clear() resets the tracker with the session")
-    func clearResetsTracker() {
+    @Test("clear() drops the session and with it the question")
+    func clearDropsTheQuestion() {
         let state = SearchState()
-        state.userModifiedSelections = true
+        state.results = [makeResult(selected: true)]
         state.clear()
-        #expect(state.userModifiedSelections == false)
+        #expect(state.hasUnappliedSelections(liveApplied: []) == false)
     }
 
     // MARK: - Copy pins

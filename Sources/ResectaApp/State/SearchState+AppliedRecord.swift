@@ -38,7 +38,7 @@ extension SearchState {
             scanConfiguration = configuration
         }
         return AppliedSearchRecord(
-            query: AppliedSearchQuery(kind: kind, options: options),
+            query: AppliedSearchQuery(kind: kind, options: lastRunOptions ?? options),
             foundCount: results.count,
             foundHitCap: resultsAtCap,
             ocrSkippedPages: ocrSkippedPages,

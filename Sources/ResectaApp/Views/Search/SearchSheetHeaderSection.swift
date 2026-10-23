@@ -151,15 +151,9 @@ extension SearchAndRedactSheet {
                     // round-trip.
                     || searchState.selectionFullyApplied,
                 onDismiss: {
-                    // Conditional dismiss: route through the dialog
-                    // while a selection is unapplied. Otherwise the sheet still
-                    // dismisses directly so the common no-op case adds
-                    // no friction.
-                    if DocumentState.hasUnappliedSelections(redactionState) {
-                        showDismissConfirmation = true
-                    } else {
-                        performDismiss(afterConfirmation: false)
-                    }
+                    // Conditional dismiss: ask while a selection is unapplied,
+                    // else close directly (`requestDismiss()`, Escape's rule too).
+                    requestDismiss()
                 },
                 onApply: {
                     // The selected search results promote through
