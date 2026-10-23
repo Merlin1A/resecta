@@ -702,21 +702,15 @@ class DocumentState {
             redactionState.clearOutput()
             transition(to: .editing)
         case .verifying:
-            // Preserve `outputURL` and the
-            // `regionsModifiedSinceVerification` flag. The redacted output
-            // is valid even if verification was interrupted, so we
-            // transition to `.verified(report: .skipped)` rather than
-            // `.editing`. The DocumentEditorView background-resume banner
-            // reads the flag to choose between Re-verify (when output is
-            // still valid and no regions were modified) and Restart.
-            // Note: clearVerification() is intentionally NOT called here —
-            // doing so would reset `regionsModifiedSinceVerification`
-            // to false and misrepresent staleness to the banner predicate.
-            // The OCR-return-report contract was removed
-            // (no production writer ever set `ocrReturnReport`), so cancel from
-            // `.verifying` unconditionally lands on the skipped report,
-            // carrying `.cancelled` so the results copy names the real cause
-            // (covers both user Stop and backgrounding mid-verify — same path).
+            // The redacted output is valid even if verification was
+            // interrupted: keep `outputURL` and land on the skipped report,
+            // carrying `.cancelled` so the results copy names the cause
+            // (user Stop and backgrounding mid-verify alike). The stale
+            // flag clears only through the burned-version guard, for the
+            // run recorded with the output; `clearVerification()` is not
+            // called, since it would clear the flag for any output. The
+            // resume banner reads the flag to choose Re-verify or Restart.
+            redactionState.markVerificationCurrentForRecordedRun()
             transition(to: .verified(report: .skipped(reason: .cancelled)))
         default:
             break

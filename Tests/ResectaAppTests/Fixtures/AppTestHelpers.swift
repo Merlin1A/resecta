@@ -331,7 +331,8 @@ extension RedactionState.LastRunInputs {
         appliedSearches: [SearchRecheckRequest] = [],
         deselection: RedactionState.DeselectionSnapshot? = nil,
         ocrSkippedPages: Set<Int> = [],
-        degradeFailures: [String]? = nil
+        degradeFailures: [String]? = nil,
+        burnedRegionVersion: Int? = nil
     ) -> RedactionState.LastRunInputs {
         RedactionState.LastRunInputs(
             perPageModes: perPageModes,
@@ -342,6 +343,7 @@ extension RedactionState.LastRunInputs {
             appliedSearches: appliedSearches,
             deselection: deselection,
             ocrSkippedPages: ocrSkippedPages,
-            degradeFailures: degradeFailures)
+            degradeFailures: degradeFailures,
+            burnedRegionVersion: burnedRegionVersion)
     }
 }

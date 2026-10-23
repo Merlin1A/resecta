@@ -21,4 +21,14 @@ extension RedactionState {
         guard regionVersion == burnedRegionVersion else { return }
         markVerificationCurrent()
     }
+
+    /// The same guard for the run recorded with the output
+    /// (`lastRunInputs.burnedRegionVersion`): a verify cancelled mid-run
+    /// leaves an output that still carries every region it burned. With
+    /// no recorded run the flag stands.
+    func markVerificationCurrentForRecordedRun() {
+        if let burned = lastRunInputs?.burnedRegionVersion {
+            markVerificationCurrent(burnedRegionVersion: burned)
+        }
+    }
 }
