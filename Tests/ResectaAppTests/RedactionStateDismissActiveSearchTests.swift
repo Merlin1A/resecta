@@ -73,7 +73,7 @@ struct RedactionStateDismissActiveSearchTests {
 
     @Test("Source pin: the results-screen Home routes through handleHomeTap")
     func verifiedHomeRoutesThroughHandleHomeTap() throws {
-        let editor = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorView.swift")
+        let editor = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorToolbar.swift")
         guard let id = editor.range(of: ".accessibilityIdentifier(\"verificationDoneButton\")") else {
             Issue.record("Could not locate verificationDoneButton")
             return

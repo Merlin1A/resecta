@@ -275,7 +275,7 @@ struct DrawWinsTests {
 
     @Test("The editor's Add to Selection toggle exits the Rectangle tool and tool entry clears the toggle (source pin)")
     func testEditorMutualExclusionSourcePin() throws {
-        let source = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorView.swift")
+        let source = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorToolbar.swift")
         #expect(source.contains("if isMultiSelectActive { activeTool = nil }"))
         #expect(source.contains("DocumentEditorView.drawToolEntryEffects(entering: entering)"))
     }
