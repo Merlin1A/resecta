@@ -86,6 +86,13 @@ struct ParkedChromeLayoutTests {
         #expect(!layout(sheet: false, walk: false, phase: .verified).showsPageBar)
     }
 
+    @Test("A one-page document shows the page bar, and bottom toasts clear it; no page shows none")
+    func onePageDocumentShowsTheBar() {
+        #expect(layout(sheet: false, walk: false, pages: 1).showsPageBar)
+        #expect(layout(sheet: false, walk: false, pages: 1).toastClearance == ParkedChromeLayout.pageBarClearance)
+        #expect(!layout(sheet: false, walk: false, pages: 0).showsPageBar)
+    }
+
     @Test("The page bar stays while the sheet is parked at the compact float, with or without a live walk")
     func pageBarStaysWhileParked() {
         // sheet × detent × walk — a parked walk keeps the page control,

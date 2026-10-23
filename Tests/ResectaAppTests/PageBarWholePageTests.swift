@@ -175,6 +175,95 @@ struct PageBarWholePageTests {
         #expect(redactionState.pendingManualDrawNudge == nil)
     }
 
+    // MARK: - The toggle
+
+    private static func toggle(_ documentState: DocumentState, _ redactionState: RedactionState,
+                               undoManager: UndoManager?) {
+        undoManager?.beginUndoGrouping()
+        PageNavigationBar.toggleWholePage(
+            redactionState: redactionState, documentState: documentState, undoManager: undoManager)
+        undoManager?.endUndoGrouping()
+    }
+
+    private static func box() -> RedactionRegion {
+        RedactionRegion(id: UUID(), normalizedRect: CGRect(x: 0.1, y: 0.2, width: 0.3, height: 0.05),
+                        source: .manual)
+    }
+
+    @Test("A page reads as marked only while it holds the whole-page region")
+    func markedReadsTheWholePageRegion() {
+        let (documentState, redactionState) = Self.makeStates(currentPage: 1)
+        #expect(!PageNavigationBar.isWholePageMarked(page: 1, in: redactionState))
+        redactionState.addRegion(Self.box(), page: 1, undoManager: nil)
+        #expect(!PageNavigationBar.isWholePageMarked(page: 1, in: redactionState),
+                "a drawn box is not the whole-page region")
+        Self.mark(documentState, redactionState)
+        #expect(PageNavigationBar.isWholePageMarked(page: 1, in: redactionState))
+        #expect(!PageNavigationBar.isWholePageMarked(page: 0, in: redactionState))
+    }
+
+    @Test("Marking a marked page adds no second whole-page region")
+    func markOnAMarkedPageAddsNothing() {
+        let (documentState, redactionState) = Self.makeStates(currentPage: 0)
+        Self.mark(documentState, redactionState)
+        let versionAfterFirst = redactionState.regionVersion
+        Self.mark(documentState, redactionState)
+        #expect(redactionState.regions[0]?.count == 1)
+        #expect(redactionState.regionVersion == versionAfterFirst, "the second mark changes nothing")
+    }
+
+    @Test("The toggle marks, then unmarks: one undo step each way, named for it; Undo after Unmark marks the page again")
+    func toggleTwiceIsTwoNamedSteps() {
+        let (documentState, redactionState) = Self.makeStates(currentPage: 0)
+        let undoManager = UndoManager()
+        undoManager.groupsByEvent = false
+        Self.toggle(documentState, redactionState, undoManager: undoManager)
+        #expect(redactionState.regions[0]?.count == 1)
+        #expect(undoManager.undoActionName == "Mark Whole Page")
+        Self.toggle(documentState, redactionState, undoManager: undoManager)
+        #expect((redactionState.regions[0] ?? []).isEmpty)
+        #expect(undoManager.undoActionName == "Unmark Whole Page")
+        undoManager.undo()
+        #expect(PageNavigationBar.isWholePageMarked(page: 0, in: redactionState))
+        #expect(undoManager.redoActionName == "Unmark Whole Page")
+        undoManager.undo()
+        #expect((redactionState.regions[0] ?? []).isEmpty)
+    }
+
+    @Test("Unmark removes the whole-page region only: the page's drawn boxes stay")
+    func unmarkKeepsTheOtherRegions() {
+        let (documentState, redactionState) = Self.makeStates(currentPage: 2)
+        let drawn = Self.box()
+        redactionState.addRegion(drawn, page: 2, undoManager: nil)
+        Self.toggle(documentState, redactionState, undoManager: nil)
+        #expect(redactionState.regions[2]?.count == 2)
+        Self.toggle(documentState, redactionState, undoManager: nil)
+        #expect(redactionState.regions[2]?.map(\.id) == [drawn.id])
+    }
+
+    @Test("The control's words follow the page: Mark Whole Page, then Unmark Whole Page")
+    func labelFollowsThePage() {
+        #expect(PageNavigationBar.wholePageActionLabel(marked: false) == "Mark Whole Page")
+        #expect(PageNavigationBar.wholePageActionLabel(marked: true) == "Unmark Whole Page")
+    }
+
+    // MARK: - The zero arm and the one-page bar
+
+    @Test("An empty page's counter reads '0 regions', drawn and spoken")
+    func counterZeroArm() {
+        #expect(PageNavigationBar.regionCountLabel(0) == "0 regions")
+        #expect(PageNavigationBar.pageAccessibilityLabel(page: 1, pageCount: 3, regionCount: 0)
+                == "Page 1 of 3, 0 regions")
+    }
+
+    @Test("A one-page document's bar keeps the count and drops the page arrows and the whole-page control")
+    func onePageBarDropsArrowsAndControl() {
+        #expect(!PageNavigationBar.showsChevrons(pageCount: 1))
+        #expect(!PageNavigationBar.showsMarkControl(pageCount: 1))
+        #expect(PageNavigationBar.showsChevrons(pageCount: 3))
+        #expect(PageNavigationBar.showsMarkControl(pageCount: 3))
+    }
+
     // MARK: - The bar's source
 
     @Test("The bar carries the action with its label and identifier, floored to the shared touch target, and no disabled modifier of its own")
