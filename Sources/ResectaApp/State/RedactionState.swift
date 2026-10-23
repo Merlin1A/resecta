@@ -76,6 +76,10 @@ class RedactionState {
         /// The degrade-failure list at run entry; nil when detection was
         /// not degraded.
         let degradeFailures: [String]?
+        /// The region version the run redacted, kept with its output so a
+        /// verify cancelled mid-run still clears the stale flag through the
+        /// burned-version guard; nil when no run recorded one.
+        var burnedRegionVersion: Int? = nil
     }
     private(set) var lastRunInputs: LastRunInputs?
 

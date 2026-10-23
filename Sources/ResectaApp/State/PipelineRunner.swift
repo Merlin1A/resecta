@@ -192,7 +192,8 @@ struct PipelineRunner {
                     appliedSearches: runContext.appliedSearches,
                     deselection: deselectionSnapshot,
                     ocrSkippedPages: entry.ocrSkippedPages,
-                    degradeFailures: entry.degradeFailures)))
+                    degradeFailures: entry.degradeFailures,
+                    burnedRegionVersion: entry.burnedRegionVersion)))
 
             // --- Verification ---
             // Paranoid-mode override #2: paranoid
