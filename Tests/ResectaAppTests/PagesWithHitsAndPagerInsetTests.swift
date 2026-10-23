@@ -158,3 +158,20 @@ struct ParkedChromeLayoutTests {
         #expect(layout() != layout(hug: 120))
     }
 }
+
+// The sheet-local toast host at a medium or large detent: it sits above the
+// footer, so a notice never covers Select All or Apply.
+@Suite("Sheet toast host lift")
+@MainActor
+struct SheetToastHostLiftTests {
+
+    @Test("With the footer up, the host lifts by the footer's height on top of the clearance")
+    func liftsAboveTheFooter() {
+        #expect(SearchAndRedactSheet.sheetToastLift(clearance: 12, footerHeight: 64, footerShown: true) == 76)
+    }
+
+    @Test("Without the footer, the host keeps the clearance alone")
+    func clearanceAloneWithoutTheFooter() {
+        #expect(SearchAndRedactSheet.sheetToastLift(clearance: 12, footerHeight: 64, footerShown: false) == 12)
+    }
+}
