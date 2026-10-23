@@ -119,12 +119,12 @@ extension DocumentEditorView {
 
         case .nothingFound(let pageCount):
             return DetectionBannerModel(
-                message: "Detection ran on \(pageCount) page\(pageCount == 1 ? "" : "s") and flagged no items.",
+                message: "Scan found no items across \(pageCount) page\(pageCount == 1 ? "" : "s").",
                 autoDismisses: false, isWarning: false)
 
         case .failed:
             return DetectionBannerModel(
-                message: "Detection couldn't finish \u{2014} no regions were changed. Manual redaction tools remain available.",
+                message: "The last scan couldn't start because the document wasn't ready.",
                 autoDismisses: false, isWarning: true)
         }
     }

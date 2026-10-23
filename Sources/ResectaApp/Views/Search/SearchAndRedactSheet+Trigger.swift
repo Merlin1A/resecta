@@ -120,7 +120,7 @@ extension SearchAndRedactSheet {
                             if UIAccessibility.isVoiceOverRunning && current % 10 == 0 {
                                 UIAccessibility.post(
                                     notification: .announcement,
-                                    argument: "Searching page \(current) of \(total)"
+                                    argument: "Scanning page \(current) of \(total)"
                                 )
                             }
                         }
@@ -423,7 +423,7 @@ extension SearchAndRedactSheet {
         await searcher.setScannedRegionNotAnalyzedSink({ [weak toastManager] _ in
             Task { @MainActor in
                 toastManager?.enqueue(
-                    "Some pages hold scanned regions that weren't text-analyzed because OCR is off. Turn on Include OCR to search scanned content.",
+                    "Some pages hold scanned regions that weren't text-analyzed because OCR is off. Turn on Include OCR Pages to search scanned content.",
                     severity: .warning
                 )
             }
@@ -760,7 +760,7 @@ extension SearchAndRedactSheet {
     /// testable static and triggers through the standard path — exactly
     /// one `triggerSearch()` (single-trigger discipline). If the
     /// recalled filter state hides every result, the existing
-    /// "filters hide all candidates" empty state surfaces (already
+    /// "filters hide all results" empty state surfaces (already
     /// implemented in SearchResultsSection; no new copy).
     ///
     /// A recall that replaces a results-carrying session names the drop:

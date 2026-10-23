@@ -128,7 +128,7 @@ struct SaveCurrentRegexCommitTests {
     func alertTitleIndependentOfMenuLabel() {
         #expect(SearchAndRedactSheet.saveCurrentRegexAlertTitle == "Save current pattern")
         // The menu item itself stays unchanged.
-        #expect(SearchToolbarSection.saveCurrentRegexMenuItem == "Save current...")
+        #expect(SearchToolbarSection.saveCurrentRegexMenuItem == "Save current…")
     }
 }
 

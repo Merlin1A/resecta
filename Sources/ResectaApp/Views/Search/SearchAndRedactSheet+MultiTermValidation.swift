@@ -55,7 +55,7 @@ extension SearchAndRedactSheet {
         guard !trimmed.isEmpty else { return .rejectedEmpty }
         guard trimmed.count <= multiTermMaxLength else {
             return .rejectedTooLong(
-                message: "Search term is too long. Trim to 200 characters or fewer."
+                message: "Pattern too long (max \(multiTermMaxLength) characters)."
             )
         }
         let isDuplicate = existingTerms.contains {

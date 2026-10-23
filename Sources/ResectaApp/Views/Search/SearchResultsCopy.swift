@@ -144,8 +144,8 @@ enum SearchEmptyStateCopy {
             return "Not scanned yet"
         case .piiScanPostScanZero:
             // Names what the run produced, not an
-            // affirmation: matches the canvas banner's own voice
-            // ("…flagged no items"). A checkmark-style "Scan complete"
+            // affirmation, in the canvas banner's voice ("Scan found
+            // no items…"). A checkmark-style "Scan complete"
             // read as a clean bill; this names the produced count
             // instead (zero, stated plainly).
             return "No items flagged"
@@ -251,15 +251,14 @@ enum SearchEmptyStateCopy {
         "A zero result means nothing on the scanned pages cleared the current threshold for those detectors \u{2014} it is not a statement about what the document contains."
 
     /// Pointer line naming the three existing recourse
-    /// controls by their shipped labels/glyphs: the search-bar re-run
-    /// affordance (\u{21bb}, accessibility label "Scan document for
-    /// PII", `SearchAndRedactSheet.scanRescanButton`), the Search
+    /// controls: running Scan again (the results' "Scan Again" and the
+    /// search-bar re-run, `SearchAndRedactSheet.scanRescanButton`), the Search
     /// interface's literal-match modes (`SearchInterface.search`
     /// displayName "Search"), and the Settings "Detection Sensitivity"
     /// preset picker (`SettingsView`). Names no control beyond what
     /// already ships.
     static let piiScanZeroRecourseLine =
-        "To look further: re-run with different detectors (\u{21bb}), search for specific terms in Search, or change the Detection Sensitivity preset in Settings."
+        "To look further: run Scan again, search for specific terms in Search, or change the Detection Sensitivity preset in Settings."
 
     // MARK: Search-interface role line
 
@@ -332,5 +331,5 @@ enum SearchEmptyStateCopy {
 
     static let filteredOutHeadline = "No results match current filters"
     static let showAllButton = "Show All"
-    static let filteredOutDescription = "Your active filters hide all candidates. Adjust source, confidence, or category filters to see results."
+    static let filteredOutDescription = "Your active filters hide all results. Adjust the source, OCR confidence, category, or applied filters to see them."
 }

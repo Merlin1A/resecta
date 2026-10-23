@@ -121,8 +121,9 @@ struct CanvasPolishBundleTests {
     @Test("Caption copy names the gesture mechanism (no outcome verb)")
     func captionMechanismDescription() {
         // Mechanism-description language — names the gesture, not
-        // a promised outcome. "tap and drag" describes what the touch
-        // does; the user supplies the intent.
-        #expect(DocumentEditorView.drawingModeCaption == "Drawing — tap and drag")
+        // a promised outcome. "Drag to draw" names what one finger does and
+        // "two fingers to scroll" names the other gesture; the user supplies
+        // the intent.
+        #expect(DocumentEditorView.drawingModeCaption == "Drag to draw · two fingers to scroll")
     }
 }
