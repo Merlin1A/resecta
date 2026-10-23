@@ -54,4 +54,15 @@ extension SearchState {
         guard let data = defaults.data(forKey: lastFilterKey) else { return nil }
         return try? JSONDecoder().decode(LastSearchFilterShape.self, from: data)
     }
+
+    /// Re-read the stored filter shape, or the declared defaults when it
+    /// is gone (Settings' Reset to Defaults removes it): a session parked
+    /// while Settings was open comes back with what Settings left.
+    func reloadFilterShape() {
+        let shape = Self.storedFilterShape(in: defaults)
+            ?? LastSearchFilterShape(sourceFilter: .all, minimumOCRConfidence: 0, sortOrder: .discoveryOrder)
+        sourceFilter = shape.sourceFilter
+        minimumOCRConfidence = shape.minimumOCRConfidence
+        sortOrder = shape.sortOrder
+    }
 }

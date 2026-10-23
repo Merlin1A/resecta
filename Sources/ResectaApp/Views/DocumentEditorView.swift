@@ -46,7 +46,6 @@ struct DocumentEditorView: View {
     @State private var dismissTask: Task<Void, Never>?
 
     // Batch delete confirmation
-    @State private var showBatchDeleteConfirmation = false
 
     // Done confirmation for the verification results screen.
     // Lifted from VerificationActionBar when Done moved into the top-left
@@ -64,6 +63,7 @@ struct DocumentEditorView: View {
     /// this flag; the slot's `onDismiss` presents the dialog once the sheet
     /// is actually down. A second Home tap during the park is absorbed.
     @State var homeCloseAwaitsSheetDismissal = false
+    @State var settingsAwaitsSheetDismissal = false  // Settings opens once the parked sheet is down
 
     /// A search session parked for the close dialog, kept whole for Cancel
     /// (`restoreParkedSearchIfNeeded()`); Close drops it with the session.
@@ -82,8 +82,6 @@ struct DocumentEditorView: View {
     @State private var exportingReport: VerificationReport?   // the export in flight returns to it
 
     // iPad hover popover state
-    @State private var showHoverPopover = false
-    @State private var hoveredMetadata: RegionMetadata?
 
     // Search sheet detent for auto-minimize on result navigation
     @State var searchSheetDetent: PresentationDetent = .medium
@@ -446,6 +444,10 @@ struct DocumentEditorView: View {
                 }
             }
         ), onDismiss: {
+            if settingsAwaitsSheetDismissal {  // parked for Settings: open it now
+                settingsAwaitsSheetDismissal = false
+                showSettings = true
+            }
             // A sheet parked by `handleHomeTap()` hands off to the
             // close dialog here, once its presentation is actually down.
             guard homeCloseAwaitsSheetDismissal else { return }
@@ -513,90 +515,9 @@ struct DocumentEditorView: View {
                 }
             }
         }
-        // iPad hover popover — observe hoveredRegionID on RedactionState
-        // VoiceOver announcement on selection count change
-        .onChange(of: redactionState.selectedRegionIDs.count) { oldCount, newCount in
-            guard UIAccessibility.isVoiceOverRunning,
-                  documentState.phaseKind == .editing else { return }
-            let announcement: String
-            switch newCount {
-            case 0:  announcement = "Selection cleared"
-            case 1:  announcement = "1 region selected"
-            default: announcement = "\(newCount) regions selected"
-            }
-            AccessibilityNotification.Announcement(announcement).post()
-        }
-        .onChange(of: redactionState.hoveredRegionID) { _, newID in
-            if let id = newID, let metadata = redactionState.regionMetadata[id] {
-                hoveredMetadata = metadata
-                showHoverPopover = true
-            } else {
-                showHoverPopover = false
-            }
-        }
-        // [R-20]: manual-draw nearby-PII nudge observer. `addRegion`'s post-add
-        // hook sets `pendingManualDrawNudge` after a `.manual` region commits
-        // adjacent (≤ 50 pt normalized) to an unapplied high-confidence
-        // PII match. We enqueue a non-modal info toast with an "Add"
-        // action that calls `acceptManualDrawNudge` with the nudge captured
-        // by value, so the accept survives the suppression mark below
-        // clearing the pending field; a run start drops the toast. The
-        // `markManualDrawNudgeSuppressed()` call gates further toasts
-        // for the current search session; the suppression
-        // resets on any `activeSearch` transition + on `clearAll()` +
-        // on `clearForNewDocument()`.
-        .onChange(of: redactionState.pendingManualDrawNudge?.id) { _, _ in
-            guard let nudge = redactionState.pendingManualDrawNudge else { return }
-            let capturedNudge = nudge
-            toastManager.enqueue(
-                "1 match nearby. Add to selection?",
-                severity: .info,
-                actionLabel: "Add",
-                editsRegions: true,
-                actionHandler: { [weak redactionState, weak undoManager, weak documentState] in
-                    guard let state = redactionState else { return }
-                    state.acceptManualDrawNudge(
-                        capturedNudge, undoManager: undoManager, documentState: documentState)
-                }
-            )
-            redactionState.markManualDrawNudgeSuppressed()
-        }
-        .popover(isPresented: $showHoverPopover, attachmentAnchor: .point(.center)) {
-            if let metadata = hoveredMetadata {
-                // Pass the region's forward-rationale, if any, into
-                // the popover so the "View rationale" disclosure renders.
-                let rationale = redactionState.hoveredRegionID.flatMap {
-                    redactionState.rationale(forRegionID: $0)
-                }
-                RegionInfoPopover(metadata: metadata, rationale: rationale)
-                    .frame(minWidth: 160, idealWidth: 200, maxWidth: 260)
-                    .presentationCompactAdaptation(.popover)
-            }
-        }
-        // Batch delete confirmation (mechanism-description language)
-        // Dialog-grammar normalization — sentence-case
-        // question title, bare-verb destructive button.
-        .confirmationDialog(
-            DocumentEditorView.batchDeleteDialogTitle(
-                regionCount: redactionState.selectedRegionIDs.count),
-            isPresented: $showBatchDeleteConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button("Delete", role: .destructive) {
-                deleteSelectedRegions()
-            }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            // Page-span line names how many pages the deletion
-            // spans so the user can reckon scope before confirming.
-            Text(DocumentEditorView.batchDeleteDialogMessage(
-                regionCount: redactionState.selectedRegionIDs.count,
-                pageCount: DocumentEditorView.selectedPageCount(
-                    selectedIDs: redactionState.selectedRegionIDs,
-                    pageLookup: redactionState.pageIndex(for:)
-                )
-            ))
-        }
+        .modifier(EditorAnnouncementObservers(
+            documentState: documentState, redactionState: redactionState,
+            toastManager: toastManager, undoManager: undoManager))
         // Destructive-action confirmation symmetry for
         // the verification-results Done. Same pattern as the Redact /
         // Delete N Regions / Pre-Export / Override-FAIL dialogs. Copy is
@@ -650,7 +571,13 @@ struct DocumentEditorView: View {
             coordinator.undoManager = undoManager
         }
         // Keyboard shortcuts for editing, handled by one modifier
-        .modifier(DocumentEditorKeyboard(activeTool: $activeTool))
+        .modifier(DocumentEditorKeyboard(activeTool: $activeTool, isMultiSelectActive: $isMultiSelectActive))
+        .onChange(of: showSettings) { _, shown in if !shown { restoreParkedSearchIfNeeded() } }
+        // Add to Selection turns off on a page with no regions (its row
+        // unmounts there), through the one tool-and-toggle reset.
+        .onChange(of: redactionState.regions[documentState.currentPageIndex]?.isEmpty ?? true) { _, empty in
+            if empty, isMultiSelectActive { editorToolbar.resetCanvasTools() }
+        }
         // Page navigation bar on iPhone only (editing
         // phase). Extracted to a small helper
         // property so the compact-float inset math stays out of this
@@ -711,11 +638,11 @@ struct DocumentEditorView: View {
             coordinator: coordinator, horizontalSizeClass: horizontalSizeClass,
             undoManager: undoManager,
             activeTool: $activeTool, isMultiSelectActive: $isMultiSelectActive,
-            showBatchDeleteConfirmation: $showBatchDeleteConfirmation, showSettings: $showSettings,
+            searchSheetDetent: $searchSheetDetent,
             documentOverride: documentOverride, redactButtonDisabled: redactButtonDisabled,
             redactButtonHint: redactButtonHint, handleHomeTap: handleHomeTap,
             homeButton: AnyView(homeButton), pipelineModePicker: AnyView(pipelineModePicker),
-            deleteSelectedRegions: deleteSelectedRegions
+            deleteSelectedRegions: deleteSelectedRegions, openSettings: openSettings
         )
     }
 
@@ -779,40 +706,6 @@ struct DocumentEditorView: View {
 
     private func deleteSelectedRegions() {
         redactionState.deleteSelected(undoManager: undoManager)
-    }
-
-    // MARK: - Batch delete dialog page-span helpers
-
-    /// Page count spanned by a selection set. Looks each ID up via the
-    /// caller-provided closure so the helper is testable without a full
-    /// RedactionState.
-    static func selectedPageCount(
-        selectedIDs: Set<UUID>,
-        pageLookup: (UUID) -> Int?
-    ) -> Int {
-        Set(selectedIDs.compactMap(pageLookup)).count
-    }
-
-    /// Message body for the batch-delete confirmation dialog. Names the
-    /// page-span so the user reckons scope before confirming. Singulars
-    /// switch to "region" / "page" so the count grammar reads naturally.
-    static func batchDeleteDialogMessage(
-        regionCount: Int,
-        pageCount: Int
-    ) -> String {
-        let regionLabel = regionCount == 1 ? "region" : "regions"
-        let pageLabel = pageCount == 1 ? "page" : "pages"
-        return "Deleting \(regionCount) \(regionLabel) across "
-            + "\(pageCount) \(pageLabel).\n"
-            + "This removes the selected redaction regions. Use Undo to restore them."
-    }
-
-    /// Dialog-grammar normalization — sentence-case
-    /// question title, singular-aware. The destructive button is now
-    /// bare "Delete" (dominant grammar for this dialog family); the
-    /// title alone carries the count.
-    static func batchDeleteDialogTitle(regionCount: Int) -> String {
-        regionCount == 1 ? "Delete 1 region?" : "Delete \(regionCount) regions?"
     }
 
     // MARK: - Drawing-mode caption helpers

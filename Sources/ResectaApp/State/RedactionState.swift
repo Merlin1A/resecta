@@ -232,7 +232,7 @@ class RedactionState {
     /// within `manualDrawNudgeProximityNormalized` of the new region
     /// that has NOT been applied or suppressed for this session.
     /// Observed by `DocumentEditorView` via `.onChange(of:)` to enqueue
-    /// the non-modal "Add to selection?" toast. Cleared after enqueue
+    /// the non-modal "Mark it too?" toast. Cleared after enqueue
     /// (and on any `activeSearch` transition per the didSet above).
     /// The surface is a toast — NOT a new canvas long-press
     /// action — so the canvas density cap stays at 6 menu items.
@@ -1026,33 +1026,15 @@ class RedactionState {
         hoveredRegionID = nil
     }
 
-    // MARK: - Undo Helper
+    // MARK: - Undo Helper state (`RedactionState+UndoHelper.swift`)
 
-    /// Register an undoable action. Under the app target's SE-0466 MainActor
-    /// default, `RedactionState` — and this method — are MainActor
-    /// isolated, as is `UndoManager.registerUndo` on iOS 26. The `handler` is
-    /// typed `@MainActor` because every handler body mutates MainActor region
-    /// state and re-registers the inverse action; they already executed on
-    /// MainActor via the `assumeIsolated` wrappers below, so the annotation
-    /// makes the type system agree without changing runtime behavior. The inner
-    /// `MainActor.assumeIsolated` still bridges the iOS-26
-    /// `registerUndo(withTarget:)` callback (whose handler is not statically
-    /// MainActor-typed).
-    func registerUndo(
-        _ undoManager: UndoManager?, _ actionName: String,
-        handler: @escaping @MainActor (RedactionState) -> Void
-    ) {
-        guard let undoManager else { return }
-        nonisolated(unsafe) let target = self
-        MainActor.assumeIsolated {
-            undoManager.registerUndo(withTarget: target) { target in
-                MainActor.assumeIsolated {
-                    handler(target)
-                }
-            }
-            undoManager.setActionName(actionName)
-        }
-    }
+    /// The last Undo or Redo step: the pages it changed, its name and a
+    /// serial, so a repeat on the same page is a change too. A step that
+    /// registers once per page (a delete across pages) unions its pages:
+    /// the first record of a step opens it, and the next main-actor turn
+    /// closes it.
+    var lastUndoRedo: UndoRedoStep?
+    @ObservationIgnored var undoRedoStepOpen = false
 }
 
 // MARK: - Detection-degrade copy

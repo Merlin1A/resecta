@@ -5,8 +5,8 @@ import RedactionEngine
 // (the hub) along its `// MARK: - Verification Done` and
 // `// MARK: - Home` seams: the shared session teardown
 // (`performDoneCloseSession`), the Home tap's route, the park-then-dialog
-// hand-off, the parked-search restore and the dialog's presenting
-// binding. The hub's `body` keeps the dialog itself and the sheet slot's
+// hand-off and the dialog's presenting binding (the park and the restore
+// live in `DocumentEditorView+SheetParking.swift`). The hub's `body` keeps the dialog itself and the sheet slot's
 // `onDismiss` hand-off; the hub's `@State showDoneConfirmation` /
 // `homeCloseAwaitsSheetDismissal` stay stored
 // on the hub (an extension adds no storage) and are read from here.
@@ -56,7 +56,7 @@ extension DocumentEditorView {
     /// is the existing `.empty` auto-return; nothing here calls
     /// `appCoordinator.returnHome()` directly. While the
     /// sheet slot is presenting, the confirm route parks the sheet first
-    /// (`parkEditorSheetForHomeClose()`) and the dialog presents from the
+    /// (`parkEditorSheet()`) and the dialog presents from the
     /// slot's `onDismiss`.
     func handleHomeTap() {
         guard !homeCloseAwaitsSheetDismissal else { return }
@@ -72,7 +72,7 @@ extension DocumentEditorView {
             showDoneConfirmation = true
         case .parkSheetThenDialog:
             homeCloseAwaitsSheetDismissal = true
-            parkEditorSheetForHomeClose()
+            parkEditorSheet()
         }
     }
 
@@ -93,60 +93,6 @@ extension DocumentEditorView {
     static func homeCloseRoute(needsConfirm: Bool, sheetPresented: Bool) -> HomeCloseRoute {
         guard needsConfirm else { return .closeDirectly }
         return sheetPresented ? .parkSheetThenDialog : .presentDialog
-    }
-
-    /// Pure gate for re-presenting a parked search session after the close
-    /// dialog went down without Close: the slot idle, the session editing,
-    /// and the same document still open (a drop behind the dialog replaces
-    /// it; the old session's results would name the wrong pages).
-    static func homeCloseShouldRestoreSearch(
-        sheetPresented: Bool, phaseKind: DocumentState.PhaseKind, sameDocument: Bool
-    ) -> Bool {
-        !sheetPresented && phaseKind == .editing && sameDocument
-    }
-
-    /// Mirrors the `.sheet(item:)` getter: the slot is presenting whenever
-    /// either source is live.
-    private var editorSheetIsPresented: Bool {
-        redactionState.activeSearch != nil
-            || redactionState.pendingCanvasRationaleRequest != nil
-    }
-
-    /// Take the presenting sheet down without touching the work behind it.
-    /// Only `activeSearch` is cleared — the search session is kept whole
-    /// in `parkedEditorSearch`, its
-    /// results and selections intact, flagged so the sheet's teardown
-    /// spares it; a rationale sheet is simply dropped.
-    private func parkEditorSheetForHomeClose() {
-        if let search = redactionState.activeSearch {
-            search.parkedForHomeClose = true
-            search.parkedDocument = documentState.sourceDocumentToken
-            parkedEditorSearch = search
-            redactionState.activeSearch = nil
-        } else if redactionState.pendingCanvasRationaleRequest != nil {
-            redactionState.pendingCanvasRationaleRequest = nil
-        }
-    }
-
-    /// Re-present a search session parked for the dialog when it went down
-    /// without Close: the same `SearchState` back in the sheet slot. Nothing
-    /// when Close already tore the session down (it drops the parked
-    /// session) or the slot is busy.
-    private func restoreParkedSearchIfNeeded() {
-        guard let parked = parkedEditorSearch else { return }
-        parkedEditorSearch = nil
-        parked.parkedForHomeClose = false
-        guard Self.homeCloseShouldRestoreSearch(
-            sheetPresented: editorSheetIsPresented, phaseKind: documentState.phaseKind,
-            sameDocument: parked.parkedDocument == documentState.sourceDocumentToken
-        ) else {
-            // The slot busy, the session over, or the document replaced
-            // behind the dialog: the parked session goes down, as Close
-            // takes it down.
-            parked.cancelSearchWithoutAwait()
-            return
-        }
-        redactionState.activeSearch = parked
     }
 
     /// `$showDoneConfirmation` with one hook: when the dialog goes
