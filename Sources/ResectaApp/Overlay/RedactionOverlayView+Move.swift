@@ -35,19 +35,24 @@ extension RedactionOverlayView {
         moveCommitFeedback.prepare()
     }
 
-    /// Update all selected regions' positions during a group move.
+    /// Update all selected regions' positions during a group move. One
+    /// delta moves every member, clamped so the group's union stays on
+    /// the page: an edge stops the whole group, keeping its spacing.
     func updateGroupMove(to point: CGPoint) {
         guard let start = groupMoveStart else { return }
-        let dx = point.x - start.x
-        let dy = point.y - start.y
+        var union = CGRect.null
+        for region in regions where selectedIDs.contains(region.id) {
+            if let originalNorm = preDragGroupRects[region.id] {
+                union = union.union(pdfNormalizedToOverlay(originalNorm))
+            }
+        }
+        guard !union.isNull else { return }
+        let dx = min(max(point.x - start.x, bounds.minX - union.minX), bounds.maxX - union.maxX)
+        let dy = min(max(point.y - start.y, bounds.minY - union.minY), bounds.maxY - union.maxY)
 
         for i in regions.indices where selectedIDs.contains(regions[i].id) {
             guard let originalNorm = preDragGroupRects[regions[i].id] else { continue }
-            let originalOverlay = pdfNormalizedToOverlay(originalNorm)
-            var moved = originalOverlay.offsetBy(dx: dx, dy: dy)
-            // Clamp to overlay bounds
-            moved.origin.x = max(0, min(moved.origin.x, bounds.width - moved.width))
-            moved.origin.y = max(0, min(moved.origin.y, bounds.height - moved.height))
+            let moved = pdfNormalizedToOverlay(originalNorm).offsetBy(dx: dx, dy: dy)
             regions[i].normalizedRect = overlayToPDFNormalized(moved)
         }
     }
