@@ -14,7 +14,6 @@ import SwiftUI
 
 struct SearchFooterSection: View {
     @Bindable var searchState: SearchState
-    @Environment(RedactionState.self) private var redactionState
 
     var body: some View {
         VStack(spacing: ResectaTokens.Spacing.xxs) {

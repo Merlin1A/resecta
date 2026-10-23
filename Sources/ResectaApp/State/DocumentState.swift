@@ -3,7 +3,6 @@ import PDFKit
 import PDFKitGuard
 import os
 import RedactionEngine
-import Vision  // VNRequestTextRecognitionLevel for lastUsedRecognitionLevel
 
 // Log only phase kind (enum case names) as .public.
 // Never log document content, file paths, or redaction coordinates.
@@ -208,7 +207,7 @@ class DocumentState {
     var activeImportTask: Task<Void, Never>?
 
     /// UUID stamp owned by the active pipeline Task.
-    /// Set at Task dispatch in `runFullPipeline` / `runDetectionPipeline`,
+    /// Set at Task dispatch in `runFullPipeline`,
     /// nilled in the Task's defer/error-recovery blocks only when it matches.
     /// This guards against the cancel-then-restart race where an older
     /// Task's error-recovery block would clear the NEW run's outputURL /
@@ -274,13 +273,6 @@ class DocumentState {
     /// The redaction mode the editor's picker chose for this document (nil =
     /// the global setting); every new document and Start Over clear it.
     var documentOverride: PipelineMode?
-
-    /// Recognition level of the most recent Auto-Detect run,
-    /// recorded by `runDetectionPipeline`. A detect-pause resume re-uses it so
-    /// the re-run matches the level the user originally chose (fallback
-    /// `.accurate` when nil). A PROPERTY addition only — mirrors
-    /// `lastUsedPipelineMode`; the Phase enum and transition table are untouched.
-    var lastUsedRecognitionLevel: VNRequestTextRecognitionLevel?
 
     /// True if at least one page has a rich text layer.
     var hasAnyTextLayer: Bool {

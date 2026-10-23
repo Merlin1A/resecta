@@ -151,10 +151,9 @@ class RedactionState {
     /// Populated during the extraction phase; nil for Secure Rasterization.
     var textExtractionBuffer: [Int: [CharacterInfo]]? = nil
 
-    /// Record of how the most recent detection run ended, for
-    /// BOTH run origins: pipeline detection runs (staged for triage)
-    /// and the sheet's Scan-interface runs (results listed in-sheet).
-    /// Written on every run exit path (staged, nothing found, failed)
+    /// Record of how the most recent Scan-interface run ended (results
+    /// listed in-sheet). Written on every run exit path (staged, nothing
+    /// found, failed)
     /// and read by `DocumentEditorView` to drive the detection summary
     /// banner — zero/failed runs previously surfaced only as transient
     /// toasts. `run` increments per record so two identical consecutive
@@ -162,9 +161,8 @@ class RedactionState {
     /// Session-scoped; cleared on new-document import.
     struct DetectionRunRecord: Equatable {
         enum Outcome: Equatable {
-            /// Findings staged for user review — triage for pipeline
-            /// runs, the in-sheet result list for Scan-interface runs.
-            /// Nothing is applied until the user selects and applies.
+            /// Findings listed in-sheet for review. Nothing is applied
+            /// until the user selects and applies.
             case staged
             /// The run completed and flagged nothing.
             case nothingFound(pageCount: Int)
@@ -696,8 +694,7 @@ class RedactionState {
     /// commit-toast copy (`CommitFeedback`), which reports regions
     /// actually created — never the raw detection or selection total.
     struct ApplyOutcome: Equatable {
-        /// Regions actually created (signature candidates and overlap
-        /// skips excluded).
+        /// Regions actually created (overlap skips excluded).
         let applied: Int
         /// Search origin only: selected results skipped for >80%
         /// overlap with an existing region. Skipped results earn no
@@ -710,13 +707,10 @@ class RedactionState {
         /// dedup-skipped as already covered. No badge, no audit entry
         /// — consumed only by the Apply-graying gate.
         var coveredResultIDs: Set<UUID> = []
-        /// Detection-map origin only: detections routed to the review
-        /// instead of applied.
-        let signatureCandidates: Int
 
         static let zero = ApplyOutcome(
             applied: 0, skippedOverlaps: 0,
-            appliedResultIDs: [], signatureCandidates: 0)
+            appliedResultIDs: [])
     }
 
     /// The one apply path for BOTH result origins. Every origin creates
@@ -893,8 +887,7 @@ class RedactionState {
             applied: prepared.appliedCount,
             skippedOverlaps: prepared.skippedOverlaps,
             appliedResultIDs: prepared.appliedResultIDs,
-            coveredResultIDs: prepared.coveredResultIDs,
-            signatureCandidates: 0
+            coveredResultIDs: prepared.coveredResultIDs
         )
     }
 
@@ -952,8 +945,7 @@ class RedactionState {
             applied: prepared.appliedCount,
             skippedOverlaps: prepared.skippedOverlaps,
             appliedResultIDs: prepared.appliedResultIDs,
-            coveredResultIDs: prepared.coveredResultIDs,
-            signatureCandidates: 0
+            coveredResultIDs: prepared.coveredResultIDs
         )
         guard prepared.appliedCount > 0 else { return outcome }
 
