@@ -501,9 +501,10 @@ class RedactionState {
     }
 
     func removeRegion(_ id: UUID, page: Int, undoManager: UndoManager?) {
-        regionVersion += 1
         guard var pageRegions = regions[page],
               let index = pageRegions.firstIndex(where: { $0.id == id }) else { return }
+        regionVersion += 1
+        selectedRegionIDs.remove(id)
         let removed = pageRegions.remove(at: index)
         regions[page] = pageRegions
         regionPageIndex.removeValue(forKey: id)
