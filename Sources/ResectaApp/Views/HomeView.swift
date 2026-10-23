@@ -152,7 +152,8 @@ struct HomeView: View {
     private var masthead: some View {
         VStack(spacing: ResectaTokens.Spacing.sm) {
             if !isAccessibilitySize {
-                HomeMark(height: ResectaTokens.HomeEntry.markHeight)
+                HomeMark(size: ResectaTokens.HomeEntry.markTile)
+                    .padding(.bottom, ResectaTokens.Spacing.xs)
             }
 
             Text("Resecta")

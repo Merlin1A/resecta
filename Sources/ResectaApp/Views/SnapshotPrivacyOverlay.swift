@@ -10,8 +10,8 @@ import SwiftUI
 //
 // Behavior contract:
 // - Opaque grouped background fill (the home screen's grey; no transparency).
-// - Branded placeholder: the app's mark drawn from shapes (`HomeMark`, as
-//   on the home and first-launch screens) + "Resecta" label, always centred
+// - Branded placeholder: the app's icon tile drawn from shapes (`HomeMark`,
+//   as on the home and first-launch screens) + "Resecta" label, always centred
 //   in the window — the overlay covers every screen, not Home alone.
 // - No taps, no gestures, no interactivity — the overlay must not race with
 //   the system snapshotting path.
@@ -24,7 +24,7 @@ struct SnapshotPrivacyOverlay: View {
         ZStack {
             Color(.systemGroupedBackground)
             VStack(spacing: ResectaTokens.Spacing.sm) {
-                HomeMark(height: ResectaTokens.HomeEntry.markHeight)
+                HomeMark(size: ResectaTokens.HomeEntry.markTile)
                 Text("Resecta")
                     .font(.title2)
                     .foregroundStyle(.secondary)

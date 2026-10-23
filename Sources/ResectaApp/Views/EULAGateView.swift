@@ -43,10 +43,10 @@ struct EULAGateView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: ResectaTokens.Spacing.md) {
-                // The app's mark, as the home screen draws it; hidden at
+                // The app's icon tile, as the home screen draws it; hidden at
                 // the accessibility sizes, as there.
                 if !dynamicTypeSize.isAccessibilitySize {
-                    HomeMark(height: ResectaTokens.HomeEntry.markHeight)
+                    HomeMark(size: ResectaTokens.HomeEntry.markTile)
                         .padding(.bottom, ResectaTokens.Spacing.xs)
                 }
 
