@@ -893,8 +893,13 @@ final class SearchState: Identifiable {
     /// passes to `appendResult(_:run:)`. Called after `clearResults()`.
     func beginRun() -> Int {
         runToken += 1
+        lastRunOptions = options
         return runToken
     }
+
+    /// The options the current run started with, which the applied
+    /// record names (`appliedSearchRecord()`); nil before any run.
+    private(set) var lastRunOptions: SearchOptions?
 
     // MARK: - Result Navigation
 
