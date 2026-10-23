@@ -130,4 +130,29 @@ struct CancelledVerifyCurrencyTests {
             hasOutput: true, isVerificationStale: coord.redactionState.isVerificationStale,
             hasUnappliedSelections: false) == .fullPipeline)
     }
+
+    @Test("A cancel after a region changed behind the run keeps the stale caption")
+    func regionAddedDuringTheRunKeepsTheCaption() throws {
+        // A recorded run whose burned version is behind the live one: a
+        // region added after the output was registered. The run's finish
+        // re-asserts the output and records the version it burned, which
+        // is now old, so the flag must stand through the cancel.
+        let coord = makeLoadedCoordinator()
+        coord.redactionState.addRegion(drawnRegion(y: 0.2), page: 0, undoManager: nil)
+        let burned = coord.redactionState.regionVersion
+        let (output, root) = try writeOutput()
+        defer { try? FileManager.default.removeItem(at: root) }
+        coord.apply(.runStarted(effectiveMode: .secureRasterization))
+        coord.apply(.phase(.redacting(progress: .init(currentPage: 0, totalPages: 1, currentStep: "Page 1…"))))
+        coord.apply(.outputRegistered(output))
+        coord.redactionState.addRegion(drawnRegion(y: 0.5), page: 0, undoManager: nil)
+        coord.apply(.redactionFinished(outputURL: output, inputs: .fixture(burnedRegionVersion: burned)))
+        coord.apply(.phase(Self.verifyingPhase))
+        let f = Fixture(coord: coord, output: output, root: root)
+        guard backgroundMidVerify(f) else { return }
+
+        #expect(coord.redactionState.isVerificationStale)
+        #expect(VerificationResultsView.shareDisabledReason(
+            outputExists: true, isStale: coord.redactionState.isVerificationStale) == Self.staleCaption)
+    }
 }
