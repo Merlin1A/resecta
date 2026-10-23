@@ -985,7 +985,8 @@ class RedactionState {
     @discardableResult
     func acceptManualDrawNudge(
         _ nudge: SearchResult,
-        undoManager: UndoManager?
+        undoManager: UndoManager?,
+        documentState: DocumentState? = nil
     ) -> RedactionRegion? {
         let region = RedactionRegion(
             id: UUID(),

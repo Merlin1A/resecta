@@ -416,4 +416,49 @@ struct ManualDrawNudgeTests {
         state.addRegion(beside, page: 0, undoManager: nil)
         #expect(state.pendingManualDrawNudge == nil)
     }
+
+    // MARK: - (e) The accept refuses while a run owns the regions
+
+    @Test("An accept while a run owns the regions changes nothing")
+    func acceptDuringARunChangesNothing() {
+        // The toast outlives the run start: its Add can be tapped while
+        // the pipeline is burning or verifying the pages.
+        let phases: [(String, DocumentState.Phase)] = [
+            ("detecting", .detecting(progress: .init(currentPage: 0, totalPages: 1, currentStep: "Starting"))),
+            ("redacting", .redacting(progress: .init(currentPage: 0, totalPages: 1, currentStep: "Starting"))),
+            ("verifying", .verifying(progress: .init(currentLayer: 1, totalLayers: 5,
+                                                     layerName: "Layer 1", completedLayers: []))),
+            ("exporting", .exporting),
+        ]
+        for (label, phase) in phases {
+            let state = RedactionState()
+            let doc = DocumentState()
+            doc.phase = phase
+            let output = URL(fileURLWithPath: "/tmp/redacted.pdf")
+            state.outputURL = output
+            let versionBefore = state.regionVersion
+            let nudge = Self.piiResult(rect: CGRect(x: 0.18, y: 0.10, width: 0.05, height: 0.02))
+
+            let region = state.acceptManualDrawNudge(nudge, undoManager: nil, documentState: doc)
+
+            #expect(region == nil, "\(label): the accept must refuse")
+            #expect(state.regions.values.allSatisfy { $0.isEmpty }, "\(label): no region added")
+            #expect(state.regionMetadata.isEmpty && state.appliedMatchAudit.isEmpty, "\(label)")
+            #expect(state.regionVersion == versionBefore, "\(label): no region-version bump")
+            #expect(state.outputURL == output, "\(label): the run's output stays linked")
+        }
+    }
+
+    @Test("An accept in the editing phase still adds the match")
+    func acceptWhileEditingAddsTheRegion() {
+        let state = RedactionState()
+        let doc = DocumentState()
+        doc.phase = .editing
+        let nudge = Self.piiResult(rect: CGRect(x: 0.18, y: 0.10, width: 0.05, height: 0.02))
+
+        let region = state.acceptManualDrawNudge(nudge, undoManager: nil, documentState: doc)
+
+        #expect(region != nil)
+        #expect(state.regions[nudge.pageIndex]?.count == 1)
+    }
 }
