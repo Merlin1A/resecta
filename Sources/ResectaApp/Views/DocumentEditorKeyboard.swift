@@ -23,6 +23,16 @@ extension DocumentEditorView {
         }
         return (dx: 1 / size.width, dy: 1 / size.height)
     }
+
+    /// `rect` nudged by one step and clamped to the page. PDF Y is
+    /// bottom-left, so the up arrow (negative `dy` on screen) moves the
+    /// rect up the page.
+    static func nudgedRect(_ rect: CGRect, dx: CGFloat, dy: CGFloat) -> CGRect {
+        var rect = rect
+        rect.origin.x = max(0, min(rect.origin.x + dx, 1 - rect.width))
+        rect.origin.y = max(0, min(rect.origin.y - dy, 1 - rect.height))
+        return rect
+    }
 }
 
 /// The editor's key handling. Mounted once by `DocumentEditorView.body`;
@@ -127,14 +137,7 @@ struct DocumentEditorKeyboard: ViewModifier {
         let moves: [(id: UUID, newRect: CGRect)] = redactionState.selectedRegionIDs.compactMap { id in
             guard let regions = redactionState.regions[page],
                   let region = regions.first(where: { $0.id == id }) else { return nil }
-            var rect = region.normalizedRect
-            rect.origin.x += dx
-            // PDF Y is bottom-left, so up arrow (negative dy in screen) = positive in PDF
-            rect.origin.y -= dy
-            // Clamp to 0–1
-            rect.origin.x = max(0, min(rect.origin.x, 1 - rect.width))
-            rect.origin.y = max(0, min(rect.origin.y, 1 - rect.height))
-            return (id: id, newRect: rect)
+            return (id: id, newRect: DocumentEditorView.nudgedRect(region.normalizedRect, dx: dx, dy: dy))
         }
         guard !moves.isEmpty else { return .ignored }
         let now = Date()
