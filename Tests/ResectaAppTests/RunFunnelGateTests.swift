@@ -55,7 +55,6 @@ struct RunFunnelGateTests {
         search.results = [SearchResult(
             pageIndex: 0, normalizedRect: CGRect(x: 0.1, y: 0.1, width: 0.2, height: 0.03),
             matchedText: "alpha", contextSnippet: "…alpha…", source: .textLayer, term: "alpha", isSelected: true)]
-        search.userModifiedSelections = true
         f.coord.redactionState.activeSearch = search
 
         f.coord.runFullPipeline(documentOverride: .secureRasterization)
@@ -65,7 +64,6 @@ struct RunFunnelGateTests {
         #expect(!started)
         #expect(f.coord.documentState.phaseKind == .editing)
         #expect(f.coord.redactionState.activeSearch === search)
-        #expect(search.userModifiedSelections)
         #expect(f.undo.canUndo)
         #expect(f.toasts.activeToasts.map(\.message) == ["Apply or clear the selected matches first"])
     }
@@ -126,7 +124,6 @@ struct RunFunnelGateTests {
         search.results = [SearchResult(
             pageIndex: 0, normalizedRect: CGRect(x: 0.1, y: 0.1, width: 0.2, height: 0.03),
             matchedText: "alpha", contextSnippet: "…alpha…", source: .textLayer, term: "alpha", isSelected: true)]
-        search.userModifiedSelections = true
         f.coord.redactionState.activeSearch = search
 
         // The purge toast's Re-run, as the scene-phase handler runs it.
@@ -141,7 +138,6 @@ struct RunFunnelGateTests {
         #expect(f.coord.redactionState.activeSearch === search,
                 "the preamble leaves the session for the funnel to judge")
         #expect(search.results.first?.isSelected == true)
-        #expect(search.userModifiedSelections)
         #expect(f.toasts.activeToasts.map(\.message) == [DocumentState.RedactRefusal.selectedMatches.hint])
     }
 

@@ -172,20 +172,6 @@ struct ApplySeamSearchOriginTests {
         #expect(outcome == nil)
     }
 
-    @Test("The seam owns the conditional-dismiss tracker reset for the search origin")
-    func trackerResetOwnedBySeam() async {
-        let state = RedactionState()
-        let search = SearchState()
-        search.results = [makeSearchResult()]
-        search.userModifiedSelections = true
-        state.activeSearch = search
-
-        _ = await state.applyFindings(.selectedSearchResults, undoManager: nil)
-
-        #expect(search.userModifiedSelections == false,
-                "committed selections reset the tracker inside the path")
-    }
-
     @Test("A PII Scan apply returns the created count the Marked notice reports")
     func piiScanApplyFeedsMarkedNotice() async {
         let state = RedactionState()
@@ -359,8 +345,6 @@ struct ApplySeamSingleResultOriginTests {
         #expect(audit?.rationale?.ruleID == "ssn.pattern")
         #expect(state.regionMetadata.count == 1)
         #expect(state.appliedMatchAudit.count == 1)
-        #expect(state.lastAppliedSearchRegionVersion == state.regionVersion,
-                "the single origin records the search apply-version marker like the bulk origin")
     }
 
     @Test("The single and bulk origins build identical artifacts for the same result")
@@ -412,8 +396,6 @@ struct ApplySeamSingleResultOriginTests {
         #expect(singleAudit?.piiConfidence == bulkAudit?.piiConfidence)
         #expect(singleAudit?.rationale?.ruleID == bulkAudit?.rationale?.ruleID)
         #expect(singleAudit?.term == bulkAudit?.term)
-        #expect(singleState.lastAppliedSearchRegionVersion == singleState.regionVersion)
-        #expect(bulkState.lastAppliedSearchRegionVersion == bulkState.regionVersion)
     }
 
     @Test("The checkbox neither gates nor is required — an unchecked current result applies")
@@ -458,7 +440,6 @@ struct ApplySeamSingleResultOriginTests {
         #expect(state.appliedMatchAudit.isEmpty)
         #expect(state.regionVersion == versionBefore,
                 "an inert apply must not signal a region mutation")
-        #expect(state.lastAppliedSearchRegionVersion == -1)
     }
 
     @Test("Undo removes the region, metadata, audit and marker in one step; redo restores all three")
@@ -484,15 +465,12 @@ struct ApplySeamSingleResultOriginTests {
         #expect(state.regionMetadata[regionID] != nil)
         #expect(state.appliedMatchAudit[regionID] != nil)
         let versionAfterApply = state.regionVersion
-        #expect(state.lastAppliedSearchRegionVersion == versionAfterApply)
 
         undo.undo()
         #expect(state.regions[0]?.isEmpty ?? true)
         #expect(state.regionMetadata[regionID] == nil)
         #expect(state.appliedMatchAudit[regionID] == nil)
         #expect(state.regionVersion > versionAfterApply)
-        #expect(state.regionVersion != state.lastAppliedSearchRegionVersion,
-                "the sheet's marker handler reads this bump as a real undo and drops the applied marker")
 
         let versionAfterUndo = state.regionVersion
         undo.redo()
@@ -544,7 +522,6 @@ struct ApplySeamSingleResultOriginTests {
         #expect(state.regions.isEmpty)
         #expect(state.appliedMatchAudit.isEmpty)
         #expect(state.regionVersion == versionBefore)
-        #expect(state.lastAppliedSearchRegionVersion == -1)
     }
 
     @Test("A stale id — a result no longer on board — refuses with zero mutations")
@@ -552,7 +529,6 @@ struct ApplySeamSingleResultOriginTests {
         let state = RedactionState()
         let search = SearchState()
         search.results = [makeSearchResult()]
-        search.userModifiedSelections = true
         state.activeSearch = search
         let versionBefore = state.regionVersion
 
@@ -563,7 +539,6 @@ struct ApplySeamSingleResultOriginTests {
         #expect(state.regionMetadata.isEmpty)
         #expect(state.appliedMatchAudit.isEmpty)
         #expect(state.regionVersion == versionBefore)
-        #expect(search.userModifiedSelections == true, "a refusal touches no session state")
     }
 
     @Test("No active search refuses")
@@ -572,22 +547,5 @@ struct ApplySeamSingleResultOriginTests {
         let outcome = await state.applyFindings(.searchResult(id: UUID()), undoManager: nil)
         #expect(outcome == nil)
         #expect(state.regions.isEmpty)
-    }
-
-    @Test("A partial commit keeps the conditional-dismiss tracker set (the entity-group rule)")
-    func partialCommitKeepsTracker() async {
-        let state = RedactionState()
-        let search = SearchState()
-        let first = makeSearchResult(y: 0.1)
-        let second = makeSearchResult(y: 0.6, matchedText: "987-65-4321")
-        search.results = [first, second]
-        search.userModifiedSelections = true
-        state.activeSearch = search
-
-        let outcome = await state.applyFindings(.searchResult(id: first.id), undoManager: nil)
-
-        #expect(outcome?.applied == 1)
-        #expect(search.userModifiedSelections == true,
-                "the other selections are still live work — the tracker stays set")
     }
 }

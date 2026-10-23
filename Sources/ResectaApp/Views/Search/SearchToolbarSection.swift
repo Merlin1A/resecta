@@ -580,7 +580,7 @@ struct SearchToolbarSection: View {
                     searchState.piiCategoryFilter = [category]
                 } else if searchState.piiCategoryFilter?.contains(category) == true {
                     searchState.piiCategoryFilter?.remove(category)
-                    if searchState.piiCategoryFilter?.isEmpty == true {
+                    if searchState.piiCategoryFilter?.isEmpty == true, !searchState.customTermMatchesInFilter {
                         searchState.piiCategoryFilter = nil
                     }
                 } else {
@@ -588,6 +588,27 @@ struct SearchToolbarSection: View {
                 }
             }
             .accessibilityLabel("\(category.rawValue), \(count) match\(count == 1 ? "" : "es")")
+        }
+
+        // Custom-term matches (no detector category) get their own chip.
+        let customCount = searchState.customTermMatchCount
+        if customCount > 0 {
+            FilterChip(
+                label: "Custom",
+                count: searchState.piiCategoryFilter != nil ? customCount : nil,
+                isSelected: searchState.piiCategoryFilter == nil || searchState.customTermMatchesInFilter
+            ) {
+                if searchState.piiCategoryFilter == nil {
+                    searchState.piiCategoryFilter = []
+                    searchState.customTermMatchesInFilter = true
+                } else if searchState.customTermMatchesInFilter {
+                    searchState.customTermMatchesInFilter = false
+                    if searchState.piiCategoryFilter?.isEmpty == true { searchState.piiCategoryFilter = nil }
+                } else {
+                    searchState.customTermMatchesInFilter = true
+                }
+            }
+            .accessibilityLabel("Custom, \(customCount) match\(customCount == 1 ? "" : "es")")
         }
     }
 

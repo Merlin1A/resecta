@@ -64,6 +64,35 @@ struct SearchFooterCapBannerTests {
         #expect(state.resultsAtCap)
         #expect(state.capUnscannedPageCount == 28)
     }
+
+    @Test("A stream of exactly the cap reads as capped, with the unscanned remainder")
+    func streamReachingTheCapReadsAsCapped() {
+        withScratchDefaults { defaults in
+            let state = SearchState(defaults: defaults)
+            // The run's own sequence: clear, mint the token, the engine's
+            // progress hop, then the results under that token.
+            state.clearResults()
+            let run = state.beginRun()
+            state.totalPages = 40
+            state.currentSearchPage = 12
+
+            for index in 0..<DocumentSearcher.maxResults {
+                state.appendResult(SearchResult(
+                    pageIndex: index % 12,
+                    normalizedRect: CGRect(x: 0.1, y: 0.01 * CGFloat(index % 90), width: 0.1, height: 0.01),
+                    matchedText: "match-\(index)",
+                    contextSnippet: "match-\(index)",
+                    source: .textLayer,
+                    term: "match"
+                ), run: run)
+            }
+            state.flushPendingResults()
+
+            #expect(state.results.count == DocumentSearcher.maxResults, "every result of the stream is kept")
+            #expect(state.resultsAtCap, "the append that reaches the cap is the one that caps")
+            #expect(state.capUnscannedPageCount == 28)
+        }
+    }
 }
 
 // MARK: - Hidden selection

@@ -35,7 +35,6 @@ struct RedactGateTests {
     func pendingSelectionsBlock() {
         let (documentState, redactionState) = states()
         let touched = SearchState(defaults: makeScratchDefaults().0)
-        touched.userModifiedSelections = true
         redactionState.activeSearch = touched
         #expect(documentState.redactRefusal(with: redactionState) == nil, "touched, nothing selected: nothing to apply")
         touched.results = [SearchResult(

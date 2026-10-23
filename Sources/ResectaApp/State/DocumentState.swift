@@ -486,6 +486,12 @@ class DocumentState {
         phase = .verified(report: report)
     }
 
+    /// The share in flight: a fresh token per share, set when its sheet is
+    /// about to present and cleared when the share finishes or is
+    /// abandoned. A watchdog or a completion that names another token
+    /// belongs to an earlier share.
+    @ObservationIgnored var liveShareAttempt: UUID?
+
     // MARK: - Transition Engine
 
     /// All legal transitions as (from-kind, to-kind) pairs.

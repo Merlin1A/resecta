@@ -50,7 +50,6 @@ struct DocumentEditorHomeCloseTests {
         redactionState.activeSearch = untouched
         #expect(DocumentState.hasUnappliedSelections(redactionState) == false)
         let touched = SearchState(defaults: makeScratchDefaults().0)
-        touched.userModifiedSelections = true
         touched.results = [SearchResult(
             pageIndex: 0, normalizedRect: CGRect(x: 0.1, y: 0.1, width: 0.2, height: 0.03),
             matchedText: "alpha", contextSnippet: "…alpha…", source: .textLayer, term: "alpha", isSelected: true)]

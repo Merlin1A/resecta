@@ -52,6 +52,13 @@ extension SearchAndRedactSheet {
         ).toastClearance
     }
 
+    /// The sheet-local toast host's lift at a medium or large detent: the
+    /// clearance plus the footer's height while the footer is up, so a
+    /// notice sits above Select All and Apply, never over them.
+    static func sheetToastLift(clearance: CGFloat, footerHeight: CGFloat, footerShown: Bool) -> CGFloat {
+        clearance + (footerShown ? footerHeight : 0)
+    }
+
     // MARK: - Per-item Apply (compact handle)
 
     /// A filled capsule — `BrandTeal.fill`, white headline label,

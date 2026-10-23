@@ -92,11 +92,6 @@ extension RedactionState {
         if let documentState, !documentState.canMutateRegions {
             return nil
         }
-        // The conditional-dismiss tracker reset is owned by this path:
-        // the search origin resets it on every non-refused outcome (it
-        // resolves the session's whole selection context); a
-        // single-result apply from the compact handle leaves it set.
-        // Each branch resets the session it actually applied against.
         switch origin {
         case .selectedSearchResults:
             return await applySelectedSearchResultsOrigin(
