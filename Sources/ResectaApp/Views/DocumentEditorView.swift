@@ -533,15 +533,13 @@ struct DocumentEditorView: View {
                 showHoverPopover = false
             }
         }
-        // [R-20]: manual-draw nearby-PII nudge observer. The
-        // post-add hook on `RedactionState.addRegion` sets
-        // `pendingManualDrawNudge` after a `.manual` region commits
+        // [R-20]: manual-draw nearby-PII nudge observer. `addRegion`'s post-add
+        // hook sets `pendingManualDrawNudge` after a `.manual` region commits
         // adjacent (≤ 50 pt normalized) to an unapplied high-confidence
         // PII match. We enqueue a non-modal info toast with an "Add"
-        // action that calls `acceptManualDrawNudge(_:undoManager:)`
-        // with the nudge captured by value — closure-capture so the
-        // accept path survives the suppression mark
-        // below clearing the pending field. The
+        // action that calls `acceptManualDrawNudge` with the nudge captured
+        // by value, so the accept survives the suppression mark below
+        // clearing the pending field; a run start drops the toast. The
         // `markManualDrawNudgeSuppressed()` call gates further toasts
         // for the current search session; the suppression
         // resets on any `activeSearch` transition + on `clearAll()` +
@@ -553,9 +551,11 @@ struct DocumentEditorView: View {
                 "1 match nearby. Add to selection?",
                 severity: .info,
                 actionLabel: "Add",
-                actionHandler: { [weak redactionState, weak undoManager] in
+                editsRegions: true,
+                actionHandler: { [weak redactionState, weak undoManager, weak documentState] in
                     guard let state = redactionState else { return }
-                    state.acceptManualDrawNudge(capturedNudge, undoManager: undoManager)
+                    state.acceptManualDrawNudge(
+                        capturedNudge, undoManager: undoManager, documentState: documentState)
                 }
             )
             redactionState.markManualDrawNudgeSuppressed()

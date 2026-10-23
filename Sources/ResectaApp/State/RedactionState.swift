@@ -966,21 +966,16 @@ class RedactionState {
 
     /// Accept a nudged `SearchResult` directly: convert it into a
     /// redaction region whose `Source` carries the result's
-    /// `MatchRationale`. Caller passes
-    /// the captured nudge so the accept path works even after the
-    /// toast-enqueue path cleared `pendingManualDrawNudge` (the toast
-    /// closure captures the value-type `SearchResult` at enqueue
-    /// time). Routes through `addRegion` so the standard
-    /// undo / region-version / page-index mutations apply —
-    /// rationale continuity is preserved because the new region's
-    /// `Source.searchMatch(term:rationale:)` carries `nudge.rationale`
-    /// verbatim. Side-effects mirror the search-origin apply's
-    /// per-result branch (regionMetadata + audit snapshot, plus the
-    /// sheet's `appliedResultIDs` marker while a session is open) so a
-    /// nudge-accepted region looks like a sheet-applied one. The toast
-    /// outlives the sheet, and the nudge carries everything the region
-    /// needs, so the accept never requires a live session.
-    /// The suppression flag is NOT set on accept — the user is
+    /// `MatchRationale` verbatim. The caller passes the nudge captured
+    /// at toast enqueue (the enqueue path clears `pendingManualDrawNudge`).
+    /// Routes through `addRegion` for the standard undo / region-version /
+    /// page-index mutations, and mirrors the search-origin apply's
+    /// per-result side effects (regionMetadata + audit snapshot, plus the
+    /// sheet's `appliedResultIDs` marker while a session is open). The
+    /// toast outlives the sheet, so the accept needs no live session; it
+    /// also outlives a run start, so the accept refuses while the
+    /// pipeline owns the regions (`!canMutateRegions`), as `applyFindings`
+    /// does. The suppression flag is NOT set on accept — the user is
     /// engaged; the toast-enqueue path sets it.
     @discardableResult
     func acceptManualDrawNudge(
@@ -988,6 +983,7 @@ class RedactionState {
         undoManager: UndoManager?,
         documentState: DocumentState? = nil
     ) -> RedactionRegion? {
+        if let documentState, !documentState.canMutateRegions { return nil }
         let region = RedactionRegion(
             id: UUID(),
             normalizedRect: nudge.normalizedRect,

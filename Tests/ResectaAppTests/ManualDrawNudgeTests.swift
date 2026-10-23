@@ -461,4 +461,22 @@ struct ManualDrawNudgeTests {
         #expect(region != nil)
         #expect(state.regions[nudge.pageIndex]?.count == 1)
     }
+
+    @Test("A run start drops the nearby-match toast")
+    func runStartDropsTheNudgeToast() {
+        let coord = makeLoadedCoordinator()
+        let toasts = ToastQueueManager()
+        coord.toastManager = toasts
+        coord.redactionState.addRegion(
+            Self.manualRegion(at: CGRect(x: 0.10, y: 0.10, width: 0.05, height: 0.02)),
+            page: 0, undoManager: nil)
+        toasts.enqueue("1 match nearby. Add to selection?", actionLabel: "Add", editsRegions: true) {}
+        #expect(toasts.activeToasts.count == 1)
+
+        coord.runFullPipeline(documentOverride: nil)
+        defer { coord.documentState.cancelActivePipeline(redactionState: coord.redactionState) }
+
+        #expect(coord.documentState.activePipelineTask != nil, "the run started")
+        #expect(!toasts.activeToasts.contains { $0.editsRegions })
+    }
 }
