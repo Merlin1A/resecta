@@ -1044,6 +1044,24 @@ class RedactionState {
     /// `MainActor.assumeIsolated` still bridges the iOS-26
     /// `registerUndo(withTarget:)` callback (whose handler is not statically
     /// MainActor-typed).
+    /// The pages the last Undo or Redo step changed. A step that
+    /// registers once per page (a delete across pages) unions them: the
+    /// first record of a step opens it, and the next main-actor turn
+    /// closes it.
+    private(set) var lastUndoRedoPages: Set<Int> = []
+    @ObservationIgnored private var undoRedoStepOpen = false
+
+    private func recordUndoRedoPages(before: [Int: [RedactionRegion]]) {
+        let touched = Set(before.keys).union(regions.keys).filter { before[$0] != regions[$0] }
+        if undoRedoStepOpen {
+            lastUndoRedoPages.formUnion(touched)
+        } else {
+            lastUndoRedoPages = touched
+            undoRedoStepOpen = true
+            Task { @MainActor [weak self] in self?.undoRedoStepOpen = false }
+        }
+    }
+
     func registerUndo(
         _ undoManager: UndoManager?, _ actionName: String,
         handler: @escaping @MainActor (RedactionState) -> Void
@@ -1053,7 +1071,9 @@ class RedactionState {
         MainActor.assumeIsolated {
             undoManager.registerUndo(withTarget: target) { target in
                 MainActor.assumeIsolated {
+                    let before = target.regions
                     handler(target)
+                    target.recordUndoRedoPages(before: before)
                 }
             }
             undoManager.setActionName(actionName)

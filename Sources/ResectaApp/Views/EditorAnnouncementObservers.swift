@@ -56,6 +56,14 @@ struct EditorAnnouncementObservers: ViewModifier {
                 AccessibilityNotification.Announcement(Self.selectionAnnouncement(
                     newCount: new.selected, regionsRemoved: new.regions < old.regions)).post()
             }
+            // After Undo or Redo, show the first page the step changed and
+            // say which page it is.
+            .onChange(of: redactionState.lastUndoRedoPages) { _, pages in
+                guard let page = pages.min(), documentState.phaseKind == .editing else { return }
+                if page != documentState.currentPageIndex { documentState.currentPageIndex = page }
+                AccessibilityNotification.Announcement(
+                    "Page \(page + 1) of \(documentState.pageCount)").post()
+            }
             // iPad hover popover — observe hoveredRegionID on RedactionState
             .onChange(of: redactionState.hoveredRegionID) { _, newID in
                 if let id = newID, let metadata = redactionState.regionMetadata[id],
