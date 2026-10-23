@@ -142,11 +142,14 @@ class SettingsState {
         let storedMode = defaults.string(forKey: "pipelineMode.v2")
         self.pipelineMode = storedMode
             .flatMap(PipelineMode.init(rawValue:)) ?? .secureRasterization
-        // One-time cleanup of the retired auto-apply preference.
-        // The setting is gone — every detection run stages for review —
-        // so the persisted key is removed rather than hydrated.
-        // Idempotent removeObject-on-init (nothing writes this key
-        // anymore), mirroring `SavedSearchStore.legacyDefaultsKey`.
+        // One-time cleanup of retired preferences, removed rather than
+        // hydrated: the auto-apply setting, and the per-category accept
+        // and reject counts that only the removed detection review
+        // recorded. Upgraded installs still hold them, and the preference
+        // store goes into device backups. Idempotent removeObject-on-init
+        // (nothing writes these keys anymore), mirroring
+        // `SavedSearchStore.legacyDefaultsKey`.
+        defaults.removeObject(forKey: "perCategoryPriors.v1")
         defaults.removeObject(forKey: "autoApplyDetections")
         // The snap-to-text preference and the export counter that timed the
         // old rating prompt are retired too; their stored values go the
