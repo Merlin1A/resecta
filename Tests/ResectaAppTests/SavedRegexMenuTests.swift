@@ -6,7 +6,7 @@ import Foundation
 // Saved-regex inline menu (Regex mode). Menu lives next to the regex
 // warning in `SearchToolbarSection.standardSearchOptions`; tapping a
 // saved entry inserts its pattern into `searchState.queryText`,
-// "Save current..." opens an alert that flushes via
+// "Save current…" opens an alert that flushes via
 // `savedRegexStore.add(label:pattern:)` after
 // `RegexSentinelCheck.validate(_:)`. Pure-function contracts pinned
 // here keep the menu's predicates + strings testable without hosting
@@ -34,12 +34,12 @@ struct SavedRegexMenuTests {
 
     @Test("Save current menu item label pins the SAFE-classified copy")
     func saveCurrentRegexMenuItemLabel() {
-        #expect(SearchToolbarSection.saveCurrentRegexMenuItem == "Save current...")
+        #expect(SearchToolbarSection.saveCurrentRegexMenuItem == "Save current…")
     }
 
     @Test("Saved section header label pins the SAFE-classified copy")
     func savedRegexSectionHeaderLabel() {
-        #expect(SearchToolbarSection.savedRegexSectionHeader == "Saved...")
+        #expect(SearchToolbarSection.savedRegexSectionHeader == "Saved…")
     }
 
     // MARK: - canSaveCurrentRegex

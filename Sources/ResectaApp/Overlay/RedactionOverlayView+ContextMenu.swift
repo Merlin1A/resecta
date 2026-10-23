@@ -19,7 +19,7 @@ extension RedactionOverlayView: UIContextMenuInteractionDelegate {
         // Select the region when showing its context menu
         coordinator?.selectRegion(region.id)
 
-        return UIContextMenuConfiguration(actionProvider: { _ in
+        return UIContextMenuConfiguration(identifier: region.id as NSUUID, actionProvider: { _ in
             var actions: [UIMenuElement] = []
 
             // Region info item (disabled — display only).

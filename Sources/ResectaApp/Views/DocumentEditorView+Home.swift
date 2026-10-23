@@ -181,19 +181,19 @@ extension DocumentEditorView {
         hasDrawnRegions || hasUnappliedSelections
     }
 
-    /// Message for the shared close dialog, switched on phase. The
-    /// verification screen names verification results (the literal pinned
-    /// by `VerificationActionBarDoneConfirmationTests`); every other
-    /// phase — the editing-phase Home entry — names detection results,
-    /// the sentence the Replace dialog already uses
-    /// (`RedactWorkspaceView`; byte-identity pinned by
+    /// Message for the shared close dialog, switched on phase — one
+    /// teardown family with the failed screen's Start Over: every phase
+    /// but verification reads Start Over's own sentence
+    /// (`FailedStateView.startOverMessage`); the verification screen adds
+    /// its results (the literal pinned by
+    /// `VerificationActionBarDoneConfirmationTests` and
     /// `DocumentEditorHomeCloseTests`).
     static func closeDialogMessage(phaseKind: DocumentState.PhaseKind) -> String {
         switch phaseKind {
         case .verified:
-            "Drawn regions and verification results will be cleared."
+            "The document, drawn regions, and verification results will be cleared."
         default:
-            "Drawn regions and detection results will be cleared."
+            FailedStateView.startOverMessage
         }
     }
 }

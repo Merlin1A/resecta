@@ -1125,7 +1125,7 @@ struct SearchAndRedactSheet: View {
             )
         }
         guard store.add(label: trimmedLabel, pattern: trimmedPattern) else {
-            return "Pattern rejected. Check syntax, length, or label uniqueness."
+            return PatternAdmission.storeRejectedMessage
         }
         return nil
     }

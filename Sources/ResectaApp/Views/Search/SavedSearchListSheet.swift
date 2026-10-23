@@ -233,6 +233,7 @@ struct SavedSearchListSheet: View {
         // presents modally above the search sheet's shield swap, so it
         // carries its own screen-capture shield for the same reason.
         .shieldedSheetContent(monitor: captureMonitor)
+        .presentationBackground(.regularMaterial)
     }
 
     // MARK: - Delete All
@@ -333,7 +334,7 @@ struct SavedSearchListSheet: View {
 
     static func emptyStateDescription(for interface: SearchInterface) -> String {
         interface == .scan
-            ? "Save a scan to reuse its category and option setup later. Text searches are listed on the Search side."
+            ? "Save a scan to reuse it later on this or other documents. Saved searches are listed on the Search side."
             : "Save a search to reuse it later on this or other documents. Saved scans are listed on the Scan side."
     }
 
@@ -365,7 +366,7 @@ struct SavedSearchListSheet: View {
 
     static func savePromptMessage(for interface: SearchInterface) -> String {
         interface == .scan
-            ? "Saves the current scan shape — selected categories and options. Never document content or results."
+            ? "Saves the current scan shape — options and filter settings. Never document content or results."
             : "Saves the current query shape — mode, query text, and filter settings. Never document content or results."
     }
 

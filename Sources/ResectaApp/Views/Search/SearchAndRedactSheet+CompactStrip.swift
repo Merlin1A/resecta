@@ -107,10 +107,18 @@ extension SearchAndRedactSheet {
     /// medium detent.
     nonisolated static let showFullSheetActionName = "Show full sheet"
 
-    /// The compact handle's title — the centred headline, unchanged.
+    /// The compact handle's title — the centred headline: the interface
+    /// name, or the live count while a Scan runs.
     var compactStripTitle: some View {
-        Text(searchState.searchModeType.interface.displayName)
+        Text(Self.compactStripTitleText(
+            interface: searchState.searchModeType.interface,
+            isSearching: searchState.isSearching, found: searchState.totalCount))
             .font(.headline)
             .lineLimit(1)
+    }
+
+    /// "Scanning… N found" while a Scan runs; the interface name otherwise.
+    static func compactStripTitleText(interface: SearchInterface, isSearching: Bool, found: Int) -> String {
+        isSearching && interface == .scan ? "Scanning… \(found) found" : interface.displayName
     }
 }

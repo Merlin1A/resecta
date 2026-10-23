@@ -291,10 +291,8 @@ struct SettingsView: View {
             // description.
             .accessibilityHint(Self.verifyToggleHint(paranoidMode: settingsState.paranoidMode))
 
-            // The "Review Detections Before Applying" toggle is retired:
-            // review-before-apply is now the only behavior (detected
-            // items always stage for review; nothing is applied without
-            // an explicit selection), so there is no setting to show.
+            // The "Review Detections Before Applying" toggle is retired;
+            // there is no setting to show.
 
             // Detection preset picker. SELECTS one of
             // the calibrated threshold vectors (conservative / balanced /
@@ -331,11 +329,6 @@ struct SettingsView: View {
             .accessibilityHint("Manage the saved regex patterns surfaced in the regex search menu.")
         } header: {
             Label("Workflow", systemImage: "arrow.triangle.2.circlepath")
-        } footer: {
-            // The review-toggle era's conditional phrasing retired
-            // with the toggle: review-before-apply is the only
-            // behavior, so the footer states it unconditionally.
-            Text("Detected items are staged for your review; nothing is applied without an explicit selection.")
         }
     }
 

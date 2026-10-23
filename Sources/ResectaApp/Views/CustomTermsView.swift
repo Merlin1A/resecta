@@ -368,12 +368,12 @@ struct AddTermRow: View {
         guard !trimmed.isEmpty else { return .empty }
         guard trimmed.count <= UserTermsStore.patternLengthCap else {
             return .tooLong(
-                message: "Pattern exceeds \(UserTermsStore.patternLengthCap) characters."
+                message: "Pattern too long (max \(UserTermsStore.patternLengthCap) characters)."
             )
         }
         if isRegex {
             guard DocumentSearcher.validateRegexPattern(trimmed) != nil else {
-                return .invalidRegex(message: "Invalid or unsafe regex pattern.")
+                return .invalidRegex(message: "Term rejected. The pattern may be invalid or fail the regex safety check.")
             }
             guard await PatternAdmission.sentinelAdmits(trimmed) else {
                 return .sentinelRejected(message: PatternAdmission.sentinelRejectedMessage)

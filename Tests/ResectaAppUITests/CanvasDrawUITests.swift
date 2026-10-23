@@ -193,6 +193,13 @@ nonisolated final class CanvasDrawUITests: XCTestCase {
             currentRegionCount(), 1,
             "A 9 × 9 screen-pt drag must not commit at zoom — the commit floor is measured on screen."
         )
+        // The rejection's notice sits above the page bar, over the band the
+        // next drag starts in; it must clear before that drag.
+        let notice = app.staticTexts
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Region too small. Zoom in to draw a smaller region."))
+            .firstMatch
+        XCTAssertTrue(notice.waitForExistence(timeout: 10), "The rejected drag shows its notice.")
+        XCTAssertTrue(notice.waitForNonExistence(timeout: 20), "The notice clears on its own.")
         // … and 24 × 24 commits again.
         drag(fromNormalized: bandRight, byPoints: 24, 24)
         XCTAssertTrue(

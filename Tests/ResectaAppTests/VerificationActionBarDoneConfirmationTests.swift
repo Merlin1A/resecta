@@ -121,7 +121,7 @@ struct VerificationActionBarDoneConfirmationTests {
         // VerificationActionBar). Pin the copy so it can't silently
         // drift into outcome-promise language.
         let title = "Close this document?"
-        let message = "Drawn regions and verification results will be cleared."
+        let message = "The document, drawn regions, and verification results will be cleared."
 
         let banned = ["guaranteed", "ensures", "impossible", "securely"] // LegalPhrases:safe (test banlist)
         for word in banned {
@@ -132,7 +132,7 @@ struct VerificationActionBarDoneConfirmationTests {
         }
         // Message names the two state buckets touched. The shape of the
         // copy carries the mechanism.
-        #expect(message.contains("Drawn regions"))
+        #expect(message.contains("drawn regions"))
         #expect(message.contains("verification results"))
     }
 }

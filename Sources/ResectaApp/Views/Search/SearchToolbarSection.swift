@@ -121,7 +121,7 @@ struct SearchToolbarSection: View {
                                    a11yLabel: "Case sensitive search")
                         optionChip("Whole word", \.wholeWord,
                                    a11yLabel: "Whole word matching")
-                        optionChip("Include OCR", \.includeOCR,
+                        optionChip("Include OCR Pages", \.includeOCR,
                                    a11yLabel: "Include scanned page text")
                     }
 
@@ -207,7 +207,7 @@ struct SearchToolbarSection: View {
             if let msg = duplicateTermMessage {
                 Text(msg)
                     .font(.caption)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(ResectaTokens.SemanticColor.warnText)
                     .padding(.horizontal, ResectaTokens.Spacing.md)
                     .transition(.opacity)
                     .onAppear {
@@ -224,7 +224,7 @@ struct SearchToolbarSection: View {
                     savedRegexMenu
                     Text("Regex patterns can match unintended text. Review all matches before redacting.")
                         .font(.caption)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(ResectaTokens.SemanticColor.warnText)
                     Spacer()
                 }
                 .padding(.horizontal, ResectaTokens.Spacing.md)
@@ -256,7 +256,7 @@ struct SearchToolbarSection: View {
             ) {
                 HStack {
                     Image(systemName: "exclamationmark.triangle")
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(ResectaTokens.SemanticColor.warningTint)
                     Text("Short terms may produce many results.")
                         .font(.caption)
                         .foregroundStyle(.secondary)

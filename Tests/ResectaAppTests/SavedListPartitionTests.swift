@@ -69,7 +69,7 @@ struct SavedListPartitionTests {
         #expect(SavedSearchListSheet.savePromptMessage(for: .search)
                 == "Saves the current query shape — mode, query text, and filter settings. Never document content or results.")
         #expect(SavedSearchListSheet.savePromptMessage(for: .scan)
-                == "Saves the current scan shape — selected categories and options. Never document content or results.")
+                == "Saves the current scan shape — options and filter settings. Never document content or results.")
     }
 
     @Test("Recall round-trip stays interface-correct for both entry kinds")

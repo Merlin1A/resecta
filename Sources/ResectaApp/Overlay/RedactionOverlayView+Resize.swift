@@ -11,48 +11,22 @@ extension RedactionOverlayView {
 
     // MARK: - Resize
 
+    /// Resize the selected region toward the dragged handle. The rect the
+    /// resize began with is the anchor for the whole drag; a finger past
+    /// the opposite edge flips the box about that edge; the snap acts on the
+    /// edges that now move, and the size floor holds after it, on those
+    /// axes only.
     func updateSelectedRegionForResize(handle: ResizeHandle, to point: CGPoint) {
         guard let selectedID,
-              let idx = regions.firstIndex(where: { $0.id == selectedID })
+              let idx = regions.firstIndex(where: { $0.id == selectedID }),
+              let start = preResizeNormalizedRect
         else { return }
 
-        let current = pdfNormalizedToOverlay(regions[idx].normalizedRect)
-        var newRect: CGRect
-
-        switch handle {
-        case .topLeft:
-            newRect = CGRect(x: point.x, y: point.y,
-                             width: current.maxX - point.x, height: current.maxY - point.y)
-        case .topRight:
-            newRect = CGRect(x: current.minX, y: point.y,
-                             width: point.x - current.minX, height: current.maxY - point.y)
-        case .bottomLeft:
-            newRect = CGRect(x: point.x, y: current.minY,
-                             width: current.maxX - point.x, height: point.y - current.minY)
-        case .bottomRight:
-            newRect = CGRect(x: current.minX, y: current.minY,
-                             width: point.x - current.minX, height: point.y - current.minY)
-        case .topCenter:
-            newRect = CGRect(x: current.minX, y: point.y,
-                             width: current.width, height: current.maxY - point.y)
-        case .bottomCenter:
-            newRect = CGRect(x: current.minX, y: current.minY,
-                             width: current.width, height: point.y - current.minY)
-        case .leftCenter:
-            newRect = CGRect(x: point.x, y: current.minY,
-                             width: current.maxX - point.x, height: current.height)
-        case .rightCenter:
-            newRect = CGRect(x: current.minX, y: current.minY,
-                             width: point.x - current.minX, height: current.height)
-        }
-
-        // Enforce minimum size in overlay space
-        let resizeFloor = Self.minimumRegionSize * fingerScale
-        newRect.size.width = max(abs(newRect.size.width), resizeFloor)
-        newRect.size.height = max(abs(newRect.size.height), resizeFloor)
-
-        // Apply snap guides to moving edges during resize
-        newRect = snapEngine.applyResizeSnapping(to: newRect, handle: handle, excluding: selectedID, in: snapPage)
+        let resized = Self.resizedRect(pdfNormalizedToOverlay(start), handle: handle, to: point)
+        var newRect = snapEngine.applyResizeSnapping(
+            to: resized.rect, handle: resized.handle, excluding: selectedID, in: snapPage)
+        newRect = Self.flooredRect(newRect, handle: resized.handle,
+                                   floor: Self.minimumRegionSize * fingerScale)
 
         // Clamp to overlay bounds
         newRect = newRect.intersection(bounds)
@@ -60,6 +34,78 @@ extension RedactionOverlayView {
 
         regions[idx].normalizedRect = overlayToPDFNormalized(newRect)
         setNeedsDisplay()
+    }
+
+    /// The edges a handle moves.
+    static func movingEdges(_ handle: ResizeHandle) -> (left: Bool, right: Bool, top: Bool, bottom: Bool) {
+        switch handle {
+        case .topLeft: return (true, false, true, false)
+        case .topRight: return (false, true, true, false)
+        case .bottomLeft: return (true, false, false, true)
+        case .bottomRight: return (false, true, false, true)
+        case .topCenter: return (false, false, true, false)
+        case .bottomCenter: return (false, false, false, true)
+        case .leftCenter: return (true, false, false, false)
+        case .rightCenter: return (false, true, false, false)
+        }
+    }
+
+    /// The handle that moves exactly these edges.
+    static func handle(movingLeft left: Bool, right: Bool, top: Bool, bottom: Bool) -> ResizeHandle {
+        switch (left, right, top, bottom) {
+        case (true, _, true, _): return .topLeft
+        case (_, true, true, _): return .topRight
+        case (true, _, _, true): return .bottomLeft
+        case (_, true, _, true): return .bottomRight
+        case (_, _, true, _): return .topCenter
+        case (_, _, _, true): return .bottomCenter
+        case (true, _, _, _): return .leftCenter
+        default: return .rightCenter
+        }
+    }
+
+    /// The rect a handle drag gives from the rect the resize began with:
+    /// each moving edge follows the finger and the opposite edge is the
+    /// anchor; a finger past the anchor flips the box about it. Also
+    /// returns the handle as it now sits (left and right, or top and
+    /// bottom, swapped on a flipped axis) for the snap and the floor.
+    static func resizedRect(
+        _ start: CGRect, handle: ResizeHandle, to point: CGPoint
+    ) -> (rect: CGRect, handle: ResizeHandle) {
+        let edges = movingEdges(handle)
+        var (minX, maxX, minY, maxY) = (start.minX, start.maxX, start.minY, start.maxY)
+        var (left, right, top, bottom) = (false, false, false, false)
+        if edges.left || edges.right {
+            let anchor = edges.left ? start.maxX : start.minX
+            right = point.x > anchor || (point.x == anchor && edges.right)
+            left = !right
+            minX = min(anchor, point.x)
+            maxX = max(anchor, point.x)
+        }
+        if edges.top || edges.bottom {
+            let anchor = edges.top ? start.maxY : start.minY
+            bottom = point.y > anchor || (point.y == anchor && edges.bottom)
+            top = !bottom
+            minY = min(anchor, point.y)
+            maxY = max(anchor, point.y)
+        }
+        let rect = CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+        return (rect, Self.handle(movingLeft: left, right: right, top: top, bottom: bottom))
+    }
+
+    /// Hold `floor` on the axes `handle` moves, keeping the anchored edge.
+    static func flooredRect(_ rect: CGRect, handle: ResizeHandle, floor: CGFloat) -> CGRect {
+        let edges = movingEdges(handle)
+        var floored = rect
+        if (edges.left || edges.right), floored.width < floor {
+            if edges.left { floored.origin.x = floored.maxX - floor }
+            floored.size.width = floor
+        }
+        if (edges.top || edges.bottom), floored.height < floor {
+            if edges.top { floored.origin.y = floored.maxY - floor }
+            floored.size.height = floor
+        }
+        return floored
     }
 
     // MARK: - Region Hit Testing
@@ -100,18 +146,24 @@ extension RedactionOverlayView {
     /// of two or more handles overlap the touch point, the nearest
     /// handle center wins — deterministic, independent of the array
     /// order below (which previously decided ties by accident).
+    /// Two more rules. A point inside the region past every handle box's
+    /// inward reach (at most a quarter of that side) is the region's body,
+    /// for a move, even on a thin region whose boxes overlap its middle.
+    /// And with `containerBounds` (the page), a box that would cross the
+    /// page edge slides inward so all of it can be touched.
     internal static func resolveResizeHandle(
         at point: CGPoint,
         regionRect: CGRect,
         targetHandleSize: CGFloat = ResectaTokens.TouchTarget.minimum,
-        minimumHandleSize: CGFloat = 22
+        minimumHandleSize: CGFloat = 22,
+        containerBounds: CGRect? = nil
     ) -> ResizeHandle? {
         let clamped = min(
             targetHandleSize,
             max(minimumHandleSize, min(regionRect.width, regionRect.height) / 2)
         )
 
-        let handles: [(ResizeHandle, CGPoint)] = [
+        let centers: [(ResizeHandle, CGPoint)] = [
             (.topLeft,     CGPoint(x: regionRect.minX, y: regionRect.minY)),
             (.topRight,    CGPoint(x: regionRect.maxX, y: regionRect.minY)),
             (.bottomLeft,  CGPoint(x: regionRect.minX, y: regionRect.maxY)),
@@ -121,20 +173,45 @@ extension RedactionOverlayView {
             (.leftCenter,  CGPoint(x: regionRect.minX, y: regionRect.midY)),
             (.rightCenter, CGPoint(x: regionRect.maxX, y: regionRect.midY)),
         ]
-
-        let candidates = handles.filter { _, center in
-            CGRect(x: center.x - clamped / 2, y: center.y - clamped / 2,
-                   width: clamped, height: clamped).contains(point)
+        let boxes: [(handle: ResizeHandle, box: CGRect)] = centers.map { handle, center in
+            var box = CGRect(x: center.x - clamped / 2, y: center.y - clamped / 2,
+                             width: clamped, height: clamped)
+            if let page = containerBounds {
+                box.origin.x = max(page.minX, min(box.origin.x, page.maxX - clamped))
+                box.origin.y = max(page.minY, min(box.origin.y, page.maxY - clamped))
+            }
+            return (handle, box)
         }
-        return candidates.min(by: { lhs, rhs in
-            let ldx = lhs.1.x - point.x, ldy = lhs.1.y - point.y
-            let rdx = rhs.1.x - point.x, rdy = rhs.1.y - point.y
+        func box(_ handle: ResizeHandle) -> CGRect {
+            boxes.first { $0.handle == handle }?.box ?? .null
+        }
+
+        // The body zone: past each side's handle-box reach, capped at a
+        // quarter of that side.
+        let left = min(box(.leftCenter).maxX - regionRect.minX, regionRect.width / 4)
+        let right = min(regionRect.maxX - box(.rightCenter).minX, regionRect.width / 4)
+        let top = min(box(.topCenter).maxY - regionRect.minY, regionRect.height / 4)
+        let bottom = min(regionRect.maxY - box(.bottomCenter).minY, regionRect.height / 4)
+        let body = CGRect(x: regionRect.minX + left, y: regionRect.minY + top,
+                          width: regionRect.width - left - right,
+                          height: regionRect.height - top - bottom)
+        if body.width > 0, body.height > 0, body.contains(point) { return nil }
+
+        return boxes.filter { $0.box.contains(point) }.min(by: { lhs, rhs in
+            let ldx = lhs.box.midX - point.x, ldy = lhs.box.midY - point.y
+            let rdx = rhs.box.midX - point.x, rdy = rhs.box.midY - point.y
             return (ldx * ldx + ldy * ldy) < (rdx * rdx + rdy * rdy)
-        })?.0
+        })?.handle
     }
 
+    /// The selected region shows and takes resize handles only while Add
+    /// to Selection is off: with it on, a tap anywhere on a region adds or
+    /// removes that region, never starts a resize.
+    var resizeHandlesActive: Bool { !isMultiSelectActive }
+
     func hitTestResizeHandle(at point: CGPoint) -> ResizeHandle? {
-        guard let selectedID,
+        guard resizeHandlesActive,
+              let selectedID,
               let region = regions.first(where: { $0.id == selectedID })
         else { return nil }
 
@@ -143,7 +220,8 @@ extension RedactionOverlayView {
             at: point,
             regionRect: rect,
             targetHandleSize: ResectaTokens.TouchTarget.minimum * fingerScale,
-            minimumHandleSize: 22 * fingerScale
+            minimumHandleSize: 22 * fingerScale,
+            containerBounds: bounds
         )
     }
 }

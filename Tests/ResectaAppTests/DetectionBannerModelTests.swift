@@ -37,21 +37,21 @@ struct DetectionBannerModelTests {
             outcome: .nothingFound(pageCount: 3),
             scanSummary: .init(foundCount: 0, pageCount: 3))
         #expect(model == .init(
-            message: "Detection ran on 3 pages and flagged no items.",
+            message: "Scan found no items across 3 pages.",
             autoDismisses: false, isWarning: false))
 
         let singular = DocumentEditorView.detectionBannerModel(
             outcome: .nothingFound(pageCount: 1), scanSummary: nil)
-        #expect(singular?.message == "Detection ran on 1 page and flagged no items.")
+        #expect(singular?.message == "Scan found no items across 1 page.")
     }
 
-    @Test("A failed run is a persistent warning that says no regions changed")
+    @Test("A failed run is a persistent warning in the Search sheet's words")
     func failedIsPersistentWarning() {
         let model = DocumentEditorView.detectionBannerModel(
             outcome: .failed,
             scanSummary: .init(foundCount: 0, pageCount: 0))
         #expect(model == .init(
-            message: "Detection couldn't finish \u{2014} no regions were changed. Manual redaction tools remain available.",
+            message: "The last scan couldn't start because the document wasn't ready.",
             autoDismisses: false, isWarning: true))
     }
 }

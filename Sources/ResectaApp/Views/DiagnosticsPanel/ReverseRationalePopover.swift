@@ -45,8 +45,8 @@ struct ReverseRationalePopover: View {
             .navigationTitle(String(localized: "reverseRationale.title", table: "Legal"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
                 }
             }
             .task(id: request.id) {

@@ -66,22 +66,23 @@ struct DocumentEditorHomeCloseTests {
 
     // MARK: - Dialog message
 
-    @Test(".verified keeps the pinned verification-results literal")
+    @Test(".verified names the document, the drawn regions and the verification results")
     func verifiedMessageIsPinnedLiteral() {
         #expect(DocumentEditorView.closeDialogMessage(phaseKind: .verified)
-                == "Drawn regions and verification results will be cleared.")
+                == "The document, drawn regions, and verification results will be cleared.")
     }
 
-    @Test("Every other phase reads the detection-results sentence")
-    func otherPhasesReadDetectionSentence() {
-        let expected = "Drawn regions and detection results will be cleared."
+    @Test("Every other phase reads Start Over's sentence (one teardown family)")
+    func otherPhasesReadStartOverSentence() {
+        let expected = "The document and drawn regions will be cleared."
+        #expect(FailedStateView.startOverMessage == expected)
         let others: [DocumentState.PhaseKind] = [
             .empty, .importing, .editing, .detecting,
             .redacting, .verifying, .exporting, .failed,
         ]
         for phase in others {
             #expect(DocumentEditorView.closeDialogMessage(phaseKind: phase) == expected,
-                    "phase \(phase) must read the detection-results sentence")
+                    "phase \(phase) must read Start Over's sentence")
         }
     }
 
