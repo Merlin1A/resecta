@@ -89,7 +89,7 @@ struct SearchRedactIntegrationTests {
         let search = SearchState()
         search.results = [
             makeResult(pageIndex: 0, term: "test"),
-            makeResult(pageIndex: 0, term: "test")
+            makeResult(pageIndex: 0, term: "test", normalizedRect: CGRect(x: 0.1, y: 0.4, width: 0.3, height: 0.04))
         ]
         redactionState.activeSearch = search
 
@@ -354,7 +354,7 @@ struct SearchRedactIntegrationTests {
         let prepared = prepareApply(
             selected: [
                 makeResult(term: "Name", piiCategory: .name),
-                makeResult(term: "wrenfield"),
+                makeResult(term: "wrenfield", normalizedRect: CGRect(x: 0.1, y: 0.4, width: 0.3, height: 0.04)),
             ],
             existingRectsByPage: [:],
             appliedAt: Date(),
@@ -372,7 +372,7 @@ struct SearchRedactIntegrationTests {
         let prepared = prepareApply(
             selected: [
                 makeResult(term: "Phone", piiCategory: .phone),
-                makeResult(term: "wrenfield"),
+                makeResult(term: "wrenfield", normalizedRect: CGRect(x: 0.1, y: 0.4, width: 0.3, height: 0.04)),
             ],
             existingRectsByPage: [:],
             appliedAt: Date(),

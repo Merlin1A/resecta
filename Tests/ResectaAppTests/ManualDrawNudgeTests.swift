@@ -357,6 +357,32 @@ struct ManualDrawNudgeTests {
         #expect(state.pendingManualDrawNudge == nil)
     }
 
+    // MARK: - Only a fresh drawing offers the nearby match
+
+    @Test("Duplicating a manual region next to an unapplied PII match does NOT set the nudge")
+    func duplicateDoesNotNudge() {
+        withScratchDefaults { defaults in
+            let state = RedactionState()
+            // The source is added before the session exists, so its own
+            // add sets nothing.
+            let source = Self.manualRegion(at: CGRect(x: 0.10, y: 0.10, width: 0.05, height: 0.02))
+            state.addRegion(source, page: 0, undoManager: nil)
+            let search = SearchState(defaults: defaults)
+            // The copy lands at x 0.12…0.17 (offset +0.02, −0.02); the match
+            // starts at x = 0.20, 0.03 away — inside the 0.082 proximity.
+            let candidate = Self.piiResult(rect: CGRect(x: 0.20, y: 0.08, width: 0.05, height: 0.02))
+            search.results = [candidate]
+            state.activeSearch = search
+            #expect(state.pendingManualDrawNudge == nil, "precondition: nothing pending")
+
+            state.duplicateRegion(source.id, page: 0, undoManager: nil)
+
+            #expect(state.regions[0]?.count == 2, "the copy exists")
+            #expect(state.pendingManualDrawNudge == nil,
+                    "a copy is not a fresh drawing — no nearby-match notice")
+        }
+    }
+
     // MARK: - Covered matches
 
     @Test("A name another region already covers does not nudge when a region is drawn beside it")

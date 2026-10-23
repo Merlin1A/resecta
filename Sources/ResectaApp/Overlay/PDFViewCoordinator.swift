@@ -232,9 +232,13 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
         refreshAllOverlays()
     }
 
+    /// The resize, move and group-move commits. A tap on a selected region,
+    /// or on one region of a selected group, ends its "drag" where it
+    /// began; the mutators judge that no-op themselves (no step, no Redo
+    /// re-armed, the output kept), and the resize is announced only when
+    /// the rect changed.
     func commitResize(_ id: UUID, page: Int, newRect: CGRect, undoManager: UndoManager?) {
-        if storedRect(id, page: page) != newRect {
-            redactionState?.resizeRegion(id, page: page, newRect: newRect, undoManager: undoManager)
+        if redactionState?.resizeRegion(id, page: page, newRect: newRect, undoManager: undoManager) == true {
             UIAccessibility.post(notification: .announcement, argument: Self.commitAnnouncement(.resized))
         }
         refreshOverlay(for: page)
@@ -242,27 +246,13 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
 
     // Commit region move after drag ends.
     func commitMove(_ id: UUID, page: Int, newRect: CGRect, undoManager: UndoManager?) {
-        if storedRect(id, page: page) != newRect {
-            redactionState?.moveRegion(id, page: page, newRect: newRect, undoManager: undoManager)
-        }
+        redactionState?.moveRegion(id, page: page, newRect: newRect, undoManager: undoManager)
         refreshOverlay(for: page)
-    }
-
-    /// The stored rect of a region. A tap on a selected region, or on one
-    /// region of a selected group, ends its "drag" where it began; the
-    /// resize, move and group-move commits keep only the rects that
-    /// changed, so that tap records no Move or Resize step, re-arms no
-    /// Redo and leaves the output alone.
-    private func storedRect(_ id: UUID, page: Int) -> CGRect? {
-        redactionState?.regions[page]?.first(where: { $0.id == id })?.normalizedRect
     }
 
     /// Commit a batch move of multiple regions on the same page.
     func commitMoveMultiple(_ moves: [(id: UUID, newRect: CGRect)], page: Int, undoManager: UndoManager?) {
-        let changed = moves.filter { storedRect($0.id, page: page) != $0.newRect }
-        if !changed.isEmpty {
-            redactionState?.moveRegions(changed, page: page, undoManager: undoManager)
-        }
+        redactionState?.moveRegions(moves, page: page, undoManager: undoManager)
         refreshOverlay(for: page)
     }
 

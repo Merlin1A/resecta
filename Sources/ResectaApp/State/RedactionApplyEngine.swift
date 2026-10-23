@@ -37,7 +37,7 @@ extension RedactionState {
         /// Regions actually created (overlap skips excluded).
         let applied: Int
         /// Search origin only: selected results skipped for >80%
-        /// overlap with an existing region. Skipped results earn no
+        /// overlap with an existing or just-created region. Skipped results earn no
         /// applied badge and no audit entry.
         let skippedOverlaps: Int
         /// Search origin only: the `SearchResult.id`s that produced a
@@ -244,6 +244,18 @@ nonisolated func resultIsCovered(_ resultRect: CGRect, by rects: [CGRect]) -> Bo
     }
 }
 
+/// The confidence a region stores for the result it came from, for the
+/// apply and the nudge accept alike: the detector's score when the result
+/// has one, else its source's (1.0 for the text layer, the recognizer's
+/// for OCR).
+nonisolated func regionConfidence(for result: SearchResult) -> Double {
+    if let piiConfidence = result.piiConfidence { return piiConfidence }
+    return switch result.source {
+    case .textLayer: 1.0
+    case .ocr(let conf): Double(conf)
+    }
+}
+
 /// Sendable bundle returned by the detached `prepareApply` step.
 struct PreparedApply: Sendable {
     let createdRegions: [Int: [RedactionRegion]]
@@ -256,8 +268,8 @@ struct PreparedApply: Sendable {
     /// sheet's `appliedResultIDs` union (the green "applied" badge state)
     /// matches the audit-backed set instead of the full selection.
     let appliedResultIDs: Set<UUID>
-    /// The `SearchResult.id`s dedup-SKIPPED for >80% overlap
-    /// with an existing region. These are kept out of
+    /// The `SearchResult.id`s dedup-SKIPPED for >80% overlap with an
+    /// existing region or one this pass created. These are kept out of
     /// `appliedResultIDs` (no badge, no audit entry); the sheet unions
     /// them into `SearchState.coveredResultIDs` so `selectionFullyApplied`
     /// can gray Apply on a fully covered selection.
@@ -267,7 +279,7 @@ struct PreparedApply: Sendable {
 /// Pure-function detached prepare step for the search origin of
 /// `RedactionState.applyFindings`.
 /// Runs the overlap rejection against a snapshot of existing region
-/// rects per page and constructs the per-result region / metadata /
+/// rects per page, grown by each region the pass creates, and constructs the per-result region / metadata /
 /// audit-snapshot trio. No actor state is read; the result is re-merged
 /// on MainActor by the caller. File-level (not a static method) so the
 /// detached task body captures no implicit `Self`, which keeps the
@@ -299,10 +311,13 @@ nonisolated func prepareApply(
     var skippedOverlaps = 0
     var appliedResultIDs: Set<UUID> = []
     var coveredResultIDs: Set<UUID> = []
+    // The covering rects grow with each region this pass creates, so two
+    // results over the same text make one region.
+    var coveringRectsByPage = existingRectsByPage
 
     for result in selected {
-        // Skip results an existing region already covers.
-        if resultIsCovered(result.normalizedRect, by: existingRectsByPage[result.pageIndex] ?? []) {
+        // Skip results an existing or just-created region already covers.
+        if resultIsCovered(result.normalizedRect, by: coveringRectsByPage[result.pageIndex] ?? []) {
             skippedOverlaps += 1
             coveredResultIDs.insert(result.id)
             continue
@@ -318,12 +333,9 @@ nonisolated func prepareApply(
             source: .searchMatch(term: result.term, rationale: result.rationale)
         )
         createdRegions[result.pageIndex, default: []].append(region)
+        coveringRectsByPage[result.pageIndex, default: []].append(result.normalizedRect)
         appliedResultIDs.insert(result.id)
 
-        let confidence: Double = switch result.source {
-        case .textLayer: 1.0
-        case .ocr(let conf): Double(conf)
-        }
         // A PII-scan result carries its detected category —
         // stamp the region with it, so downstream surfaces (info popover,
         // long-press row, verifier term collection) see the category the
@@ -333,7 +345,7 @@ nonisolated func prepareApply(
             .map { .pii($0.piiKind) } ?? .searchMatch(term: result.term)
         createdMetadata[region.id] = RegionMetadata(
             piiKind: piiKind,
-            confidence: confidence,
+            confidence: regionConfidence(for: result),
             matchedText: result.matchedText,
             recognitionLevel: result.source == .textLayer ? .fast : .accurate
         )

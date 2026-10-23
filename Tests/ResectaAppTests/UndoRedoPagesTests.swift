@@ -54,7 +54,7 @@ struct UndoRedoPagesTests {
         mgr.undo()
         let first = state.lastUndoRedo
         #expect(first?.pages == [1])
-        #expect(first?.name == "Add Redaction")
+        #expect(first?.name == "Add Region")
         // The step closes on the next main-actor turn, as between two taps.
         try await Task.sleep(for: .milliseconds(50))
         mgr.undo()

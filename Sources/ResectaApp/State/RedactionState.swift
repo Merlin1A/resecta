@@ -92,18 +92,19 @@ class RedactionState {
         var deselectedCount: Int { items.count }
     }
 
-    /// The deselection facts of the search session the user
-    /// most recently *applied* results from, captured at the apply
-    /// commit (`applySelectedSearchResultsOrigin`) rather than at
+    /// The deselection facts of the search sessions the user *applied*
+    /// results from, captured at the apply commit rather than at
     /// pipeline run entry. Closes the common-path gap where the search
     /// sheet dismisses (nil-ing `activeSearch`) between the apply and the
     /// Redact tap, so `runEntryDeselectionSnapshot()` below would
     /// otherwise see no live session and ship no disclosure even though
     /// the user deliberately left results un-checked when they applied.
     ///
-    /// Lifetime: last apply wins — a later apply from a search session
-    /// (this or any other) overwrites the previous value; there is no
-    /// accumulation across applies. It survives a pipeline run
+    /// Lifetime: one part per session (`pendingRunDeselectionParts`),
+    /// merged here. A later apply from the same session replaces its
+    /// part, an apply from another Scan adds one, and a typed search,
+    /// which has no deselection facts, leaves them alone; undoing an
+    /// apply restores the parts it found. It survives a pipeline run
     /// (including cancel/fail, both of which route through
     /// `clearOutput()`) so a retry that didn't re-apply still reports
     /// the same counts — `clearOutput()` deliberately does NOT clear
@@ -112,7 +113,10 @@ class RedactionState {
     /// apply fact). It must not leak across documents, so both
     /// document-boundary resets (`clearForNewDocument()`,
     /// `clearAll()`) clear it explicitly.
-    private(set) var pendingRunDeselection: DeselectionSnapshot?
+    var pendingRunDeselection: DeselectionSnapshot? {
+        DeselectionSnapshot(merging: pendingRunDeselectionParts.map(\.snapshot))
+    }
+    private(set) var pendingRunDeselectionParts: [RunDeselectionPart] = []
 
     /// Set when any gazetteer / context-keywords loader failed to
     /// initialize for this session. Drives the persistent degrade
@@ -301,7 +305,17 @@ class RedactionState {
     private(set) var regionsModifiedSinceVerification = false
 
     /// Reverse index: region UUID → page index. O(1) lookup instead of O(n×m) scan.
-    private var regionPageIndex: [UUID: Int] = [:]
+    /// Written by the region mutations (`RedactionState+RegionMutations.swift`).
+    var regionPageIndex: [UUID: Int] = [:]
+
+    /// The two one-way writes every region mutation makes to the state
+    /// above, for the mutations in `RedactionState+RegionMutations.swift`:
+    /// the version only counts up, and the verification flag is only set.
+    func bumpRegionVersion() { regionVersion += 1 }
+    func markRegionsModified() {
+        regionsModifiedSinceVerification = true
+        clearOutput()
+    }
 
     /// Called by the pipeline runner after successful verification completes.
     /// This is the ONLY public path for setting the flag to false.
@@ -359,7 +373,7 @@ class RedactionState {
         // the PRIOR document; `clearOutput()` deliberately leaves them
         // alone (they survive pipeline retries), so the document boundary
         // is where they are dropped.
-        pendingRunDeselection = nil
+        pendingRunDeselectionParts = []
         // A full-document reset: no regions remain, so "regions modified
         // since verification" is logically false.
         regionsModifiedSinceVerification = false
@@ -448,212 +462,6 @@ class RedactionState {
         lastRunInputs = nil
     }
 
-    // MARK: - Region Mutations with Undo
-
-    func addRegion(_ region: RedactionRegion, page: Int, undoManager: UndoManager?) {
-        regionVersion += 1
-        regions[page, default: []].append(region)
-        regionPageIndex[region.id] = page
-        regionsModifiedSinceVerification = true
-        clearOutput()
-        let regionID = region.id
-        registerUndo(undoManager, "Add Redaction") { target in
-            target.removeRegion(regionID, page: page, undoManager: undoManager)
-        }
-        // Post-add hook for the manual-draw nearby-PII
-        // nudge. Only fires for `.manual` source regions — the search-
-        // apply path that creates `.searchMatch` regions is itself the
-        // origin of nudge candidates, so we deliberately skip it to
-        // avoid recursive toast spam. The predicate handles all other
-        // filtering (proximity, applied-IDs, category, suppression).
-        if case .manual = region.source,
-           let search = activeSearch,
-           !manualDrawNudgeSuppressedForSession {
-            let resultsSnapshot = MainActor.assumeIsolated { search.results }
-            let appliedSnapshot = MainActor.assumeIsolated { search.appliedResultIDs }
-            if let match = RedactionState.nearbyUnappliedPIIMatch(
-                addedRegion: region,
-                page: page,
-                results: resultsSnapshot,
-                appliedIDs: appliedSnapshot,
-                suppressed: manualDrawNudgeSuppressedForSession,
-                proximityNormalized: RedactionState.manualDrawNudgeProximityNormalized,
-                coveringRects: regions[page]?.map(\.normalizedRect) ?? []
-            ) {
-                pendingManualDrawNudge = match
-            }
-        }
-    }
-
-    func removeRegion(_ id: UUID, page: Int, undoManager: UndoManager?) {
-        guard var pageRegions = regions[page],
-              let index = pageRegions.firstIndex(where: { $0.id == id }) else { return }
-        regionVersion += 1
-        selectedRegionIDs.remove(id)
-        let removed = pageRegions.remove(at: index)
-        regions[page] = pageRegions
-        regionPageIndex.removeValue(forKey: id)
-        let removedMetadata = regionMetadata.removeValue(forKey: id) // Capture metadata
-        regionsModifiedSinceVerification = true
-        clearOutput()
-        registerUndo(undoManager, "Delete Redaction") { target in
-            target.addRegion(removed, page: page, undoManager: undoManager)
-            if let removedMetadata { // Restore metadata on undo
-                target.regionMetadata[removed.id] = removedMetadata
-            }
-        }
-    }
-
-    func resizeRegion(
-        _ id: UUID, page: Int,
-        newRect: CGRect, undoManager: UndoManager?
-    ) {
-        regionVersion += 1
-        guard var pageRegions = regions[page],
-              let index = pageRegions.firstIndex(where: { $0.id == id }) else { return }
-        let oldRect = pageRegions[index].normalizedRect
-        pageRegions[index].normalizedRect = newRect
-        regions[page] = pageRegions
-        regionsModifiedSinceVerification = true
-        clearOutput()
-        registerUndo(undoManager, "Resize Redaction") { target in
-            target.resizeRegion(id, page: page, newRect: oldRect, undoManager: undoManager)
-        }
-    }
-
-    // Move region to new position. Follows resizeRegion undo pattern.
-    func moveRegion(
-        _ id: UUID, page: Int,
-        newRect: CGRect, undoManager: UndoManager?
-    ) {
-        regionVersion += 1
-        guard var pageRegions = regions[page],
-              let index = pageRegions.firstIndex(where: { $0.id == id }) else { return }
-        let oldRect = pageRegions[index].normalizedRect
-        pageRegions[index].normalizedRect = newRect
-        regions[page] = pageRegions
-        regionsModifiedSinceVerification = true
-        clearOutput()
-        registerUndo(undoManager, "Move Redaction") { target in
-            target.moveRegion(id, page: page, newRect: oldRect, undoManager: undoManager)
-        }
-    }
-
-    /// Batch move multiple regions on the same page. Single undo action.
-    func moveRegions(_ moves: [(id: UUID, newRect: CGRect)], page: Int, undoManager: UndoManager?) {
-        regionVersion += 1
-        guard var pageRegions = regions[page] else { return }
-        var mutableOldRects: [(id: UUID, oldRect: CGRect)] = []
-        for move in moves {
-            guard let index = pageRegions.firstIndex(where: { $0.id == move.id }) else { continue }
-            mutableOldRects.append((move.id, pageRegions[index].normalizedRect))
-            pageRegions[index].normalizedRect = move.newRect
-        }
-        regions[page] = pageRegions
-        regionsModifiedSinceVerification = true
-        clearOutput()
-        let snapshot = mutableOldRects
-        registerUndo(undoManager, "Move Redactions") { target in
-            let restoreMoves = snapshot.map { (id: $0.id, newRect: $0.oldRect) }
-            target.moveRegions(restoreMoves, page: page, undoManager: undoManager)
-        }
-    }
-
-    /// Batch remove multiple regions from a single page. Single undo action.
-    func removeRegions(_ ids: Set<UUID>, page: Int, undoManager: UndoManager?) {
-        regionVersion += 1
-        guard var pageRegions = regions[page] else { return }
-        var mutableRemoved: [(region: RedactionRegion, metadata: RegionMetadata?)] = []
-        for id in ids {
-            guard let index = pageRegions.firstIndex(where: { $0.id == id }) else { continue }
-            let region = pageRegions.remove(at: index)
-            let metadata = regionMetadata.removeValue(forKey: id)
-            mutableRemoved.append((region, metadata))
-        }
-        regions[page] = pageRegions
-        for id in ids { regionPageIndex.removeValue(forKey: id) }
-        regionsModifiedSinceVerification = true
-        clearOutput()
-        selectedRegionIDs.subtract(ids)
-        let snapshot = mutableRemoved
-        registerUndo(undoManager, "Delete Redactions") { target in
-            for item in snapshot {
-                target.regions[page, default: []].append(item.region)
-                target.regionPageIndex[item.region.id] = page
-                if let meta = item.metadata {
-                    target.regionMetadata[item.region.id] = meta
-                }
-            }
-            target.regionsModifiedSinceVerification = true
-            target.clearOutput()
-            // Undo re-inserts the deleted regions — bump so the overlay
-            // refresh gate observes it (the redo leg recurses into
-            // `removeRegions`, which bumps at entry).
-            target.regionVersion += 1
-            target.registerUndo(undoManager, "Delete Redactions") { target2 in
-                target2.removeRegions(ids, page: page, undoManager: undoManager)
-            }
-        }
-    }
-
-    /// Delete all selected regions, grouped by page for batch undo.
-    /// Returns affected page indices so callers can refresh overlays.
-    @discardableResult
-    func deleteSelected(undoManager: UndoManager?) -> Set<Int> {
-        let ids = selectedRegionIDs
-        guard !ids.isEmpty else { return [] }
-        var affectedPages: Set<Int> = []
-        var byPage: [Int: Set<UUID>] = [:]
-        for id in ids {
-            if let page = pageIndex(for: id) {
-                byPage[page, default: []].insert(id)
-                affectedPages.insert(page)
-            }
-        }
-        for (page, pageIDs) in byPage {
-            if pageIDs.count == 1, let id = pageIDs.first {
-                removeRegion(id, page: page, undoManager: undoManager)
-            } else {
-                removeRegions(pageIDs, page: page, undoManager: undoManager)
-            }
-        }
-        selectedRegionIDs = []
-        return affectedPages
-    }
-
-    /// Duplicate a region with a small offset. The copy is manual-sourced.
-    /// Routes through `addRegion` for the actual mutation but
-    /// overrides the inner action name so the iOS long-press Undo menu
-    /// reads "Duplicate Redaction" rather than the generic "Add Redaction".
-    func duplicateRegion(_ id: UUID, page: Int, undoManager: UndoManager?) {
-        regionVersion += 1
-        guard let pageRegions = regions[page],
-              let region = pageRegions.first(where: { $0.id == id }) else { return }
-        let newRect = RedactionState.duplicateOffsetClamp(
-            source: region.normalizedRect
-        )
-        let copy = RedactionRegion(id: UUID(), normalizedRect: newRect, source: .manual)
-        addRegion(copy, page: page, undoManager: undoManager)
-        // Override the inner addRegion's "Add Redaction" name. UndoManager
-        // setActionName is last-write-wins on the current registration.
-        undoManager?.setActionName("Duplicate Redaction")
-    }
-
-    /// 0.02-offset clamp for `duplicateRegion`. Normalized PDF coords are
-    /// rotation-independent (rotation is a display transform), so a clamp
-    /// to [0, 1]² covers every page-size / rotation combination. Right
-    /// edge is bounded by `1 - width`; bottom edge is bounded by 0.
-    /// Pure function — testable without a full RedactionState.
-    static func duplicateOffsetClamp(source: CGRect) -> CGRect {
-        let offset: CGFloat = 0.02
-        return CGRect(
-            x: min(source.minX + offset, 1 - source.width),
-            y: max(source.minY - offset, 0),
-            width: source.width,
-            height: source.height
-        )
-    }
-
     // MARK: - Apply serialization state
 
     // The apply gate (`waitForApplyTurn()` / `endApplyTurn()` in
@@ -706,36 +514,36 @@ class RedactionState {
         if let documentState, !documentState.canMutateRegions {
             return nil
         }
-
-        commitApply(
-            createdRegions: prepared.createdRegions,
-            createdMetadata: prepared.createdMetadata,
-            createdAudit: prepared.createdAudit,
-            actionName: Self.searchApplyActionName(count: selected.count),
-            undoManager: undoManager
-        )
-        // Capture the CAPTURED session's deselection facts at
-        // the moment of commit, before the caller dismisses the sheet
-        // and nils `activeSearch` out from under a later pipeline-entry
-        // read. Last apply wins: this overwrites whatever a previous
-        // apply (this session or an earlier one) left pending. Derivation
-        // is unchanged — same `deselectionSnapshotForRun()` the coverage
-        // panel and the live-session pipeline-entry path use.
-        pendingRunDeselection = search.deselectionSnapshotForRun()
-        // Caller is responsible for clearing activeSearch after showing feedback.
-        return ApplyOutcome(
+        let outcome = ApplyOutcome(
             applied: prepared.appliedCount,
             skippedOverlaps: prepared.skippedOverlaps,
             appliedResultIDs: prepared.appliedResultIDs,
             coveredResultIDs: prepared.coveredResultIDs
         )
-    }
+        // A selection the regions already cover creates nothing, so it
+        // commits nothing: no version bump, no empty undo step. Its
+        // deselection facts still join the run's, as an apply's always do.
+        guard prepared.appliedCount > 0 else {
+            pendingRunDeselectionParts = runDeselectionParts(after: search)
+            return outcome
+        }
 
-    /// The search origins' undo action name — the toast's verb, no document
-    /// text: "Mark N Instances", singular at one. One construction for both
-    /// origins (the bulk origin reads the singular for one result too).
-    private static func searchApplyActionName(count: Int) -> String {
-        count == 1 ? "Mark 1 Instance" : "Mark \(count) Instances"
+        // The CAPTURED session's deselection facts join the pending
+        // parts at the moment of commit, before the caller dismisses the
+        // sheet and nils `activeSearch` out from under a later
+        // pipeline-entry read. Derivation is unchanged — the same
+        // `deselectionSnapshotForRun()` the coverage panel and the
+        // live-session pipeline-entry path use.
+        commitApply(
+            createdRegions: prepared.createdRegions,
+            createdMetadata: prepared.createdMetadata,
+            createdAudit: prepared.createdAudit,
+            actionName: UndoName.mark(prepared.appliedCount),
+            runDeselectionParts: runDeselectionParts(after: search),
+            undoManager: undoManager
+        )
+        // Caller is responsible for clearing activeSearch after showing feedback.
+        return outcome
     }
 
     /// Single-result search origin: the
@@ -757,15 +565,15 @@ class RedactionState {
     /// badge, no audit entry), the same `commitApply`
     /// transaction recording the search apply-version marker,
     /// the same action-name construction in its singular form, and the
-    /// same post-commit deselection snapshot (last apply wins).
+    /// same deselection parts at the commit.
     /// One result needs no detached prepare, so nothing suspends between
     /// the mutation guard in `applyFindings` and the commit — the
     /// post-suspension re-check the bulk origin needs has no window
-    /// here. Two differences by design: a covered result creates
-    /// nothing, so it commits nothing (no version bump, no empty undo
-    /// step — an inert apply must not signal a region mutation); and
-    /// this is a PARTIAL commit — the remaining selections stay live
-    /// work, which the dismiss rule reads from the rows (the
+    /// here. As in the bulk origin, a covered result creates nothing,
+    /// so it commits nothing (no version bump, no empty undo step — an
+    /// inert apply must not signal a region mutation). One difference by
+    /// design: this is a PARTIAL commit — the remaining selections stay
+    /// live work, which the dismiss rule reads from the rows (the
     /// entity-group rule).
     func applySearchResultOrigin(
         id: UUID,
@@ -793,10 +601,10 @@ class RedactionState {
             createdRegions: prepared.createdRegions,
             createdMetadata: prepared.createdMetadata,
             createdAudit: prepared.createdAudit,
-            actionName: Self.searchApplyActionName(count: 1),
+            actionName: UndoName.mark(1),
+            runDeselectionParts: runDeselectionParts(after: search),
             undoManager: undoManager
         )
-        pendingRunDeselection = search.deselectionSnapshotForRun()
         return outcome
     }
 
@@ -819,16 +627,20 @@ class RedactionState {
     /// The single write-back transaction every apply origin commits
     /// through: one `regionVersion` bump, region + reverse-index
     /// insert, metadata + audit merge, verification/output
-    /// invalidation, and ONE two-leg undo registration. Undo removes
-    /// the created regions with their metadata AND audit records in
-    /// lockstep; redo re-inserts all three.
+    /// invalidation, the run's deselection parts, and ONE two-leg undo
+    /// registration. Undo removes the created regions with their metadata
+    /// AND audit records in lockstep and gives back the deselection parts
+    /// it found; redo re-inserts all three and the parts it set.
     private func commitApply(
         createdRegions: [Int: [RedactionRegion]],
         createdMetadata: [UUID: RegionMetadata],
         createdAudit: [UUID: MatchAuditSnapshot],
         actionName: String,
+        runDeselectionParts: [RunDeselectionPart],
         undoManager: UndoManager?
     ) {
+        let partsBefore = pendingRunDeselectionParts
+        pendingRunDeselectionParts = runDeselectionParts
         regionVersion += 1
         for (page, newRegions) in createdRegions {
             regions[page, default: []].append(contentsOf: newRegions)
@@ -847,6 +659,7 @@ class RedactionState {
                 let idsToRemove = Set(newRegions.map(\.id))
                 target.regions[page]?.removeAll { idsToRemove.contains($0.id) }
                 for id in idsToRemove { target.regionPageIndex.removeValue(forKey: id) }
+                target.selectedRegionIDs.subtract(idsToRemove)
             }
             for id in metaSnapshot.keys {
                 target.regionMetadata.removeValue(forKey: id)
@@ -856,6 +669,7 @@ class RedactionState {
             }
             target.regionsModifiedSinceVerification = true
             target.clearOutput()
+            target.pendingRunDeselectionParts = partsBefore
             // The undo leg is a region mutation like any other: bump
             // `regionVersion` so the overlay refresh gate and the search
             // sheet's applied-marker `.onChange` observe the removal.
@@ -869,6 +683,7 @@ class RedactionState {
                 target2.appliedMatchAudit.merge(auditSnapshot) { _, new in new }
                 target2.regionsModifiedSinceVerification = true
                 target2.clearOutput()
+                target2.pendingRunDeselectionParts = runDeselectionParts
                 // Redo re-inserts regions — a region mutation; the bump
                 // keeps the canvas overlays refreshing. The sheet's
                 // applied markers come back with the re-inserted audit
@@ -955,17 +770,13 @@ class RedactionState {
             normalizedRect: nudge.normalizedRect,
             source: .searchMatch(term: nudge.term, rationale: nudge.rationale)
         )
-        let confidence: Double = switch nudge.source {
-        case .textLayer: 1.0
-        case .ocr(let conf): Double(conf)
-        }
         // Category stamp — mirrors `prepareApply` so a nudge-accepted
         // region stays indistinguishable from a sheet-applied region.
         let nudgeKind: DetectionResult.Kind = nudge.piiCategory
             .map { .pii($0.piiKind) } ?? .searchMatch(term: nudge.term)
         let metadata = RegionMetadata(
             piiKind: nudgeKind,
-            confidence: confidence,
+            confidence: regionConfidence(for: nudge),
             matchedText: nudge.matchedText,
             recognitionLevel: nudge.source == .textLayer ? .fast : .accurate
         )
@@ -986,11 +797,10 @@ class RedactionState {
             // re-run, so the Search Re-check never sees it.
             searchRecord: nil
         )
-        addRegion(region, page: nudge.pageIndex, undoManager: undoManager)
+        addRegion(region, page: nudge.pageIndex, undoManager: undoManager, actionName: UndoName.addNearbyMatch)
         regionMetadata[region.id] = metadata
         appliedMatchAudit[region.id] = audit
         pendingManualDrawNudge = nil
-        undoManager?.setActionName("Add Nearby Match")
         return region
     }
 
@@ -1026,7 +836,7 @@ class RedactionState {
         hoveredRegionID = nil
     }
 
-    // MARK: - Undo Helper state (`RedactionState+UndoHelper.swift`)
+    // MARK: - Undo Helper state (`RedactionState+RegionMutations.swift`)
 
     /// The last Undo or Redo step: the pages it changed, its name and a
     /// serial, so a repeat on the same page is a change too. A step that

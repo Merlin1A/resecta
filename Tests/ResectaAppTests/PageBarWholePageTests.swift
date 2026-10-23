@@ -107,7 +107,7 @@ struct PageBarWholePageTests {
         let undoManager = UndoManager()
         Self.mark(documentState, redactionState, undoManager: undoManager)
         #expect(undoManager.canUndo)
-        #expect(undoManager.undoActionName == "Add Redaction")
+        #expect(undoManager.undoActionName == "Add Region")
         undoManager.undo()
         #expect((redactionState.regions[2] ?? []).isEmpty)
         #expect(!undoManager.canUndo)
