@@ -11,48 +11,22 @@ extension RedactionOverlayView {
 
     // MARK: - Resize
 
+    /// Resize the selected region toward the dragged handle. The rect the
+    /// resize began with is the anchor for the whole drag; a finger past
+    /// the opposite edge flips the box about that edge; the snap acts on the
+    /// edges that now move, and the size floor holds after it, on those
+    /// axes only.
     func updateSelectedRegionForResize(handle: ResizeHandle, to point: CGPoint) {
         guard let selectedID,
-              let idx = regions.firstIndex(where: { $0.id == selectedID })
+              let idx = regions.firstIndex(where: { $0.id == selectedID }),
+              let start = preResizeNormalizedRect
         else { return }
 
-        let current = pdfNormalizedToOverlay(regions[idx].normalizedRect)
-        var newRect: CGRect
-
-        switch handle {
-        case .topLeft:
-            newRect = CGRect(x: point.x, y: point.y,
-                             width: current.maxX - point.x, height: current.maxY - point.y)
-        case .topRight:
-            newRect = CGRect(x: current.minX, y: point.y,
-                             width: point.x - current.minX, height: current.maxY - point.y)
-        case .bottomLeft:
-            newRect = CGRect(x: point.x, y: current.minY,
-                             width: current.maxX - point.x, height: point.y - current.minY)
-        case .bottomRight:
-            newRect = CGRect(x: current.minX, y: current.minY,
-                             width: point.x - current.minX, height: point.y - current.minY)
-        case .topCenter:
-            newRect = CGRect(x: current.minX, y: point.y,
-                             width: current.width, height: current.maxY - point.y)
-        case .bottomCenter:
-            newRect = CGRect(x: current.minX, y: current.minY,
-                             width: current.width, height: point.y - current.minY)
-        case .leftCenter:
-            newRect = CGRect(x: point.x, y: current.minY,
-                             width: current.maxX - point.x, height: current.height)
-        case .rightCenter:
-            newRect = CGRect(x: current.minX, y: current.minY,
-                             width: point.x - current.minX, height: current.height)
-        }
-
-        // Enforce minimum size in overlay space
-        let resizeFloor = Self.minimumRegionSize * fingerScale
-        newRect.size.width = max(abs(newRect.size.width), resizeFloor)
-        newRect.size.height = max(abs(newRect.size.height), resizeFloor)
-
-        // Apply snap guides to moving edges during resize
-        newRect = snapEngine.applyResizeSnapping(to: newRect, handle: handle, excluding: selectedID, in: snapPage)
+        let resized = Self.resizedRect(pdfNormalizedToOverlay(start), handle: handle, to: point)
+        var newRect = snapEngine.applyResizeSnapping(
+            to: resized.rect, handle: resized.handle, excluding: selectedID, in: snapPage)
+        newRect = Self.flooredRect(newRect, handle: resized.handle,
+                                   floor: Self.minimumRegionSize * fingerScale)
 
         // Clamp to overlay bounds
         newRect = newRect.intersection(bounds)
@@ -60,6 +34,78 @@ extension RedactionOverlayView {
 
         regions[idx].normalizedRect = overlayToPDFNormalized(newRect)
         setNeedsDisplay()
+    }
+
+    /// The edges a handle moves.
+    static func movingEdges(_ handle: ResizeHandle) -> (left: Bool, right: Bool, top: Bool, bottom: Bool) {
+        switch handle {
+        case .topLeft: return (true, false, true, false)
+        case .topRight: return (false, true, true, false)
+        case .bottomLeft: return (true, false, false, true)
+        case .bottomRight: return (false, true, false, true)
+        case .topCenter: return (false, false, true, false)
+        case .bottomCenter: return (false, false, false, true)
+        case .leftCenter: return (true, false, false, false)
+        case .rightCenter: return (false, true, false, false)
+        }
+    }
+
+    /// The handle that moves exactly these edges.
+    static func handle(movingLeft left: Bool, right: Bool, top: Bool, bottom: Bool) -> ResizeHandle {
+        switch (left, right, top, bottom) {
+        case (true, _, true, _): return .topLeft
+        case (_, true, true, _): return .topRight
+        case (true, _, _, true): return .bottomLeft
+        case (_, true, _, true): return .bottomRight
+        case (_, _, true, _): return .topCenter
+        case (_, _, _, true): return .bottomCenter
+        case (true, _, _, _): return .leftCenter
+        default: return .rightCenter
+        }
+    }
+
+    /// The rect a handle drag gives from the rect the resize began with:
+    /// each moving edge follows the finger and the opposite edge is the
+    /// anchor; a finger past the anchor flips the box about it. Also
+    /// returns the handle as it now sits (left and right, or top and
+    /// bottom, swapped on a flipped axis) for the snap and the floor.
+    static func resizedRect(
+        _ start: CGRect, handle: ResizeHandle, to point: CGPoint
+    ) -> (rect: CGRect, handle: ResizeHandle) {
+        let edges = movingEdges(handle)
+        var (minX, maxX, minY, maxY) = (start.minX, start.maxX, start.minY, start.maxY)
+        var (left, right, top, bottom) = (false, false, false, false)
+        if edges.left || edges.right {
+            let anchor = edges.left ? start.maxX : start.minX
+            right = point.x > anchor || (point.x == anchor && edges.right)
+            left = !right
+            minX = min(anchor, point.x)
+            maxX = max(anchor, point.x)
+        }
+        if edges.top || edges.bottom {
+            let anchor = edges.top ? start.maxY : start.minY
+            bottom = point.y > anchor || (point.y == anchor && edges.bottom)
+            top = !bottom
+            minY = min(anchor, point.y)
+            maxY = max(anchor, point.y)
+        }
+        let rect = CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+        return (rect, Self.handle(movingLeft: left, right: right, top: top, bottom: bottom))
+    }
+
+    /// Hold `floor` on the axes `handle` moves, keeping the anchored edge.
+    static func flooredRect(_ rect: CGRect, handle: ResizeHandle, floor: CGFloat) -> CGRect {
+        let edges = movingEdges(handle)
+        var floored = rect
+        if (edges.left || edges.right), floored.width < floor {
+            if edges.left { floored.origin.x = floored.maxX - floor }
+            floored.size.width = floor
+        }
+        if (edges.top || edges.bottom), floored.height < floor {
+            if edges.top { floored.origin.y = floored.maxY - floor }
+            floored.size.height = floor
+        }
+        return floored
     }
 
     // MARK: - Region Hit Testing

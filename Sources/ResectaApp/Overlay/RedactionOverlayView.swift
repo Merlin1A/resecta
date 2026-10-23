@@ -91,6 +91,8 @@ class RedactionOverlayView: UIView {
     var dragOffset: CGSize = .zero
     /// Normalized rect captured before a move begins, for cancel restoration.
     var preDragNormalizedRect: CGRect?
+    /// Normalized rect captured when a resize begins: the drag's anchor and the cancel's restore.
+    var preResizeNormalizedRect: CGRect?
     /// Primary touch reference recorded at touchesBegan. Secondary
     /// touches (e.g., a finger landing during a Pencil drag) are ignored
     /// while a gesture is in flight to prevent corruption of
@@ -433,6 +435,7 @@ class RedactionOverlayView: UIView {
         // Priority 1: Resize handle of selected region
         if let handle = hitTestResizeHandle(at: point) {
             activeResizeHandle = handle
+            preResizeNormalizedRect = selectedID.flatMap { id in regions.first { $0.id == id }?.normalizedRect }
             isActivelyDragging = true
             return
         }
@@ -716,10 +719,10 @@ class RedactionOverlayView: UIView {
            let idx = regions.firstIndex(where: { $0.id == selectedID }) {
             // Restore pre-move position
             regions[idx].normalizedRect = preDragNormalizedRect
-        }
-        if activeResizeHandle != nil {
-            // Undo the in-progress resize by re-configuring from state
-            coordinator?.refreshOverlay(for: pageIndex)
+        } else if activeResizeHandle != nil, let preResizeNormalizedRect, let selectedID,
+                  let idx = regions.firstIndex(where: { $0.id == selectedID }) {
+            // Restore the pre-resize rect (nothing was committed)
+            regions[idx].normalizedRect = preResizeNormalizedRect
         }
         resetDragState()
         setNeedsDisplay()
@@ -738,6 +741,7 @@ class RedactionOverlayView: UIView {
         isDraggingExistingRegion = false
         dragOffset = .zero
         preDragNormalizedRect = nil
+        preResizeNormalizedRect = nil
         cancelLongPress()
         // Group move cleanup
         isGroupMoving = false
