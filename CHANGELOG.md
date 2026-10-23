@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ### Added
 
+- Password sheet: when a refused password holds an accented letter, a line beneath the refusal says such a password may not open the document in Resecta even when it is correct (Known Issues KI-12).
 - Settings: a "Rate Resecta on the App Store" row under Support opens the App Store's review page for the app.
 - Acknowledgements: the third-party data and typeface notices the app ships (the repo-root NOTICE) are bundled and readable in-app, from the first-launch gate beside the EULA and Privacy Policy and from Settings.
 - Photos and images (JPEG, PNG and HEIC) can be opened from the system Photos picker (up to 20 at a time, in the order chosen), from Files, or by a drop onto an open document; each image becomes one page of a new PDF, redrawn from its decoded pixels at 300 pixels per inch, so the image's embedded metadata is not carried into the document.
