@@ -73,13 +73,9 @@ class RedactionState {
         /// 0-indexed pages whose raster exceeded the OCR pixel caps in the
         /// session's detection, as read at run entry.
         let ocrSkippedPages: Set<Int>
-        /// The degrade-failure list at run entry; nil when detection was
-        /// not degraded.
+        /// The degrade-failure list at run entry; nil when not degraded.
         let degradeFailures: [String]?
-        /// The region version the run redacted, kept with its output so a
-        /// verify cancelled mid-run still clears the stale flag through the
-        /// burned-version guard; nil when no run recorded one.
-        var burnedRegionVersion: Int? = nil
+        var burnedRegionVersion: Int? = nil  // the run's redacted region version
     }
     private(set) var lastRunInputs: LastRunInputs?
 
