@@ -214,11 +214,7 @@ struct SearchAndRedactSheet: View {
         // Attached to the content Group (not the outer modifier chain)
         // to stay inside the type-checker budget beside the
         // audit-export dialog.
-        .confirmationDialog(
-            Self.dismissTitle,
-            isPresented: $showDismissConfirmation,
-            titleVisibility: .visible
-        ) {
+        .alert(Self.dismissTitle, isPresented: $showDismissConfirmation) {
             Button("Discard", role: .destructive) {
                 performDismiss(afterConfirmation: true)
             }

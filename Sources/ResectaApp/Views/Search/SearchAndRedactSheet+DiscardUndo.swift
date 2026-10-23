@@ -83,7 +83,7 @@ extension SearchAndRedactSheet {
     // MARK: - Dismiss (conditional dismiss)
 
     /// Dismiss-confirmation copy — the single source of truth for both
-    /// the production `.confirmationDialog` and the copy-pin banned-word
+    /// the production `.alert` and the copy-pin banned-word
     /// sweep (`SearchSheetDismissRuleTests`), so a copy rename can't
     /// drift past the sweep. Covers both result origins; the message
     /// names the concrete loss — selected matches that will not be
