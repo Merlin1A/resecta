@@ -12,7 +12,7 @@ import RedactionEngine
 // MainActor-default flip, breaking the detached apply-prepare path; pin the type
 // nonisolated to restore its pre-flip status (mirrors UserTermsBlob et al.).
 nonisolated struct RegionMetadata: Sendable {
-    /// The detection kind (e.g., .pii(.ssn), .face).
+    /// The detection kind (e.g., .pii(.ssn), .searchMatch).
     let piiKind: DetectionResult.Kind
     /// Detection confidence (0.0–1.0).
     let confidence: Double

@@ -255,24 +255,6 @@ func makeJPEGWithEXIFAndGPS(probe: String) -> Data? {
 
 // MARK: - Mock Factories
 
-extension DetectionResult {
-    /// Create a mock detection result for app-target tests.
-    static func mock(
-        kind: DetectionResult.Kind = .pii(.ssn),
-        matchedText: String? = nil,
-        recognitionLevel: DetectionResult.RecognitionLevel = .fast
-    ) -> DetectionResult {
-        DetectionResult(
-            id: UUID(),
-            normalizedRect: CGRect(x: 0.1, y: 0.8, width: 0.3, height: 0.04),
-            kind: kind,
-            confidence: 0.95,
-            matchedText: matchedText,
-            recognitionLevel: recognitionLevel
-        )
-    }
-}
-
 extension RedactionRegion {
     /// Create a mock manual redaction region.
     static func mock(

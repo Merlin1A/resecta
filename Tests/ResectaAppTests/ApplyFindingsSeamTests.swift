@@ -48,24 +48,6 @@ private func makeSearchResult(
     )
 }
 
-private func makeDetection(
-    page: Int = 0,
-    y: Double = 0.5,
-    kind: DetectionResult.Kind = .pii(.ssn),
-    confidence: Double = 0.9,
-    matchedText: String? = "123-45-6789",
-    provenance: DetectionResult.Provenance = .ocrRan
-) -> DetectionResult {
-    DetectionResult(
-        normalizedRect: CGRect(x: 0.1, y: y, width: 0.3, height: 0.04),
-        kind: kind,
-        confidence: confidence,
-        matchedText: matchedText,
-        recognitionLevel: .accurate,
-        provenance: provenance
-    )
-}
-
 /// A DocumentState parked in a pipeline-owning phase
 /// (`canMutateRegions == false`).
 @MainActor
@@ -227,7 +209,9 @@ struct ApplySeamUndoTests {
         let state = RedactionState()
         let undo = UndoManager()
         undo.groupsByEvent = false
-        let region = makeDetection().toRegion()
+        let region = RedactionRegion(
+            id: UUID(), normalizedRect: CGRect(x: 0.1, y: 0.5, width: 0.3, height: 0.04),
+            source: .detectedPII(kind: .ssn))
         state.addRegion(region, page: 0, undoManager: nil)
 
         let versionBefore = state.regionVersion
