@@ -269,9 +269,10 @@ public struct TextLayerExtractor: Sendable {
     /// `PDFDocument(data:)` — i.e. every production import path — so the
     /// defense silently failed open. The page-level check stays here because
     /// it varies per page: it reads the page's own resource dictionary or the
-    /// one it inherits from the page tree, and every form XObject reachable
-    /// from it, for a `/Properties` entry (how content names a group) or an
-    /// `/OC` entry on the XObject itself.
+    /// one it inherits from the page tree, and every form XObject, soft-mask
+    /// form, Type 3 font and tiling pattern reachable from it, for a
+    /// `/Properties` entry (how content names a group) or an `/OC` entry on a
+    /// form itself.
     static func pageReferencesHiddenOCG(
         _ page: PDFPage, hasHiddenOCG: Bool
     ) -> Bool {
@@ -289,7 +290,7 @@ public struct TextLayerExtractor: Sendable {
         case .unreadable:
             return true
         case .found(let resources):
-            var visited: Set<CGPDFStreamRef> = []
+            var visited = WalkVisited()
             return resourcesNameOptionalContent(resources, depth: 0, visited: &visited)
         }
     }
@@ -298,6 +299,15 @@ public struct TextLayerExtractor: Sendable {
     static let maxPageTreeDepth = 32
     /// Bound on form XObjects nested inside one another.
     static let maxFormXObjectDepth = 8
+
+    /// What one walk has already read. A resource dictionary answers the
+    /// same way on every visit, so N forms that share one dictionary cost
+    /// one enumeration of it rather than N; a stream seen before is not
+    /// walked twice (a form that draws itself).
+    struct WalkVisited {
+        var streams: Set<CGPDFStreamRef> = []
+        var resources: Set<CGPDFDictionaryRef> = []
+    }
 
     /// What the page-tree walk found: the resource dictionary in force, none
     /// anywhere on the chain, or a chain the walk could not follow to its end.
@@ -309,92 +319,273 @@ public struct TextLayerExtractor: Sendable {
 
     /// The page's own `/Resources`, or the nearest ancestor's through the
     /// `/Parent` chain (the entry is inheritable; ISO 32000-1 §7.7.3.4). A
-    /// chain longer than `maxPageTreeDepth` is not read to its end.
+    /// chain longer than `maxPageTreeDepth`, or a `/Resources` or `/Parent`
+    /// entry that is no dictionary, is not read to its end.
     static func inheritedResources(of page: CGPDFDictionaryRef) -> ResourceLookup {
         var node = page
         for _ in 0..<maxPageTreeDepth {
-            var resources: CGPDFDictionaryRef?
-            if CGPDFDictionaryGetDictionary(node, "Resources", &resources), let resources {
-                return .found(resources)
+            switch entry("Resources", in: node) {
+            case .absent: break
+            case .dictionary(let resources): return .found(resources)
+            case .stream, .other: return .unreadable
             }
-            var parent: CGPDFDictionaryRef?
-            guard CGPDFDictionaryGetDictionary(node, "Parent", &parent), let parent else {
-                return .none
+            switch entry("Parent", in: node) {
+            case .absent: return .none
+            case .dictionary(let parent): node = parent
+            case .stream, .other: return .unreadable
             }
-            node = parent
         }
         return .unreadable
     }
 
+    /// A dictionary entry as the walk reads it. An entry that is present
+    /// with a shape other than the one its key declares is never read as
+    /// clean: the walk cannot see what it would have named.
+    enum Entry {
+        case absent
+        case dictionary(CGPDFDictionaryRef)
+        case stream(CGPDFStreamRef)
+        case other
+    }
+
+    static func entry(_ key: String, in dictionary: CGPDFDictionaryRef) -> Entry {
+        var object: CGPDFObjectRef?
+        guard CGPDFDictionaryGetObject(dictionary, key, &object), let object else { return .absent }
+        var inner: CGPDFDictionaryRef?
+        if CGPDFObjectGetValue(object, .dictionary, &inner), let inner { return .dictionary(inner) }
+        var stream: CGPDFStreamRef?
+        if CGPDFObjectGetValue(object, .stream, &stream), let stream { return .stream(stream) }
+        return .other
+    }
+
     /// True when a resource dictionary names optional content — a
-    /// `/Properties` entry — or when a form XObject reachable through its
-    /// `/XObject` entries carries `/OC` or names optional content through
-    /// its own resources. A nesting past `maxFormXObjectDepth`, or an
-    /// XObject whose dictionary cannot be read, is not known to be clean and
-    /// reads as naming it. `visited` keeps a self-referencing XObject from
-    /// being walked twice.
+    /// `/Properties` entry — or when a form XObject, a soft-mask form, a
+    /// Type 3 font or a tiling pattern reachable from it carries `/OC` or
+    /// names optional content through its own resources. A nesting past
+    /// `maxFormXObjectDepth`, an entry that is not of its declared shape, or
+    /// a walk cancelled part-way is not known to be clean and reads as
+    /// naming it.
     static func resourcesNameOptionalContent(
-        _ resources: CGPDFDictionaryRef, depth: Int, visited: inout Set<CGPDFStreamRef>
+        _ resources: CGPDFDictionaryRef, depth: Int, visited: inout WalkVisited
     ) -> Bool {
-        var properties: CGPDFDictionaryRef?
-        if CGPDFDictionaryGetDictionary(resources, "Properties", &properties),
-           properties != nil {
+        if visited.resources.contains(resources) { return false }
+        visited.resources.insert(resources)
+        switch entry("Properties", in: resources) {
+        case .absent: break
+        case .dictionary, .stream, .other: return true
+        }
+        return contentResources(in: resources, depth: depth, visited: &visited) { dictionary in
+            var optionalContent: CGPDFObjectRef?
+            return CGPDFDictionaryGetObject(dictionary, "OC", &optionalContent)
+        } recurse: { inner, visited in
+            resourcesNameOptionalContent(inner, depth: depth + 1, visited: &visited)
+        }
+    }
+
+    /// True when a `/Properties` value in `resources`, or the `/OC` value of
+    /// a form XObject reachable from it, is anything but a plain group: a
+    /// membership dictionary (`/Type /OCMD`, whose `/P` or `/VE` can hide
+    /// content while every group is on), a dictionary with no type, a value
+    /// that is no dictionary, or one that cannot be read. The document walk
+    /// reads such a reference as hidden without evaluating it.
+    static func resourcesNameMembershipDictionary(
+        _ resources: CGPDFDictionaryRef, depth: Int, visited: inout WalkVisited
+    ) -> Bool {
+        if visited.resources.contains(resources) { return false }
+        visited.resources.insert(resources)
+        switch entry("Properties", in: resources) {
+        case .absent:
+            break
+        case .dictionary(let properties):
+            var other = false
+            CGPDFDictionaryApplyBlock(properties, { _, value, _ in
+                if isPlainGroup(value) { return true }
+                other = true
+                return false
+            }, nil)
+            if other { return true }
+        case .stream, .other:
             return true
         }
-        var xobjects: CGPDFDictionaryRef?
-        guard CGPDFDictionaryGetDictionary(resources, "XObject", &xobjects),
-              let xobjects else { return false }
+        return contentResources(in: resources, depth: depth, visited: &visited) { dictionary in
+            var optionalContent: CGPDFObjectRef?
+            guard CGPDFDictionaryGetObject(dictionary, "OC", &optionalContent),
+                  let optionalContent else { return false }
+            return !isPlainGroup(optionalContent)
+        } recurse: { inner, visited in
+            resourcesNameMembershipDictionary(inner, depth: depth + 1, visited: &visited)
+        }
+    }
+
+    /// A dictionary of `/Type /OCG`. Anything else — a membership
+    /// dictionary, a dictionary with no type, a non-dictionary — is not a
+    /// plain group.
+    static func isPlainGroup(_ value: CGPDFObjectRef) -> Bool {
+        var dictionary: CGPDFDictionaryRef?
+        guard CGPDFObjectGetValue(value, .dictionary, &dictionary), let dictionary else {
+            return false
+        }
+        var type: UnsafePointer<CChar>?
+        guard CGPDFDictionaryGetName(dictionary, "Type", &type), let type else { return false }
+        return String(cString: type) == "OCG"
+    }
+
+    /// The content-bearing entries of a resource dictionary the walk reads.
+    static let contentResourceKeys = ["XObject", "ExtGState", "Font", "Pattern"]
+
+    /// Walks what `resources` can draw with, once each: the form XObjects
+    /// under `/XObject` and the soft-mask forms under `/ExtGState → /SMask →
+    /// /G` (`carries` reads the form's own dictionary, `recurse` its
+    /// `/Resources`), and the resources of a Type 3 font under `/Font` and of
+    /// a tiling pattern under `/Pattern` (`recurse`; a glyph procedure or a
+    /// pattern cell is content and can name a group). A nesting past
+    /// `maxFormXObjectDepth`, an entry that is not of its declared shape (a
+    /// container that is no dictionary, an XObject with no `/Subtype`, a font
+    /// or graphics state that is no dictionary, a soft mask without its form),
+    /// or a cancelled task answers true (not known clean).
+    static func contentResources(
+        in resources: CGPDFDictionaryRef, depth: Int, visited: inout WalkVisited,
+        carries: (CGPDFDictionaryRef) -> Bool,
+        recurse: (CGPDFDictionaryRef, inout WalkVisited) -> Bool
+    ) -> Bool {
+        var containers: [(key: String, dictionary: CGPDFDictionaryRef)] = []
+        for key in contentResourceKeys {
+            switch entry(key, in: resources) {
+            case .absent: continue
+            case .dictionary(let dictionary): containers.append((key, dictionary))
+            case .stream, .other: return true
+            }
+        }
+        guard !containers.isEmpty else { return false }
         guard depth < maxFormXObjectDepth else { return true }
 
-        var streams: [CGPDFStreamRef] = []
+        // Collected first: the apply block cannot touch `visited`.
+        var forms: [CGPDFStreamRef] = []
+        var patterns: [CGPDFStreamRef] = []
+        var nested: [CGPDFDictionaryRef] = []
         var unreadable = false
-        CGPDFDictionaryApplyBlock(xobjects, { _, value, _ in
-            var stream: CGPDFStreamRef?
-            if CGPDFObjectGetValue(value, .stream, &stream), let stream {
-                streams.append(stream)
-            } else {
-                unreadable = true
-            }
-            return true
-        }, nil)
-        if unreadable { return true }
+        for (key, container) in containers {
+            CGPDFDictionaryApplyBlock(container, { _, value, _ in
+                var stream: CGPDFStreamRef?
+                var dictionary: CGPDFDictionaryRef?
+                switch key {
+                case "XObject":
+                    if CGPDFObjectGetValue(value, .stream, &stream), let stream {
+                        forms.append(stream)
+                    } else {
+                        unreadable = true
+                    }
+                case "ExtGState":
+                    guard CGPDFObjectGetValue(value, .dictionary, &dictionary), let state = dictionary else {
+                        unreadable = true
+                        return false
+                    }
+                    switch entry("SMask", in: state) {
+                    case .absent:
+                        break
+                    case .dictionary(let mask):
+                        if case .stream(let group) = entry("G", in: mask) {
+                            forms.append(group)
+                        } else {
+                            unreadable = true
+                        }
+                    case .other:
+                        // The name `/None` turns the mask off; any other shape is unread.
+                        var name: UnsafePointer<CChar>?
+                        if !CGPDFDictionaryGetName(state, "SMask", &name) { unreadable = true }
+                    case .stream:
+                        unreadable = true
+                    }
+                case "Font":
+                    guard CGPDFObjectGetValue(value, .dictionary, &dictionary), let font = dictionary else {
+                        unreadable = true
+                        return false
+                    }
+                    var subtype: UnsafePointer<CChar>?
+                    if CGPDFDictionaryGetName(font, "Subtype", &subtype), let subtype,
+                       String(cString: subtype) == "Type3" {
+                        switch entry("Resources", in: font) {
+                        case .absent: break   // the glyphs draw with the page's resources, read already
+                        case .dictionary(let inner): nested.append(inner)
+                        case .stream, .other: unreadable = true
+                        }
+                    }
+                case "Pattern":
+                    if CGPDFObjectGetValue(value, .stream, &stream), let stream {
+                        patterns.append(stream)   // a tiling pattern: a content stream with resources
+                    } else if !CGPDFObjectGetValue(value, .dictionary, &dictionary) {
+                        unreadable = true         // a shading pattern is a dictionary and draws no content
+                    }
+                default:
+                    break
+                }
+                return !unreadable
+            }, nil)
+            if unreadable { return true }
+        }
 
-        for stream in streams {
-            if visited.contains(stream) { continue }
-            visited.insert(stream)
+        for stream in forms {
+            if Task.isCancelled { return true }
+            if visited.streams.contains(stream) { continue }
+            visited.streams.insert(stream)
             guard let dictionary = CGPDFStreamGetDictionary(stream) else { return true }
             var subtype: UnsafePointer<CChar>?
-            guard CGPDFDictionaryGetName(dictionary, "Subtype", &subtype), let subtype,
-                  String(cString: subtype) == "Form" else { continue }
-            var optionalContent: CGPDFObjectRef?
-            if CGPDFDictionaryGetObject(dictionary, "OC", &optionalContent) {
-                return true
+            guard CGPDFDictionaryGetName(dictionary, "Subtype", &subtype), let subtype else {
+                return true   // not known to be an image: unread
             }
-            var inner: CGPDFDictionaryRef?
-            if CGPDFDictionaryGetDictionary(dictionary, "Resources", &inner), let inner,
-               resourcesNameOptionalContent(inner, depth: depth + 1, visited: &visited) {
-                return true
+            guard String(cString: subtype) == "Form" else { continue }
+            if carries(dictionary) { return true }
+            switch entry("Resources", in: dictionary) {
+            case .absent: break
+            case .dictionary(let inner): if recurse(inner, &visited) { return true }
+            case .stream, .other: return true
             }
+        }
+        for stream in patterns {
+            if Task.isCancelled { return true }
+            if visited.streams.contains(stream) { continue }
+            visited.streams.insert(stream)
+            guard let dictionary = CGPDFStreamGetDictionary(stream) else { return true }
+            switch entry("Resources", in: dictionary) {
+            case .absent: break
+            case .dictionary(let inner): if recurse(inner, &visited) { return true }
+            case .stream, .other: return true
+            }
+        }
+        for inner in nested {
+            if Task.isCancelled { return true }
+            if recurse(inner, &visited) { return true }
         }
         return false
     }
 
     /// Doc-level OCG check intended to run once at import time, when raw bytes
     /// are still available to build a `CGPDFDocument`. Walks the catalog for
-    /// `/OCProperties → /D` and reports whether the default configuration
-    /// hides any group: a non-empty `/OFF` array, or a `/BaseState` of `OFF`
-    /// with a group in `/OCGs` that the `/ON` array does not name (no `/ON`
-    /// at all turns every group off). A catalog the reader cannot give, an
-    /// `/OCProperties` without its `/D`, or an OFF base state with no readable
-    /// group list answers true: the document is not known to be free of hidden
-    /// content. The page-level companion `pageReferencesHiddenOCG(_:hasHiddenOCG:)`
-    /// consumes this flag and adds the per-page resource check.
+    /// `/OCProperties → /D` and reports whether the document can hide a
+    /// group's content: a non-empty `/OFF` array; a `/BaseState` of `OFF`
+    /// with a group in `/OCGs` that the `/ON` array does not name (the
+    /// groups are matched one by one, so a list that names one group twice
+    /// does not stand in for another; no `/ON` at all turns every group
+    /// off); a usage-application entry (`/AS`), by which a viewer turns
+    /// groups off on its own events; or, anywhere a page or a form names
+    /// optional content, a membership dictionary (`/Type /OCMD`), whose
+    /// policy or visibility expression can hide content while every group is
+    /// on. The last two are read as hidden, not evaluated. A catalog the
+    /// reader cannot give, an `/OCProperties` without its `/D`, or an OFF
+    /// base state with no readable group list answers true: the document is
+    /// not known to be free of hidden content, and so does an entry of the
+    /// wrong shape anywhere the walk reads. The page-level companion
+    /// `pageReferencesHiddenOCG(_:hasHiddenOCG:)` consumes this flag and adds
+    /// the per-page resource check.
     public static func documentHasHiddenOCG(_ document: CGPDFDocument) -> Bool {
         guard let catalog = document.catalog else { return true }
 
-        var ocProps: CGPDFDictionaryRef?
-        guard CGPDFDictionaryGetDictionary(catalog, "OCProperties", &ocProps),
-              let ocProperties = ocProps else { return false }
+        let ocProperties: CGPDFDictionaryRef
+        switch entry("OCProperties", in: catalog) {
+        case .absent: return false
+        case .dictionary(let dictionary): ocProperties = dictionary
+        case .stream, .other: return true
+        }
 
         // /D is required beside /OCGs (ISO 32000-1 §8.11.4.2): its absence is
         // a malformed dictionary, not a document with no hidden layer.
@@ -402,10 +593,29 @@ public struct TextLayerExtractor: Sendable {
         guard CGPDFDictionaryGetDictionary(ocProperties, "D", &defaultConfig),
               let config = defaultConfig else { return true }
 
-        var offArray: CGPDFArrayRef?
-        if CGPDFDictionaryGetArray(config, "OFF", &offArray), let off = offArray,
-           CGPDFArrayGetCount(off) > 0 {
-            return true
+        if defaultConfigurationHidesAGroup(config, groupsIn: ocProperties) { return true }
+
+        // Usage application (ISO 32000-1 §8.11.4.4): the viewer may turn
+        // groups off on view, print or export events. Not evaluated here.
+        var usageApplication: CGPDFObjectRef?
+        if CGPDFDictionaryGetObject(config, "AS", &usageApplication) { return true }
+
+        return pagesNameMembershipDictionary(in: document)
+    }
+
+    /// The default configuration's own hiding: a non-empty `/OFF`, an `/OFF`
+    /// that is no array (unread, so not known empty), or an OFF base state
+    /// with a group the `/ON` array does not name.
+    static func defaultConfigurationHidesAGroup(
+        _ config: CGPDFDictionaryRef, groupsIn ocProperties: CGPDFDictionaryRef
+    ) -> Bool {
+        var offObject: CGPDFObjectRef?
+        if CGPDFDictionaryGetObject(config, "OFF", &offObject) {
+            var offArray: CGPDFArrayRef?
+            guard CGPDFDictionaryGetArray(config, "OFF", &offArray), let off = offArray else {
+                return true
+            }
+            if CGPDFArrayGetCount(off) > 0 { return true }
         }
 
         // A base state of OFF hides every group the `/ON` array does not
@@ -423,6 +633,48 @@ public struct TextLayerExtractor: Sendable {
         guard CGPDFDictionaryGetArray(config, "ON", &onArray), let on = onArray else {
             return true
         }
-        return CGPDFArrayGetCount(on) < groupCount
+        // The reader resolves one indirect object to one dictionary, so the
+        // groups are matched by identity; an entry that is no dictionary
+        // names no group. A group the list does not name is hidden.
+        var named: Set<CGPDFDictionaryRef> = []
+        for index in 0..<CGPDFArrayGetCount(on) {
+            var group: CGPDFDictionaryRef?
+            if CGPDFArrayGetDictionary(on, index, &group), let group {
+                named.insert(group)
+            }
+        }
+        for index in 0..<groupCount {
+            var group: CGPDFDictionaryRef?
+            guard CGPDFArrayGetDictionary(groups, index, &group), let group,
+                  named.contains(group) else { return true }
+        }
+        return false
+    }
+
+    /// True when any page's resources (own or inherited), or a form XObject
+    /// reachable from them, name optional content through anything but a
+    /// plain group. A page whose dictionary cannot be read answers true.
+    static func pagesNameMembershipDictionary(in document: CGPDFDocument) -> Bool {
+        var visited = WalkVisited()
+        let pageCount = document.numberOfPages
+        guard pageCount > 0 else { return false }
+        for index in 1...pageCount {
+            if Task.isCancelled { return true }
+            guard let page = document.page(at: index), let dictionary = page.dictionary else {
+                return true
+            }
+            switch inheritedResources(of: dictionary) {
+            case .none:
+                continue
+            case .unreadable:
+                return true
+            case .found(let resources):
+                if resourcesNameMembershipDictionary(resources, depth: 0, visited: &visited) {
+                    return true
+                }
+            }
+        }
+        return false
     }
 }
+
