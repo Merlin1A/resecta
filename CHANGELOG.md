@@ -19,6 +19,9 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ### Changed
 
+- Undo and Redo name region steps with the controls' word, Region (Add Region, Duplicate Region, Delete Regions, Move Region, Resize Region), and Redo names the action it repeats.
+- A search apply's undo step is named by the regions it creates, not counting results already covered.
+- Duplicate selects the copy.
 - The "match nearby" notice says Mark, matching the Marked N notice.
 - With VoiceOver on, the Rectangle tool is disabled with a hint pointing to Search and Scan.
 - Deleting several selected regions no longer asks first, from the toolbar or the selection menu; one Undo restores them.
@@ -80,6 +83,14 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Document canvas: with a hardware keyboard, Select All then Copy (⌘A, ⌘C) no longer places the document's text on the system pasteboard. The canvas view refuses the copy, cut, paste, select and select-all actions and builds its menu without the edit, look-up, learn and share groups; in 1.2.0 that keyboard path copied the whole document's text with no selection shown.
 ### Fixed
 
+- Undoing a delete selects the deleted regions again if they were selected.
+- Undoing a search apply leaves none of its regions selected.
+- A tap or an arrow-key nudge that leaves a region where it was no longer records an undo step or discards the redacted output.
+- Duplicating a region or undoing a delete no longer offers the nearby-match notice.
+- Two search results over the same text in one apply make one region.
+- A Scan region on a text page keeps the detector's confidence instead of reading as high confidence.
+- An apply whose results are all already covered no longer records an empty undo step.
+- The run discloses the unchecked results of every Scan applied from, not only the last apply's; undoing an apply restores the earlier disclosure.
 - Settings opens while the Search sheet is parked; the sheet steps aside and returns when Settings closes.
 - Select All on Page on a page without regions no longer empties the selection.
 - VoiceOver announces region deletes.
