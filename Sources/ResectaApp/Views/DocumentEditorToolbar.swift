@@ -323,12 +323,14 @@ struct DocumentEditorToolbar {
                 get: { isMultiSelectActive },
                 set: { on in
                     isMultiSelectActive = on
-                    if on { activeTool = nil }
+                    if isMultiSelectActive { activeTool = nil }
                 }
             )) {
                 Label(RedactionOverlayView.selectMoreToggleTitle, systemImage: "checkmark.square")
             }
-            .tint(ResectaTokens.BrandTeal.tint)
+            // Teal only while on: the Redact button stays the one brand-tint
+            // literal in the toolbar.
+            .tint(isMultiSelectActive ? ResectaTokens.BrandTeal.tint : nil)
             .accessibilityIdentifier("selectMoreToggle")
         }
     }
