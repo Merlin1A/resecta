@@ -338,6 +338,12 @@ enum ImportService {
     /// `.importing → .failed` pair a failed load produces, so the failed
     /// screen names the refusal; an open document is kept.
     @MainActor
+    /// The notice for a drop of more than one item. The drop door opens one
+    /// document, the first; the rest are not read.
+    static func dropOpenedFirstMessage(droppedCount: Int) -> String {
+        "Only the first of the \(droppedCount) dropped files was opened. Drop the others one at a time."
+    }
+
     static func refuse(_ failure: PipelineError.ImportFailure, documentState: DocumentState) {
         guard documentState.canStartImport else { return }
         let returnPhase: DocumentState.ReturnPhase =
