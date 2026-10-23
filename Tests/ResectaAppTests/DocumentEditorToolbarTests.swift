@@ -64,6 +64,32 @@ struct DocumentEditorToolbarTests {
         #expect(window.contains("editorToolbar.resetCanvasTools()"))
     }
 
+    @Test("The overflow's Mark Whole Page adds the page bar's whole-page region to the page in view, on a one-page document too")
+    func overflowMarksTheWholePage() {
+        let coordinator = makeCoordinator()
+        coordinator.documentState.sourceDocument = makeMultiPagePDFDocument(pages: 1)
+        coordinator.documentState.currentPageIndex = 0
+        toolbar(for: coordinator).markWholePage()
+        let regions = coordinator.redactionState.regions[0] ?? []
+        #expect(regions.count == 1)
+        #expect(regions.first?.normalizedRect == PageNavigationBar.wholePageRegion().normalizedRect)
+    }
+
+    @Test("The overflow mounts Mark Whole Page after Home (source pin)")
+    func overflowMountsMarkWholePage() throws {
+        let source = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorToolbar.swift")
+        guard let group = source.range(of: "var secondaryActionToolbarItems: some View {"),
+              let end = source.range(of: ".tint(.primary)", range: group.upperBound..<source.endIndex),
+              let home = source.range(of: "homeButton", range: group.upperBound..<end.lowerBound),
+              let mark = source.range(of: "markWholePageButton", range: group.upperBound..<end.lowerBound)
+        else {
+            Issue.record("The overflow must mount homeButton and markWholePageButton")
+            return
+        }
+        #expect(home.lowerBound < mark.lowerBound)
+        #expect(source.contains("PageNavigationBar.markWholePage("), "one action, the page bar's own")
+    }
+
     /// Mirrors `HonestySurfacesTests.loadRepoFile`.
     private func loadRepoFile(
         _ relativePath: String, from file: StaticString = #filePath

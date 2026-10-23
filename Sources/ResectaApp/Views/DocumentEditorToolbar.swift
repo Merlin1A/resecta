@@ -210,6 +210,7 @@ struct DocumentEditorToolbar {
     var secondaryActionToolbarItems: some View {
         Group {
             homeButton
+            markWholePageButton
             selectionMenu
             selectMoreToggle
             deleteButton
@@ -220,6 +221,24 @@ struct DocumentEditorToolbar {
     }
 
     // MARK: - Toolbar Components
+
+    /// Mark Whole Page in the overflow: the page bar's own action on the
+    /// page in view. It shows for every page count; the page bar's
+    /// button is hidden on a one-page document.
+    @ViewBuilder
+    private var markWholePageButton: some View {
+        Button("Mark Whole Page", systemImage: "rectangle.inset.filled") {
+            markWholePage()
+        }
+        .accessibilityIdentifier("overflowMarkWholePage")
+    }
+
+    /// The overflow row's action — `PageNavigationBar.markWholePage`, the
+    /// one home of the whole-page region.
+    func markWholePage() {
+        PageNavigationBar.markWholePage(
+            redactionState: redactionState, documentState: documentState, undoManager: undoManager)
+    }
 
     @ViewBuilder
     private var undoRedoButtons: some View {
