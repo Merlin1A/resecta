@@ -115,6 +115,8 @@ class RedactionOverlayView: UIView {
     var groupMoveStart: CGPoint?
     /// The member the group move's touch landed on.
     var groupMoveTouchedID: UUID?
+    /// The region an Add to Selection touch landed on, toggled on lift.
+    var pendingToggleID: UUID?
 
     // MARK: - Snap State
 
@@ -177,8 +179,8 @@ class RedactionOverlayView: UIView {
     //   DimensionLabelPosition + dimensionLabelPosition(…),
     //   clampedDragOrigin(…).
 
-    // Predicate for the touchesBegan branch that routes a region tap
-    // through `coordinator?.toggleRegionSelection`. Returns true when either
+    // Predicate for the region tap that toggles on lift through
+    // `coordinator?.toggleRegionSelection`. Returns true when either
     // the iPad Shift modifier is held OR the iPhone "Select More" toolbar
     // toggle is on; otherwise the tap follows the replace-selection path.
     // Pure predicate so the OR shape is pinned without a UITouch host.
@@ -443,15 +445,15 @@ class RedactionOverlayView: UIView {
         // Priority 2: Tap on existing region — select, and start move if already selected
         if let tappedRegion = hitTestRegion(at: point) {
             // iPad Shift+tap OR iPhone "Select More" toggle: tap toggles
-            // multi-selection. Both routes converge on the same toggle
-            // call — the toolbar toggle layers on top of the existing
-            // selection model, no parallel mutation path.
+            // multi-selection, when the touch lifts (`commitPendingToggle`).
+            // Both routes converge on the same toggle call — the toolbar
+            // toggle layers on top of the existing selection model.
             let shiftHeld = event?.modifierFlags.contains(.shift) ?? false
             if RedactionOverlayView.shouldToggleSelection(
                 isMultiSelectActive: isMultiSelectActive,
                 shiftHeld: shiftHeld
             ) {
-                coordinator?.toggleRegionSelection(tappedRegion.id)
+                pendingToggleID = tappedRegion.id
                 return
             }
 
@@ -629,6 +631,7 @@ class RedactionOverlayView: UIView {
         // gesture. Checked BEFORE the defer on purpose.
         guard let primaryTouch, touches.contains(primaryTouch) else { return }
         defer { resetDragState() }
+        if commitPendingToggle() { return }
 
         // Commit lasso marquee — intersect every visible region's
         // normalizedRect against the marquee's normalized rect; route the
@@ -745,6 +748,7 @@ class RedactionOverlayView: UIView {
         preDragGroupRects = [:]
         groupMoveStart = nil
         groupMoveTouchedID = nil
+        pendingToggleID = nil
         // Snap state cleanup
         snapEngine.reset()
         // Repaint on gesture end. The commit paths

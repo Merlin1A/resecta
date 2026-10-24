@@ -4,9 +4,10 @@ import RedactionEngine
 // The move and group-move helpers, moved out of `RedactionOverlayView.swift`
 // (the hub) from its `// MARK: - Move Helpers` seam: beginning a move on a
 // selected region, beginning a group move, updating either as the finger
-// travels, and ending a group move. The hub's touch handling calls them; the
-// long-press helpers stay in the hub. The drag state they read and write is
-// stored on the hub (an extension adds no storage).
+// travels, ending a group move, and committing an Add to Selection toggle on
+// lift. The hub's touch handling calls them; the long-press helpers stay in
+// the hub. The drag state they read and write is stored on the hub (an
+// extension adds no storage).
 
 extension RedactionOverlayView {
 
@@ -35,6 +36,16 @@ extension RedactionOverlayView {
         isGroupMoving = true
         isActivelyDragging = true
         moveCommitFeedback.prepare()
+    }
+
+    /// With Add to Selection on, a touch on a region edits the selection
+    /// when it lifts: the touch records the region and the primary touch's
+    /// lift toggles it. A cancelled touch (the region's menu, a pinch, a
+    /// scroll) is reset without toggling. True when a toggle was committed.
+    func commitPendingToggle() -> Bool {
+        guard let id = pendingToggleID else { return false }
+        coordinator?.toggleRegionSelection(id)
+        return true
     }
 
     /// End a group move on lift. A lift with no travel, every member still
