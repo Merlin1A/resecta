@@ -347,6 +347,7 @@ class RedactionOverlayView: UIView {
     override func didMoveToWindow() {
         super.didMoveToWindow()
         reconcileWindowPanDeference()
+        observeDifferentiateWithoutColor()
     }
 
     // MARK: - Window-pan deference

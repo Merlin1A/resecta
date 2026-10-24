@@ -72,6 +72,21 @@ extension RedactionOverlayView {
                 ctx.restoreGState()
             }
 
+            // With Differentiate Without Color on, a selection is not told
+            // by its colour alone: every member of a multi-selection also
+            // carries a dashed outline (a single selection shows handles).
+            if let cue = Self.selectionCue(
+                isSelected: isSelected, selectionCount: selectedIDs.count,
+                differentiateWithoutColor: UIAccessibility.shouldDifferentiateWithoutColor,
+                fingerScale: fingerScale) {
+                ctx.saveGState()
+                ctx.setStrokeColor(UIColor.black.cgColor)
+                ctx.setLineWidth(cue.lineWidth)
+                ctx.setLineDash(phase: 0, lengths: cue.dash)
+                ctx.stroke(drawRect.insetBy(dx: -cue.lineWidth * 1.5, dy: -cue.lineWidth * 1.5))
+                ctx.restoreGState()
+            }
+
             // PII type badge for detected regions
             drawRegionBadge(ctx: ctx, region: region, rect: drawRect)
 
@@ -402,6 +417,26 @@ extension RedactionOverlayView {
         let padding = 4 * fingerScale
         return CGSize(width: textSize.width + padding * 2, height: textSize.height + padding)
     }
+
+    /// The selection cue under Differentiate Without Color: a dashed outline
+    /// 2 on-screen points wide on every member of a multi-selection, nil
+    /// otherwise (a single selection shows its handles).
+    static func selectionCue(
+        isSelected: Bool, selectionCount: Int, differentiateWithoutColor: Bool, fingerScale: CGFloat
+    ) -> (lineWidth: CGFloat, dash: [CGFloat])? {
+        guard differentiateWithoutColor, isSelected, selectionCount > 1 else { return nil }
+        return (2 * fingerScale, [4 * fingerScale, 3 * fingerScale])
+    }
+
+    /// Redraw when Differentiate Without Color changes, so the cue follows it.
+    func observeDifferentiateWithoutColor() {
+        let name = UIAccessibility.differentiateWithoutColorDidChangeNotification
+        NotificationCenter.default.removeObserver(self, name: name, object: nil)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(differentiateWithoutColorDidChange), name: name, object: nil)
+    }
+
+    @objc private func differentiateWithoutColorDidChange() { setNeedsDisplay() }
 
     /// Draw active snap guide lines spanning the full overlay.
     func drawSnapGuides(ctx: CGContext) {
