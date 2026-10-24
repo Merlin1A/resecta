@@ -19,6 +19,10 @@ struct SettingsView: View {
     /// mechanism description and the paranoid-locked variant. Exposed
     /// as `static` so the conditional can be unit-tested without
     /// rendering the toggle.
+    /// What Paranoid Mode does to the pipeline mode — the Settings bullet
+    /// and the editor's Switch Mode hint read this one sentence.
+    static let paranoidForcesSecureLine = "Pipeline mode is forced to Secure Rasterization."
+
     static func verifyToggleHint(paranoidMode: Bool) -> String {
         paranoidMode ? verifyToggleParanoidLockedHint : verifyToggleDefaultHint
     }
@@ -397,7 +401,7 @@ struct SettingsView: View {
                 Text("While on:")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
-                Text("\u{2022} Pipeline mode is forced to Secure Rasterization.")
+                Text("\u{2022} \(Self.paranoidForcesSecureLine)")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                 Text("\u{2022} Verification runs before every export; the toggle above is disabled.")

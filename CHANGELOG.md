@@ -30,9 +30,10 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Duplicate selects the copy.
 - A one-page document shows the page bar with its region count; the page arrows are hidden there. The counter reads "0 regions" on a page with none, drawn and spoken.
 - A document dropped over an open one that holds drawn regions or selected matches asks before replacing it; Cancel keeps the open document. With the Search sheet up, such a drop is refused until the sheet is dismissed.
+- Editor toolbar on iPhone: one Undo button — tap to undo, touch and hold for Undo and Redo with the step's name — and Redact as a teal scissors button beside it; Settings moves into the … menu, which lists the selection actions first and Home last, and the separate More menu is gone. At the largest text sizes Redact moves into the … menu and Undo stays in the bar. The document's name is no longer drawn clipped in the bar.
 - The "match nearby" notice says Mark, matching the Marked N notice.
 - With VoiceOver on, the Rectangle tool is disabled with a hint pointing to Search and Scan.
-- Deleting several selected regions no longer asks first, from the toolbar or the selection menu; one Undo restores them.
+- Deleting several selected regions no longer asks first; one Undo restores them.
 - A run of arrow-key nudges is one undo step.
 - Deleting selected regions from a hardware keyboard takes Command-Delete.
 - The Discard selections confirmation is an alert with a Cancel button.
@@ -101,6 +102,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - The Processing was paused notice stays until it is dismissed, Restart is tapped or another run starts, so it is still there after time away from the app.
 - While a match walk is parked, paging away with the page bar lets go of the current match, so the strip's Apply never applies a match on another page, and the walk's arrows and J / K step from the page shown.
 - Duplicate of a region at the page's edge no longer lands exactly on its source: with no room toward the edge, the copy steps the other way.
+- With Paranoid Mode on, Switch Mode in the … menu shows Secure Rasterization and is unavailable, with the reason, instead of offering Searchable Redaction the run would not use.
 - Undoing a search apply leaves none of its regions selected.
 - A tap or an arrow-key nudge that leaves a region where it was no longer records an undo step or discards the redacted output.
 - Duplicating a region or undoing a delete no longer offers the nearby-match notice.
@@ -169,7 +171,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - The share confirmation for a failed or needs-review result also lists the same report's checks that could not verify part of the output or were skipped, as the documents say; its header reads "These checks reported issues or did not run in full:".
 - The page sidebar's thumbnail cache tells a new document apart from a freed one at the same address, so a new session never shows the previous document's page images.
 - The VoiceOver announcement at the end of a run speaks the verification status only, not the masthead sentence that can quote review terms.
-- Redact and ⇧⌘R are unavailable while the search sheet holds selected matches that are not applied, with the hint "Apply or clear the selected matches first", instead of tearing the session down and dropping them.
+- Redact and ⇧⌘R stay available while the search sheet holds selected matches that are not applied; a tap raises the sheet and says "Apply or clear the selected matches first" instead of tearing the session down and dropping them.
 - Redact: a Stop that lands while the output is being finalized leaves no output file behind in the session folder.
 - The app-switcher cover sits in its own window above every presented sheet, so the Search & Redact sheet and Settings → Custom Terms are covered too.
 - The failed screen's copy for a refused page names its rotation beside the size and scale, and the advice says so.

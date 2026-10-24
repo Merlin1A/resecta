@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import SwiftUI
 @testable import ResectaApp
 
 // Source-scanning contract pins for `DocumentEditorView.swift` surfaces
@@ -39,12 +40,12 @@ struct DocumentEditorViewSourceContractsTests {
                 "the glyph tint must gate on model.isWarning and reference the warningTint token")
     }
 
-    @Test("The three toolbar groups render neutral")
+    @Test("The toolbar groups and the iPhone Undo control render neutral")
     func toolbarGroupsCarryNeutralTint() throws {
         let source = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorToolbar.swift")
         let occurrences = source.components(separatedBy: ".tint(.primary)").count - 1
-        #expect(occurrences == 3,
-                "expected 3 neutral-tint toolbar groups (leading, trailing, secondaryAction); found \(occurrences)")
+        #expect(occurrences == 4,
+                "expected 4 neutral tints (the leading, trailing and … groups, and the iPhone Undo item); found \(occurrences)")
     }
 
     @Test("The Redact button is the one designated emphasis action")
@@ -71,30 +72,24 @@ struct DocumentEditorViewSourceContractsTests {
                 "expected exactly 1 explicit brand-tint literal (the Redact button); found \(brandTintOccurrences)")
     }
 
-    @Test("1.1.0 Home swap — the file-import entry is gone and Home leads the overflow group")
-    func homeLeadsSecondaryActionGroup() throws {
+    @Test("1.1.0 Home swap — the file-import entry is gone; the selection rows lead the … menu and Home ends it")
+    func homeEndsSecondaryActionGroup() throws {
         let source = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorView.swift")
             + loadRepoFile("Sources/ResectaApp/Views/DocumentEditorToolbar.swift")
         #expect(!source.contains("Open Document"),
                 "the editor's former file-import entry must not return (opening a file is HomeView's job)")
         #expect(!source.contains("openDocumentButton"),
                 "the retired property must stay deleted with its mount")
-        guard let groupStart = source.range(of: "var secondaryActionToolbarItems: some View {"),
-              let groupEnd = source.range(of: ".tint(.primary)",
-                                          range: groupStart.upperBound..<source.endIndex)
-        else {
-            Issue.record("Could not locate secondaryActionToolbarItems")
-            return
+        // The order is the layout's (`EditorToolbarLayout`), read here
+        // rather than by string offsets in the toolbar's source.
+        for size in DynamicTypeSize.allCases {
+            let sections = EditorToolbarLayout(dynamicTypeSize: size, canUndo: false, canRedo: false)
+                .overflowSections
+            #expect(sections.first?.first == .selectRegions, "the selection rows lead, at \(size)")
+            #expect(sections.last == [.home], "Home ends the … menu, alone in its section, at \(size)")
         }
-        let group = source[groupStart.upperBound..<groupEnd.lowerBound]
-        guard let home = group.range(of: "homeButton"),
-              let selection = group.range(of: "selectionMenu")
-        else {
-            Issue.record("secondaryActionToolbarItems must mount homeButton and selectionMenu")
-            return
-        }
-        #expect(home.lowerBound < selection.lowerBound,
-                "Home must be the first of our items in the overflow group")
+        #expect(source.contains("case .home: homeButton"), "the … menu mounts the editor's Home")
+        #expect(source.contains("case .selectRegions: selectionMenu"), "the … menu mounts the selection menu")
     }
 
     @Test("HomeView's Settings button renders neutral, like the editor toolbar")
