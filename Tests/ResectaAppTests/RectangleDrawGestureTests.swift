@@ -154,22 +154,21 @@ struct RectangleDrawGestureTests {
 
     @Test("The far edge snaps to a neighbour's edge while the origin corner stays put")
     func testFarEdgeSnapsWithoutMovingTheOrigin() {
-        // Neighbour whose LEFT edge sits at x = 206, 6 pt short of the
-        // drag's far edge (212) and nearer than the page-centre line (200,
-        // 12 pt away). Its y-extent (340…380) and its other x-targets
-        // (246, 286) are ≥ 10 pt clear of every edge of the drag.
+        // Neighbour beside the band (its y-extent 120…160 inside the
+        // band's 60…180) whose LEFT edge sits at x = 209, 3 pt short of the
+        // drag's far edge (212), inside the 5-pt reach; its right edge (289)
+        // and its top and bottom are clear of every edge of the drag.
         let neighbour = RedactionRegion.mock(
-            rect: CGRect(x: 0.515, y: 0.05, width: 0.2, height: 0.1)
+            rect: CGRect(x: 0.5225, y: 0.6, width: 0.2, height: 0.1)
         )
         let (overlay, coordinator) = makeOverlay(regions: [neighbour])
         drag(overlay, from: CGPoint(x: 60, y: 60), through: [CGPoint(x: 212, y: 180)])
 
         #expect(coordinator.addedRegions.count == 1)
         guard let committed = coordinator.addedRegions.first?.normalizedRect else { return }
-        // The old translating snapper shifted the whole band by −6
-        // (minX 60 → 54). The anchored snapper moves only the far edge.
+        // The anchored snapper moves only the far edge.
         expectClose(committed.minX, 60.0 / 400.0, "minX (origin corner)")
-        expectClose(committed.maxX, 206.0 / 400.0, "maxX (snapped far edge)")
+        expectClose(committed.maxX, 209.0 / 400.0, "maxX (snapped far edge)")
         expectClose(committed.minY, 1.0 - 180.0 / 400.0, "minY")
         expectClose(committed.maxY, 1.0 - 60.0 / 400.0, "maxY")
     }
@@ -180,8 +179,8 @@ struct RectangleDrawGestureTests {
         // edge is at x = 126 sits 3.5 pt from that midpoint — the old
         // translating snapper matched `midX` and shifted the whole band by
         // +3.5. The anchored snapper only considers the finger's edges
-        // (185: nearest target is the page centre at 200, 15 pt away, out
-        // of band), so nothing moves.
+        // (185: the neighbour's edges are 126 and 326, out of reach), so
+        // nothing moves.
         let neighbour = RedactionRegion.mock(
             rect: CGRect(x: 0.315, y: 0.05, width: 0.5, height: 0.1)
         )

@@ -15,10 +15,10 @@ import Foundation
 //
 // Geometry: a 400×400 overlay, so 1 overlay pt = 0.0025 normalized, at
 // zoom 1.0 (no PDFView ancestor): the handle box is 46 pt (half 23), the
-// snap band 10 pt and the resize floor 8 pt across a box 20 or more long. Snap targets are the other
-// regions' edges and midlines, the 16-pt page margins and the page centre
-// lines (200). Region A is the centred square, overlay 100…300 × 100…300;
-// its right-centre handle sits at (300, 200).
+// guide reach 5 pt and the resize floor 8 pt across a box 20 or more long.
+// Guides are the edges of the other regions beside the moving one.
+// Region A is the centred square, overlay 100…300 × 100…300; its
+// right-centre handle sits at (300, 200).
 
 @Suite("Overlay resize cancel and geometry", .tags(.overlay))
 @MainActor
@@ -152,10 +152,10 @@ struct OverlayCancelAndHapticTests {
     @Test("A snapped edge never leaves the box under the resize floor")
     func snapNeverPullsTheBoxUnderTheFloor() {
         let region = Self.regionA()
-        // A neighbour below A, overlay 103…143 × 320…360: its left edge
-        // (x = 103) sits inside the 10-pt snap band of a right edge the
-        // floor holds at 108, and it is clear of the touch.
-        let neighbour = RedactionRegion.mock(rect: CGRect(x: 0.2575, y: 0.1, width: 0.1, height: 0.1))
+        // A neighbour beside A (overlay 105…145 × 180…220, inside A's
+        // y-range): its left edge (x = 105) sits inside the 5-pt guide reach
+        // of a right edge the floor holds at 108.
+        let neighbour = RedactionRegion.mock(rect: CGRect(x: 0.2625, y: 0.45, width: 0.1, height: 0.1))
         let canvas = makeCanvas(regions: [region, neighbour], selectedIDs: [region.id])
 
         // The right-centre handle dragged to x = 102: a 2-pt box.

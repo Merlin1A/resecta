@@ -260,14 +260,13 @@ enum ResectaTokens {
     // MARK: - Snap Guides
 
     enum Snap {
-        /// Distance (in overlay points) within which an edge snaps to a guide.
-        static let proximityThreshold: CGFloat = 10
+        /// Distance (in screen points; × the overlay's finger scale) within
+        /// which an edge aligns to a guide.
+        static let proximityThreshold: CGFloat = 5
         /// Width of rendered guide lines.
         static let guideLineWidth: CGFloat = 1.0
         /// Guide line color — orange for contrast (matches WARN color rationale).
         static let guideColor: UIColor = .systemOrange
-        /// Page margin inset for margin guide lines.
-        static let pageMarginInset: CGFloat = 16
     }
 
     // MARK: - Touch Targets
