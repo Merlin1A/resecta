@@ -226,6 +226,14 @@ struct PageBarWholePageTests {
         #expect(PageNavigationBar.showsMarkControl(pageCount: 3))
     }
 
+    @Test("At accessibility sizes the counter stacks its position over its count, each on one line")
+    func counterStacksAtAccessibilitySizes() {
+        #expect(PageNavigationBar.counterStacks(dynamicTypeSize: .accessibility1))
+        #expect(PageNavigationBar.counterStacks(dynamicTypeSize: .accessibility5))
+        #expect(!PageNavigationBar.counterStacks(dynamicTypeSize: .xxxLarge))
+        #expect(!PageNavigationBar.counterStacks(dynamicTypeSize: .large))
+    }
+
     // MARK: - The bar's source
 
     @Test("The bar carries the control with its state's label and identifier, floored to the shared touch target, and no disabled modifier of its own")
