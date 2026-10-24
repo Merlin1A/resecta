@@ -8,15 +8,10 @@ import SwiftUI
 // Legal text referenced from Legal.xcstrings catalog.
 
 struct EULAGateView: View {
-    // Versioned key — increment to _v2 to force re-acceptance on terms change.
-    @AppStorage("disclaimerAccepted_v1") private var disclaimerAccepted = false
-
-    // EULA acceptance-key history. The CURRENT key is
-    // "disclaimerAccepted_v1" (above). When the terms change and the key is
-    // bumped (e.g. to _v2), move the now-superseded key name into this list so
-    // accepting the new terms clears the orphaned UserDefaults entry. _v1 is the
-    // first shipped key, so this list is empty today (no _v0 ever existed).
-    private static let supersededDisclaimerKeys: [String] = []
+    // Versioned key — bump it in `FirstLaunchFlow` to force re-acceptance on
+    // a terms change, and move the old name into its superseded list so
+    // accepting the new terms clears the orphaned UserDefaults entry.
+    @AppStorage(FirstLaunchFlow.agreementKey) private var disclaimerAccepted = false
 
     // Mirror HomeView's content-column cap so the gate and the screen it
     // precedes share the same width on regular-width layouts.
@@ -114,7 +109,7 @@ struct EULAGateView: View {
                 disclaimerAccepted = true
                 // Drop any superseded EULA keys so a key bump does not
                 // orphan stale acceptance flags in UserDefaults.
-                for key in Self.supersededDisclaimerKeys {
+                for key in FirstLaunchFlow.supersededAgreementKeys {
                     UserDefaults.standard.removeObject(forKey: key)
                 }
             } label: {

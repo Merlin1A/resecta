@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Page bar: a Mark Whole Page control beside the page chevrons adds one redaction region covering the page on screen, through the same path a drawn region takes — the counter reads "1 region", Undo removes it in one step, and no search term is captured from it.
 - Import: a password-protected PDF can be opened by entering its password; the import checks run on the unlocked document, and the redacted copy is not password-protected. The password is held in memory while the document is open and released when the session closes; the failed-state card beneath the password sheet reads as locked rather than damaged. A document that was encrypted — one opened with a password, or one carrying only an owner password — shows a notice at import and a caption on the Share card saying the redacted copy carries neither the password nor the original's usage restrictions.
 - With Differentiate Without Color on, every region of a multi-region selection also carries a dashed outline.
+- First launch: after the agreement, a short note from the developer on why Resecta exists, shown once.
 
 ### Changed
 
@@ -72,6 +73,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Alignment guides engage closer to an edge and only for regions beside the one being moved, so a box follows the finger across lines of applied regions.
 - Verification: a check that had nothing to check reports Not applicable instead of passing or adding a note — the Search Re-check and the Detection Sweep when no search or scan was applied, the two term searches when no redacted term was captured, and Character Count, Monospace Fonts and Character Sequence when every page was rasterized. A Not applicable check neither passes the document nor lowers its result.
 - Verification: the Detection Sweep reports Needs review when an item remains on the output in a category your applied scan covered and you did not leave unselected, such as an SSN in an image after an SSN scan. Before, it read as a note. An item only in a category no applied scan covered stays a note.
+- The first launch after updating asks for agreement to the End-User License Agreement and Privacy Policy again, as both have changed since 1.2.0.
 
 ### Removed
 

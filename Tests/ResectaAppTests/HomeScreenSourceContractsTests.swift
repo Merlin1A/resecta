@@ -17,6 +17,7 @@ struct HomeScreenSourceContractsTests {
     static let gatePath = "Sources/ResectaApp/Views/EULAGateView.swift"
     static let cardPath = "Sources/ResectaApp/Views/HomeChoiceCard.swift"
     static let overlayPath = "Sources/ResectaApp/Views/SnapshotPrivacyOverlay.swift"
+    static let notePath = "Sources/ResectaApp/Views/DeveloperNoteView.swift"
     static let progressPath = "Sources/ResectaApp/Views/VerificationProgressView.swift"
 
     @Test("The four entry and gear identifiers are on the home screen")
@@ -138,7 +139,7 @@ struct HomeScreenSourceContractsTests {
             let text = try String(contentsOf: file, encoding: .utf8)
             #expect(!text.contains("doc.text.redact"), "\(file.lastPathComponent) names the retired symbol")
         }
-        for path in [Self.homePath, Self.gatePath, Self.overlayPath] {
+        for path in [Self.homePath, Self.gatePath, Self.overlayPath, Self.notePath] {
             let text = try loadRepoFile(path)
             #expect(text.contains("HomeMark("), "\(path) draws the mark")
             #expect(!text.contains("doc.viewfinder"), "\(path) still names the scan glyph")
