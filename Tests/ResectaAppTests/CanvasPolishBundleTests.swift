@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import UIKit
 @testable import ResectaApp
 
 // Canvas polish bundle. Three independently-scoped
@@ -74,5 +75,38 @@ struct CanvasPolishBundleTests {
         // "two fingers to scroll" names the other gesture; the user supplies
         // the intent.
         #expect(DocumentEditorView.drawingModeCaption == "Drag to draw · two fingers to scroll")
+    }
+
+    // MARK: - One on-screen size at every zoom
+
+    /// Overlay points show at 1 / fingerScale on screen.
+    private static func onScreen(_ overlayPoints: CGFloat, viewScale: CGFloat) -> CGFloat {
+        overlayPoints * viewScale
+    }
+
+    @Test("The size label, the outline and the handle ring keep one on-screen size at 0.64 and 2.0")
+    func onScreenSizesHoldAcrossZoom() {
+        let label = "120 \u{00D7} 24" as NSString
+        func sizes(_ viewScale: CGFloat) -> (pill: CGFloat, ring: CGFloat, stroke: CGFloat) {
+            let fingerScale = 1 / viewScale
+            return (
+                Self.onScreen(RedactionOverlayView.dimensionLabelPillSize(for: label, fingerScale: fingerScale).height, viewScale: viewScale),
+                Self.onScreen(RedactionOverlayView.handleRingWidth(handleScale: 1, fingerScale: fingerScale), viewScale: viewScale),
+                Self.onScreen(RedactionOverlayView.regionStrokeWidth(isSelected: true, fingerScale: fingerScale), viewScale: viewScale)
+            )
+        }
+        let fit = sizes(0.64), zoomed = sizes(2.0)
+        #expect(abs(fit.pill - zoomed.pill) < 0.5, "the label's pill: \(fit.pill) at fit, \(zoomed.pill) at 2x")
+        #expect(abs(fit.ring - zoomed.ring) < 0.01)
+        #expect(abs(fit.stroke - 2.5) < 0.01 && abs(zoomed.stroke - 2.5) < 0.01)
+    }
+
+    @Test("The lift shadow resolves to the same colour in dark appearance as in light")
+    func liftShadowShowsInDarkAppearance() {
+        let shadow = RedactionOverlayView.liftShadowColor
+        let light = shadow.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
+        let dark = shadow.resolvedColor(with: UITraitCollection(userInterfaceStyle: .dark))
+        #expect(light == dark)
+        #expect(dark.cgColor.alpha >= 0.2, "a shadow on the white page reads in either appearance")
     }
 }

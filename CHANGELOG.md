@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Double-tap the page to return to the fit zoom.
 - Page bar: Mark Whole Page covers the page on screen with one region, through the same path a drawn region takes, and no search term is captured from it; on a marked page the control reads Unmark Whole Page and removes it, each way one undo step, and it keeps its place when the count changes; it is hidden on a one-page document, where the … menu keeps it. Marking a page that is already marked, from the bar or the menu, adds nothing.
 - Import: a password-protected PDF can be opened by entering its password; the import checks run on the unlocked document, and the redacted copy is not password-protected. The password is held in memory while the document is open and released when the session closes; the failed-state card beneath the password sheet reads as locked rather than damaged. A document that was encrypted — one opened with a password, or one carrying only an owner password — shows a notice at import and a caption on the Share card saying the redacted copy carries neither the password nor the original's usage restrictions.
+- With Differentiate Without Color on, every region of a multi-region selection also carries a dashed outline.
 
 ### Changed
 
@@ -221,6 +222,8 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - The Run Verification card's full run holds the Redact gate too: with selected matches not applied it shows the hint instead of dropping the session.
 - A refused drop on the results screen or an error screen names that screen's way back: Keep Editing, Return to Editor, Return to Results, Choose Another File or Re-open Document.
 - A document dropped over an open one starts with an empty undo history, the redaction mode set in Settings and no notices from the previous document; a drop on the results or error screen is refused with a notice instead of doing nothing.
+- A tap or a hold on stacked one-line regions picks the region under the finger instead of the one below it, and a whole-page region no longer takes touches meant for the regions inside it.
+- The size label, the region outlines, the lift shadow and the handle rings keep one on-screen size at every zoom, and the lift shadow shows in dark appearance.
 
 ### Internal
 
