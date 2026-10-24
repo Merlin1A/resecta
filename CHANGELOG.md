@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 ### Added
 
 - Editor: the iPhone overflow menu offers Mark Whole Page for the page in view, on one-page documents too — or Unmark Whole Page, checked, on a marked page — through the page bar's own toggle.
+- At the accessibility text sizes the page bar's counter shows its position above its region count, each on one line, instead of wrapping a letter at a time.
 - Password sheet: when a refused password holds an accented letter, a line beneath the refusal says such a password may not open the document in Resecta even when it is correct (Known Issues KI-12).
 - Settings: a "Rate Resecta on the App Store" row under Support opens the App Store's review page for the app.
 - Acknowledgements: the third-party data and typeface notices the app ships (the repo-root NOTICE) are bundled and readable in-app, from the first-launch gate beside the EULA and Privacy Policy and from Settings.

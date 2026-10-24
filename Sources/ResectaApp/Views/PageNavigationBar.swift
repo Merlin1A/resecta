@@ -16,6 +16,7 @@ struct PageNavigationBar: View {
     @Environment(DocumentState.self) private var documentState
     @Environment(RedactionState.self) private var redactionState
     @Environment(\.undoManager) private var undoManager
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         let pageCount = documentState.pageCount
@@ -49,14 +50,22 @@ struct PageNavigationBar: View {
             // Page position + region count for iPhone — ONE spoken
             // element ("Page k of N, n regions"); the drawn pieces
             // (the counter, the dot, the count) stay separate views.
+            // At accessibility sizes the position stacks over the count,
+            // each on one line (scaling down rather than breaking a word).
             let count = redactionState.regions[documentState.currentPageIndex]?.count ?? 0
-            HStack(spacing: ResectaTokens.Spacing.xs) {
+            let stacks = PageNavigationBar.counterStacks(dynamicTypeSize: dynamicTypeSize)
+            let counterLayout = stacks
+                ? AnyLayout(VStackLayout(spacing: 0))
+                : AnyLayout(HStackLayout(spacing: ResectaTokens.Spacing.xs))
+            counterLayout {
                 Text("\(documentState.currentPageIndex + 1) of \(pageCount)")
                     .font(.subheadline.monospacedDigit())
 
-                Text("\u{B7}")
-                    .foregroundStyle(.quaternary)
-                    .padding(.horizontal, ResectaTokens.Spacing.xxs)
+                if !stacks {
+                    Text("\u{B7}")
+                        .foregroundStyle(.quaternary)
+                        .padding(.horizontal, ResectaTokens.Spacing.xxs)
+                }
                 // The count's slot is as wide as the wider of "0 regions"
                 // and the live count (both laid out, one hidden), so the
                 // bar keeps its width — and the whole-page control its
@@ -73,6 +82,8 @@ struct PageNavigationBar: View {
                 }
                 .font(.caption.monospacedDigit())
             }
+            .lineLimit(1)
+            .minimumScaleFactor(0.5)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(PageNavigationBar.pageAccessibilityLabel(
                 page: documentState.currentPageIndex + 1,
@@ -167,6 +178,12 @@ extension PageNavigationBar {
     static func showPage(_ page: Int, documentState: DocumentState, redactionState: RedactionState) {
         documentState.currentPageIndex = page
         redactionState.activeSearch?.yieldWalk(toPage: page)
+    }
+
+    /// At the accessibility sizes the counter stacks its position over its
+    /// count: side by side, the pair wrapped a letter at a time.
+    static func counterStacks(dynamicTypeSize: DynamicTypeSize) -> Bool {
+        dynamicTypeSize.isAccessibilitySize
     }
 
     /// The page arrows step between pages: none on a one-page document.
