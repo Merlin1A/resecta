@@ -164,7 +164,7 @@ struct ParkedChromeLayoutTests {
         #expect(layout() == layout())
         // A live walk moves the chrome (the bar steps aside); so does the page count.
         #expect(layout() != layout(walk: false))
-        #expect(layout() != layout(pages: 0))
+        #expect(layout(walk: false) != layout(walk: false, pages: 0))
         #expect(layout() != layout(hug: 120))
     }
 }
