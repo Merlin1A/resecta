@@ -22,6 +22,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Tapping an empty part of the page clears the region selection; with Add to Selection on, a tap on empty page changes nothing.
 - Tapping one region of a selected group without moving it selects only that region; dragging it still moves the group.
 - Holding a region opens its menu; to move a region, select it, then drag it.
+- The long-press menu on a region of a selected group acts on the whole selection — Delete N Regions and Deselect All — and leaves the selection as it was.
 - Undo and Redo name region steps with the controls' word, Region (Add Region, Duplicate Region, Delete Regions, Move Region, Resize Region), and Redo names the action it repeats.
 - A search apply's undo step is named by the regions it creates, not counting results already covered.
 - Duplicate selects the copy.
