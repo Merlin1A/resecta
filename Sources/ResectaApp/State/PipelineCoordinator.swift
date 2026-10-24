@@ -241,12 +241,8 @@ final class PipelineCoordinator: @unchecked Sendable {
         // Mechanism-description: the rasterization
         // route is designed to drop vector text and image layers from
         // redacted regions.
-        let effectiveMode: PipelineMode
-        if runSettings.paranoidMode {
-            effectiveMode = .secureRasterization
-        } else {
-            effectiveMode = documentOverride ?? runSettings.pipelineMode
-        }
+        let effectiveMode = PipelineMode.effective(
+            paranoid: runSettings.paranoidMode, override: documentOverride, setting: runSettings.pipelineMode)
         launch(.full(effectiveMode: effectiveMode, runSettings: runSettings))
     }
 
@@ -267,9 +263,8 @@ final class PipelineCoordinator: @unchecked Sendable {
         guard let outputURL = redactionState.outputURL else { return }
 
         let effectiveMode = documentState.lastUsedPipelineMode
-            ?? (settingsState.paranoidMode
-                ? .secureRasterization
-                : settingsState.pipelineMode)
+            ?? PipelineMode.effective(
+                paranoid: settingsState.paranoidMode, override: nil, setting: settingsState.pipelineMode)
 
         // Drive the phase to .verifying up front so any downstream failure
         // path inside runVerification (e.g., PDFDocument load crash before
@@ -699,5 +694,14 @@ final class PipelineCoordinator: @unchecked Sendable {
             settings: runSettings ?? RunSettings.snapshot(from: settingsState),
             effectiveMode: effectiveMode
         )
+    }
+}
+
+extension PipelineMode {
+    /// The mode a run uses: Secure Rasterization whenever Paranoid Mode is
+    /// on, else the document's override, else the setting. The run, the
+    /// verify-only re-run and the editor's Switch Mode read this one rule.
+    static func effective(paranoid: Bool, override: PipelineMode?, setting: PipelineMode) -> PipelineMode {
+        paranoid ? .secureRasterization : (override ?? setting)
     }
 }

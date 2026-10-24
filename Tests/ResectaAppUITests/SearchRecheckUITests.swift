@@ -68,16 +68,15 @@ nonisolated final class SearchRecheckUITests: XCTestCase {
         ).firstMatch
         XCTAssertTrue(toast.waitForExistence(timeout: 10), "Apply toast never appeared.")
 
-        // Dismiss the sheet, then Redact from the toolbar overflow.
+        // Dismiss the sheet, then Redact from the bar.
         let dismiss = app.buttons["searchDismissButton"]
         XCTAssertTrue(dismiss.waitForExistence(timeout: 10), "Dismiss button not found after Apply.")
         dismiss.tap()
 
-        let overflow = app.buttons["OverflowBarButtonItem"]
-        XCTAssertTrue(overflow.waitForExistence(timeout: 10), "Toolbar overflow button never appeared.")
-        overflow.tap()
-        let redact = app.buttons["Redact"]
-        XCTAssertTrue(redact.waitForExistence(timeout: 10), "Redact menu item never appeared.")
+        // Redact sits in the bar beside Undo (the … menu holds it only at
+        // the largest text sizes).
+        let redact = app.buttons["redactButton"].firstMatch
+        XCTAssertTrue(redact.waitForExistence(timeout: 10), "Redact never appeared in the bar.")
         redact.tap()
 
         // Redaction + verification of a one-page fixture: seconds, with
@@ -150,11 +149,10 @@ nonisolated final class SearchRecheckUITests: XCTestCase {
                    thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.70, dy: 0.62)))
         drawTool.tap()
 
-        let overflow = app.buttons["OverflowBarButtonItem"]
-        XCTAssertTrue(overflow.waitForExistence(timeout: 10), "Toolbar overflow button never appeared.")
-        overflow.tap()
-        let redact = app.buttons["Redact"]
-        XCTAssertTrue(redact.waitForExistence(timeout: 10), "Redact menu item never appeared.")
+        // Redact sits in the bar beside Undo (the … menu holds it only at
+        // the largest text sizes).
+        let redact = app.buttons["redactButton"].firstMatch
+        XCTAssertTrue(redact.waitForExistence(timeout: 10), "Redact never appeared in the bar.")
         redact.tap()
 
         XCTAssertTrue(app.staticTexts["Checks Passed"].waitForExistence(timeout: 90),

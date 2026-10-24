@@ -59,7 +59,7 @@ nonisolated final class ShareRiskSheetUITests: XCTestCase {
         app.launch()
 
         awaitSearchAndApplyAll()
-        runRedactFromOverflowMenu()
+        runRedactFromTheBar()
 
         XCTAssertTrue(
             app.staticTexts["Verification Skipped"].waitForExistence(timeout: 30),
@@ -187,21 +187,13 @@ nonisolated final class ShareRiskSheetUITests: XCTestCase {
         dismissButton.tap()
     }
 
-    /// The editor's trailing toolbar overflows on this device/width after
-    /// the search round trip — Redact resolves through the
-    /// system overflow menu rather than directly on the bar.
-    private func runRedactFromOverflowMenu() {
-        let overflow = app.buttons["OverflowBarButtonItem"]
-        XCTAssertTrue(
-            overflow.waitForExistence(timeout: 10),
-            "Toolbar overflow button never appeared."
-        )
-        overflow.tap()
-
-        let redact = app.buttons["Redact"]
+    /// Redact sits in the bar beside Undo (the … menu holds it only at
+    /// the largest text sizes).
+    private func runRedactFromTheBar() {
+        let redact = app.buttons["redactButton"].firstMatch
         XCTAssertTrue(
             redact.waitForExistence(timeout: 10),
-            "Redact menu item never appeared in the overflow menu."
+            "Redact never appeared in the bar."
         )
         redact.tap()
     }

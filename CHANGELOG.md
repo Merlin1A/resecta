@@ -8,12 +8,13 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ### Added
 
-- Editor: the iPhone overflow menu offers Mark Whole Page for the page in view, on one-page documents too, through the page bar's own action.
+- Editor: the iPhone overflow menu offers Mark Whole Page for the page in view, on one-page documents too — or Unmark Whole Page, checked, on a marked page — through the page bar's own toggle.
+- At the accessibility text sizes the page bar's counter shows its position above its region count, each on one line, instead of wrapping a letter at a time.
 - Password sheet: when a refused password holds an accented letter, a line beneath the refusal says such a password may not open the document in Resecta even when it is correct (Known Issues KI-12).
 - Settings: a "Rate Resecta on the App Store" row under Support opens the App Store's review page for the app.
 - Acknowledgements: the third-party data and typeface notices the app ships (the repo-root NOTICE) are bundled and readable in-app, from the first-launch gate beside the EULA and Privacy Policy and from Settings.
 - Photos and images (JPEG, PNG and HEIC) can be opened from the system Photos picker (up to 20 at a time, in the order chosen), from Files, or by a drop onto an open document; each image becomes one page of a new PDF, redrawn from its decoded pixels at 300 pixels per inch, so the image's embedded metadata is not carried into the document.
-- Page bar: Mark Whole Page covers the page on screen with one region, through the same path a drawn region takes, and no search term is captured from it; on a marked page the control reads Unmark Whole Page and removes it, each way one undo step, and it keeps its place when the count changes; it is hidden on a one-page document, where the … menu keeps it. Marking a page that is already marked, from the bar or the menu, adds nothing.
+- Page bar: Mark Whole Page covers the page on screen with one region, through the same path a drawn region takes, and no search term is captured from it; on a marked page the control reads Unmark Whole Page and removes it, each way one undo step, and it keeps its place when the count changes; it is hidden on a one-page document, where the … menu keeps it.
 - Double-tap an empty part of the page to return to the fit zoom.
 - Page bar: a Mark Whole Page control beside the page chevrons adds one redaction region covering the page on screen, through the same path a drawn region takes — the counter reads "1 region", Undo removes it in one step, and no search term is captured from it.
 - Import: a password-protected PDF can be opened by entering its password; the import checks run on the unlocked document, and the redacted copy is not password-protected. The password is held in memory while the document is open and released when the session closes; the failed-state card beneath the password sheet reads as locked rather than damaged. A document that was encrypted — one opened with a password, or one carrying only an owner password — shows a notice at import and a caption on the Share card saying the redacted copy carries neither the password nor the original's usage restrictions.
@@ -30,9 +31,12 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Duplicate selects the copy.
 - A one-page document shows the page bar with its region count; the page arrows are hidden there. The counter reads "0 regions" on a page with none, drawn and spoken.
 - A document dropped over an open one that holds drawn regions or selected matches asks before replacing it; Cancel keeps the open document. With the Search sheet up, such a drop is refused until the sheet is dismissed.
+- With Add to Selection on, a capsule above the page bar reads "Adding to selection · N selected" with a Done button that turns the mode off.
+- At the largest accessibility text sizes the drawing caption no longer covers the bottom of the page: the capsules' text stops growing at Accessibility 1.
+- Editor toolbar on iPhone: one Undo button — tap to undo, touch and hold for Undo and Redo with the step's name — and Redact as a teal scissors button beside it; Settings moves into the … menu, which lists the selection actions first and Home last, and the separate More menu is gone. At the largest text sizes Redact moves into the … menu and Undo stays in the bar. The document's name is no longer drawn clipped in the bar.
 - The "match nearby" notice says Mark, matching the Marked N notice.
 - With VoiceOver on, the Rectangle tool is disabled with a hint pointing to Search and Scan.
-- Deleting several selected regions no longer asks first, from the toolbar or the selection menu; one Undo restores them.
+- Deleting several selected regions happens at once, as one undo step, and a "Deleted N regions." notice offers Undo; a delete from the … menu or ⌘⌫ ends Add to Selection.
 - A run of arrow-key nudges is one undo step.
 - Deleting selected regions from a hardware keyboard takes Command-Delete.
 - The Discard selections confirmation is an alert with a Cancel button.
@@ -101,6 +105,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - The Processing was paused notice stays until it is dismissed, Restart is tapped or another run starts, so it is still there after time away from the app.
 - While a match walk is parked, paging away with the page bar lets go of the current match, so the strip's Apply never applies a match on another page, and the walk's arrows and J / K step from the page shown.
 - Duplicate of a region at the page's edge no longer lands exactly on its source: with no room toward the edge, the copy steps the other way.
+- With Paranoid Mode on, Switch Mode in the … menu shows Secure Rasterization and is unavailable, with the reason, instead of offering Searchable Redaction the run would not use.
 - Undoing a search apply leaves none of its regions selected.
 - A tap or an arrow-key nudge that leaves a region where it was no longer records an undo step or discards the redacted output.
 - Duplicating a region or undoing a delete no longer offers the nearby-match notice.
@@ -169,7 +174,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - The share confirmation for a failed or needs-review result also lists the same report's checks that could not verify part of the output or were skipped, as the documents say; its header reads "These checks reported issues or did not run in full:".
 - The page sidebar's thumbnail cache tells a new document apart from a freed one at the same address, so a new session never shows the previous document's page images.
 - The VoiceOver announcement at the end of a run speaks the verification status only, not the masthead sentence that can quote review terms.
-- Redact and ⇧⌘R are unavailable while the search sheet holds selected matches that are not applied, with the hint "Apply or clear the selected matches first", instead of tearing the session down and dropping them.
+- Redact and ⇧⌘R stay available while the search sheet holds selected matches that are not applied; a tap raises the sheet and says "Apply or clear the selected matches first" instead of tearing the session down and dropping them.
 - Redact: a Stop that lands while the output is being finalized leaves no output file behind in the session folder.
 - The app-switcher cover sits in its own window above every presented sheet, so the Search & Redact sheet and Settings → Custom Terms are covered too.
 - The failed screen's copy for a refused page names its rotation beside the size and scale, and the advice says so.

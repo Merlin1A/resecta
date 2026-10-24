@@ -52,6 +52,39 @@ struct RedactGateTests {
         #expect(busy.redactRefusal(with: busyState) == .busy)
     }
 
+    private func selectedSession() -> SearchState {
+        let touched = SearchState(defaults: makeScratchDefaults().0)
+        touched.results = [SearchResult(
+            pageIndex: 0, normalizedRect: CGRect(x: 0.1, y: 0.1, width: 0.2, height: 0.03),
+            matchedText: "alpha", contextSnippet: "…alpha…", source: .textLayer, term: "alpha", isSelected: true)]
+        return touched
+    }
+
+    @Test("Selected matches not applied leave the button available; a tap raises the sheet and explains")
+    func selectionsExplainOnTap() {
+        let (documentState, redactionState) = states()
+        redactionState.activeSearch = selectedSession()
+        #expect(documentState.redactRefusal(with: redactionState) == .selectedMatches, "the run still refuses")
+        #expect(!DocumentEditorView.redactButtonDisabled(documentState: documentState, redactionState: redactionState))
+        #expect(DocumentEditorView.redactTapRoute(documentState: documentState, redactionState: redactionState)
+                == .raiseSheetAndExplain)
+    }
+
+    @Test("Disabled means cannot: no region to redact, or a run that cannot start; otherwise a tap runs")
+    func disabledMeansCannot() {
+        let (noRegions, noRegionsState) = states(effective: false)
+        #expect(DocumentEditorView.redactButtonDisabled(documentState: noRegions, redactionState: noRegionsState))
+        noRegionsState.activeSearch = selectedSession()
+        #expect(DocumentEditorView.redactButtonDisabled(documentState: noRegions, redactionState: noRegionsState),
+                "selections do not lift the missing-region block")
+        let (busy, busyState) = states()
+        busy.phase = .empty
+        #expect(DocumentEditorView.redactButtonDisabled(documentState: busy, redactionState: busyState))
+        let (ready, readyState) = states()
+        #expect(!DocumentEditorView.redactButtonDisabled(documentState: ready, redactionState: readyState))
+        #expect(DocumentEditorView.redactTapRoute(documentState: ready, redactionState: readyState) == .run)
+    }
+
     @Test("The hint names the selected matches first, then the missing regions, else nothing")
     func hint() {
         let (documentState, redactionState) = states(effective: false)

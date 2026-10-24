@@ -82,7 +82,7 @@ struct SelectionRuleTests {
 
     // MARK: - Every surface calls the one rule
 
-    @Test("The toolbar's menus and the keyboard call the one rule and re-type nothing")
+    @Test("The toolbar's … menu, the Rectangle tool's entry and the keyboard call the one rule and re-type nothing")
     func surfacesCallTheRule() throws {
         let toolbar = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorToolbar.swift")
         let keyboard = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorKeyboard.swift")
@@ -90,8 +90,8 @@ struct SelectionRuleTests {
             #expect(!source.contains("selectedRegionIDs = Set("), "no surface re-types Select All")
             #expect(!source.contains("selectedRegionIDs = []"), "no surface re-types Deselect All")
         }
-        #expect(toolbar.components(separatedBy: "selectAllOnPage(").count - 1 == 2, "both menus call it")
-        #expect(toolbar.components(separatedBy: "deselectAllRegions()").count - 1 == 3, "both menus and the Rectangle tool's entry call it")
+        #expect(toolbar.components(separatedBy: "selectAllOnPage(").count - 1 == 1, "the … menu's selectionMenu calls it")
+        #expect(toolbar.components(separatedBy: "deselectAllRegions()").count - 1 == 2, "the … menu's selectionMenu and the Rectangle tool's entry call it")
         #expect(keyboard.contains("selectAllOnPage(") && keyboard.contains("deselectAllRegions()"), "Command-A and Escape call it")
     }
 

@@ -19,7 +19,7 @@ struct DocumentEditorToolbarTests {
             searchSheetDetent: .constant(.medium),
             documentOverride: nil, redactButtonDisabled: true, redactButtonHint: "",
             handleHomeTap: {}, homeButton: AnyView(EmptyView()), pipelineModePicker: AnyView(EmptyView()),
-            deleteSelectedRegions: {}, openSettings: {}
+            openSettings: {}
         )
     }
 
@@ -45,7 +45,7 @@ struct DocumentEditorToolbarTests {
             searchSheetDetent: .constant(.medium),
             documentOverride: nil, redactButtonDisabled: true, redactButtonHint: "",
             handleHomeTap: {}, homeButton: AnyView(EmptyView()), pipelineModePicker: AnyView(EmptyView()),
-            deleteSelectedRegions: {}, openSettings: {}
+            openSettings: {}
         )
         toolbar.resetCanvasTools()
         #expect(tool == nil)
@@ -69,25 +69,32 @@ struct DocumentEditorToolbarTests {
         let coordinator = makeCoordinator()
         coordinator.documentState.sourceDocument = makeMultiPagePDFDocument(pages: 1)
         coordinator.documentState.currentPageIndex = 0
-        toolbar(for: coordinator).markWholePage()
+        toolbar(for: coordinator).toggleWholePage()
         let regions = coordinator.redactionState.regions[0] ?? []
         #expect(regions.count == 1)
         #expect(regions.first?.normalizedRect == PageNavigationBar.wholePageRegion().normalizedRect)
     }
 
-    @Test("The overflow mounts Mark Whole Page after Home (source pin)")
+    @Test("The … menu's whole-page row is the page bar's toggle: Mark, then Unmark, on the page in view")
+    func overflowTogglesTheWholePage() {
+        let coordinator = makeCoordinator()
+        coordinator.documentState.sourceDocument = makeMultiPagePDFDocument(pages: 1)
+        coordinator.documentState.currentPageIndex = 0
+        let toolbar = toolbar(for: coordinator)
+        toolbar.toggleWholePage()
+        #expect(PageNavigationBar.isWholePageMarked(page: 0, in: coordinator.redactionState))
+        toolbar.toggleWholePage()
+        #expect((coordinator.redactionState.regions[0] ?? []).isEmpty, "the row unmarks a marked page")
+    }
+
+    @Test("The … menu mounts Mark Whole Page last among the selection rows (layout + source pin)")
     func overflowMountsMarkWholePage() throws {
         let source = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorToolbar.swift")
-        guard let group = source.range(of: "var secondaryActionToolbarItems: some View {"),
-              let end = source.range(of: ".tint(.primary)", range: group.upperBound..<source.endIndex),
-              let home = source.range(of: "homeButton", range: group.upperBound..<end.lowerBound),
-              let mark = source.range(of: "markWholePageButton", range: group.upperBound..<end.lowerBound)
-        else {
-            Issue.record("The overflow must mount homeButton and markWholePageButton")
-            return
-        }
-        #expect(home.lowerBound < mark.lowerBound)
-        #expect(source.contains("PageNavigationBar.markWholePage("), "one action, the page bar's own")
+        let first = EditorToolbarLayout(dynamicTypeSize: .large, canUndo: false, canRedo: false)
+            .overflowSections.first
+        #expect(first?.last == .markWholePage)
+        #expect(source.contains("case .markWholePage: markWholePageButton"))
+        #expect(source.contains("PageNavigationBar.toggleWholePage("), "one action, the page bar's own")
     }
 
     /// Mirrors `HonestySurfacesTests.loadRepoFile`.

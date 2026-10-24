@@ -28,7 +28,7 @@ struct PageBarWholePageTests {
 
     private static func mark(_ documentState: DocumentState, _ redactionState: RedactionState,
                              undoManager: UndoManager? = nil) {
-        PageNavigationBar.markWholePage(
+        PageNavigationBar.toggleWholePage(
             redactionState: redactionState, documentState: documentState, undoManager: undoManager)
     }
 
@@ -173,16 +173,6 @@ struct PageBarWholePageTests {
         #expect(!PageNavigationBar.isWholePageMarked(page: 0, in: redactionState))
     }
 
-    @Test("Marking a marked page adds no second whole-page region")
-    func markOnAMarkedPageAddsNothing() {
-        let (documentState, redactionState) = Self.makeStates(currentPage: 0)
-        Self.mark(documentState, redactionState)
-        let versionAfterFirst = redactionState.regionVersion
-        Self.mark(documentState, redactionState)
-        #expect(redactionState.regions[0]?.count == 1)
-        #expect(redactionState.regionVersion == versionAfterFirst, "the second mark changes nothing")
-    }
-
     @Test("The toggle marks, then unmarks: one undo step each way, named for it; Undo after Unmark marks the page again")
     func toggleTwiceIsTwoNamedSteps() {
         let (documentState, redactionState) = Self.makeStates(currentPage: 0)
@@ -233,6 +223,14 @@ struct PageBarWholePageTests {
         #expect(!PageNavigationBar.showsMarkControl(pageCount: 1))
         #expect(PageNavigationBar.showsChevrons(pageCount: 3))
         #expect(PageNavigationBar.showsMarkControl(pageCount: 3))
+    }
+
+    @Test("At accessibility sizes the counter stacks its position over its count, each on one line")
+    func counterStacksAtAccessibilitySizes() {
+        #expect(PageNavigationBar.counterStacks(dynamicTypeSize: .accessibility1))
+        #expect(PageNavigationBar.counterStacks(dynamicTypeSize: .accessibility5))
+        #expect(!PageNavigationBar.counterStacks(dynamicTypeSize: .xxxLarge))
+        #expect(!PageNavigationBar.counterStacks(dynamicTypeSize: .large))
     }
 
     // MARK: - The bar's source
