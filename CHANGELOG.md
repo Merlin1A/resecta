@@ -246,6 +246,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - The zoom you set stays when the search sheet is raised, parked or dismissed, and when you move to another page.
 - VoiceOver reaches each redaction region on the page, the whole-page region included.
 - Search: the live highlight drawn while typing sits on the box Apply will place, on pages whose text the search normalizes and on a match that wraps onto a second line.
+- At the Search sheet's medium height, an upward drag on the empty part of the Scan chip row raises the sheet again.
 
 ### Internal
 
