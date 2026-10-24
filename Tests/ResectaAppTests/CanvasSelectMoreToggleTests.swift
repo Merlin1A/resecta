@@ -43,22 +43,11 @@ struct CanvasSelectMoreToggleTests {
         ) == true)
     }
 
-    // MARK: - Toggle label (selection count surfacing)
+    // MARK: - Toggle label
 
-    @Test("Label hides the count when nothing is selected")
-    func labelHidesZeroCount() {
-        #expect(RedactionOverlayView.selectMoreToggleLabel(selectedCount: 0)
-                == "Add to Selection")
-    }
-
-    @Test("Label surfaces the running count in lock-step with selection size")
-    func labelSurfacesRunningCount() {
-        #expect(RedactionOverlayView.selectMoreToggleLabel(selectedCount: 1)
-                == "Add to Selection (1)")
-        #expect(RedactionOverlayView.selectMoreToggleLabel(selectedCount: 7)
-                == "Add to Selection (7)")
-        #expect(RedactionOverlayView.selectMoreToggleLabel(selectedCount: 42)
-                == "Add to Selection (42)")
+    @Test("The toggle row reads its bare name; the On/Off state carries the rest")
+    func toggleRowReadsItsBareName() {
+        #expect(RedactionOverlayView.selectMoreToggleTitle == "Add to Selection")
     }
 
     // MARK: - Default state

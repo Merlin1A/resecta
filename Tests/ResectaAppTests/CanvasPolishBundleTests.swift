@@ -35,59 +35,6 @@ struct CanvasPolishBundleTests {
         #expect(toasts.activeToasts.map(\.message) == [RedactionOverlayView.subThresholdRejectionAnnouncement])
     }
 
-    // MARK: - Batch-delete dialog page-span
-
-    @Test("Page count derives from unique pages spanned by the selection")
-    func pageCountIsUniquePagesInSelection() {
-        let id0 = UUID(), id1 = UUID(), id2 = UUID(), id3 = UUID()
-        let pages: [UUID: Int] = [id0: 0, id1: 0, id2: 3, id3: 7]
-        let selection: Set<UUID> = [id0, id1, id2, id3]
-        let count = DocumentEditorView.selectedPageCount(
-            selectedIDs: selection,
-            pageLookup: { pages[$0] }
-        )
-        #expect(count == 3)  // pages 0, 3, 7
-    }
-
-    @Test("Page count is zero when every selection ID misses the lookup")
-    func pageCountZeroOnMissingLookups() {
-        let selection: Set<UUID> = [UUID(), UUID()]
-        let count = DocumentEditorView.selectedPageCount(
-            selectedIDs: selection,
-            pageLookup: { _ in nil }
-        )
-        #expect(count == 0)
-    }
-
-    @Test("Plural-region / plural-page message reads with the s-suffixed nouns")
-    func dialogMessagePluralsBothNouns() {
-        let msg = DocumentEditorView.batchDeleteDialogMessage(
-            regionCount: 5, pageCount: 2
-        )
-        #expect(msg.contains("Deleting 5 regions across 2 pages."))
-        #expect(msg.contains("Use Undo to restore them."))
-    }
-
-    @Test("Single region / single page switches to the singular nouns")
-    func dialogMessageSingularsBothNouns() {
-        let msg = DocumentEditorView.batchDeleteDialogMessage(
-            regionCount: 1, pageCount: 1
-        )
-        #expect(msg.contains("Deleting 1 region across 1 page."))
-        // Singular branch must NOT pluralize either noun:
-        #expect(msg.contains("1 regions") == false)
-        #expect(msg.contains("1 pages") == false)
-    }
-
-    @Test("Mixed shape (plural regions, single page) keeps grammar coherent")
-    func dialogMessageMixedShape() {
-        let msg = DocumentEditorView.batchDeleteDialogMessage(
-            regionCount: 4, pageCount: 1
-        )
-        #expect(msg.contains("Deleting 4 regions across 1 page."))
-        #expect(msg.contains("1 pages") == false)
-    }
-
     // MARK: - Drawing-mode caption predicate
 
     @Test("Caption is visible only with rectangle tool active in editing phase")

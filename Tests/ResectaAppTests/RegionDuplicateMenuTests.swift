@@ -7,9 +7,8 @@ import RedactionEngine
 // Duplicate Region on the canvas context menu.
 // The 0.02-offset clamp pre-existed in `RedactionState.duplicateRegion`;
 // this promotes it to the long-press menu, retitles the action
-// "Duplicate Region", and overrides the inner addRegion undo name to
-// "Duplicate Redaction" so the iOS long-press Undo menu reads in the
-// existing "<verb> Redaction" pattern.
+// "Duplicate Region", and names the undo step "Duplicate Region" too, so
+// the iOS long-press Undo menu reads the menu's own words.
 
 @Suite("Region duplicate menu")
 @MainActor
@@ -68,7 +67,7 @@ struct RegionDuplicateMenuTests {
 
     // MARK: - Undo action name override
 
-    @Test("duplicateRegion overrides the inner addRegion undo name with Duplicate Redaction")
+    @Test("duplicateRegion names its undo step Duplicate Region")
     func duplicateOverridesAddUndoName() {
         let state = RedactionState()
         let region = RedactionRegion(
@@ -83,10 +82,9 @@ struct RegionDuplicateMenuTests {
             state.duplicateRegion(region.id, page: 0, undoManager: mgr)
         }
 
-        // The inner addRegion call sets the action name to "Add
-        // Redaction"; duplicateRegion's trailing setActionName overrides
-        // it. UndoManager.undoActionName reads the name of the next undo.
-        #expect(mgr.undoActionName == "Duplicate Redaction")
+        // duplicateRegion hands its step name to the inner addRegion.
+        // UndoManager.undoActionName reads the name of the next undo.
+        #expect(mgr.undoActionName == "Duplicate Region")
     }
 
     @Test("Undo restores the page region count")

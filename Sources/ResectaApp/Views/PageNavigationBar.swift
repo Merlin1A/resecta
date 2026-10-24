@@ -130,7 +130,7 @@ extension PageNavigationBar {
     /// `documentState.currentPageIndex` through `addRegion`, the path a
     /// drawn region takes — the region version moves (the overlay
     /// refreshes on it), the output is cleared, one undo step named
-    /// "Add Redaction" is registered. A repeated tap adds another
+    /// "Add Region" is registered. A repeated tap adds another
     /// region, each its own undo step.
     static func markWholePage(
         redactionState: RedactionState,

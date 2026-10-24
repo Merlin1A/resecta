@@ -19,6 +19,14 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ### Changed
 
+- Undo and Redo name region steps with the controls' word, Region (Add Region, Duplicate Region, Delete Regions, Move Region, Resize Region), and Redo names the action it repeats.
+- A search apply's undo step is named by the regions it creates, not counting results already covered.
+- Duplicate selects the copy.
+- The "match nearby" notice says Mark, matching the Marked N notice.
+- With VoiceOver on, the Rectangle tool is disabled with a hint pointing to Search and Scan.
+- Deleting several selected regions no longer asks first, from the toolbar or the selection menu; one Undo restores them.
+- A run of arrow-key nudges is one undo step.
+- Deleting selected regions from a hardware keyboard takes Command-Delete.
 - The Discard selections confirmation is an alert with a Cancel button.
 - A light haptic on adding or resizing a region.
 - Share: when annotations in the original document — a black box, a stamp, an unapplied redaction mark — cover text that no redaction box covers, the share confirmation names those pages before the file is shared, whatever the verification result. Annotations are not part of the page image, so that text is visible in the exported file. On a scanned page, where the printed text is in the page image, any such annotation that no redaction box covers is named; on a rotated page an annotation is compared with the boxes as the page is shown.
@@ -75,6 +83,21 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Document canvas: with a hardware keyboard, Select All then Copy (⌘A, ⌘C) no longer places the document's text on the system pasteboard. The canvas view refuses the copy, cut, paste, select and select-all actions and builds its menu without the edit, look-up, learn and share groups; in 1.2.0 that keyboard path copied the whole document's text with no selection shown.
 ### Fixed
 
+- Undoing a delete selects the deleted regions again if they were selected.
+- Undoing a search apply leaves none of its regions selected.
+- A tap or an arrow-key nudge that leaves a region where it was no longer records an undo step or discards the redacted output.
+- Duplicating a region or undoing a delete no longer offers the nearby-match notice.
+- Two search results over the same text in one apply make one region.
+- A Scan region on a text page keeps the detector's confidence instead of reading as high confidence.
+- An apply whose results are all already covered no longer records an empty undo step.
+- The run discloses the unchecked results of every Scan applied from, not only the last apply's; undoing an apply restores the earlier disclosure.
+- Settings opens while the Search sheet is parked; the sheet steps aside and returns when Settings closes.
+- Select All on Page on a page without regions no longer empties the selection.
+- VoiceOver announces region deletes.
+- A new Search or Scan session opens at the medium height, whatever height the last session ended at.
+- Add to Selection turns off on Esc and when the page has no regions; the overflow row shows its on/off state.
+- Undo and Redo show the page they change, and VoiceOver names the step with its page.
+- The region hover popover no longer opens while the Search sheet is up.
 - A Search or Scan that stops at the 1,000-result cap now shows the cap banner and the unscanned page count on the run that reached it.
 - A match skipped as already covered no longer reads "Applied" after the covering region is deleted or undone.
 - The applied-search record stamps the options the run used, not the options changed afterwards.

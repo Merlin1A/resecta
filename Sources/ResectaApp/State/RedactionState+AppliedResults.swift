@@ -18,6 +18,20 @@ extension RedactionState {
             .map(\.resultID))
     }
 
+    /// One search session's deselection facts in the pending set, keyed
+    /// by the session's id.
+    typealias RunDeselectionPart = (session: UUID, snapshot: DeselectionSnapshot)
+
+    /// The pending deselection parts after an apply from `search`: its
+    /// facts replace its own earlier part (its unchecked list is that
+    /// session's current view) or join as a new part; a session with no
+    /// facts (a typed search) leaves the parts as they are, so a later
+    /// apply keeps an earlier Scan's unchecked results.
+    func runDeselectionParts(after search: SearchState) -> [RunDeselectionPart] {
+        guard let snapshot = search.deselectionSnapshotForRun() else { return pendingRunDeselectionParts }
+        return pendingRunDeselectionParts.filter { $0.session != search.id } + [(search.id, snapshot)]
+    }
+
     /// The snapshot pipeline entry should record for this run: the
     /// apply-commit snapshot when one is pending (the common path — see
     /// `pendingRunDeselection`), else the live search session's, less
@@ -55,5 +69,14 @@ extension RedactionState {
         let markers = derivedSearchMarkers(for: search.results)
         if search.appliedResultIDs != markers.applied { search.appliedResultIDs = markers.applied }
         if search.coveredResultIDs != markers.covered { search.coveredResultIDs = markers.covered }
+    }
+}
+
+extension RedactionState.DeselectionSnapshot {
+    /// Several sessions' facts as one: every part's unchecked results over
+    /// the sum of the parts' result counts. Nil when there is no part.
+    init?(merging parts: [Self]) {
+        guard !parts.isEmpty else { return nil }
+        self.init(items: parts.flatMap(\.items), totalCount: parts.reduce(0) { $0 + $1.totalCount })
     }
 }

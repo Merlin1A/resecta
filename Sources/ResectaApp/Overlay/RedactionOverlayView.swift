@@ -192,9 +192,7 @@ class RedactionOverlayView: UIView {
     // while the toggle is on. When at least one region is selected, the
     // count surfaces in the label so the user can see the selection size
     // without opening a separate count badge.
-    static func selectMoreToggleLabel(selectedCount: Int) -> String {
-        selectedCount > 0 ? "Add to Selection (\(selectedCount))" : "Add to Selection"
-    }
+    static let selectMoreToggleTitle = "Add to Selection"
 
     // Pure helper resolving a normalized rect-marquee against a
     // set of regions. Returns the subset whose `normalizedRect` intersects

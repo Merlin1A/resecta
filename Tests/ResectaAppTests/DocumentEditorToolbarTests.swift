@@ -16,10 +16,10 @@ struct DocumentEditorToolbarTests {
             documentState: coordinator.documentState, redactionState: coordinator.redactionState,
             coordinator: coordinator, horizontalSizeClass: .compact, undoManager: nil,
             activeTool: .constant(nil), isMultiSelectActive: .constant(false),
-            showBatchDeleteConfirmation: .constant(false), showSettings: .constant(false),
+            searchSheetDetent: .constant(.medium),
             documentOverride: nil, redactButtonDisabled: true, redactButtonHint: "",
             handleHomeTap: {}, homeButton: AnyView(EmptyView()), pipelineModePicker: AnyView(EmptyView()),
-            deleteSelectedRegions: {}
+            deleteSelectedRegions: {}, openSettings: {}
         )
     }
 
@@ -42,10 +42,10 @@ struct DocumentEditorToolbarTests {
             coordinator: coordinator, horizontalSizeClass: .compact, undoManager: nil,
             activeTool: Binding(get: { tool }, set: { tool = $0 }),
             isMultiSelectActive: Binding(get: { addToSelection }, set: { addToSelection = $0 }),
-            showBatchDeleteConfirmation: .constant(false), showSettings: .constant(false),
+            searchSheetDetent: .constant(.medium),
             documentOverride: nil, redactButtonDisabled: true, redactButtonHint: "",
             handleHomeTap: {}, homeButton: AnyView(EmptyView()), pipelineModePicker: AnyView(EmptyView()),
-            deleteSelectedRegions: {}
+            deleteSelectedRegions: {}, openSettings: {}
         )
         toolbar.resetCanvasTools()
         #expect(tool == nil)
@@ -101,5 +101,11 @@ struct DocumentEditorToolbarTests {
         return try String(
             contentsOf: repoRoot.appendingPathComponent(relativePath),
             encoding: .utf8)
+    }
+
+    @Test("Under VoiceOver the Rectangle tool says what to use instead")
+    func rectangleVoiceOverHint() {
+        #expect(DocumentEditorToolbar.rectangleVoiceOverHint
+                == "Drawing needs direct touch. Use Search or Scan.")
     }
 }

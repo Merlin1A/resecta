@@ -196,9 +196,10 @@ struct DocumentEditorHomeCloseTests {
     @Test("Wiring: the park keeps the session whole, Cancel's binding restores it, Close drops it, the sheet's teardown spares it (source pin)")
     func parkedSearchWiringSourcePin() throws {
         let home = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorView+Home.swift")
-        #expect(home.contains("parkedEditorSearch = search"), "the park keeps the session")
-        #expect(home.contains("func restoreParkedSearchIfNeeded()"))
-        #expect(home.contains("redactionState.activeSearch = parked"), "Cancel re-presents the same session")
+        let parking = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorView+SheetParking.swift")
+        #expect(parking.contains("parkedEditorSearch = search"), "the park keeps the session")
+        #expect(parking.contains("func restoreParkedSearchIfNeeded()"))
+        #expect(parking.contains("redactionState.activeSearch = parked"), "Cancel re-presents the same session")
         let binding = try #require(home.range(of: "var doneConfirmationPresented: Binding<Bool> {"))
         #expect(home[binding.upperBound...].contains("restoreParkedSearchIfNeeded()"),
                 "the dialog's binding restores it")

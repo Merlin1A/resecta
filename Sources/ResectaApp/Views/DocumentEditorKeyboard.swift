@@ -23,6 +23,16 @@ extension DocumentEditorView {
         }
         return (dx: 1 / size.width, dy: 1 / size.height)
     }
+
+    /// `rect` nudged by one step and clamped to the page. PDF Y is
+    /// bottom-left, so the up arrow (negative `dy` on screen) moves the
+    /// rect up the page.
+    static func nudgedRect(_ rect: CGRect, dx: CGFloat, dy: CGFloat) -> CGRect {
+        var rect = rect
+        rect.origin.x = max(0, min(rect.origin.x + dx, 1 - rect.width))
+        rect.origin.y = max(0, min(rect.origin.y - dy, 1 - rect.height))
+        return rect
+    }
 }
 
 /// The editor's key handling. Mounted once by `DocumentEditorView.body`;
@@ -32,6 +42,25 @@ struct DocumentEditorKeyboard: ViewModifier {
     @Environment(RedactionState.self) private var redactionState
     @Environment(\.undoManager) private var undoManager
     @Binding var activeTool: DocumentEditorView.DrawingTool?
+    @Binding var isMultiSelectActive: Bool
+    /// The nudge run in progress: its selection and its last key press.
+    @State private var nudgeRun: NudgeRun?
+
+    struct NudgeRun: Equatable {
+        let selection: Set<UUID>
+        let at: Date
+    }
+
+    /// How long after one nudge the next still belongs to its run.
+    static let nudgeRunWindow: TimeInterval = 1.0
+
+    /// A nudge continues the run, and registers no undo step of its own,
+    /// when it moves the same selection within the window: the run's first
+    /// step undoes to where the run began and redoes to where it ended.
+    static func nudgeContinuesRun(previous: NudgeRun?, selection: Set<UUID>, now: Date) -> Bool {
+        guard let previous else { return false }
+        return previous.selection == selection && now.timeIntervalSince(previous.at) < nudgeRunWindow
+    }
 
     func body(content: Content) -> some View {
         content.onKeyPress(phases: .down, action: handleKeyPress)
@@ -78,13 +107,17 @@ struct DocumentEditorKeyboard: ViewModifier {
             activeTool = nil
             return .handled
         }
+        if isMultiSelectActive {
+            isMultiSelectActive = false
+            return .handled
+        }
         return .ignored
     }
 
     private func handleSelectAllKey() -> KeyPress.Result {
         guard documentState.phaseKind == .editing else { return .ignored }
         let page = documentState.currentPageIndex
-        guard let pageRegions = redactionState.regions[page], !pageRegions.isEmpty else { return .ignored }
+        guard redactionState.canSelectAllOnPage(page), let pageRegions = redactionState.regions[page] else { return .ignored }
         redactionState.selectedRegionIDs = Set(pageRegions.map(\.id))
         return .handled
     }
@@ -104,22 +137,18 @@ struct DocumentEditorKeyboard: ViewModifier {
         let moves: [(id: UUID, newRect: CGRect)] = redactionState.selectedRegionIDs.compactMap { id in
             guard let regions = redactionState.regions[page],
                   let region = regions.first(where: { $0.id == id }) else { return nil }
-            var rect = region.normalizedRect
-            rect.origin.x += dx
-            // PDF Y is bottom-left, so up arrow (negative dy in screen) = positive in PDF
-            rect.origin.y -= dy
-            // Clamp to 0–1
-            rect.origin.x = max(0, min(rect.origin.x, 1 - rect.width))
-            rect.origin.y = max(0, min(rect.origin.y, 1 - rect.height))
-            return (id: id, newRect: rect)
+            return (id: id, newRect: DocumentEditorView.nudgedRect(region.normalizedRect, dx: dx, dy: dy))
         }
         guard !moves.isEmpty else { return .ignored }
-        if moves.count == 1 {
-            redactionState.moveRegion(moves[0].id, page: page,
-                                      newRect: moves[0].newRect, undoManager: undoManager)
-        } else {
-            redactionState.moveRegions(moves, page: page, undoManager: undoManager)
-        }
+        let now = Date()
+        let selection = redactionState.selectedRegionIDs
+        let undo = Self.nudgeContinuesRun(previous: nudgeRun, selection: selection, now: now) ? nil : undoManager
+        let moved = moves.count == 1
+            ? redactionState.moveRegion(moves[0].id, page: page, newRect: moves[0].newRect, undoManager: undo)
+            : redactionState.moveRegions(moves, page: page, undoManager: undo)
+        // A press held at the page edge moves nothing, so it neither starts
+        // nor extends a run: the next real move still records its step.
+        if moved { nudgeRun = NudgeRun(selection: selection, at: now) }
         return .handled
     }
 }

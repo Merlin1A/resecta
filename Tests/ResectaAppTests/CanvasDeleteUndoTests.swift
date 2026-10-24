@@ -91,7 +91,7 @@ struct CanvasDeleteUndoTests {
         coordinator.deleteRegion(deleted, page: 0)
         undo.endUndoGrouping()
         #expect(state.regions[0]?.count == 4)
-        #expect(undo.undoActionName == "Delete Redaction",
+        #expect(undo.undoActionName == "Delete Region",
                 "the delete is its own step (today the top step is still the apply)")
 
         undo.undo()   // the delete

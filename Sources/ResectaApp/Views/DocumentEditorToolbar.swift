@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import PDFKit
 import RedactionEngine
 
@@ -19,8 +20,8 @@ struct DocumentEditorToolbar {
     let undoManager: UndoManager?
     @Binding var activeTool: DocumentEditorView.DrawingTool?
     @Binding var isMultiSelectActive: Bool
-    @Binding var showBatchDeleteConfirmation: Bool
-    @Binding var showSettings: Bool
+    /// The search sheet's detent: every Scan or Search entry opens at medium.
+    @Binding var searchSheetDetent: PresentationDetent
     let documentOverride: PipelineMode?
     let redactButtonDisabled: Bool
     let redactButtonHint: String
@@ -28,10 +29,15 @@ struct DocumentEditorToolbar {
     let homeButton: AnyView
     let pipelineModePicker: AnyView
     let deleteSelectedRegions: () -> Void
+    /// Settings, parking the search sheet first when it is up.
+    let openSettings: () -> Void
 
     /// The one reset of the canvas tools: the draw tool off and Add to
     /// Selection off. The editor calls it when a different document
     /// replaces the open one, so neither carries into the new document.
+    /// The Rectangle tool's hint while VoiceOver is running.
+    static let rectangleVoiceOverHint = "Drawing needs direct touch. Use Search or Scan."
+
     func resetCanvasTools() {
         activeTool = nil
         isMultiSelectActive = false
@@ -70,6 +76,9 @@ struct DocumentEditorToolbar {
             .accessibilityIdentifier("drawTool")
             .accessibilityValue(activeTool == .rectangle
                                 ? "Drawing mode active" : "Tap to enter drawing mode")
+            // A drag cannot draw under VoiceOver: the tool is off, and says why.
+            .disabled(UIAccessibility.isVoiceOverRunning)
+            .accessibilityHint(UIAccessibility.isVoiceOverRunning ? Self.rectangleVoiceOverHint : "")
 
             // Two peer entry points into the one search-and-scan sheet
             // (two interfaces over one chassis). Both open the same
@@ -85,6 +94,7 @@ struct DocumentEditorToolbar {
                 let state = SearchState()
                 state.searchModeType = .piiScan
                 state.pendingAutoRunScan = true
+                searchSheetDetent = .medium
                 redactionState.activeSearch = state
             }
             .disabled(documentState.phaseKind != .editing
@@ -97,6 +107,7 @@ struct DocumentEditorToolbar {
             // [Search] opens the literal-search interface. A fresh
             // SearchState defaults to `.text` — the Search side.
             Button("Search", systemImage: "magnifyingglass") {
+                searchSheetDetent = .medium
                 redactionState.activeSearch = SearchState()
             }
             .disabled(documentState.phaseKind != .editing
@@ -197,7 +208,7 @@ struct DocumentEditorToolbar {
     @ViewBuilder
     private var settingsButton: some View {
         Button("Settings", systemImage: "gearshape") {
-            showSettings = true
+            openSettings()
         }
         .accessibilityIdentifier("settings-button")
     }
@@ -259,24 +270,18 @@ struct DocumentEditorToolbar {
     private var deleteButton: some View {
         let count = redactionState.selectedRegionIDs.count
         if count > 0 {
-            Button(deleteButtonLabel, systemImage: "trash") {
-                // Batch delete confirmation for multi-selection
-                if count > 1 {
-                    showBatchDeleteConfirmation = true
-                } else {
-                    deleteSelectedRegions()
-                }
-            }
+            // Deletes at once, any count: one Undo step restores them all.
+            Button(deleteButtonLabel, systemImage: "trash") { deleteSelectedRegions() }
             .tint(.red)
-            .keyboardShortcut(.delete, modifiers: [])
+            // Command-Delete: a bare Delete key belongs to the text field it edits.
+            .keyboardShortcut(.delete, modifiers: [.command])
         }
     }
 
     // "More" menu that bundles batch operations on the active
     // selection. Visible only when `selectedRegionIDs.isEmpty == false`,
     // gated by `batchOpsMenuShouldShow(selectedCount:)`. "Delete Selected"
-    // routes through the existing `showBatchDeleteConfirmation` dialog
-    // so the page-span message applies to this entry too.
+    // deletes at once, like the toolbar's Delete; Undo restores them.
     @ViewBuilder
     private var batchOpsMenu: some View {
         let selectedCount = redactionState.selectedRegionIDs.count
@@ -287,12 +292,12 @@ struct DocumentEditorToolbar {
                 Button("Select All on Page", systemImage: "checkmark.circle") {
                     redactionState.selectedRegionIDs = Set(pageRegions.map(\.id))
                 }
-                .disabled(selectedCount == pageRegions.count)
+                .disabled(!redactionState.canSelectAllOnPage(page))
                 Button("Deselect", systemImage: "xmark.circle") {
                     redactionState.selectedRegionIDs = []
                 }
                 Button(role: .destructive) {
-                    showBatchDeleteConfirmation = true
+                    deleteSelectedRegions()
                 } label: {
                     Label("Delete Selected", systemImage: "trash")
                 }
@@ -306,32 +311,27 @@ struct DocumentEditorToolbar {
     // "Select More" toolbar toggle. While on, a tap on a region
     // adds to selection rather than replacing it — iPhone parity for
     // the iPad Shift+tap path. Visible only when the current page has
-    // regions to select. Count surfaces in the label so the user sees
-    // the running selection size without opening a separate badge.
+    // regions to select; it turns off on a page with none.
     @ViewBuilder
     private var selectMoreToggle: some View {
         let page = documentState.currentPageIndex
-        let pageRegionCount = redactionState.regions[page]?.count ?? 0
-        let selectedCount = redactionState.selectedRegionIDs.count
-        if pageRegionCount > 0 {
-            Button {
-                isMultiSelectActive.toggle()
-                // Mutual exclusion with the Rectangle tool:
-                // whichever was activated last wins.
-                if isMultiSelectActive { activeTool = nil }
-            } label: {
-                Label(
-                    RedactionOverlayView.selectMoreToggleLabel(selectedCount: selectedCount),
-                    systemImage: isMultiSelectActive
-                        ? "checkmark.square.fill"
-                        : "checkmark.square"
-                )
+        if (redactionState.regions[page]?.count ?? 0) > 0 {
+            // A Toggle row: its own On/Off state is the value VoiceOver
+            // reads. Mutual exclusion with the Rectangle tool: whichever
+            // was turned on last wins.
+            Toggle(isOn: Binding(
+                get: { isMultiSelectActive },
+                set: { on in
+                    isMultiSelectActive = on
+                    if isMultiSelectActive { activeTool = nil }
+                }
+            )) {
+                Label(RedactionOverlayView.selectMoreToggleTitle, systemImage: "checkmark.square")
             }
+            // Teal only while on: the Redact button stays the one brand-tint
+            // literal in the toolbar.
             .tint(isMultiSelectActive ? ResectaTokens.BrandTeal.tint : nil)
             .accessibilityIdentifier("selectMoreToggle")
-            .accessibilityValue(isMultiSelectActive
-                                ? "On. Tapping a region adds it to the selection."
-                                : "Off. Tapping a region replaces the selection.")
         }
     }
 
@@ -347,7 +347,7 @@ struct DocumentEditorToolbar {
                     redactionState.selectedRegionIDs = Set(
                         (redactionState.regions[page] ?? []).map(\.id))
                 }
-                .disabled(selectedCount == pageRegionCount)
+                .disabled(!redactionState.canSelectAllOnPage(page))
                 if selectedCount > 0 {
                     Button("Deselect All", systemImage: "xmark.circle") {
                         redactionState.selectedRegionIDs = []
