@@ -282,21 +282,22 @@ struct DrawWinsTests {
 
     // MARK: - Source contract
 
-    @Test("applyResizeSnapping posts the 'Aligned to guide' VoiceOver announcement like applySnapping — the draw path snaps through it too (source pin)")
+    @Test("Both snap paths, the move's and the resize/draw path's, report a held guide through one place that posts 'Aligned to guide' under VoiceOver (source pin)")
     func testResizeSnapAnnouncesGuideAlignment() throws {
         let source = try loadRepoFile("Sources/ResectaApp/Overlay/SnapGuideEngine.swift")
-        guard let start = source.range(of: "func applyResizeSnapping("),
+        guard let start = source.range(of: "private func noteGuides("),
               let end = source.range(of: "// MARK: - Reset",
                                      range: start.upperBound..<source.endIndex)
         else {
-            Issue.record("Could not locate applyResizeSnapping")
+            Issue.record("Could not locate noteGuides")
             return
         }
         let body = source[start.upperBound..<end.lowerBound]
         #expect(body.contains("UIAccessibility.isVoiceOverRunning"),
-                "the announcement must be gated on VoiceOver, as in applySnapping")
-        #expect(body.contains("argument: \"Aligned to guide\""),
-                "the resize/draw snap path must post the same announcement the move path posts")
+                "the announcement is gated on VoiceOver")
+        #expect(body.contains("argument: \"Aligned to guide\""))
+        #expect(source.components(separatedBy: "noteGuides(guides)").count - 1 == 2,
+                "applySnapping and applyResizeSnapping both report through it")
     }
 
     private func loadRepoFile(_ relativePath: String, file: StaticString = #filePath) throws -> String {

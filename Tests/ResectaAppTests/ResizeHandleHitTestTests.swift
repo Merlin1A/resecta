@@ -105,7 +105,7 @@ struct ResizeHandleHitTestTests {
         )
     }
 
-    @Test("Region at the true resize floor (10×10): clamp never regresses below the pre-fix 22pt")
+    @Test("A 10×10 region: clamp never regresses below the pre-fix 22pt")
     func clampFloorsAt22ForTinyRegions() {
         // min(width,height) = 10 -> 10/2 = 5 -> max(22,5) = 22 -> min(46,22) = 22 (half-width 11).
         // Unaffected by the 44->46 target bump — 22 wins either way.

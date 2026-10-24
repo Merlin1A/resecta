@@ -3,9 +3,9 @@ import RedactionEngine
 
 // The move and group-move helpers, moved out of `RedactionOverlayView.swift`
 // (the hub) from its `// MARK: - Move Helpers` seam: beginning a move on a
-// selected region, beginning a group move, updating either as the finger
-// travels, ending a group move, and committing an Add to Selection toggle on
-// lift. The hub's touch handling calls them. The drag state they read and
+// selected region, beginning a group move, the start slop every move, group
+// move and resize waits out, updating either as the finger travels, ending a
+// group move, and committing an Add to Selection toggle on lift. The hub's touch handling calls them. The drag state they read and
 // write is stored on the hub (an extension adds no storage).
 
 extension RedactionOverlayView {
@@ -18,6 +18,7 @@ extension RedactionOverlayView {
             height: point.y - viewRect.origin.y
         )
         preDragNormalizedRect = region.normalizedRect
+        dragStartPoint = point
         isDraggingExistingRegion = true
         isActivelyDragging = true
         moveCommitFeedback.prepare()
@@ -30,11 +31,28 @@ extension RedactionOverlayView {
         for region in regions where selectedIDs.contains(region.id) {
             preDragGroupRects[region.id] = region.normalizedRect
         }
-        groupMoveStart = point
+        dragStartPoint = point
         groupMoveTouchedID = touchedID
         isGroupMoving = true
         isActivelyDragging = true
         moveCommitFeedback.prepare()
+    }
+
+    /// The start slop, in screen points: a move, a group move or a resize
+    /// changes nothing until the finger has travelled this far from where it
+    /// went down, so a tap that drifts is a tap; from then on it follows the
+    /// finger, and only then does its lift commit.
+    static let startSlop: CGFloat = 4
+
+    /// True once the finger has travelled past the start slop from
+    /// `dragStartPoint` (or when there is none); it stays true for the drag.
+    func passStartSlop(to point: CGPoint) -> Bool {
+        if !hasPassedStartSlop, let start = dragStartPoint {
+            hasPassedStartSlop = hypot(point.x - start.x, point.y - start.y) >= Self.startSlop * fingerScale
+        } else {
+            hasPassedStartSlop = true
+        }
+        return hasPassedStartSlop
     }
 
     /// With Add to Selection on, a touch on a region edits the selection
@@ -67,7 +85,7 @@ extension RedactionOverlayView {
     /// delta moves every member, clamped so the group's union stays on
     /// the page: an edge stops the whole group, keeping its spacing.
     func updateGroupMove(to point: CGPoint) {
-        guard let start = groupMoveStart else { return }
+        guard passStartSlop(to: point), let start = dragStartPoint else { return }
         var union = CGRect.null
         for region in regions where selectedIDs.contains(region.id) {
             if let originalNorm = preDragGroupRects[region.id] {
@@ -87,7 +105,7 @@ extension RedactionOverlayView {
 
     /// Update the selected region's position during a move drag.
     func updateSelectedRegionForMove(to point: CGPoint) {
-        guard let selectedID,
+        guard passStartSlop(to: point), let selectedID,
               let idx = regions.firstIndex(where: { $0.id == selectedID })
         else { return }
 
@@ -108,8 +126,11 @@ extension RedactionOverlayView {
 
         var newRect = CGRect(origin: newOrigin, size: regionSize)
 
-        // Apply snap guides during move
+        // Apply snap guides during move, then keep the region on the page:
+        // a guide near the edge may pull it past.
         newRect = snapEngine.applySnapping(to: newRect, excluding: selectedID, in: snapPage)
+        newRect.origin = CGPoint(x: max(0, min(newRect.minX, bounds.width - newRect.width)),
+                                 y: max(0, min(newRect.minY, bounds.height - newRect.height)))
 
         regions[idx].normalizedRect = overlayToPDFNormalized(newRect)
 

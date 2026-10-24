@@ -102,8 +102,11 @@ class RedactionOverlayView: UIView {
     var isGroupMoving: Bool = false
     /// Pre-drag normalized rects for all regions in the group move, for cancel restoration.
     var preDragGroupRects: [UUID: CGRect] = [:]
-    /// Touch start point for computing group move delta.
-    var groupMoveStart: CGPoint?
+    /// Where the touch went down for a move, a group move or a resize: the
+    /// start slop and the grab offset read it.
+    var dragStartPoint: CGPoint?
+    /// True once the finger has travelled past the start slop (`+Move`).
+    var hasPassedStartSlop = false
     /// The member the group move's touch landed on.
     var groupMoveTouchedID: UUID?
     /// The region an Add to Selection touch landed on, toggled on lift.
@@ -152,14 +155,9 @@ class RedactionOverlayView: UIView {
     /// Minimum drag distance (in points) before creating a region.
     /// Prevents accidental taps from creating tiny regions.
     private static let minimumDragThreshold: CGFloat = 8.0
-    // Minimum committed region size (overlay points). Prevents accidental
-    // taps from creating invisible regions. Separate from minimumDragThreshold
-    // (which prevents drag start); this rejects valid drags that produce too-small regions.
-    static let minimumCommittedRegionSize: CGFloat = 20.0
-
-    // The notice when the committed rect falls below
-    // `minimumCommittedRegionSize` on either axis: on screen and spoken. It
-    // names the remedy, not the floor, since the floor is in screen points.
+    // The notice when a drawn band falls below the size floor
+    // (`RegionSizeFloor`): on screen and spoken. It names the remedy, not
+    // the floor, since the floor is in screen points.
     static let subThresholdRejectionAnnouncement =
         "Region too small. Zoom in to draw a smaller region."
 
@@ -225,9 +223,6 @@ class RedactionOverlayView: UIView {
         case (false, false): return .topLeft
         }
     }
-
-    /// Minimum region dimension in overlay points.
-    static let minimumRegionSize: CGFloat = 10.0
 
     /// Prepared haptic generator for sub-threshold rejection feedback.
     private lazy var rejectionFeedback: UIImpactFeedbackGenerator = {
@@ -420,6 +415,7 @@ class RedactionOverlayView: UIView {
         if let handle = hitTestResizeHandle(at: point) {
             activeResizeHandle = handle
             preResizeNormalizedRect = selectedID.flatMap { id in regions.first { $0.id == id }?.normalizedRect }
+            dragStartPoint = point
             isActivelyDragging = true
             return
         }
@@ -601,7 +597,7 @@ class RedactionOverlayView: UIView {
         }
 
         // Commit single move
-        if isDraggingExistingRegion, let id = selectedID,
+        if isDraggingExistingRegion, hasPassedStartSlop, let id = selectedID,
            let region = regions.first(where: { $0.id == id }) {
             moveCommitFeedback.impactOccurred()
             coordinator?.commitMove(id, page: pageIndex,
@@ -611,7 +607,7 @@ class RedactionOverlayView: UIView {
         }
 
         // Commit resize
-        if activeResizeHandle != nil, let id = selectedID,
+        if activeResizeHandle != nil, hasPassedStartSlop, let id = selectedID,
            let region = regions.first(where: { $0.id == id }) {
             moveCommitFeedback.impactOccurred(intensity: 0.4)  // a light tick: the resize landed
             coordinator?.commitResize(id, page: pageIndex,
@@ -623,10 +619,12 @@ class RedactionOverlayView: UIView {
         // Commit new region
         guard let rect = currentDragRect else { return }
 
-        // Reject sub-threshold regions (< 20×20pt in overlay space).
-        // Animate shrink-to-center + fade, soft haptic, VoiceOver announcement.
-        let floor = Self.minimumCommittedRegionSize * fingerScale
-        if rect.width < floor || rect.height < floor {
+        // Reject a band under the size floor, judged on the band the finger
+        // drew (before the guides and the page clamp), so a guide never lifts
+        // it over: shrink-to-centre + fade, soft haptic, announcement.
+        let lift = primaryTouch.location(in: self)
+        let finger = dragOrigin.map { CGSize(width: abs(lift.x - $0.x), height: abs(lift.y - $0.y)) } ?? rect.size
+        if !RegionSizeFloor.admits(finger, fingerScale: fingerScale) {
             rejectSubThresholdRegion(rect)
             return
         }
@@ -685,7 +683,8 @@ class RedactionOverlayView: UIView {
         // Group move cleanup
         isGroupMoving = false
         preDragGroupRects = [:]
-        groupMoveStart = nil
+        dragStartPoint = nil
+        hasPassedStartSlop = false
         groupMoveTouchedID = nil
         pendingToggleID = nil
         // Snap state cleanup

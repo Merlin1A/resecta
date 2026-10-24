@@ -154,22 +154,21 @@ struct RectangleDrawGestureTests {
 
     @Test("The far edge snaps to a neighbour's edge while the origin corner stays put")
     func testFarEdgeSnapsWithoutMovingTheOrigin() {
-        // Neighbour whose LEFT edge sits at x = 206, 6 pt short of the
-        // drag's far edge (212) and nearer than the page-centre line (200,
-        // 12 pt away). Its y-extent (340…380) and its other x-targets
-        // (246, 286) are ≥ 10 pt clear of every edge of the drag.
+        // Neighbour beside the band (its y-extent 120…160 inside the
+        // band's 60…180) whose LEFT edge sits at x = 209, 3 pt short of the
+        // drag's far edge (212), inside the 5-pt reach; its right edge (289)
+        // and its top and bottom are clear of every edge of the drag.
         let neighbour = RedactionRegion.mock(
-            rect: CGRect(x: 0.515, y: 0.05, width: 0.2, height: 0.1)
+            rect: CGRect(x: 0.5225, y: 0.6, width: 0.2, height: 0.1)
         )
         let (overlay, coordinator) = makeOverlay(regions: [neighbour])
         drag(overlay, from: CGPoint(x: 60, y: 60), through: [CGPoint(x: 212, y: 180)])
 
         #expect(coordinator.addedRegions.count == 1)
         guard let committed = coordinator.addedRegions.first?.normalizedRect else { return }
-        // The old translating snapper shifted the whole band by −6
-        // (minX 60 → 54). The anchored snapper moves only the far edge.
+        // The anchored snapper moves only the far edge.
         expectClose(committed.minX, 60.0 / 400.0, "minX (origin corner)")
-        expectClose(committed.maxX, 206.0 / 400.0, "maxX (snapped far edge)")
+        expectClose(committed.maxX, 209.0 / 400.0, "maxX (snapped far edge)")
         expectClose(committed.minY, 1.0 - 180.0 / 400.0, "minY")
         expectClose(committed.maxY, 1.0 - 60.0 / 400.0, "maxY")
     }
@@ -180,8 +179,8 @@ struct RectangleDrawGestureTests {
         // edge is at x = 126 sits 3.5 pt from that midpoint — the old
         // translating snapper matched `midX` and shifted the whole band by
         // +3.5. The anchored snapper only considers the finger's edges
-        // (185: nearest target is the page centre at 200, 15 pt away, out
-        // of band), so nothing moves.
+        // (185: the neighbour's edges are 126 and 326, out of reach), so
+        // nothing moves.
         let neighbour = RedactionRegion.mock(
             rect: CGRect(x: 0.315, y: 0.05, width: 0.5, height: 0.1)
         )
@@ -324,5 +323,55 @@ struct RectangleDrawGestureTests {
     func drawingToolMapsToRectangle() {
         #expect(DocumentEditorView.shapeTool(for: nil) == .rectangle)
         #expect(DocumentEditorView.shapeTool(for: .rectangle) == .rectangle)
+    }
+
+    // MARK: - Quieter guides (the snap engine)
+
+    /// A snap page of boxes given in overlay points (top-left origin) on a
+    /// 400 × 400 overlay at zoom 1.
+    private static func snapPage(_ rects: [CGRect]) -> (page: SnapGuideEngine.Page, ids: [UUID]) {
+        let size = overlaySize
+        let regions = rects.map { r in
+            RedactionRegion(id: UUID(), normalizedRect: CGRect(
+                x: r.minX / size.width, y: 1 - r.maxY / size.height,
+                width: r.width / size.width, height: r.height / size.height), source: .manual)
+        }
+        let page = SnapGuideEngine.Page(
+            regions: regions, bounds: CGRect(origin: .zero, size: size), fingerScale: 1,
+            toOverlay: { n in CGRect(x: n.minX * size.width, y: (1 - n.maxY) * size.height,
+                                     width: n.width * size.width, height: n.height * size.height) })
+        return (page, regions.map(\.id))
+    }
+
+    @Test("A box moved 3 points in a stack of one-line boxes at a 7.7-point pitch follows the finger within half a point")
+    func testStackMoveFollowsTheFinger() {
+        let rows = (0..<6).map { CGRect(x: 100, y: 100 + 7.7 * CGFloat($0), width: 100, height: 5) }
+        let (page, ids) = Self.snapPage(rows)
+        let moved = rows[2].offsetBy(dx: 0, dy: 3)
+        let snapped = SnapGuideEngine().applySnapping(to: moved, excluding: ids[2], in: page)
+        #expect(abs(snapped.minY - moved.minY) <= 0.5, "moved to \(moved.minY), snapped to \(snapped.minY)")
+    }
+
+    @Test("The nearest edge wins: a bottom edge 1 point from a neighbour's edge snaps, not a top edge 4 points from another")
+    func testNearestEdgeWins() {
+        let above = CGRect(x: 100, y: 80, width: 100, height: 16)    // its bottom at 96
+        let below = CGRect(x: 100, y: 131, width: 100, height: 20)   // its top at 131
+        let (page, _) = Self.snapPage([above, below])
+        let moving = CGRect(x: 120, y: 100, width: 60, height: 30)  // top 100 (4 from 96), bottom 130 (1 from 131)
+        let snapped = SnapGuideEngine().applySnapping(to: moving, excluding: nil, in: page)
+        #expect(abs(snapped.maxY - 131) < 1e-6 && abs(snapped.height - 30) < 1e-6, "snapped \(snapped)")
+    }
+
+    @Test("No guide at the page margins or the page centre; only boxes beside the moving one on the other axis")
+    func testOnlyEdgesOfBoxesBeside() {
+        let (empty, _) = Self.snapPage([])
+        let nearMargin = CGRect(x: 19, y: 19, width: 60, height: 30)  // 3 from the 16-point margins
+        #expect(SnapGuideEngine().applySnapping(to: nearMargin, excluding: nil, in: empty) == nearMargin)
+        let nearCentre = CGRect(x: 100, y: 198, width: 60, height: 30)  // its top 2 from the centre line (200)
+        #expect(SnapGuideEngine().applySnapping(to: nearCentre, excluding: nil, in: empty) == nearCentre)
+        // A box far to the right shares no x-range with the moving one: its top edge 2 points off is no target.
+        let (farRight, _) = Self.snapPage([CGRect(x: 300, y: 102, width: 60, height: 20)])
+        let moving = CGRect(x: 100, y: 100, width: 60, height: 30)
+        #expect(SnapGuideEngine().applySnapping(to: moving, excluding: nil, in: farRight) == moving)
     }
 }
