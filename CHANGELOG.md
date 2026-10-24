@@ -223,6 +223,8 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - A tap on a selected region no longer moves or reshapes it, and a resize keeps the edge where it was grabbed.
 - A region moved against the page edge stays on the page when it aligns to a guide.
 - When zoomed in, dragging a selected region moves it instead of scrolling the page; two fingers scroll.
+- The zoom you set stays when the search sheet is raised, parked or dismissed, and when you move to another page.
+- VoiceOver reaches each redaction region on the page, the whole-page region included.
 
 ### Internal
 

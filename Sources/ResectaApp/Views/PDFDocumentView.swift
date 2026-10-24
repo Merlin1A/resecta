@@ -429,6 +429,19 @@ final class FitFlooredPDFView: PDFView {
 }
 
 extension FitFlooredPDFView {
+    /// VoiceOver reaches the canvas's regions. Each page's overlay builds
+    /// one element per region, but the page view PDFKit hosts the overlay
+    /// in serves none of them; this view serves its own content (PDFKit's
+    /// answer, else its subviews) followed by the overlays it hosts.
+    override var accessibilityElements: [Any]? {
+        get { (super.accessibilityElements ?? subviews) + Self.regionOverlays(in: self) }
+        set { super.accessibilityElements = newValue }
+    }
+
+    private static func regionOverlays(in view: UIView) -> [RedactionOverlayView] {
+        view.subviews.flatMap { ($0 as? RedactionOverlayView).map { [$0] } ?? regionOverlays(in: $0) }
+    }
+
     /// The double tap's one delegate: a touch the canvas overlay claims (a
     /// region, a handle, every draw and Add to Selection touch) is never a
     /// double tap; a touch on the page is. PDFKit's own recognizers keep
