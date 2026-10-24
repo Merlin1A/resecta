@@ -75,11 +75,14 @@ extension VerificationEngine {
     }
 
     /// Per-page Layer-2 verdict. Classified per page with priority
-    /// `sensitiveTermInRegion > textInRegion > fillArtifactInRegion >
-    /// sensitiveTermOutsideRegions > textOutsideRegionsOnly > none`; the
-    /// cross-page layer fold (`foldLayer2PageOutcomes`) then places the
-    /// attention and warnable out-of-region arms ahead of the fill-artifact
-    /// note — see the priority-fold comment there.
+    /// `sensitiveTermInRegion > textInRegion > sensitiveTermOutsideRegions >
+    /// sensitiveTermFragmentBesideRegion > fillArtifactInRegion >
+    /// textOutsideRegionsOnly > none`: on one page a redacted term read
+    /// whole or in part outside every box outranks the fill-artifact note,
+    /// so a surviving occurrence is never folded into a note the report
+    /// aggregate reads as a pass. The cross-page layer fold
+    /// (`foldLayer2PageOutcomes`) keeps the same order — see the
+    /// priority-fold comment there.
     /// `fillArtifactInRegion` (Part A) is an in-region OCR hit proven to be a
     /// Vision hallucination off the SOLID fill — it DEMOTES the would-be
     /// FAIL/WARN to an informational note, and never silences a hit: it
@@ -186,6 +189,11 @@ extension VerificationEngine {
             var hitHasReadableInRegionBox = false
             var hitHasFillArtifactInRegionBox = false
             var hitHasOutOfRegionBox = false
+            // A fill-demoted box that still reaches outside every region
+            // (`straddleOutsideFraction`): its line is read for the whole
+            // term too, so an occurrence printed past the box's edge is never
+            // folded into the fill note.
+            var hitHasStraddleOutside = false
 
             for (index, box) in boxes.enumerated() {
                 // One word box over the bar pulls the hit in — the shared
@@ -202,6 +210,9 @@ extension VerificationEngine {
                     let fillConsistent = index < samples.count && isFillConsistent(samples[index])
                     if fillConsistent {
                         hitHasFillArtifactInRegionBox = true
+                        if outsideFraction(of: box, regions: pageRegions) >= straddleOutsideFraction {
+                            hitHasStraddleOutside = true
+                        }
                     } else {
                         hitHasReadableInRegionBox = true
                     }
@@ -222,7 +233,7 @@ extension VerificationEngine {
             // signal to its own bucket on both page modes and the fold reports
             // ATTENTION; `outsideRegionTermTexts` re-walks the same geometry for
             // the term texts the results row names.
-            if hitHasOutOfRegionBox,
+            if hitHasOutOfRegionBox || hitHasStraddleOutside,
                hit.confidence >= sensitiveTermFailConfidenceThreshold,
                let text = hit.text,
                validTerms.contains(where: { containsTerm(text, $0) }) {
@@ -260,43 +271,74 @@ extension VerificationEngine {
             if sawSensitiveTermFragmentBesideRegion { return .textInRegionAndSensitiveTermFragmentBesideRegion }
             return .textInRegion
         }
-        // A whole surviving occurrence says more than a fragment. The fill
-        // note keeps its place ahead of the whole-term arm on the same page,
-        // as it did before the fragment arm existed; it never masks the
-        // fragment arm — the shape a box short of its glyphs leaves.
-        if sawSensitiveTermOutsideRegions, !sawFillArtifactInRegion { return .sensitiveTermOutsideRegions }
+        // A whole surviving occurrence says more than a fragment, and both
+        // say more than the fill note: a page that carries a readable
+        // occurrence of a redacted term beside a fill artifact reports the
+        // term (ATTENTION), never the note (INFO) — the aggregate counts a
+        // note as a pass, so the fill note masking the term read as a PASS
+        // on an output where the term was still readable. The fill note
+        // keeps its place ahead of the page's own outside text only.
+        if sawSensitiveTermOutsideRegions { return .sensitiveTermOutsideRegions }
         if sawSensitiveTermFragmentBesideRegion { return .sensitiveTermFragmentBesideRegion }
         if sawFillArtifactInRegion { return .fillArtifactInRegion }
         if sawTextOutsideRegions { return .textOutsideRegionsOnly }
         return .none
     }
 
-    /// The shortest fragment of a term the edge rule reads: three
-    /// characters (the shared searchable-term floor), and never the whole
-    /// term (that is `containsTerm`'s case).
+    /// The residue length from which the edge rule reads the END of the OCR
+    /// line as the fragment: three characters (the shared searchable-term
+    /// floor). A shorter residue — one or two characters, or the fragment of
+    /// a three-character term — counts only when it is the WHOLE word beside
+    /// the box, so a line that merely ends in a letter of the term is not a
+    /// fragment. Never the whole term (that is `containsTerm`'s case).
     static let fragmentMinimumLength = 3
 
+    /// The separators the fragment comparison ignores on both sides: a
+    /// space, the hyphens, the soft hyphen and the zero-width characters —
+    /// the marks a box edge, a line break or OCR may add or drop.
+    static let fragmentSeparators: Set<Character> = [
+        " ", "\u{00A0}", "-", "\u{2010}", "\u{2011}", "\u{2012}", "\u{2013}", "\u{2014}", "\u{2212}",
+        "\u{00AD}", "\u{200B}", "\u{200C}", "\u{200D}", "\u{2060}", "\u{FEFF}",
+    ]
+
+    /// `text` in the search path's normalized form, lowercased, minus the
+    /// separators.
+    static func fragmentFold(_ text: String) -> [Character] {
+        TextNormalizer.normalize(text).lowercased().filter { !fragmentSeparators.contains($0) }
+    }
+
     /// A fragment of `term` at the edge of a box: `text` (the OCR line, in
-    /// the search path's normalized form, case-insensitive) ENDS with a
-    /// prefix of the term and the line's box ends within one line height
-    /// before a region it overlaps vertically, or BEGINS with a suffix of
-    /// the term and the box begins within one line height after such a
-    /// region. Boxes and regions share the normalized bottom-left space.
+    /// the search path's normalized form, case-insensitive, separators
+    /// ignored on both sides) ENDS with a proper prefix of the term and the
+    /// line's box ends within one line height before a region it overlaps
+    /// vertically, or BEGINS with a proper suffix of the term and the box
+    /// begins within one line height after such a region. A residue shorter
+    /// than `fragmentMinimumLength` must be the whole word beside the box.
+    /// Boxes and regions share the normalized bottom-left space.
     static func fragmentBesideRegion(
         text: String, box: CGRect, term: SensitiveTerm, pageRegions: [RedactionRegion]
     ) -> Bool {
-        let line = Array(TextNormalizer.normalize(text).lowercased().trimmingCharacters(in: .whitespacesAndNewlines))
-        let whole = Array(TextNormalizer.normalize(term.text).lowercased())
-        guard whole.count > fragmentMinimumLength, line.count >= fragmentMinimumLength else { return false }
+        let normalizedLine = TextNormalizer.normalize(text).lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        let line = fragmentFold(normalizedLine)
+        let whole = fragmentFold(term.text)
+        guard whole.count >= 2, !line.isEmpty else { return false }
         let longest = min(line.count, whole.count - 1)
+        guard longest >= 1 else { return false }
+        let words = normalizedLine.split(whereSeparator: { $0.isWhitespace }).map { fragmentFold(String($0)) }.filter { !$0.isEmpty }
+        let lastWord = words.last ?? []
+        let firstWord = words.first ?? []
         var endsWithPrefix = false
         var beginsWithSuffix = false
-        if longest >= fragmentMinimumLength {
-            for length in stride(from: longest, through: fragmentMinimumLength, by: -1) {
-                if !endsWithPrefix, line.suffix(length).elementsEqual(whole.prefix(length)) { endsWithPrefix = true }
-                if !beginsWithSuffix, line.prefix(length).elementsEqual(whole.suffix(length)) { beginsWithSuffix = true }
-                if endsWithPrefix && beginsWithSuffix { break }
+        for length in stride(from: longest, through: 1, by: -1) {
+            let prefix = whole.prefix(length)
+            let suffix = whole.suffix(length)
+            if !endsWithPrefix, line.suffix(length).elementsEqual(prefix) {
+                endsWithPrefix = length >= fragmentMinimumLength || lastWord.elementsEqual(prefix)
             }
+            if !beginsWithSuffix, line.prefix(length).elementsEqual(suffix) {
+                beginsWithSuffix = length >= fragmentMinimumLength || firstWord.elementsEqual(suffix)
+            }
+            if endsWithPrefix && beginsWithSuffix { break }
         }
         guard endsWithPrefix || beginsWithSuffix, box.height > 0 else { return false }
         let reach = box.height
@@ -342,6 +384,22 @@ extension VerificationEngine {
     /// by a sliver is not in-region; a box substantially inside (a paint
     /// miss) still is. Shared by `classifyPageOCR` and `outsideRegionTermTexts`
     /// so the verdict and the term texts read the SAME geometry.
+    /// The share of a box's own area a fill-demoted box may keep outside
+    /// every region before its line is read for the whole term as well
+    /// (2026-10-22): above it the box reaches past the bar's edge into
+    /// printed space — a sample of the in-region portion alone would fold a
+    /// term printed there into the fill note, which counts as a pass. Below
+    /// it is the rounding sliver a hallucination box leaves at the bar's edge.
+    static let straddleOutsideFraction: CGFloat = 0.10
+
+    /// The share of `box` outside every region: one minus its largest
+    /// coverage by any one region. 0 for a degenerate box.
+    static func outsideFraction(of box: CGRect, regions: [RedactionRegion]) -> CGFloat {
+        guard box.width > 0, box.height > 0 else { return 0 }
+        let inside = regions.map { coverageFraction(of: box, inside: $0.normalizedRect) }.max() ?? 0
+        return max(0, 1 - inside)
+    }
+
     static func boxLiesInRegion(_ box: CGRect, of pageRegions: [RedactionRegion]) -> Bool {
         pageRegions.contains { region in
             coverageFraction(of: box, inside: region.normalizedRect) >= inRegionCoverageThreshold
@@ -369,7 +427,12 @@ extension VerificationEngine {
             guard hit.confidence >= sensitiveTermFailConfidenceThreshold,
                   let text = hit.text else { continue }
             let boxes = inRegionCandidateBoxes(of: hit)
-            guard boxes.contains(where: { !boxLiesInRegion($0, of: pageRegions) }) else { continue }
+            let samples = hit.boxFill
+            guard boxes.enumerated().contains(where: { index, box in
+                !boxLiesInRegion(box, of: pageRegions)
+                    || (index < samples.count && isFillConsistent(samples[index])
+                        && outsideFraction(of: box, regions: pageRegions) >= straddleOutsideFraction)
+            }) else { continue }
             for term in validTerms where containsTerm(text, term) && seen.insert(term.text).inserted {
                 texts.append(term.text)
             }

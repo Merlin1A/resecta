@@ -176,33 +176,61 @@ struct Layer3BoundaryAndMaskingTests {
             filterDigests: [], perPageModes: [.secureRasterization])
     }
 
-    @Test("A term trailing a longer name token is a fragment WARN, not a FAIL")
+    @Test("A term inside a name token is the file's syntax: no structural result (a fragment WARN before 2026-10-22)")
     func trailingFragmentDemotedToWarn() async throws {
-        // The sample-doc Layer 3 false positive: "Name" inside "/FontName "
-        // was a complete token under the one-sided (following-byte) rule.
-        // Two-sided: 't' precedes the match → fragment.
         let (doc, url) = try TestFixtures.writeTempPDF(
             TestFixtures.withMetadataRaw(infoDictBody: "/FontName (x)"),
             prefix: "l3_twosided_")
         defer { try? FileManager.default.removeItem(at: url) }
         let result = await runLayer3(doc, terms: [SensitiveTerm(text: "Name")])
-        #expect(!result.status.isFail,
-                "match embedded at a token tail must not FAIL; got \(result.status)")
-        #expect(result.status.isWarn,
-                "fragment collision keeps the WARN tier; got \(result.status)")
+        #expect(result.status.isPass, "a match outside every string object is no structural result; got \(result.status)")
     }
 
-    @Test("A genuine delimiter-bounded token still FAILs")
+    @Test("A delimiter-bounded name object is the file's syntax: no structural result; the same word in a string object FAILs")
     func delimiterBoundedTokenStillFails() async throws {
-        // '/' is a PDF delimiter — a literal /Name name-object is a
-        // complete token on both sides.
-        let (doc, url) = try TestFixtures.writeTempPDF(
+        let (named, url) = try TestFixtures.writeTempPDF(
             TestFixtures.withMetadataRaw(infoDictBody: "/Marker /Name"),
             prefix: "l3_nametoken_")
         defer { try? FileManager.default.removeItem(at: url) }
-        let result = await runLayer3(doc, terms: [SensitiveTerm(text: "Name")])
-        #expect(result.status.isFail,
-                "delimiter-bounded structural token must FAIL; got \(result.status)")
+        let nameResult = await runLayer3(named, terms: [SensitiveTerm(text: "Name")])
+        #expect(nameResult.status.isPass, "a name object is not a string object; got \(nameResult.status)")
+        let (inString, url2) = try TestFixtures.writeTempPDF(
+            TestFixtures.withMetadataRaw(infoDictBody: "/Marker (Name)"),
+            prefix: "l3_namestring_")
+        defer { try? FileManager.default.removeItem(at: url2) }
+        let stringResult = await runLayer3(inString, terms: [SensitiveTerm(text: "Name")])
+        #expect(stringResult.status.isFail, "the term inside a literal string still FAILs; got \(stringResult.status)")
+    }
+
+    @Test("PDF-syntax terms on a correct file PASS: a surname 'Page', a value '612', 'Count'; the same word left in a string object FAILs")
+    func pdfSyntaxTermsPassOnACorrectFile() async throws {
+        let (clean, url) = try TestFixtures.writeTempPDF(
+            TestFixtures.withMetadataRaw(infoDictBody: "/Title (Statement)"),
+            prefix: "l3_syntax_terms_")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let raw = try String(contentsOf: url, encoding: .isoLatin1)
+        #expect(raw.contains("/Type /Page") && raw.contains("612"), "the fixture carries the syntax the terms collide with")
+        for word in ["Page", "612", "Count"] {
+            let result = await runLayer3(clean, terms: [SensitiveTerm(text: word)])
+            #expect(result.status.isPass, "'\(word)' is the file's own syntax here; got \(result.status)")
+        }
+        let (leaked, url2) = try TestFixtures.writeTempPDF(
+            TestFixtures.withMetadataRaw(infoDictBody: "/Title (Page 612) /Type /Page"),
+            prefix: "l3_syntax_leak_")
+        defer { try? FileManager.default.removeItem(at: url2) }
+        let leak = await runLayer3(leaked, terms: [SensitiveTerm(text: "Page")])
+        #expect(leak.status.isFail, "'Page' left in a literal string still FAILs; got \(leak.status)")
+    }
+
+    @Test("stringObjectRanges: literal strings with nesting and escapes, hex strings, dictionaries and comments skipped, streams excluded")
+    func stringObjectScanner() {
+        let text = "<< /A (x (y) \\) z) /B <4142> /C /Name >> % (not a string)\n[ (s) ]"
+        let data = Data(text.utf8)
+        let ranges = VerificationEngine.stringObjectRanges(data, excluding: [])
+        let pieces = ranges.map { String(decoding: data[$0], as: UTF8.self) }
+        #expect(pieces == ["(x (y) \\) z)", "<4142>", "(s)"], "\(pieces)")
+        let inStream = VerificationEngine.stringObjectRanges(data, excluding: [0..<text.utf8.count])
+        #expect(inStream.isEmpty)
     }
 
     @Test("Boundary-required term embedded in a word produces no structural verdict at all")
