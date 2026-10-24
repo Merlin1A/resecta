@@ -47,6 +47,38 @@ struct SearchRecheckPipelineTests {
         }
     }
 
+    /// The redacted output the harness verifies, drawn as the pipeline
+    /// leaves a Searchable page: each source line with the term's glyphs
+    /// blanked (Courier is monospace, so every other glyph keeps its place)
+    /// and a black box painted at the page's applied region. `leftover`
+    /// draws the term again on a second line, outside every box: an
+    /// occurrence the applied search did not cover.
+    private func redactedOutputPDFData(
+        sourceLines: [String], boxes: [CGRect?], leftoverOnPage: Int?
+    ) -> Data {
+        let pageRect = CGRect(x: 0, y: 0, width: 612, height: 792)
+        let renderer = UIGraphicsPDFRenderer(bounds: pageRect)
+        let font = UIFont(name: "Courier", size: 18) ?? UIFont(name: "Menlo-Regular", size: 18)!
+        let blank = String(repeating: " ", count: Self.term.count)
+        return renderer.pdfData { ctx in
+            for (index, line) in sourceLines.enumerated() {
+                ctx.beginPage()
+                let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: UIColor.black]
+                (line.replacingOccurrences(of: Self.term, with: blank) as NSString)
+                    .draw(at: CGPoint(x: 72, y: 72), withAttributes: attributes)
+                if leftoverOnPage == index {
+                    ("Also \(Self.term) here" as NSString).draw(at: CGPoint(x: 72, y: 300), withAttributes: attributes)
+                }
+                if index < boxes.count, let box = boxes[index] {
+                    // Normalized bottom-left → the renderer's top-left points.
+                    UIColor.black.setFill()
+                    UIRectFill(CGRect(x: box.minX * pageRect.width, y: (1 - box.maxY) * pageRect.height,
+                                      width: box.width * pageRect.width, height: box.height * pageRect.height))
+                }
+            }
+        }
+    }
+
     private struct Harness {
         let coordinator: PipelineCoordinator
         let outputURL: URL
@@ -59,36 +91,51 @@ struct SearchRecheckPipelineTests {
 
     /// Source = two text pages carrying the term. When `applyTerm`, the
     /// regions + audit come from a REAL search-origin apply of a typed
-    /// text search for the term (one result per page); otherwise one
-    /// manual region stands in. Output on disk = `outputPageTexts`.
+    /// text search for the term (one result per page, at the term's rect)
+    /// and the output on disk is that redaction (`redactedOutputPDFData`),
+    /// with the term once more on page `leftoverOnPage` outside every box;
+    /// otherwise one manual region stands in and the output is the two
+    /// lines without the term.
     private func makeHarness(
-        outputPageTexts: [String],
         mode: PipelineMode,
-        applyTerm: Bool = true
+        applyTerm: Bool = true,
+        leftoverOnPage: Int? = nil
     ) async throws -> Harness {
         let coordinator = makeCoordinator()
         let documentState = coordinator.documentState
         let redactionState = coordinator.redactionState
-        let sourceData = textPagesPDFData([
+        let sourceLines = [
             "Account holder \(Self.term) page one",
             "Balance for \(Self.term) page two",
-        ])
+        ]
+        let sourceData = textPagesPDFData(sourceLines)
         documentState.sourceDocument = PDFDocument(data: sourceData)
         try #require(documentState.pageCount == 2)
 
         if applyTerm {
+            // Each result at the term's own rect on its source page, as the
+            // search places it: the coverage check compares the applied box
+            // with the match the re-run reads on the original page.
+            let source = try #require(documentState.sourceDocument)
+            let searcher = DocumentSearcher()
+            func termRect(_ pageIndex: Int) throws -> CGRect {
+                let page = try #require(source.page(at: pageIndex))
+                let range = ((page.string ?? "") as NSString).range(of: Self.term)
+                try #require(range.location != NSNotFound, "page \(pageIndex + 1) carries the term")
+                return try #require(searcher.boundingRect(for: range, page: page))
+            }
             let search = SearchState()
             search.searchModeType = .text
             search.queryText = Self.term
             search.results = [
                 SearchResult(
                     pageIndex: 0,
-                    normalizedRect: CGRect(x: 0.25, y: 0.08, width: 0.15, height: 0.03),
+                    normalizedRect: try termRect(0),
                     matchedText: Self.term, contextSnippet: "…\(Self.term)…",
                     source: .textLayer, term: Self.term, isSelected: true),
                 SearchResult(
                     pageIndex: 1,
-                    normalizedRect: CGRect(x: 0.22, y: 0.08, width: 0.15, height: 0.03),
+                    normalizedRect: try termRect(1),
                     matchedText: Self.term, contextSnippet: "…\(Self.term)…",
                     source: .textLayer, term: Self.term, isSelected: true),
             ]
@@ -103,7 +150,13 @@ struct SearchRecheckPipelineTests {
 
         let outputURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("sv_recheck_\(UUID().uuidString).pdf")
-        try textPagesPDFData(outputPageTexts).write(to: outputURL)
+        let outputData = applyTerm
+            ? redactedOutputPDFData(
+                sourceLines: sourceLines,
+                boxes: (0..<sourceLines.count).map { redactionState.regions[$0]?.first?.normalizedRect },
+                leftoverOnPage: leftoverOnPage)
+            : textPagesPDFData(["Account holder page one", "Balance for page two"])
+        try outputData.write(to: outputURL)
         // After the apply (a region mutation nils the output URL).
         redactionState.outputURL = outputURL
         documentState.lastUsedPipelineMode = mode
@@ -151,9 +204,7 @@ struct SearchRecheckPipelineTests {
 
     @Test("PASS end to end in Searchable: twelve layers, the re-check then the sweep last, 2 found · 2 redacted · 0 remaining")
     func passSearchable() async throws {
-        let h = try await makeHarness(
-            outputPageTexts: ["Account holder page one", "Balance for page two"],
-            mode: .searchableRedaction)
+        let h = try await makeHarness(mode: .searchableRedaction)
         defer { h.removeOutput() }
         #expect(h.coordinator.collectAppliedSearches() == [expectedRequest])
         recordRunInputs(h, mode: .searchableRedaction)
@@ -192,9 +243,7 @@ struct SearchRecheckPipelineTests {
 
     @Test("Secure Raster schedule: seven layers, the re-check then the sweep last, with the same counts (text-layer fixture; Layer 1 reports the fixture's text, not this test's subject)")
     func passRaster() async throws {
-        let h = try await makeHarness(
-            outputPageTexts: ["Account holder page one", "Balance for page two"],
-            mode: .secureRasterization)
+        let h = try await makeHarness(mode: .secureRasterization)
         defer { h.removeOutput() }
         recordRunInputs(h, mode: .secureRasterization)
 
@@ -216,9 +265,7 @@ struct SearchRecheckPipelineTests {
 
     @Test("ATTENTION end to end: one leftover occurrence → the row names the query, the masthead names it once")
     func attentionEndToEnd() async throws {
-        let h = try await makeHarness(
-            outputPageTexts: ["Account holder page one", "Balance for \(Self.term) page two"],
-            mode: .searchableRedaction)
+        let h = try await makeHarness(mode: .searchableRedaction, leftoverOnPage: 1)
         defer { h.removeOutput() }
         recordRunInputs(h, mode: .searchableRedaction)
 
@@ -265,9 +312,7 @@ struct SearchRecheckPipelineTests {
 
     @Test("Zero applied searches → the re-check is an info row that had nothing to check")
     func zeroSearchesIsInfo() async throws {
-        let h = try await makeHarness(
-            outputPageTexts: ["Account holder page one", "Balance for page two"],
-            mode: .secureRasterization, applyTerm: false)
+        let h = try await makeHarness(mode: .secureRasterization, applyTerm: false)
         defer { h.removeOutput() }
         #expect(h.coordinator.collectAppliedSearches().isEmpty)
         recordRunInputs(h, mode: .secureRasterization)
@@ -299,9 +344,7 @@ struct SearchRecheckPipelineTests {
 
     @Test("Verify-only with no retained inputs re-derives the same requests from the live audit")
     func resumeRefeedEquality() async throws {
-        let h = try await makeHarness(
-            outputPageTexts: ["Account holder page one", "Balance for page two"],
-            mode: .searchableRedaction)
+        let h = try await makeHarness(mode: .searchableRedaction)
         defer { h.removeOutput() }
         // No `recordLastRunInputs`: the resumed-session posture.
         #expect(h.redactionState.lastRunInputs?.appliedSearches == nil)
@@ -329,9 +372,7 @@ struct SearchRecheckPipelineTests {
 
     @Test("Cancel race with an applied search never yields .verified + .pass with a skipped re-check")
     func cancelRaceWithAppliedSearch() async throws {
-        let h = try await makeHarness(
-            outputPageTexts: ["Account holder page one", "Balance for page two"],
-            mode: .searchableRedaction)
+        let h = try await makeHarness(mode: .searchableRedaction)
         defer { h.removeOutput() }
         recordRunInputs(h, mode: .searchableRedaction)
         let retained = h.redactionState.lastRunInputs?.appliedSearches

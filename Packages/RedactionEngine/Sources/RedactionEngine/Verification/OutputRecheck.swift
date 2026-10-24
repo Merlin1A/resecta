@@ -194,7 +194,11 @@ struct OutputRecheck: Sendable {
             return observation
         }
 
-        let searcher = DocumentSearcher(regexTimeoutOverride: regexTimeoutOverride)
+        // The page's text-layer status as the import reads it, so a page
+        // whose rebuilt layer is only a header is re-run through OCR, not
+        // trusted for its body (the one-page document's page is index 0).
+        let status: [Int: TextLayerStatus] = pageDocument.page(at: 0).map { [0: TextLayerDetector.detectTextLayer($0)] } ?? [:]
+        let searcher = DocumentSearcher(regexTimeoutOverride: regexTimeoutOverride, textLayerStatusByPage: status)
         let box = CoverageBox()
         await searcher.setPageCoverageSink { coverage in box.record(coverage.route) }
         let wrapped = SendablePDFDocument(pageDocument)
