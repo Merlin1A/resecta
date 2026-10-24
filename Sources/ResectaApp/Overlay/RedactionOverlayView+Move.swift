@@ -126,8 +126,11 @@ extension RedactionOverlayView {
 
         var newRect = CGRect(origin: newOrigin, size: regionSize)
 
-        // Apply snap guides during move
+        // Apply snap guides during move, then keep the region on the page:
+        // a guide near the edge may pull it past.
         newRect = snapEngine.applySnapping(to: newRect, excluding: selectedID, in: snapPage)
+        newRect.origin = CGPoint(x: max(0, min(newRect.minX, bounds.width - newRect.width)),
+                                 y: max(0, min(newRect.minY, bounds.height - newRect.height)))
 
         regions[idx].normalizedRect = overlayToPDFNormalized(newRect)
 

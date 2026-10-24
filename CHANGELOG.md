@@ -218,6 +218,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - A tap or a hold on stacked one-line regions picks the region under the finger instead of the one below it, and a whole-page region no longer takes touches meant for the regions inside it.
 - The size label, the region outlines, the lift shadow and the handle rings keep one on-screen size at every zoom, and the lift shadow shows in dark appearance.
 - A tap on a selected region no longer moves or reshapes it, and a resize keeps the edge where it was grabbed.
+- A region moved against the page edge stays on the page when it aligns to a guide.
 
 ### Internal
 
