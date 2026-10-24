@@ -36,30 +36,24 @@ extension RedactionOverlayView {
                 let dy = viewRect.height * 0.01
                 drawRect = viewRect.insetBy(dx: -dx, dy: -dy)
                 ctx.saveGState()
-                // Adapt the drag-lift shadow so it reads against the dark
-                // editor background when the overlay extends past the page
-                // edge. Core Graphics consumes a CGColor, so resolve the
-                // trait-aware UIColor through the view's traitCollection.
-                let liftShadowColor = UIColor { trait in
-                    trait.userInterfaceStyle == .dark
-                        ? UIColor.white.withAlphaComponent(0.08)
-                        : UIColor.black.withAlphaComponent(0.20)
-                }
+                // The shadow falls on the page, which is white in either
+                // appearance, so one dark shadow reads in both; its offset
+                // and blur keep one on-screen size at every zoom.
                 ctx.setShadow(
-                    offset: CGSize(width: 0, height: 4),
-                    blur: 12,
-                    color: liftShadowColor.resolvedColor(with: traitCollection).cgColor
+                    offset: CGSize(width: 0, height: 4 * fingerScale),
+                    blur: 12 * fingerScale,
+                    color: Self.liftShadowColor.cgColor
                 )
             } else {
                 drawRect = viewRect
             }
 
             // Fill at 30% opacity (60% when reduceTransparency enabled),
-            // border at 100%. Stroke: 2pt unselected, 2.5pt selected. LegalPhrases:safe (moved comment)
+            // the border opaque. Stroke: 2 on-screen points unselected, 2.5 selected.
             let fillOpacity: CGFloat = UIAccessibility.isReduceTransparencyEnabled ? 0.6 : 0.3
             ctx.setFillColor(color.withAlphaComponent(fillOpacity).cgColor)
             ctx.setStrokeColor(color.cgColor)
-            ctx.setLineWidth(isSelected ? 2.5 : 2.0)
+            ctx.setLineWidth(Self.regionStrokeWidth(isSelected: isSelected, fingerScale: fingerScale))
             ctx.setLineDash(phase: 0, lengths: [])
             // Polygon regions render as filled polygons (even-odd
             // rule). The lift effect for moves still uses the bounding
@@ -220,7 +214,7 @@ extension RedactionOverlayView {
         let handleRadius: CGFloat = 5.0 * handleScale * fingerScale
         // Mid-gray outer ring scales together with the handle so
         // it animates in/out alongside the white-fill / blue-stroke disc.
-        let outerStroke: CGFloat = Self.selectionHandleOuterStrokeWidth * handleScale
+        let outerStroke = Self.handleRingWidth(handleScale: handleScale, fingerScale: fingerScale)
         let points = [
             CGPoint(x: rect.minX, y: rect.minY), CGPoint(x: rect.maxX, y: rect.minY),
             CGPoint(x: rect.minX, y: rect.maxY), CGPoint(x: rect.maxX, y: rect.maxY),
@@ -249,7 +243,7 @@ extension RedactionOverlayView {
             )
             ctx.setFillColor(UIColor.white.cgColor)
             ctx.setStrokeColor(UIColor.systemBlue.cgColor)
-            ctx.setLineWidth(1.5)
+            ctx.setLineWidth(1.5 * fingerScale)
             ctx.fillEllipse(in: handleRect)
             ctx.strokeEllipse(in: handleRect)
         }
@@ -331,23 +325,20 @@ extension RedactionOverlayView {
     /// the overlay, the label is suppressed rather than clamped on top
     /// of the region.
     private func drawDimensionLabel(ctx: CGContext, rect: CGRect) {
+        // The value is page points; the pill keeps one on-screen size.
         let text = "\(Int(rect.width)) \u{00D7} \(Int(rect.height))" as NSString
-        let font = UIFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium)
         let attributes: [NSAttributedString.Key: Any] = [
-            .font: font,
+            .font: Self.dimensionLabelFont(fingerScale: fingerScale),
             .foregroundColor: UIColor.label,
         ]
-        let textSize = text.size(withAttributes: attributes)
-        let padding: CGFloat = 4
-        let pillSize = CGSize(
-            width: textSize.width + padding * 2,
-            height: textSize.height + padding
-        )
+        let padding = 4 * fingerScale
+        let pillSize = Self.dimensionLabelPillSize(for: text, fingerScale: fingerScale)
 
         let position = Self.dimensionLabelPosition(
             regionRect: rect,
             pillHeight: pillSize.height,
-            overlayHeight: bounds.height
+            overlayHeight: bounds.height,
+            gap: 4 * fingerScale
         )
 
         let pillY: CGFloat
@@ -369,7 +360,7 @@ extension RedactionOverlayView {
         let pillRect = CGRect(origin: pillOrigin, size: pillSize)
 
         // Background pill
-        let pillPath = UIBezierPath(roundedRect: pillRect, cornerRadius: 4)
+        let pillPath = UIBezierPath(roundedRect: pillRect, cornerRadius: 4 * fingerScale)
         ctx.saveGState()
         ctx.setFillColor(UIColor.systemBackground.withAlphaComponent(0.85).cgColor)
         ctx.addPath(pillPath.cgPath)
@@ -381,6 +372,35 @@ extension RedactionOverlayView {
             at: CGPoint(x: pillOrigin.x + padding, y: pillOrigin.y + padding / 2),
             withAttributes: attributes
         )
+    }
+
+    // MARK: - On-screen sizes
+
+    /// Overlay points are page points, shown at 1 / `fingerScale`; each size
+    /// below is multiplied by `fingerScale` so it keeps one on-screen size.
+
+    /// The lift shadow's colour: the page is white in either appearance.
+    static let liftShadowColor = UIColor.black.withAlphaComponent(0.20)
+
+    /// A region's outline: 2.5 on-screen points selected, 2 otherwise.
+    static func regionStrokeWidth(isSelected: Bool, fingerScale: CGFloat) -> CGFloat {
+        (isSelected ? 2.5 : 2.0) * fingerScale
+    }
+
+    /// The grey ring around a resize handle, grown in with `handleScale`.
+    static func handleRingWidth(handleScale: CGFloat, fingerScale: CGFloat) -> CGFloat {
+        selectionHandleOuterStrokeWidth * handleScale * fingerScale
+    }
+
+    static func dimensionLabelFont(fingerScale: CGFloat) -> UIFont {
+        UIFont.monospacedDigitSystemFont(ofSize: 11 * fingerScale, weight: .medium)
+    }
+
+    /// The size label's pill: the text plus 4 on-screen points of padding.
+    static func dimensionLabelPillSize(for text: NSString, fingerScale: CGFloat) -> CGSize {
+        let textSize = text.size(withAttributes: [.font: dimensionLabelFont(fingerScale: fingerScale)])
+        let padding = 4 * fingerScale
+        return CGSize(width: textSize.width + padding * 2, height: textSize.height + padding)
     }
 
     /// Draw active snap guide lines spanning the full overlay.
