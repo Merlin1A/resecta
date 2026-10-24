@@ -8,10 +8,11 @@ import RedactionEngine
 struct ResectaApp: App {
     // Persist EULA acceptance. @AppStorage is fine in App struct —
     // it only prohibits @AppStorage inside @Observable classes.
-    // Versioned key for EULA re-acceptance on terms change.
-    // The key-history list + superseded-key cleanup live in EULAGateView
-    // (the acceptance site). Bump this key and EULAGateView's in lockstep.
-    @AppStorage("disclaimerAccepted_v1") private var disclaimerAccepted = false
+    // Versioned key for EULA re-acceptance on terms change; the key, its
+    // history and the note's key live in `FirstLaunchFlow`, shared with
+    // EULAGateView (the acceptance site) and DeveloperNoteView.
+    @AppStorage(FirstLaunchFlow.agreementKey) private var disclaimerAccepted = false
+    @AppStorage(FirstLaunchFlow.noteSeenKey) private var developerNoteSeen = false
     @State private var settingsState: SettingsState
     @State private var savedRegexStore: SavedRegexStore
     @State private var userTermsStore: UserTermsStore
@@ -74,7 +75,8 @@ struct ResectaApp: App {
 
     #if DEBUG
     /// Handle launch arguments for UI testing.
-    /// --uitesting: Auto-accept EULA to bypass the gate, and clear the
+    /// --uitesting: Auto-accept EULA and mark the developer's note seen to
+    ///   bypass both first-launch screens, and clear the
     ///   persisted last-filter shape so every test launch opens the
     ///   search sheet at the default Source=All. The cross-session
     ///   filter persistence is a shipped feature; a non-default source
@@ -86,17 +88,30 @@ struct ResectaApp: App {
     /// --resetEULA: Clear the acceptance flag so the gate PRESENTS — the
     ///   gate-links UI tests drive the un-accepted gate itself, the
     ///   inverse of --uitesting. DEBUG-only, and it only ever forces the
-    ///   gate ON; it adds no path past it.
+    ///   gate ON; it adds no path past it. It also clears the note's
+    ///   flag, so Agree leads to the note as on a fresh install.
+    /// --seedLegacyAcceptance: The state of a 1.2.0 install — the old
+    ///   agreement key accepted, the current one and the note unseen — so
+    ///   the upgrade path can be driven. Forces the gate ON, like the above.
     /// --searchSourceFilter=ocr: Write a persisted Source = OCR filter
     ///   AFTER the --uitesting clear, so the next search sheet opens
     ///   filtered to OCR rows — the state a born-digital document must
     ///   be able to leave from inside the sheet.
     private static func handleUITestLaunchArguments() {
-        if CommandLine.arguments.contains("--resetEULA") {
-            UserDefaults.standard.set(false, forKey: "disclaimerAccepted_v1")
+        let defaults = UserDefaults.standard
+        if CommandLine.arguments.contains("--seedLegacyAcceptance") {
+            for key in FirstLaunchFlow.supersededAgreementKeys {
+                defaults.set(true, forKey: key)
+            }
+            defaults.removeObject(forKey: FirstLaunchFlow.agreementKey)
+            defaults.removeObject(forKey: FirstLaunchFlow.noteSeenKey)
+        } else if CommandLine.arguments.contains("--resetEULA") {
+            defaults.set(false, forKey: FirstLaunchFlow.agreementKey)
+            defaults.removeObject(forKey: FirstLaunchFlow.noteSeenKey)
         } else if CommandLine.arguments.contains("--uitesting") {
-            UserDefaults.standard.set(true, forKey: "disclaimerAccepted_v1")
-            UserDefaults.standard.removeObject(forKey: "search.lastFilter.v1")
+            defaults.set(true, forKey: FirstLaunchFlow.agreementKey)
+            defaults.set(true, forKey: FirstLaunchFlow.noteSeenKey)
+            defaults.removeObject(forKey: "search.lastFilter.v1")
         }
         if CommandLine.arguments.contains("--searchSourceFilter=ocr"),
            let data = try? JSONEncoder().encode(SearchState.LastSearchFilterShape(
@@ -163,7 +178,9 @@ struct ResectaApp: App {
             ZStack {
                 // EULA gate — show clickwrap before any app content; the
                 // host fades the gate out and the app in.
-                RootGate(accepted: disclaimerAccepted) {
+                RootGate(screen: FirstLaunchFlow.screen(
+                    agreementAccepted: disclaimerAccepted,
+                    noteSeen: developerNoteSeen)) {
                     ContentView()
                         .environment(settingsState)
                         .environment(savedRegexStore)
@@ -362,34 +379,46 @@ struct ResectaApp: App {
     }
 }
 
-/// The root swap between the first-launch gate and the app, with the fade
-/// between them: the gate fades out, then the app fades in after the gate
-/// is gone, so the two marks never show together; under Reduce Motion one
-/// plain cross-fade. Hosted as a view so it reads the environment.
+/// The root swap between the first-launch screens (the gate, then the
+/// developer's note) and the app, with the fade between them: each screen
+/// fades out, then the next fades in after it is gone, so two marks never
+/// show together; under Reduce Motion one plain cross-fade. Hosted as a
+/// view so it reads the environment.
 private struct RootGate<Content: View>: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    let accepted: Bool
+    let screen: FirstLaunchFlow.Screen
     @ViewBuilder let content: () -> Content
 
     var body: some View {
-        // The app's fade waits out the gate's removal; under Reduce Motion
-        // both legs resolve to one 0.2-s fade and run together.
-        let delay: Double = reduceMotion ? 0 : 0.12
         Group {
-            if accepted {
+            switch screen {
+            case .app:
                 content()
-                    .transition(.asymmetric(
-                        insertion: .opacity.animation(
-                            ResectaTokens.Anim.resolved(.easeOut(duration: 0.18), reduceMotion: reduceMotion)?.delay(delay)),
-                        removal: .opacity))
-            } else {
+                    .transition(.asymmetric(insertion: fadeInAfterRemoval, removal: .opacity))
+            case .note:
+                DeveloperNoteView()
+                    .transition(.asymmetric(insertion: fadeInAfterRemoval, removal: fadeOut))
+            case .agreement:
                 EULAGateView()
                     .transition(.asymmetric(
                         insertion: .opacity,
-                        removal: .opacity.animation(
-                            ResectaTokens.Anim.resolved(.easeIn(duration: 0.12), reduceMotion: reduceMotion))))
+                        removal: fadeOut))
             }
         }
-        .animation(ResectaTokens.Anim.resolved(.easeInOut(duration: 0.3), reduceMotion: reduceMotion), value: accepted)
+        .animation(ResectaTokens.Anim.resolved(.easeInOut(duration: 0.3), reduceMotion: reduceMotion), value: screen)
+    }
+
+    /// Each incoming screen's fade waits out the outgoing one's removal;
+    /// under Reduce Motion both legs resolve to one 0.2-s fade and run
+    /// together.
+    private var fadeInAfterRemoval: AnyTransition {
+        let delay: Double = reduceMotion ? 0 : 0.12
+        return .opacity.animation(
+            ResectaTokens.Anim.resolved(.easeOut(duration: 0.18), reduceMotion: reduceMotion)?.delay(delay))
+    }
+
+    private var fadeOut: AnyTransition {
+        .opacity.animation(
+            ResectaTokens.Anim.resolved(.easeIn(duration: 0.12), reduceMotion: reduceMotion))
     }
 }
