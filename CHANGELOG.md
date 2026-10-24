@@ -23,6 +23,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - A search apply's undo step is named by the regions it creates, not counting results already covered.
 - Duplicate selects the copy.
 - A one-page document shows the page bar with its region count; the page arrows are hidden there. The counter reads "0 regions" on a page with none, drawn and spoken.
+- A document dropped over an open one that holds drawn regions or selected matches asks before replacing it; Cancel keeps the open document. With the Search sheet up, such a drop is refused until the sheet is dismissed.
 - The "match nearby" notice says Mark, matching the Marked N notice.
 - With VoiceOver on, the Rectangle tool is disabled with a hint pointing to Search and Scan.
 - Deleting several selected regions no longer asks first, from the toolbar or the selection menu; one Undo restores them.
@@ -60,7 +61,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 ### Removed
 
 - The search sheet's disabled audit-export, scan-coverage, doctype-diagnostic and category-strip surfaces, the navigation-scope controls, the custom-terms template picker and the two debug launch arguments that revealed them: each sat behind a flag that was false in every shipped build, so no shipped screen changes. The match rationale's classifier explanation and the coverage counts the verification screen reads stay.
-- The workspace's in-editor file importer and its "Replace the open document?" dialog, which nothing could present (the drop target stays), and the second sample packet bundled with no screen that opened it.
+- The workspace's in-editor file importer, which nothing could present (the drop target stays), and the second sample packet bundled with no screen that opened it.
 - The paused-detection resume path.
 - The unreachable face, barcode and signature detection code.
 - The detection review that nothing staged any more: its list in the Scan interface, its walk and counter, the cross-page grouping, the banner's Review button, and the long-press menu over recognized words that opened a pre-selected search.
