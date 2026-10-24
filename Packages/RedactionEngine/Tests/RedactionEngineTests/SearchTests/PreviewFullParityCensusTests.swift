@@ -96,7 +96,7 @@ struct PreviewFullParityCensusTests {
             let searcher = DocumentSearcher(textLayerStatusByPage: status)
             for query in file.queries {
                 for vector in file.vectors {
-                    var options = try SearchGroundTruthRunnerTests.makeOptions(vector.options)
+                    var options = try SearchGroundTruthRunnerTests.makeOptions(vector.options, mode: query.mode)
                     options.includeOCR = false   // the text layer only: the preview never runs OCR
                     let mode = try SearchGroundTruthRunnerTests.makeMode(query, options: options)
 

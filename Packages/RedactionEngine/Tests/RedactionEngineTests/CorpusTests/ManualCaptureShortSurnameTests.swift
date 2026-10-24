@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 import Testing
 import Foundation
 import PDFKit
@@ -94,3 +95,4 @@ struct ManualCaptureShortSurnameTests {
         #expect(lineOnly.status == .pass, "the line term alone reads nothing: \(lineOnly.status)")
     }
 }
+#endif

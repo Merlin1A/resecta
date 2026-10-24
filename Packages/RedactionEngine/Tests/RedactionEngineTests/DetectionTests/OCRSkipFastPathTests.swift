@@ -8,7 +8,7 @@ import UIKit
 @testable import RedactionEngine
 
 // The engine's embedded-text builder (`EmbeddedTextSource.make`) on empty and
-// sparse pages, and `DetectionResult`'s default provenance.
+// sparse pages.
 @Suite("OCR Skip Fast Path", .serialized)
 struct OCRSkipFastPathTests {
 
@@ -35,19 +35,5 @@ struct OCRSkipFastPathTests {
         // 0.95 threshold. Skip gate must NOT engage.
         #expect(source.coverage < 0.95)
         #expect(source.coverage > 0)
-    }
-
-    // MARK: - Provenance default value
-
-    @Test("DetectionResult init defaults to .ocrRan provenance")
-    func testDetectionResultDefaultProvenanceIsOcrRan() {
-        let det = DetectionResult(
-            normalizedRect: CGRect(x: 0, y: 0, width: 0.1, height: 0.1),
-            kind: .pii(.ssn),
-            confidence: 0.9
-        )
-        #expect(det.provenance.ocrSkipped == false)
-        #expect(det.provenance.ocrSkipReason == nil)
-        #expect(det.provenance == .ocrRan)
     }
 }

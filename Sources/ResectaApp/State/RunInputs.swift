@@ -31,11 +31,15 @@ enum RunInputs {
             let cropBoxBounds = page.bounds(for: .cropBox)
             let cgPage = page.pageRef
             let pageRegions = regions[i]?.compactMap { region -> RedactionRegion? in
-                // Minimum dimension threshold.
-                guard region.normalizedRect.width > 0.001,
-                      region.normalizedRect.height > 0.001 else { return nil }
                 var clamped = region
                 clamped.normalizedRect = region.normalizedRect.clampedToNormalized()
+                // Minimum dimension threshold, read on the clamped box: a
+                // box reaching past the page edge keeps only its on-page
+                // part, and one wholly past the edge clamps to nothing. Read
+                // before the clamp, a box of full size off the page passed
+                // the floor and reached the pipeline with no area.
+                guard clamped.normalizedRect.width > 0.001,
+                      clamped.normalizedRect.height > 0.001 else { return nil }
                 return clamped
             } ?? []
 

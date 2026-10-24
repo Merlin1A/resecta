@@ -37,15 +37,16 @@ struct RegexCaseOptionTests {
         #expect(exact.first?.matchedText == "Smith")
     }
 
-    @Test("The compile options follow the session's option; a validation-only compile has none")
+    @Test("The compile options follow the session's option; anchors match per line in every compile")
     func compileOptionsFollowTheSession() throws {
-        #expect(DocumentSearcher.regexCompileOptions(nil) == [])
-        #expect(DocumentSearcher.regexCompileOptions(SearchOptions(caseSensitive: true)) == [])
-        #expect(DocumentSearcher.regexCompileOptions(SearchOptions(caseSensitive: false)) == [.caseInsensitive])
-        #expect(try DocumentSearcher.validateRegexPatternWithError("smith").options == [])
+        #expect(DocumentSearcher.regexCompileOptions(nil) == [.anchorsMatchLines])
+        #expect(DocumentSearcher.regexCompileOptions(SearchOptions(caseSensitive: true)) == [.anchorsMatchLines])
+        #expect(DocumentSearcher.regexCompileOptions(SearchOptions(caseSensitive: false))
+                == [.anchorsMatchLines, .caseInsensitive])
+        #expect(try DocumentSearcher.validateRegexPatternWithError("smith").options == [.anchorsMatchLines])
         #expect(try DocumentSearcher.validateRegexPatternWithError(
-            "smith", options: SearchOptions(caseSensitive: false)).options == [.caseInsensitive])
-        #expect(DocumentSearcher.validateRegexPattern("smith")?.options == [])
+            "smith", options: SearchOptions(caseSensitive: false)).options == [.anchorsMatchLines, .caseInsensitive])
+        #expect(DocumentSearcher.validateRegexPattern("smith")?.options == [.anchorsMatchLines])
     }
 
     @Test("The sentinel's verdict is the same under both settings")

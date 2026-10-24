@@ -79,6 +79,54 @@ public struct TextNormalizer: Sendable {
     /// asymmetric by precedent: "." was always stripped.
     static let separatorCharacters: Set<Character> = ["-", " ", ".", "/", ","]
 
+    /// A character that spaces a run: whitespace, or a C0 control (what
+    /// PDFKit emits for a tab byte).
+    static func isSpacingCharacter(_ character: Character) -> Bool {
+        if character.isWhitespace { return true }
+        return character.unicodeScalars.allSatisfy { (0x0000...0x001F).contains($0.value) }
+    }
+
+    /// A character a run is made of: a spacing character, or one of the
+    /// zero-width joiners and marks a layout engine leaves between glyphs.
+    static func isRunCharacter(_ character: Character) -> Bool {
+        if isSpacingCharacter(character) { return true }
+        return character.unicodeScalars.allSatisfy { scalar in
+            switch scalar.value {
+            case 0x200B, 0x200C, 0x200D, 0x2060, 0xFEFF: return true
+            default: return false
+            }
+        }
+    }
+
+    /// Fold every run of whitespace, zero-width and control characters to one
+    /// space: a line break, a tab, a no-break space, a justified gap or an
+    /// invisible joiner between two words reads as the one space a user
+    /// types. A run of zero-width characters alone (inside a word) is
+    /// dropped, not spaced. Length-changing on a run: the page side folds
+    /// under the raw-text map (`SearchCore.normalizedPage`), which keeps one
+    /// map entry per folded Character; a page without a run is unchanged.
+    static func foldWhitespaceRuns(_ text: String) -> String {
+        var result = ""
+        result.reserveCapacity(text.utf8.count)
+        var runHasWhitespace = false
+        var inRun = false
+        for character in text {
+            if isRunCharacter(character) {
+                inRun = true
+                if isSpacingCharacter(character) { runHasWhitespace = true }
+                continue
+            }
+            if inRun {
+                if runHasWhitespace { result.append(" ") }
+                inRun = false
+                runHasWhitespace = false
+            }
+            result.append(character)
+        }
+        if inRun, runHasWhitespace { result.append(" ") }
+        return result
+    }
+
     /// Strip separator characters, returning the stripped string plus an
     /// explicit offset map: `offsetMap[i]` is the Character index in
     /// `text` of `normalized[i]`. Length-changing — callers MUST route

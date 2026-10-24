@@ -35,14 +35,20 @@ enum SearchCore {
     /// The case / Unicode normalization both tiers apply to a page and to a
     /// query before matching: NFKC + ligature expansion (+ case fold unless
     /// case-sensitive) when `normalizeUnicode` is on, the plain case fold
-    /// otherwise, the text unchanged when case-sensitive without NFKC.
+    /// otherwise, the text unchanged when case-sensitive without NFKC — and,
+    /// in every case, the whitespace-run fold (`TextNormalizer.foldWhitespaceRuns`):
+    /// a phrase broken across a line, a tab, a no-break space or an invisible
+    /// joiner matches the phrase a user types with one space.
     static func normalizedText(_ text: String, options: SearchOptions) -> String {
+        let cased: String
         if options.normalizeUnicode {
-            return TextNormalizer.normalizeForSearch(text, caseSensitive: options.caseSensitive)
+            cased = TextNormalizer.normalizeForSearch(text, caseSensitive: options.caseSensitive)
         } else if !options.caseSensitive {
-            return text.lowercased()
+            cased = text.lowercased()
+        } else {
+            cased = text
         }
-        return text
+        return TextNormalizer.foldWhitespaceRuns(cased)
     }
 
     /// The full tier's per-page CJK detection: on a page whose dominant
@@ -65,7 +71,6 @@ enum SearchCore {
         var effective = options
         if isCJK {
             effective.wholeWord = false
-            effective.exactMatch = false
         }
         return effective
     }
@@ -207,23 +212,50 @@ enum SearchCore {
     static func normalizedPage(
         _ pageText: String, options: SearchOptions
     ) -> (text: String, rawMap: RawTextMap?) {
+        // The fast path holds only when no step changed the length: a run
+        // folded to one space would, so such a page takes the map path.
         if isSingleUnitASCII(pageText) {
             let whole = normalizedText(pageText, options: options)
             if whole.count == pageText.count, isSingleUnitASCII(whole) { return (whole, nil) }
         }
         var text = ""
         text.reserveCapacity(pageText.utf8.count)
-        var scalarRaw: [Int] = []   // per scalar of `text`: the raw Character index
+        var scalarRaw: [Int] = []       // per scalar of `text`: the first raw Character index
+        var scalarRawLast: [Int] = []   // per scalar of `text`: the last raw Character index
         scalarRaw.reserveCapacity(pageText.unicodeScalars.count)
+        scalarRawLast.reserveCapacity(pageText.unicodeScalars.count)
         var utf16: [Int] = [0]
         utf16.reserveCapacity(pageText.count + 1)
+        // A maximal run of whitespace, zero-width or control Characters is one
+        // piece — one space, or nothing when the run is zero-width only —
+        // whose map entry spans the run's first to its last raw Character.
+        var runStart: Int? = nil
+        var runHasWhitespace = false
+        func closeRun(before i: Int) {
+            guard let start = runStart else { return }
+            if runHasWhitespace {
+                text.append(" ")
+                scalarRaw.append(start)
+                scalarRawLast.append(i - 1)
+            }
+            runStart = nil
+            runHasWhitespace = false
+        }
         for (i, character) in pageText.enumerated() {
+            utf16.append(utf16[utf16.count - 1] + character.utf16.count)
+            if TextNormalizer.isRunCharacter(character) {
+                if runStart == nil { runStart = i }
+                if TextNormalizer.isSpacingCharacter(character) { runHasWhitespace = true }
+                continue
+            }
+            closeRun(before: i)
             var piece = normalizedText(String(character), options: options)
             if options.normalizeSmartPunctuation { piece = TextNormalizer.normalizeSmartPunctuation(piece) }
             text.append(piece)
             scalarRaw.append(contentsOf: repeatElement(i, count: piece.unicodeScalars.count))
-            utf16.append(utf16[utf16.count - 1] + character.utf16.count)
+            scalarRawLast.append(contentsOf: repeatElement(i, count: piece.unicodeScalars.count))
         }
+        closeRun(before: pageText.count)
         // Appending never changes scalars, only Character boundaries: walk
         // the joined text's Characters over the per-scalar raw indices.
         var first: [Int] = []
@@ -234,7 +266,7 @@ enum SearchCore {
         for character in text {
             let count = character.unicodeScalars.count
             first.append(scalarRaw[scalar])
-            last.append(scalarRaw[scalar + count - 1])
+            last.append(scalarRawLast[scalar + count - 1])
             scalar += count
         }
         return (text, RawTextMap(rawFirst: first, rawLast: last, rawUTF16Offsets: utf16))
