@@ -44,12 +44,24 @@ struct OutputRecheckTests {
             #expect(Set(observation.counts.keys) == [0, 1, 2],
                     "page \(observation.pageIndex): every request is counted from the one loop")
             #expect(observation.route == .textLayer)
+            #expect(observation.textLayerRead)
         }
         #expect(observations[0].counts[0]?.remaining == 1)
         #expect(observations[1].counts[0]?.remaining == 0)
         #expect(observations[2].counts[0]?.remaining == 1)
         #expect(observations[0].counts[0]?.items.isEmpty == true,
                 "a typed request records counts only")
+    }
+
+    @Test("A text layer over a page-scale scan is read on both legs: route OCR, text layer read too")
+    func textLayerOverScanReadOnBothLegs() async throws {
+        let doc = SendablePDFDocument(try #require(PDFDocument(data: TestFixtures.vendorLayerOverScanPDF())))
+        let observations = try await OutputRecheck().observe(
+            outputDocument: doc, requests: [TestFixtures.textRequest("Delia")])
+        let observation = try #require(observations.first)
+        #expect(observation.route == .ocr, "the hybrid leg's OCR is the page's worst route")
+        #expect(observation.textLayerRead, "the text layer was searched first")
+        #expect(observation.restricted(to: [0]).textLayerRead, "a request subset keeps the page view")
     }
 
     @Test("The request's threshold vector is installed before its stream: a stricter cutoff yields fewer items on the same page")

@@ -250,6 +250,8 @@ struct SearchRecheck: Sendable {
         var ocrPagesByRequest = [Int](repeating: 0, count: requestCount)
         var textPages = 0
         var ocrPages = 0
+        // Pages read on both legs (counted in `textPages` and `ocrPages`).
+        var bothPages = 0
         // Unchecked pages → reason clauses, in page order.
         var uncheckedClauses: [Int: [String]] = [:]
         // Requests the searcher refused to re-run on at least one page.
@@ -264,6 +266,10 @@ struct SearchRecheck: Sendable {
                 pageWasRead = true
             case .ocr?:
                 ocrPages += 1
+                if observation.textLayerRead {
+                    textPages += 1
+                    bothPages += 1
+                }
                 pageWasRead = true
             case .ocrSkippedOversize?:
                 uncheckedClauses[page, default: []].append("too large to scan for text")
@@ -298,9 +304,10 @@ struct SearchRecheck: Sendable {
                 }
                 if count.hitCap { pageHitCap = true }
                 if pageWasRead {
-                    if observation.route == .textLayer {
+                    if observation.textLayerRead || observation.route == .textLayer {
                         textPagesByRequest[requestIndex] += 1
-                    } else {
+                    }
+                    if observation.route == .ocr {
                         ocrPagesByRequest[requestIndex] += 1
                     }
                 }
@@ -323,7 +330,7 @@ struct SearchRecheck: Sendable {
 
         let n = requestCount
         let searches = n == 1 ? "1 search" : "\(n) searches"
-        let routeSentence = Self.routeSentence(textPages: textPages, ocrPages: ocrPages)
+        let routeSentence = Self.routeSentence(textPages: textPages, ocrPages: ocrPages, bothPages: bothPages)
         let uncheckedList = uncheckedPages.map { page -> String in
             let clauses = uncheckedClauses[page] ?? []
             let number = String(page + 1)
@@ -434,12 +441,16 @@ struct SearchRecheck: Sendable {
 
     /// The route sentence of the detail copy. Empty when no page was
     /// read at all — the copy then carries only the unchecked-page clause.
-    static func routeSentence(textPages: Int, ocrPages: Int) -> String {
+    /// `bothPages` of the pages were read on both legs and are counted in
+    /// `textPages` and `ocrPages` alike.
+    static func routeSentence(textPages: Int, ocrPages: Int, bothPages: Int = 0) -> String {
         switch (textPages > 0, ocrPages > 0) {
         case (true, false):
             return "Text was read from the output's text layer."
         case (false, true):
             return "Text was read by OCR from the rendered pages."
+        case (true, true) where bothPages == textPages && bothPages == ocrPages:
+            return "Text was read from the output's text layer and by OCR from the rendered pages."
         case (true, true):
             return "Text was read from the text layer on \(textPages) \(textPages == 1 ? "page" : "pages") and by OCR from the rendered pages on \(ocrPages)."
         case (false, false):

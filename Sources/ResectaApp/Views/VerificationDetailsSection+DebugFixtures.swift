@@ -62,6 +62,8 @@ enum VerificationDebugFixtures {
     }
 
     private static let ocrRoute = "Text was read by OCR from the rendered pages."
+    /// A searchable output: a text layer over the page image, read on both legs.
+    private static let bothLegsRoute = "Text was read from the output's text layer and by OCR from the rendered pages."
 
     private static let recheckPass = row(
         .searchRecheck,
@@ -69,6 +71,14 @@ enum VerificationDebugFixtures {
         detail: "Search Re-check re-ran each applied search on the output through the search engine. \(ocrRoute)",
         lines: [SearchRecheckQueryLine(label: "\u{201C}Delia\u{201D}", foundCount: 2, foundHitCap: false,
                                        appliedCount: 2, remainingCount: 0, route: .ocr)],
+        seconds: 0.6)
+
+    private static let recheckPassBothLegs = row(
+        .searchRecheck,
+        short: "Re-ran 1 search on the output — no remaining matches in the text the app can read.",
+        detail: "Search Re-check re-ran each applied search on the output through the search engine. \(bothLegsRoute)",
+        lines: [SearchRecheckQueryLine(label: "\u{201C}Delia\u{201D}", foundCount: 2, foundHitCap: false,
+                                       appliedCount: 2, remainingCount: 0, route: .mixed(textPages: 3, ocrPages: 3))],
         seconds: 0.6)
 
     private static let recheckIdle = row(
@@ -81,6 +91,14 @@ enum VerificationDebugFixtures {
         detail: "Detection Sweep ran every detector on the output. \(ocrRoute) Names and addresses are not swept.",
         lines: [SearchRecheckQueryLine(label: "Scan (17 detectors)", foundCount: 0, foundHitCap: false,
                                        appliedCount: 0, remainingCount: 0, route: .ocr)],
+        seconds: 1.8)
+
+    private static let sweepPassBothLegs = row(
+        .detectionSweep,
+        short: "Ran the detectors on the output — nothing further reported.",
+        detail: "Detection Sweep ran every detector on the output. \(bothLegsRoute) Names and addresses are not swept.",
+        lines: [SearchRecheckQueryLine(label: "Scan (17 detectors)", foundCount: 0, foundHitCap: false,
+                                       appliedCount: 0, remainingCount: 0, route: .mixed(textPages: 3, ocrPages: 3))],
         seconds: 1.8)
 
     private static let sweepNoteMessage =
@@ -141,7 +159,7 @@ enum VerificationDebugFixtures {
         overallStatus: .pass, durationSeconds: 4.0, perPageModes: secure)
 
     static let searchableAllPass = VerificationReport(
-        layers: rows(coreSearchable, recheck: recheckPass, sweep: sweepPass),
+        layers: rows(coreSearchable, recheck: recheckPassBothLegs, sweep: sweepPassBothLegs),
         overallStatus: .pass, durationSeconds: 6.2, perPageModes: searchable)
 
     /// Searchable, every page rasterized: the three text-layer checks read
