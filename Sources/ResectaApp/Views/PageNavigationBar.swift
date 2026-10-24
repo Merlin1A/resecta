@@ -202,9 +202,12 @@ extension PageNavigationBar {
         wholePageRegion(on: page, in: redactionState) != nil
     }
 
-    /// The control's action on the page on screen: a marked page loses
-    /// its whole-page region (one undo step named "Unmark Whole Page");
-    /// any other page is marked (`markWholePage`). The page's other
+    /// The control's action on the page on screen — the bar's control and
+    /// the … menu's row both call it. A marked page loses its whole-page
+    /// region (one undo step named "Unmark Whole Page"); any other page is
+    /// marked: one `.manual` unit-rect region through `addRegion`, the path
+    /// a drawn region takes (the region version moves, the output is
+    /// cleared, one undo step named "Mark Whole Page"). The page's other
     /// regions are never touched.
     static func toggleWholePage(
         redactionState: RedactionState,
@@ -216,26 +219,9 @@ extension PageNavigationBar {
             redactionState.removeRegion(
                 region.id, page: page, undoManager: undoManager, actionName: unmarkWholePageLabel)
         } else {
-            markWholePage(redactionState: redactionState, documentState: documentState, undoManager: undoManager)
+            redactionState.addRegion(
+                wholePageRegion(), page: page, undoManager: undoManager, actionName: markWholePageLabel)
         }
-    }
-
-    /// Mark the page on screen: one `.manual` unit-rect region on
-    /// `documentState.currentPageIndex` through `addRegion`, the path a
-    /// drawn region takes — the region version moves (the overlay
-    /// refreshes on it), the output is cleared, one undo step named
-    /// "Mark Whole Page" is registered. A page already marked gains
-    /// nothing, so the … menu's row, which calls this, never stacks a
-    /// second whole-page region.
-    static func markWholePage(
-        redactionState: RedactionState,
-        documentState: DocumentState,
-        undoManager: UndoManager?
-    ) {
-        let page = documentState.currentPageIndex
-        guard !isWholePageMarked(page: page, in: redactionState) else { return }
-        redactionState.addRegion(
-            wholePageRegion(), page: page, undoManager: undoManager, actionName: markWholePageLabel)
     }
 
     /// The counter's text for `count` regions on the page: "0 regions",

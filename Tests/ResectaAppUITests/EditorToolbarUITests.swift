@@ -58,7 +58,8 @@ nonisolated final class EditorToolbarUITests: XCTestCase {
         XCTAssertTrue(overflow.waitForExistence(timeout: 10), "The … menu button is missing.")
         overflow.tap()
 
-        let expected = ["Select Regions", "Add to Selection", "Mark Whole Page", "Switch Mode", "Settings", "Home"]
+        // The page is marked, so the whole-page row reads Unmark.
+        let expected = ["Select Regions", "Add to Selection", "Unmark Whole Page", "Switch Mode", "Settings", "Home"]
         var ys: [CGFloat] = []
         for label in expected {
             let row = app.buttons[label].firstMatch.exists ? app.buttons[label].firstMatch

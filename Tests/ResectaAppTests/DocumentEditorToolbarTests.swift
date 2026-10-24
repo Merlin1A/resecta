@@ -69,7 +69,7 @@ struct DocumentEditorToolbarTests {
         let coordinator = makeCoordinator()
         coordinator.documentState.sourceDocument = makeMultiPagePDFDocument(pages: 1)
         coordinator.documentState.currentPageIndex = 0
-        toolbar(for: coordinator).markWholePage()
+        toolbar(for: coordinator).toggleWholePage()
         let regions = coordinator.redactionState.regions[0] ?? []
         #expect(regions.count == 1)
         #expect(regions.first?.normalizedRect == PageNavigationBar.wholePageRegion().normalizedRect)
@@ -94,7 +94,7 @@ struct DocumentEditorToolbarTests {
             .overflowSections.first
         #expect(first?.last == .markWholePage)
         #expect(source.contains("case .markWholePage: markWholePageButton"))
-        #expect(source.contains("PageNavigationBar.markWholePage("), "one action, the page bar's own")
+        #expect(source.contains("PageNavigationBar.toggleWholePage("), "one action, the page bar's own")
     }
 
     /// Mirrors `HonestySurfacesTests.loadRepoFile`.

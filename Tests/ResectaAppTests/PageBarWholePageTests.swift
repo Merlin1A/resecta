@@ -28,7 +28,7 @@ struct PageBarWholePageTests {
 
     private static func mark(_ documentState: DocumentState, _ redactionState: RedactionState,
                              undoManager: UndoManager? = nil) {
-        PageNavigationBar.markWholePage(
+        PageNavigationBar.toggleWholePage(
             redactionState: redactionState, documentState: documentState, undoManager: undoManager)
     }
 
@@ -172,16 +172,6 @@ struct PageBarWholePageTests {
         Self.mark(documentState, redactionState)
         #expect(PageNavigationBar.isWholePageMarked(page: 1, in: redactionState))
         #expect(!PageNavigationBar.isWholePageMarked(page: 0, in: redactionState))
-    }
-
-    @Test("Marking a marked page adds no second whole-page region")
-    func markOnAMarkedPageAddsNothing() {
-        let (documentState, redactionState) = Self.makeStates(currentPage: 0)
-        Self.mark(documentState, redactionState)
-        let versionAfterFirst = redactionState.regionVersion
-        Self.mark(documentState, redactionState)
-        #expect(redactionState.regions[0]?.count == 1)
-        #expect(redactionState.regionVersion == versionAfterFirst, "the second mark changes nothing")
     }
 
     @Test("The toggle marks, then unmarks: one undo step each way, named for it; Undo after Unmark marks the page again")

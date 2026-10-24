@@ -272,21 +272,25 @@ struct DocumentEditorToolbar {
 
     // MARK: - Toolbar Components
 
-    /// Mark Whole Page in the overflow: the page bar's own action on the
+    /// Mark Whole Page in the overflow: the page bar's own toggle on the
     /// page in view. It shows for every page count; the page bar's
-    /// button is hidden on a one-page document.
+    /// control is hidden on a one-page document.
+    /// The row reads Mark Whole Page, or Unmark Whole Page with its check on
+    /// a marked page — the page bar's words, through its one label static.
     @ViewBuilder
     private var markWholePageButton: some View {
-        Button("Mark Whole Page", systemImage: "rectangle.inset.filled") {
-            markWholePage()
+        let marked = PageNavigationBar.isWholePageMarked(
+            page: documentState.currentPageIndex, in: redactionState)
+        Toggle(isOn: Binding(get: { marked }, set: { _ in toggleWholePage() })) {
+            Label(PageNavigationBar.wholePageActionLabel(marked: marked), systemImage: "rectangle.inset.filled")
         }
         .accessibilityIdentifier("overflowMarkWholePage")
     }
 
-    /// The overflow row's action — `PageNavigationBar.markWholePage`, the
+    /// The overflow row's action — `PageNavigationBar.toggleWholePage`, the
     /// one home of the whole-page region.
-    func markWholePage() {
-        PageNavigationBar.markWholePage(
+    func toggleWholePage() {
+        PageNavigationBar.toggleWholePage(
             redactionState: redactionState, documentState: documentState, undoManager: undoManager)
     }
 
