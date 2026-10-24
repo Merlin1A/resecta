@@ -221,6 +221,31 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
         refreshAllOverlays()
     }
 
+    /// What a tap on the canvas clears: with the Rectangle tool off and Add
+    /// to Selection off, a tap on no region clears a non-empty selection. A
+    /// region under the point is the overlay's own touch.
+    static func canvasTapClearsSelection(
+        hitsRegion: Bool, isDrawingMode: Bool, isMultiSelectActive: Bool, hasSelection: Bool
+    ) -> Bool {
+        hasSelection && !hitsRegion && !isDrawingMode && !isMultiSelectActive
+    }
+
+    /// The canvas's single tap (`FitFlooredPDFView.onSingleTap`), in
+    /// `view`'s coordinates. The visible page's overlay answers whether a
+    /// region is under the point, by its own hit test.
+    func handleCanvasTap(at point: CGPoint, in view: UIView) {
+        guard let state = redactionState else { return }
+        let overlay = documentState.flatMap { activeOverlays[$0.currentPageIndex] }
+        let hitsRegion = overlay.map { $0.hitTestRegion(at: view.convert(point, to: $0)) != nil } ?? false
+        guard Self.canvasTapClearsSelection(
+            hitsRegion: hitsRegion,
+            isDrawingMode: isDrawingMode,
+            isMultiSelectActive: isMultiSelectActive,
+            hasSelection: !state.selectedRegionIDs.isEmpty
+        ) else { return }
+        selectRegion(nil)
+    }
+
     /// Toggle a region in/out of the multi-selection set (Shift+tap on iPad).
     func toggleRegionSelection(_ id: UUID) {
         guard let state = redactionState else { return }

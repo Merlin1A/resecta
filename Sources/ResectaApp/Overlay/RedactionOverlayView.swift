@@ -98,21 +98,16 @@ class RedactionOverlayView: UIView {
     /// while a gesture is in flight to prevent corruption of
     /// marquee state. Cleared in resetDragState.
     private var primaryTouch: UITouch?
-    /// Long-press timer for selecting + moving unselected regions.
-    private var longPressTimer: Timer?
-    private var longPressOrigin: CGPoint?
-    private var longPressCandidateID: UUID?
-    /// Maximum finger movement before long-press is cancelled.
-    private static let longPressMoveThreshold: CGFloat = 10.0
-    /// Duration before long-press fires. 0.35s matches Apple's standard
-    /// context menu duration — feels more responsive on iPad.
-    private static let longPressDuration: TimeInterval = 0.35
     /// True when dragging multiple selected regions as a group.
     var isGroupMoving: Bool = false
     /// Pre-drag normalized rects for all regions in the group move, for cancel restoration.
     var preDragGroupRects: [UUID: CGRect] = [:]
     /// Touch start point for computing group move delta.
     var groupMoveStart: CGPoint?
+    /// The member the group move's touch landed on.
+    var groupMoveTouchedID: UUID?
+    /// The region an Add to Selection touch landed on, toggled on lift.
+    var pendingToggleID: UUID?
 
     // MARK: - Snap State
 
@@ -131,8 +126,8 @@ class RedactionOverlayView: UIView {
     var snapZoomScaleOverride: CGFloat?
 
     /// Screen points → overlay units. Finger tolerances
-    /// (drag-start gate, commit floor, resize floor, long-press travel,
-    /// region hit inset, handle boxes, snap proximity) are specified in
+    /// (drag-start gate, commit floor, resize floor, region hit inset,
+    /// handle boxes, snap proximity) are specified in
     /// SCREEN points; the overlay's space is the page's unscaled bounds
     /// (PDFKit zooms the container), so a tolerance in overlay units is
     /// the screen tolerance × 1/zoom. Document geometry (page-margin
@@ -175,8 +170,8 @@ class RedactionOverlayView: UIView {
     //   DimensionLabelPosition + dimensionLabelPosition(…),
     //   clampedDragOrigin(…).
 
-    // Predicate for the touchesBegan branch that routes a region tap
-    // through `coordinator?.toggleRegionSelection`. Returns true when either
+    // Predicate for the region tap that toggles on lift through
+    // `coordinator?.toggleRegionSelection`. Returns true when either
     // the iPad Shift modifier is held OR the iPhone "Select More" toolbar
     // toggle is on; otherwise the tap follows the replace-selection path.
     // Pure predicate so the OR shape is pinned without a UITouch host.
@@ -244,13 +239,6 @@ class RedactionOverlayView: UIView {
     /// Haptic for move commit ("stamp placed" metaphor).
     lazy var moveCommitFeedback: UIImpactFeedbackGenerator = {
         let gen = UIImpactFeedbackGenerator(style: .medium)
-        gen.prepare()
-        return gen
-    }()
-
-    /// Selection haptic for long-press activation.
-    private lazy var selectionFeedback: UISelectionFeedbackGenerator = {
-        let gen = UISelectionFeedbackGenerator()
         gen.prepare()
         return gen
     }()
@@ -441,15 +429,15 @@ class RedactionOverlayView: UIView {
         // Priority 2: Tap on existing region — select, and start move if already selected
         if let tappedRegion = hitTestRegion(at: point) {
             // iPad Shift+tap OR iPhone "Select More" toggle: tap toggles
-            // multi-selection. Both routes converge on the same toggle
-            // call — the toolbar toggle layers on top of the existing
-            // selection model, no parallel mutation path.
+            // multi-selection, when the touch lifts (`commitPendingToggle`).
+            // Both routes converge on the same toggle call — the toolbar
+            // toggle layers on top of the existing selection model.
             let shiftHeld = event?.modifierFlags.contains(.shift) ?? false
             if RedactionOverlayView.shouldToggleSelection(
                 isMultiSelectActive: isMultiSelectActive,
                 shiftHeld: shiftHeld
             ) {
-                coordinator?.toggleRegionSelection(tappedRegion.id)
+                pendingToggleID = tappedRegion.id
                 return
             }
 
@@ -458,19 +446,10 @@ class RedactionOverlayView: UIView {
                 beginMove(for: tappedRegion, at: point)
             } else if selectedIDs.contains(tappedRegion.id), selectedIDs.count > 1 {
                 // Multi-selected and tapped one of them — begin group move
-                beginGroupMove(at: point)
+                beginGroupMove(at: point, touching: tappedRegion.id)
             } else {
-                // Not selected — select and start long-press timer for move
+                // Not selected — select it; a drag moves it once selected
                 coordinator?.selectRegion(tappedRegion.id)
-                longPressOrigin = point
-                longPressCandidateID = tappedRegion.id
-                longPressTimer = Timer.scheduledTimer(
-                    withTimeInterval: Self.longPressDuration, repeats: false
-                ) { [weak self] _ in
-                    MainActor.assumeIsolated {
-                        self?.longPressTimerFired()
-                    }
-                }
             }
             return
         }
@@ -515,29 +494,6 @@ class RedactionOverlayView: UIView {
         return 1.0
     }
 
-    // MARK: - Move Helpers
-
-    /// Long-press timer fired — select the region and begin move.
-    private func longPressTimerFired() {
-        guard let candidateID = longPressCandidateID,
-              let region = regions.first(where: { $0.id == candidateID }),
-              let origin = longPressOrigin else {
-            cancelLongPress()
-            return
-        }
-        selectionFeedback.selectionChanged()
-        coordinator?.selectRegion(candidateID)
-        beginMove(for: region, at: origin)
-        setNeedsDisplay()
-    }
-
-    private func cancelLongPress() {
-        longPressTimer?.invalidate()
-        longPressTimer = nil
-        longPressOrigin = nil
-        longPressCandidateID = nil
-    }
-
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
         // Only honor the primary touch while a gesture is in flight:
         // a second finger's moves must not steer it.
@@ -545,16 +501,6 @@ class RedactionOverlayView: UIView {
               let touch = touches.first(where: { $0 === primaryTouch })
         else { return }
         let point = touch.location(in: self)
-
-        // Cancel long-press timer if finger moved too far
-        if let origin = longPressOrigin {
-            let dx = abs(point.x - origin.x)
-            let dy = abs(point.y - origin.y)
-            let travel = Self.longPressMoveThreshold * fingerScale
-            if dx > travel || dy > travel {
-                cancelLongPress()
-            }
-        }
 
         if isGroupMoving {
             // Group move — translate all selected regions by delta
@@ -627,6 +573,7 @@ class RedactionOverlayView: UIView {
         // gesture. Checked BEFORE the defer on purpose.
         guard let primaryTouch, touches.contains(primaryTouch) else { return }
         defer { resetDragState() }
+        if commitPendingToggle() { return }
 
         // Commit lasso marquee — intersect every visible region's
         // normalizedRect against the marquee's normalized rect; route the
@@ -649,14 +596,9 @@ class RedactionOverlayView: UIView {
             return
         }
 
-        // Commit group move
+        // Commit group move, or narrow the selection on a still tap
         if isGroupMoving {
-            moveCommitFeedback.impactOccurred()
-            let moves = regions
-                .filter { selectedIDs.contains($0.id) }
-                .map { (id: $0.id, newRect: $0.normalizedRect) }
-            coordinator?.commitMoveMultiple(moves, page: pageIndex,
-                                            undoManager: window?.undoManager)
+            endGroupMove()
             return
         }
 
@@ -742,11 +684,12 @@ class RedactionOverlayView: UIView {
         dragOffset = .zero
         preDragNormalizedRect = nil
         preResizeNormalizedRect = nil
-        cancelLongPress()
         // Group move cleanup
         isGroupMoving = false
         preDragGroupRects = [:]
         groupMoveStart = nil
+        groupMoveTouchedID = nil
+        pendingToggleID = nil
         // Snap state cleanup
         snapEngine.reset()
         // Repaint on gesture end. The commit paths
@@ -933,9 +876,6 @@ class RedactionOverlayView: UIView {
     override func removeFromSuperview() {
         handleDisplayLink?.invalidate()
         handleDisplayLink = nil
-        // PDFView's overlay-recycling can drop the view mid-long-press; the
-        // scheduled Timer otherwise retains itself on the runloop until fire.
-        cancelLongPress()
         super.removeFromSuperview()
     }
 
