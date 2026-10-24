@@ -76,14 +76,21 @@ struct ParkedChromeLayoutTests {
             pageCount: pages, sizeClass: size, phase: phase, hugHeight: hug)
     }
 
-    @Test("The page bar mounts only at compact width, on more than one page, in the editing phase")
+    @Test("The page bar mounts only at compact width, with a page open, in the editing phase")
     func pageBarEligibility() {
         #expect(layout(sheet: false, walk: false).showsPageBar)
-        #expect(!layout(sheet: false, walk: false, pages: 1).showsPageBar)
+        #expect(!layout(sheet: false, walk: false, pages: 0).showsPageBar)
         #expect(!layout(sheet: false, walk: false, size: .regular).showsPageBar)
         #expect(!layout(sheet: false, walk: false, size: nil).showsPageBar)
         #expect(!layout(sheet: false, walk: false, phase: .verifying).showsPageBar)
         #expect(!layout(sheet: false, walk: false, phase: .verified).showsPageBar)
+    }
+
+    @Test("A one-page document shows the page bar, and bottom toasts clear it; no page shows none")
+    func onePageDocumentShowsTheBar() {
+        #expect(layout(sheet: false, walk: false, pages: 1).showsPageBar)
+        #expect(layout(sheet: false, walk: false, pages: 1).toastClearance == ParkedChromeLayout.pageBarClearance)
+        #expect(!layout(sheet: false, walk: false, pages: 0).showsPageBar)
     }
 
     @Test("The page bar stays while the sheet is parked at the compact float, with or without a live walk")
@@ -104,7 +111,7 @@ struct ParkedChromeLayoutTests {
     func canvasInsetIsTheHugOnlyWhileParked() {
         #expect(layout(walk: true).canvasBottomInset == CompactFloatDetent.hugHeight)
         #expect(layout(walk: false).canvasBottomInset == CompactFloatDetent.hugHeight)
-        #expect(layout(pages: 1).canvasBottomInset == CompactFloatDetent.hugHeight)
+        #expect(layout(pages: 0).canvasBottomInset == CompactFloatDetent.hugHeight)
         #expect(layout(detent: .medium).canvasBottomInset == 0)
         #expect(layout(detent: .large).canvasBottomInset == 0)
         #expect(layout(sheet: false).canvasBottomInset == 0)
@@ -114,7 +121,7 @@ struct ParkedChromeLayoutTests {
     func readsTheGivenHug() {
         #expect(layout(hug: 120).canvasBottomInset == 120)
         #expect(layout(hug: 120).toastClearance == 120 + ParkedChromeLayout.pageBarClearance)
-        #expect(layout(pages: 1, hug: 120).toastClearance == 120)
+        #expect(layout(pages: 0, hug: 120).toastClearance == 120)
     }
 
     @Test("Toast clearance: the hug while parked, plus the bar while it is up and uncovered; zero under a taller sheet")
@@ -123,12 +130,12 @@ struct ParkedChromeLayoutTests {
         let hug = CompactFloatDetent.hugHeight
         // No sheet: the import toast clears the bar.
         #expect(layout(sheet: false, walk: false).toastClearance == bar)
-        #expect(layout(sheet: false, walk: false, pages: 1).toastClearance == 0)
+        #expect(layout(sheet: false, walk: false, pages: 0).toastClearance == 0)
         // Parked with a live walk: the bar stays — both.
         #expect(layout(walk: true).toastClearance == hug + bar)
         // Parked with no walk: the bar stays — both.
         #expect(layout(walk: false).toastClearance == hug + bar)
-        #expect(layout(pages: 1).toastClearance == hug)
+        #expect(layout(pages: 0).toastClearance == hug)
         // A taller sheet covers the app-level host; the sheet-local
         // host needs nothing.
         #expect(layout(detent: .medium).toastClearance == 0)
@@ -154,7 +161,7 @@ struct ParkedChromeLayoutTests {
         #expect(layout() == layout())
         // The walk no longer moves the chrome; the page count still does.
         #expect(layout() == layout(walk: false))
-        #expect(layout() != layout(pages: 1))
+        #expect(layout() != layout(pages: 0))
         #expect(layout() != layout(hug: 120))
     }
 }

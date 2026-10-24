@@ -460,7 +460,7 @@ struct AccessibilityLabelTests {
         #expect(PageNavigationBar.pageAccessibilityLabel(page: 3, pageCount: 5, regionCount: 1)
                 == "Page 3 of 5, 1 region")
         #expect(PageNavigationBar.pageAccessibilityLabel(page: 2, pageCount: 5, regionCount: 0)
-                == "Page 2 of 5")
+                == "Page 2 of 5, 0 regions")
     }
 
     @Test("The parked strip offers the 'Show full sheet' action")

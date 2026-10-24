@@ -154,25 +154,20 @@ struct ImportAnnotationNoticeBanner: View {
     }
 
     /// Visibility contract, exposed as a static so unit tests can pin
-    /// it without rendering the view: the notice shows while editing a
+    /// it without rendering the view: the notice is owed while editing a
     /// document whose source carries annotations or filled form fields,
-    /// until the user dismisses it, and yields to the two sibling
-    /// top-edge banners (background-resume and detection-summary) rather
-    /// than stacking over them — it returns once they clear because
-    /// dismissal is the only terminal state.
+    /// until the user dismisses it. Whether it shows now or waits for a
+    /// sibling top-edge notice is the editor's top-banner slot's call
+    /// (`TopBannerSlot`); dismissal is its only terminal state.
     static func isVisible(
         phaseKind: DocumentState.PhaseKind,
         annotationTypeCount: Int,
         filledFormFieldCount: Int = 0,
-        dismissed: Bool,
-        pausedBannerActive: Bool,
-        detectionBannerActive: Bool
+        dismissed: Bool
     ) -> Bool {
         phaseKind == .editing
             && (annotationTypeCount > 0 || filledFormFieldCount > 0)
             && !dismissed
-            && !pausedBannerActive
-            && !detectionBannerActive
     }
 
     @Environment(DocumentState.self) private var documentState
