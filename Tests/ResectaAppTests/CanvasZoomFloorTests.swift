@@ -1,6 +1,7 @@
 import Testing
 import UIKit
 import PDFKit
+import RedactionEngine
 @testable import ResectaApp
 
 // The document view's zoom floor. `FitFlooredPDFView`
@@ -186,5 +187,31 @@ struct CanvasZoomFloorTests {
         coordinator.updateDrawingMode(true, isDrawing: false)
         #expect(pans.allSatisfy { $0.minimumNumberOfTouches == 1 }, "the tool off, one finger scrolls again")
         withExtendedLifetime(coordinator) {}
+    }
+
+    @Test("A one-finger touch the overlay claims never scrolls; a touch on empty page scrolls with one finger; the pinch is untouched")
+    func claimedTouchNeedsTwoFingersToScroll() throws {
+        let (view, _) = makeView()
+        let state = RedactionState()
+        let region = RedactionRegion(id: UUID(), normalizedRect: CGRect(x: 0.2, y: 0.5, width: 0.3, height: 0.1), source: .manual)
+        state.addRegion(region, page: 0, undoManager: nil)
+        let coordinator = PDFViewCoordinator()
+        coordinator.redactionState = state
+        coordinator.pdfView = view
+        let page = try #require(view.document?.page(at: 0))
+        let overlay = try #require(coordinator.pdfView(view, overlayViewFor: page) as? RedactionOverlayView)
+        overlay.frame = CGRect(origin: .zero, size: Self.letter)
+        coordinator.updateDrawingMode(true, isDrawing: false)
+        let scrolls = Self.scrollViews(in: view)
+        try #require(!scrolls.isEmpty)
+        let box = overlay.pdfNormalizedToOverlay(region.normalizedRect)
+
+        #expect(overlay.hitTest(CGPoint(x: box.midX, y: box.midY), with: nil) === overlay, "the overlay claims a touch on a region")
+        #expect(scrolls.contains { $0.panGestureRecognizer.minimumNumberOfTouches == 2 }, "from that touch-down one finger does not scroll")
+        #expect(scrolls.allSatisfy { $0.pinchGestureRecognizer?.isEnabled ?? true }, "the pinch is untouched")
+
+        #expect(overlay.hitTest(CGPoint(x: 20, y: 20), with: nil) == nil, "empty page is PDFKit's")
+        #expect(scrolls.allSatisfy { $0.panGestureRecognizer.minimumNumberOfTouches == 1 }, "a touch on empty page scrolls with one finger")
+        withExtendedLifetime((coordinator, overlay)) {}
     }
 }
