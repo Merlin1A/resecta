@@ -214,52 +214,7 @@ struct DocumentEditorView: View {
                                 .transition(.opacity)
                         }
                     }
-                    // Detection summary banner (all run outcomes,
-                    // not just success — zero/failed previously left no
-                    // persistent record).
-                    .overlay(alignment: .top) {
-                        detectionBannerOverlay
-                    }
-                    // InlineWarningBanner for background resume
-                    // (cancel-from-detecting / cancel-from-redacting path).
-                    .overlay(alignment: .top) {
-                        resumeBannerOverlay
-                    }
-                    // Import annotation notice: the imported source
-                    // carries annotations or filled form fields, which the
-                    // on-screen view draws but the export raster (built
-                    // from the page content stream) does not include.
-                    // Persistent until the user dismisses it; yields to
-                    // the two banners above via the visibility predicate
-                    // rather than stacking.
-                    .overlay(alignment: .top) {
-                        let annotationCount = ImportAnnotationNoticeBanner.noticeWorthyCount(
-                            documentState.sourceAnnotationFindings)
-                        if ImportAnnotationNoticeBanner.isVisible(
-                            phaseKind: documentState.phaseKind,
-                            annotationTypeCount: annotationCount,
-                            filledFormFieldCount: documentState.sourceFilledFormFieldCount,
-                            dismissed: documentState.annotationNoticeDismissed,
-                            pausedBannerActive: documentState.wasPausedByBackground,
-                            detectionBannerActive: detectionBanner != nil
-                        ) {
-                            ImportAnnotationNoticeBanner(
-                                annotationCount: annotationCount,
-                                filledFormFieldCount: documentState.sourceFilledFormFieldCount
-                            ) {
-                                withAnimation(ResectaTokens.Anim.overlayDismiss) {
-                                    documentState.annotationNoticeDismissed = true
-                                }
-                            }
-                            // Routed through the resolver so Reduce
-                            // Motion swaps the slide for an opacity-only
-                            // crossfade.
-                            .transition(ResectaTokens.Anim.resolvedTransition(
-                                standard: .move(edge: .top).combined(with: .opacity),
-                                reduceMotion: reduceMotion))
-                            .padding(.top, ResectaTokens.Spacing.toolbarClearance)
-                        }
-                    }
+                    .overlay(alignment: .top) { topBannerSlot }
                     // (Note: the mid-verify background-resume
                     // banner that used to chain here was structurally
                     // unreachable — it gated on `.verified(report: .skipped)`,
