@@ -60,7 +60,8 @@ struct DetectionSweepFoldTests {
     /// One page's observation: per request index, the items the stream
     /// yielded; `timedOut` names the requests whose pattern ran out of time.
     private func page(_ index: Int, route: PageSearchCoverage.Route? = .textLayer,
-                      _ itemsByRequest: [Int: [Item]], timedOut: Set<Int> = []) -> RecheckObservation {
+                      _ itemsByRequest: [Int: [Item]], timedOut: Set<Int> = [],
+                      bothLegs: Bool = false) -> RecheckObservation {
         var counts: [Int: Count] = [:]
         for (request, items) in itemsByRequest {
             var perTerm: [String: Int] = [:]
@@ -69,7 +70,8 @@ struct DetectionSweepFoldTests {
                                     timedOut: timedOut.contains(request), items: items)
         }
         return RecheckObservation(
-            pageIndex: index, route: route, regexTimedOut: !timedOut.isEmpty, counts: counts)
+            pageIndex: index, route: route, regexTimedOut: !timedOut.isEmpty, counts: counts,
+            textLayerRead: bothLegs || route == .textLayer)
     }
 
     private func message(_ status: VerificationStatus) -> String {
@@ -159,6 +161,17 @@ struct DetectionSweepFoldTests {
         #expect(outcome.copyOverride?.detail == "\(DetectionSweep.detailLeadSweep) Text was read by OCR from the rendered pages. \(DetectionSweep.gateSentence)")
         #expect(outcome.queryLines?.first?.label == "Scan (\(PIICategory.allCases.count) detectors)")
         #expect(outcome.queryLines?.first?.route == .ocr)
+    }
+
+    @Test("PASS: every page read on both legs — the route sentence names both")
+    func passBothLegs() {
+        let outcome = DetectionSweep.fold(
+            requests: [sweep],
+            observations: [page(0, route: .ocr, [0: []], bothLegs: true), page(1, route: .ocr, [0: []], bothLegs: true)],
+            pageCount: 2)
+        #expect(outcome.status == .pass)
+        #expect(outcome.copyOverride?.detail == "\(DetectionSweep.detailLeadSweep) Text was read from the output's text layer and by OCR from the rendered pages. \(DetectionSweep.gateSentence)")
+        #expect(outcome.queryLines?.first?.route == .mixed(textPages: 2, ocrPages: 2))
     }
 
     @Test("INFO with page chips: the sweep origin reports possible items on their pages")

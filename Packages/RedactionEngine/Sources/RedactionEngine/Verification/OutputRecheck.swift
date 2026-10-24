@@ -60,6 +60,9 @@ struct RecheckObservation: Sendable, Equatable {
     var regexTimedOut: Bool
     /// Keyed by request index.
     var counts: [Int: Count]
+    /// The page's text layer was searched. With `route` `.ocr` the page was
+    /// read on both legs: a text layer over image content (the hybrid route).
+    var textLayerRead: Bool = false
 
     /// The same observation keyed by a subset of the requests, in the
     /// subset's order: `indices[k]` becomes key `k`; the page view follows
@@ -71,7 +74,8 @@ struct RecheckObservation: Sendable, Equatable {
         }
         return RecheckObservation(
             pageIndex: pageIndex, route: route,
-            regexTimedOut: subset.values.contains(where: \.timedOut), counts: subset)
+            regexTimedOut: subset.values.contains(where: \.timedOut), counts: subset,
+            textLayerRead: textLayerRead)
     }
 }
 
@@ -149,6 +153,7 @@ struct OutputRecheck: Sendable {
     private final class CoverageBox: @unchecked Sendable {
         private let lock = NSLock()
         private var worst: PageSearchCoverage.Route?
+        private var sawTextLayer = false
 
         private static func rank(_ route: PageSearchCoverage.Route?) -> Int {
             switch route {
@@ -164,6 +169,12 @@ struct OutputRecheck: Sendable {
         func record(_ route: PageSearchCoverage.Route) {
             lock.lock(); defer { lock.unlock() }
             if Self.rank(route) > Self.rank(worst) { worst = route }
+            if route == .textLayer { sawTextLayer = true }
+        }
+
+        var textLayerSeen: Bool {
+            lock.lock(); defer { lock.unlock() }
+            return sawTextLayer
         }
 
         var snapshot: PageSearchCoverage.Route? {
@@ -259,6 +270,7 @@ struct OutputRecheck: Sendable {
         }
 
         observation.route = box.snapshot
+        observation.textLayerRead = box.textLayerSeen
         observation.regexTimedOut = observation.counts.values.contains(where: \.timedOut)
         return observation
     }

@@ -218,13 +218,14 @@ struct SearchRecheckTests {
 
     private func observation(
         _ page: Int, route: PageSearchCoverage.Route?, remaining: Int = 0,
-        hitCap: Bool = false, timeout: Bool = false, request: Int = 0
+        hitCap: Bool = false, timeout: Bool = false, request: Int = 0, bothLegs: Bool = false
     ) -> SearchRecheck.PageObservation {
         SearchRecheck.PageObservation(
             pageIndex: page, route: route, regexTimedOut: timeout,
             counts: route == nil || route == .unopenable
                 ? [:]
-                : [request: .init(remaining: remaining, hitCap: hitCap, perTerm: [:], timedOut: timeout)])
+                : [request: .init(remaining: remaining, hitCap: hitCap, perTerm: [:], timedOut: timeout)],
+            textLayerRead: bothLegs || route == .textLayer)
     }
 
     @Test("An unchecked page's WARN carries couldNotVerify through runLayer; a clean re-run and INFO do not")
@@ -355,5 +356,34 @@ struct SearchRecheckTests {
         #expect(outcome.status == .warn(""))
         #expect(outcome.copyOverride?.detail == "\(SearchRecheck.detailLead) 1 page could not be checked: 1.")
         #expect(SearchRecheck.routeSentence(textPages: 0, ocrPages: 0) == "")
+    }
+
+    @Test("fold: pages read on both legs count on each; when every page was, the sentence names both")
+    func foldBothLegs() {
+        let requests = [TestFixtures.textRequest("Delia")]
+        let both = SearchRecheck.fold(
+            requests: requests,
+            observations: [observation(0, route: .ocr, bothLegs: true), observation(1, route: .ocr, bothLegs: true)],
+            pageCount: 2)
+        #expect(both.status == .pass)
+        #expect(both.copyOverride?.detail == "\(SearchRecheck.detailLead) Text was read from the output's text layer and by OCR from the rendered pages.")
+        #expect(both.queryLines?.first?.route == .mixed(textPages: 2, ocrPages: 2))
+
+        let mixed = SearchRecheck.fold(
+            requests: requests,
+            observations: [observation(0, route: .textLayer), observation(1, route: .ocr, bothLegs: true)],
+            pageCount: 2)
+        #expect(mixed.copyOverride?.detail == "\(SearchRecheck.detailLead) Text was read from the text layer on 2 pages and by OCR from the rendered pages on 1.")
+        #expect(mixed.queryLines?.first?.route == .mixed(textPages: 2, ocrPages: 1))
+    }
+
+    @Test("routeSentence: every page read on both legs, some, none")
+    func routeSentenceBothLegs() {
+        #expect(SearchRecheck.routeSentence(textPages: 3, ocrPages: 3, bothPages: 3)
+                == "Text was read from the output's text layer and by OCR from the rendered pages.")
+        #expect(SearchRecheck.routeSentence(textPages: 3, ocrPages: 2, bothPages: 2)
+                == "Text was read from the text layer on 3 pages and by OCR from the rendered pages on 2.")
+        #expect(SearchRecheck.routeSentence(textPages: 2, ocrPages: 1)
+                == "Text was read from the text layer on 2 pages and by OCR from the rendered pages on 1.")
     }
 }
