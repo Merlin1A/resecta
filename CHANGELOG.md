@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ### Changed
 
+- Tapping an empty part of the page clears the region selection; with Add to Selection on, a tap on empty page changes nothing.
 - Undo and Redo name region steps with the controls' word, Region (Add Region, Duplicate Region, Delete Regions, Move Region, Resize Region), and Redo names the action it repeats.
 - A search apply's undo step is named by the regions it creates, not counting results already covered.
 - Duplicate selects the copy.
