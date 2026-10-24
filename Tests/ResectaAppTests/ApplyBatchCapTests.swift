@@ -66,7 +66,6 @@ struct ApplyBatchCapTests {
 
         let outcome = state.applyBatch(
             regions,
-            undoManager: nil,
             toastManager: toastManager
         )
 
@@ -99,7 +98,7 @@ struct ApplyBatchCapTests {
         state.regions[0] = regions
 
         let outcome = state.applyBatch(
-            regions, undoManager: nil, toastManager: toastManager
+            regions, toastManager: toastManager
         )
 
         #expect(outcome.selected == 500)
@@ -117,7 +116,7 @@ struct ApplyBatchCapTests {
         let regions = fabricateRegions(count: 750)
 
         let outcome = state.applyBatch(
-            regions, undoManager: nil, toastManager: nil
+            regions, toastManager: nil
         )
 
         #expect(outcome.selected == 500)
@@ -137,7 +136,7 @@ struct ApplyBatchCapTests {
         let regions = fabricateRegions(count: 600)
         state.regions[0] = regions
 
-        state.applyBatch(regions, undoManager: nil, toastManager: nil)
+        state.applyBatch(regions, toastManager: nil)
 
         let expectedIDs = Set(regions.prefix(500).map(\.id))
         #expect(state.selectedRegionIDs == expectedIDs)
@@ -158,7 +157,7 @@ struct ApplyBatchCapTests {
         let regions = fabricateRegions(count: 500)
 
         let outcome = state.applyBatch(
-            regions, undoManager: nil, toastManager: nil
+            regions, toastManager: nil
         )
 
         #expect(outcome.selected == 500)

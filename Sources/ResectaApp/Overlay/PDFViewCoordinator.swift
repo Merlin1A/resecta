@@ -221,6 +221,31 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
         refreshAllOverlays()
     }
 
+    /// What a tap on the canvas clears: with the Rectangle tool off and Add
+    /// to Selection off, a tap on no region clears a non-empty selection. A
+    /// region under the point is the overlay's own touch.
+    static func canvasTapClearsSelection(
+        hitsRegion: Bool, isDrawingMode: Bool, isMultiSelectActive: Bool, hasSelection: Bool
+    ) -> Bool {
+        hasSelection && !hitsRegion && !isDrawingMode && !isMultiSelectActive
+    }
+
+    /// The canvas's single tap (`FitFlooredPDFView.onSingleTap`), in
+    /// `view`'s coordinates. The visible page's overlay answers whether a
+    /// region is under the point, by its own hit test.
+    func handleCanvasTap(at point: CGPoint, in view: UIView) {
+        guard let state = redactionState else { return }
+        let overlay = documentState.flatMap { activeOverlays[$0.currentPageIndex] }
+        let hitsRegion = overlay.map { $0.hitTestRegion(at: view.convert(point, to: $0)) != nil } ?? false
+        guard Self.canvasTapClearsSelection(
+            hitsRegion: hitsRegion,
+            isDrawingMode: isDrawingMode,
+            isMultiSelectActive: isMultiSelectActive,
+            hasSelection: !state.selectedRegionIDs.isEmpty
+        ) else { return }
+        selectRegion(nil)
+    }
+
     /// Toggle a region in/out of the multi-selection set (Shift+tap on iPad).
     func toggleRegionSelection(_ id: UUID) {
         guard let state = redactionState else { return }
@@ -264,7 +289,7 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
     /// With Add to Selection on, the marquee ADDS to the current
     /// selection (current first, so the cap keeps what was already
     /// chosen) and an empty marquee — a tap on the page — changes nothing.
-    func commitLassoSelection(_ regions: [RedactionRegion], undoManager: UndoManager?) {
+    func commitLassoSelection(_ regions: [RedactionRegion]) {
         guard let state = redactionState else { return }
         var batch = regions
         if isMultiSelectActive {
@@ -274,7 +299,7 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
             let currentIDs = Set(current.map(\.id))
             batch = current + regions.filter { !currentIDs.contains($0.id) }
         }
-        state.applyBatch(batch, undoManager: undoManager, toastManager: toastManager)
+        state.applyBatch(batch, toastManager: toastManager)
         refreshAllOverlays()
     }
 
@@ -308,6 +333,15 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
         redactionState?.removeRegion(id, page: page, undoManager: pdfView?.window?.undoManager)
         refreshOverlay(for: page)
         UIAccessibility.post(notification: .announcement, argument: Self.commitAnnouncement(.deleted))
+    }
+
+    /// Delete the selection at once, one undo step on the window's undo
+    /// manager: the long-press menu's Delete N Regions. The one door for the
+    /// menu's selection delete.
+    func deleteSelection() {
+        guard let state = redactionState else { return }
+        let pages = state.deleteSelected(undoManager: pdfView?.window?.undoManager)
+        for page in pages { refreshOverlay(for: page) }
     }
 
     // MARK: - Overlay Refresh

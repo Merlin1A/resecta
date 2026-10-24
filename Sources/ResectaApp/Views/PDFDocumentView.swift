@@ -63,6 +63,12 @@ struct PDFDocumentView: UIViewRepresentable {
         }
 
         context.coordinator.setupObservers(for: pdfView)
+        // A tap on the page outside the overlays' own touches: the
+        // coordinator decides whether it clears the selection.
+        pdfView.onSingleTap = { [weak coordinator = context.coordinator, weak pdfView] point in
+            guard let pdfView else { return }
+            coordinator?.handleCanvasTap(at: point, in: pdfView)
+        }
         return pdfView
     }
 
@@ -182,13 +188,13 @@ final class FitFlooredPDFView: PDFView {
     override init(frame: CGRect) {
         super.init(frame: frame)
         observePageChanges()
-        addReturnToFitGesture()
+        addTapGestures()
     }
 
     required init?(coder: NSCoder) {
         super.init(coder: coder)
         observePageChanges()
-        addReturnToFitGesture()
+        addTapGestures()
     }
 
     deinit {
@@ -347,6 +353,11 @@ final class FitFlooredPDFView: PDFView {
     }
 
     static let returnToFitGestureName = "returnToFit"
+    static let clearSelectionTapName = "clearSelectionTap"
+
+    /// The canvas's single tap, in this view's coordinates. The editor's
+    /// coordinator decides whether it clears the region selection.
+    var onSingleTap: (@MainActor (CGPoint) -> Void)?
 
     /// Return a zoomed-in page to the fit scale — the double tap's
     /// action. At fit it does nothing.
@@ -356,15 +367,27 @@ final class FitFlooredPDFView: PDFView {
         scaleFactor = fit
     }
 
-    /// The double tap neither cancels nor delays the touches beneath it,
-    /// so a tap on a region still selects it.
-    private func addReturnToFitGesture() {
+    /// The double tap returns to fit; the single tap waits for it to fail.
+    /// Neither cancels nor delays the touches beneath it, so a tap on a
+    /// region still reaches the overlay.
+    private func addTapGestures() {
         let doubleTap = UITapGestureRecognizer(target: self, action: #selector(returnToFit))
         doubleTap.numberOfTapsRequired = 2
         doubleTap.cancelsTouchesInView = false
         doubleTap.delaysTouchesEnded = false
         doubleTap.name = Self.returnToFitGestureName
         addGestureRecognizer(doubleTap)
+
+        let singleTap = UITapGestureRecognizer(target: self, action: #selector(handleSingleTap(_:)))
+        singleTap.cancelsTouchesInView = false
+        singleTap.delaysTouchesEnded = false
+        singleTap.name = Self.clearSelectionTapName
+        singleTap.require(toFail: doubleTap)
+        addGestureRecognizer(singleTap)
+    }
+
+    @objc private func handleSingleTap(_ recognizer: UITapGestureRecognizer) {
+        onSingleTap?(recognizer.location(in: self))
     }
 
     /// Pin `minScaleFactor` to the current fit scale. A no-op while the

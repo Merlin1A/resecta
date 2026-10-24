@@ -165,10 +165,8 @@ extension RedactionState {
     /// caller has resolved a rect-marquee against `regions` and produced
     /// the intersecting subset.
     ///
-    /// Mirrors the `commitApply` undo-grouping pattern:
-    /// the entire selection mutation is one undoable step so a follow-on
-    /// batch-delete via `deleteSelected` collapses into a second single
-    /// undo step (one `undoManager.undo()` per user-visible action).
+    /// Selecting is never an undo step: Undo after a marquee undoes the
+    /// last edit to the regions, and Redo is left as it was.
     ///
     /// Enforces the 500-region cap (`lassoSelectionCap`) inside this
     /// method so any caller route — the overlay marquee path today,
@@ -182,9 +180,6 @@ extension RedactionState {
     ///   - regions: Regions to mark selected. Order is preserved across
     ///     the truncation — the first `lassoSelectionCap` entries are
     ///     kept; later entries are dropped silently after the toast.
-    ///   - undoManager: Optional UndoManager for grouping the selection
-    ///     mutation as a single undo step. Nil disables undo support
-    ///     (test seam).
     ///   - toastManager: Optional ToastQueueManager for surfacing the
     ///     overflow toast. Nil disables the toast surfacing (test seam).
     /// - Returns: A tuple naming the count actually selected and a flag
@@ -195,7 +190,6 @@ extension RedactionState {
     @discardableResult
     func applyBatch(
         _ regions: [RedactionRegion],
-        undoManager: UndoManager?,
         toastManager: ToastQueueManager? = nil
     ) -> (selected: Int, truncated: Bool) {
         let truncated = regions.count > Self.lassoSelectionCap
@@ -204,22 +198,7 @@ extension RedactionState {
             : regions
         let newSelection = Set(kept.map(\.id))
 
-        let previousSelection = selectedRegionIDs
         selectedRegionIDs = newSelection
-
-        // Undo: restore the prior selection set in one step, then a
-        // redo step that re-applies the truncated selection. Mirrors
-        // commitApply's two-leg register/re-register pattern
-        // so redo after undo lands the same selection
-        // (rather than the original, untruncated input).
-        let snapshot = newSelection
-        let priorSnapshot = previousSelection
-        registerUndo(undoManager, "Select Regions") { target in
-            target.selectedRegionIDs = priorSnapshot
-            target.registerUndo(undoManager, "Select Regions") { target2 in
-                target2.selectedRegionIDs = snapshot
-            }
-        }
 
         if truncated {
             toastManager?.enqueue(

@@ -28,9 +28,25 @@ final class RecordingCoordinator: PDFViewCoordinator {
     var testOverlays: [RedactionOverlayView] = []
     /// Every `selectRegion(_:)` call in order (`nil` = clear).
     var selections: [UUID?] = []
+    /// Every `commitMoveMultiple` call in order — the group moves.
+    var groupMoves: [[(id: UUID, newRect: CGRect)]] = []
+    /// Every `toggleRegionSelection(_:)` call in order.
+    var toggles: [UUID] = []
 
     override func selectRegion(_ id: UUID?) {
         selections.append(id)
+    }
+
+    override func commitMoveMultiple(
+        _ moves: [(id: UUID, newRect: CGRect)],
+        page: Int,
+        undoManager: UndoManager?
+    ) {
+        groupMoves.append(moves)
+    }
+
+    override func toggleRegionSelection(_ id: UUID) {
+        toggles.append(id)
     }
 
     override func addRegion(
@@ -59,10 +75,7 @@ final class RecordingCoordinator: PDFViewCoordinator {
         resizedRegions.append((id: id, newRect: newRect))
     }
 
-    override func commitLassoSelection(
-        _ regions: [RedactionRegion],
-        undoManager: UndoManager?
-    ) {
+    override func commitLassoSelection(_ regions: [RedactionRegion]) {
         lassoCommits.append(regions)
     }
 
