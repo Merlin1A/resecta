@@ -34,7 +34,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Editor toolbar on iPhone: one Undo button — tap to undo, touch and hold for Undo and Redo with the step's name — and Redact as a teal scissors button beside it; Settings moves into the … menu, which lists the selection actions first and Home last, and the separate More menu is gone. At the largest text sizes Redact moves into the … menu and Undo stays in the bar. The document's name is no longer drawn clipped in the bar.
 - The "match nearby" notice says Mark, matching the Marked N notice.
 - With VoiceOver on, the Rectangle tool is disabled with a hint pointing to Search and Scan.
-- Deleting several selected regions no longer asks first; one Undo restores them.
+- Deleting several selected regions happens at once, as one undo step, and a "Deleted N regions." notice offers Undo; a delete from the … menu or ⌘⌫ ends Add to Selection.
 - A run of arrow-key nudges is one undo step.
 - Deleting selected regions from a hardware keyboard takes Command-Delete.
 - The Discard selections confirmation is an alert with a Cancel button.

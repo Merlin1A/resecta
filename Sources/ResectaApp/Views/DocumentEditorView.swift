@@ -529,7 +529,7 @@ struct DocumentEditorView: View {
             documentOverride: documentOverride, redactButtonDisabled: redactButtonDisabled,
             redactButtonHint: redactButtonHint, handleHomeTap: handleHomeTap,
             homeButton: AnyView(homeButton), pipelineModePicker: AnyView(pipelineModePicker),
-            deleteSelectedRegions: deleteSelectedRegions, openSettings: openSettings
+            openSettings: openSettings
         )
     }
 
@@ -589,10 +589,6 @@ struct DocumentEditorView: View {
             phase: documentState.phaseKind,
             hugHeight: CompactFloatDetent.hug(for: dynamicTypeSize)
         )
-    }
-
-    private func deleteSelectedRegions() {
-        redactionState.deleteSelected(undoManager: undoManager)
     }
 
     // MARK: - Drawing-mode caption helpers

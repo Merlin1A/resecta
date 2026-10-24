@@ -19,7 +19,7 @@ struct DocumentEditorToolbarTests {
             searchSheetDetent: .constant(.medium),
             documentOverride: nil, redactButtonDisabled: true, redactButtonHint: "",
             handleHomeTap: {}, homeButton: AnyView(EmptyView()), pipelineModePicker: AnyView(EmptyView()),
-            deleteSelectedRegions: {}, openSettings: {}
+            openSettings: {}
         )
     }
 
@@ -45,7 +45,7 @@ struct DocumentEditorToolbarTests {
             searchSheetDetent: .constant(.medium),
             documentOverride: nil, redactButtonDisabled: true, redactButtonHint: "",
             handleHomeTap: {}, homeButton: AnyView(EmptyView()), pipelineModePicker: AnyView(EmptyView()),
-            deleteSelectedRegions: {}, openSettings: {}
+            openSettings: {}
         )
         toolbar.resetCanvasTools()
         #expect(tool == nil)

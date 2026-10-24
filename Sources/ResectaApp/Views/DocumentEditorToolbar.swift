@@ -30,7 +30,6 @@ struct DocumentEditorToolbar {
     let handleHomeTap: () -> Void
     let homeButton: AnyView
     let pipelineModePicker: AnyView
-    let deleteSelectedRegions: () -> Void
     /// Settings, parking the search sheet first when it is up.
     let openSettings: () -> Void
 
@@ -342,8 +341,8 @@ struct DocumentEditorToolbar {
     private var deleteButton: some View {
         let count = redactionState.selectedRegionIDs.count
         if count > 0 {
-            // Deletes at once, any count: one Undo step restores them all.
-            Button(deleteButtonLabel, systemImage: "trash") { deleteSelectedRegions() }
+            // Deletes at once, any count, through the one delete rule.
+            Button(deleteButtonLabel, systemImage: "trash") { deleteSelection() }
             .tint(.red)
             // Command-Delete: a bare Delete key belongs to the text field it edits.
             .keyboardShortcut(.delete, modifiers: [.command])
@@ -404,6 +403,14 @@ struct DocumentEditorToolbar {
                       ? "checkmark.circle.fill" : "circle")
             }
         }
+    }
+
+    /// The … menu's Delete and ⌘⌫: the one delete rule (its notice for
+    /// several), then Add to Selection ends through the one reset.
+    func deleteSelection() {
+        let outcome = RegionDeleteRule.deleteSelection(
+            redactionState: redactionState, undoManager: undoManager, toastManager: coordinator.toastManager)
+        if outcome.endsAddToSelection { resetCanvasTools() }
     }
 
     /// The delete's words, shared by the toolbar and the long-press menu.
