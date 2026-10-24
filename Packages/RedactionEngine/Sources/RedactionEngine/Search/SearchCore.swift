@@ -71,7 +71,6 @@ enum SearchCore {
         var effective = options
         if isCJK {
             effective.wholeWord = false
-            effective.exactMatch = false
         }
         return effective
     }

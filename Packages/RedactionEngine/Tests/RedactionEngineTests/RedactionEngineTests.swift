@@ -89,32 +89,6 @@ struct ModelTypeTests {
         #expect(skipped.durationSeconds == 0)
     }
 
-    // MARK: - DetectionResult
-
-    @Test("DetectionResult.toRegion converts correctly")
-    func detectionResultToRegion() {
-        let det = DetectionResult(
-            normalizedRect: CGRect(x: 0.1, y: 0.2, width: 0.3, height: 0.4),
-            kind: .pii(.ssn),
-            confidence: 0.95
-        )
-        let region = det.toRegion()
-        #expect(region.normalizedRect == det.normalizedRect)
-        #expect(region.source == .detectedPII(kind: .ssn))
-        #expect(region.id != det.id) // Fresh UUID
-    }
-
-    @Test("DetectionResult face kind converts to detectedFace source")
-    func detectionResultFaceToRegion() {
-        let det = DetectionResult(
-            normalizedRect: .zero,
-            kind: .face,
-            confidence: 0.8
-        )
-        let region = det.toRegion()
-        #expect(region.source == .detectedFace)
-    }
-
     // MARK: - PipelineError
 
     @Test("PipelineError provides user-facing error descriptions")

@@ -230,7 +230,6 @@ enum ResectaTokens {
 
         // Detection kind badge colors (canvas badges, triage rows, popover)
         static let badgePII: Color = Color(.systemOrange)
-        static let badgeFace: Color = Color(.systemPurple)
 
         // Accent colors
         /// Region count indicator in page navigation bar

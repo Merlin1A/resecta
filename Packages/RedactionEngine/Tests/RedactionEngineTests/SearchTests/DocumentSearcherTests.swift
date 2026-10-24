@@ -585,24 +585,6 @@ struct DocumentSearcherTests {
         #expect(terms.contains("123"))
     }
 
-    @Test("SearchResult → DetectionResult → RedactionRegion preserves searchMatch")
-    func searchMatchRoundTrip() {
-        let detection = DetectionResult(
-            normalizedRect: CGRect(x: 0.1, y: 0.2, width: 0.3, height: 0.04),
-            kind: .searchMatch(term: "test"),
-            confidence: 1.0,
-            matchedText: "test"
-        )
-
-        let region = detection.toRegion()
-
-        if case .searchMatch(let term, _) = region.source {
-            #expect(term == "test")
-        } else {
-            Issue.record("Expected .searchMatch source, got \(region.source)")
-        }
-    }
-
     // MARK: - Regex Search Tests
 
     @Test("Regex matches SSN pattern")

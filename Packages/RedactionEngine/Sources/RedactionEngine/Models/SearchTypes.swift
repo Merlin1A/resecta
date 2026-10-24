@@ -168,24 +168,6 @@ public struct SearchOptions: Sendable, Equatable, Hashable {
     public var wholeWord: Bool = false
     public var includeOCR: Bool = true
     public var normalizeUnicode: Bool = true
-    /// Magic-wand select-by-similar-text. When `true`, the
-    /// text-search runtime applies word-boundary semantics around every
-    /// candidate match (alphanumeric / underscore on either side
-    /// disqualifies it), so a query for "Doe" matches "Doe" but not
-    /// "Doer" or "OldDoe". Default `false` so existing callers see no
-    /// behavior change.
-    ///
-    /// Call-site contract: the search runtime treats the term as a
-    /// literal substring (no regex), so the caller is responsible for
-    /// escaping any regex metacharacters in the term before constructing
-    /// the `.text(...)` mode. The `regex` mode path ignores this flag
-    /// because callers there deliberately opt into pattern semantics
-    /// and must handle word boundaries via `\b` themselves.
-    ///
-    /// Semantically equivalent to `wholeWord = true` on the text /
-    /// multi-term / OCR paths; kept as a distinct flag so the magic-wand
-    /// call site reads self-documentingly.
-    public var exactMatch: Bool = false
 
     // Search-recall normalization extensions.
     // The two length-changing flags (separator strip, diacritic fold)
@@ -228,7 +210,6 @@ public struct SearchOptions: Sendable, Equatable, Hashable {
         wholeWord: Bool = false,
         includeOCR: Bool = true,
         normalizeUnicode: Bool = true,
-        exactMatch: Bool = false,
         stripDigitSeparators: Bool = false,
         normalizeSmartPunctuation: Bool = true,
         foldDiacritics: Bool = false,
@@ -238,7 +219,6 @@ public struct SearchOptions: Sendable, Equatable, Hashable {
         self.wholeWord = wholeWord
         self.includeOCR = includeOCR
         self.normalizeUnicode = normalizeUnicode
-        self.exactMatch = exactMatch
         self.stripDigitSeparators = stripDigitSeparators
         self.normalizeSmartPunctuation = normalizeSmartPunctuation
         self.foldDiacritics = foldDiacritics

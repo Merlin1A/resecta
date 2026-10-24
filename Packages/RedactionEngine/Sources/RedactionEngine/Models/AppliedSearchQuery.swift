@@ -87,12 +87,12 @@ public struct AppliedSearchQuery: Sendable, Hashable {
     }
 
     /// Display-only option badges in fixed order: "case-sensitive" when
-    /// `options.caseSensitive`, "whole word" when `options.wholeWord` or
-    /// `options.exactMatch`. Empty for default options.
+    /// `options.caseSensitive`, "whole word" when `options.wholeWord`.
+    /// Empty for default options.
     public var optionBadges: [String] {
         var badges: [String] = []
         if options.caseSensitive { badges.append("case-sensitive") }
-        if options.wholeWord || options.exactMatch { badges.append("whole word") }
+        if options.wholeWord { badges.append("whole word") }
         return badges
     }
 }

@@ -704,11 +704,9 @@ public actor DocumentSearcher {
                 let extTerm = SearchCore.preparedQuery(normalized: term, options: options)
                 if extTerm.isEmpty { everyTermMatched = false; continue }
 
-                // The magic-wand `exactMatch` gates the same live-preview
-                // word-boundary check as `wholeWord`.
                 let (spans, stoppedAtCap) = SearchCore.literalSpans(
                     in: page, query: extTerm, comparison: [.literal],
-                    wholeWord: options.wholeWord || options.exactMatch,
+                    wholeWord: options.wholeWord,
                     cap: remaining
                 )
                 for span in spans {
@@ -1545,11 +1543,9 @@ public actor DocumentSearcher {
                     range: searchStart..<lineText.endIndex
                 ) else { break }
 
-                // The magic-wand `exactMatch` gates the same OCR
-                // word-boundary check as `wholeWord`. Base-
-                // coordinate variant when an offset map is active, same
-                // as findTextMatches.
-                if options.wholeWord || options.exactMatch {
+                // The word-boundary check: the base-coordinate variant
+                // when an offset map is active, same as findTextMatches.
+                if options.wholeWord {
                     let isBoundaried: Bool
                     if let baseLineChars, let map = ext.offsetMap {
                         let start = lineText.distance(from: lineText.startIndex, to: matchRange.lowerBound)
@@ -1832,12 +1828,9 @@ public actor DocumentSearcher {
 
         var results: [SearchResult] = []
 
-        // `exactMatch` is the magic-wand select-by-similar-text call-site
-        // flag; semantically equivalent to `wholeWord` on the
-        // text/multi-term/OCR paths.
         let (spans, _) = SearchCore.literalSpans(
             in: prepared, query: searchQuery, comparison: [],
-            wholeWord: effectiveOptions.wholeWord || effectiveOptions.exactMatch,
+            wholeWord: effectiveOptions.wholeWord,
             cap: nil
         )
         for span in spans {
