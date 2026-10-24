@@ -363,9 +363,13 @@ struct DocumentEditorToolbar {
         }
     }
 
+    /// The delete's words, shared by the toolbar and the long-press menu.
+    static func deleteLabel(count: Int) -> String {
+        count > 1 ? "Delete \(count) Regions" : "Delete Region"
+    }
+
     var deleteButtonLabel: String {
-        let count = redactionState.selectedRegionIDs.count
-        return count > 1 ? "Delete \(count) Regions" : "Delete Region"
+        Self.deleteLabel(count: redactionState.selectedRegionIDs.count)
     }
 }
 

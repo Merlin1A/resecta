@@ -335,6 +335,15 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
         UIAccessibility.post(notification: .announcement, argument: Self.commitAnnouncement(.deleted))
     }
 
+    /// Delete the selection at once, one undo step on the window's undo
+    /// manager: the long-press menu's Delete N Regions. The one door for the
+    /// menu's selection delete.
+    func deleteSelection() {
+        guard let state = redactionState else { return }
+        let pages = state.deleteSelected(undoManager: pdfView?.window?.undoManager)
+        for page in pages { refreshOverlay(for: page) }
+    }
+
     // MARK: - Overlay Refresh
 
     /// Refresh a single page's overlay from current state.
