@@ -81,13 +81,13 @@ struct LayerResultHasDetailTests {
         #expect(r.hasDetail == false)
     }
 
-    @Test("INFO: the short line is the note; no restating detail")
-    func infoDetailIsEmpty() async throws {
+    @Test("NOT APPLICABLE: the short line is the reason; no restating detail")
+    func notApplicableDetailIsEmpty() async throws {
         let (doc, url) = try TestFixtures.writeTempPDF(TestFixtures.blankPage(), prefix: "hd_info_")
         defer { try? FileManager.default.removeItem(at: url) }
-        // Layer 3 with no sensitive terms → INFO.
+        // Layer 3 with no sensitive terms → NOT APPLICABLE.
         let r = await run(2, doc, mode: .secureRasterization, terms: [])
-        #expect(r.status.isInfo, "got \(r.status)")
+        #expect(r.status.isNotApplicable, "got \(r.status)")
         #expect(r.detailDescription == "", "got: \(r.detailDescription)")
         #expect(r.hasDetail == false)
     }
@@ -167,12 +167,12 @@ struct LayerResultHasDetailTests {
     static let oneManualRegionDetail = "No term was captured from 1 manual region: it covers the whole page, or its page has no text layer."
     static let manyManualRegionsDetail = "No term was captured from 3 manual regions: each covers the whole page, or its page has no text layer."
 
-    @Test("Layer 3 INFO (no terms) with manual regions on pages with no text layer carries the one detail sentence")
+    @Test("Layer 3 NOT APPLICABLE (no terms) with manual regions on pages with no text layer carries the one detail sentence")
     func layer3InfoCarriesManualRegionsDetail() async throws {
         let (doc, url) = try TestFixtures.writeTempPDF(TestFixtures.blankPage(), prefix: "hd_l3_manual_info_")
         defer { try? FileManager.default.removeItem(at: url) }
         let r = await run(2, doc, mode: .secureRasterization, terms: [], manualRegionsWithoutText: 3)
-        #expect(r.status.isInfo, "got \(r.status)")
+        #expect(r.status.isNotApplicable, "got \(r.status)")
         #expect(r.shortDescription == "No sensitive terms were provided — string search did not run.")
         #expect(r.detailDescription == Self.manyManualRegionsDetail, "got: \(r.detailDescription)")
         #expect(r.hasDetail)

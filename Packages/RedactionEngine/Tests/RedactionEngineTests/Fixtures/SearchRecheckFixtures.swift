@@ -48,7 +48,7 @@ extension TestFixtures {
     /// (`VerificationStatus ==` compares case identity only).
     static func message(of status: VerificationStatus) -> String? {
         switch status {
-        case .warn(let m), .info(let m), .attention(let m), .fail(let m): m
+        case .warn(let m), .info(let m), .attention(let m), .fail(let m), .notApplicable(let m): m
         case .pass, .skipped: nil
         }
     }

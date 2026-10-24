@@ -16,6 +16,7 @@ extension VerificationStatus {
         case .attention: "shield.lefthalf.filled"
         case .fail:      "xmark.shield.fill"
         case .skipped:   "shield.slash"
+        case .notApplicable: "minus.circle"
         }
     }
 
@@ -28,7 +29,7 @@ extension VerificationStatus {
         case .info:      ResectaTokens.SemanticColor.searchableMode
         case .attention: .pink     // urgent family, distinct from warn orange / fail red
         case .fail:      .red
-        case .skipped:   .secondary
+        case .skipped, .notApplicable: .secondary
         }
     }
 
@@ -41,7 +42,7 @@ extension VerificationStatus {
         case .info:      ResectaTokens.SemanticColor.searchableMode
         case .attention: .pink
         case .fail:      .red
-        case .skipped:   .secondary
+        case .skipped, .notApplicable: .secondary
         }
     }
 
@@ -60,6 +61,7 @@ extension VerificationStatus {
         case .attention: ResectaTokens.SemanticColor.attentionText
         case .fail:      ResectaTokens.SemanticColor.failText
         case .skipped:   .secondary
+        case .notApplicable: ResectaTokens.SemanticColor.supportText
         }
     }
 
@@ -77,6 +79,7 @@ extension VerificationStatus {
         case .attention:   "Needs Review"
         case .fail:        "Checks Failed"
         case .skipped:     "Verification Skipped"
+        case .notApplicable: "Nothing to Check"
         }
     }
 
@@ -92,6 +95,7 @@ extension VerificationStatus {
         case .attention: "Needs review. Unredacted text remains — review before sharing."
         case .fail:    "Checks failed. Review the issues below before sharing."
         case .skipped: "Verification skipped. Consider verifying before sharing."
+        case .notApplicable: "Not applicable. The check had nothing to check."
         }
     }
 
@@ -110,6 +114,7 @@ extension VerificationStatus {
         case .attention: "Needs review."
         case .fail:      "Failed."
         case .skipped:   "Could not verify."
+        case .notApplicable: "Nothing to check."
         }
     }
 }
@@ -122,7 +127,7 @@ extension LayerResult {
     /// a plain phrase so an eleven-layer run isn't eleven sentences of filler.
     func completionAnnouncement(layerNumber: Int) -> String {
         switch status {
-        case .warn, .fail, .info, .attention:
+        case .warn, .fail, .info, .attention, .notApplicable:
             "Layer \(layerNumber), \(name), \(status.layerAccessibilityPhrase) \(shortDescription)"
         case .pass, .skipped:
             "Layer \(layerNumber), \(name), \(status.layerAccessibilityPhrase)"

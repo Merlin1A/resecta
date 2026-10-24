@@ -72,7 +72,7 @@ enum VerificationDebugFixtures {
         seconds: 0.6)
 
     private static let recheckIdle = row(
-        .searchRecheck, .info("No searches were applied — the search re-check did not run."),
+        .searchRecheck, .notApplicable("No searches were applied — the search re-check did not run."),
         short: "No searches were applied — the search re-check did not run.")
 
     private static let sweepPass = row(
@@ -106,6 +106,11 @@ enum VerificationDebugFixtures {
     private static let coreSecure: [VerificationLayer] = [
         .textExtraction, .ocrCheck, .binaryStringSearch, .structureCheck, .metadataCheck,
     ]
+    private static func noTextLayerRow(_ identity: VerificationLayer) -> LayerResult {
+        let message = "No page kept a text layer — every page was rasterized, so this check had nothing to check."
+        return row(identity, .notApplicable(message), short: message)
+    }
+
     private static let coreSearchable: [VerificationLayer] = [
         .textExtraction, .ocrCheck, .binaryStringSearch, .structureCheck, .metadataCheck,
         .spatialVerification, .characterCount, .fontVerification, .characterLineage, .operatorReExtraction,
@@ -147,7 +152,11 @@ enum VerificationDebugFixtures {
     /// Searchable, every page rasterized: the three text-layer checks read
     /// no page.
     static let searchableAllRasterized = VerificationReport(
-        layers: rows(coreSearchable, recheck: recheckPass, sweep: sweepPass),
+        layers: rows(coreSearchable, recheck: recheckPass, sweep: sweepPass, [
+            .characterCount: noTextLayerRow(.characterCount),
+            .fontVerification: noTextLayerRow(.fontVerification),
+            .characterLineage: noTextLayerRow(.characterLineage),
+        ]),
         overallStatus: .pass, durationSeconds: 5.1, perPageModes: secure)
 
     /// Needs review · could not verify · a warning · an idle re-check.
