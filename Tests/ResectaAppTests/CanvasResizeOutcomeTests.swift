@@ -190,4 +190,64 @@ struct CanvasResizeOutcomeTests {
         #expect(stored.minY >= 0 && stored.maxY <= 1 && stored.minX >= 0 && stored.maxX <= 1, "stored \(stored)")
         withExtendedLifetime(c) {}
     }
+
+    // MARK: - The size floor: 20 along, 8 across
+
+    /// Screen points at the fit scale, in overlay points.
+    private static func overlay(_ screen: CGFloat) -> CGFloat { screen / fitScale }
+
+    /// Draw a band from `origin` sized `screen` (on-screen points) with the
+    /// Rectangle tool on; returns the regions added.
+    private func drawBand(_ c: Canvas, from origin: CGPoint, screen: CGSize) -> [RedactionRegion] {
+        c.overlay.isDrawingMode = true
+        let before = Set((c.state.regions[0] ?? []).map(\.id))
+        let end = CGPoint(x: origin.x + Self.overlay(screen.width), y: origin.y + Self.overlay(screen.height))
+        drag(c.overlay, from: origin, through: [CGPoint(x: (origin.x + end.x) / 2, y: (origin.y + end.y) / 2), end])
+        return (c.state.regions[0] ?? []).filter { !before.contains($0.id) }
+    }
+
+    @Test("At the fit zoom a 60 x 9 band commits as drawn and 19 x 60 commits; 60 x 7 and 7 x 60 are rejected")
+    func floorIs20AlongAnd8Across() throws {
+        let c = try mount([], selected: [])
+        let added = drawBand(c, from: CGPoint(x: 60, y: 120), screen: CGSize(width: 60, height: 9))
+        #expect(added.count == 1, "60 x 9 commits")
+        if let r = added.first {
+            let h = c.overlay.pdfNormalizedToOverlay(r.normalizedRect).height
+            #expect(abs(h - Self.overlay(9)) < 0.01, "stored as drawn, never grown to the floor: \(h)")
+        }
+        #expect(drawBand(c, from: CGPoint(x: 60, y: 220), screen: CGSize(width: 60, height: 7)).isEmpty, "60 x 7 is under the 8-point floor")
+        #expect(drawBand(c, from: CGPoint(x: 60, y: 320), screen: CGSize(width: 7, height: 60)).isEmpty, "7 x 60 is under the 8-point floor across")
+        #expect(drawBand(c, from: CGPoint(x: 200, y: 320), screen: CGSize(width: 19, height: 60)).count == 1, "19 x 60: 60 along, 19 across")
+        withExtendedLifetime(c) {}
+    }
+
+    @Test("A 60 x 7 band that a neighbour's edge 2 points out would lift to 9 is rejected: the floor judges the finger's band")
+    func floorJudgesTheFingersBand() throws {
+        let origin = CGPoint(x: 60, y: 200)
+        let farEdge = origin.y + Self.overlay(7)
+        let neighbour = Self.region(CGRect(x: 300, y: farEdge + Self.overlay(2), width: 100, height: 40))
+        let c = try mount([neighbour], selected: [])
+        #expect(drawBand(c, from: origin, screen: CGSize(width: 60, height: 7)).isEmpty)
+        withExtendedLifetime(c) {}
+    }
+
+    @Test("A resize floors at 8 across a long side and at 20 along a short one")
+    func resizeFloorsByAxis() throws {
+        // A long box: its height floors at 8 when the bottom edge is dragged past the top.
+        let long = CGRect(x: 60, y: 420, width: 160, height: 40)
+        let r = Self.region(long)
+        let c = try mount([r], selected: [r.id])
+        let bottom = CGPoint(x: long.midX, y: long.maxY)
+        drag(c.overlay, from: bottom, through: [CGPoint(x: bottom.x, y: bottom.y - 20), CGPoint(x: bottom.x, y: long.minY + 1)])
+        #expect(abs((c.rect(r.id)?.height ?? 0) - Self.overlay(8)) < 0.01, "8 across a long box")
+
+        // A one-line box 10 points tall: its width floors at 20 when the right edge is dragged to the left one.
+        let thin = CGRect(x: 60, y: 600, width: 160, height: Self.overlay(10))
+        let t = Self.region(thin)
+        let d = try mount([t], selected: [t.id])
+        let right = CGPoint(x: thin.maxX, y: thin.midY)
+        drag(d.overlay, from: right, through: [CGPoint(x: right.x - 20, y: right.y), CGPoint(x: thin.minX + 1, y: right.y)])
+        #expect(abs((d.rect(t.id)?.width ?? 0) - Self.overlay(20)) < 0.01, "20 along a one-line box")
+        withExtendedLifetime((c, d)) {}
+    }
 }
