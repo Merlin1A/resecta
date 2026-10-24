@@ -2,8 +2,9 @@ import XCTest
 
 /// UI tests for the editor's iPhone toolbar: the … menu's order, the one
 /// Undo control (a tap undoes; a touch and hold opens Undo and Redo named
-/// for their steps), and Redact staying available with selected matches
-/// not yet applied — a tap raises the search sheet instead of redacting.
+/// for their steps), Redact staying available with selected matches not yet
+/// applied — a tap raises the search sheet instead of redacting — the Add
+/// to Selection capsule's Done, and the delete notice's Undo.
 ///
 /// Launch arguments only; assertions read identifiers and labels.
 /// nonisolated for the same reason as `SearchDetentLayoutUITests`: an
@@ -126,5 +127,57 @@ nonisolated final class EditorToolbarUITests: XCTestCase {
         XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "verificationResults").firstMatch.exists,
                        "Redact must not run without the selected matches.")
         attachScreenshot(named: "toolbar-redact-explains")
+    }
+
+    // MARK: - Add to Selection's capsule
+
+    private func openOverflowAndTap(_ label: String) {
+        let overflow = app.buttons["OverflowBarButtonItem"].firstMatch
+        XCTAssertTrue(overflow.waitForExistence(timeout: 10), "The … menu button is missing.")
+        overflow.tap()
+        let row = app.buttons[label].firstMatch.exists ? app.buttons[label].firstMatch : app.switches[label].firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 5), "The … menu has no '\(label)' row.")
+        row.tap()
+    }
+
+    func testAddToSelection_capsuleShowsAndDoneEndsTheMode() {
+        launchWithOneRegion()
+        openOverflowAndTap("Add to Selection")
+        let capsule = app.descendants(matching: .any).matching(identifier: "addModeCapsule").firstMatch
+        XCTAssertTrue(capsule.waitForExistence(timeout: 5), "Add to Selection must show its capsule.")
+        attachScreenshot(named: "toolbar-add-capsule")
+        app.buttons["addModeDoneButton"].firstMatch.tap()
+        XCTAssertTrue(capsule.waitForNonExistence(timeout: 5), "Done must end Add to Selection and its capsule.")
+    }
+
+    // MARK: - The delete notice
+
+    func testDeleteTwoRegions_noticeUndoRestoresThem() {
+        launchWithOneRegion()
+        // A second region, drawn.
+        let draw = app.buttons["drawTool"].firstMatch
+        XCTAssertTrue(draw.waitForExistence(timeout: 10))
+        draw.tap()
+        let window = app.windows.firstMatch
+        window.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.40))
+            .press(forDuration: 0.1, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.6, dy: 0.45)))
+        draw.tap()
+        XCTAssertTrue(waitForLabel(counter, containing: "2 regions"), "The drawn box did not count.")
+
+        openOverflowAndTap("Select Regions")
+        let selectAll = app.buttons["Select All on Page"].firstMatch
+        XCTAssertTrue(selectAll.waitForExistence(timeout: 5))
+        selectAll.tap()
+        openOverflowAndTap("Delete 2 Regions")
+        XCTAssertTrue(waitForLabel(counter, containing: "0 regions"), "Both regions must go at once.")
+        let notice = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH 'Deleted 2 regions.'")).firstMatch
+        XCTAssertTrue(notice.waitForExistence(timeout: 5), "Deleting two must show the notice.")
+        attachScreenshot(named: "toolbar-delete-notice")
+        // The notice's button speaks as "Undo action" (ToastView).
+        let undo = app.buttons["Undo action"].firstMatch
+        XCTAssertTrue(undo.waitForExistence(timeout: 5), "The notice must offer Undo.")
+        undo.tap()
+        XCTAssertTrue(waitForLabel(counter, containing: "2 regions"), "The notice's Undo must restore both.")
     }
 }
