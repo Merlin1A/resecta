@@ -592,7 +592,7 @@ class RedactionOverlayView: UIView {
                 marqueeNormalized: normalizedMarquee,
                 regions: regions
             )
-            coordinator?.commitLassoSelection(hits, undoManager: window?.undoManager)
+            coordinator?.commitLassoSelection(hits)
             return
         }
 

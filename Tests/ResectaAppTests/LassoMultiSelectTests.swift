@@ -9,7 +9,7 @@ import RedactionEngine
 // hits empty space, the drag is treated as a marquee. On touch-up, the
 // overlay intersects every region's `normalizedRect` against the
 // marquee and routes the hit set through
-// `RedactionState.applyBatch(_:undoManager:toastManager:)` — a peer of
+// `RedactionState.applyBatch(_:toastManager:)` — a peer of
 // the region-creating `applyFindings` seam, not a collapse onto
 // it. The 500-region cap and warning toast surface inside
 // `applyBatch` itself; see `ApplyBatchCapTests` for that side.
@@ -86,7 +86,7 @@ struct LassoMultiSelectTests {
 
         // Route the hits through applyBatch — the multi-select set must
         // hold exactly those four region IDs after commit.
-        state.applyBatch(hits, undoManager: nil, toastManager: nil)
+        state.applyBatch(hits, toastManager: nil)
         #expect(state.selectedRegionIDs == Set(regions.prefix(4).map(\.id)))
     }
 
@@ -132,7 +132,7 @@ struct LassoMultiSelectTests {
         // applyBatch with empty input is a valid no-op selection: the
         // selection set becomes empty.
         state.selectedRegionIDs = Set(regions.map(\.id))  // pre-fill
-        state.applyBatch(hits, undoManager: nil, toastManager: nil)
+        state.applyBatch(hits, toastManager: nil)
         #expect(state.selectedRegionIDs.isEmpty)
     }
 
@@ -207,7 +207,7 @@ struct LassoMultiSelectTests {
         #expect(hits.count == 4)
 
         // Apply the lasso batch: the selection changes, no undo step.
-        state.applyBatch(hits, undoManager: undoManager, toastManager: nil)
+        state.applyBatch(hits, toastManager: nil)
         #expect(state.selectedRegionIDs.count == 4)
 
         // Delete via existing affordance — `deleteSelected` routes
@@ -241,7 +241,7 @@ struct LassoMultiSelectTests {
         undoManager.undo()
         #expect(undoManager.canRedo)
 
-        state.applyBatch(regions, undoManager: undoManager, toastManager: nil)
+        state.applyBatch(regions, toastManager: nil)
         #expect(state.selectedRegionIDs == Set(regions.map(\.id)))
         #expect(undoManager.canUndo == false, "selecting is not an undo step")
         #expect(undoManager.canRedo, "Redo is left as it was")
@@ -254,7 +254,7 @@ struct LassoMultiSelectTests {
         let regions = seedRegions(state, count: 3)
         state.selectedRegionIDs = Set(regions.map(\.id))
         let undoManager = UndoManager()
-        state.applyBatch(regions, undoManager: undoManager, toastManager: nil)
+        state.applyBatch(regions, toastManager: nil)
         #expect(state.selectedRegionIDs == Set(regions.map(\.id)))
         #expect(undoManager.canUndo == false)
         state.checkInvariants()
@@ -271,10 +271,10 @@ struct LassoMultiSelectTests {
         coordinator.isMultiSelectActive = true
         state.selectedRegionIDs = [regions[0].id]
 
-        coordinator.commitLassoSelection([], undoManager: nil)
+        coordinator.commitLassoSelection([])
         #expect(state.selectedRegionIDs == [regions[0].id], "a stray tap on the page must not clear an accumulated selection")
 
-        coordinator.commitLassoSelection([regions[1]], undoManager: nil)
+        coordinator.commitLassoSelection([regions[1]])
         #expect(state.selectedRegionIDs == [regions[0].id, regions[1].id])
     }
 
@@ -286,9 +286,9 @@ struct LassoMultiSelectTests {
         coordinator.redactionState = state
         state.selectedRegionIDs = [regions[0].id]
 
-        coordinator.commitLassoSelection([regions[1]], undoManager: nil)
+        coordinator.commitLassoSelection([regions[1]])
         #expect(state.selectedRegionIDs == [regions[1].id])
-        coordinator.commitLassoSelection([], undoManager: nil)
+        coordinator.commitLassoSelection([])
         #expect(state.selectedRegionIDs.isEmpty)
     }
 }

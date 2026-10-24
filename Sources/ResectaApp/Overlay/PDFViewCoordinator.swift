@@ -289,7 +289,7 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
     /// With Add to Selection on, the marquee ADDS to the current
     /// selection (current first, so the cap keeps what was already
     /// chosen) and an empty marquee — a tap on the page — changes nothing.
-    func commitLassoSelection(_ regions: [RedactionRegion], undoManager: UndoManager?) {
+    func commitLassoSelection(_ regions: [RedactionRegion]) {
         guard let state = redactionState else { return }
         var batch = regions
         if isMultiSelectActive {
@@ -299,7 +299,7 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
             let currentIDs = Set(current.map(\.id))
             batch = current + regions.filter { !currentIDs.contains($0.id) }
         }
-        state.applyBatch(batch, undoManager: undoManager, toastManager: toastManager)
+        state.applyBatch(batch, toastManager: toastManager)
         refreshAllOverlays()
     }
 
