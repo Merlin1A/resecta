@@ -56,6 +56,12 @@ nonisolated final class SearchAccessibilitySizeUITests: XCTestCase {
         app.launch()
         let next = app.buttons["resultNavNext"]
         XCTAssertTrue(next.waitForExistence(timeout: 30), "The seeded query returned nothing or the sheet never presented.")
+        // At AX5 the import's "Text layer detected" toast runs to full height
+        // and lies over the sheet's result chevrons while it shows; a tap then
+        // lands on the toast. Tap the chevron once it has gone.
+        let toast = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Text layer detected")).firstMatch
+        XCTAssertTrue(toast.waitForNonExistence(timeout: 20), "The import toast never cleared off the sheet.")
         next.tap()
         let strip = app.descendants(matching: .any).matching(identifier: "compactFloatStrip").firstMatch
         XCTAssertTrue(strip.waitForExistence(timeout: 10), "The first chevron tap did not park the sheet.")
