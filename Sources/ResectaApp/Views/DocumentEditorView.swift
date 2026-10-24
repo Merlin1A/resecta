@@ -16,7 +16,7 @@ struct DocumentEditorView: View {
     @Environment(PipelineCoordinator.self) var coordinator
     @Environment(AppCoordinator.self) private var appCoordinator
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.dynamicTypeSize) var dynamicTypeSize
     @Environment(\.undoManager) private var undoManager
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @Environment(ToastQueueManager.self) var toastManager
@@ -31,13 +31,13 @@ struct DocumentEditorView: View {
 
     // View-local tool state — purely UI, no cross-view observation needed.
     // Persistent — toggled only by explicit tap, Escape, or Done.
-    @State private var activeTool: DrawingTool? = nil
+    @State var activeTool: DrawingTool? = nil
 
     /// iPhone "Select More" toolbar toggle. While on, a tap on a
     /// region toggles its membership in the selection instead of replacing
     /// the selection — iPhone parity for the iPad Shift+tap path. iPad
     /// Shift+tap continues to work whether the toggle is on or off.
-    @State private var isMultiSelectActive: Bool = false
+    @State var isMultiSelectActive: Bool = false
 
 
     // Brief status flash state for .verifying → .verified transition
@@ -215,35 +215,7 @@ struct DocumentEditorView: View {
                     // `VerificationResultsView`, never this overlay chain.
                     // The recovery CTA now lives on the results screen as the
                     // Run Verification card; see `handleRunVerificationTap`.)
-                    // Drawing-mode caption — subtle
-                    // banner names the active gesture for the rectangle
-                    // tool.
-                    .overlay(alignment: .bottom) {
-                        if DocumentEditorView.drawingModeCaptionShouldShow(
-                            activeTool: activeTool,
-                            phaseKind: documentState.phaseKind
-                        ),
-                           let caption = DocumentEditorView.activeDrawingCaption(
-                            activeTool: activeTool
-                           ) {
-                            HStack(spacing: ResectaTokens.Spacing.md) {
-                                Text(caption)
-                                    .font(.caption.weight(.medium))
-                                    .foregroundStyle(.secondary)
-                            }
-                                .padding(.horizontal, ResectaTokens.Spacing.md)
-                                .padding(.vertical, ResectaTokens.Spacing.xs)
-                                .background(.regularMaterial, in: Capsule())
-                                .padding(.bottom, ResectaTokens.Spacing.lg + parkedChromeLayout.hintCapsuleLift)
-                                .accessibilityElement(children: .contain)
-                                .accessibilityLabel(
-                                    DocumentEditorView.captionAccessibilityLabel(
-                                        activeTool: activeTool
-                                    )
-                                )
-                                .allowsHitTesting(false).transition(.opacity)
-                        }
-                    }
+                    .overlay(alignment: .bottom) { captionOverlay }
 
             case .verifying:
                 // Full-screen replacement — verification is a distinct workflow phase
@@ -547,7 +519,7 @@ struct DocumentEditorView: View {
     }
 
     /// The toolbar TYPE over this editor's state, bindings and actions.
-    private var editorToolbar: DocumentEditorToolbar {
+    var editorToolbar: DocumentEditorToolbar {
         DocumentEditorToolbar(
             documentState: documentState, redactionState: redactionState,
             coordinator: coordinator, horizontalSizeClass: horizontalSizeClass,
@@ -557,7 +529,7 @@ struct DocumentEditorView: View {
             documentOverride: documentOverride, redactButtonDisabled: redactButtonDisabled,
             redactButtonHint: redactButtonHint, handleHomeTap: handleHomeTap,
             homeButton: AnyView(homeButton), pipelineModePicker: AnyView(pipelineModePicker),
-            deleteSelectedRegions: deleteSelectedRegions, openSettings: openSettings
+            openSettings: openSettings
         )
     }
 
@@ -607,7 +579,7 @@ struct DocumentEditorView: View {
     /// sheet slot, the detent binding, the published walk liveness, the
     /// document's page count and phase, the size class, and the hug the
     /// detent reports for the current type size.
-    private var parkedChromeLayout: ParkedChromeLayout {
+    var parkedChromeLayout: ParkedChromeLayout {
         ParkedChromeLayout(
             sheetPresented: redactionState.activeSearch != nil,
             detent: searchSheetDetent,
@@ -619,21 +591,8 @@ struct DocumentEditorView: View {
         )
     }
 
-    private func deleteSelectedRegions() {
-        redactionState.deleteSelected(undoManager: undoManager)
-    }
-
     // MARK: - Drawing-mode caption helpers
 
-    /// Caption text shown while the rectangle drawing tool is active.
-    /// Mechanism description: names the active gesture so the user knows
-    /// what shape the touch will produce.
-    static let drawingModeCaption = "Drag to draw · two fingers to scroll"
-
-    /// Caption is visible only when (a) a captioned drawing tool is
-    /// active (the rectangle) AND (b) the document is
-    /// in the editing phase. Other phases blur the canvas underneath
-    /// their own progress UI, so the caption would be stale.
     /// Pure static behind the Rectangle button: on ENTRY
     /// the selection and the Add-to-Selection toggle are cleared; on exit
     /// nothing else changes.
@@ -641,14 +600,6 @@ struct DocumentEditorView: View {
         entering: Bool
     ) -> (clearSelection: Bool, disableMultiSelect: Bool) {
         (clearSelection: entering, disableMultiSelect: entering)
-    }
-
-    static func drawingModeCaptionShouldShow(
-        activeTool: DrawingTool?,
-        phaseKind: DocumentState.PhaseKind
-    ) -> Bool {
-        guard phaseKind == .editing else { return false }
-        return activeTool == .rectangle
     }
 
     /// Results-screen card: which pipeline the Run Verification
@@ -684,32 +635,6 @@ struct DocumentEditorView: View {
             )
             coordinator.runFullPipeline(documentOverride: documentOverride)
         }
-    }
-
-    /// Pick the caption string for whichever drawing tool is
-    /// active, so the `.overlay` block and the accessibility label read
-    /// the same string. Returns nil when no captioned tool is active.
-    static func activeDrawingCaption(
-        activeTool: DrawingTool?
-    ) -> String? {
-        switch activeTool {
-        case .rectangle: return drawingModeCaption
-        default: return nil
-        }
-    }
-
-    /// VoiceOver label for the bottom hint capsule. Mirrors the
-    /// visible caption so sighted and VoiceOver users hear the same
-    /// mechanism description.
-    static func captionAccessibilityLabel(
-        activeTool: DrawingTool?
-    ) -> String {
-        guard let caption = activeDrawingCaption(
-            activeTool: activeTool
-        ) else {
-            return ""
-        }
-        return caption
     }
 
 
