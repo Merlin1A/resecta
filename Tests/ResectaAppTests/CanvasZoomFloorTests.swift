@@ -165,4 +165,26 @@ struct CanvasZoomFloorTests {
         view.returnToFit()
         #expect(near(view.scaleFactor, fit), "scale \(view.scaleFactor) after a double tap vs fit \(fit)")
     }
+
+    // MARK: - One finger draws, two fingers scroll
+
+    private static func scrollViews(in view: UIView) -> [UIScrollView] {
+        view.subviews.flatMap { sub -> [UIScrollView] in
+            ((sub as? UIScrollView).map { [$0] } ?? []) + scrollViews(in: sub)
+        }
+    }
+
+    @Test("With the Rectangle tool on, PDFKit's scroll pan needs two fingers, wherever PDFKit nests its scroll view")
+    func drawModeScrollNeedsTwoFingers() throws {
+        let (view, _) = makeView()
+        let coordinator = PDFViewCoordinator()
+        coordinator.pdfView = view
+        let pans = Self.scrollViews(in: view).map(\.panGestureRecognizer)
+        try #require(!pans.isEmpty, "PDFKit's view carries a scroll view")
+        coordinator.updateDrawingMode(true, isDrawing: true)
+        #expect(pans.contains { $0.minimumNumberOfTouches == 2 }, "one finger draws")
+        coordinator.updateDrawingMode(true, isDrawing: false)
+        #expect(pans.allSatisfy { $0.minimumNumberOfTouches == 1 }, "the tool off, one finger scrolls again")
+        withExtendedLifetime(coordinator) {}
+    }
 }
