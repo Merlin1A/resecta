@@ -4,11 +4,12 @@ import SwiftUI
 // bar, the parked-canvas inset, both bottom toast hosts and the
 // drawing-mode hint capsule. The three predicates that used to re-derive
 // the parked geometry (`pageBarCompactInset`, `compactParkedCanvasInset`,
-// `toastBottomClearance`) collapse into this value. The page bar stays
-// while the Search/Scan sheet is parked at the compact float, with or
-// without a live result walk: the strip's ‹ › step between hits, and
-// only the bar reaches a page with no hits (and shows its region
-// count) without raising or dismissing the sheet.
+// `toastBottomClearance`) collapse into this value. While a result walk
+// is live at the compact float the page bar steps aside: the walk owns
+// paging there (the strip's ‹ › step between hits, across pages), and a
+// page with no hits is reached by scrolling or by raising the sheet. The
+// bar stays when the sheet is parked with no walk (the draw tests' park),
+// and is back behind a taller sheet and once the walk ends.
 //
 // Inputs are the editor's own reads (the sheet slot, the detent
 // binding, the published walk liveness, the document's page count and
@@ -28,7 +29,7 @@ struct ParkedChromeLayout: Equatable {
 
     /// Whether the iPhone page bar mounts: compact width, a document
     /// open (one page included, for its region count), the editing
-    /// phase — parked or not.
+    /// phase, and no result walk parked at the compact float.
     let showsPageBar: Bool
     /// The bottom safe-area inset under the page bar, or the bare inset
     /// when no bar mounts: the hug while the sheet is parked, else 0.
@@ -57,9 +58,7 @@ struct ParkedChromeLayout: Equatable {
     ) {
         let parked = sheetPresented && detent == .compactFloat
         let barEligible = sizeClass == .compact && pageCount >= 1 && phase == .editing
-        // `walkLive` no longer gates the bar; the input stays so the
-        // model's callers and its truth table read every chrome input.
-        showsPageBar = barEligible
+        showsPageBar = barEligible && !(parked && walkLive)
         canvasBottomInset = parked ? hugHeight : 0
         let barUncovered = showsPageBar && !(sheetPresented && !parked)
         toastClearance = (parked ? hugHeight : 0)
