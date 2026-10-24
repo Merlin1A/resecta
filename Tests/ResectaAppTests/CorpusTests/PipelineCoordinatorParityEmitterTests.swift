@@ -31,8 +31,8 @@ import UIKit
 // plus the TEST_RUNNER_-prefixed forms xcodebuild forwards.
 //
 // Seeding contract (stated in the session notes before the first run):
-// regions come from regions.json (page · rect · polygon → the rect's four
-// corners, the mirror's `region(from:polygon:)` order); the document's
+// regions come from regions.json (page · rect; `polygon` is always false
+// since the polygon path was deleted, and a row flagged true is not seeded); the document's
 // per-page text-layer status and hidden-OCG flag are computed with the same
 // two engine calls the mirror makes and cross-checked against the cell's
 // record; sensitive terms are seeded through `RegionMetadata` (matched
@@ -68,7 +68,9 @@ struct PipelineCoordinatorParityEmitterTests {
     struct RegionRow: Decodable {
         let page: Int
         let rect: [Double]
-        let polygon: Bool
+        /// Always false since the polygon path was deleted; a row flagged
+        /// true is refused, never seeded as its rect.
+        let polygon: Bool?
         let gt_id: String?
         let value: String?
         let category: String?
@@ -113,14 +115,11 @@ struct PipelineCoordinatorParityEmitterTests {
         var pendingTerms = overrideTerms.map { Array($0) } ?? []
         for row in cell.regions {
             guard row.rect.count == 4 else { return (nil, "malformed rect on page \(row.page)") }
+            guard row.polygon != true else {
+                return (nil, "a polygon region on page \(row.page) (the polygon path is deleted; the cell is removed)")
+            }
             let rect = CGRect(x: row.rect[0], y: row.rect[1],
                               width: row.rect[2], height: row.rect[3])
-            let vertices: [CGPoint]? = row.polygon ? [
-                CGPoint(x: rect.minX, y: rect.minY),
-                CGPoint(x: rect.maxX, y: rect.minY),
-                CGPoint(x: rect.maxX, y: rect.maxY),
-                CGPoint(x: rect.minX, y: rect.maxY),
-            ] : nil
             let id = UUID()
             var source: RedactionRegion.Source = .manual
             var meta: RegionMetadata? = nil
@@ -151,7 +150,7 @@ struct PipelineCoordinatorParityEmitterTests {
                 }
             }
             let region = RedactionRegion(
-                id: id, normalizedRect: rect, source: source, vertices: vertices)
+                id: id, normalizedRect: rect, source: source)
             seed.regions[row.page, default: []].append(region)
             if let meta { seed.metadata[id] = meta }
         }

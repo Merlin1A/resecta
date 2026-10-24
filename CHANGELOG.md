@@ -75,8 +75,9 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - The detection review that nothing staged any more: its list in the Scan interface, its walk and counter, the cross-page grouping, the banner's Review button, and the long-press menu over recognized words that opened a pre-selected search.
 - Settings: the "Reset Detection History" row and the on-device accept and reject counts it cleared; only the removed review recorded them, and no scan read them. Counts an earlier version stored are deleted the first time the updated app opens.
 - The Pencil circle-to-select on the search results; the app runs on iPhone, where no Pencil touch arrives.
-- The freeform and polygon drawing tools, which the editor no longer offered, and the code behind them; committed polygon regions still fill and verify.
 - The unused snap-to-text setting and the text-row snapping code only it reached.
+- The freeform and polygon drawing tools, which the editor no longer offered, and the code behind them.
+- The engine's polygon regions: the polygon fill and its readback, the polygon character filter and spatial check, and the polygon word capture. A region every path now fills, filters and verifies is a rectangle; a region saved by an earlier version with polygon vertices is read as its bounding rectangle, which covers at least the polygon.
 
 ### Security
 

@@ -4,11 +4,10 @@ import CoreGraphics
 import PDFKit
 @testable import RedactionEngine
 
-// `TextSpan.words(fullyInside:polygon:on:)` — the word-span primitive:
+// `TextSpan.words(fullyInside:on:)` — the word-span primitive:
 // the words of a page's text layer whose boxes lie fully inside a
 // normalized region rect (the displayed frame, bottom-left origin), in
-// reading order, with a 0.5-pt tolerance on the region's edges; a polygon
-// narrows the rect to the words whose centre lies inside it. The rects it
+// reading order, with a 0.5-pt tolerance on the region's edges. The rects it
 // returns are the frame `DocumentSearcher.boundingRect(for:page:)` uses,
 // so the search path and the capture agree on every rotation. The
 // whole-page skip is the caller's (the whole-page rule), not the primitive's.
@@ -102,31 +101,6 @@ struct TextLayerSpansTests {
         #expect(TextSpan.words(fullyInside: alpha, on: page).map(\.text) == ["ALPHA"])
         #expect(TextSpan.words(fullyInside: inset(alpha, points: 0.4, on: page), on: page).map(\.text) == ["ALPHA"])
         #expect(TextSpan.words(fullyInside: inset(alpha, points: 1.0, on: page), on: page).isEmpty)
-    }
-
-    @Test("An L-shaped polygon excludes the word in its notch")
-    func polygonExcludesTheNotch() throws {
-        let page = try page(Self.wordsPDF())
-        let rects = wordRects(page)
-        let alpha = try #require(rects["ALPHA"]); let charlie = try #require(rects["CHARLIE"])
-        let delta = try #require(rects["DELTA"]); let echo = try #require(rects["ECHO"])
-        // The bounding rect spans both upper lines; the notch (top-right)
-        // cuts CHARLIE out, DELTA/ECHO sit under the full-width lower arm.
-        let bounds = inset(alpha.union(charlie).union(delta).union(echo), points: -2, on: page)
-        let notchX = (rects["BRAVO"]!.maxX + charlie.minX) / 2
-        let notchY = (echo.maxY + alpha.minY) / 2
-        let lShape = [
-            CGPoint(x: bounds.minX, y: bounds.minY),
-            CGPoint(x: bounds.maxX, y: bounds.minY),
-            CGPoint(x: bounds.maxX, y: notchY),
-            CGPoint(x: notchX, y: notchY),
-            CGPoint(x: notchX, y: bounds.maxY),
-            CGPoint(x: bounds.minX, y: bounds.maxY),
-        ]
-        let spans = TextSpan.words(fullyInside: bounds, polygon: lShape, on: page)
-        #expect(spans.map(\.text) == ["ALPHA", "BRAVO", "DELTA", "ECHO"])
-        // Without the polygon the bounding rect admits the notch's word too.
-        #expect(TextSpan.words(fullyInside: bounds, on: page).map(\.text) == ["ALPHA", "BRAVO", "CHARLIE", "DELTA", "ECHO"])
     }
 
     @Test("A rotated page: the region drawn in the displayed frame returns the word under it",
