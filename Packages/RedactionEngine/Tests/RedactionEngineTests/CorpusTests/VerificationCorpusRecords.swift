@@ -193,7 +193,6 @@ extension VerificationCorpusRunnerTests {
         case .attention(let m): statusCase = "attention"; message = m
         case .fail(let m): statusCase = "fail"; message = m
         case .skipped: statusCase = "skipped"; message = ""
-        case .notApplicable(let m): statusCase = "not_applicable"; message = m
         }
         let pages = layer.pageReferences.map { $0.map(String.init).joined(separator: ",") } ?? "-"
         let terms = layer.reviewTermTexts?.joined(separator: "|") ?? "-"
@@ -210,7 +209,6 @@ extension VerificationCorpusRunnerTests {
         case .attention: "attention"
         case .fail: "fail"
         case .skipped: "skipped"
-        case .notApplicable: "not_applicable"
         }
     }
 

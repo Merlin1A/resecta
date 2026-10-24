@@ -76,11 +76,11 @@ extension VerificationEngineTests {
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
         )
-        // A manual-only redaction ran no string search — NOT APPLICABLE
-        // (masthead unaffected), not a "No issues found" PASS.
-        #expect(result.status.isNotApplicable,
-                "Empty sensitive terms → NOT APPLICABLE, not PASS; got \(result.status)")
-        if case .notApplicable(let msg) = result.status {
+        // A manual-only redaction ran no string search — INFO (notes group,
+        // masthead unaffected), not a "No issues found" PASS.
+        #expect(result.status.isInfo,
+                "Empty sensitive terms → INFO, not PASS; got \(result.status)")
+        if case .info(let msg) = result.status {
             #expect(msg.contains("string search did not run"), "got: \(msg)")
         }
     }

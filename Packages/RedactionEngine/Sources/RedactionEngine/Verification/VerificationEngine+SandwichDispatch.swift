@@ -11,16 +11,6 @@ import AppKit  // macOS tooling destination: thumbnail returns NSImage
 extension VerificationEngine {
     // MARK: - Per-page mode coverage (Layers 6–9)
 
-    /// Layers 7–9 read only Searchable Redaction pages. When every page
-    /// went through Secure Rasterization, no page kept a text layer and the
-    /// check had nothing to check: NOT APPLICABLE, not a PASS.
-    static let noTextLayerMessage =
-        "No page kept a text layer — every page was rasterized, so this check had nothing to check."
-
-    func noPageKeptATextLayer(_ perPageModes: [PipelineMode]) -> Bool {
-        !perPageModes.isEmpty && !perPageModes.contains(.searchableRedaction)
-    }
-
     /// The 0-based pages `perPageModes` does not describe — every index at
     /// or beyond `perPageModes.count` — or nil when the array covers the
     /// whole document. The Searchable-layer dispatchers (Layers 6–9) pick
@@ -227,10 +217,10 @@ extension VerificationEngine {
         // Eligible-but-unchecked → honest .skipped (the verify-only
         // resume path rebuilds all-nil digests). Partial coverage → .warn
         // (defensive; unreachable today since digests are all-present or
-        // all-nil). eligible == 0 when `perPageModes` covers the document
-        // reads NOT APPLICABLE on the exit below — every page is per-page
-        // Secure Rasterization; promoting it to a warning would flag valid
-        // docs (the false-positive trap one layer up). Pages beyond `perPageModes`
+        // all-nil). eligible == 0 stays .pass when `perPageModes` covers the
+        // document — skipped by design (every page is per-page Secure
+        // Rasterization); promoting it would WARN-flag valid docs (the
+        // false-positive trap one layer up). Pages beyond `perPageModes`
         // never counted as eligible, so they are reported last, on the
         // otherwise-PASS exit (see perPageModeCoverageGap).
         if eligible > 0 && checked == 0 {
@@ -248,9 +238,6 @@ extension VerificationEngine {
         // The verifier's per-page count-excess warnings: a note (the check
         // ran), ranked below the could-not-verify warnings above.
         if let warning = outcomes.warning(couldNotVerify: false) { return warning }
-        if noPageKeptATextLayer(perPageModes) {
-            return (.notApplicable(Self.noTextLayerMessage), nil, false)
-        }
         return (.pass, nil, false)
     }
 
@@ -299,9 +286,6 @@ extension VerificationEngine {
         // The verifier's per-page warnings — a font it could not inspect,
         // a page with no page-level resources: the check did not run there.
         if let warning = outcomes.warning(couldNotVerify: true) { return warning }
-        if noPageKeptATextLayer(perPageModes) {
-            return (.notApplicable(Self.noTextLayerMessage), nil, false)
-        }
         return (.pass, nil, false)
     }
 
@@ -360,7 +344,7 @@ extension VerificationEngine {
             return (.fail(msg), failingPages, false)
         }
         // Eligible-but-unchecked → .skipped; partial → .warn;
-        // eligible == 0 reads NOT APPLICABLE (nothing to check); pages beyond
+        // eligible == 0 stays .pass (skipped by design); pages beyond
         // `perPageModes` are reported last. See Layer 7.
         if eligible > 0 && checked == 0 {
             return (.skipped, nil, false)
@@ -373,9 +357,6 @@ extension VerificationEngine {
         ) {
             return (perPageModeCoverageWarn(
                 uncovered: uncovered, pageCount: doc.pageCount), uncovered, true)
-        }
-        if noPageKeptATextLayer(perPageModes) {
-            return (.notApplicable(Self.noTextLayerMessage), nil, false)
         }
         return (.pass, nil, false)
     }

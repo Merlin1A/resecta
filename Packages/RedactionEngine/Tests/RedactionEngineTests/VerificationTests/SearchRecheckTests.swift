@@ -18,10 +18,10 @@ struct SearchRecheckTests {
 
     // MARK: - Statuses
 
-    @Test("Zero applied searches → NOT APPLICABLE with the ruled string, never skipped and never a pass")
-    func zeroSearchesIsNotApplicable() async throws {
+    @Test("Zero applied searches → INFO with the ruled string, never skipped")
+    func zeroSearchesIsInfo() async throws {
         let result = await TestFixtures.recheck(try output(["Delia R. Hartwell"]), requests: [])
-        #expect(result.status == .notApplicable(""))
+        #expect(result.status == .info(""))
         #expect(!result.status.isSkipped)
         #expect(TestFixtures.message(of: result.status) == SearchRecheck.infoMessage)
         #expect(result.shortDescription == SearchRecheck.infoMessage)
@@ -30,7 +30,7 @@ struct SearchRecheckTests {
         #expect(result.queryLines == nil)
         #expect(result.reviewTermTexts == nil)
         #expect(result.pageReferences == nil)
-        // The aggregate folds the idle re-check as if absent, not as a skip.
+        // The aggregate treats the idle re-check as a note, not a skip.
         #expect(VerificationEngine().aggregateStatus([LayerResult.mock(status: .pass), result]) == .pass)
     }
 
@@ -247,7 +247,7 @@ struct SearchRecheckTests {
         #expect(pass.status == .pass)
         #expect(!pass.couldNotVerify)
         let info = await TestFixtures.recheck(clean, requests: [])
-        #expect(info.status == .notApplicable(""))
+        #expect(info.status == .info(""))
         #expect(!info.couldNotVerify)
     }
 

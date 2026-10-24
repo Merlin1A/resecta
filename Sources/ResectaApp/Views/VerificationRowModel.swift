@@ -168,17 +168,21 @@ nonisolated struct VerificationRowModel: Equatable {
     /// - fail → Failed · attention → Needs review
     /// - warn → Could not verify when the engine flagged it, else Warning
     /// - skipped → Could not verify (a skipped check gates sharing)
-    /// - notApplicable → Nothing to check (the engine says so: no search
-    ///   or scan applied, no redacted term to search for, or no page kept
-    ///   a text layer)
-    /// - info → Note
-    /// - pass → Passed
+    /// - info → Nothing to check on the two term searches (their only info
+    ///   arm is "no redacted terms") and on an idle Search Re-check or
+    ///   Detection Sweep (the arms that carry no query lines); every other
+    ///   info is a Note
+    /// - pass → Nothing to check on Character Count, Monospace Fonts and
+    ///   Character Sequence when every page of the run rasterized (those
+    ///   checks read only pages that kept a text layer); an empty
+    ///   page-mode list is unknown coverage and stays Passed
     ///
-    /// The page modes no longer decide an outcome — the engine reports a
-    /// check with nothing to check as NOT APPLICABLE itself. The parameter
-    /// stays so every caller keeps one signature. The derivation table in
-    /// `VerificationRowModelTests` pins every cell.
-    static func outcome(for layer: LayerResult, perPageModes _: [PipelineMode]) -> VerificationOutcome {
+    /// The inference is fragile in one direction: a future info arm on
+    /// the two term searches, or a future info arm without query lines on
+    /// the re-check or the sweep, would read as Nothing to check. The
+    /// derivation table in `VerificationRowModelTests` pins every cell, so
+    /// such a change fails a test first.
+    static func outcome(for layer: LayerResult, perPageModes: [PipelineMode]) -> VerificationOutcome {
         switch layer.status {
         case .fail:
             return .failed
@@ -188,12 +192,22 @@ nonisolated struct VerificationRowModel: Equatable {
             return layer.couldNotVerify ? .couldNotVerify : .warning
         case .skipped:
             return .couldNotVerify
-        case .notApplicable:
-            return .nothingToCheck
         case .info:
-            return .note
+            switch layer.layer {
+            case .binaryStringSearch, .operatorReExtraction:
+                return .nothingToCheck
+            case .searchRecheck, .detectionSweep:
+                return layer.queryLines == nil ? .nothingToCheck : .note
+            default:
+                return .note
+            }
         case .pass:
-            return .passed
+            switch layer.layer {
+            case .characterCount, .fontVerification, .characterLineage:
+                return hasNoSearchablePage(perPageModes) ? .nothingToCheck : .passed
+            default:
+                return .passed
+            }
         }
     }
 

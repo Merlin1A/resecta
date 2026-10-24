@@ -364,7 +364,7 @@ struct VerificationResultsView: View {
         overallStatus: VerificationStatus
     ) -> Bool {
         switch overallStatus {
-        case .pass, .warn, .info, .attention, .fail, .skipped, .notApplicable: true
+        case .pass, .warn, .info, .attention, .fail, .skipped: true
         }
     }
 

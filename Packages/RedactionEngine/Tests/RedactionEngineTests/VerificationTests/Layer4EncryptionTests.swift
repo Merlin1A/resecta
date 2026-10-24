@@ -57,7 +57,7 @@ struct Layer4EncryptionTests {
 
     private func message(_ r: LayerResult) -> String {
         switch r.status {
-        case .fail(let m), .warn(let m), .info(let m), .attention(let m), .notApplicable(let m): m
+        case .fail(let m), .warn(let m), .info(let m), .attention(let m): m
         case .pass, .skipped: ""
         }
     }

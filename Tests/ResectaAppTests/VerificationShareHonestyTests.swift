@@ -123,7 +123,7 @@ struct VerificationShareHonestyTests {
                       Self.layer(.info("i"), .detectionSweep, lines: [SearchRecheckQueryLine(
                           label: "Scan (17 detectors)", foundCount: 0, foundHitCap: false, appliedCount: 0,
                           remainingCount: 2, route: .ocr)], pages: [0]),
-                      Self.layer(.notApplicable("i"), .searchRecheck), Self.layer(.pass, .structureCheck)]
+                      Self.layer(.info("i"), .searchRecheck), Self.layer(.pass, .structureCheck)]
         let partition = VerificationLayerPartition(layers: layers, perPageModes: [])
         #expect(VerificationDetailsSection.groups(partition).map(\.header)
                 == ["Findings", "Could not verify", "Notes", "Nothing to check"])

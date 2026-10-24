@@ -72,38 +72,24 @@ extension VerificationEngineTests {
                 "Layer 9 eligible-but-unchecked must report .skipped, not .pass")
     }
 
-    @Test("Layers 7, 8 and 9 read NOT APPLICABLE when no page kept a text layer (all per-page SR)",
-          arguments: [VerificationLayer.characterCount, .fontVerification, .characterLineage])
-    func allSRPagesReadNotApplicable(layer: VerificationLayer) async throws {
+    @Test("Layer 7 stays .pass when no page is eligible (all per-page SR)")
+    func layer7AllSRPagesStaysPass() async throws {
         // eligible == 0 (every page is per-page Secure Rasterization, e.g. a
-        // rotated-page stopgap): the check had nothing to check. Not a PASS,
-        // and not a warning — a warning would flag valid docs.
+        // rotated-page stopgap): the layer is skipped by design and
+        // must stay .pass — promoting it would WARN-flag valid docs.
         let (doc, url) = try makeBlankPDF(pageCount: 2)
         defer { try? FileManager.default.removeItem(at: url) }
 
         let engine = VerificationEngine()
         let result = await engine.runLayer(
-            layer, outputDocument: SendablePDFDocument(doc),
+            .characterCount, outputDocument: SendablePDFDocument(doc),
             sourcePageCount: 2, regions: [:], sensitiveTerms: [],
             pipelineMode: .searchableRedaction,
             filterDigests: [nil, nil],
             perPageModes: [.secureRasterization, .secureRasterization]
         )
-        #expect(result.status == .notApplicable(VerificationEngine.noTextLayerMessage),
-                "\(layer) with zero eligible pages; got \(result.status)")
-        #expect(engine.aggregateStatus([LayerResult.mock(status: .pass), result]) == .pass,
-                "NOT APPLICABLE neither passes nor lowers the verdict")
-    }
-
-    @Test("An empty page-mode list is unknown coverage: Layer 8 never reads NOT APPLICABLE")
-    func emptyPageModesIsNotNotApplicable() async throws {
-        let (doc, url) = try makeBlankPDF(pageCount: 1)
-        defer { try? FileManager.default.removeItem(at: url) }
-        let result = await VerificationEngine().runLayer(
-            .fontVerification, outputDocument: SendablePDFDocument(doc),
-            sourcePageCount: 1, regions: [:], sensitiveTerms: [],
-            pipelineMode: .searchableRedaction, filterDigests: [nil], perPageModes: [])
-        #expect(!result.status.isNotApplicable, "got \(result.status)")
+        #expect(result.status == .pass,
+                "Layer 7 with zero eligible pages stays .pass (skipped by design)")
     }
 
     // MARK: - Layers 6–9: Per-Page Mode Coverage

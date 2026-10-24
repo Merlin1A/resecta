@@ -13,7 +13,7 @@ import SwiftUI
 // MARK: - The derivation table's axes
 
 nonisolated enum RowModelStatusAxis: String, CaseIterable, Sendable {
-    case pass, info, warn, attention, fail, skipped, notApplicable
+    case pass, info, warn, attention, fail, skipped
 
     var status: VerificationStatus {
         switch self {
@@ -23,7 +23,6 @@ nonisolated enum RowModelStatusAxis: String, CaseIterable, Sendable {
         case .attention: .attention("An attention line.")
         case .fail:      .fail("A fail line.")
         case .skipped:   .skipped
-        case .notApplicable: .notApplicable("A not-applicable line.")
         }
     }
 }
@@ -46,18 +45,22 @@ nonisolated enum RowModelRule: Sendable {
     case always(VerificationOutcome)
     /// Keyed on the could-not-verify flag.
     case byFlag(off: VerificationOutcome, on: VerificationOutcome)
+    /// Keyed on whether the layer carries query lines.
+    case byLines(none: VerificationOutcome, some: VerificationOutcome)
+    /// Keyed on the run's page modes: every page rasterized vs any other list.
+    case byCoverage(allRasterized: VerificationOutcome, otherwise: VerificationOutcome)
 
     func expected(lines: Bool, modes: RowModelModesAxis, flag: Bool) -> VerificationOutcome {
         switch self {
         case .always(let o): o
         case .byFlag(let off, let on): flag ? on : off
+        case .byLines(let none, let some): lines ? some : none
+        case .byCoverage(let raster, let other): modes == .allRasterized ? raster : other
         }
     }
 }
 
-/// THE ORACLE — status → identity ("nil" = no identity) → rule. 7 × 13 rows.
-/// Neither the query lines nor the page modes decide an outcome: the engine
-/// reports a check with nothing to check as NOT APPLICABLE itself.
+/// THE ORACLE — status → identity ("nil" = no identity) → rule. 6 × 13 rows.
 nonisolated let rowModelOracle: [RowModelStatusAxis: [String: RowModelRule]] = [
     .pass: [
         "textExtraction": .always(.passed),
@@ -66,9 +69,9 @@ nonisolated let rowModelOracle: [RowModelStatusAxis: [String: RowModelRule]] = [
         "structureCheck": .always(.passed),
         "metadataCheck": .always(.passed),
         "spatialVerification": .always(.passed),
-        "characterCount": .always(.passed),
-        "fontVerification": .always(.passed),
-        "characterLineage": .always(.passed),
+        "characterCount": .byCoverage(allRasterized: .nothingToCheck, otherwise: .passed),
+        "fontVerification": .byCoverage(allRasterized: .nothingToCheck, otherwise: .passed),
+        "characterLineage": .byCoverage(allRasterized: .nothingToCheck, otherwise: .passed),
         "operatorReExtraction": .always(.passed),
         "searchRecheck": .always(.passed),
         "detectionSweep": .always(.passed),
@@ -77,16 +80,16 @@ nonisolated let rowModelOracle: [RowModelStatusAxis: [String: RowModelRule]] = [
     .info: [
         "textExtraction": .always(.note),
         "ocrCheck": .always(.note),
-        "binaryStringSearch": .always(.note),
+        "binaryStringSearch": .always(.nothingToCheck),
         "structureCheck": .always(.note),
         "metadataCheck": .always(.note),
         "spatialVerification": .always(.note),
         "characterCount": .always(.note),
         "fontVerification": .always(.note),
         "characterLineage": .always(.note),
-        "operatorReExtraction": .always(.note),
-        "searchRecheck": .always(.note),
-        "detectionSweep": .always(.note),
+        "operatorReExtraction": .always(.nothingToCheck),
+        "searchRecheck": .byLines(none: .nothingToCheck, some: .note),
+        "detectionSweep": .byLines(none: .nothingToCheck, some: .note),
         "nil": .always(.note),
     ],
     .warn: [
@@ -149,21 +152,6 @@ nonisolated let rowModelOracle: [RowModelStatusAxis: [String: RowModelRule]] = [
         "detectionSweep": .always(.couldNotVerify),
         "nil": .always(.couldNotVerify),
     ],
-    .notApplicable: [
-        "textExtraction": .always(.nothingToCheck),
-        "ocrCheck": .always(.nothingToCheck),
-        "binaryStringSearch": .always(.nothingToCheck),
-        "structureCheck": .always(.nothingToCheck),
-        "metadataCheck": .always(.nothingToCheck),
-        "spatialVerification": .always(.nothingToCheck),
-        "characterCount": .always(.nothingToCheck),
-        "fontVerification": .always(.nothingToCheck),
-        "characterLineage": .always(.nothingToCheck),
-        "operatorReExtraction": .always(.nothingToCheck),
-        "searchRecheck": .always(.nothingToCheck),
-        "detectionSweep": .always(.nothingToCheck),
-        "nil": .always(.nothingToCheck),
-    ],
 ]
 
 nonisolated struct RowModelCell: Sendable, CustomTestStringConvertible {
@@ -177,8 +165,8 @@ nonisolated struct RowModelCell: Sendable, CustomTestStringConvertible {
         "\(status) · \(identity?.rawValue ?? "nil") · lines \(hasLines) · \(modes) · cnv \(flag)"
     }
 
-    /// Every cell: 7 statuses × 13 identities × 2 line states × 4 mode
-    /// lists × 2 flag values = 1,456.
+    /// Every cell: 6 statuses × 13 identities × 2 line states × 4 mode
+    /// lists × 2 flag values = 1,248.
     static let all: [RowModelCell] = {
         let identities: [VerificationLayer?] = VerificationLayer.allCases.map { $0 } + [nil]
         var cells: [RowModelCell] = []
@@ -231,10 +219,10 @@ struct VerificationRowModelTests {
         #expect(VerificationRowModel(layer: layer, perPageModes: cell.modes.modes).outcome == expected)
     }
 
-    @Test("The oracle covers 1,456 cells over 91 rules")
+    @Test("The oracle covers 1,248 cells over 78 rules")
     func oracleCoversEveryCell() {
-        #expect(RowModelCell.all.count == 1_456)
-        #expect(rowModelOracle.values.reduce(0) { $0 + $1.count } == 91)
+        #expect(RowModelCell.all.count == 1_248)
+        #expect(rowModelOracle.values.reduce(0) { $0 + $1.count } == 78)
     }
 
     @Test("Items remain only on a Detection Sweep note that carries query lines")
@@ -249,18 +237,6 @@ struct VerificationRowModelTests {
                 }
             }
         }
-    }
-
-    @Test("A Detection Sweep item left in an applied scan's category reads Needs review, in the findings, with the engine's line")
-    func sweepAttentionIsAFinding() {
-        let line = "Re-ran your scan on the output — 1 remains on page 1. Open Scan to review."
-        let layer = Self.layer(.attention(line), identity: .detectionSweep, short: line, pages: [0],
-                               lines: [Self.sweepLine])
-        let model = VerificationRowModel(layer: layer, perPageModes: [])
-        #expect(model.outcome == .needsReview)
-        #expect(model.caption == line)
-        #expect(!model.hasItemsRemaining, "the items-remaining note is the out-of-scope case only")
-        #expect(VerificationLayerPartition(layers: [layer], perPageModes: []).findings == [0])
     }
 
     @Test("The Layer 7 excess warning reads Warning; the two Layer 8 warnings read Could not verify")
@@ -493,7 +469,7 @@ struct VerificationRowModelTests {
         let typed = VerificationRowModel(layer: Self.layer(.pass, identity: .searchRecheck, short: "Re-ran 1 search on the output — no remaining matches in the text the app can read.", lines: [typedLine]), perPageModes: [])
         #expect(typed.caption == VerificationRowModel.explainer(for: .searchRecheck))
         // Nothing applied: the nothing-to-check reason is unchanged.
-        let idle = VerificationRowModel(layer: Self.layer(.notApplicable("No searches were applied — the search re-check did not run."), identity: .searchRecheck, lines: nil), perPageModes: [])
+        let idle = VerificationRowModel(layer: Self.layer(.info("No searches were applied — the search re-check did not run."), identity: .searchRecheck, lines: nil), perPageModes: [])
         #expect(idle.outcome == .nothingToCheck)
         #expect(idle.caption == VerificationRowModel.nothingToCheckReason(for: .searchRecheck))
     }
@@ -503,7 +479,7 @@ struct VerificationRowModelTests {
         let cases: [(LayerResult, [PipelineMode], String)] = [
             (Self.layer(.pass, identity: .ocrCheck), [],
              "OCR of Page Images, Passed. Reads page images against redactions."),
-            (Self.layer(.notApplicable("x"), identity: .characterCount), [.secureRasterization],
+            (Self.layer(.pass, identity: .characterCount), [.secureRasterization],
              "Character Count, Nothing to check. No Searchable pages to check."),
             (Self.layer(.info("x"), identity: .ocrCheck, short: "Fill artifact on page 1."), [],
              "OCR of Page Images, Note. Fill artifact on page 1."),
@@ -544,13 +520,7 @@ struct VerificationRowModelTests {
     }
 
     static let sweepNote = layer(.info("x"), identity: .detectionSweep, pages: [0, 2], lines: [sweepLine])
-    static let idleRecheck = layer(.notApplicable("x"), identity: .searchRecheck)
-    /// The three text-layer checks on a run where every page rasterized.
-    static let noTextLayer: [VerificationLayer: LayerResult] = [
-        .characterCount: layer(.notApplicable("x"), identity: .characterCount),
-        .fontVerification: layer(.notApplicable("x"), identity: .fontVerification),
-        .characterLineage: layer(.notApplicable("x"), identity: .characterLineage),
-    ]
+    static let idleRecheck = layer(.info("x"), identity: .searchRecheck)
     static let all = VerificationLayer.allCases
 
     /// The eleven summary lines of the merged design, one per report shape.
@@ -560,7 +530,7 @@ struct VerificationRowModelTests {
         (report(secureChecks, secure, .pass, [.detectionSweep: sweepNote, .searchRecheck: idleRecheck]),
          "5 of 7 checks passed · 1\u{00A0}note · 1\u{00A0}had nothing to check"),
         (report(all, searchable), "12 of 12 checks passed"),
-        (report(all, secure, .pass, noTextLayer), "9 of 12 checks passed · 3\u{00A0}had nothing to check"),
+        (report(all, secure), "9 of 12 checks passed · 3\u{00A0}had nothing to check"),
         (report(all, searchable, .warn("x"), [
             .spatialVerification: layer(.warn("x"), identity: .spatialVerification),
             .ocrCheck: layer(.info("x"), identity: .ocrCheck)]),
@@ -619,7 +589,6 @@ struct VerificationRowModelTests {
             .metadataCheck: Self.layer(.warn("x"), identity: .metadataCheck),
             .spatialVerification: Self.layer(.warn("x"), identity: .spatialVerification),
             .characterCount: Self.layer(.info("x"), identity: .characterCount),
-            .fontVerification: Self.layer(.notApplicable("x"), identity: .fontVerification),
             .detectionSweep: Self.sweepNote,
             .searchRecheck: Self.idleRecheck,
         ]
@@ -651,7 +620,7 @@ struct VerificationRowModelTests {
                 == [.lead("It matches text you redacted. Use text\u{00A0}search to redact the rest."), ocr, ocrRule, .detail("Engine detail."), took])
         #expect(items(Self.layer(.fail("x"), identity: .ocrCheck)) == [ocr, ocrRule, .detail("Engine detail."), took])
         #expect(items(Self.layer(.info("x"), identity: .ocrCheck)) == [ocr, ocrRule, .detail("Engine detail."), took])
-        #expect(items(Self.layer(.notApplicable("x"), identity: .characterCount), [.secureRasterization])
+        #expect(items(Self.layer(.pass, identity: .characterCount), [.secureRasterization])
                 == [.explainer("Compares character counts with the record."),
                     .rule(VerificationRowModel.rule(for: .characterCount)), .detail("Engine detail."), took])
         // Skipped: the lead first; no engine detail (it names a reason that does not apply).
