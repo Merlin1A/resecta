@@ -208,17 +208,25 @@ struct DocumentEditorToolbar {
     /// glass button, and the … menu's row at the largest text sizes.
     @ViewBuilder
     var redactButton: some View {
-        Button("Redact", systemImage: "scissors") {
-            coordinator.runFullPipeline(documentOverride: documentOverride)
-        }
+        Button("Redact", systemImage: "scissors") { redactTapped() }
         .tint(ResectaTokens.BrandTeal.tint)
-        // The gate (`+RedactGate`): effective regions, the pipeline-start
-        // predicate, no selected-but-unapplied matches. The shortcut
-        // inherits `.disabled`.
+        // The gate (`+RedactGate`): disabled only when there is no region
+        // to redact or a run cannot start; the shortcut inherits it.
         .disabled(redactButtonDisabled)
         .keyboardShortcut("r", modifiers: [.command, .shift])
         .accessibilityIdentifier("redactButton")
         .accessibilityHint(redactButtonHint)
+    }
+
+    /// Redact's tap and ⇧⌘R: with selected matches not yet applied, the
+    /// search sheet comes up to where they are, and the run funnel refuses
+    /// with their notice; otherwise the run starts.
+    func redactTapped() {
+        if DocumentEditorView.redactTapRoute(documentState: documentState, redactionState: redactionState)
+            == .raiseSheetAndExplain {
+            searchSheetDetent = .medium
+        }
+        coordinator.runFullPipeline(documentOverride: documentOverride)
     }
 
     /// The iPhone … menu — same neutral-group rule — in the layout's

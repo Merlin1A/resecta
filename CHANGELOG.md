@@ -169,7 +169,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - The share confirmation for a failed or needs-review result also lists the same report's checks that could not verify part of the output or were skipped, as the documents say; its header reads "These checks reported issues or did not run in full:".
 - The page sidebar's thumbnail cache tells a new document apart from a freed one at the same address, so a new session never shows the previous document's page images.
 - The VoiceOver announcement at the end of a run speaks the verification status only, not the masthead sentence that can quote review terms.
-- Redact and ⇧⌘R are unavailable while the search sheet holds selected matches that are not applied, with the hint "Apply or clear the selected matches first", instead of tearing the session down and dropping them.
+- Redact and ⇧⌘R stay available while the search sheet holds selected matches that are not applied; a tap raises the sheet and says "Apply or clear the selected matches first" instead of tearing the session down and dropping them.
 - Redact: a Stop that lands while the output is being finalized leaves no output file behind in the session folder.
 - The app-switcher cover sits in its own window above every presented sheet, so the Search & Redact sheet and Settings → Custom Terms are covered too.
 - The failed screen's copy for a refused page names its rotation beside the size and scale, and the advice says so.
