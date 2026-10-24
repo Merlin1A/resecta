@@ -307,8 +307,15 @@ extension DocumentSearcher {
             if let head, let tail, tail.0.midX - head.0.midX > 1 { ends = (head, tail) }
         }
         // The same occurrence of its text in the layer and in the read row,
-        // or not this word (a repeated word read in another place).
-        if aligned, let model, !model.sameOrdinal {
+        // or not this word (a repeated word read in another place). The
+        // layer's occurrences count on the match's own printed row: a layer
+        // line can hold a cell's wrapped lines, which Vision reads as rows of
+        // their own.
+        func sameOrdinal(_ model: InkLineModel) -> Bool {
+            let onRow = model.layerOccurrences.filter { $0 == model.matchText || onBand($0) != nil }
+            return onRow.count == model.readTotal && onRow.filter { $0 < model.matchText }.count == model.readBefore
+        }
+        if aligned, let model, !sameOrdinal(model) {
             inkFitLogger.log("ink fit: the read word placed is another occurrence of its text; the box is the drift envelope")
             return job.envelope()
         }

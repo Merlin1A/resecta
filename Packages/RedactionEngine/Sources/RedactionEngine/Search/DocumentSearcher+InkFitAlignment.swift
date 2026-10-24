@@ -111,10 +111,14 @@ extension DocumentSearcher {
         /// The agreeing letters in line order: each one's index in the page
         /// text and its place along the read row (points).
         let letters: [(text: Int, read: CGFloat)]
-        /// The match is the same occurrence of its text, counted along the
-        /// aligned stretch, in the layer and in the read row, and both hold
-        /// it as often.
-        let sameOrdinal: Bool
+        /// Where the match's text occurs on the layer's line (each start's
+        /// index in the page text, the match's among them), and how often on
+        /// the read row and before the match there: the fit counts the
+        /// layer's on the match's own printed row (`InkFitJob.layerBox`).
+        let layerOccurrences: [Int]
+        let matchText: Int
+        let readTotal: Int
+        let readBefore: Int
     }
 
     /// `alignedBox`, and in `model` the line's drift it read.
@@ -198,16 +202,20 @@ extension DocumentSearcher {
                 return (total, before)
             }
             let word = lineKey[start..<(start + length)]
-            let layerSpan = min(k0, start)...max(k1, start + length - 1)
-            let readSpan = min(map[k0], first)...max(map[k1], last)
-            let inLayer = occurrences(lineKey, of: word, in: layerSpan, before: start)
-            let inRead = occurrences(readKey, of: word, in: readSpan, before: first)
+            let inRead = occurrences(readKey, of: word, in: 0...(readKey.count - 1), before: first)
+            var layerStarts: [Int] = []
+            var i = 0
+            while i + word.count <= lineKey.count {
+                if lineKey[i..<(i + word.count)].elementsEqual(word), i < textIndex.count { layerStarts.append(textIndex[i]) }
+                i += 1
+            }
             let letters = agreeing.compactMap { k -> (text: Int, read: CGFloat)? in
                 guard k < textIndex.count, let x = readX(map[k]) else { return nil }
                 return (textIndex[k], x)
             }
-            model = InkLineModel(letters: letters,
-                                 sameOrdinal: inLayer.total == inRead.total && inLayer.before == inRead.before)
+            model = InkLineModel(letters: letters, layerOccurrences: layerStarts,
+                                 matchText: start < textIndex.count ? textIndex[start] : range.location,
+                                 readTotal: inRead.total, readBefore: inRead.before)
         }
         var offset = 0
         var found: CGRect?

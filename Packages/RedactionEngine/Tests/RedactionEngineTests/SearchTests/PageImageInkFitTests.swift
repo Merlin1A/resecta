@@ -402,6 +402,35 @@ struct PageImageInkFitTests {
         }
     }
 
+    @Test("A short word repeated on a cell's wrapped lines is counted on its own printed row: fitted, not the envelope")
+    func repeatedWordCountsOnItsOwnRow() async throws {
+        let (export, source) = try await Self.reimportedExport()
+        let page = try #require(export.page(at: 0)), sourcePage = try #require(source.page(at: 0))
+        await DocumentSearcher.prepareInkFit(page)
+        let size = page.bounds(for: .cropBox).size
+        let text = (page.string ?? "") as NSString, sourceText = (sourcePage.string ?? "") as NSString
+        let searcher = DocumentSearcher()
+        var checked = 0, at = 0, sourceAt = 0
+        while true {
+            // "ID" in "ID:PR44…": the layer line also holds "ID:…" from the cell's other line.
+            let token = text.range(of: "ID:PR44", range: NSRange(location: at, length: text.length - at))
+            let sourceToken = sourceText.range(of: "ID:PR44", range: NSRange(location: sourceAt, length: sourceText.length - sourceAt))
+            guard token.location != NSNotFound, sourceToken.location != NSNotFound else { break }
+            at = NSMaxRange(token); sourceAt = NSMaxRange(sourceToken)
+            let range = NSRange(location: token.location, length: 2)
+            let raw = try #require(page.selection(for: range).flatMap { searcher.normalizedRect(for: $0, page: page) })
+            let truth = try #require(sourcePage.selection(for: NSRange(location: sourceToken.location, length: 2))
+                .flatMap { searcher.normalizedRect(for: $0, page: sourcePage) })
+            let fit = try #require(Self.settled({ DocumentSearcher.inkFit(raw, page: page, text: "ID", range: range, paintOnly: true) },
+                                                degraded: \.degraded))
+            #expect(!fit.degraded, "\"ID\" at \(range.location) is fitted, not left to the envelope")
+            let outside = try Self.inkOutside(page, word: Self.points(truth, size), boxes: [Self.points(fit.rect, size)])
+            #expect(outside.share == 0, "\"ID\" at \(range.location): \(outside.share * 100)% of its ink outside")
+            checked += 1
+        }
+        #expect(checked == 2, "the statement's first page has two payroll rows; checked \(checked)")
+    }
+
     @Test("A word inside a longer read token is painted alone: DELIA in INDN:DELIA leaves INDN: unpainted")
     func cutLeavesTheRestOfTheTokenUnpainted() async throws {
         let (export, source) = try await Self.reimportedExport()
