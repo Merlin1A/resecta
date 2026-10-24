@@ -9,7 +9,7 @@ import RedactionEngine
 // (the committed regions; the search layer — live preview, highlights,
 // the walk's ring; the in-progress shapes — rubber band,
 // marquee, the resize label), followed by the helpers those
-// segments call (polygon fill, resize handles, the type badge, the
+// segments call (resize handles, the type badge, the
 // dimension label and the snap guides).
 
 extension RedactionOverlayView {
@@ -55,18 +55,8 @@ extension RedactionOverlayView {
             ctx.setStrokeColor(color.cgColor)
             ctx.setLineWidth(Self.regionStrokeWidth(isSelected: isSelected, fingerScale: fingerScale))
             ctx.setLineDash(phase: 0, lengths: [])
-            // Polygon regions render as filled polygons (even-odd
-            // rule). The lift effect for moves still uses the bounding
-            // box (drawRect) — the polygon itself is drawn at its real
-            // shape inside that box.
-            if let vertices = region.vertices, vertices.count >= 3 {
-                drawPolygonRegion(
-                    ctx: ctx, vertices: vertices
-                )
-            } else {
-                ctx.addRect(drawRect)
-                ctx.drawPath(using: .fillStroke)
-            }
+            ctx.addRect(drawRect)
+            ctx.drawPath(using: .fillStroke)
 
             if isBeingMoved {
                 ctx.restoreGState()
@@ -192,34 +182,6 @@ extension RedactionOverlayView {
             let resizeRect = pdfNormalizedToOverlay(region.normalizedRect)
             drawDimensionLabel(ctx: ctx, rect: resizeRect)
         }
-    }
-
-    /// Draw a committed polygon region. Translates normalized
-    /// vertices into overlay-space and fills the closed path with the
-    /// caller's current fill color (set by `draw(_:)` before calling
-    /// in). Even-odd rule matches the engine fill path (PixelOperations
-    /// `fillPath(using: .evenOdd)`).
-    private func drawPolygonRegion(
-        ctx: CGContext,
-        vertices: [CGPoint]
-    ) {
-        let overlayPoints = vertices.map(normalizedPointToOverlay)
-        guard overlayPoints.count >= 3 else { return }
-        ctx.beginPath()
-        ctx.move(to: overlayPoints[0])
-        for p in overlayPoints.dropFirst() {
-            ctx.addLine(to: p)
-        }
-        ctx.closePath()
-        ctx.drawPath(using: .eoFillStroke)
-    }
-
-    /// Convert a normalized point (0–1, bottom-left origin) into
-    /// overlay-space (UIKit top-left origin).
-    private func normalizedPointToOverlay(_ point: CGPoint) -> CGPoint {
-        let w = bounds.width
-        let h = bounds.height
-        return CGPoint(x: point.x * w, y: (1.0 - point.y) * h)
     }
 
     private func drawResizeHandles(ctx: CGContext, rect: CGRect) {

@@ -89,6 +89,9 @@ extension VerificationCorpusRunnerTests {
     struct RegionSetSpec {
         let name: String
         let seeds: [RegionSeed]
+        /// Always false since the engine's polygon path was removed. Kept so
+        /// the runner (VerificationCorpusRunnerTests.swift, which reads it and
+        /// which the H2.2 shard guard compares byte for byte) is unchanged.
         let polygon: Bool
         let params: [String: Int]?
     }
@@ -107,26 +110,17 @@ extension VerificationCorpusRunnerTests {
             RegionSetSpec(name: "seeded-subset", seeds: subset,
                           polygon: false,
                           params: ["k": k, "seed": Int(subsetSeed)]),
-            RegionSetSpec(name: "polygon", seeds: ordered,
-                          polygon: true, params: nil),
         ]
     }
 
     /// GT rect -> RedactionRegion, mirroring `buildPDFPageData`'s minimum
     /// dimension floor and clamp (`PipelineCoordinator.buildPDFPageData`).
     /// Returns nil for a below-floor box so the caller can record the drop.
+    /// `polygon` is always false (see `RegionSetSpec.polygon`).
     static func region(from seed: RegionSeed, polygon: Bool) -> RedactionRegion? {
         guard seed.rect.width > 0.001, seed.rect.height > 0.001 else { return nil }
         let clamped = seed.rect.clampedToNormalized()
-        let vertices: [CGPoint]? = polygon ? [
-            CGPoint(x: clamped.minX, y: clamped.minY),
-            CGPoint(x: clamped.maxX, y: clamped.minY),
-            CGPoint(x: clamped.maxX, y: clamped.maxY),
-            CGPoint(x: clamped.minX, y: clamped.maxY),
-        ] : nil
-        return RedactionRegion(
-            id: UUID(), normalizedRect: clamped, source: .manual,
-            vertices: vertices)
+        return RedactionRegion(id: UUID(), normalizedRect: clamped, source: .manual)
     }
 
     /// Sensitive terms for the burned regions, mirroring the app's
@@ -190,7 +184,7 @@ extension VerificationCorpusRunnerTests {
                 withoutText += 1
                 continue
             }
-            let lines = capturedLines(touching: rect, polygon: region.vertices, on: page)
+            let lines = capturedLines(touching: rect, on: page)
             let words = lines.flatMap(\.words)
             if words.count == 1 {
                 insert(words[0], bounded: true)
@@ -209,16 +203,16 @@ extension VerificationCorpusRunnerTests {
         return (terms, withoutText)
     }
 
-    /// The app's capture reader (`ManualCapturePageWords.lines(touching:polygon:)`)
+    /// The app's capture reader (`ManualCapturePageWords.lines(touching:)`)
     /// in lockstep: a word is taken when its box meets the region, or meets
     /// the region's 3-pt halo while the region meets the word's own line
-    /// band; with a polygon the word's centre must lie inside it. Consecutive
+    /// band. Consecutive
     /// taken words whose boxes overlap vertically form one line, whose text
     /// is the page text's verbatim span from the first word to the last when
     /// their ranges read in order with no line break inside, else the words
     /// space-joined. Lines never join across.
     static func capturedLines(
-        touching rect: CGRect, polygon: [CGPoint]?, on page: PDFPage
+        touching rect: CGRect, on page: PDFPage
     ) -> [(text: String, words: [String])] {
         guard rect.width > 0, rect.height > 0,
               let source = EmbeddedTextSource.make(from: page),
@@ -235,10 +229,6 @@ extension VerificationCorpusRunnerTests {
         for (index, word) in entries.enumerated() {
             let onBand = rect.minY < word.box.maxY && word.box.minY < rect.maxY
             guard word.box.intersects(rect) || (onBand && word.box.intersects(halo)) else { continue }
-            if let polygon, polygon.count >= 3,
-               !pointInPolygon(CGPoint(x: word.box.midX, y: word.box.midY), vertices: polygon) {
-                continue
-            }
             if index == previousIndex + 1, let last = lines.last?.last,
                last.box.minY < word.box.maxY && word.box.minY < last.box.maxY {
                 lines[lines.count - 1].append(word)

@@ -142,10 +142,7 @@ extension VerificationEngine {
     /// Pure Layer-2 classifier. An OCR hit is "in region" when any of
     /// its boxes has at least `inRegionCoverageThreshold` of its own area inside
     /// a region's `normalizedRect` (identity space) — meaningful containment, not
-    /// a sliver edge touch — AND, for a polygon region
-    /// the box intersects the vertex polygon itself: the rect is only
-    /// the polygon's bounding box, and text inside bbox-minus-polygon is page
-    /// content the user chose to keep. FAIL when a sensitive term is
+    /// a sliver edge touch. FAIL when a sensitive term is
     /// readable inside a redacted region; WARN for any other in-region text; text
     /// only outside regions is the page's own (un-redacted) content. No Vision
     /// dependency — fully unit-testable.
@@ -193,7 +190,7 @@ extension VerificationEngine {
             for (index, box) in boxes.enumerated() {
                 // One word box over the bar pulls the hit in — the shared
                 // predicate (`boxLiesInRegion`) requires MEANINGFUL
-                // containment plus the polygon test.
+                // containment.
                 let inRegion = boxLiesInRegion(box, of: pageRegions)
                 if inRegion {
                     // Part A: distinguish a fill artifact (Vision read a token off
@@ -343,20 +340,11 @@ extension VerificationEngine {
     /// area inside a region's `normalizedRect` — never an any-overlap edge
     /// touch. A still-visible word whose box clips a mid-line region's edge
     /// by a sliver is not in-region; a box substantially inside (a paint
-    /// miss) still is. A polygon region's `normalizedRect` is only its
-    /// bounding box — text the user deliberately preserved inside
-    /// bbox-minus-polygon (an L-shape's notch) is NOT redacted content — so
-    /// the box must also intersect the polygon itself (same normalized
-    /// space; shared geometry with the character filter and Layer 6).
-    /// Rect-only regions (`vertices == nil` or < 3) take the rect-coverage
-    /// path alone. Shared by `classifyPageOCR` and `outsideRegionTermTexts`
+    /// miss) still is. Shared by `classifyPageOCR` and `outsideRegionTermTexts`
     /// so the verdict and the term texts read the SAME geometry.
     static func boxLiesInRegion(_ box: CGRect, of pageRegions: [RedactionRegion]) -> Bool {
         pageRegions.contains { region in
-            guard coverageFraction(of: box, inside: region.normalizedRect)
-                    >= inRegionCoverageThreshold else { return false }
-            guard let vertices = region.vertices, vertices.count >= 3 else { return true }
-            return rectIntersectsPolygon(box, vertices: vertices)
+            coverageFraction(of: box, inside: region.normalizedRect) >= inRegionCoverageThreshold
         }
     }
 

@@ -48,11 +48,6 @@ extension VerificationEngine {
     /// is probed for a text layer: image-only output must carry none (the
     /// writer draws no text on such a page), so a text layer there FAILs
     /// the layer outright — a tampered or foreign output, never a skip.
-    ///
-    /// When any region on the page carries `vertices`, the spatial
-    /// exclusion check uses polygon-or-rect intersection (rect for
-    /// vertex-less regions, even-odd polygon for vertex-bearing). The
-    /// helper accepts `regionShapes` so the verifier can choose per-region.
     func runLayer6SpatialVerification(
         _ doc: PDFDocument,
         regions: [Int: [RedactionRegion]],
@@ -117,36 +112,16 @@ extension VerificationEngine {
             let rectsInPoints = pageRegions.map {
                 normalizedToPDFPageCoordinates($0.normalizedRect, pageRect: outputBounds)
             }
-            // Build polygon-aware shapes. Polygon vertices are
-            // converted into PDF-point-space via the same conversion the
-            // rect path uses. Rect-only regions carry `polygonVertices ==
-            // nil`. `bounds` carries the un-expanded rect (the
-            // unconditional 0pt floor + the band gate) and `expandedBounds`
-            // the filter's safety-margin halo, so Layer 6 enforces the
-            // same two-tier contract the character filter excludes by.
-            let regionShapes: [RegionShape] = zip(pageRegions, rectsInPoints)
-                .map { region, rect in
-                    let expanded = rect.insetBy(
-                        dx: -safetyMarginPoints, dy: -safetyMarginPoints
-                    )
-                    guard let normalized = region.vertices,
-                          normalized.count >= 3 else {
-                        return RegionShape(
-                            expandedBounds: expanded, polygonVertices: nil,
-                            bounds: rect
-                        )
-                    }
-                    let inPoints = normalized.map { v in
-                        normalizedToPDFPageCoordinates(
-                            CGRect(x: v.x, y: v.y, width: 0, height: 0),
-                            pageRect: outputBounds
-                        ).origin
-                    }
-                    return RegionShape(
-                        expandedBounds: expanded, polygonVertices: inPoints,
-                        bounds: rect
-                    )
-                }
+            // `bounds` carries the un-expanded rect (the unconditional 0pt
+            // floor + the band gate) and `expandedBounds` the filter's
+            // safety-margin halo, so Layer 6 enforces the same two-tier
+            // contract the character filter excludes by.
+            let regionShapes: [RegionShape] = rectsInPoints.map { rect in
+                RegionShape(
+                    expandedBounds: rect.insetBy(dx: -safetyMarginPoints, dy: -safetyMarginPoints),
+                    bounds: rect
+                )
+            }
 
             let outcome = try await verifier.spatialExclusionOutcome(
                 outputPage: page,

@@ -396,8 +396,8 @@ enum TextLayerReconstructor {
     /// the line's origin plus the CTLine's advance to that glyph at the band
     /// pitch, vertically the Courier line box shrunk to its glyph core by the
     /// same descent fraction Layer 6 applies to a read-back box — and returns
-    /// every entry whose core centre lies inside a region (the polygon when
-    /// the shape carries one, else the rect: the centre test Layer 6 runs).
+    /// every entry whose core centre lies inside a region rect (the centre
+    /// test Layer 6 runs).
     /// A cell that only crosses a region edge is NOT returned: that is
     /// Layer 6's graze note, a positional observation about content that
     /// stays outside.
@@ -433,13 +433,7 @@ enum TextLayerReconstructor {
                     width: x1 - x0, height: ascent + descent)
                 let core = cell.insetBy(dx: 0, dy: fraction * cell.height)
                 let centre = CGPoint(x: core.midX, y: core.midY)
-                let inside = regionShapes.contains { shape in
-                    if let vertices = shape.polygonVertices {
-                        return polygonContainsPoint(
-                            centre, vertices: vertices)
-                    }
-                    return shape.bounds.contains(centre)
-                }
+                let inside = regionShapes.contains { $0.bounds.contains(centre) }
                 if inside { hits.insert(entry) }
             }
         }
@@ -478,7 +472,7 @@ enum TextLayerReconstructor {
                 RegionShape(
                     expandedBounds: $0.insetBy(
                         dx: -safetyMarginPoints, dy: -safetyMarginPoints),
-                    polygonVertices: nil, bounds: $0)
+                    bounds: $0)
             })
     }
 

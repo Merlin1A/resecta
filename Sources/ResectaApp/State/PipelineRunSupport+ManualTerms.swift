@@ -42,8 +42,8 @@ extension PipelineCoordinator {
     ///
     /// Per `.manual` region (page by page, in region order): a whole-page
     /// region adds no term and is counted; on a page whose text layer is `.rich` the words
-    /// the Searchable filter would touch (`ManualCapturePageWords.lines`;
-    /// its polygon honoured) are captured — a region over exactly one word
+    /// the Searchable filter would touch (`ManualCapturePageWords.lines`)
+    /// are captured — a region over exactly one word
     /// keeps that word as one bounded token (the user's intent); otherwise
     /// every captured LINE of two or more words joins as ONE substring
     /// term, the page text's verbatim span from its first word to its last
@@ -87,7 +87,7 @@ extension PipelineCoordinator {
                     continue
                 }
                 if words == nil { words = .some(pageWords(page)) }
-                let lines = words??.lines(touching: rect, polygon: region.vertices) ?? []
+                let lines = words??.lines(touching: rect) ?? []
                 let captured = lines.flatMap(\.words)
                 if captured.count == 1 {
                     insert(captured[0], requiresTokenBoundary: true)
@@ -147,9 +147,9 @@ nonisolated struct CapturedLine: Equatable, Sendable {
 /// One page's text-layer words, read once for every manual region on the
 /// page: the engine's word source (`EmbeddedTextSource`) with the words'
 /// text and ranges, filtered per region either by the rule of the engine's
-/// word-span primitive (`TextSpan.words(fullyInside:polygon:on:)`, which
+/// word-span primitive (`TextSpan.words(fullyInside:on:)`, which
 /// reads the page again on every call) or by the Searchable filter's
-/// removal rule (`lines(touching:polygon:)`).
+/// removal rule (`lines(touching:)`).
 nonisolated struct ManualCapturePageWords {
 
     /// `TextSpan.edgeTolerancePoints` (internal to the engine), in PDF
@@ -183,12 +183,11 @@ nonisolated struct ManualCapturePageWords {
     /// The lines the Searchable filter would touch under `rect`: a word is
     /// taken when its box meets the region (the filter's tier (a)), or meets
     /// the region's 3-pt halo while the region meets the word's own line
-    /// band (tier (b)); with `polygon` a word's centre must also lie inside
-    /// it. Consecutive taken words whose boxes overlap vertically form one
+    /// band (tier (b)). Consecutive taken words whose boxes overlap vertically form one
     /// line; its text is the page text's verbatim span from the first word
     /// to the last when their ranges read in order on one line, else the
     /// words space-joined. Lines never join across.
-    func lines(touching rect: CGRect, polygon: [CGPoint]? = nil) -> [CapturedLine] {
+    func lines(touching rect: CGRect) -> [CapturedLine] {
         guard rect.width > 0, rect.height > 0 else { return [] }
         let halo = rect.insetBy(dx: -Self.removalHaloPoints / displayedSize.width,
                                 dy: -Self.removalHaloPoints / displayedSize.height)
@@ -197,10 +196,6 @@ nonisolated struct ManualCapturePageWords {
         for (index, word) in entries.enumerated() {
             let onBand = rect.minY < word.box.maxY && word.box.minY < rect.maxY
             guard word.box.intersects(rect) || (onBand && word.box.intersects(halo)) else { continue }
-            if let polygon, polygon.count >= 3,
-               !pointInPolygon(CGPoint(x: word.box.midX, y: word.box.midY), vertices: polygon) {
-                continue
-            }
             if index == previousIndex + 1, let last = lines.last?.last,
                last.box.minY < word.box.maxY && word.box.minY < last.box.maxY {
                 lines[lines.count - 1].append(word)
@@ -225,17 +220,13 @@ nonisolated struct ManualCapturePageWords {
     }
 
     /// The words fully inside `rect` (page-normalized, displayed frame), in
-    /// reading order; with `polygon` a word's centre must also lie inside it.
-    func words(fullyInside rect: CGRect, polygon: [CGPoint]? = nil) -> [String] {
+    /// reading order.
+    func words(fullyInside rect: CGRect) -> [String] {
         guard rect.width > 0, rect.height > 0 else { return [] }
         let halo = rect.insetBy(dx: -Self.edgeTolerancePoints / displayedSize.width,
                                 dy: -Self.edgeTolerancePoints / displayedSize.height)
         return entries.compactMap { word in
             guard halo.contains(word.box) else { return nil }
-            if let polygon, polygon.count >= 3,
-               !pointInPolygon(CGPoint(x: word.box.midX, y: word.box.midY), vertices: polygon) {
-                return nil
-            }
             return word.text
         }
     }

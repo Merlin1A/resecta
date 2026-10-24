@@ -41,12 +41,11 @@ struct PageBarWholePageTests {
 
     // MARK: - The region
 
-    @Test("The region is the page's unit rectangle, manual, with no polygon")
+    @Test("The region is the page's unit rectangle, manual")
     func regionIsTheUnitRectangle() {
         let region = PageNavigationBar.wholePageRegion()
         #expect(region.normalizedRect == Self.unit)
         #expect(region.source == .manual)
-        #expect(region.vertices == nil)
         #expect(region.normalizedRect.width * region.normalizedRect.height
                 >= PipelineCoordinator.wholePageRegionArea,
                 "the region is a whole-page region by the capture rule's own threshold")

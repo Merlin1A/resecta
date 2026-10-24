@@ -14,11 +14,11 @@ import PDFKit
 @Suite("Search Re-check coverage check", .tags(.search))
 struct RegionCoverageTests {
 
-    private func region(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat, vertices: [CGPoint]? = nil) -> RedactionRegion {
-        RedactionRegion(id: UUID(), normalizedRect: CGRect(x: x, y: y, width: w, height: h), source: .manual, vertices: vertices)
+    private func region(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat) -> RedactionRegion {
+        RedactionRegion(id: UUID(), normalizedRect: CGRect(x: x, y: y, width: w, height: h), source: .manual)
     }
 
-    @Test("coveredFraction: whole, half, the union of two boxes, a polygon's notch, a degenerate match")
+    @Test("coveredFraction: whole, half, the union of two boxes, a degenerate match")
     func coveredFraction() {
         let match = CGRect(x: 0.2, y: 0.5, width: 0.2, height: 0.02)
         #expect(RegionCoverage.coveredFraction(of: match, by: [region(0.2, 0.5, 0.2, 0.02)]) == 1)
@@ -27,10 +27,6 @@ struct RegionCoverageTests {
         #expect(abs(half - 0.5) < 0.03)
         let union = RegionCoverage.coveredFraction(of: match, by: [region(0.2, 0.5, 0.1, 0.02), region(0.3, 0.5, 0.1, 0.02)])
         #expect(union == 1)
-        // An L-shaped polygon whose bounding box is the match: the notch (the right half's top) is uncovered.
-        let l = [CGPoint(x: 0.2, y: 0.5), CGPoint(x: 0.4, y: 0.5), CGPoint(x: 0.4, y: 0.51), CGPoint(x: 0.3, y: 0.51), CGPoint(x: 0.3, y: 0.52), CGPoint(x: 0.2, y: 0.52)]
-        let notched = RegionCoverage.coveredFraction(of: match, by: [region(0.2, 0.5, 0.2, 0.02, vertices: l)])
-        #expect(notched > 0.7 && notched < 0.8, "\(notched)")
         #expect(RegionCoverage.coveredFraction(of: CGRect(x: 0.2, y: 0.5, width: 0, height: 0.02), by: [region(0, 0, 1, 1)]) == 0)
         #expect(RegionCoverage.coveredFraction(of: match, by: []) == 0)
     }
