@@ -33,7 +33,7 @@ struct Layer2FoldOrderTests {
 
     private func message(_ status: VerificationStatus) -> String {
         switch status {
-        case .fail(let m), .warn(let m), .info(let m), .attention(let m): m
+        case .fail(let m), .warn(let m), .info(let m), .attention(let m), .notApplicable(let m): m
         case .pass, .skipped: ""
         }
     }

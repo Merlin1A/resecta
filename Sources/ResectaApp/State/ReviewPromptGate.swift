@@ -25,7 +25,7 @@ nonisolated struct ReviewPromptGate {
     /// Checks that read as passed on the results screen.
     static func passed(_ status: VerificationStatus) -> Bool {
         switch status {
-        case .pass, .info: true
+        case .pass, .info, .notApplicable: true
         case .warn, .attention, .fail, .skipped: false
         }
     }

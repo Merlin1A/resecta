@@ -310,8 +310,8 @@ struct SearchRecheckPipelineTests {
 
     // MARK: - INFO
 
-    @Test("Zero applied searches → the re-check is an info row that had nothing to check")
-    func zeroSearchesIsInfo() async throws {
+    @Test("Zero applied searches → the re-check is a not-applicable row that had nothing to check")
+    func zeroSearchesIsNotApplicable() async throws {
         let h = try await makeHarness(mode: .secureRasterization, applyTerm: false)
         defer { h.removeOutput() }
         #expect(h.coordinator.collectAppliedSearches().isEmpty)
@@ -322,19 +322,19 @@ struct SearchRecheckPipelineTests {
 
         let last = try recheckRow(report)
         #expect(last.layer == .searchRecheck)
-        #expect(last.status.isInfo)
+        #expect(last.status.isNotApplicable)
         #expect(last.shortDescription == SearchRecheck.infoMessage)
         #expect(last.queryLines == nil)
         #expect(LayerResultRow.queryLineTexts(layer: last).isEmpty)
-        #expect(!report.layers.contains { $0.status.isSkipped }, ".info never .skipped")
+        #expect(!report.layers.contains { $0.status.isSkipped }, ".notApplicable never .skipped")
 
         // The Details summary counts only the passes and names the idle
         // re-check as a check that had nothing to check.
         let summary = VerificationResultsView.detailsSummaryText(for: report)
         let total = report.layers.count
         let passed = report.layers.filter { $0.status == .pass }.count
-        let infoCount = report.layers.filter(\.status.isInfo).count
-        #expect(infoCount >= 1)
+        let notApplicableCount = report.layers.filter(\.status.isNotApplicable).count
+        #expect(notApplicableCount >= 1)
         #expect(VerificationRowModel(layer: last, perPageModes: report.perPageModes).outcome == .nothingToCheck)
         #expect(summary.contains("\u{00A0}had nothing to check"), "\(summary)")
         #expect(summary.hasPrefix("\(passed) of \(total) checks passed"), "\(summary)")

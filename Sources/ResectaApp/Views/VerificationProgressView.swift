@@ -30,6 +30,7 @@ struct VerificationProgressView: View {
             case .attention(let msg): statusKey = "a:\(msg)"
             case .fail(let msg): statusKey = "f:\(msg)"
             case .skipped: statusKey = "s"
+            case .notApplicable(let msg): statusKey = "n:\(msg)"
             }
             return "\(idx):\(statusKey)"
         }.joined(separator: "|")

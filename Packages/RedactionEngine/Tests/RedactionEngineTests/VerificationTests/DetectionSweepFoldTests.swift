@@ -76,7 +76,7 @@ struct DetectionSweepFoldTests {
 
     private func message(_ status: VerificationStatus) -> String {
         switch status {
-        case .fail(let m), .warn(let m), .info(let m), .attention(let m): m
+        case .fail(let m), .warn(let m), .info(let m), .attention(let m), .notApplicable(let m): m
         case .pass, .skipped: ""
         }
     }
@@ -92,7 +92,7 @@ struct DetectionSweepFoldTests {
             requests: [request],
             observations: [page(0, [0: [item(0, .ssn, r), item(0, .ssn, twin)]])],
             pageCount: 1)
-        #expect(outcome.status.isInfo, "two remain, one was left unredacted → one is further; got \(outcome.status)")
+        #expect(outcome.status.isAttention, "two remain, one was left unredacted → one is further, in the scan's own category; got \(outcome.status)")
         #expect(message(outcome.status).contains("2 remain"))
         #expect(message(outcome.status).contains("(1 you left unredacted)"))
         #expect(outcome.pageReferences == [0])
@@ -110,18 +110,18 @@ struct DetectionSweepFoldTests {
         let underBar = DetectionSweep.fold(
             requests: [applied([.ssn], deselected: [result(0, .ssn, shifted)])],
             observations: [page(0, [0: [item(0, .ssn, base, text: "987-65-4321")]])], pageCount: 1)
-        #expect(underBar.status.isInfo, "IoU under 0.5 and another text leave the item further; got \(underBar.status)")
+        #expect(underBar.status.isAttention, "IoU under 0.5 and another text leave the item further; got \(underBar.status)")
         #expect(!message(underBar.status).contains("left unredacted"))
 
         let otherCategory = DetectionSweep.fold(
             requests: [applied([.ssn, .phone], deselected: [result(0, .phone, base)])],
             observations: [page(0, [0: [item(0, .ssn, base)]])], pageCount: 1)
-        #expect(otherCategory.status.isInfo, "a different category never subtracts; got \(otherCategory.status)")
+        #expect(otherCategory.status.isAttention, "a different category never subtracts; got \(otherCategory.status)")
 
         let otherPage = DetectionSweep.fold(
             requests: [applied([.ssn], deselected: [result(1, .ssn, base)])],
             observations: [page(0, [0: [item(0, .ssn, base)]]), page(1, [0: []])], pageCount: 2)
-        #expect(otherPage.status.isInfo, "a different page never subtracts; got \(otherPage.status)")
+        #expect(otherPage.status.isAttention, "a different page never subtracts; got \(otherPage.status)")
 
         let exact = DetectionSweep.fold(
             requests: [applied([.ssn], deselected: [result(0, .ssn, base)])],
@@ -195,7 +195,7 @@ struct DetectionSweepFoldTests {
         #expect(outcome.copyOverride?.detail == "\(DetectionSweep.detailLeadSweep) Text was read from the output's text layer. \(DetectionSweep.gateSentence) 3 possible items remain on 2 pages: 2, 5.")
     }
 
-    @Test("INFO: an applied scan beside the sweep splits in-scope and out-of-scope; both sub-lines")
+    @Test("ATTENTION: an applied scan beside the sweep splits in-scope and out-of-scope; both sub-lines")
     func infoSplitInAndOutOfScope() {
         let left = rect(0.5, 0.5)
         let outcome = DetectionSweep.fold(
@@ -205,7 +205,7 @@ struct DetectionSweepFoldTests {
                          1: [item(0, .ssn, left), item(0, .dateOfBirth, rect(0.1, 0.1)), item(0, .email, rect(0.1, 0.8))]]),
                 page(2, [0: [], 1: [item(2, .phone, rect(0.1, 0.1))]]),
             ], pageCount: 3)
-        #expect(outcome.status.isInfo, "got \(outcome.status)")
+        #expect(outcome.status.isAttention, "1 remains in the scan's categories; got \(outcome.status)")
         let m = message(outcome.status)
         #expect(m.hasPrefix("Re-ran your scan on the output — in your scan's categories: 2 remain (1 you left unredacted); outside them: 2 possible items on 2 pages: 1, 3. Open Scan to review."),
                 "got \(m)")
@@ -256,10 +256,10 @@ struct DetectionSweepFoldTests {
         #expect(outcome.reviewTermTexts == nil)
     }
 
-    @Test("No scan request at all → the idle INFO, never skipped")
-    func idleInfo() {
+    @Test("No scan request at all → NOT APPLICABLE, never skipped and never a pass")
+    func idleNotApplicable() {
         let outcome = DetectionSweep.fold(requests: [], observations: [], pageCount: 3)
-        #expect(outcome.status.isInfo)
+        #expect(outcome.status.isNotApplicable, "got \(outcome.status)")
         #expect(message(outcome.status) == DetectionSweep.infoMessage)
         #expect(outcome.queryLines == nil)
         #expect(outcome.pageReferences == nil)
@@ -361,7 +361,7 @@ struct DetectionSweepFoldTests {
                 1: [item(0, nil, rect(0.1, 0.1), text: "ACME"), item(0, nil, rect(0.1, 0.3), text: "BETA")],
             ])],
             pageCount: 1)
-        #expect(outcome.status.isInfo, "got \(outcome.status)")
+        #expect(outcome.status.isAttention, "the scan's own term remains; got \(outcome.status)")
         let m = message(outcome.status)
         #expect(m.contains("in your scan's categories: 1 remains"), "the scan's own term; got \(m)")
         #expect(m.contains("outside them: 1 possible item"), "the later term is a possible item; got \(m)")
@@ -380,8 +380,8 @@ struct DetectionSweepFoldTests {
 
     // MARK: - Invariants
 
-    @Test("Never ATTENTION and never a term text in a status message, over random observations")
-    func neverAttentionAndContentFree() {
+    @Test("ATTENTION only after an applied scan, and never a term text in a status message, over random observations")
+    func attentionOnlyAfterAnAppliedScanAndContentFree() {
         var rng = SplitMix64(seed: 20_260_927)
         let categories = PIICategory.allCases
         for _ in 0..<200 {
@@ -413,7 +413,7 @@ struct DetectionSweepFoldTests {
             if hasApplied { requests.append(applied([.ssn, .name, .phone], deselected: deselected)) }
             if hasSweep { requests.append(sweep) }
             let outcome = DetectionSweep.fold(requests: requests, observations: observations, pageCount: pageCount)
-            #expect(!outcome.status.isAttention)
+            #expect(hasApplied || !outcome.status.isAttention, "the sweep alone never reads ATTENTION")
             #expect(!outcome.status.isFail)
             #expect(outcome.reviewTermTexts == nil)
             let text = (message(outcome.status) + (outcome.copyOverride?.short ?? "") + (outcome.copyOverride?.detail ?? ""))
