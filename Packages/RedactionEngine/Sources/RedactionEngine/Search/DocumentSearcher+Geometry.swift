@@ -88,9 +88,13 @@ extension DocumentSearcher {
     /// bitmap produced by renderPage()/getDrawingTransform().
     ///
     /// SECURITY NOTE: Wrong normalization = fill at wrong pixel position = data leak.
+    /// On a page whose text lies over a page-scale image the box is fitted
+    /// to the ink under it (`inkFittedRect`).
     public nonisolated func boundingRect(for nsRange: NSRange, page: PDFPage) -> CGRect? {
         guard let selection = page.selection(for: nsRange) else { return nil }
-        return normalizedRect(for: selection, page: page)
+        return normalizedRect(for: selection, page: page).map {
+            Self.inkFittedRect($0, page: page, text: selection.string, range: nsRange)
+        }
     }
 
     /// One normalized rect per line of the range's selection
@@ -100,8 +104,38 @@ extension DocumentSearcher {
     /// (the same refusal as `boundingRect`).
     nonisolated func lineRects(for nsRange: NSRange, page: PDFPage) -> [CGRect]? {
         guard let selection = page.selection(for: nsRange) else { return nil }
-        let rects = selection.selectionsByLine().compactMap { normalizedRect(for: $0, page: page) }
+        let lines = selection.selectionsByLine()
+        let rects = lines.compactMap { line in
+            normalizedRect(for: line, page: page).map {
+                Self.inkFittedRect($0, page: page, text: line.string,
+                                   range: lines.count == 1 ? nsRange : line.range(at: 0, on: page))
+            }
+        }
         return rects.isEmpty ? nil : rects
+    }
+
+    /// On a page whose glyphs are inkless over a page-scale image, each line of
+    /// the match as two rects, index-aligned: `paint`, the word's ink (what the
+    /// fill covers), and `strip`, the selection box of the line's hidden glyphs
+    /// (what a Searchable export removes from the text layer); `degraded` when
+    /// some line's fit fell back to the drift envelope (the caller reports the
+    /// page as not fully analysed). Nil on any other page: the line rects are
+    /// `lineRects`' as they are.
+    nonisolated func textLayerAndInkRects(for nsRange: NSRange, page: PDFPage)
+        -> (paint: [CGRect], strip: [CGRect], degraded: Bool)? {
+        guard let cgPage = page.pageRef, Self.carriesHiddenTextOverImage(page, cgPage: cgPage),
+              let selection = page.selection(for: nsRange) else { return nil }
+        let lines = selection.selectionsByLine()
+        var paint: [CGRect] = [], strip: [CGRect] = [], degraded = false
+        for line in lines {
+            guard let raw = normalizedRect(for: line, page: page) else { continue }
+            let fit = Self.inkFit(raw, page: page, text: line.string,
+                                  range: lines.count == 1 ? nsRange : line.range(at: 0, on: page), paintOnly: true)
+            strip.append(raw)
+            paint.append(fit.rect)
+            degraded = degraded || fit.degraded
+        }
+        return paint.isEmpty ? nil : (paint, strip, degraded)
     }
 
     /// The one home for the selection → normalized-rect transform: the

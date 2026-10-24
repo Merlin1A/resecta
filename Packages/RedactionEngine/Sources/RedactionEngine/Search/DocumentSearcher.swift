@@ -821,10 +821,10 @@ public actor DocumentSearcher {
             if !pageText.isEmpty && pageHasRichTextLayer(pageIndex) {
                 // Text-layer path
                 pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer))
-                let results = findTextMatches(
+                let results = await withInkFitRead(page) { findTextMatches(
                     pageText: pageText, query: query, options: options,
                     page: page, pageIndex: pageIndex, term: query
-                )
+                ) }
                 let hybrid = await hybridOCRLeg(page: page, pageIndex: pageIndex, textLayerRects: results.map(\.normalizedRect),
                     includeOCR: options.includeOCR) { await self.searchPageViaOCR(page: page, pageIndex: pageIndex, query: query, options: options, term: query) }
                 emitCapped(results + hybrid, into: continuation, total: &totalYielded)
@@ -914,7 +914,7 @@ public actor DocumentSearcher {
 
             // PDFPage isn't Sendable; the per-match closure below captures the
             // page (the enumeration invokes it synchronously), via the wrapper.
-            let sendablePage = SendablePDFPage(page)
+            let sendablePage = await preparedForInkFit(page)
             // The page with its route back to the raw text (`rawNSRange`).
             let regexPage = SearchCore.regexPage(pageText, options: options)
             let searchText = regexPage.text
@@ -1029,7 +1029,7 @@ public actor DocumentSearcher {
                     if Task.isCancelled { break }
 
                     if useTextLayer {
-                        let hits = findTextMatches(pageText: pageText, query: term, options: options, page: page, pageIndex: pageIndex, term: term)
+                        let hits = await withInkFitRead(page) { findTextMatches(pageText: pageText, query: term, options: options, page: page, pageIndex: pageIndex, term: term) }
                         pageHits += hits + (await hybridOCRLeg(page: page, pageIndex: pageIndex, textLayerRects: hits.map(\.normalizedRect), includeOCR: options.includeOCR,
                             reportsWhenOff: term == terms.first) { await self.searchPageViaOCR(page: page, pageIndex: pageIndex, query: term, options: options, term: term) })
                     } else if options.includeOCR {
@@ -1082,10 +1082,10 @@ public actor DocumentSearcher {
                 if Task.isCancelled || totalYielded >= Self.maxResults { break }
 
                 if useTextLayer {
-                    let results = findTextMatches(
+                    let results = await withInkFitRead(page) { findTextMatches(
                         pageText: pageText, query: term, options: options,
                         page: page, pageIndex: pageIndex, term: term
-                    )
+                    ) }
                     let hybrid = await hybridOCRLeg(page: page, pageIndex: pageIndex, textLayerRects: results.map(\.normalizedRect), includeOCR: options.includeOCR,
                         reportsWhenOff: term == terms.first) { await self.searchPageViaOCR(page: page, pageIndex: pageIndex, query: term, options: options, term: term) }
                     emitCapped(results + hybrid, into: continuation, total: &totalYielded)
@@ -1137,7 +1137,7 @@ public actor DocumentSearcher {
             if !pageText.isEmpty && pageHasRichTextLayer(pageIndex) {
                 // Text-layer path: PIIDetector on the extracted text, then NSRange → bounding rect via PDFKit selection.
                 pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer))
-                var rawMatches = await piiDetector.detect(in: pageText, categories: categories)
+                var rawMatches = await afterInkFitRead(page, await piiDetector.detect(in: pageText, categories: categories))
                 // Spatial address assembly on the text leg. The line
                 // records come from `EmbeddedTextSource.make` — the SAME
                 // provider the orchestrator's embedded fast path feeds
@@ -1147,7 +1147,7 @@ public actor DocumentSearcher {
                 // geometry for the same page.
                 var spatialRectByText: [String: CGRect] = [:]
                 if categories.contains(.address),
-                   let embedded = EmbeddedTextSource.make(from: page) {
+                   let embedded = EmbeddedTextSource.make(from: page, fitLines: true) {
                     let assembly = assembledAddressMatches(
                         lines: embedded.lines, haystack: pageText as NSString)
                     rawMatches.append(contentsOf: assembly.matches)

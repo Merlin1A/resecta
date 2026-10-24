@@ -1,0 +1,754 @@
+import CoreGraphics
+import Foundation
+import OSLog
+import PDFKit
+import PDFKitGuard
+
+// A text-layer box on a page whose text lies over a page-scale image is fitted
+// to the ink it names. Such a text layer was laid down over a picture of the
+// page (an earlier Searchable export, a vendor OCR layer) and its glyph boxes
+// need not sit on the printed letters: a monospaced layer on a snapped grid sits
+// low and to one side, so a box from its selection leaves letter tops and word
+// ends outside the fill (SECURITY: ink outside the box survives the redaction).
+// The fitted box is the selection's box united with the ink of the word under
+// it, read from a render of the box's neighbourhood: the hidden glyphs stay
+// covered, and so does the ink. Only a page whose glyphs are inkless — text
+// shown in an invisible render mode over a page-scale image — is fitted; every
+// other page keeps its selection boxes as they are.
+
+extension DocumentSearcher {
+
+    /// Posted on the main thread when a page's read lands in the background:
+    /// a live preview that drew unfitted boxes asks again.
+    public static let inkFitDidUpdate = Notification.Name("DocumentSearcher.inkFitDidUpdate")
+
+    /// The render scale for the fit: the OCR leg's 300 dpi.
+    static let inkFitScale: CGFloat = 300.0 / 72.0
+
+    /// The margin (points) past the fitted ink on a side the box may grow;
+    /// half of it above and below.
+    static let inkFitMargin: CGFloat = 1.0
+
+    /// How far (points) a hidden layer was measured to sit from its ink along
+    /// its line, plus a margin: 28.7 pt the most for a word that occurs once
+    /// on its page, over the statement, packet, multi-column, form, rotated
+    /// and third-party inputs (Latin script).
+    static let inkFitDriftBound: CGFloat = 36
+
+    /// The growth along the line for each wide (CJK) character before the
+    /// match on its line, as a share of the line's height: a fixed-pitch
+    /// layer advances 0.6 em where an ideograph takes 1 em, so its drift grows
+    /// about 0.4 em a character (50 pt measured, 13 characters in).
+    static let inkFitDriftPerWide: CGFloat = 0.5
+
+    /// How far (points) at least a layer may sit above or below its ink:
+    /// 7.1 pt measured, 11.7 on a heading whose layer is 8.5 pt tall (one
+    /// and a half line heights when larger).
+    static let inkFitDriftAcross: CGFloat = 10
+
+    /// The growth along the line for each point between the line's start and
+    /// the match's end: a layer set smaller than its ink (a heading's layer
+    /// held to the page's usual line height) falls behind it in proportion,
+    /// up to 0.42 of the way measured on 18 pt headings.
+    static let inkFitDriftPerPoint: CGFloat = 0.45
+
+    /// The constant (points) on top of an aligned word's residual from its
+    /// line's drift: 2.25 measured as the least that rejects no true word,
+    /// with 1.25 of headroom.
+    static let inkFitResidualSlack: CGFloat = 3.5
+
+    /// A pixel this dark (of 255, DeviceGray) is ink.
+    static let inkFitThreshold: UInt8 = 128
+
+    /// A row inked across this share of the window is a rule, an underline or
+    /// a border, not a glyph: the fit neither follows it nor rides it.
+    static let inkFitRuleShare = 0.9
+
+    /// Past this share of inked pixels the window is a dark ground (a shaded
+    /// cell, light text on dark, a photograph): no fit; the box stays as it is.
+    static let inkFitDarkGroundShare = 0.35
+
+    static let inkFitLogger = Logger(subsystem: "com.resecta.app", category: "search")
+
+    /// `rect` (normalized, post-rotation, bottom-left) — the selection box of
+    /// `text` — united with the ink of that text, on a page whose glyphs are
+    /// inkless over a page-scale image; `rect` itself on any other page.
+    /// The ink is found by the words Vision reads on the page (`inkTokens`):
+    /// the token on the box's line that holds each word of `text`, the
+    /// nearest when it repeats, cut to the word's share (a character wider each side) when the token is
+    /// longer (a word inside "INDN:DELIA"). Its rows are then checked against
+    /// the render (`inkBox`: a dot or a cap above the token box joins it). A
+    /// word Vision did not read is fitted by the render alone, from the
+    /// selection box.
+    nonisolated static func inkFittedRect(
+        _ rect: CGRect, page: PDFPage, text: String?, range: NSRange? = nil, paintOnly: Bool = false
+    ) -> CGRect {
+        inkFit(rect, page: page, text: text, range: range, paintOnly: paintOnly).rect
+    }
+
+    /// `inkFittedRect`, and whether the fit was degraded (no read or render in
+    /// time, or no private copy to draw from): the box is then the drift
+    /// envelope, and the caller reports the page as not fully analysed.
+    nonisolated static func inkFit(
+        _ rect: CGRect, page: PDFPage, text: String?, range: NSRange? = nil, paintOnly: Bool = false
+    ) -> (rect: CGRect, degraded: Bool) {
+        guard !rect.isEmpty, let cgPage = page.pageRef, carriesHiddenTextOverImage(page, cgPage: cgPage) else { return (rect, false) }
+        let visual = effectiveBounds(page.bounds(for: .cropBox), rotation: page.rotation).size
+        guard visual.width > 0, visual.height > 0 else { return (rect, false) }
+        let pageKey = InkTokenCache.key(page: page, cgPage: cgPage, visual: visual)
+        var job = InkFitJob(rect: rect, cgPage: cgPage, rotation: page.rotation, visual: visual, pageKey: pageKey,
+                            pageText: page.string ?? "", text: text, range: range, paintOnly: paintOnly,
+                            frame: readingFrame(of: page, visual: visual),
+                            wideBefore: range != nil ? wideCharacters(before: range, in: page.string ?? "")
+                                : wideCharacters(before: NSRange(location: 0, length: ((text ?? "") as NSString).length), in: text ?? ""),
+                            fromLineStart: 0)
+        if let known = InkFitCache.shared.fitted(for: job.key) { return (known, false) }
+        let readingBox = job.frame.toReading(CGRect(x: rect.minX * visual.width, y: rect.minY * visual.height,
+                                                    width: rect.width * visual.width, height: rect.height * visual.height))
+        job.fromLineStart = distanceFromLineStart(of: range, box: readingBox, page: page, visual: visual, frame: job.frame)
+        let frame = job.frame
+        job.layerBox = { index in
+            page.selection(for: NSRange(location: index, length: 1)).flatMap { DocumentSearcher().normalizedRect(for: $0, page: page) }
+                .map { frame.toReading(CGRect(x: $0.minX * visual.width, y: $0.minY * visual.height,
+                                              width: $0.width * visual.width, height: $0.height * visual.height)) }
+        }
+        // The main thread (the live preview) reads only what a search fitted
+        // off the main thread; it renders, reads and copies nothing, and asks
+        // again on `inkFitDidUpdate`.
+        if Thread.isMainThread { return (rect, false) }
+        // A search, on its own copy of the document: the queue draws from a
+        // private copy of that copy, made here on the copy's own thread through
+        // the guarded data path, so a job that outlives its wait never touches
+        // the copy the search goes on reading.
+        guard let document = page.document, case let index = document.index(for: page), index != NSNotFound,
+              let privateCopy = PrivatePDFCopies.shared.copy(of: document),
+              let privatePage = privateCopy.page(at: index + 1) else {
+            inkFitLogger.log("ink fit: no private copy of the document to draw from; the box is the drift envelope")
+            return (job.envelope(), true)
+        }
+        let onCopy = job.with(privatePage)
+        let fitted = onCopy.run()
+        let degraded = onCopy.uncached.isRaised
+        InkFitCache.shared.finish(job.key, fitted: degraded ? nil : fitted)
+        if !degraded { InkFitUpdates.shared.post() }
+        return (fitted, degraded)
+    }
+
+    /// One fit, with everything it reads taken from the page up front (the
+    /// fit runs on any thread; `PDFPage` stays on its caller's).
+    struct InkFitJob: @unchecked Sendable {
+        let rect: CGRect
+        let cgPage: CGPDFPage
+        let rotation: Int
+        let visual: CGSize
+        let pageKey: Int
+        let pageText: String
+        let text: String?
+        let range: NSRange?
+        let paintOnly: Bool
+        /// The page's reading frame (`readingFrame`).
+        let frame: InkFitFrame
+        /// Wide (CJK) characters on the match's line up to its end, and the
+        /// points from the line's start to the match's end in the reading
+        /// frame (`driftBound`).
+        var wideBefore: Int = 0
+        var fromLineStart: CGFloat = 0
+        /// A layer character's box in the reading frame, by its index in the
+        /// page text (read on the caller's thread, from its page).
+        var layerBox: (Int) -> CGRect? = { _ in nil }
+        /// Set by a fit that fell back on a timeout: its box is not cached.
+        let uncached = Flag()
+        final class Flag: @unchecked Sendable {
+            private let lock = NSLock()
+            private var set = false
+            func raise() { lock.lock(); set = true; lock.unlock() }
+            var isRaised: Bool { lock.lock(); defer { lock.unlock() }; return set }
+        }
+        func markUncached() { uncached.raise() }
+
+        var key: Int {
+            var hasher = Hasher()
+            hasher.combine(pageKey)
+            hasher.combine(rect.minX); hasher.combine(rect.minY); hasher.combine(rect.width); hasher.combine(rect.height)
+            hasher.combine(text)
+            hasher.combine(range?.location); hasher.combine(range?.length)
+            hasher.combine(paintOnly)
+            return hasher.finalize()
+        }
+
+        /// The selection box grown by the drift bound in the reading frame (a
+        /// line height above and below its line, `inkFitDriftBound` along it),
+        /// clamped to the page.
+        func envelope() -> CGRect {
+            markUncached()
+            let box = CGRect(x: rect.minX * visual.width, y: rect.minY * visual.height,
+                             width: rect.width * visual.width, height: rect.height * visual.height)
+            let grown = frame.toVisual(DocumentSearcher.driftBound(around: frame.toReading(box), wideBefore: wideBefore,
+                                                                   fromLineStart: fromLineStart)
+                .intersection(CGRect(origin: .zero, size: frame.size)))
+            return CGRect(x: grown.minX / visual.width, y: grown.minY / visual.height,
+                          width: grown.width / visual.width, height: grown.height / visual.height).clampedToNormalized()
+        }
+
+        func with(_ page: CGPDFPage) -> InkFitJob {
+            InkFitJob(rect: rect, cgPage: page, rotation: rotation, visual: visual, pageKey: pageKey,
+                      pageText: pageText, text: text, range: range, paintOnly: paintOnly, frame: frame,
+                      wideBefore: wideBefore, fromLineStart: fromLineStart, layerBox: layerBox)
+        }
+
+        func run() -> CGRect {
+            DocumentSearcher.fit(self)
+        }
+    }
+
+    /// Where the ink of a match whose layer box is `box` (reading frame) can
+    /// lie: the drift bound along its line, grown with its distance from the
+    /// line's start and for the wide characters before it there, and one
+    /// and a half line heights (at least `inkFitDriftAcross`) above and below.
+    nonisolated static func driftBound(around box: CGRect, wideBefore: Int = 0, fromLineStart: CGFloat = 0) -> CGRect {
+        box.insetBy(dx: -(inkFitDriftBound + inkFitDriftPerPoint * max(fromLineStart, 0)
+                            + inkFitDriftPerWide * box.height * CGFloat(wideBefore)),
+                    dy: -max(1.5 * box.height, inkFitDriftAcross))
+    }
+
+    /// The points from the start of the line of `range` (its first letter
+    /// that is not a space, in the layer) to the end of `box` (reading frame).
+    nonisolated static func distanceFromLineStart(of range: NSRange?, box: CGRect, page: PDFPage,
+                                                  visual: CGSize, frame: InkFitFrame) -> CGFloat {
+        guard let range, range.location != NSNotFound else { return box.width }
+        let text = (page.string ?? "") as NSString
+        guard NSMaxRange(range) <= text.length else { return box.width }
+        let line = text.lineRange(for: NSRange(location: range.location, length: 0))
+        var first = line.location
+        while first < range.location,
+              let scalar = Unicode.Scalar(text.character(at: first)), CharacterSet.whitespaces.contains(scalar) { first += 1 }
+        guard let start = page.selection(for: NSRange(location: first, length: 1))
+                .flatMap({ DocumentSearcher().normalizedRect(for: $0, page: page) }) else { return box.width }
+        let startBox = frame.toReading(CGRect(x: start.minX * visual.width, y: start.minY * visual.height,
+                                              width: start.width * visual.width, height: start.height * visual.height))
+        return max(box.maxX - startBox.minX, 0)
+    }
+
+    /// The wide (CJK) characters on the line of `range` in `text`, from the
+    /// line's start to the range's end.
+    nonisolated static func wideCharacters(before range: NSRange?, in text: String) -> Int {
+        guard let range, range.location != NSNotFound else { return 0 }
+        let ns = text as NSString
+        guard NSMaxRange(range) <= ns.length else { return 0 }
+        let line = ns.lineRange(for: NSRange(location: range.location, length: 0))
+        let span = ns.substring(with: NSRange(location: line.location, length: NSMaxRange(range) - line.location))
+        return span.unicodeScalars.reduce(0) { count, scalar in
+            switch scalar.value {
+            case 0x1100...0x11FF, 0x2E80...0x303F, 0x3040...0x33FF, 0x3400...0x4DBF, 0x4E00...0x9FFF,
+                 0xAC00...0xD7AF, 0xF900...0xFAFF, 0xFF00...0xFF60, 0xFFE0...0xFFE6: count + 1
+            default: count
+            }
+        }
+    }
+
+    /// Fits in the job's reading frame (`InkFitFrame`): the selection box,
+    /// the read tokens, the renders and the fitted box are turned into it,
+    /// and the fitted box turned back.
+    nonisolated static func fit(_ job: InkFitJob) -> CGRect {
+        let (rect, visual, cgPage, frame) = (job.rect, job.visual, job.cgPage, job.frame)
+        let size = frame.size
+        let box = frame.toReading(CGRect(x: rect.minX * visual.width, y: rect.minY * visual.height,
+                                         width: rect.width * visual.width, height: rect.height * visual.height))
+        // A read that did not finish in time: the conservative envelope, never
+        // the selection box alone (that is the drifted box), and not cached.
+        func envelope() -> CGRect {
+            inkFitLogger.log("ink fit: no read or render in time; the box is the selection grown by the drift bound")
+            return job.envelope()
+        }
+        // A search's matching run before its page was read: the envelope for
+        // now, and the read noted (`withInkFitRead`).
+        if let deferral = InkFitDeferral.current, InkTokenCache.shared.value(for: job.pageKey) == nil {
+            deferral.want()
+            return job.envelope()
+        }
+        // Read in the reading frame: Vision sees the text upright, and its
+        // boxes come back in this frame.
+        guard let tokens = inkTokens(key: job.pageKey, cgPage: cgPage, rotation: job.rotation, visual: visual,
+                                     languages: inkFitLanguages(for: job.pageText), frame: frame) else {
+            return envelope()
+        }
+        // The read word's own box when the alignment places it: the painted box
+        // is then the word's ink alone. It may grow past a side where Vision's
+        // box ends (a letter the box clipped), never into the rest of a longer
+        // token it was cut from.
+        var anchor: (rect: CGRect, growLeft: Bool, growRight: Bool, whole: CGRect?, cuts: [InkCut])?
+        var model: InkLineModel?
+        if let range = job.range { anchor = alignedBox(range: range, pageText: job.pageText as NSString, near: box, tokens: tokens, model: &model) }
+        let aligned = anchor != nil
+        if anchor == nil, let text = job.text { anchor = tokenBox(for: text, near: box, tokens: tokens) }
+        // No read word placed: where the word's ink lies is not known, so the
+        // box is the envelope (a fit from the drifted box alone can land on
+        // the next word's ink).
+        guard let placed = anchor else {
+            inkFitLogger.log("ink fit: no read word matched a text-layer box; the box is the drift envelope")
+            return job.envelope()
+        }
+        // A read word where its line's drift does not put it is a wrong one
+        // (another word, another row): the envelope, never a fit there. An
+        // aligned word is held to its line's own drift, read from the line's
+        // first and last agreeing letters (a near-linear drift along the
+        // line); a word placed without its line, to the fixed bound.
+        // The line's own drift: from the agreeing letters on the match's
+        // band in the layer (a layer line can hold a cell's wrapped lines,
+        // read as rows of their own), the first and the last.
+        func onBand(_ index: Int) -> CGRect? {
+            job.layerBox(index).flatMap { abs($0.midY - box.midY) <= 0.5 * box.height ? $0 : nil }
+        }
+        var ends: (first: (CGRect, CGFloat), last: (CGRect, CGFloat))?
+        if aligned, let model {
+            let probe = model.letters
+            let head = probe.prefix(24).lazy.compactMap { l in onBand(l.text).map { ($0, l.read) } }.first
+            let tail = probe.reversed().prefix(24).lazy.compactMap { l in onBand(l.text).map { ($0, l.read) } }.first
+            if let head, let tail, tail.0.midX - head.0.midX > 1 { ends = (head, tail) }
+        }
+        // The same occurrence of its text in the layer and in the read row,
+        // or not this word (a repeated word read in another place).
+        if aligned, let model, !model.sameOrdinal {
+            inkFitLogger.log("ink fit: the read word placed is another occurrence of its text; the box is the drift envelope")
+            return job.envelope()
+        }
+        if let (first, last) = ends {
+            let scale = (last.1 - first.1) / (last.0.midX - first.0.midX)
+            let predicted = first.1 + (box.midX - first.0.midX) * scale
+            // The layer snaps runs to its fixed-pitch grid, so its drift
+            // saw-tooths along the line by up to a cell: one cell (the layer
+            // word's width over its characters) and a constant on top of
+            // the residual, sized on the measured inputs with headroom.
+            let cell = box.width / CGFloat(max(job.range?.length ?? job.text.map { ($0 as NSString).length } ?? 1, 1))
+            let residual = max(0.75 * box.height, 5) + 0.5 * box.width + cell + inkFitResidualSlack
+            guard abs(placed.rect.midX - predicted) <= residual,
+                  abs(placed.rect.midY - box.midY) <= max(1.5 * box.height, inkFitDriftAcross) else {
+                inkFitLogger.log("ink fit: the read word placed is off its line's drift; the box is the drift envelope")
+                return job.envelope()
+            }
+        } else {
+            let fixed = driftBound(around: box, wideBefore: job.wideBefore).insetBy(dx: -inkFitMargin, dy: -inkFitMargin)
+            guard fixed.contains(placed.rect) else {
+                inkFitLogger.log("ink fit: the read word placed lies outside the drift bound; the box is the drift envelope")
+                return job.envelope()
+            }
+        }
+        // A cut from a longer token by the token's own glyphs: its ink split
+        // into columns at blank columns, one run per character as read; the
+        // cut is the runs of its characters. The character-share cut stays
+        // when the runs do not count the characters (touching glyphs).
+        if let a = anchor, !a.cuts.isEmpty {
+            var glyphCuts: CGRect? = nil
+            var exact = true
+            var runs: [(cut: InkCut, columns: [ClosedRange<CGFloat>])] = []
+            for cut in a.cuts {
+                guard let columns = glyphColumns(of: cut.token, cgPage: cgPage, rotation: job.rotation, visual: visual,
+                                                 key: job.pageKey, frame: frame)
+                else { exact = false; continue }
+                runs.append((cut, columns))
+                guard columns.count == cut.token.raw.count, cut.rawLo <= cut.rawHi, cut.rawHi < columns.count
+                else { exact = false; continue }
+                // A cut side takes half the blank gap to the next glyph, at
+                // most half the margin: a render a pixel off from this one
+                // still holds the glyph's edge, and the next glyph stays out.
+                let half = inkFitMargin / 2
+                let left = columns[cut.rawLo].lowerBound
+                    - (cut.rawLo > 0 ? min(half, (columns[cut.rawLo].lowerBound - columns[cut.rawLo - 1].upperBound) / 2) : 0)
+                let right = columns[cut.rawHi].upperBound
+                    + (cut.rawHi + 1 < columns.count ? min(half, (columns[cut.rawHi + 1].lowerBound - columns[cut.rawHi].upperBound) / 2) : 0)
+                let rect = CGRect(x: left, y: cut.token.rect.minY, width: right - left, height: cut.token.rect.height)
+                glyphCuts = glyphCuts.map { $0.union(rect) } ?? rect
+            }
+            if exact, let glyphCuts {
+                anchor = (a.whole.map { $0.union(glyphCuts) } ?? glyphCuts, a.growLeft, a.growRight, a.whole, a.cuts)
+            } else {
+                inkFitLogger.log("ink fit: a cut token's glyphs did not resolve into columns; cut by character share")
+                // A share cut's side inside the token can end inside its last
+                // glyph's ink: the side walks out to the end of that ink run
+                // (the blank column before the next glyph), at most half a
+                // character, so it never takes the next glyph.
+                var rect = a.rect
+                for (cut, columns) in runs {
+                    let half = cut.token.rect.width / CGFloat(max(cut.token.raw.count, 1)) / 2
+                    if cut.rawHi < cut.token.raw.count - 1, cut.token.rect.minX < rect.maxX, rect.maxX < cut.token.rect.maxX,
+                       let run = columns.first(where: { $0.lowerBound < rect.maxX && rect.maxX < $0.upperBound }) {
+                        rect.size.width += min(run.upperBound, rect.maxX + half) - rect.maxX
+                    }
+                    if cut.rawLo > 0, cut.token.rect.minX < rect.minX, rect.minX < cut.token.rect.maxX,
+                       let run = columns.first(where: { $0.lowerBound < rect.minX && rect.minX < $0.upperBound }) {
+                        let left = max(run.lowerBound, rect.minX - half)
+                        rect = CGRect(x: left, y: rect.minY, width: rect.maxX - left, height: rect.height)
+                    }
+                }
+                anchor = (rect, a.growLeft, a.growRight, a.whole, a.cuts)
+            }
+        }
+        let seed = anchor?.rect ?? box
+        let height = max(seed.height, box.height)
+        let vPad = max(height, 4), hPad = max(0.75 * height, 3)
+        let window = seed.insetBy(dx: -hPad, dy: -vPad).intersection(CGRect(origin: .zero, size: size))
+        var fitted = anchor?.rect ?? box
+        let page = InkFitPage(cgPage)
+        var renderTimeout: TimeInterval? = nil, renderQueue: DispatchQueue? = nil, renderStall: TimeInterval = 0
+        #if DEBUG
+        if let injected = inkFitInjectedRenderStalls.value(for: job.pageKey) {
+            (renderStall, renderTimeout) = injected
+            renderQueue = DispatchQueue(label: "com.resecta.search.inkfit.stalled-render")
+        }
+        #endif
+        let rendered: GrayBitmap?? = window.isNull || window.width <= 0 || window.height <= 0 ? .some(nil)
+            : onInkFitQueue(key: job.pageKey, drawing: page.document, timeout: renderTimeout, queue: renderQueue) {
+                if renderStall > 0 { Thread.sleep(forTimeInterval: renderStall); return nil }
+                // A failed render is tried once more before it counts.
+                return renderGray(page.page, rotation: job.rotation, visual: visual, window: window, frame: frame)
+                    ?? renderGray(page.page, rotation: job.rotation, visual: visual, window: window, frame: frame)
+            }
+        // No render (in time, or at all): the envelope, even with a read word
+        // to stand on. Vision's word box alone can leave a glyph's top or foot
+        // outside; only the render's ink rows close it.
+        guard let finished = rendered, let bitmap = finished else { return envelope() }
+        let reading = inkBox(in: bitmap, box: seed, window: window,
+                             growLeft: anchor?.growLeft ?? true, growRight: anchor?.growRight ?? true)
+        switch reading.outcome {
+        case .darkGround: inkFitLogger.log("ink fit: dark ground around a text-layer box; no render fit")
+        case .otherLine: inkFitLogger.log("ink fit: no inked line overlaps half the box; no render fit")
+        case .capped: inkFitLogger.log("ink fit reached its window: the box grew to the cap")
+        case .fitted, .noInk: break
+        }
+        if let ink = reading.box {
+            switch reading.outcome {
+            case .fitted, .capped:
+                // The height is the ink's own rows: Vision's box can reach
+                // past its line's ink into the leading, toward the next line.
+                let minX = min(fitted.minX, ink.minX), maxX = max(fitted.maxX, ink.maxX)
+                fitted = CGRect(x: minX, y: ink.minY, width: maxX - minX, height: ink.height)
+            case .noInk, .darkGround, .otherLine:
+                fitted = fitted.union(ink)
+            }
+        }
+        // A margin past the ink on every side the box may grow (a render's
+        // half-inked edge, a round letter's overshoot): never on a side cut
+        // from a longer token, which would paint its next letter.
+        let side = inkFitMargin, cap = inkFitMargin / 2
+        fitted = CGRect(x: fitted.minX - ((anchor?.growLeft ?? true) ? side : 0), y: fitted.minY - cap,
+                        width: fitted.width + ((anchor?.growLeft ?? true) ? side : 0) + ((anchor?.growRight ?? true) ? side : 0),
+                        height: fitted.height + 2 * cap)
+        // The selection box too, unless the caller strips the hidden glyphs by
+        // their own rect (`textLayerAndInkRects`): a fill that covers them is
+        // then the only thing that removes them from a Searchable export.
+        // The fit past its read word's window (a render that grew onto
+        // another word): the envelope.
+        guard window.insetBy(dx: -inkFitMargin, dy: -inkFitMargin).contains(fitted) else {
+            inkFitLogger.log("ink fit: the fitted box reaches past its window; the box is the drift envelope")
+            return job.envelope()
+        }
+        if !job.paintOnly { fitted = fitted.union(box) }
+        let back = frame.toVisual(fitted)
+        return CGRect(x: back.minX / visual.width, y: back.minY / visual.height,
+                      width: back.width / visual.width, height: back.height / visual.height)
+            .clampedToNormalized()
+    }
+
+    /// The page's read tokens: one full-page render at the fit's scale, read
+    /// once per page content (`InkTokenCache`, keyed by the page's text, its
+    /// image and box, so a search on a fresh copy of the document reads the
+    /// cache and two pages that share a text never share tokens).
+    /// In `frame` (the page's reading frame, upright when nil); the frame
+    /// follows from the page's layer, which its key carries.
+    nonisolated static func inkTokens(key: Int, cgPage: CGPDFPage, rotation: Int, visual: CGSize,
+                                      languages: [String]? = nil, frame: InkFitFrame? = nil) -> [InkToken]? {
+        if let known = InkTokenCache.shared.value(for: key) { return known }
+        guard let tokens = readTokens(cgPage, rotation: rotation, visual: visual, key: key, languages: languages,
+                                      frame: frame) else { return nil }
+        InkTokenCache.shared.set(tokens, for: key)
+        return tokens
+    }
+
+    /// The ink fit's page reads and renders run on this one serial queue, off
+    /// Swift's cooperative pool (concurrent searches each calling Vision on
+    /// pool threads were seen to stall together), and a caller waits at most
+    /// `inkFitTimeout` for them.
+
+    /// How long a caller waits for a page read or a render before it falls
+    /// back to the box without the fit.
+    static let inkFitTimeout: TimeInterval = 30
+
+    #if DEBUG
+    /// Test seam: per page content key, a stall in place of its read and a
+    /// shorter wait for it. The stalled job runs on a queue of its own and
+    /// does no work after its stall (no second reader beside the lane), so
+    /// other pages, and other tests, are untouched.
+    static let inkFitInjectedStalls = InkFitStalls()
+    /// Test seam: the same for the fit's renders on a page, after its read.
+    static let inkFitInjectedRenderStalls = InkFitStalls()
+    /// Test seam: a stall in place of every job for a page on the shared
+    /// lane, and that job's limit there.
+    static let inkFitInjectedLaneStalls = InkFitStalls()
+    #endif
+
+    /// `work` on an ink-fit lane (`InkFitQueueState`); nil on a timeout, a
+    /// stuck page or a cancelled task. The wait times the job at the head of
+    /// the lane against its own limit (`timeout`, else `inkFitTimeout`), not
+    /// the time spent behind other jobs. A head job past its limit retires its
+    /// lane and marks its page `key` stuck: a caller whose job is that one
+    /// gets nil, the others move to the fresh lane. A caller waits at most
+    /// `inkFitWaitCeiling` on lanes that move. On a queue of the caller's own
+    /// (`queue`) it waits at most `timeout`.
+    nonisolated static func onInkFitQueue<T>(key: Int? = nil, drawing: CGPDFDocument? = nil, timeout: TimeInterval? = nil,
+                                             queue: DispatchQueue? = nil, state: InkFitQueueState = .shared,
+                                             _ work: @escaping () -> T) -> T? {
+        if DispatchQueue.getSpecific(key: InkFitLane.tag) == true { return work() }
+        if Task.isCancelled { return nil }
+        let box = InkFitResult<T>()
+        if let queue {
+            queue.async { box.value = work(); box.done.signal() }
+            guard box.done.wait(timeout: .now() + (timeout ?? inkFitTimeout)) == .success else {
+                inkFitLogger.log("ink fit: a page read or render did not finish in time; the box is the drift envelope")
+                return nil
+            }
+            return box.value
+        }
+        if state.isStuck(key: key) { return nil }
+        var limit = timeout ?? inkFitTimeout, stall: TimeInterval = 0
+        #if DEBUG
+        if state === InkFitQueueState.shared, let key, let injected = inkFitInjectedLaneStalls.value(for: key) { (stall, limit) = injected }
+        #endif
+        let runLimit = limit, runStall = stall
+        func enqueue(on lane: InkFitLane) {
+            lane.queue.async {
+                guard box.claim() else { return }
+                lane.began(key: key, drawing: drawing, limit: runLimit)
+                // A stalled job (the test seam) only stalls: it adds no reader beside the lane.
+                if runStall > 0 { Thread.sleep(forTimeInterval: runStall) } else { box.value = work() }
+                lane.ended()
+                state.ended(on: lane)
+                box.done.signal()
+            }
+        }
+        let queued = Date()
+        var lane = state.current
+        enqueue(on: lane)
+        while box.done.wait(timeout: .now() + 0.25) != .success {
+            if let hung = lane.overrun() {
+                state.retire(lane, key: hung.key, drawing: hung.drawing)
+                if box.isRunning {
+                    inkFitLogger.log("ink fit: a page read or render ran past its timeout; the box is the drift envelope")
+                    return nil
+                }
+                // A job that draws from the copy the hung job draws from does
+                // not move: the fresh lane would draw that copy alongside it.
+                if state.isStuck(key: key) || (drawing != nil && drawing === hung.drawing) {
+                    box.abandon()
+                    if box.isRunning { continue }
+                    inkFitLogger.log("ink fit: a job behind a hung one shares its page or its copy; the box is the drift envelope")
+                    return nil
+                }
+                lane = state.current
+                enqueue(on: lane)
+                continue
+            }
+            if Task.isCancelled || Date().timeIntervalSince(queued) > inkFitWaitCeiling {
+                box.abandon()
+                if box.isRunning { continue }
+                inkFitLogger.log("ink fit: the ink-fit lane did not reach this job in time; the box is the drift envelope")
+                return nil
+            }
+        }
+        return box.value
+    }
+
+    /// The longest a caller waits behind other jobs on a queue that is still moving.
+    static let inkFitWaitCeiling: TimeInterval = 90
+
+    /// The languages a page's read uses: the CJK ones its layer's script
+    /// names, else Vision's default (nil).
+    nonisolated static func inkFitLanguages(for pageText: String) -> [String]? {
+        var han = false, kana = false, hangul = false
+        for scalar in pageText.unicodeScalars {
+            switch scalar.value {
+            case 0x3040...0x30FF, 0x31F0...0x31FF: kana = true
+            case 0xAC00...0xD7AF, 0x1100...0x11FF, 0x3130...0x318F: hangul = true
+            case 0x4E00...0x9FFF, 0x3400...0x4DBF, 0xF900...0xFAFF: han = true
+            default: continue
+            }
+        }
+        if kana { return ["ja-JP", "en-US"] }
+        if hangul { return ["ko-KR", "en-US"] }
+        if han { return ["zh-Hans", "zh-Hant", "en-US"] }
+        return nil
+    }
+
+    nonisolated static func readTokens(_ cgPage: CGPDFPage, rotation: Int, visual: CGSize, key: Int? = nil,
+                                       languages: [String]? = nil, frame: InkFitFrame? = nil) -> [InkToken]? {
+        let size = frame?.size ?? visual
+        let page = InkFitPage(cgPage)
+        var stall: TimeInterval = 0, timeout: TimeInterval? = nil, queue: DispatchQueue? = nil
+        #if DEBUG
+        if let key, let injected = inkFitInjectedStalls.value(for: key) {
+            (stall, timeout) = injected
+            queue = DispatchQueue(label: "com.resecta.search.inkfit.stalled")
+        }
+        #endif
+        // A stalled job only stalls: a seam must not add a reader beside the lanes.
+        if stall > 0 {
+            _ = onInkFitQueue(key: key, timeout: timeout, queue: queue) { Thread.sleep(forTimeInterval: stall) }
+            return nil
+        }
+        // The page drawn on the render lane (it draws the private copy), then
+        // read on the Vision lane: a wait for a render never waits on Vision.
+        // A failed render or read is tried once more before it counts; one
+        // that timed out, or failed both times, is no read (the caller falls
+        // back to the envelope, and nothing is cached).
+        for attempt in 1...2 {
+            let drawn = onInkFitQueue(key: key, drawing: page.document) {
+                renderGrayImage(page.page, rotation: rotation, visual: visual, frame: frame).map(InkFitImage.init)
+            }
+            guard let drawn else { return nil }
+            guard let image = drawn else {
+                inkFitLogger.log("ink fit: the page did not render for its read (attempt \(attempt))")
+                continue
+            }
+            let read: [OCREngine.Token]?? = onInkFitQueue(key: key, state: .vision) {
+                do { return try OCREngine.recognizeTokens(in: image.image, languages: languages) } catch {
+                    inkFitLogger.log("ink fit: the page read failed (attempt \(attempt)): \(error.localizedDescription, privacy: .public)")
+                    return nil
+                }
+            }
+            guard let finished = read else { return nil }
+            if let tokens = finished { return inkTokens(from: tokens, size: size) }
+        }
+        return nil
+    }
+
+    /// The whole page as a DeviceGray image at the fit's scale, under the OCR
+    /// leg's pixel ceiling.
+    /// Vision's tokens as the fit reads them: their boxes in points of a
+    /// page (or reading frame) of `size`, their alignment keys, and for each
+    /// key letter its character in the token as read.
+    nonisolated static func inkTokens(from read: [OCREngine.Token], size: CGSize) -> [InkToken] {
+        read.map { t in
+            var keyToRaw: [Int] = []
+            // One entry per key letter: a ligature read as one character
+            // gives its key several letters.
+            for (index, character) in t.text.enumerated() {
+                keyToRaw += Array(repeating: index, count: alignmentKey(Substring(String(character))).count)
+            }
+            return InkToken(key: alignmentKey(Substring(t.text)),
+                            rect: CGRect(x: t.normalizedRect.minX * size.width, y: t.normalizedRect.minY * size.height,
+                                         width: t.normalizedRect.width * size.width, height: t.normalizedRect.height * size.height),
+                            line: t.line, raw: t.text, keyToRaw: keyToRaw)
+        }
+    }
+
+    /// The whole page at the fit's scale, turned into `frame` when given.
+    nonisolated static func renderGrayImage(_ cgPage: CGPDFPage, rotation: Int, visual: CGSize,
+                                            frame: InkFitFrame? = nil) -> CGImage? {
+        let size = frame?.size ?? visual
+        let width = Int((size.width * inkFitScale).rounded(.up)), height = Int((size.height * inkFitScale).rounded(.up))
+        guard width > 0, height > 0, width <= 10_000, height <= 10_000, CGFloat(width * height) <= 36_000_000,
+              let ctx = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                                  space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue)
+        else { return nil }
+        ctx.setFillColor(gray: 1, alpha: 1)
+        ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        ctx.scaleBy(x: inkFitScale, y: inkFitScale)
+        if let frame, frame.turn != .upright { ctx.concatenate(frame.transform) }
+        ctx.concatenate(PageRasterizer.drawingTransform(
+            for: cgPage, box: .cropBox, rotation: rotation, targetRect: CGRect(origin: .zero, size: visual)))
+        ctx.clip(to: cgPage.getBoxRect(.cropBox))
+        ctx.drawPDFPage(cgPage)
+        return ctx.makeImage()
+    }
+
+    /// A page-scale image under text shown in an invisible render mode: the
+    /// page's glyphs leave no ink of their own (a hidden layer over a picture
+    /// of the page). Read once per page.
+    nonisolated static func carriesHiddenTextOverImage(_ page: PDFPage, cgPage: CGPDFPage) -> Bool {
+        if let known = HiddenTextOverImageCache.shared.value(for: page) { return known }
+        let answer = carriesPageScaleImage(page, cgPage: cgPage) && showsInvisibleText(cgPage)
+        HiddenTextOverImageCache.shared.set(answer, for: page)
+        return answer
+    }
+
+    /// An image object covering at least `PageImageCensus.imageShareFloor` of
+    /// the crop box: the page is a picture with a text layer over it.
+    nonisolated static func carriesPageScaleImage(_ page: PDFPage, cgPage: CGPDFPage) -> Bool {
+        guard let pixels = PageImageCensus.largestImagePixelArea(of: cgPage) else { return false }
+        return PageImageCensus.imageShare(pixelArea: pixels, cropBox: page.bounds(for: .cropBox))
+            >= PageImageCensus.imageShareFloor
+    }
+
+    /// Whether the page's content shows text in render mode 3 or 7 (no fill,
+    /// no stroke): `Tr` tracked through `q`/`Q` and into Form XObjects (to a
+    /// depth of 8), any text-showing operator while it is set answers true. A
+    /// stream the scanner cannot read, or a form chain past the depth, answers
+    /// true as well: a page not known to be clean is fitted.
+    nonisolated static func showsInvisibleText(_ cgPage: CGPDFPage) -> Bool {
+        final class State {
+            var mode: Int = 0
+            var saved: [Int] = []
+            var found = false
+            var depth = 0
+            var table: CGPDFOperatorTableRef?
+        }
+        guard let table = CGPDFOperatorTableCreate() else { return true }
+        defer { CGPDFOperatorTableRelease(table) }
+        CGPDFOperatorTableSetCallback(table, "Tr") { scanner, info in
+            var value: CGPDFInteger = 0
+            guard let info, CGPDFScannerPopInteger(scanner, &value) else { return }
+            Unmanaged<State>.fromOpaque(info).takeUnretainedValue().mode = Int(value)
+        }
+        CGPDFOperatorTableSetCallback(table, "q") { _, info in
+            guard let info else { return }
+            let state = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
+            state.saved.append(state.mode)
+        }
+        CGPDFOperatorTableSetCallback(table, "Q") { _, info in
+            guard let info else { return }
+            let state = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
+            if let mode = state.saved.popLast() { state.mode = mode }
+        }
+        let show: CGPDFOperatorCallback = { scanner, info in
+            guard let info else { return }
+            let state = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
+            if state.mode == 3 || state.mode == 7 { state.found = true; CGPDFScannerStop(scanner) }
+        }
+        for op in ["Tj", "TJ", "'", "\""] { CGPDFOperatorTableSetCallback(table, op, show) }
+        CGPDFOperatorTableSetCallback(table, "Do") { scanner, info in
+            guard let info else { return }
+            let state = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
+            var name: UnsafePointer<CChar>?
+            guard CGPDFScannerPopName(scanner, &name), let name else { return }
+            let content = CGPDFScannerGetContentStream(scanner)
+            var stream: CGPDFStreamRef?
+            guard let object = CGPDFContentStreamGetResource(content, "XObject", name),
+                  CGPDFObjectGetValue(object, .stream, &stream), let stream,
+                  let dictionary = CGPDFStreamGetDictionary(stream) else { return }
+            var subtype: UnsafePointer<CChar>?
+            guard CGPDFDictionaryGetName(dictionary, "Subtype", &subtype), let subtype,
+                  String(cString: subtype) == "Form" else { return }
+            guard state.depth < 8, let table = state.table else { state.found = true; CGPDFScannerStop(scanner); return }
+            var resources: CGPDFDictionaryRef?
+            _ = CGPDFDictionaryGetDictionary(dictionary, "Resources", &resources)
+            let inner = CGPDFContentStreamCreateWithStream(stream, resources ?? dictionary, content)
+            let innerScanner = CGPDFScannerCreate(inner, table, info)
+            let mode = state.mode
+            state.depth += 1
+            if !CGPDFScannerScan(innerScanner) && !state.found { state.found = true }
+            state.depth -= 1
+            state.mode = mode
+            CGPDFScannerRelease(innerScanner)
+            CGPDFContentStreamRelease(inner)
+            if state.found { CGPDFScannerStop(scanner) }
+        }
+        let state = State()
+        state.table = table
+        let content = CGPDFContentStreamCreateWithPage(cgPage)
+        let scanner = CGPDFScannerCreate(content, table, Unmanaged.passUnretained(state).toOpaque())
+        let read = CGPDFScannerScan(scanner)
+        CGPDFScannerRelease(scanner)
+        CGPDFContentStreamRelease(content)
+        return state.found || !read
+    }
+
+}
