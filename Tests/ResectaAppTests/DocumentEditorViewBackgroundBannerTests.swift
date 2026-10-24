@@ -183,6 +183,21 @@ struct DocumentEditorViewBackgroundBannerTests {
         #expect(documentState.phaseKind == .editing, "the phase is the run's to move, not the banner's")
     }
 
+    /// The paused notice records a run that did not finish, so time away
+    /// does not end it: the slot reads only the pause pair, which the
+    /// banner's own dismiss and Restart (and its leaving the screen with
+    /// the editing phase) clear.
+    @Test("The paused notice keeps the top slot however long the app was away, until the pause is cleared")
+    func testPausedNoticePersistsUntilCleared() {
+        let documentState = DocumentState()
+        documentState.phase = .editing
+        documentState.wasPausedByBackground = true
+        documentState.pausedFromPhase = .redacting
+        #expect(TopBannerSlot.winner(documentState: documentState, detectionBannerPresent: true) == .paused)
+        DocumentEditorView.clearBackgroundPause(documentState)
+        #expect(TopBannerSlot.winner(documentState: documentState, detectionBannerPresent: true) == .detection)
+    }
+
     /// Leaving the app during Verify lands on the results screen, where
     /// nothing reads the pause pair. Left set, Keep Editing (a bare
     /// transition to `.editing`) mounted the paused banner over a finished

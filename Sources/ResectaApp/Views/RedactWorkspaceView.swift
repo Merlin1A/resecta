@@ -38,6 +38,15 @@ struct RedactWorkspaceView: View {
     /// True while a password the sheet submitted is being tried.
     @State private var passwordSubmitInFlight = false
 
+    /// A drop held for the replace dialog while the open document holds
+    /// work; nil otherwise. Replace imports it, Cancel lets it go.
+    @State private var heldDrop: HeldDrop?
+
+    struct HeldDrop {
+        let dropped: DroppedDocument
+        let droppedCount: Int
+    }
+
     var body: some View {
         navigationContainer
             // Fire the import-completion toasts when a new document is
@@ -68,50 +77,45 @@ struct RedactWorkspaceView: View {
                     enqueueImportRefusedNotPDFToast()
                     return true
                 }
-                // Reject drops while the pipeline is active or the results
-                // or error screen is up. A drop replaces an open document
-                // with no confirmation, so it consults the import gate
-                // directly. The drop handler returns true on accept; on reject
-                // we still return true so the system snaps the payload back
-                // rather than leaving it dangling, and we surface the precise
-                // reason via toast.
-                if let refusal = workspace.documentState.importRefusalMessage(
-                    door: appCoordinator.openedDoor) {
-                    toastManager.enqueue(refusal, severity: .warning)
-                    return true
-                }
-                // Phase admission has already passed by this point; the
-                // import reads the bytes again before any parse.
-                // Cancel any prior in-flight import
-                // dispatch so a rapid double-drop doesn't race two
-                // ImportService.importDocument calls.
-                activeImportDispatch?.cancel()
-                if items.count > 1 {
-                    toastManager.enqueue(
-                        ImportService.dropOpenedFirstMessage(droppedCount: items.count), severity: .info)
-                }
-                activeImportDispatch = Task {
-                    switch dropped.payload {
-                    case .bytes(let data):
-                        let outcome = await ImportService.importDocument(
-                            data: data, door: .drop,
-                            documentState: workspace.documentState,
-                            redactionState: workspace.redactionState
-                        )
-                        // A locked document waits for its password; the
-                        // sheet presents over the failed state, the prior
-                        // document intact beneath it.
-                        if case .needsPassword(let hold) = outcome {
-                            workspace.lockedImport = hold
-                        }
-                    case .refused(let failure):
-                        // The door met the refusal before any byte was read
-                        // (a file over the size cap); it reaches the failed
-                        // screen the way a failed load does.
-                        ImportService.refuse(failure, documentState: workspace.documentState)
-                    }
+                // The handler returns true on accept and on reject alike,
+                // so the system snaps a refused payload back rather than
+                // leaving it dangling; a refusal says why in a toast.
+                switch Self.dropAdmission(
+                    documentState: workspace.documentState,
+                    redactionState: workspace.redactionState,
+                    door: appCoordinator.openedDoor
+                ) {
+                case .refuse(let message):
+                    toastManager.enqueue(message, severity: .warning)
+                case .confirmReplace:
+                    heldDrop = HeldDrop(dropped: dropped, droppedCount: items.count)
+                case .importNow:
+                    startDropImport(dropped, droppedCount: items.count)
                 }
                 return true
+            }
+            // The replace dialog for a drop over an open document that
+            // holds work: the replace dialog's words, the Close dialog's
+            // sentence from its one home.
+            .confirmationDialog(
+                Self.dropReplaceTitle,
+                isPresented: Binding(
+                    get: { heldDrop != nil },
+                    set: { if !$0 { heldDrop = nil } }
+                ),
+                titleVisibility: .visible
+            ) {
+                Button(Self.dropReplaceButton, role: .destructive) {
+                    if let held = heldDrop {
+                        startDropImport(held.dropped, droppedCount: held.droppedCount)
+                    }
+                    heldDrop = nil
+                }
+                Button("Cancel", role: .cancel) {
+                    heldDrop = nil
+                }
+            } message: {
+                Text(Self.dropReplaceMessage)
             }
             // The password sheet for a locked import, over the failed state
             // the refusal left. A swipe-dismiss is Cancel.
@@ -137,6 +141,100 @@ struct RedactWorkspaceView: View {
             .environment(workspace.documentState)
             .environment(workspace.redactionState)
             .environment(workspace.coordinator)
+    }
+
+    // MARK: - The drop door
+
+    /// What the drop door does with an admitted drop.
+    enum DropAdmission: Equatable {
+        /// Import at once: no document open, or the open one holds no work.
+        case importNow
+        /// Hold the drop for the replace dialog: the open document holds work.
+        case confirmReplace
+        /// Refuse with the sentence: the import gate's, or the sheet's.
+        case refuse(String)
+    }
+
+    /// The replace dialog's words — those of the replace dialog the
+    /// workspace's removed file importer carried — and the Close dialog's
+    /// sentence, read from its one home.
+    static let dropReplaceTitle = "Replace the open document?"
+    static let dropReplaceButton = "Replace"
+    static var dropReplaceMessage: String {
+        DocumentEditorView.closeDialogMessage(phaseKind: .editing)
+    }
+
+    /// A drop that owes the dialog while the editor's sheet is up: the
+    /// dialog cannot present over the sheet, so the drop is refused with
+    /// the import gate's sentence, naming the sheet's Dismiss.
+    static let dropOverSheetMessage = DocumentState.importBlockedOnThisScreenMessage(wayBack: "Dismiss")
+
+    /// Whether a drop owes the replace dialog: a document is open and it
+    /// holds work by the Close dialog's own rule
+    /// (`DocumentEditorView.homeNeedsCloseConfirm`) — drawn regions, or
+    /// selected matches not yet applied.
+    static func dropNeedsConfirm(documentState: DocumentState, redactionState: RedactionState) -> Bool {
+        documentState.sourceDocument != nil
+            && DocumentEditorView.homeNeedsCloseConfirm(
+                hasDrawnRegions: redactionState.regions.values.contains { !$0.isEmpty },
+                hasUnappliedSelections: DocumentState.hasUnappliedSelections(redactionState))
+    }
+
+    /// The drop door's one decision, after the payload's format check: the
+    /// import gate refuses first (a run, the results or the error screen
+    /// up); then work held asks — or, with the editor's sheet up, refuses —
+    /// and anything else imports at once.
+    static func dropAdmission(
+        documentState: DocumentState, redactionState: RedactionState, door: ImportDoor?
+    ) -> DropAdmission {
+        if let refusal = documentState.importRefusalMessage(door: door) {
+            return .refuse(refusal)
+        }
+        guard dropNeedsConfirm(documentState: documentState, redactionState: redactionState) else {
+            return .importNow
+        }
+        return DocumentEditorView.sheetSlotIsPresenting(redactionState)
+            ? .refuse(dropOverSheetMessage)
+            : .confirmReplace
+    }
+
+    /// Start the drop's import, cancelling any prior in-flight dispatch so
+    /// a rapid double drop does not race two imports for the one
+    /// `activeImportTask` slot.
+    private func startDropImport(_ dropped: DroppedDocument, droppedCount: Int) {
+        activeImportDispatch?.cancel()
+        if droppedCount > 1 {
+            toastManager.enqueue(
+                ImportService.dropOpenedFirstMessage(droppedCount: droppedCount), severity: .info)
+        }
+        let workspace = workspace
+        activeImportDispatch = Task {
+            await Self.importDrop(dropped, workspace: workspace)
+        }
+    }
+
+    /// The drop's import. The phase admission has already passed; the
+    /// import reads the bytes again before any parse.
+    static func importDrop(_ dropped: DroppedDocument, workspace: RedactWorkspace) async {
+        switch dropped.payload {
+        case .bytes(let data):
+            let outcome = await ImportService.importDocument(
+                data: data, door: .drop,
+                documentState: workspace.documentState,
+                redactionState: workspace.redactionState
+            )
+            // A locked document waits for its password; the sheet
+            // presents over the failed state, the prior document intact
+            // beneath it.
+            if case .needsPassword(let hold) = outcome {
+                workspace.lockedImport = hold
+            }
+        case .refused(let failure):
+            // The door met the refusal before any byte was read (a file
+            // over the size cap); it reaches the failed screen the way a
+            // failed load does.
+            ImportService.refuse(failure, documentState: workspace.documentState)
+        }
     }
 
     // MARK: - Navigation Container

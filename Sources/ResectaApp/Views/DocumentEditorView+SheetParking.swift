@@ -23,6 +23,12 @@ extension DocumentEditorView {
     /// Mirrors the `.sheet(item:)` getter: the slot is presenting whenever
     /// either source is live.
     var editorSheetIsPresented: Bool {
+        Self.sheetSlotIsPresenting(redactionState)
+    }
+
+    /// The slot's rule, readable outside the editor (the workspace's drop
+    /// door asks it before presenting its own dialog).
+    static func sheetSlotIsPresenting(_ redactionState: RedactionState) -> Bool {
         redactionState.activeSearch != nil
             || redactionState.pendingCanvasRationaleRequest != nil
     }

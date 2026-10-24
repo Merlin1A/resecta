@@ -89,8 +89,6 @@ struct DocumentEditorView: View {
     // Detection summary banner
     @State var detectionBanner: DetectionBannerModel?
     @State var dismissSummaryTask: Task<Void, Never>?
-    // WP4a: Auto-dismiss timer for background resume banner
-    @State var dismissBannerTask: Task<Void, Never>?
 
     /// Bindings to trigger import/settings from parent ContentView
     @Binding var showSettings: Bool
@@ -214,52 +212,7 @@ struct DocumentEditorView: View {
                                 .transition(.opacity)
                         }
                     }
-                    // Detection summary banner (all run outcomes,
-                    // not just success — zero/failed previously left no
-                    // persistent record).
-                    .overlay(alignment: .top) {
-                        detectionBannerOverlay
-                    }
-                    // InlineWarningBanner for background resume
-                    // (cancel-from-detecting / cancel-from-redacting path).
-                    .overlay(alignment: .top) {
-                        resumeBannerOverlay
-                    }
-                    // Import annotation notice: the imported source
-                    // carries annotations or filled form fields, which the
-                    // on-screen view draws but the export raster (built
-                    // from the page content stream) does not include.
-                    // Persistent until the user dismisses it; yields to
-                    // the two banners above via the visibility predicate
-                    // rather than stacking.
-                    .overlay(alignment: .top) {
-                        let annotationCount = ImportAnnotationNoticeBanner.noticeWorthyCount(
-                            documentState.sourceAnnotationFindings)
-                        if ImportAnnotationNoticeBanner.isVisible(
-                            phaseKind: documentState.phaseKind,
-                            annotationTypeCount: annotationCount,
-                            filledFormFieldCount: documentState.sourceFilledFormFieldCount,
-                            dismissed: documentState.annotationNoticeDismissed,
-                            pausedBannerActive: documentState.wasPausedByBackground,
-                            detectionBannerActive: detectionBanner != nil
-                        ) {
-                            ImportAnnotationNoticeBanner(
-                                annotationCount: annotationCount,
-                                filledFormFieldCount: documentState.sourceFilledFormFieldCount
-                            ) {
-                                withAnimation(ResectaTokens.Anim.overlayDismiss) {
-                                    documentState.annotationNoticeDismissed = true
-                                }
-                            }
-                            // Routed through the resolver so Reduce
-                            // Motion swaps the slide for an opacity-only
-                            // crossfade.
-                            .transition(ResectaTokens.Anim.resolvedTransition(
-                                standard: .move(edge: .top).combined(with: .opacity),
-                                reduceMotion: reduceMotion))
-                            .padding(.top, ResectaTokens.Spacing.toolbarClearance)
-                        }
-                    }
+                    .overlay(alignment: .top) { topBannerSlot }
                     // (Note: the mid-verify background-resume
                     // banner that used to chain here was structurally
                     // unreachable — it gated on `.verified(report: .skipped)`,
@@ -557,7 +510,6 @@ struct DocumentEditorView: View {
             beginExport: exportFlow.beginExport, concealedPages: shareConcealedPages
         ))
         .onDisappear {
-            dismissBannerTask?.cancel()
             dismissSummaryTask?.cancel()
             dismissTask?.cancel()
             // The per-window UndoManager outlives this document; clear
@@ -750,15 +702,10 @@ struct DocumentEditorView: View {
     }
 
     /// Action for the Run Verification card on the skipped results screen.
-    /// Clears the background-pause flag (the ContentView scene handler sets
-    /// it on the verified-arm cancel; nothing else consumes it for the
-    /// skipped case) and routes per `runVerificationRoute`. The full-pipeline
+    /// Routes per `runVerificationRoute`. The full-pipeline
     /// leg takes the purge re-run's preamble first: `runFullPipeline`'s start
     /// guard (`redactRefusal(with:)`) reads `.verified` as busy.
     private func handleRunVerificationTap() {
-        dismissBannerTask?.cancel()
-        documentState.wasPausedByBackground = false
-        documentState.pausedFromPhase = nil
         switch Self.runVerificationRoute(
             hasOutput: redactionState.outputURL != nil,
             isVerificationStale: redactionState.isVerificationStale, hasUnappliedSelections: DocumentState.hasUnappliedSelections(redactionState)

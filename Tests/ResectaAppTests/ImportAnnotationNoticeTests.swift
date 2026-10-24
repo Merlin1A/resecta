@@ -164,8 +164,7 @@ struct ImportAnnotationNoticeTests {
         let count = ImportAnnotationNoticeBanner.noticeWorthyCount(doc.sourceAnnotationFindings)
         #expect(count == 0)
         #expect(!ImportAnnotationNoticeBanner.isVisible(
-            phaseKind: .editing, annotationTypeCount: count, dismissed: false,
-            pausedBannerActive: false, detectionBannerActive: false))
+            phaseKind: .editing, annotationTypeCount: count, dismissed: false))
     }
 
     @Test("Link plus a black square still shows the notice")
@@ -181,8 +180,7 @@ struct ImportAnnotationNoticeTests {
         let count = ImportAnnotationNoticeBanner.noticeWorthyCount(doc.sourceAnnotationFindings)
         #expect(count == 1, "the square stays notice-worthy; only the link is filtered")
         #expect(ImportAnnotationNoticeBanner.isVisible(
-            phaseKind: .editing, annotationTypeCount: count, dismissed: false,
-            pausedBannerActive: false, detectionBannerActive: false))
+            phaseKind: .editing, annotationTypeCount: count, dismissed: false))
     }
 
     // MARK: - Filled form fields
@@ -270,8 +268,7 @@ struct ImportAnnotationNoticeTests {
         #expect(annotationCount == 0)
         #expect(ImportAnnotationNoticeBanner.isVisible(
             phaseKind: .editing, annotationTypeCount: annotationCount,
-            filledFormFieldCount: doc.sourceFilledFormFieldCount, dismissed: false,
-            pausedBannerActive: false, detectionBannerActive: false))
+            filledFormFieldCount: doc.sourceFilledFormFieldCount, dismissed: false))
 
         // A clean import resets the count: the next document has no fields.
         await ImportService.importDocument(
@@ -307,28 +304,15 @@ struct ImportAnnotationNoticeTests {
     func visibilityContract() {
         // The one visible combination.
         #expect(ImportAnnotationNoticeBanner.isVisible(
-            phaseKind: .editing, annotationTypeCount: 1, dismissed: false,
-            pausedBannerActive: false, detectionBannerActive: false))
+            phaseKind: .editing, annotationTypeCount: 1, dismissed: false))
 
         // Each gate flips it off independently.
         #expect(!ImportAnnotationNoticeBanner.isVisible(
-            phaseKind: .empty, annotationTypeCount: 1, dismissed: false,
-            pausedBannerActive: false, detectionBannerActive: false))
+            phaseKind: .empty, annotationTypeCount: 1, dismissed: false))
         #expect(!ImportAnnotationNoticeBanner.isVisible(
-            phaseKind: .editing, annotationTypeCount: 0, dismissed: false,
-            pausedBannerActive: false, detectionBannerActive: false))
+            phaseKind: .editing, annotationTypeCount: 0, dismissed: false))
         #expect(!ImportAnnotationNoticeBanner.isVisible(
-            phaseKind: .editing, annotationTypeCount: 1, dismissed: true,
-            pausedBannerActive: false, detectionBannerActive: false))
-
-        // The sibling top-edge banners take precedence; the notice
-        // returns once they clear (dismissal is the only terminal state).
-        #expect(!ImportAnnotationNoticeBanner.isVisible(
-            phaseKind: .editing, annotationTypeCount: 1, dismissed: false,
-            pausedBannerActive: true, detectionBannerActive: false))
-        #expect(!ImportAnnotationNoticeBanner.isVisible(
-            phaseKind: .editing, annotationTypeCount: 1, dismissed: false,
-            pausedBannerActive: false, detectionBannerActive: true))
+            phaseKind: .editing, annotationTypeCount: 1, dismissed: true))
     }
 
     // MARK: - XFA form data and embedded files
@@ -385,8 +369,7 @@ struct ImportAnnotationNoticeTests {
         #expect(count == 1, "the document-level entry counts toward the notice gate")
         #expect(ImportAnnotationNoticeBanner.isVisible(
             phaseKind: .editing, annotationTypeCount: count,
-            filledFormFieldCount: 0, dismissed: false,
-            pausedBannerActive: false, detectionBannerActive: false))
+            filledFormFieldCount: 0, dismissed: false))
 
         await ImportService.importDocument(
             data: makeTextPDFData(text: "No fields"), suggestedType: "pdf",

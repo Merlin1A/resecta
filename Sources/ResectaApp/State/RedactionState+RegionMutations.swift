@@ -247,16 +247,25 @@ extension RedactionState {
         selectedRegionIDs = [copy.id]
     }
 
-    /// 0.02-offset clamp for `duplicateRegion`. Normalized PDF coords are
-    /// rotation-independent (rotation is a display transform), so a clamp
-    /// to [0, 1]² covers every page-size / rotation combination. Right
-    /// edge is bounded by `1 - width`; bottom edge is bounded by 0.
+    /// The 0.02 offset for `duplicateRegion`, kept inside [0, 1]².
+    /// Normalized PDF coords are rotation-independent (rotation is a
+    /// display transform), so the unit square covers every page-size /
+    /// rotation combination. On an axis with no room for the offset the
+    /// copy steps the other way, so it never lands on its source; an axis
+    /// the region fills has no room either way and keeps its place.
     /// Pure function — testable without a full RedactionState.
     static func duplicateOffsetClamp(source: CGRect) -> CGRect {
         let offset: CGFloat = 0.02
+        func step(_ origin: CGFloat, size: CGFloat, by delta: CGFloat) -> CGFloat {
+            let room = max(1 - size, 0)
+            for candidate in [origin + delta, origin - delta] where (0...room).contains(candidate) {
+                return candidate
+            }
+            return min(max(origin + delta, 0), room)
+        }
         return CGRect(
-            x: min(source.minX + offset, 1 - source.width),
-            y: max(source.minY - offset, 0),
+            x: step(source.minX, size: source.width, by: offset),
+            y: step(source.minY, size: source.height, by: -offset),
             width: source.width,
             height: source.height
         )

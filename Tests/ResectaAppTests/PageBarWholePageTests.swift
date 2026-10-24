@@ -5,13 +5,13 @@ import PDFKit
 import RedactionEngine
 @testable import ResectaApp
 
-// The page bar's whole-page action: one tap marks the visible page as a
+// The page bar's whole-page control: one tap marks the visible page as a
 // region through the ordinary add path, so it behaves like a drawn
-// region in every respect — one undo step with the drawn region's name,
-// the same counter, no term captured from it, no nearby-match nudge
-// from it. The bar itself is shown only at the compact width of a
-// multi-page document in the editing phase, so the action is never
-// disabled: a page the bar can show is a page it can mark.
+// region in every respect — one undo step, the same counter, no term
+// captured from it, no nearby-match nudge from it — and the next tap
+// unmarks it. The control shows on the bar of a multi-page document in
+// the editing phase and is never disabled: a page it can show is a page
+// it can mark or unmark.
 
 @MainActor
 @Suite("Page bar whole-page action")
@@ -78,21 +78,13 @@ struct PageBarWholePageTests {
         #expect((redactionState.regions[0] ?? []).isEmpty)
     }
 
-    @Test("A repeated tap adds another region on the same page")
-    func repeatedTapAddsAnotherRegion() {
-        let (documentState, redactionState) = Self.makeStates(currentPage: 0)
-        Self.mark(documentState, redactionState)
-        Self.mark(documentState, redactionState)
-        #expect(redactionState.regions[0]?.count == 2)
-    }
-
     // MARK: - The counter
 
-    @Test("The bar's counter reads '1 region' after the tap, nothing before it, and pluralises beyond one")
+    @Test("The bar's counter reads '1 region' after the tap, '0 regions' before it, and pluralises beyond one")
     func counterReadsOneRegion() {
         let (documentState, redactionState) = Self.makeStates(currentPage: 0)
         let countBefore = redactionState.regions[0]?.count ?? 0
-        #expect(PageNavigationBar.regionCountLabel(countBefore) == nil)
+        #expect(PageNavigationBar.regionCountLabel(countBefore) == "0 regions")
         Self.mark(documentState, redactionState)
         let count = redactionState.regions[documentState.currentPageIndex]?.count ?? 0
         #expect(PageNavigationBar.regionCountLabel(count) == "1 region")
@@ -101,39 +93,19 @@ struct PageBarWholePageTests {
 
     // MARK: - Undo
 
-    @Test("Undo removes the region in one step that carries the drawn region's name")
+    @Test("Undo removes the region in one step named Mark Whole Page")
     func undoRemovesTheRegion() {
         let (documentState, redactionState) = Self.makeStates(currentPage: 2)
         let undoManager = UndoManager()
         Self.mark(documentState, redactionState, undoManager: undoManager)
         #expect(undoManager.canUndo)
-        #expect(undoManager.undoActionName == "Add Region")
+        #expect(undoManager.undoActionName == "Mark Whole Page")
         undoManager.undo()
         #expect((redactionState.regions[2] ?? []).isEmpty)
         #expect(!undoManager.canUndo)
         #expect(undoManager.canRedo)
         undoManager.redo()
         #expect(redactionState.regions[2]?.count == 1)
-    }
-
-    @Test("Two taps are two undo steps; each undo removes one region")
-    func eachTapIsItsOwnUndoStep() {
-        let (documentState, redactionState) = Self.makeStates(currentPage: 0)
-        // Two taps arrive as two run-loop events, each its own undo
-        // group; a test runs both synchronously, so the groups are
-        // opened and closed by hand with event grouping off.
-        let undoManager = UndoManager()
-        undoManager.groupsByEvent = false
-        for _ in 0..<2 {
-            undoManager.beginUndoGrouping()
-            Self.mark(documentState, redactionState, undoManager: undoManager)
-            undoManager.endUndoGrouping()
-        }
-        #expect(redactionState.regions[0]?.count == 2)
-        undoManager.undo()
-        #expect(redactionState.regions[0]?.count == 1)
-        undoManager.undo()
-        #expect((redactionState.regions[0] ?? []).isEmpty)
     }
 
     // MARK: - The run's inputs
@@ -175,15 +147,104 @@ struct PageBarWholePageTests {
         #expect(redactionState.pendingManualDrawNudge == nil)
     }
 
+    // MARK: - The toggle
+
+    private static func toggle(_ documentState: DocumentState, _ redactionState: RedactionState,
+                               undoManager: UndoManager?) {
+        undoManager?.beginUndoGrouping()
+        PageNavigationBar.toggleWholePage(
+            redactionState: redactionState, documentState: documentState, undoManager: undoManager)
+        undoManager?.endUndoGrouping()
+    }
+
+    private static func box() -> RedactionRegion {
+        RedactionRegion(id: UUID(), normalizedRect: CGRect(x: 0.1, y: 0.2, width: 0.3, height: 0.05),
+                        source: .manual)
+    }
+
+    @Test("A page reads as marked only while it holds the whole-page region")
+    func markedReadsTheWholePageRegion() {
+        let (documentState, redactionState) = Self.makeStates(currentPage: 1)
+        #expect(!PageNavigationBar.isWholePageMarked(page: 1, in: redactionState))
+        redactionState.addRegion(Self.box(), page: 1, undoManager: nil)
+        #expect(!PageNavigationBar.isWholePageMarked(page: 1, in: redactionState),
+                "a drawn box is not the whole-page region")
+        Self.mark(documentState, redactionState)
+        #expect(PageNavigationBar.isWholePageMarked(page: 1, in: redactionState))
+        #expect(!PageNavigationBar.isWholePageMarked(page: 0, in: redactionState))
+    }
+
+    @Test("Marking a marked page adds no second whole-page region")
+    func markOnAMarkedPageAddsNothing() {
+        let (documentState, redactionState) = Self.makeStates(currentPage: 0)
+        Self.mark(documentState, redactionState)
+        let versionAfterFirst = redactionState.regionVersion
+        Self.mark(documentState, redactionState)
+        #expect(redactionState.regions[0]?.count == 1)
+        #expect(redactionState.regionVersion == versionAfterFirst, "the second mark changes nothing")
+    }
+
+    @Test("The toggle marks, then unmarks: one undo step each way, named for it; Undo after Unmark marks the page again")
+    func toggleTwiceIsTwoNamedSteps() {
+        let (documentState, redactionState) = Self.makeStates(currentPage: 0)
+        let undoManager = UndoManager()
+        undoManager.groupsByEvent = false
+        Self.toggle(documentState, redactionState, undoManager: undoManager)
+        #expect(redactionState.regions[0]?.count == 1)
+        #expect(undoManager.undoActionName == "Mark Whole Page")
+        Self.toggle(documentState, redactionState, undoManager: undoManager)
+        #expect((redactionState.regions[0] ?? []).isEmpty)
+        #expect(undoManager.undoActionName == "Unmark Whole Page")
+        undoManager.undo()
+        #expect(PageNavigationBar.isWholePageMarked(page: 0, in: redactionState))
+        #expect(undoManager.redoActionName == "Unmark Whole Page")
+        undoManager.undo()
+        #expect((redactionState.regions[0] ?? []).isEmpty)
+    }
+
+    @Test("Unmark removes the whole-page region only: the page's drawn boxes stay")
+    func unmarkKeepsTheOtherRegions() {
+        let (documentState, redactionState) = Self.makeStates(currentPage: 2)
+        let drawn = Self.box()
+        redactionState.addRegion(drawn, page: 2, undoManager: nil)
+        Self.toggle(documentState, redactionState, undoManager: nil)
+        #expect(redactionState.regions[2]?.count == 2)
+        Self.toggle(documentState, redactionState, undoManager: nil)
+        #expect(redactionState.regions[2]?.map(\.id) == [drawn.id])
+    }
+
+    @Test("The control's words follow the page: Mark Whole Page, then Unmark Whole Page")
+    func labelFollowsThePage() {
+        #expect(PageNavigationBar.wholePageActionLabel(marked: false) == "Mark Whole Page")
+        #expect(PageNavigationBar.wholePageActionLabel(marked: true) == "Unmark Whole Page")
+    }
+
+    // MARK: - The zero arm and the one-page bar
+
+    @Test("An empty page's counter reads '0 regions', drawn and spoken")
+    func counterZeroArm() {
+        #expect(PageNavigationBar.regionCountLabel(0) == "0 regions")
+        #expect(PageNavigationBar.pageAccessibilityLabel(page: 1, pageCount: 3, regionCount: 0)
+                == "Page 1 of 3, 0 regions")
+    }
+
+    @Test("A one-page document's bar keeps the count and drops the page arrows and the whole-page control")
+    func onePageBarDropsArrowsAndControl() {
+        #expect(!PageNavigationBar.showsChevrons(pageCount: 1))
+        #expect(!PageNavigationBar.showsMarkControl(pageCount: 1))
+        #expect(PageNavigationBar.showsChevrons(pageCount: 3))
+        #expect(PageNavigationBar.showsMarkControl(pageCount: 3))
+    }
+
     // MARK: - The bar's source
 
-    @Test("The bar carries the action with its label and identifier, floored to the shared touch target, and no disabled modifier of its own")
+    @Test("The bar carries the control with its state's label and identifier, floored to the shared touch target, and no disabled modifier of its own")
     func barSourcePins() throws {
         let source = try Self.repoFile("Sources/ResectaApp/Views/PageNavigationBar.swift")
-        #expect(source.contains("accessibilityLabel(\"Mark Whole Page\")"))
+        #expect(source.contains("accessibilityLabel(PageNavigationBar.wholePageActionLabel(marked: marked))"))
         #expect(source.contains("accessibilityIdentifier(\"pageNavMarkWholePage\")"))
         #expect(source.contains("@Environment(\\.undoManager)"))
-        #expect(source.contains("PageNavigationBar.markWholePage("))
+        #expect(source.contains("PageNavigationBar.toggleWholePage("))
         #expect(source.contains("PageNavigationBar.regionCountLabel("))
         // The two chevrons are the only disabled controls: the action
         // is enabled whenever the bar is shown.
