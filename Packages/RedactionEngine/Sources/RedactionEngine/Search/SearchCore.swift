@@ -75,14 +75,6 @@ enum SearchCore {
         return effective
     }
 
-    /// The page-side text the regex tiers enumerate over (`regexPage`'s
-    /// text): NFKC when `normalizeUnicode` is on, then the smart-punctuation
-    /// fold. The pattern itself is never transformed, and the length-changing
-    /// extensions are excluded from the regex paths; see `SearchOptions`.
-    static func regexSearchText(_ pageText: String, options: SearchOptions) -> String {
-        regexPage(pageText, options: options).text
-    }
-
     /// The regex tiers' page with its route back to the raw page text. NFKC
     /// is not UTF-16 length-preserving (a ligature expands, a compatibility
     /// character or a decomposed accent contracts), so a match range in the
@@ -90,6 +82,10 @@ enum SearchCore {
     /// unit by unit. A page of single-unit ASCII is normalized whole with no
     /// map (every step is the identity on it).
     struct RegexPage {
+        /// The text the regex tiers enumerate over: NFKC when
+        /// `normalizeUnicode` is on, then the smart-punctuation fold. The
+        /// pattern itself is never transformed, and the length-changing
+        /// extensions are excluded from the regex paths; see `SearchOptions`.
         let text: String
         /// Per UTF-16 unit of `text`: the raw Character it came from; nil
         /// when `text`'s units are the raw page's.
@@ -166,6 +162,12 @@ enum SearchCore {
         func rawNSRange(baseStart: Int, length: Int) -> NSRange? {
             guard let rawMap else { return NSRange(location: baseStart, length: length) }
             return rawMap.nsRange(baseStart: baseStart, length: length)
+        }
+
+        /// The raw page range of a literal match: the one route the full
+        /// search's boxes and the preview's raw ranges share.
+        func rawNSRange(of span: MatchSpan) -> NSRange? {
+            rawNSRange(baseStart: span.baseOffsets.start, length: span.baseOffsets.length)
         }
     }
 
@@ -318,6 +320,20 @@ enum SearchCore {
         let searchedIndices: Range<String.Index>
         let searchedCharacters: Range<Int>
         let base: Range<Int>?
+
+        /// The span in base Character offsets: the remapped one under an
+        /// offset map, else the searched offsets themselves.
+        var baseOffsets: (start: Int, length: Int) {
+            (base?.lowerBound ?? searchedCharacters.lowerBound, base?.count ?? searchedCharacters.count)
+        }
+
+        /// The range the preview emits in `currentPageMatches`: the base
+        /// span when a length-changing extension is active (Character
+        /// offsets, the `findTextMatches` convention), the searched range
+        /// otherwise.
+        var previewRange: NSRange {
+            base.map { NSRange(location: $0.lowerBound, length: $0.count) } ?? searchedRange
+        }
     }
 
     // MARK: - The literal matcher
