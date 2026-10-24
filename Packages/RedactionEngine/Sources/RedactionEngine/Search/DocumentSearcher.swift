@@ -1323,9 +1323,9 @@ public actor DocumentSearcher {
         let textLines = await ocrLines(for: page, pageIndex: pageIndex)
         guard !textLines.isEmpty else { return [] }
 
-        // PII detection reads the normalized parallel
-        // cache, not verbatim Vision output. On miss, run OCRTextNormalizer
-        // per line and record offsets against the normalized concatenation.
+        // PII detection reads the normalized parallel cache, not verbatim
+        // Vision output. On miss, run OCRTextNormalizer per line and record
+        // UTF-16 offsets (the detector's NSRange unit) into the concatenation.
         let normalizedPage: NormalizedOCRPage
         if let cached = ocrPageCache.normalizedPage(for: pageIndex) {
             normalizedPage = cached
@@ -1336,7 +1336,7 @@ public actor DocumentSearcher {
             for line in textLines {
                 let normalized = ocrNormalizer.normalize(line.text)
                 entries.append(NormalizedLineEntry(
-                    start: concat.count,
+                    start: concat.utf16.count,
                     normalizedText: normalized,
                     normalizedRect: line.normalizedRect,
                     confidence: line.confidence
@@ -1393,7 +1393,7 @@ public actor DocumentSearcher {
             let matchEnd = matchStart + range.length
 
             let overlappingLines = lineOffsets.filter { entry in
-                let lineEnd = entry.start + entry.normalizedText.count + 1
+                let lineEnd = entry.start + entry.normalizedText.utf16.count + 1
                 return entry.start < matchEnd && lineEnd > matchStart
             }
             guard let firstLine = overlappingLines.first else { return nil }
