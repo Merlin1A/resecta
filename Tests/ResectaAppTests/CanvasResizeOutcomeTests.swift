@@ -173,4 +173,21 @@ struct CanvasResizeOutcomeTests {
         #expect(g.undo.canUndo == false)
         withExtendedLifetime((c, g)) {}
     }
+
+    // MARK: - On the page after a guide
+
+    @Test("A region moved along the page's bottom edge stays on the page when it aligns to a neighbour's edge")
+    func moveStaysOnThePageAfterTheSnap() throws {
+        // The moving box sits on the bottom edge; a neighbour's top lies 3
+        // points below the moving box's top, inside the guide's reach.
+        let moving = CGRect(x: 100, y: Self.pageSize.height - 40, width: 100, height: 40)
+        let neighbour = CGRect(x: 320, y: Self.pageSize.height - 37, width: 100, height: 30)
+        let r = Self.region(moving), n = Self.region(neighbour)
+        let c = try mount([r, n], selected: [r.id])
+        let start = CGPoint(x: moving.midX, y: moving.midY)
+        drag(c.overlay, from: start, through: [CGPoint(x: start.x + 10, y: start.y), CGPoint(x: start.x + 20, y: start.y)])
+        let stored = try #require(c.state.regions[0]?.first { $0.id == r.id }?.normalizedRect)
+        #expect(stored.minY >= 0 && stored.maxY <= 1 && stored.minX >= 0 && stored.maxX <= 1, "stored \(stored)")
+        withExtendedLifetime(c) {}
+    }
 }
