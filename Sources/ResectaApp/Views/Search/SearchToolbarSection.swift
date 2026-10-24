@@ -421,11 +421,21 @@ struct SearchToolbarSection: View {
     private var chipRowSubstrate: some View {
         // Wraps at every type size (the accessibility sizes always did):
         // a single scrolling row clipped the chips past the right edge
-        // with no visible cue.
-        FlowLayout(spacing: ResectaTokens.Spacing.xs) {
-            chipRowSubstrateItems
+        // with no visible cue. The wrap sits in a horizontal scroll view
+        // as wide as the sheet, so it never scrolls sideways: a vertical
+        // drag on the row's empty space lands on that scroll view, whose
+        // pan declines it, and the sheet takes the drag. Laid out bare,
+        // the row's empty space kept the drag from the sheet, though the
+        // search-bar row beside it passed one.
+        ScrollView(.horizontal) {
+            FlowLayout(spacing: ResectaTokens.Spacing.xs) {
+                chipRowSubstrateItems
+            }
+            .padding(.horizontal, ResectaTokens.Spacing.md)
+            .containerRelativeFrame(.horizontal)
         }
-        .padding(.horizontal, ResectaTokens.Spacing.md)
+        .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+        .scrollIndicators(.hidden)
         // Container id for the XCUI strip-cooperation battery.
         .accessibilityIdentifier("chipRowSubstrate")
     }
