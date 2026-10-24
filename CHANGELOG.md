@@ -88,6 +88,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Undoing a delete selects the deleted regions again if they were selected.
 - The paused, scan-summary and annotation notices share one place at the top of the editor and never stack; the paused notice shows first.
 - The Processing was paused notice stays until it is dismissed, Restart is tapped or another run starts, so it is still there after time away from the app.
+- While a match walk is parked, paging away with the page bar lets go of the current match, so the strip's Apply never applies a match on another page, and the walk's arrows and J / K step from the page shown.
 - Duplicate of a region at the page's edge no longer lands exactly on its source: with no room toward the edge, the copy steps the other way.
 - Undoing a search apply leaves none of its regions selected.
 - A tap or an arrow-key nudge that leaves a region where it was no longer records an undo step or discards the redacted output.

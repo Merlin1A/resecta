@@ -199,14 +199,14 @@ struct SearchResultsSection: View {
     private var keyboardShortcutButtons: some View {
         Group {
             Button {
-                searchState.navigateToPrevious(currentPageIndex: documentState.currentPageIndex)
+                searchState.walkToPrevious(fromPage: documentState.currentPageIndex)
                 if let id = searchState.currentResult?.id { onFocusWalk(id, false) }
             } label: { EmptyView() }
                 .accessibilityLabel("Previous match")
                 .keyboardShortcut("j", modifiers: [])
 
             Button {
-                searchState.navigateToNext(currentPageIndex: documentState.currentPageIndex)
+                searchState.walkToNext(fromPage: documentState.currentPageIndex)
                 if let id = searchState.currentResult?.id { onFocusWalk(id, false) }
             } label: { EmptyView() }
                 .accessibilityLabel("Next match")

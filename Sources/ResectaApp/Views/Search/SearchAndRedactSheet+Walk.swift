@@ -52,14 +52,14 @@ extension SearchAndRedactSheet {
         }
     }
 
-    /// One chevron tap at either site: step the search walk, then focus
-    /// through the seam.
+    /// One chevron tap at either site: step the search walk from the page
+    /// shown (`SearchState+WalkNavigator`), then focus through the seam.
     func stepWalk(_ direction: ResultNavDirection) {
         switch direction {
         case .next:
-            searchState.navigateToNext(currentPageIndex: documentState.currentPageIndex)
+            searchState.walkToNext(fromPage: documentState.currentPageIndex)
         case .previous:
-            searchState.navigateToPrevious(currentPageIndex: documentState.currentPageIndex)
+            searchState.walkToPrevious(fromPage: documentState.currentPageIndex)
         }
         focusWalk(on: searchState.currentResult?.id, parking: true)
     }

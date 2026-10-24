@@ -24,7 +24,9 @@ struct PageNavigationBar: View {
         HStack(spacing: ResectaTokens.Spacing.md) {
             if PageNavigationBar.showsChevrons(pageCount: pageCount) {
                 Button {
-                    documentState.currentPageIndex = max(0, documentState.currentPageIndex - 1)
+                    PageNavigationBar.showPage(
+                        max(0, documentState.currentPageIndex - 1),
+                        documentState: documentState, redactionState: redactionState)
                 } label: {
                     // This pair measured as the smallest
                     // interactive targets in the app (12.7×16.7 at Large
@@ -81,10 +83,9 @@ struct PageNavigationBar: View {
 
             if PageNavigationBar.showsChevrons(pageCount: pageCount) {
                 Button {
-                    documentState.currentPageIndex = min(
-                        pageCount - 1,
-                        documentState.currentPageIndex + 1
-                    )
+                    PageNavigationBar.showPage(
+                        min(pageCount - 1, documentState.currentPageIndex + 1),
+                        documentState: documentState, redactionState: redactionState)
                 } label: {
                     Image(systemName: "chevron.right")
                         .frame(
@@ -158,6 +159,14 @@ extension PageNavigationBar {
 
     static func wholePageActionLabel(marked: Bool) -> String {
         marked ? unmarkWholePageLabel : markWholePageLabel
+    }
+
+    /// The page arrows' page write: the page shown moves, and a parked
+    /// search walk lets go of a current match on another page, so the
+    /// strip's Apply never acts on a match out of view.
+    static func showPage(_ page: Int, documentState: DocumentState, redactionState: RedactionState) {
+        documentState.currentPageIndex = page
+        redactionState.activeSearch?.yieldWalk(toPage: page)
     }
 
     /// The page arrows step between pages: none on a one-page document.
