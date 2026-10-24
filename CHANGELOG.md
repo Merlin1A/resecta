@@ -62,6 +62,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - The page bar stays while a match walk is parked.
 - Moving to another page keeps only the selected regions on the page in view; a delete or a nudge never reaches a region you cannot see.
 - One wording per concept across the Search sheet and Custom Terms; the Search options' warnings and the result-cap banner use the warning color token; the saved-searches sheet has a translucent material background.
+- One-line regions can be drawn at the fit zoom: a box needs 20 on-screen points along its long side and 8 across, and a box drawn under that size is no longer enlarged by an alignment guide.
 
 ### Removed
 

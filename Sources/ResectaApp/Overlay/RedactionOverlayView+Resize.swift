@@ -30,8 +30,7 @@ extension RedactionOverlayView {
         let resized = Self.resizedRect(startRect, handle: handle, to: edge)
         var newRect = snapEngine.applyResizeSnapping(
             to: resized.rect, handle: resized.handle, excluding: selectedID, in: snapPage)
-        newRect = Self.flooredRect(newRect, handle: resized.handle,
-                                   floor: Self.minimumRegionSize * fingerScale)
+        newRect = Self.flooredRect(newRect, handle: resized.handle, fingerScale: fingerScale)
 
         // Clamp to overlay bounds
         newRect = newRect.intersection(bounds)
@@ -105,19 +104,43 @@ extension RedactionOverlayView {
         return (rect, Self.handle(movingLeft: left, right: right, top: top, bottom: bottom))
     }
 
-    /// Hold `floor` on the axes `handle` moves, keeping the anchored edge.
-    static func flooredRect(_ rect: CGRect, handle: ResizeHandle, floor: CGFloat) -> CGRect {
+    /// Hold the size floor on the axes `handle` moves, keeping the anchored
+    /// edge: each moved axis floors at what `RegionSizeFloor` asks of it
+    /// beside the other axis.
+    static func flooredRect(_ rect: CGRect, handle: ResizeHandle, fingerScale: CGFloat) -> CGRect {
         let edges = movingEdges(handle)
         var floored = rect
-        if (edges.left || edges.right), floored.width < floor {
-            if edges.left { floored.origin.x = floored.maxX - floor }
-            floored.size.width = floor
+        let widthFloor = RegionSizeFloor.floor(across: floored.height, fingerScale: fingerScale)
+        if (edges.left || edges.right), floored.width < widthFloor {
+            if edges.left { floored.origin.x = floored.maxX - widthFloor }
+            floored.size.width = widthFloor
         }
-        if (edges.top || edges.bottom), floored.height < floor {
-            if edges.top { floored.origin.y = floored.maxY - floor }
-            floored.size.height = floor
+        let heightFloor = RegionSizeFloor.floor(across: floored.width, fingerScale: fingerScale)
+        if (edges.top || edges.bottom), floored.height < heightFloor {
+            if edges.top { floored.origin.y = floored.maxY - heightFloor }
+            floored.size.height = heightFloor
         }
         return floored
+    }
+
+    /// The one size floor, in screen points (overlay points are page
+    /// points, so each is multiplied by `fingerScale`): a region needs 20
+    /// along its long side and 8 across, so a one-line region can be drawn
+    /// at the fit zoom. The draw reject and the resize floor both read it.
+    enum RegionSizeFloor {
+        static let longSide: CGFloat = 20
+        static let across: CGFloat = 8
+
+        static func admits(_ size: CGSize, fingerScale: CGFloat) -> Bool {
+            max(size.width, size.height) >= longSide * fingerScale
+                && min(size.width, size.height) >= across * fingerScale
+        }
+
+        /// The floor one axis is held at beside `other`: 8 across when
+        /// `other` already carries the long side, else 20 along.
+        static func floor(across other: CGFloat, fingerScale: CGFloat) -> CGFloat {
+            (other >= longSide * fingerScale ? across : longSide) * fingerScale
+        }
     }
 
     // MARK: - Resize Handle Hit Testing

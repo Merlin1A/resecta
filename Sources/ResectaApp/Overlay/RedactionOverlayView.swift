@@ -155,14 +155,9 @@ class RedactionOverlayView: UIView {
     /// Minimum drag distance (in points) before creating a region.
     /// Prevents accidental taps from creating tiny regions.
     private static let minimumDragThreshold: CGFloat = 8.0
-    // Minimum committed region size (overlay points). Prevents accidental
-    // taps from creating invisible regions. Separate from minimumDragThreshold
-    // (which prevents drag start); this rejects valid drags that produce too-small regions.
-    static let minimumCommittedRegionSize: CGFloat = 20.0
-
-    // The notice when the committed rect falls below
-    // `minimumCommittedRegionSize` on either axis: on screen and spoken. It
-    // names the remedy, not the floor, since the floor is in screen points.
+    // The notice when a drawn band falls below the size floor
+    // (`RegionSizeFloor`): on screen and spoken. It names the remedy, not
+    // the floor, since the floor is in screen points.
     static let subThresholdRejectionAnnouncement =
         "Region too small. Zoom in to draw a smaller region."
 
@@ -228,9 +223,6 @@ class RedactionOverlayView: UIView {
         case (false, false): return .topLeft
         }
     }
-
-    /// Minimum region dimension in overlay points.
-    static let minimumRegionSize: CGFloat = 10.0
 
     /// Prepared haptic generator for sub-threshold rejection feedback.
     private lazy var rejectionFeedback: UIImpactFeedbackGenerator = {
@@ -627,10 +619,12 @@ class RedactionOverlayView: UIView {
         // Commit new region
         guard let rect = currentDragRect else { return }
 
-        // Reject sub-threshold regions (< 20×20pt in overlay space).
-        // Animate shrink-to-center + fade, soft haptic, VoiceOver announcement.
-        let floor = Self.minimumCommittedRegionSize * fingerScale
-        if rect.width < floor || rect.height < floor {
+        // Reject a band under the size floor, judged on the band the finger
+        // drew (before the guides and the page clamp), so a guide never lifts
+        // it over: shrink-to-centre + fade, soft haptic, announcement.
+        let lift = primaryTouch.location(in: self)
+        let finger = dragOrigin.map { CGSize(width: abs(lift.x - $0.x), height: abs(lift.y - $0.y)) } ?? rect.size
+        if !RegionSizeFloor.admits(finger, fingerScale: fingerScale) {
             rejectSubThresholdRegion(rect)
             return
         }
