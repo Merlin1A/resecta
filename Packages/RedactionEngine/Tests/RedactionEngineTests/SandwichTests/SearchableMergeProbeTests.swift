@@ -383,7 +383,6 @@ struct SearchableMergeProbeTests {
         case .attention: "ATTENTION"
         case .fail: "FAIL"
         case .skipped: "SKIPPED"
-        case .notApplicable: "NOT_APPLICABLE"
         }
     }
     private func round4(_ d: Double) -> Double { (d * 10000).rounded() / 10000 }

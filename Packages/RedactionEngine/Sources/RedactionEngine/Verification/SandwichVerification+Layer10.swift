@@ -49,7 +49,7 @@ extension SandwichVerification {
         // "No issues found" would overstate what this layer observed
         // (mirrors Layer 3's guard).
         guard !sensitiveTerms.isEmpty else {
-            return (.notApplicable("No sensitive terms were provided — string search did not run."), nil, nil, false)
+            return (.info("No sensitive terms were provided — string search did not run."), nil, nil, false)
         }
         // Filter terms too short to search (matches Layer 3, shared
         // `AhoCorasick.isSearchableTerm`): ≥3 scalars (supports 3-letter PII

@@ -552,7 +552,7 @@ struct AdversarialSearchableVerificationTests {
         }
     }
 
-    @Test("Layer 10 reports NOT APPLICABLE when no sensitive terms provided (VQ-30)")
+    @Test("Layer 10 reports INFO when no sensitive terms provided (VQ-30)")
     func layer10InfoOnEmptyTerms() async throws {
         let (doc, url) = try TestFixtures.writeTempPDF(
             TestFixtures.imageOnlyPDF(),
@@ -561,15 +561,15 @@ struct AdversarialSearchableVerificationTests {
         defer { try? FileManager.default.removeItem(at: url) }
 
         // Manual-only redaction: no operator-semantic search ran, so the
-        // layer must say so (NOT APPLICABLE) rather than claim "No issues found"
+        // layer must say so (INFO) rather than claim "No issues found"
         // (mirrors Layer 3's guard for the same case).
         let result = await sandwichVerifier.verifyTextOperatorSemantics(
             outputDocument: SendablePDFDocument(doc),
             sensitiveTerms: []
         ).status
-        #expect(result.isNotApplicable,
-                "empty terms → NOT APPLICABLE, not PASS; got \(result)")
-        if case .notApplicable(let msg) = result {
+        #expect(result.isInfo,
+                "empty terms → INFO, not PASS; got \(result)")
+        if case .info(let msg) = result {
             #expect(msg.contains("string search did not run"), "got: \(msg)")
         }
     }

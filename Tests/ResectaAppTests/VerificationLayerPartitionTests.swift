@@ -104,7 +104,7 @@ struct VerificationLayerPartitionTests {
 
     @Test("Nothing-to-check rows have their own group; the headers carry counts, spoken with a comma")
     func nothingToCheckGroupAndHeaders() {
-        let idle = LayerResult(name: "Search Re-check", symbolName: "shield", status: .notApplicable("x"),
+        let idle = LayerResult(name: "Search Re-check", symbolName: "shield", status: .info("x"),
                                shortDescription: "", detailDescription: "", pageReferences: nil,
                                durationSeconds: 0, layer: .searchRecheck)
         let p = VerificationLayerPartition(layers: [layer(.pass), idle], perPageModes: [])

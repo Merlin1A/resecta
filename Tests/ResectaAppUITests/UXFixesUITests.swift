@@ -3,7 +3,7 @@ import XCTest
 /// UI tests for the search sheet's exits and the parked chrome: a
 /// persisted Source = OCR filter on a document whose pages read as
 /// text offers Show All from the empty state, and a parked result walk
-/// keeps the page bar so a page with no hits stays reachable.
+/// owns paging: the page bar steps aside and the walk's ‹ › cross pages.
 ///
 /// Every launch passes `--uitesting` (its filter clear runs first); the
 /// seeded-filter case writes the filter after that clear.
@@ -25,9 +25,12 @@ nonisolated final class UXFixesUITests: XCTestCase {
         super.tearDown()
     }
 
-    // MARK: - The parked walk keeps the page bar
+    // MARK: - The parked walk owns paging
 
-    func testParkedWalk_keepsPageBarAndReachesAPageWithNoHits() {
+    /// While the walk is parked the page bar is not mounted (so VoiceOver
+    /// cannot land on it), and the walk's own ‹ › still change the page:
+    /// ‹ from the first result wraps to the last result on another page.
+    func testParkedWalk_hidesPageBarAndTheWalkStillPages() {
         app.launchArguments = [
             "--uitesting", "--loadTestDocument", "--multipageDoc",
             "--openSearchSheet", "--searchQuery=Amount", "--searchDetent=medium",
@@ -40,21 +43,32 @@ nonisolated final class UXFixesUITests: XCTestCase {
         XCTAssertTrue(strip.waitForExistence(timeout: 10), "The first chevron tap did not park the sheet at the compact float.")
 
         let pageBar = app.descendants(matching: .any).matching(identifier: "pageNav").firstMatch
-        XCTAssertTrue(pageBar.waitForExistence(timeout: 10), "The page bar must stay while the walk is parked.")
-        let pageNext = app.buttons["pageNavNext"]
-        XCTAssertTrue(pageNext.waitForExistence(timeout: 5) && pageNext.isHittable, "The page bar's next control must be reachable above the parked strip.")
-        let position = pageBar.staticTexts.matching(NSPredicate(format: "label MATCHES %@", "^[0-9]+ of [0-9]+$")).firstMatch
-        XCTAssertTrue(position.waitForExistence(timeout: 5), "The page bar's position label is missing.")
-        let parts = position.label.components(separatedBy: " of ")
-        guard parts.count == 2, let current = Int(parts[0]) else {
-            XCTFail("Unreadable page position '\(position.label)'.")
-            return
+        let gone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: pageBar)
+        XCTAssertEqual(XCTWaiter().wait(for: [gone], timeout: 10), .completed, "The page bar must step aside while the walk is parked.")
+        XCTAssertFalse(app.buttons["pageNavNext"].exists, "No page-bar control is reachable while the walk is parked.")
+
+        let apply = app.buttons["applyCurrentResultButton"]
+        XCTAssertTrue(apply.waitForExistence(timeout: 10), "The parked strip's Apply never appeared.")
+        let before = Self.page(of: apply)
+        XCTAssertNotNil(before, "The walk's summary names no page: '\(apply.value as? String ?? "")'.")
+        app.buttons["resultNavPrevious"].tap()
+        let deadline = Date().addingTimeInterval(10)
+        var after = Self.page(of: apply)
+        while after == before && Date() < deadline {
+            usleep(250_000)
+            after = Self.page(of: apply)
         }
-        pageNext.tap()
-        let nextPosition = pageBar.staticTexts["\(current + 1) of \(parts[1])"]
-        XCTAssertTrue(nextPosition.waitForExistence(timeout: 10), "The page bar's next control did not move the page while parked.")
-        XCTAssertTrue(strip.exists, "Paging from the bar must keep the sheet parked.")
-        attachScreenshot(named: "ux-parked-walk-page-bar")
+        XCTAssertNotEqual(after, before, "The walk's ‹ from the first result must move to another page (still \(before ?? "?")).")
+        XCTAssertTrue(strip.exists, "Stepping the walk keeps the sheet parked.")
+        XCTAssertFalse(pageBar.exists, "The page bar stays aside while the walk crosses pages.")
+        attachScreenshot(named: "ux-parked-walk-no-page-bar")
+    }
+
+    /// "Page k of N" from the walk summary carried as the Apply's value.
+    private nonisolated static func page(of element: XCUIElement) -> String? {
+        guard let value = element.value as? String,
+              let range = value.range(of: #"Page [0-9]+ of [0-9]+"#, options: .regularExpression) else { return nil }
+        return String(value[range])
     }
 
     // MARK: - Show All from a persisted OCR filter (the seeded leg runs last)

@@ -30,7 +30,7 @@ struct Layer2OCRParallelismTests {
     /// associated String), so message-level parity must bind the string.
     private static func message(of status: VerificationStatus) -> String? {
         switch status {
-        case .warn(let m), .info(let m), .attention(let m), .fail(let m), .notApplicable(let m): m
+        case .warn(let m), .info(let m), .attention(let m), .fail(let m): m
         case .pass, .skipped: nil
         }
     }

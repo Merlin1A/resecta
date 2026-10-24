@@ -80,11 +80,6 @@ public enum VerificationStatus: Sendable, Equatable {
     case attention(String)
     case fail(String)
     case skipped        // Verification was not run (autoVerify disabled)
-    /// The check had nothing to check on this run — no search or scan was
-    /// applied, no sensitive term was captured to search for, or no page
-    /// kept a text layer. Neither a pass nor a note: the aggregate
-    /// skips it (it neither passes the document nor lowers its verdict).
-    case notApplicable(String)
 
     /// Equatable compares case identity only — the associated String is ignored.
     /// This allows `status == .fail` in test assertions without binding the message.
@@ -97,7 +92,6 @@ public enum VerificationStatus: Sendable, Equatable {
         case (.attention, .attention): true
         case (.fail, .fail): true
         case (.skipped, .skipped): true
-        case (.notApplicable, .notApplicable): true
         default: false
         }
     }
@@ -108,7 +102,6 @@ public enum VerificationStatus: Sendable, Equatable {
     public var isInfo: Bool { if case .info = self { true } else { false } }
     public var isAttention: Bool { if case .attention = self { true } else { false } }
     public var isSkipped: Bool { if case .skipped = self { true } else { false } }
-    public var isNotApplicable: Bool { if case .notApplicable = self { true } else { false } }
 }
 
 /// Copy a layer supplies for its own PASS / ATTENTION / WARN row, replacing

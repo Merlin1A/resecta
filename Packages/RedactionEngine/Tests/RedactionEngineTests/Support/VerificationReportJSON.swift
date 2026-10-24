@@ -54,7 +54,6 @@ private struct StatusJSON: Encodable {
         case .attention(let msg):   self.case = "attention"; self.message = msg
         case .fail(let msg):        self.case = "fail";      self.message = msg
         case .skipped:              self.case = "skipped";   self.message = nil
-        case .notApplicable(let msg): self.case = "not_applicable"; self.message = msg
         }
     }
 }

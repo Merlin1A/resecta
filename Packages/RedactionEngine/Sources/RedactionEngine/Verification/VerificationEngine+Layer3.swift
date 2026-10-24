@@ -23,7 +23,7 @@ extension VerificationEngine {
     }
 
     /// Layer 3's copy for a run with such regions: the clean line (PASS's
-    /// generic short line, INFO's note, NOT APPLICABLE's reason) gains the detail sentence; every
+    /// generic short line, INFO's note) gains the detail sentence; every
     /// other status keeps its own copy, and a count of zero adds nothing.
     static func manualRegionsWithoutTextCopy(
         _ status: VerificationStatus, count: Int
@@ -32,7 +32,7 @@ extension VerificationEngine {
         let short: String
         switch status {
         case .pass: short = "No issues found."
-        case .info(let note), .notApplicable(let note): short = note
+        case .info(let note): short = note
         default: return nil
         }
         return LayerCopy(short: short, detail: manualRegionsWithoutTextDetail(count))
@@ -54,7 +54,7 @@ extension VerificationEngine {
         // notes group without bumping the masthead (Layer-7 boundary-count
         // precedent).
         guard !sensitiveTerms.isEmpty else {
-            return (.notApplicable("No sensitive terms were provided — string search did not run."), nil, nil, false)
+            return (.info("No sensitive terms were provided — string search did not run."), nil, nil, false)
         }
         // Filter terms too short to search (shared
         // `AhoCorasick.isSearchableTerm`): ≥3 scalars (supports 3-letter PII

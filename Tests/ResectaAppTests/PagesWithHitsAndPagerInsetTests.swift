@@ -93,16 +93,18 @@ struct ParkedChromeLayoutTests {
         #expect(!layout(sheet: false, walk: false, pages: 0).showsPageBar)
     }
 
-    @Test("The page bar stays while the sheet is parked at the compact float, with or without a live walk")
-    func pageBarStaysWhileParked() {
-        // sheet × detent × walk — a parked walk keeps the page control,
-        // so a page with no hits stays reachable without raising.
-        #expect(layout(sheet: true, detent: .compactFloat, walk: true).showsPageBar)
-        // The compact-float draw tests park with no query: the bar stays.
-        #expect(layout(sheet: true, detent: .compactFloat, walk: false).showsPageBar)
+    @Test("The page bar steps aside while a walk is live at the compact float, and is back when the walk ends or the sheet rises")
+    func pageBarStepsAsideWhileTheWalkIsParked() {
+        // sheet × detent × walk — the parked walk owns paging, so the bar
+        // does not sit above the parked strip.
+        #expect(!layout(sheet: true, detent: .compactFloat, walk: true).showsPageBar)
+        // A taller sheet covers the bar; it stays mounted behind it.
         #expect(layout(sheet: true, detent: .medium, walk: true).showsPageBar)
         #expect(layout(sheet: true, detent: .large, walk: true).showsPageBar)
-        // A stale compact detent binding with no sheet up is not a park.
+        // The compact-float draw tests park with no query: the bar stays.
+        #expect(layout(sheet: true, detent: .compactFloat, walk: false).showsPageBar)
+        // The walk ends with the sheet: a stale walk flag with no sheet up
+        // is not a walk, and a stale compact detent binding is not a park.
         #expect(layout(sheet: false, detent: .compactFloat, walk: true).showsPageBar)
         #expect(layout(sheet: false, detent: .compactFloat, walk: false).showsPageBar)
     }
@@ -120,7 +122,8 @@ struct ParkedChromeLayoutTests {
     @Test("The model reads the hug it is given — the accessibility hug rides through the inset and the clearance")
     func readsTheGivenHug() {
         #expect(layout(hug: 120).canvasBottomInset == 120)
-        #expect(layout(hug: 120).toastClearance == 120 + ParkedChromeLayout.pageBarClearance)
+        #expect(layout(walk: false, hug: 120).toastClearance == 120 + ParkedChromeLayout.pageBarClearance)
+        #expect(layout(walk: true, hug: 120).toastClearance == 120)
         #expect(layout(pages: 0, hug: 120).toastClearance == 120)
     }
 
@@ -131,8 +134,8 @@ struct ParkedChromeLayoutTests {
         // No sheet: the import toast clears the bar.
         #expect(layout(sheet: false, walk: false).toastClearance == bar)
         #expect(layout(sheet: false, walk: false, pages: 0).toastClearance == 0)
-        // Parked with a live walk: the bar stays — both.
-        #expect(layout(walk: true).toastClearance == hug + bar)
+        // Parked with a live walk: the bar steps aside — the hug alone.
+        #expect(layout(walk: true).toastClearance == hug)
         // Parked with no walk: the bar stays — both.
         #expect(layout(walk: false).toastClearance == hug + bar)
         #expect(layout(pages: 0).toastClearance == hug)
@@ -159,9 +162,9 @@ struct ParkedChromeLayoutTests {
     @Test("Equatable over the inputs")
     func equatableOverInputs() {
         #expect(layout() == layout())
-        // The walk no longer moves the chrome; the page count still does.
-        #expect(layout() == layout(walk: false))
-        #expect(layout() != layout(pages: 0))
+        // A live walk moves the chrome (the bar steps aside); so does the page count.
+        #expect(layout() != layout(walk: false))
+        #expect(layout(walk: false) != layout(walk: false, pages: 0))
         #expect(layout() != layout(hug: 120))
     }
 }

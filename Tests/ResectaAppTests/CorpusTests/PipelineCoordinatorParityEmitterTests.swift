@@ -209,7 +209,6 @@ struct PipelineCoordinatorParityEmitterTests {
             case .attention(let m):   self.case = "attention"; self.message = m
             case .fail(let m):        self.case = "fail";      self.message = m
             case .skipped:            self.case = "skipped";   self.message = nil
-            case .notApplicable(let m): self.case = "not_applicable"; self.message = m
             }
         }
     }

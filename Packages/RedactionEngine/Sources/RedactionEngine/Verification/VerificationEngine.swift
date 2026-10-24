@@ -287,9 +287,8 @@ public struct VerificationEngine: Sendable {
                 // Detection Sweep — re-runs the applied scan on the output
                 // through the detectors, minus the items left unselected,
                 // and every detector for anything further. Supplies its own
-                // PASS/INFO/ATTENTION/WARN copy: ATTENTION when an item
-                // remains in an applied scan's own categories; NOT
-                // APPLICABLE when no scan was applied and no sweep requested.
+                // PASS/INFO/WARN copy; never ATTENTION; INFO when no scan
+                // was applied and no sweep requested.
                 let outcome = try await DetectionSweep().run(
                     outputDocument: outputDocument,
                     requests: appliedSearches,
@@ -346,8 +345,7 @@ public struct VerificationEngine: Sendable {
         case .pass:
             shortDesc = "No issues found."
             detailDesc = ""
-        case .warn(let msg), .info(let msg), .attention(let msg), .fail(let msg),
-             .notApplicable(let msg):
+        case .warn(let msg), .info(let msg), .attention(let msg), .fail(let msg):
             shortDesc = msg
             detailDesc = ""
         case .skipped:
@@ -371,10 +369,9 @@ public struct VerificationEngine: Sendable {
         }
 
         // A layer-supplied copy replaces the generic composition for the
-        // status it was composed for (PASS / INFO / NOT APPLICABLE /
-        // ATTENTION / WARN); FAIL and skipped always use the generic lines.
-        if let copyOverride,
-           status == .pass || status.isInfo || status.isNotApplicable || status.isAttention || status.isWarn {
+        // status it was composed for (PASS / INFO / ATTENTION / WARN); FAIL
+        // and skipped always use the generic lines.
+        if let copyOverride, status == .pass || status.isInfo || status.isAttention || status.isWarn {
             shortDesc = copyOverride.short
             detailDesc = copyOverride.detail
         }
@@ -415,7 +412,7 @@ public struct VerificationEngine: Sendable {
                 if firstWarn == nil { firstWarn = msg }
             case .skipped:
                 skippedCount += 1
-            case .info, .pass, .notApplicable:
+            case .info, .pass:
                 break
             }
         }

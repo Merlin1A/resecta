@@ -490,9 +490,9 @@ struct SandwichVerificationTests {
                 switch result.status {
                 case .pass:
                     break
-                case .info, .notApplicable:
+                case .info:
                     #expect(result.layer.map(Self.layersWithNothingToCheckOnAFullPage.contains) == true,
-                            "\(mode) \(result.name): INFO or NOT APPLICABLE is allowed only for a layer with nothing to read; got \(result.status)")
+                            "\(mode) \(result.name): INFO is allowed only for a layer with nothing to read; got \(result.status)")
                 default:
                     Issue.record("\(mode) \(result.name): \(result.status)")
                 }

@@ -236,7 +236,6 @@ struct PacketSearchableProbeTests {
         case .attention: "ATTENTION"
         case .fail: "FAIL"
         case .skipped: "SKIPPED"
-        case .notApplicable: "NOT_APPLICABLE"
         }
     }
 }

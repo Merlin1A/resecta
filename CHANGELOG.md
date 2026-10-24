@@ -46,7 +46,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - The App Store rating prompt asks once per app version, after the first share of a document whose checks passed, instead of after the third export.
 - Share: when annotations in the original document — a black box, a stamp, an unapplied redaction mark — cover text that no redaction box covers, the share confirmation names those pages before the file is shared, whatever the verification result. Annotations are not part of the page image, so that text is visible in the exported file.
 - Verification results: the outcome titles follow the check list's words: Attention Needed reads Needs Review, Issues Found reads Checks Failed, and Completed with Notes reads Completed with Warnings, or Some Checks Incomplete when a check could not run in full.
-- Home: the app's mark replaces the document glyph; the import entries are cards and Try the Sample a shorter row, centred on the screen, without link lines. VoiceOver reads each entry's title and description with a hint, the masthead as a heading and the trust words as one line; under Reduce Motion a press shades the card instead of shrinking it, and under Reduce Transparency the cards are opaque. The first-launch agreement fades into the home screen and keeps I Agree pinned while its text scrolls beneath; the app-switcher placeholder shows the mark on the home screen's grey; the verification progress screen's trust words read as one line.
+- Home: the app's mark replaces the document glyph; the three entries — Open a Document, Import Photos and Try the Sample — are cards of one size, centred on the screen, without link lines. VoiceOver reads each entry's title and description with a hint, the masthead as a heading and the trust words as one line; under Reduce Motion a press shades the card instead of shrinking it, and under Reduce Transparency the cards are opaque. The first-launch agreement fades into the home screen and keeps I Agree pinned while its text scrolls beneath; the app-switcher placeholder shows the mark on the home screen's grey; the verification progress screen's trust words read as one line.
 
 - Search sheet: the recent-search recall chips, the per-term section headers of the results list and the saved-search names are marked privacy-sensitive, matching the result rows and the saved-query previews.
 - Import: a file over the 50 MB cap is refused by its size on disk before any byte is read, from the Files picker and from a drop alike; a dropped file arrives as a file and is read inside its transfer rather than as 50 MB of memory.
@@ -65,13 +65,11 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - The Custom Terms screen states that a literal always-flag term matches inside words and in any case.
 - The "Marked N" notice is shorter so its "Not redacted until you tap Redact" clause fits at the default text size.
 - A saved search's suggested name no longer carries the query text.
-- The page bar stays while a match walk is parked.
+- While a match walk is parked the page bar steps aside: the walk's arrows page, a page with no hits is reached by scrolling or by raising the sheet, and the bar is back once the sheet rises or the walk ends.
 - Moving to another page keeps only the selected regions on the page in view; a delete or a nudge never reaches a region you cannot see.
 - One wording per concept across the Search sheet and Custom Terms; the Search options' warnings and the result-cap banner use the warning color token; the saved-searches sheet has a translucent material background.
 - One-line regions can be drawn at the fit zoom: a box needs 20 on-screen points along its long side and 8 across, and a box drawn under that size is no longer enlarged by an alignment guide.
 - Alignment guides engage closer to an edge and only for regions beside the one being moved, so a box follows the finger across lines of applied regions.
-- Verification: a check that had nothing to check reports Not applicable instead of passing or adding a note — the Search Re-check and the Detection Sweep when no search or scan was applied, the two term searches when no redacted term was captured, and Character Count, Monospace Fonts and Character Sequence when every page was rasterized. A Not applicable check neither passes the document nor lowers its result.
-- Verification: the Detection Sweep reports Needs review when an item remains on the output in a category your applied scan covered and you did not leave unselected, such as an SSN in an image after an SSN scan. Before, it read as a note. An item only in a category no applied scan covered stays a note.
 
 ### Removed
 
@@ -108,7 +106,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Undoing a delete selects the deleted regions again if they were selected.
 - The paused, scan-summary and annotation notices share one place at the top of the editor and never stack; the paused notice shows first.
 - The Processing was paused notice stays until it is dismissed, Restart is tapped or another run starts, so it is still there after time away from the app.
-- While a match walk is parked, paging away with the page bar lets go of the current match, so the strip's Apply never applies a match on another page, and the walk's arrows and J / K step from the page shown.
+- While a match walk is parked, the walk's arrows and J / K step from the page shown.
 - Duplicate of a region at the page's edge no longer lands exactly on its source: with no room toward the edge, the copy steps the other way.
 - With Paranoid Mode on, Switch Mode in the … menu shows Secure Rasterization and is unavailable, with the reason, instead of offering Searchable Redaction the run would not use.
 - Undoing a search apply leaves none of its regions selected.

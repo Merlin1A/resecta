@@ -256,7 +256,7 @@ struct RegionCoverageTests {
         #expect(blind.queryLines == nil && blind.pageReferences == nil)
         let sweep = SearchRecheckRequest(record: scan, appliedCount: 0, appliedPages: [], origin: .sweep)
         let idle = try await SearchRecheck().run(outputDocument: output, requests: [sweep])
-        #expect(idle.status.isNotApplicable, "the sweep applied nothing: nothing to cover — got \(idle.status)")
+        #expect(idle.status.isInfo, "the sweep applied nothing: nothing to cover — got \(idle.status)")
         // A locked source counts as unreadable too.
         let locked = try #require(PDFDocument(data: try Data(contentsOf: LockedImportTests.directory.appendingPathComponent("r4-aes-128.pdf"))))
         #expect(locked.isLocked)
@@ -362,10 +362,10 @@ struct RegionCoverageTests {
             pipelineMode: .searchableRedaction, filterDigests: [nil], perPageModes: [.searchableRedaction],
             appliedSearches: [applied], sourceDocument: SendablePDFDocument(blank))
         #expect(layer.status.isWarn && layer.couldNotVerify)
-        // Nothing applied at all: NOT APPLICABLE stands (the aggregate folds it as if absent).
+        // Nothing applied at all: the idle note stands (the aggregate reads it as nothing to check).
         let sweep = SearchRecheckRequest(record: scan, appliedCount: 0, appliedPages: [], origin: .sweep)
         let idle = try await SearchRecheck().run(outputDocument: output, requests: [sweep], sourceDocument: SendablePDFDocument(source), regions: [:])
-        #expect(idle.status == .notApplicable(SearchRecheck.infoMessage))
+        #expect(idle.status == .info(SearchRecheck.infoMessage))
     }
 
     @Test("Independence proof: a legal-prefix name boxed one character short, as the detector sized it before its fix, reads ATTENTION from the OCR Check on the Searchable output; the whole name boxed, with a legitimate neighbouring word, does not")
