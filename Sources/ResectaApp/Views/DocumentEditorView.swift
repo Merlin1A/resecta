@@ -12,7 +12,7 @@ import RedactionEngine
 struct DocumentEditorView: View {
     @Environment(DocumentState.self) var documentState
     @Environment(RedactionState.self) var redactionState
-    @Environment(SettingsState.self) private var settingsState
+    @Environment(SettingsState.self) var settingsState
     @Environment(PipelineCoordinator.self) var coordinator
     @Environment(AppCoordinator.self) private var appCoordinator
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -120,11 +120,6 @@ struct DocumentEditorView: View {
         switch tool {
         case .none, .some(.rectangle): return .rectangle
         }
-    }
-
-    /// Effective pipeline mode: per-document override or global setting.
-    private var effectivePipelineMode: PipelineMode {
-        documentOverride ?? settingsState.pipelineMode
     }
 
     // MARK: - Body (Phase Router)
@@ -717,26 +712,6 @@ struct DocumentEditorView: View {
         return caption
     }
 
-    // Pipeline mode picker (per-document override)
-    @ViewBuilder
-    private var pipelineModePicker: some View {
-        Menu {
-            Picker("Redaction Mode", selection: Binding(
-                get: { effectivePipelineMode },
-                set: { documentOverride = $0 }
-            )) {
-                Label { Text("Secure Rasterization") } icon: { PipelineMode.secureRasterization.glyph }
-                    .tag(PipelineMode.secureRasterization)
-                Label { Text("Searchable Redaction") } icon: { PipelineMode.searchableRedaction.glyph }
-                    .tag(PipelineMode.searchableRedaction)
-            }
-        } label: {
-            // Verb-object menu label (was the bare noun "Mode").
-            Label { Text("Switch Mode") } icon: { effectivePipelineMode.glyph }
-        }
-        .disabled(documentState.phaseKind != .editing)
-        .accessibilityIdentifier("pipelineMode")
-    }
 
     /// 1.1.0 Home swap (replaces the former
     /// file-import entry): closes the open document and returns to HomeView. Rides the
