@@ -75,10 +75,7 @@ final class RecordingCoordinator: PDFViewCoordinator {
         resizedRegions.append((id: id, newRect: newRect))
     }
 
-    override func commitLassoSelection(
-        _ regions: [RedactionRegion],
-        undoManager: UndoManager?
-    ) {
+    override func commitLassoSelection(_ regions: [RedactionRegion]) {
         lassoCommits.append(regions)
     }
 
