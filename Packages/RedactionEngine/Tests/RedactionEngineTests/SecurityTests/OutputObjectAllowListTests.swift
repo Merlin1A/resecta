@@ -23,6 +23,13 @@ import PDFKit
 // drawn from a JPEG that carries GPS, an EXIF comment and an XMP packet —
 // the worst case a photo brings in. Encrypted sources are covered when
 // their fixtures land.
+//
+// Reach: the key allow-lists are read on the catalog, the one page the
+// fixture has and that page's resource dictionary; the XObject and font
+// dictionaries below it, the trailer's /Info and /ID and any later page are
+// not read by key. The marker scan compares bytes and literal strings, and
+// its object walk starts at the catalog, so a marker the writer re-encoded
+// (a hex string) or placed in the trailer would be outside it.
 
 @Suite("Output object allow-list", .tags(.security))
 struct OutputObjectAllowListTests {

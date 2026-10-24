@@ -158,13 +158,29 @@ struct PageRasterizerHiddenTextTests {
         let data = TestFixtures.offCropBoxTextPDF()
         let (doc, pageData) = try Self.load(data)
         defer { withExtendedLifetime(doc) {} }
-        let page = try #require(doc.page(at: 0))
-        let planted = page.string?.contains("PLANT-ENGCROP-01") == true
-        let extracted = try await TextLayerExtractor().extractCharacters(from: page)
-        let extractedText = extracted.map(\.character).joined()
         let result = try await PageRasterizer().rasterize(pageData)
         let survivors = (result.pageOutput.textLayerEntries ?? []).map(\.character).joined()
-        print("off-crop probe: plant in page.string=\(planted) · in extracted entries=\(extractedText.contains("ENGCROP")) · reason=\(String(describing: result.fallbackReason))")
+        #expect(!survivors.contains("ENGCROP"))
+    }
+
+    @Test("text PDFKit extracts outside the visible page sends the page image-only")
+    func offVisiblePageTextSendsThePageImageOnly() async throws {
+        // The crop box reaches past the media box, so the line at 700 lies
+        // inside the crop box and outside the visible page. PDFKit extracts
+        // it all the same: without the visible-page arm the layer would
+        // carry it, and this test fails.
+        let data = TestFixtures.offCropBoxTextPDF(cropBoxPastMediaBox: true)
+        let (doc, pageData) = try Self.load(data)
+        defer { withExtendedLifetime(doc) {} }
+        let page = try #require(doc.page(at: 0))
+        #expect(page.bounds(for: .cropBox).height == 600, "the visible page is the boxes' intersection")
+        #expect(page.string?.contains("PLANT-ENGCROP-01") == true, "PDFKit extracts the line past the visible page")
+        let extracted = try await TextLayerExtractor().extractCharacters(from: page)
+        #expect(extracted.map(\.character).joined().contains("ENGCROP"), "the line reaches the extractor")
+        let result = try await PageRasterizer().rasterize(pageData)
+        #expect(result.fallbackReason == .hiddenText, "the arm sends the page image-only")
+        #expect(result.pageOutput.textLayerEntries == nil || result.pageOutput.textLayerEntries?.isEmpty == true)
+        let survivors = (result.pageOutput.textLayerEntries ?? []).map(\.character).joined()
         #expect(!survivors.contains("ENGCROP"))
     }
 }
