@@ -8,7 +8,7 @@ import UIKit
 // out, and must fit to a non-zero size. Structural: the card's body is a
 // `Button` whose label is `HomeChoiceCardContent` carrying the symbol, the
 // style, and the title / body strings the card was given — the same
-// `Mirror` pin `ToastManagerLetInjectionTests` uses. The row style, the
+// `Mirror` pin `ToastManagerLetInjectionTests` uses. One card height, the
 // press look and the filled tile are pinned beside them. The strings are
 // not read back through the accessibility tree because a unit-test host
 // receives no accessibility elements from SwiftUI on the iOS 26.5 simulator
@@ -49,15 +49,15 @@ struct HomeChoiceCardTests {
         Self.expectContent(of: card, style: .subtle, symbol: "photo.on.rectangle.angled")
     }
 
-    @Test("The row style hosts shorter than a card at the iPhone width")
-    func rowRenders() {
-        let row = Self.makeCard(style: .row, symbol: "doc.text")
-        let card = Self.makeCard(style: .primary, symbol: "doc.badge.plus")
-        let rowSize = Self.hostedSize(of: row)
-        let cardSize = Self.hostedSize(of: card)
-        #expect(rowSize.height > 0)
-        #expect(rowSize.height < cardSize.height, "row \(rowSize.height) vs card \(cardSize.height)")
-        Self.expectContent(of: row, style: .row, symbol: "doc.text")
+    @Test("A one-line description hosts as tall as a two-line one: every entry is one card height")
+    func oneLineBodyKeepsTheCardHeight() {
+        let oneLine = Self.makeCard(style: .subtle, symbol: "doc.text", body: "A bundled 3-page bank statement.")
+        let twoLines = Self.makeCard(style: .subtle, symbol: "photo.on.rectangle.angled",
+                                     body: "Choose up to 20 photos, one page each. Nothing is uploaded.")
+        let oneSize = Self.hostedSize(of: oneLine)
+        let twoSize = Self.hostedSize(of: twoLines)
+        #expect(oneSize.height > 0)
+        #expect(abs(oneSize.height - twoSize.height) <= 1, "one-line \(oneSize.height) vs two-line \(twoSize.height)")
     }
 
     @Test("The press shrinks and fades; under Reduce Motion it shades instead; at rest nothing")
@@ -83,12 +83,12 @@ struct HomeChoiceCardTests {
     private static let title = "Card title"
     private static let bodyText = "Card body"
 
-    private static func makeCard(style: HomeChoiceCard.Style, symbol: String) -> HomeChoiceCard {
+    private static func makeCard(style: HomeChoiceCard.Style, symbol: String, body: String = bodyText) -> HomeChoiceCard {
         HomeChoiceCard(
             symbol: symbol,
             style: style,
             title: LocalizedStringKey(title),
-            bodyText: LocalizedStringKey(bodyText),
+            bodyText: LocalizedStringKey(body),
             action: {}
         )
     }
