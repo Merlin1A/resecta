@@ -5,9 +5,9 @@ import RedactionEngine
 // Live-preview rect resolution.
 //
 // The engine returns NSRanges (it has no PDFPage context). The view needs
-// normalized rects to draw highlights. This helper bridges the two by
-// invoking `DocumentSearcher.boundingRect(for:page:)` (promoted to
-// `public nonisolated`) for each range on the visible page only.
+// normalized rects to draw highlights. This helper bridges the two for the
+// visible page only, from the preview's raw page ranges, one rect per line,
+// through `DocumentSearcher.boundingRect(for:page:)` (public nonisolated).
 //
 // Rendering of the resolved rects happens inside `RedactionOverlayView`
 // (the existing per-page UIKit overlay) so the live preview shares the
@@ -15,22 +15,28 @@ import RedactionEngine
 // the committed search highlights.
 enum PageHighlightOverlay {
 
-    /// Resolve preview NSRanges to normalized PDF rects for the given
-    /// page. Skips ranges PDFKit can't map (off-page, no selection).
-    /// Caller is expected to pass only the visible page's ranges.
-    static func resolveRects(
-        for ranges: [NSRange],
+    /// The live preview's highlight rects for the visible page, as the
+    /// full search places Apply's boxes: each match's range in the raw
+    /// page text (`currentPageRawRanges`, the map the boxes come from), one
+    /// rect per line the match spans. Ranges PDFKit can't place are left
+    /// out.
+    static func previewRects(
+        for preview: SearchPreviewResult,
         page: PDFPage,
         searcher: DocumentSearcher
     ) -> [CGRect] {
-        guard !ranges.isEmpty else { return [] }
-        var rects: [CGRect] = []
-        rects.reserveCapacity(ranges.count)
-        for range in ranges {
-            if let rect = searcher.boundingRect(for: range, page: page) {
-                rects.append(rect)
-            }
+        preview.currentPageRawRanges.flatMap { lineRects(for: $0, page: page, searcher: searcher) }
+    }
+
+    /// One normalized rect per line of a raw range's selection
+    /// (`selectionsByLine()`), each through the engine's one public
+    /// normalize path (`boundingRect`), the path its own per-line boxes
+    /// take.
+    private static func lineRects(for range: NSRange, page: PDFPage, searcher: DocumentSearcher) -> [CGRect] {
+        guard let selection = page.selection(for: range) else { return [] }
+        return selection.selectionsByLine().compactMap { line in
+            guard line.numberOfTextRanges(on: page) > 0 else { return nil }
+            return searcher.boundingRect(for: line.range(at: 0, on: page), page: page)
         }
-        return rects
     }
 }

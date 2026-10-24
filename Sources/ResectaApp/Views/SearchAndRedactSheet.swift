@@ -924,11 +924,7 @@ struct SearchAndRedactSheet: View {
             searchState.setLivePreviewRects([])
             return
         }
-        let rects = PageHighlightOverlay.resolveRects(
-            for: preview.currentPageMatches,
-            page: page,
-            searcher: searcher
-        )
+        let rects = PageHighlightOverlay.previewRects(for: preview, page: page, searcher: searcher)
         searchState.setLivePreviewRects(rects)
     }
 
