@@ -40,10 +40,8 @@ extension RedactionOverlayView: UIContextMenuInteractionDelegate {
                 image: UIImage(systemName: "checkmark.circle"),
                 attributes: self.coordinator?.redactionState?.canSelectAllOnPage(self.pageIndex) == true ? [] : .disabled
             ) { [weak self] _ in
-                guard let self,
-                      let regions = self.coordinator?.redactionState?.regions[self.pageIndex]
-                else { return }
-                self.coordinator?.redactionState?.selectedRegionIDs = Set(regions.map(\.id))
+                guard let self else { return }
+                self.coordinator?.redactionState?.selectAllOnPage(self.pageIndex)
             }
             actions.append(selectAllAction)
 

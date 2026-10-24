@@ -100,7 +100,7 @@ struct DocumentEditorKeyboard: ViewModifier {
     private func handleEscapeKey() -> KeyPress.Result {
         guard documentState.phaseKind == .editing else { return .ignored }
         if !redactionState.selectedRegionIDs.isEmpty {
-            redactionState.selectedRegionIDs = []
+            redactionState.deselectAllRegions()
             return .handled
         }
         if activeTool != nil {
@@ -117,8 +117,8 @@ struct DocumentEditorKeyboard: ViewModifier {
     private func handleSelectAllKey() -> KeyPress.Result {
         guard documentState.phaseKind == .editing else { return .ignored }
         let page = documentState.currentPageIndex
-        guard redactionState.canSelectAllOnPage(page), let pageRegions = redactionState.regions[page] else { return .ignored }
-        redactionState.selectedRegionIDs = Set(pageRegions.map(\.id))
+        guard redactionState.canSelectAllOnPage(page) else { return .ignored }
+        redactionState.selectAllOnPage(page)
         return .handled
     }
 

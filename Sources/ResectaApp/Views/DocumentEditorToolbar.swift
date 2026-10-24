@@ -69,7 +69,7 @@ struct DocumentEditorToolbar {
                 let entering = activeTool != .rectangle
                 activeTool = entering ? .rectangle : nil
                 let effects = DocumentEditorView.drawToolEntryEffects(entering: entering)
-                if effects.clearSelection { redactionState.selectedRegionIDs = [] }
+                if effects.clearSelection { redactionState.deselectAllRegions() }
                 if effects.disableMultiSelect { isMultiSelectActive = false }
             }
             .tint(activeTool == .rectangle ? ResectaTokens.BrandTeal.tint : nil)
@@ -287,14 +287,13 @@ struct DocumentEditorToolbar {
         let selectedCount = redactionState.selectedRegionIDs.count
         if DocumentEditorView.batchOpsMenuShouldShow(selectedCount: selectedCount) {
             let page = documentState.currentPageIndex
-            let pageRegions = redactionState.regions[page] ?? []
             Menu {
                 Button("Select All on Page", systemImage: "checkmark.circle") {
-                    redactionState.selectedRegionIDs = Set(pageRegions.map(\.id))
+                    redactionState.selectAllOnPage(page)
                 }
                 .disabled(!redactionState.canSelectAllOnPage(page))
                 Button("Deselect", systemImage: "xmark.circle") {
-                    redactionState.selectedRegionIDs = []
+                    redactionState.deselectAllRegions()
                 }
                 Button(role: .destructive) {
                     deleteSelectedRegions()
@@ -344,13 +343,12 @@ struct DocumentEditorToolbar {
         if pageRegionCount > 0 {
             Menu {
                 Button("Select All on Page", systemImage: "checkmark.circle") {
-                    redactionState.selectedRegionIDs = Set(
-                        (redactionState.regions[page] ?? []).map(\.id))
+                    redactionState.selectAllOnPage(page)
                 }
                 .disabled(!redactionState.canSelectAllOnPage(page))
                 if selectedCount > 0 {
                     Button("Deselect All", systemImage: "xmark.circle") {
-                        redactionState.selectedRegionIDs = []
+                        redactionState.deselectAllRegions()
                     }
                 }
             } label: {
