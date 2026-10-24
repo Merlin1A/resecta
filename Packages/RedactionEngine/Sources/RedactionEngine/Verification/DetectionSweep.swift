@@ -124,6 +124,8 @@ struct DetectionSweep: Sendable {
         var ocrPagesByRequest = [Int](repeating: 0, count: requestCount)
         var textPages = 0
         var ocrPages = 0
+        // Pages read on both legs (counted in `textPages` and `ocrPages`).
+        var bothPages = 0
         // Unchecked pages → reason clauses (the re-check's vocabulary), in page order.
         var uncheckedClauses: [Int: [String]] = [:]
         var uncheckedByRequest = [Bool](repeating: false, count: requestCount)
@@ -137,6 +139,10 @@ struct DetectionSweep: Sendable {
                 pageWasRead = true
             case .ocr?:
                 ocrPages += 1
+                if observation.textLayerRead {
+                    textPages += 1
+                    bothPages += 1
+                }
                 pageWasRead = true
             case .ocrSkippedOversize?:
                 uncheckedClauses[page, default: []].append("too large to scan for text")
@@ -168,9 +174,10 @@ struct DetectionSweep: Sendable {
                 itemsByRequest[requestIndex].append(contentsOf: swept)
                 if count.hitCap { pageHitCap = true }
                 if pageWasRead {
-                    if observation.route == .textLayer {
+                    if observation.textLayerRead || observation.route == .textLayer {
                         textPagesByRequest[requestIndex] += 1
-                    } else {
+                    }
+                    if observation.route == .ocr {
                         ocrPagesByRequest[requestIndex] += 1
                     }
                 }
@@ -269,7 +276,7 @@ struct DetectionSweep: Sendable {
         case (true, false): leadSentence = detailLeadApplied
         default: leadSentence = detailLeadSweep
         }
-        let routeSentence = joined([SearchRecheck.routeSentence(textPages: textPages, ocrPages: ocrPages), gateSentence])
+        let routeSentence = joined([SearchRecheck.routeSentence(textPages: textPages, ocrPages: ocrPages, bothPages: bothPages), gateSentence])
         let furtherPageList = furtherPages.map { String($0 + 1) }.joined(separator: ", ")
         let onPages = "on \(pagePhrase(furtherPages, list: furtherPageList))"
         func remainWord(_ n: Int) -> String { n == 1 ? "remains" : "remain" }
