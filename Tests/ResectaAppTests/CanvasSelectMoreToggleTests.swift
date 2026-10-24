@@ -4,8 +4,8 @@ import Foundation
 
 // iPhone "Select More" toolbar toggle. The toggle
 // flag layers on top of the existing iPad Shift+tap selection model:
-// when EITHER input route signals "add to selection", the touchesBegan
-// branch routes through `coordinator?.toggleRegionSelection(_:)`. Tests
+// when EITHER input route signals "add to selection", the tap's lift routes
+// through `coordinator?.toggleRegionSelection(_:)`. Tests
 // pin the predicate's OR shape + the label's count-surfacing shape so
 // future refactors that drift either contract surface as a test break.
 
@@ -13,7 +13,7 @@ import Foundation
 @MainActor
 struct CanvasSelectMoreToggleTests {
 
-    // MARK: - Toggle predicate (touchesBegan branch)
+    // MARK: - Toggle predicate (the tap on a region)
 
     @Test("Off + no Shift → tap follows the replace-selection path")
     func neitherInputRoutesThroughReplace() {

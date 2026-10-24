@@ -110,4 +110,43 @@ struct CanvasSelectionGestureTests {
         #expect(coordinator.groupMoves.first?.count == 3)
         #expect(coordinator.selections.isEmpty, "the selection is kept")
     }
+
+    // MARK: - Add to Selection edits the set on lift
+
+    private func cancelled(_ overlay: RedactionOverlayView, at point: CGPoint) {
+        let touch = StubTouch(location: point, view: overlay)
+        overlay.touchesBegan([touch], with: nil)
+        overlay.touchesCancelled([touch], with: nil)
+    }
+
+    @Test("With Add to Selection on, a lifted tap on a region toggles it once")
+    func addToSelectionTogglesOnLift() {
+        let regions = Self.threeRegions()
+        let (overlay, coordinator) = recordingOverlay(regions: regions, selectedIDs: [regions[0].id])
+        overlay.isMultiSelectActive = true
+        let touch = StubTouch(location: Self.centreOfB, view: overlay)
+        overlay.touchesBegan([touch], with: nil)
+        #expect(coordinator.toggles.isEmpty, "nothing changes at touch-down")
+        overlay.touchesEnded([touch], with: nil)
+        #expect(coordinator.toggles == [regions[1].id])
+    }
+
+    @Test("With Add to Selection on, a cancelled touch on a region toggles nothing")
+    func addToSelectionCancelTogglesNothing() {
+        let regions = Self.threeRegions()
+        let (overlay, coordinator) = recordingOverlay(regions: regions, selectedIDs: [regions[0].id])
+        overlay.isMultiSelectActive = true
+        cancelled(overlay, at: Self.centreOfB)
+        #expect(coordinator.toggles.isEmpty)
+    }
+
+    @Test("Through the real coordinator a cancelled touch with Add to Selection on leaves the selection as it was")
+    func addToSelectionCancelKeepsTheRealSelection() throws {
+        let regions = Self.threeRegions()
+        let m = try realOverlay(regions: regions, selectedIDs: [regions[0].id])
+        m.overlay.isMultiSelectActive = true
+        cancelled(m.overlay, at: Self.centreOfB)
+        #expect(m.state.selectedRegionIDs == [regions[0].id])
+        m.state.checkInvariants()
+    }
 }
