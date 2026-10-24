@@ -16,7 +16,7 @@ struct DocumentEditorView: View {
     @Environment(PipelineCoordinator.self) var coordinator
     @Environment(AppCoordinator.self) private var appCoordinator
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.dynamicTypeSize) var dynamicTypeSize
     @Environment(\.undoManager) private var undoManager
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @Environment(ToastQueueManager.self) var toastManager
@@ -37,7 +37,7 @@ struct DocumentEditorView: View {
     /// region toggles its membership in the selection instead of replacing
     /// the selection — iPhone parity for the iPad Shift+tap path. iPad
     /// Shift+tap continues to work whether the toggle is on or off.
-    @State private var isMultiSelectActive: Bool = false
+    @State var isMultiSelectActive: Bool = false
 
 
     // Brief status flash state for .verifying → .verified transition
@@ -519,7 +519,7 @@ struct DocumentEditorView: View {
     }
 
     /// The toolbar TYPE over this editor's state, bindings and actions.
-    private var editorToolbar: DocumentEditorToolbar {
+    var editorToolbar: DocumentEditorToolbar {
         DocumentEditorToolbar(
             documentState: documentState, redactionState: redactionState,
             coordinator: coordinator, horizontalSizeClass: horizontalSizeClass,
