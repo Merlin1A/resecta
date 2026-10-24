@@ -85,6 +85,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 ### Fixed
 
 - Undoing a delete selects the deleted regions again if they were selected.
+- Duplicate of a region at the page's edge no longer lands exactly on its source: with no room toward the edge, the copy steps the other way.
 - Undoing a search apply leaves none of its regions selected.
 - A tap or an arrow-key nudge that leaves a region where it was no longer records an undo step or discards the redacted output.
 - Duplicating a region or undoing a delete no longer offers the nearby-match notice.

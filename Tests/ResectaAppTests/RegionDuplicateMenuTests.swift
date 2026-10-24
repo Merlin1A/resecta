@@ -27,25 +27,6 @@ struct RegionDuplicateMenuTests {
         #expect(abs(clamped.height - 0.1) < 1e-9)
     }
 
-    @Test("Region touching the right edge clamps so the copy stays in-page")
-    func rightEdgeClampsToOneMinusWidth() {
-        // minX 0.95, width 0.05 — minX+offset would be 0.97, but
-        // 1-width is 0.95. Clamp keeps the duplicate flush at 0.95.
-        let source = CGRect(x: 0.95, y: 0.5, width: 0.05, height: 0.1)
-        let clamped = RedactionState.duplicateOffsetClamp(source: source)
-        #expect(abs(clamped.minX - 0.95) < 1e-9)
-        #expect(clamped.maxX <= 1.0 + 1e-9)
-    }
-
-    @Test("Region touching the top edge clamps so the copy doesn't go below 0")
-    func topEdgeClampsToZero() {
-        // PDF normalized coords use bottom-left origin; minY 0.01,
-        // offset -0.02 would yield -0.01; clamp keeps it at 0.
-        let source = CGRect(x: 0.1, y: 0.01, width: 0.1, height: 0.05)
-        let clamped = RedactionState.duplicateOffsetClamp(source: source)
-        #expect(abs(clamped.minY - 0.0) < 1e-9)
-    }
-
     @Test("A copy with no room for the offset on an axis steps the other way, so it never lands on its source")
     func edgeCopyStepsTheOtherWay() {
         let right = RedactionState.duplicateOffsetClamp(source: CGRect(x: 0.95, y: 0.5, width: 0.05, height: 0.1))
@@ -60,7 +41,7 @@ struct RegionDuplicateMenuTests {
         #expect(full == CGRect(x: 0, y: 0, width: 1, height: 1))
     }
 
-    @Test("Right-edge clamp output stays within the unit square")
+    @Test("The clamp's output stays within the unit square")
     func clampOutputStaysInUnitSquare() {
         // Sweep a battery of rect shapes; for each, maxX must not
         // exceed 1.0 and minY must not drop below 0.
@@ -76,6 +57,7 @@ struct RegionDuplicateMenuTests {
             #expect(clamped.minX >= 0.0)
             #expect(clamped.minY >= 0.0)
             #expect(clamped.maxX <= 1.0 + 1e-9, "maxX \(clamped.maxX) > 1 for \(source)")
+            #expect(clamped.maxY <= 1.0 + 1e-9, "maxY \(clamped.maxY) > 1 for \(source)")
         }
     }
 
