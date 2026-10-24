@@ -89,8 +89,6 @@ struct DocumentEditorView: View {
     // Detection summary banner
     @State var detectionBanner: DetectionBannerModel?
     @State var dismissSummaryTask: Task<Void, Never>?
-    // WP4a: Auto-dismiss timer for background resume banner
-    @State var dismissBannerTask: Task<Void, Never>?
 
     /// Bindings to trigger import/settings from parent ContentView
     @Binding var showSettings: Bool
@@ -512,7 +510,6 @@ struct DocumentEditorView: View {
             beginExport: exportFlow.beginExport, concealedPages: shareConcealedPages
         ))
         .onDisappear {
-            dismissBannerTask?.cancel()
             dismissSummaryTask?.cancel()
             dismissTask?.cancel()
             // The per-window UndoManager outlives this document; clear
@@ -705,15 +702,10 @@ struct DocumentEditorView: View {
     }
 
     /// Action for the Run Verification card on the skipped results screen.
-    /// Clears the background-pause flag (the ContentView scene handler sets
-    /// it on the verified-arm cancel; nothing else consumes it for the
-    /// skipped case) and routes per `runVerificationRoute`. The full-pipeline
+    /// Routes per `runVerificationRoute`. The full-pipeline
     /// leg takes the purge re-run's preamble first: `runFullPipeline`'s start
     /// guard (`redactRefusal(with:)`) reads `.verified` as busy.
     private func handleRunVerificationTap() {
-        dismissBannerTask?.cancel()
-        documentState.wasPausedByBackground = false
-        documentState.pausedFromPhase = nil
         switch Self.runVerificationRoute(
             hasOutput: redactionState.outputURL != nil,
             isVerificationStale: redactionState.isVerificationStale, hasUnappliedSelections: DocumentState.hasUnappliedSelections(redactionState)
