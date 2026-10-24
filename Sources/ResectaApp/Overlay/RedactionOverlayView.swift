@@ -113,6 +113,8 @@ class RedactionOverlayView: UIView {
     var preDragGroupRects: [UUID: CGRect] = [:]
     /// Touch start point for computing group move delta.
     var groupMoveStart: CGPoint?
+    /// The member the group move's touch landed on.
+    var groupMoveTouchedID: UUID?
 
     // MARK: - Snap State
 
@@ -458,7 +460,7 @@ class RedactionOverlayView: UIView {
                 beginMove(for: tappedRegion, at: point)
             } else if selectedIDs.contains(tappedRegion.id), selectedIDs.count > 1 {
                 // Multi-selected and tapped one of them — begin group move
-                beginGroupMove(at: point)
+                beginGroupMove(at: point, touching: tappedRegion.id)
             } else {
                 // Not selected — select and start long-press timer for move
                 coordinator?.selectRegion(tappedRegion.id)
@@ -649,14 +651,9 @@ class RedactionOverlayView: UIView {
             return
         }
 
-        // Commit group move
+        // Commit group move, or narrow the selection on a still tap
         if isGroupMoving {
-            moveCommitFeedback.impactOccurred()
-            let moves = regions
-                .filter { selectedIDs.contains($0.id) }
-                .map { (id: $0.id, newRect: $0.normalizedRect) }
-            coordinator?.commitMoveMultiple(moves, page: pageIndex,
-                                            undoManager: window?.undoManager)
+            endGroupMove()
             return
         }
 
@@ -747,6 +744,7 @@ class RedactionOverlayView: UIView {
         isGroupMoving = false
         preDragGroupRects = [:]
         groupMoveStart = nil
+        groupMoveTouchedID = nil
         // Snap state cleanup
         snapEngine.reset()
         // Repaint on gesture end. The commit paths

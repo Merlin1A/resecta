@@ -3,10 +3,10 @@ import RedactionEngine
 
 // The move and group-move helpers, moved out of `RedactionOverlayView.swift`
 // (the hub) from its `// MARK: - Move Helpers` seam: beginning a move on a
-// selected region, beginning a group move, and updating either as the
-// finger travels. The hub's touch handling calls them; the long-press
-// helpers stay in the hub. The drag state they read and write is stored
-// on the hub (an extension adds no storage).
+// selected region, beginning a group move, updating either as the finger
+// travels, and ending a group move. The hub's touch handling calls them; the
+// long-press helpers stay in the hub. The drag state they read and write is
+// stored on the hub (an extension adds no storage).
 
 extension RedactionOverlayView {
 
@@ -23,16 +23,34 @@ extension RedactionOverlayView {
         moveCommitFeedback.prepare()
     }
 
-    /// Begin a group move of all selected regions.
-    func beginGroupMove(at point: CGPoint) {
+    /// Begin a group move of all selected regions, from a touch on one of
+    /// them.
+    func beginGroupMove(at point: CGPoint, touching touchedID: UUID) {
         preDragGroupRects = [:]
         for region in regions where selectedIDs.contains(region.id) {
             preDragGroupRects[region.id] = region.normalizedRect
         }
         groupMoveStart = point
+        groupMoveTouchedID = touchedID
         isGroupMoving = true
         isActivelyDragging = true
         moveCommitFeedback.prepare()
+    }
+
+    /// End a group move on lift. A lift with no travel, every member still
+    /// at its pre-drag rect, was a tap on one member: it selects only that
+    /// member and commits nothing. Otherwise the members' new rects commit
+    /// as one step.
+    func endGroupMove() {
+        let members = regions.filter { selectedIDs.contains($0.id) }
+        if let touchedID = groupMoveTouchedID,
+           members.allSatisfy({ preDragGroupRects[$0.id] == $0.normalizedRect }) {
+            coordinator?.selectRegion(touchedID)
+            return
+        }
+        moveCommitFeedback.impactOccurred()
+        coordinator?.commitMoveMultiple(members.map { (id: $0.id, newRect: $0.normalizedRect) },
+                                        page: pageIndex, undoManager: window?.undoManager)
     }
 
     /// Update all selected regions' positions during a group move. One
