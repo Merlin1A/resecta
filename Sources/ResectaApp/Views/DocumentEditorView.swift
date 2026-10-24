@@ -538,39 +538,7 @@ struct DocumentEditorView: View {
         .safeAreaInset(edge: .bottom) {
             pageNavigationBarInset
         }
-        // Phase-switched toolbar
-        // The neutral group tint (routine actions
-        // render via the primary/foreground tone) is applied INSIDE
-        // each item-list computed property below, not chained onto the
-        // `ToolbarItemGroup(...)` here — chaining an extra modifier
-        // directly inside this result-builder closure pushed the
-        // compiler's whole-expression type-check over its time budget
-        // (`DocumentEditorView.swift` is already a large `body`).
-        // Isolating the tint inside each already-separate `@ViewBuilder`
-        // property keeps this closure's own shape unchanged.
-        .toolbar {
-            // Leading items
-            ToolbarItemGroup(placement: .topBarLeading) {
-                editorToolbar.leadingToolbarItems
-            }
-
-            // Trailing items. The Redact button is the ONE designated
-            // emphasis action and carries its own explicit brand tint
-            // (see `trailingToolbarItems`); `.tint(.red)` (delete) and
-            // the multi-select toggle's active-teal-or-nil pairing are
-            // untouched per-element overrides.
-            ToolbarItemGroup(placement: .topBarTrailing) {
-                editorToolbar.trailingToolbarItems
-            }
-
-            // Editing secondary actions (iPhone overflow menu)
-            // Undo/redo moved to trailing toolbar for visibility
-            if documentState.phaseKind == .editing, horizontalSizeClass == .compact {
-                ToolbarItemGroup(placement: .secondaryAction) {
-                    editorToolbar.secondaryActionToolbarItems
-                }
-            }
-        }
+        .toolbar { EditorToolbarContent(toolbar: editorToolbar) }
         .navigationTitle(documentTitle)
         .navigationBarTitleDisplayMode(.inline)
         // A different document replacing the open one turns the canvas

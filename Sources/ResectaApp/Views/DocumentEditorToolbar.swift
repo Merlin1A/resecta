@@ -6,11 +6,13 @@ import RedactionEngine
 // The editor's toolbar, moved out of `DocumentEditorView.swift` (the hub)
 // along its `// MARK: - Toolbar Leading Items` · `Toolbar Trailing Items` ·
 // `Toolbar Components` seams: the leading items (the draw and search
-// entries, the results screen's Home), the trailing items (undo and redo,
-// the iPad selection controls, Redact, Stop, Settings), the iPhone
-// overflow, and the selection components they mount. A TYPE with explicit
+// entries, the results screen's Home), the trailing items (the Undo
+// control, the iPad selection controls, Redact, Stop, Settings), the iPhone
+// … menu, and the selection components they mount. A TYPE with explicit
 // inputs: the state it reads, the bindings it writes, and the actions and
-// views the editor hands it. The editor builds it for its `.toolbar` block.
+// views the editor hands it. `EditorToolbarContent` (below) lays it out as
+// the editor's toolbar; on iPhone, `EditorToolbarLayout` decides which
+// controls sit in the bar and which in the … menu.
 
 struct DocumentEditorToolbar {
     let documentState: DocumentState
@@ -148,32 +150,19 @@ struct DocumentEditorToolbar {
         Group {
         switch documentState.phaseKind {
         case .editing:
-            // Undo/redo always visible (both iPhone and iPad)
-            undoRedoButtons
+            // The iPad's editing bar (an iPhone's lays out through
+            // `EditorToolbarContent`): Undo, the selection controls, Redact,
+            // Settings.
+            undoControl
 
-            // iPad: additional edit actions visible in toolbar
             if horizontalSizeClass == .regular {
                 selectionMenu
                 selectMoreToggle
                 deleteButton
-                batchOpsMenu
                 pipelineModePicker
             }
 
-            // Redact button — always visible. This is the ONE
-            // designated emphasis action in this toolbar — explicit
-            // brand tint so it stands out against the neutral group.
-            Button("Redact", systemImage: "scissors") {
-                coordinator.runFullPipeline(documentOverride: documentOverride)
-            }
-            .tint(ResectaTokens.BrandTeal.tint)
-            // The gate (`+RedactGate`): effective regions, the pipeline-start
-            // predicate, no selected-but-unapplied matches. The shortcut
-            // inherits `.disabled`.
-            .disabled(redactButtonDisabled)
-            .keyboardShortcut("r", modifiers: [.command, .shift])
-            .accessibilityIdentifier("redactButton")
-            .accessibilityHint(redactButtonHint)
+            redactButton
 
             settingsButton
 
@@ -213,22 +202,65 @@ struct DocumentEditorToolbar {
         .accessibilityIdentifier("settings-button")
     }
 
-    /// iPhone overflow menu — same neutral-group rule.
-    /// Extracted to its own property (mirrors `leadingToolbarItems` /
-    /// `trailingToolbarItems`) so the tint is isolated from the
-    /// `.toolbar {}` result-builder closure.
+    /// Redact — the ONE designated emphasis action in this toolbar,
+    /// with an explicit brand tint so it stands out against the neutral
+    /// group. One builder for both of its places: the bar's prominent
+    /// glass button, and the … menu's row at the largest text sizes.
     @ViewBuilder
-    var secondaryActionToolbarItems: some View {
+    var redactButton: some View {
+        Button("Redact", systemImage: "scissors") {
+            coordinator.runFullPipeline(documentOverride: documentOverride)
+        }
+        .tint(ResectaTokens.BrandTeal.tint)
+        // The gate (`+RedactGate`): effective regions, the pipeline-start
+        // predicate, no selected-but-unapplied matches. The shortcut
+        // inherits `.disabled`.
+        .disabled(redactButtonDisabled)
+        .keyboardShortcut("r", modifiers: [.command, .shift])
+        .accessibilityIdentifier("redactButton")
+        .accessibilityHint(redactButtonHint)
+    }
+
+    /// The iPhone … menu — same neutral-group rule — in the layout's
+    /// sections: the selection actions, then Switch Mode and Settings (and
+    /// Redact first there at the largest sizes), then Home.
+    func secondaryActionToolbarItems(layout: EditorToolbarLayout) -> some View {
         Group {
-            homeButton
-            markWholePageButton
-            selectionMenu
-            selectMoreToggle
-            deleteButton
-            batchOpsMenu
-            pipelineModePicker
+            ForEach(Array(layout.overflowSections.enumerated()), id: \.offset) { _, section in
+                Section {
+                    ForEach(section, id: \.self) { overflowRow($0) }
+                }
+            }
         }
         .tint(.primary)
+    }
+
+    @ViewBuilder
+    private func overflowRow(_ control: EditorToolbarLayout.Control) -> some View {
+        switch control {
+        case .selectRegions: selectionMenu
+        case .addToSelection: selectMoreToggle
+        case .delete: deleteButton
+        case .markWholePage: markWholePageButton
+        case .redact: redactButton
+        case .switchMode: pipelineModePicker
+        case .settings: settingsButton
+        case .home: homeButton
+        case .undo, .overflow: EmptyView()
+        }
+    }
+
+    /// The layout for the current text size and undo history.
+    func layout(for dynamicTypeSize: DynamicTypeSize) -> EditorToolbarLayout {
+        EditorToolbarLayout(
+            dynamicTypeSize: dynamicTypeSize,
+            canUndo: undoManager?.canUndo ?? false,
+            canRedo: undoManager?.canRedo ?? false)
+    }
+
+    /// The iPhone editing bar: compact width, the editing phase.
+    var isCompactEditing: Bool {
+        documentState.phaseKind == .editing && horizontalSizeClass == .compact
     }
 
     // MARK: - Toolbar Components
@@ -251,19 +283,51 @@ struct DocumentEditorToolbar {
             redactionState: redactionState, documentState: documentState, undoManager: undoManager)
     }
 
+    /// The one Undo control: a tap undoes, a touch and hold opens Undo and
+    /// Redo named for their steps ("Undo Add Region"). With nothing to undo
+    /// but a step to redo, a tap opens the menu; with neither it is off.
+    /// The menu's rows are built when it opens, so their names are fresh;
+    /// their ⌘Z and ⇧⌘Z stay registered while it is closed. The undo
+    /// history is not observable, so the control reads the region version
+    /// — every undoable editor step changes the regions — to re-evaluate.
     @ViewBuilder
-    private var undoRedoButtons: some View {
-        Button("Undo", systemImage: "arrow.uturn.backward") {
+    var undoControl: some View {
+        let _ = redactionState.regionVersion
+        let mode = EditorToolbarLayout.undoMode(
+            canUndo: undoManager?.canUndo ?? false, canRedo: undoManager?.canRedo ?? false)
+        Group {
+            if mode == .tapUndoesHoldOpensMenu {
+                Menu { undoRows } label: {
+                    Label("Undo", systemImage: "arrow.uturn.backward")
+                } primaryAction: {
+                    undoManager?.undo()
+                }
+            } else {
+                Menu { undoRows } label: {
+                    Label("Undo", systemImage: "arrow.uturn.backward")
+                }
+            }
+        }
+        .menuOrder(.fixed)
+        .disabled(mode == .unavailable)
+        .accessibilityHint(EditorToolbarLayout.undoHint(for: mode))
+        .accessibilityIdentifier("undoButton")
+    }
+
+    @ViewBuilder
+    private var undoRows: some View {
+        Button(undoManager?.undoMenuItemTitle ?? "Undo", systemImage: "arrow.uturn.backward") {
             undoManager?.undo()
         }
         .disabled(!(undoManager?.canUndo ?? false))
         .keyboardShortcut("z", modifiers: .command)
 
-        Button("Redo", systemImage: "arrow.uturn.forward") {
+        Button(undoManager?.redoMenuItemTitle ?? "Redo", systemImage: "arrow.uturn.forward") {
             undoManager?.redo()
         }
         .disabled(!(undoManager?.canRedo ?? false))
         .keyboardShortcut("z", modifiers: [.command, .shift])
+        .accessibilityIdentifier("redoButton")
     }
 
     @ViewBuilder
@@ -275,35 +339,6 @@ struct DocumentEditorToolbar {
             .tint(.red)
             // Command-Delete: a bare Delete key belongs to the text field it edits.
             .keyboardShortcut(.delete, modifiers: [.command])
-        }
-    }
-
-    // "More" menu that bundles batch operations on the active
-    // selection. Visible only when `selectedRegionIDs.isEmpty == false`,
-    // gated by `batchOpsMenuShouldShow(selectedCount:)`. "Delete Selected"
-    // deletes at once, like the toolbar's Delete; Undo restores them.
-    @ViewBuilder
-    private var batchOpsMenu: some View {
-        let selectedCount = redactionState.selectedRegionIDs.count
-        if DocumentEditorView.batchOpsMenuShouldShow(selectedCount: selectedCount) {
-            let page = documentState.currentPageIndex
-            Menu {
-                Button("Select All on Page", systemImage: "checkmark.circle") {
-                    redactionState.selectAllOnPage(page)
-                }
-                .disabled(!redactionState.canSelectAllOnPage(page))
-                Button("Deselect", systemImage: "xmark.circle") {
-                    redactionState.deselectAllRegions()
-                }
-                Button(role: .destructive) {
-                    deleteSelectedRegions()
-                } label: {
-                    Label("Delete Selected", systemImage: "trash")
-                }
-            } label: {
-                Label("More", systemImage: "ellipsis.circle")
-            }
-            .accessibilityIdentifier("canvasBatchOpsMenu")
         }
     }
 
@@ -373,11 +408,44 @@ struct DocumentEditorToolbar {
     }
 }
 
-extension DocumentEditorView {
-    /// Visibility predicate. The "More" menu surfaces only when at
-    /// least one region is selected. Pure function so the gate is testable
-    /// without a SwiftUI host.
-    static func batchOpsMenuShouldShow(selectedCount: Int) -> Bool {
-        selectedCount > 0
+/// The editor's toolbar content. On iPhone in the editing phase the trailing
+/// side is the layout's pieces — the Undo control, Redact, the system … —
+/// each its own item with a fixed spacer between, and the inline title is
+/// hidden (the bar leaves it no room); every other case keeps the trailing
+/// group. The neutral tint is applied inside each item's view, never
+/// chained in this builder.
+struct EditorToolbarContent: ToolbarContent {
+    let toolbar: DocumentEditorToolbar
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    var body: some ToolbarContent {
+        ToolbarItemGroup(placement: .topBarLeading) {
+            toolbar.leadingToolbarItems
+        }
+        if toolbar.isCompactEditing {
+            let layout = toolbar.layout(for: dynamicTypeSize)
+            ToolbarItem(placement: .principal) {
+                Color.clear.frame(width: 0, height: 0).accessibilityHidden(true)
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                toolbar.undoControl.tint(.primary)
+            }
+            if layout.trailing.contains(.redact) {
+                ToolbarSpacer(.fixed, placement: .topBarTrailing)
+                ToolbarItem(placement: .topBarTrailing) {
+                    toolbar.redactButton
+                        .buttonStyle(.glassProminent)
+                        .labelStyle(.iconOnly)
+                }
+            }
+            ToolbarSpacer(.fixed, placement: .topBarTrailing)
+            ToolbarItemGroup(placement: .secondaryAction) {
+                toolbar.secondaryActionToolbarItems(layout: layout)
+            }
+        } else {
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                toolbar.trailingToolbarItems
+            }
+        }
     }
 }

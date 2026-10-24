@@ -75,18 +75,13 @@ struct DocumentEditorToolbarTests {
         #expect(regions.first?.normalizedRect == PageNavigationBar.wholePageRegion().normalizedRect)
     }
 
-    @Test("The overflow mounts Mark Whole Page after Home (source pin)")
+    @Test("The … menu mounts Mark Whole Page last among the selection rows (layout + source pin)")
     func overflowMountsMarkWholePage() throws {
         let source = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorToolbar.swift")
-        guard let group = source.range(of: "var secondaryActionToolbarItems: some View {"),
-              let end = source.range(of: ".tint(.primary)", range: group.upperBound..<source.endIndex),
-              let home = source.range(of: "homeButton", range: group.upperBound..<end.lowerBound),
-              let mark = source.range(of: "markWholePageButton", range: group.upperBound..<end.lowerBound)
-        else {
-            Issue.record("The overflow must mount homeButton and markWholePageButton")
-            return
-        }
-        #expect(home.lowerBound < mark.lowerBound)
+        let first = EditorToolbarLayout(dynamicTypeSize: .large, canUndo: false, canRedo: false)
+            .overflowSections.first
+        #expect(first?.last == .markWholePage)
+        #expect(source.contains("case .markWholePage: markWholePageButton"))
         #expect(source.contains("PageNavigationBar.markWholePage("), "one action, the page bar's own")
     }
 

@@ -30,9 +30,10 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Duplicate selects the copy.
 - A one-page document shows the page bar with its region count; the page arrows are hidden there. The counter reads "0 regions" on a page with none, drawn and spoken.
 - A document dropped over an open one that holds drawn regions or selected matches asks before replacing it; Cancel keeps the open document. With the Search sheet up, such a drop is refused until the sheet is dismissed.
+- Editor toolbar on iPhone: one Undo button — tap to undo, touch and hold for Undo and Redo with the step's name — and Redact as a teal scissors button beside it; Settings moves into the … menu, which lists the selection actions first and Home last, and the separate More menu is gone. At the largest text sizes Redact moves into the … menu and Undo stays in the bar. The document's name is no longer drawn clipped in the bar.
 - The "match nearby" notice says Mark, matching the Marked N notice.
 - With VoiceOver on, the Rectangle tool is disabled with a hint pointing to Search and Scan.
-- Deleting several selected regions no longer asks first, from the toolbar or the selection menu; one Undo restores them.
+- Deleting several selected regions no longer asks first; one Undo restores them.
 - A run of arrow-key nudges is one undo step.
 - Deleting selected regions from a hardware keyboard takes Command-Delete.
 - The Discard selections confirmation is an alert with a Cancel button.

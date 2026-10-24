@@ -248,7 +248,7 @@ nonisolated final class CanvasDrawUITests: XCTestCase {
         _ = drawBaselineBox("Box A never drew — the Redact leg has nothing to redact.")
         leaveDrawMode()
         openSearchSheetAtCompact()
-        openOverflowAndTap(label: "Redact", identifier: "redactButton")
+        tapRedact()
 
         let resultsHome = app.buttons["verificationDoneButton"]
         XCTAssertTrue(
@@ -476,6 +476,17 @@ nonisolated final class CanvasDrawUITests: XCTestCase {
             "\(label) never appeared in the overflow menu (neither the label nor \(identifier) resolved)."
         )
         byIdentifier.tap()
+    }
+
+    /// Redact sits in the bar beside Undo; at the largest text sizes it
+    /// folds into the overflow menu.
+    private func tapRedact() {
+        let redact = app.buttons["redactButton"].firstMatch
+        if redact.waitForExistence(timeout: 5), redact.isHittable {
+            redact.tap()
+            return
+        }
+        openOverflowAndTap(label: "Redact", identifier: "redactButton")
     }
 
     /// Undo lives on the trailing bar; on a width where the bar folds
