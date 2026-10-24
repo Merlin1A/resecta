@@ -78,16 +78,24 @@ extension DocumentEditorView {
         return addToSelection && phaseKind == .editing ? .addToSelection : nil
     }
 
+    /// The capsules' text stops growing at Accessibility 1: past it the
+    /// drawing caption covered the bottom fifth of the page. (The Add to
+    /// Selection capsule still switches to its short words at every
+    /// accessibility size.)
+    static let capsuleTypeSizeCeiling: DynamicTypeSize = .accessibility1
+
     /// The bottom status capsule.
-    @ViewBuilder
     var captionOverlay: some View {
-        switch Self.bottomCapsule(
-            activeTool: activeTool, addToSelection: isMultiSelectActive, phaseKind: documentState.phaseKind
-        ) {
-        case .drawing?: drawingCaptionCapsule
-        case .addToSelection?: addModeCapsule
-        case nil: EmptyView()
+        Group {
+            switch Self.bottomCapsule(
+                activeTool: activeTool, addToSelection: isMultiSelectActive, phaseKind: documentState.phaseKind
+            ) {
+            case .drawing?: drawingCaptionCapsule
+            case .addToSelection?: addModeCapsule
+            case nil: EmptyView()
+            }
         }
+        .dynamicTypeSize(...Self.capsuleTypeSizeCeiling)
     }
 
     /// The Add to Selection capsule. Done turns the mode off through the
