@@ -214,4 +214,20 @@ struct CanvasZoomFloorTests {
         #expect(scrolls.allSatisfy { $0.panGestureRecognizer.minimumNumberOfTouches == 1 }, "a touch on empty page scrolls with one finger")
         withExtendedLifetime((coordinator, overlay)) {}
     }
+
+    @Test("The double tap is for empty page: it refuses a touch the canvas overlay claims and takes one on the page")
+    func doubleTapRefusesTheOverlaysTouches() throws {
+        let (view, _) = makeView()
+        let doubleTap = try #require((view.gestureRecognizers ?? []).first { $0.name == FitFlooredPDFView.returnToFitGestureName })
+        let overlay = RedactionOverlayView(frame: CGRect(origin: .zero, size: Self.letter))
+        func receives(_ touchView: UIView) -> Bool {
+            doubleTap.delegate?.gestureRecognizer?(doubleTap, shouldReceive: StubTouch(location: .zero, view: touchView)) ?? true
+        }
+        #expect(receives(overlay) == false, "a region, a handle, a draw or an Add to Selection touch is never a double tap")
+        #expect(receives(view), "a touch on the page is")
+        view.scaleFactor = view.scaleFactorForSizeToFit * 2
+        view.returnToFit()
+        settle(view)
+        #expect(near(view.scaleFactor, view.scaleFactorForSizeToFit), "the double tap ends at fit")
+    }
 }
