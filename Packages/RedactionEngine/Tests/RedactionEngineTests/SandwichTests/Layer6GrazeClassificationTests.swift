@@ -32,7 +32,7 @@ struct Layer6GrazeClassificationTests {
 
         let result = try await verifier.verifySpatialExclusion(
             outputPage: page,
-            regionShapes: [RegionShape(expandedBounds: region, polygonVertices: nil)])
+            regionShapes: [RegionShape(expandedBounds: region)])
         #expect(result.isFail, "center-inside must FAIL; got \(result)")
         if case .fail(let msg) = result {
             #expect(msg.contains("overlaps a redacted area on page 1"),
@@ -56,7 +56,7 @@ struct Layer6GrazeClassificationTests {
 
         let result = try await verifier.verifySpatialExclusion(
             outputPage: page,
-            regionShapes: [RegionShape(expandedBounds: sliver, polygonVertices: nil)])
+            regionShapes: [RegionShape(expandedBounds: sliver)])
         #expect(result.isWarn, "edge graze must WARN; got \(result)")
         if case .warn(let msg) = result {
             #expect(msg.contains("touches the edge of a redacted area on page 1"),
@@ -84,8 +84,8 @@ struct Layer6GrazeClassificationTests {
         let result = try await verifier.verifySpatialExclusion(
             outputPage: page,
             regionShapes: [
-                RegionShape(expandedBounds: sliver, polygonVertices: nil),
-                RegionShape(expandedBounds: third, polygonVertices: nil),
+                RegionShape(expandedBounds: sliver),
+                RegionShape(expandedBounds: third),
             ])
         #expect(result.isFail,
                 "in-region hit must win over an earlier graze; got \(result)")
@@ -99,8 +99,7 @@ struct Layer6GrazeClassificationTests {
         let result = try await verifier.verifySpatialExclusion(
             outputPage: page,
             regionShapes: [RegionShape(
-                expandedBounds: CGRect(x: 0, y: 0, width: 20, height: 20),
-                polygonVertices: nil)])
+                expandedBounds: CGRect(x: 0, y: 0, width: 20, height: 20))])
         #expect(result == .pass)
     }
 
@@ -136,18 +135,4 @@ struct Layer6GrazeClassificationTests {
                 "graze page must be referenced; got \(String(describing: result.pageReferences))")
     }
 
-    @Test("polygonContainsPoint even-odd matrix")
-    func pointInPolygonMatrix() {
-        let triangle = [CGPoint(x: 0, y: 0), CGPoint(x: 10, y: 0), CGPoint(x: 5, y: 10)]
-        #expect(polygonContainsPoint(
-            CGPoint(x: 5, y: 3), vertices: triangle))
-        #expect(!polygonContainsPoint(
-            CGPoint(x: 0, y: 9), vertices: triangle))
-        #expect(!polygonContainsPoint(
-            CGPoint(x: 12, y: 1), vertices: triangle))
-        // Degenerate input: fewer than 3 vertices contains nothing.
-        #expect(!polygonContainsPoint(
-            CGPoint(x: 1, y: 1),
-            vertices: [CGPoint(x: 0, y: 0), CGPoint(x: 2, y: 2)]))
-    }
 }

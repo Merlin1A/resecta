@@ -2,7 +2,7 @@ import CoreGraphics
 import Foundation
 import PDFKit
 
-// The word-span primitive (`TextSpan.words(fullyInside:polygon:on:)`): the
+// The word-span primitive (`TextSpan.words(fullyInside:on:)`): the
 // words of a page's text layer whose boxes lie fully inside a region, in
 // reading order, with their boxes in the frame every region and search
 // result uses. The verification run captures the
@@ -33,9 +33,7 @@ extension TextSpan {
     static let edgeTolerancePoints: CGFloat = 0.5
 
     /// The words fully inside `rect` (page-normalized, displayed frame) on
-    /// `page`, in reading order. With `polygon` (normalized vertices of the
-    /// region; `rect` is its bounding box) a word also needs its centre
-    /// inside the polygon. A page without a text layer yields nothing.
+    /// `page`, in reading order. A page without a text layer yields nothing.
     ///
     /// Word boxes come from PDFKit's selection API through
     /// `EmbeddedTextSource.make(from:)`, which lands them in the displayed
@@ -43,7 +41,7 @@ extension TextSpan {
     /// the page's displayed size. A whole-page region is the caller's rule
     /// to skip, not this primitive's.
     public static func words(
-        fullyInside rect: CGRect, polygon: [CGPoint]? = nil, on page: PDFPage
+        fullyInside rect: CGRect, on page: PDFPage
     ) -> [TextSpan] {
         guard rect.width > 0, rect.height > 0,
               let source = EmbeddedTextSource.make(from: page),
@@ -57,10 +55,6 @@ extension TextSpan {
         for word in source.wordBounds {
             let box = word.normalizedRect
             guard halo.contains(box), NSMaxRange(word.range) <= text.length else { continue }
-            if let polygon, polygon.count >= 3,
-               !pointInPolygon(CGPoint(x: box.midX, y: box.midY), vertices: polygon) {
-                continue
-            }
             spans.append(TextSpan(text: text.substring(with: word.range), normalizedRect: box))
         }
         return spans

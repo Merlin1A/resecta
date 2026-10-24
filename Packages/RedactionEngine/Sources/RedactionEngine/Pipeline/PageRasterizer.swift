@@ -219,7 +219,7 @@ public final class PageRasterizer: @unchecked Sendable {
                     // the :119 geometry read survives). For an un-rotated page
                     // `effectiveSize` equals the cropBox size; the origin is zero.
                     // This one `pageBounds` feeds all FOUR synchronized consumers:
-                    // the rect filter, the polygon shapes,
+                    // the rect filter, the region shapes,
                     // `redactionRectsForTextLayer` (the bridge check), and
                     // `filterResult.toDigest(redactionRects:)`. Never give the
                     // digest an independent conversion.
@@ -228,61 +228,20 @@ public final class PageRasterizer: @unchecked Sendable {
                         normalizedToPDFPageCoordinates($0.normalizedRect, pageRect: pageBounds)
                     }
 
-                    // Build polygon-aware shapes alongside the rect-
-                    // only path. Pure rectangle pages still consume the
-                    // pre-filter against `expandedBounds` only; polygon
-                    // pages add the polygon test for the final overlap
-                    // check. The expanded polygon is constructed by
-                    // applying the safety margin to the bounding box and
-                    // converting each vertex into the same coordinate
-                    // system used for the rect path.
-                    let hasAnyPolygon = page.regions.contains {
-                        ($0.vertices?.count ?? 0) >= 3
-                    }
-
-                    // Region shapes in output-page points: the polygon
-                    // path's shapes, or the rects wrapped (un-expanded
-                    // `bounds`; the halo in `expandedBounds`). The filter's
-                    // polygon overload and the drawn-cell rule below read them.
-                    let shapes: [RegionShape] = zip(page.regions, redactionRectsInPoints)
-                        .map { region, rect in
-                            let expanded = rect.insetBy(
-                                dx: -safetyMarginPoints, dy: -safetyMarginPoints
-                            )
-                            guard hasAnyPolygon,
-                                  let normalized = region.vertices,
-                                  normalized.count >= 3 else {
-                                return RegionShape(
-                                    expandedBounds: expanded,
-                                    polygonVertices: nil,
-                                    bounds: rect
-                                )
-                            }
-                            let inPoints = normalized.map { v in
-                                normalizedToPDFPageCoordinates(
-                                    CGRect(x: v.x, y: v.y, width: 0, height: 0),
-                                    pageRect: pageBounds
-                                ).origin
-                            }
-                            return RegionShape(
-                                expandedBounds: expanded,
-                                polygonVertices: inPoints,
-                                bounds: rect
-                            )
-                        }
-                    let filterResult: FilterResult
-                    if hasAnyPolygon {
-                        filterResult = try await filterCharacters(
-                            characters: characters,
-                            regionShapes: shapes
-                        )
-                    } else {
-                        // Filter characters against redaction regions
-                        filterResult = try await filterCharacters(
-                            characters: characters,
-                            redactionRects: redactionRectsInPoints
+                    // Region shapes in output-page points: the rects
+                    // wrapped (un-expanded `bounds`; the halo in
+                    // `expandedBounds`). The drawn-cell rule below reads them.
+                    let shapes: [RegionShape] = redactionRectsInPoints.map { rect in
+                        RegionShape(
+                            expandedBounds: rect.insetBy(dx: -safetyMarginPoints, dy: -safetyMarginPoints),
+                            bounds: rect
                         )
                     }
+                    // Filter characters against redaction regions
+                    let filterResult = try await filterCharacters(
+                        characters: characters,
+                        redactionRects: redactionRectsInPoints
+                    )
 
                     // The writer-side drawn-cell rule: a survivor the filter
                     // keeps on its SOURCE box can still be DRAWN inside a
@@ -428,35 +387,19 @@ public final class PageRasterizer: @unchecked Sendable {
 
             // 6. Verify fills. 256-row band cancellation
             // checks happen inside; a thrown CancellationError propagates here.
-            // Regions with `vertices != nil` route through the
-            // polygon-mask scanline verify (only mask-set pixels checked).
             for region in page.regions {
-                let verifyPassed: Bool
-                if let vertices = region.vertices, vertices.count >= 3 {
-                    let pixelVerts = vertices.map { v in
-                        normalizedVertexToPixels(
-                            v, bitmapWidth: width, bitmapHeight: height
-                        )
-                    }
-                    verifyPassed = try verifyPolygonFill(
-                        context: ctx,
-                        pixelVertices: pixelVerts,
-                        expectedColor: page.fillColor.expectedPixel
-                    )
-                } else {
-                    let pixelRect = normalizedToFillPixels(
-                        region.normalizedRect, bitmapWidth: width, bitmapHeight: height
-                    )
-                    // Clamp to bitmap bounds
-                    let clamped = pixelRect.intersection(
-                        CGRect(x: 0, y: 0, width: width, height: height)
-                    )
-                    guard !clamped.isEmpty else { continue }
-                    verifyPassed = try verifyFill(
-                        context: ctx, rect: clamped,
-                        expectedColor: page.fillColor.expectedPixel
-                    )
-                }
+                let pixelRect = normalizedToFillPixels(
+                    region.normalizedRect, bitmapWidth: width, bitmapHeight: height
+                )
+                // Clamp to bitmap bounds
+                let clamped = pixelRect.intersection(
+                    CGRect(x: 0, y: 0, width: width, height: height)
+                )
+                guard !clamped.isEmpty else { continue }
+                let verifyPassed = try verifyFill(
+                    context: ctx, rect: clamped,
+                    expectedColor: page.fillColor.expectedPixel
+                )
                 guard verifyPassed else {
                     // Fill verification failed — the redaction fill did
                     // not produce the expected pixel values across the entire region.

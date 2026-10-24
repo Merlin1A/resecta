@@ -45,8 +45,8 @@ struct ManualTermsCaptureTests {
                           uniquingKeysWith: { a, _ in a })
     }
 
-    private static func manual(_ rect: CGRect, vertices: [CGPoint]? = nil) -> RedactionRegion {
-        RedactionRegion(id: UUID(), normalizedRect: rect, source: .manual, vertices: vertices)
+    private static func manual(_ rect: CGRect) -> RedactionRegion {
+        RedactionRegion(id: UUID(), normalizedRect: rect, source: .manual)
     }
 
     /// A one-point halo around a rect (in normalized units of a 612 × 792 page).
@@ -141,24 +141,6 @@ struct ManualTermsCaptureTests {
         #expect(Self.table(set) == ["Springfield": false, "Delia Hartwell": false])
     }
 
-    @Test("A polygon region captures only the words whose centre lies inside it")
-    func polygonNarrowsTheRect() throws {
-        let doc = Self.textPDF()
-        let rects = try Self.wordRects(doc)
-        let john = try #require(rects["John"]); let smith = try #require(rects["Smith"])
-        let bounds = Self.padded(john.union(smith))
-        // A triangle over the left part of the line: John's centre inside, Smith's outside.
-        let triangle = [
-            CGPoint(x: bounds.minX, y: bounds.minY),
-            CGPoint(x: john.maxX + (smith.minX - john.maxX) / 2, y: bounds.minY),
-            CGPoint(x: bounds.minX, y: bounds.maxY),
-        ]
-        let set = PipelineCoordinator.sensitiveTermSet(
-            applied: [], manualRegions: [0: [Self.manual(bounds, vertices: triangle)]],
-            in: doc, textLayerStatus: [0: .rich])
-        #expect(Self.table(set) == ["John": true])
-    }
-
     @Test("A rich-page manual region over no words contributes nothing and is not counted (only non-rich pages count)")
     func richPageRegionOverBlankSpaceContributesNothing() throws {
         let doc = Self.textPDF()
@@ -200,10 +182,6 @@ struct ManualTermsCaptureTests {
                 for rect in Self.probeRects(on: page) {
                     #expect(words.words(fullyInside: rect)
                             == TextSpan.words(fullyInside: rect, on: page).map(\.text))
-                    let triangle = [CGPoint(x: rect.minX, y: rect.minY), CGPoint(x: rect.midX, y: rect.minY),
-                                    CGPoint(x: rect.minX, y: rect.maxY)]
-                    #expect(words.words(fullyInside: rect, polygon: triangle)
-                            == TextSpan.words(fullyInside: rect, polygon: triangle, on: page).map(\.text))
                     compared += 1
                 }
             }

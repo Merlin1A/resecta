@@ -33,7 +33,7 @@ struct DrawnCellRuleFixpointTests {
         let region = CGRect(x: 115, y: 500, width: 45, height: 10)
         let shapes = [RegionShape(
             expandedBounds: region.insetBy(dx: -safetyMarginPoints, dy: -safetyMarginPoints),
-            polygonVertices: nil, bounds: region)]
+            bounds: region)]
         return (entries, shapes)
     }
 

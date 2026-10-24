@@ -143,54 +143,6 @@ struct LineAwareFilterTests {
                 "line-B region must exclude B6–B8 only; got \(lineBIndexes.sorted())")
     }
 
-    // MARK: - Line-aware filter: polygon overload
-
-    /// RegionShape for a rectangle-shaped polygon over `rect`.
-    private func polygonShape(_ rect: CGRect) -> RegionShape {
-        RegionShape(
-            expandedBounds: rect.insetBy(
-                dx: -safetyMarginPoints, dy: -safetyMarginPoints),
-            polygonVertices: [
-                CGPoint(x: rect.minX, y: rect.minY),
-                CGPoint(x: rect.maxX, y: rect.minY),
-                CGPoint(x: rect.maxX, y: rect.maxY),
-                CGPoint(x: rect.minX, y: rect.maxY),
-            ],
-            bounds: rect
-        )
-    }
-
-    @Test("Halo does not cross a sub-point line gap (polygon)")
-    func haloDoesNotCrossLineGapPolygon() async throws {
-        let chars = twoCloseLines()
-        let result = try await filterCharacters(
-            characters: chars, regionShapes: [polygonShape(lineARegion)]
-        )
-        let survivorsByLine = Dictionary(grouping: result.surviving, by: \.lineIndex)
-        #expect(survivorsByLine[1]?.count == 10,
-                "all line-B characters must survive a line-A polygon region")
-        let lineAIndexes = Set(survivorsByLine[0]?.map(\.stringIndex) ?? [])
-        #expect(lineAIndexes == [0, 1, 7, 8, 9],
-                "line-A survivors must be exactly the out-of-halo characters; got \(lineAIndexes.sorted())")
-    }
-
-    @Test("Polygon floor holds at 0pt regardless of band gate")
-    func polygonFloorUnconditional() async throws {
-        // A one-char "line" whose band the region rect happens to intersect
-        // only AT the char itself: the 0pt floor must exclude it even if
-        // the halo tier would be gated off for every other line.
-        let chars = twoCloseLines()
-        let result = try await filterCharacters(
-            characters: chars, regionShapes: [polygonShape(lineARegion)]
-        )
-        // A3–A5 are inside the polygon at 0pt — they must never survive.
-        let insidePolygon = result.surviving.filter {
-            $0.lineIndex == 0 && (3...5).contains($0.stringIndex)
-        }
-        #expect(insidePolygon.isEmpty,
-                "characters inside the polygon must be excluded at 0pt")
-    }
-
     // MARK: - Extractor line partition (PDFKit-real)
 
     @Test("Extractor stamps the newline partition", .timeLimit(.minutes(1)))
@@ -357,7 +309,6 @@ struct LineAwareFilterTests {
             RegionShape(
                 expandedBounds: $0.insetBy(
                     dx: -safetyMarginPoints, dy: -safetyMarginPoints),
-                polygonVertices: nil,
                 bounds: $0
             )
         }

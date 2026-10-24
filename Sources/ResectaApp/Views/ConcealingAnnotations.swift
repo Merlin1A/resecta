@@ -80,16 +80,14 @@ enum ConcealingAnnotations {
     }
 
     /// Whether `rect` (normalized page space) lies under the boxes: every
-    /// point of a 12 × 4 grid inside a rectangle box. A polygon box is not
-    /// counted (its rect is only its bounding box), so a partly covered
-    /// annotation is still named.
+    /// point of a 12 × 4 grid inside a box.
     static func covered(_ rect: CGRect, by boxes: [RedactionRegion]) -> Bool {
         guard !boxes.isEmpty else { return false }
         for row in 0..<4 {
             for column in 0..<12 {
                 let point = CGPoint(x: rect.minX + rect.width * (CGFloat(column) + 0.5) / 12,
                                     y: rect.minY + rect.height * (CGFloat(row) + 0.5) / 4)
-                if !boxes.contains(where: { ($0.vertices?.count ?? 0) < 3 && $0.normalizedRect.contains(point) }) {
+                if !boxes.contains(where: { $0.normalizedRect.contains(point) }) {
                     return false
                 }
             }
