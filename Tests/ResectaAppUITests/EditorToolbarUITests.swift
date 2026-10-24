@@ -114,10 +114,9 @@ nonisolated final class EditorToolbarUITests: XCTestCase {
         let strip = app.descendants(matching: .any).matching(identifier: "compactFloatStrip").firstMatch
         XCTAssertTrue(strip.waitForExistence(timeout: 10), "The walk did not park the sheet.")
 
-        // A region of the user's own, so only the selections stand in the way.
-        let mark = app.buttons["pageNavMarkWholePage"]
-        XCTAssertTrue(mark.waitForExistence(timeout: 10))
-        mark.tap()
+        // A region of the user's own, so only the selections stand in the
+        // way: from the … menu, as the page bar steps aside while parked.
+        openOverflowAndTap("Mark Whole Page")
 
         let redact = app.buttons["redactButton"].firstMatch
         XCTAssertTrue(redact.waitForExistence(timeout: 10), "Redact is missing from the bar.")

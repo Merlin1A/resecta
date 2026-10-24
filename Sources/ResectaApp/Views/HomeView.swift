@@ -193,7 +193,7 @@ struct HomeView: View {
 
             HomeChoiceCard(
                 symbol: "doc.text",
-                style: .row,
+                style: .subtle,
                 title: "Try the Sample",
                 bodyText: "A bundled 3-page bank statement.",
                 action: { openSampleDocument() }

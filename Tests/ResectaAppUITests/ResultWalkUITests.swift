@@ -1,8 +1,8 @@
 import XCTest
 
 /// UI tests for the result walk's chrome on the parked Search sheet:
-/// the page bar stays while a walk is live at the compact float and
-/// after expand; each step centres the current match's ring
+/// the page bar steps aside while a walk is live at the compact float
+/// and is back after expand; each step centres the current match's ring
 /// in the visible canvas (pixel-measured — the ring is not served
 /// through AX); and the parked strip's controls meet the 44-pt
 /// effective floor inside the attached sheet. All three drive the
@@ -31,9 +31,9 @@ nonisolated final class ResultWalkUITests: XCTestCase {
         super.tearDown()
     }
 
-    // MARK: - The page bar stays
+    // MARK: - The page bar steps aside
 
-    func testWalkStep_keepsPageBarAtCompactAndOnExpand() {
+    func testWalkStep_pageBarStepsAsideAtCompactAndReturnsOnExpand() {
         app.launch()
         let next = app.buttons["resultNavNext"]
         XCTAssertTrue(next.waitForExistence(timeout: 30), "The seeded query returned nothing or the sheet never presented.")
@@ -42,10 +42,9 @@ nonisolated final class ResultWalkUITests: XCTestCase {
 
         next.tap()
         XCTAssertTrue(compactStrip.waitForExistence(timeout: 10), "The first chevron tap did not park the sheet at the compact float.")
-        XCTAssertTrue(
-            pageBar.waitForExistence(timeout: 10),
-            "The page bar must stay while the walk is live at the compact float."
-        )
+        let gone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: pageBar)
+        XCTAssertEqual(XCTWaiter().wait(for: [gone], timeout: 10), .completed,
+                       "The page bar must step aside while the walk is live at the compact float.")
         XCTAssertTrue(
             app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Result 1 of ")).firstMatch.exists,
             "The walk did not land on result 1."
@@ -55,7 +54,7 @@ nonisolated final class ResultWalkUITests: XCTestCase {
         expandCompactStripToMedium()
         XCTAssertTrue(
             pageBar.waitForExistence(timeout: 10),
-            "The page bar must stay once the sheet leaves the compact float."
+            "The page bar must be back once the sheet leaves the compact float."
         )
         attachScreenshot(named: "rw-page-bar-expanded")
     }
@@ -140,8 +139,9 @@ nonisolated final class ResultWalkUITests: XCTestCase {
     private func canvasBand() -> ClosedRange<CGFloat> {
         let navBar = app.navigationBars.firstMatch
         let top: CGFloat = navBar.exists ? navBar.frame.maxY : 116
-        // The page bar stays above the parked strip; the visible canvas
-        // ends at the bar (its teal chevron must not join the ring's box).
+        // The page bar steps aside while the walk is parked; were it up,
+        // the visible canvas would end at it (its teal chevron must not
+        // join the ring's box).
         let pageBar = app.descendants(matching: .any).matching(identifier: "pageNav").firstMatch
         let floor = pageBar.exists ? pageBar.frame.minY : compactStrip.frame.minY
         let bottom = floor - 14

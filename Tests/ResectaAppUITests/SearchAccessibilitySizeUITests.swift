@@ -77,12 +77,13 @@ nonisolated final class SearchAccessibilitySizeUITests: XCTestCase {
 
     // MARK: - The page bar
 
-    /// The counter is one element whose label starts "Page 1 of".
+    /// The counter is one element whose label starts "Page 1 of". Read
+    /// before the walk parks the sheet: a parked walk steps the bar aside,
+    /// and behind the taller sheet the bar stays mounted.
     func testPageBarCounterIsOneSpokenElement() {
         app.launch()
         let next = app.buttons["resultNavNext"]
         XCTAssertTrue(next.waitForExistence(timeout: 30), "The seeded query returned nothing or the sheet never presented.")
-        next.tap()
         let counter = app.descendants(matching: .any).matching(identifier: "pageNavCounter").firstMatch
         XCTAssertTrue(counter.waitForExistence(timeout: 10), "The page bar's counter element is missing.")
         XCTAssertTrue(counter.label.hasPrefix("Page 1 of "), "The counter reads \"\(counter.label)\", not one 'Page 1 of N' element.")
