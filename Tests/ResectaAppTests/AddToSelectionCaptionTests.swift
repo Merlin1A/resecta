@@ -46,4 +46,9 @@ struct AddToSelectionCaptionTests {
         #expect(DocumentEditorView.bottomCapsule(activeTool: nil, addToSelection: true, phaseKind: .redacting) == nil)
         #expect(DocumentEditorView.bottomCapsule(activeTool: .rectangle, addToSelection: false, phaseKind: .verified) == nil)
     }
+
+    @Test("The capsules' text stops growing at Accessibility 1, so a capsule never covers the page")
+    func capsuleTextCeiling() {
+        #expect(DocumentEditorView.capsuleTypeSizeCeiling == .accessibility1)
+    }
 }
