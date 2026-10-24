@@ -79,7 +79,7 @@ struct CouldNotVerifyFlagTests {
 
     private func message(_ r: LayerResult) -> String {
         switch r.status {
-        case .warn(let m), .info(let m), .attention(let m), .fail(let m): m
+        case .warn(let m), .info(let m), .attention(let m), .fail(let m), .notApplicable(let m): m
         case .pass, .skipped: ""
         }
     }
@@ -172,7 +172,7 @@ struct CouldNotVerifyFlagTests {
         #expect(exif.status.isWarn, "the EXIF hit is a WARN note; got \(exif.status)")
         expectFlag(exif, false, "L3 EXIF note")
         let info = await run(2, doc, mode: .secureRasterization, terms: [])
-        #expect(info.status.isInfo, "got \(info.status)")
+        #expect(info.status.isNotApplicable, "got \(info.status)")
         expectFlag(info, false, "L3 no terms")
     }
 
@@ -399,7 +399,7 @@ struct CouldNotVerifyFlagTests {
         #expect(message(degraded).contains("exceeded size limit"), "got \(degraded.status)")
         expectFlag(degraded, true, "L10 degraded")
         let info = await run(9, doc, mode: .searchableRedaction, terms: [])
-        #expect(info.status.isInfo, "got \(info.status)")
+        #expect(info.status.isNotApplicable, "got \(info.status)")
         expectFlag(info, false, "L10 no terms")
         let clean = await run(9, doc, mode: .searchableRedaction, terms: ["NONEXISTENT_TERM_12345"])
         #expect(clean.status == .pass, "got \(clean.status)")
@@ -424,7 +424,7 @@ struct CouldNotVerifyFlagTests {
         let (blank, u2) = try TestFixtures.writeTempPDF(TestFixtures.blankPage(), prefix: "cnv_srb_")
         defer { try? FileManager.default.removeItem(at: u2) }
         let info = await run(5, blank, mode: .secureRasterization)
-        #expect(info.status.isInfo, "got \(info.status)")
+        #expect(info.status.isNotApplicable, "got \(info.status)")
         expectFlag(info, false, "re-check no searches")
         let clean = await run(5, blank, mode: .secureRasterization,
                               searches: [TestFixtures.textRequest("Delia")])

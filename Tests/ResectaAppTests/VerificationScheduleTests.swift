@@ -83,10 +83,10 @@ struct VerificationScheduleTests {
         #expect(last.shortDescription == "Ran the detectors on the output — nothing further reported.")
         let recheck = report.layers[5]
         #expect(recheck.layer == .searchRecheck)
-        #expect(recheck.status == .info(""))
+        #expect(recheck.status == .notApplicable(""))
         #expect(recheck.shortDescription == SearchRecheck.infoMessage)
         #expect(!report.layers.contains { $0.status.isSkipped },
-                "an idle re-check is a note, never a skipped layer")
+                "an idle re-check has nothing to check, never a skipped layer")
     }
 
     @Test("Searchable verify-only reports twelve layers in canonical order; the parallel-batch layer keeps its ordinal")
@@ -99,24 +99,25 @@ struct VerificationScheduleTests {
         // the report places it at its canonical ordinal (index 9).
         #expect(report.layers[9].layer == .operatorReExtraction)
         #expect(report.layers[10].layer == .searchRecheck)
-        #expect(report.layers[10].status == .info(""))
+        #expect(report.layers[10].status == .notApplicable(""))
         #expect(report.layers[11].layer == .detectionSweep)
         #expect(report.layers[11].status == .pass, "the sweep ran on the output — never the idle note")
     }
 
-    @Test("The idle re-check row reads as an informational note, never a warn or attention row")
-    func idleRecheckRowIsNote() {
+    @Test("The idle re-check row reads NOT APPLICABLE, never a pass, a note, a warn or an attention row")
+    func idleRecheckRowIsNotApplicable() {
         let row = LayerResult(
             name: VerificationLayer.searchRecheck.name,
             symbolName: VerificationLayer.searchRecheck.symbolName,
-            status: .info(SearchRecheck.infoMessage),
+            status: .notApplicable(SearchRecheck.infoMessage),
             shortDescription: SearchRecheck.infoMessage,
             detailDescription: "",
             pageReferences: nil, durationSeconds: 0, layer: .searchRecheck)
-        // The results view's grouping predicates: an idle re-check has
-        // nothing to check; Findings = warn / attention / fail / skipped.
-        #expect(row.status.isInfo)
-        #expect(!row.status.isWarn && !row.status.isAttention && !row.status.isFail && !row.status.isSkipped)
+        // The row model reads it as Nothing to check; the aggregate folds
+        // it as if absent.
+        #expect(row.status.isNotApplicable)
+        #expect(VerificationRowModel(layer: row, perPageModes: []).outcome == .nothingToCheck)
+        #expect(!row.status.isInfo && !row.status.isWarn && !row.status.isAttention && !row.status.isFail && !row.status.isSkipped)
         #expect(VerificationRowModel(layer: row, perPageModes: []).caption == "No searches to re-run.")
         #expect(row.completionAnnouncement(layerNumber: 6)
                 == "Layer 6, Search Re-check, \(row.status.layerAccessibilityPhrase) \(SearchRecheck.infoMessage)")
