@@ -54,7 +54,7 @@ struct HomeScreenSourceContractsTests {
         #expect(!home.contains("→"), "no arrow line on any entry")
         #expect(!home.contains("Choose photos from your library"), "the staged body is replaced")
         #expect(!home.contains("Open a bundled sample bank statement to see"), "the shipped sample body is replaced")
-        #expect(!home.contains("sparkles"), "the sample row's glyph is doc.text")
+        #expect(!home.contains("sparkles"), "the sample card's glyph is doc.text")
     }
 
     @Test("The trust words are one spoken line in supportText, with no tertiary separator and no shared item")

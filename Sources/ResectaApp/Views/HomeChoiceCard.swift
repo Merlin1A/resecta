@@ -7,15 +7,14 @@ import SwiftUI
 /// the body — set on the content inside the button; the hosting screen adds
 /// the hint and the identifier at its call site.
 ///
-/// Three visual styles share the same outer chrome (regular-material
-/// background, `CornerRadius.card`, `Shadow.subtle`); the leading tile
-/// differs:
+/// Two visual styles share one card (regular-material background,
+/// `CornerRadius.card`, `Shadow.subtle`, one tile size and one padding);
+/// the leading tile's colours differ:
 ///   * `.primary` — the filled brand tile (`BrandTeal.fill`), white glyph.
 ///   * `.subtle`  — the washed tile, the tile glyph colour.
-///   * `.row`     — the quieter entry: a smaller washed tile in the same
-///     slot, less vertical padding.
-/// At accessibility sizes every style restacks: a smaller tile above the
-/// text.
+/// The description reserves two lines, so a one-line entry is as tall as
+/// its two-line peers. At accessibility sizes every card restacks: a
+/// smaller tile above the text.
 struct HomeChoiceCard: View {
 
     enum Style {
@@ -24,8 +23,6 @@ struct HomeChoiceCard: View {
         case primary
         /// Washed tile, tinted glyph. Used for the peer entries.
         case subtle
-        /// The quieter entry: a smaller washed tile, less vertical padding.
-        case row
     }
 
     let symbol: String
@@ -122,7 +119,7 @@ struct HomeChoiceCardContent: View {
         switch style {
         case .primary:
             return base
-        case .subtle, .row:
+        case .subtle:
             let wash = tintOverride ?? ResectaTokens.BrandTeal.tint
             return wash.opacity(dark ? ResectaTokens.Opacity.tileWashDark : ResectaTokens.Opacity.tileWashLight)
         }
@@ -135,23 +132,17 @@ struct HomeChoiceCardContent: View {
     private var tileForeground: Color {
         switch style {
         case .primary: return .white
-        case .subtle, .row: return tintOverride ?? ResectaTokens.BrandTeal.tileGlyph
+        case .subtle: return tintOverride ?? ResectaTokens.BrandTeal.tileGlyph
         }
     }
 
     private var isAccessibilitySize: Bool { dynamicTypeSize.isAccessibilitySize }
 
-    /// The tile's side, radius and glyph size for the style and type size.
+    /// The tile's side, radius and glyph size for the type size.
     private var tileMetrics: (side: CGFloat, radius: CGFloat, glyph: CGFloat) {
-        if isAccessibilitySize {
-            return (ResectaTokens.HomeEntry.tileAX, ResectaTokens.HomeEntry.tileRadiusAX, ResectaTokens.HomeEntry.tileGlyphAX)
-        }
-        switch style {
-        case .primary, .subtle:
-            return (ResectaTokens.HomeEntry.tile, ResectaTokens.HomeEntry.tileRadius, ResectaTokens.HomeEntry.tileGlyph)
-        case .row:
-            return (ResectaTokens.HomeEntry.rowTile, ResectaTokens.HomeEntry.rowTileRadius, ResectaTokens.HomeEntry.rowGlyph)
-        }
+        isAccessibilitySize
+            ? (ResectaTokens.HomeEntry.tileAX, ResectaTokens.HomeEntry.tileRadiusAX, ResectaTokens.HomeEntry.tileGlyphAX)
+            : (ResectaTokens.HomeEntry.tile, ResectaTokens.HomeEntry.tileRadius, ResectaTokens.HomeEntry.tileGlyph)
     }
 
     private var tile: some View {
@@ -178,11 +169,17 @@ struct HomeChoiceCardContent: View {
                 .font(.headline)
                 .foregroundStyle(.primary)
 
-            Text(bodyText)
-                .font(.subheadline)
-                .foregroundStyle(ResectaTokens.SemanticColor.supportText)
-                .multilineTextAlignment(.leading)
-                .fixedSize(horizontal: false, vertical: true)
+            // Two blank lines under the description reserve its height, so
+            // a one-line description keeps the card as tall as two lines.
+            ZStack(alignment: .topLeading) {
+                Text(verbatim: " \n ")
+                    .hidden()
+                Text(bodyText)
+                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+                    .multilineTextAlignment(.leading)
+            }
+            .font(.subheadline)
+            .fixedSize(horizontal: false, vertical: true)
 
             if let affordance {
                 Text(affordance)
@@ -203,21 +200,6 @@ struct HomeChoiceCardContent: View {
                     text
                 }
                 .padding(ResectaTokens.Spacing.md)
-            } else if style == .row {
-                // The tile is centred on the text while the caption is one
-                // line; top-aligned with the title once it wraps.
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .center, spacing: ResectaTokens.Spacing.md) {
-                        slottedTile
-                        text.fixedSize(horizontal: true, vertical: false)
-                    }
-                    HStack(alignment: .top, spacing: ResectaTokens.Spacing.md) {
-                        slottedTile
-                        text
-                    }
-                }
-                .padding(.vertical, ResectaTokens.HomeEntry.rowPadV)
-                .padding(.horizontal, ResectaTokens.Spacing.md)
             } else {
                 HStack(alignment: .top, spacing: ResectaTokens.Spacing.md) {
                     slottedTile
