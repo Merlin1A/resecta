@@ -36,6 +36,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - A run of arrow-key nudges is one undo step.
 - Deleting selected regions from a hardware keyboard takes Command-Delete.
 - The Discard selections confirmation is an alert with a Cancel button.
+- Verification: a page read both from its text layer and by OCR (a text layer over a page image) is counted under each route, and when every page was read both ways the Search Re-check and Detection Sweep details say "Text was read from the output's text layer and by OCR from the rendered pages."
 - A light haptic on adding or resizing a region.
 - Share: when annotations in the original document — a black box, a stamp, an unapplied redaction mark — cover text that no redaction box covers, the share confirmation names those pages before the file is shared, whatever the verification result. Annotations are not part of the page image, so that text is visible in the exported file. On a scanned page, where the printed text is in the page image, any such annotation that no redaction box covers is named; on a rotated page an annotation is compared with the boxes as the page is shown.
 - The App Store rating prompt asks once per app version, after the first share of a document whose checks passed, instead of after the third export.
