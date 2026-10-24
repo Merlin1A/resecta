@@ -3,30 +3,34 @@ import RedactionEngine
 
 // The resize gesture and the touch hit tests, moved out of
 // `RedactionOverlayView.swift` (the hub) along its `// MARK: - Resize` seam:
-// the selected region's resize toward a dragged handle, the region hit test
-// (topmost wins) and the resize-handle hit test with its pure resolver. The
-// hub's touch handling, `claimsTouch` and hover call them from there.
+// the selected region's resize toward a dragged handle, and the one rule for
+// what a touch picks (`resolveHitTarget`: a handle or a region) with the
+// handle resolver it reads. The hub's touch handling, `claimsTouch`, hover,
+// the long-press menu and the canvas tap all read that rule.
 
 extension RedactionOverlayView {
 
     // MARK: - Resize
 
     /// Resize the selected region toward the dragged handle. The rect the
-    /// resize began with is the anchor for the whole drag; a finger past
+    /// resize began with is the anchor for the whole drag, and the handle
+    /// keeps the offset from the finger it was grabbed at; a finger past
     /// the opposite edge flips the box about that edge; the snap acts on the
     /// edges that now move, and the size floor holds after it, on those
     /// axes only.
     func updateSelectedRegionForResize(handle: ResizeHandle, to point: CGPoint) {
-        guard let selectedID,
+        guard passStartSlop(to: point), let selectedID,
               let idx = regions.firstIndex(where: { $0.id == selectedID }),
-              let start = preResizeNormalizedRect
+              let start = preResizeNormalizedRect, let touchDown = dragStartPoint
         else { return }
 
-        let resized = Self.resizedRect(pdfNormalizedToOverlay(start), handle: handle, to: point)
+        let startRect = pdfNormalizedToOverlay(start)
+        let grabbed = Self.handlePoint(handle, in: startRect)
+        let edge = CGPoint(x: point.x + grabbed.x - touchDown.x, y: point.y + grabbed.y - touchDown.y)
+        let resized = Self.resizedRect(startRect, handle: handle, to: edge)
         var newRect = snapEngine.applyResizeSnapping(
             to: resized.rect, handle: resized.handle, excluding: selectedID, in: snapPage)
-        newRect = Self.flooredRect(newRect, handle: resized.handle,
-                                   floor: Self.minimumRegionSize * fingerScale)
+        newRect = Self.flooredRect(newRect, handle: resized.handle, fingerScale: fingerScale)
 
         // Clamp to overlay bounds
         newRect = newRect.intersection(bounds)
@@ -48,6 +52,13 @@ extension RedactionOverlayView {
         case .leftCenter: return (true, false, false, false)
         case .rightCenter: return (false, true, false, false)
         }
+    }
+
+    /// Where a handle sits on `rect`.
+    static func handlePoint(_ handle: ResizeHandle, in rect: CGRect) -> CGPoint {
+        let edges = movingEdges(handle)
+        return CGPoint(x: edges.left ? rect.minX : edges.right ? rect.maxX : rect.midX,
+                       y: edges.top ? rect.minY : edges.bottom ? rect.maxY : rect.midY)
     }
 
     /// The handle that moves exactly these edges.
@@ -93,34 +104,43 @@ extension RedactionOverlayView {
         return (rect, Self.handle(movingLeft: left, right: right, top: top, bottom: bottom))
     }
 
-    /// Hold `floor` on the axes `handle` moves, keeping the anchored edge.
-    static func flooredRect(_ rect: CGRect, handle: ResizeHandle, floor: CGFloat) -> CGRect {
+    /// Hold the size floor on the axes `handle` moves, keeping the anchored
+    /// edge: each moved axis floors at what `RegionSizeFloor` asks of it
+    /// beside the other axis.
+    static func flooredRect(_ rect: CGRect, handle: ResizeHandle, fingerScale: CGFloat) -> CGRect {
         let edges = movingEdges(handle)
         var floored = rect
-        if (edges.left || edges.right), floored.width < floor {
-            if edges.left { floored.origin.x = floored.maxX - floor }
-            floored.size.width = floor
+        let widthFloor = RegionSizeFloor.floor(across: floored.height, fingerScale: fingerScale)
+        if (edges.left || edges.right), floored.width < widthFloor {
+            if edges.left { floored.origin.x = floored.maxX - widthFloor }
+            floored.size.width = widthFloor
         }
-        if (edges.top || edges.bottom), floored.height < floor {
-            if edges.top { floored.origin.y = floored.maxY - floor }
-            floored.size.height = floor
+        let heightFloor = RegionSizeFloor.floor(across: floored.width, fingerScale: fingerScale)
+        if (edges.top || edges.bottom), floored.height < heightFloor {
+            if edges.top { floored.origin.y = floored.maxY - heightFloor }
+            floored.size.height = heightFloor
         }
         return floored
     }
 
-    // MARK: - Region Hit Testing
+    /// The one size floor, in screen points (overlay points are page
+    /// points, so each is multiplied by `fingerScale`): a region needs 20
+    /// along its long side and 8 across, so a one-line region can be drawn
+    /// at the fit zoom. The draw reject and the resize floor both read it.
+    enum RegionSizeFloor {
+        static let longSide: CGFloat = 20
+        static let across: CGFloat = 8
 
-    /// Hit-test regions in reverse order so topmost region wins.
-    func hitTestRegion(at point: CGPoint) -> RedactionRegion? {
-        for region in regions.reversed() {
-            let viewRect = pdfNormalizedToOverlay(region.normalizedRect)
-            // 8-point inset expansion for easier touch targeting
-            let hitRect = viewRect.insetBy(dx: -8 * fingerScale, dy: -8 * fingerScale)
-            if hitRect.contains(point) {
-                return region
-            }
+        static func admits(_ size: CGSize, fingerScale: CGFloat) -> Bool {
+            max(size.width, size.height) >= longSide * fingerScale
+                && min(size.width, size.height) >= across * fingerScale
         }
-        return nil
+
+        /// The floor one axis is held at beside `other`: 8 across when
+        /// `other` already carries the long side, else 20 along.
+        static func floor(across other: CGFloat, fingerScale: CGFloat) -> CGFloat {
+            (other >= longSide * fingerScale ? across : longSide) * fingerScale
+        }
     }
 
     // MARK: - Resize Handle Hit Testing
@@ -209,19 +229,77 @@ extension RedactionOverlayView {
     /// removes that region, never starts a resize.
     var resizeHandlesActive: Bool { !isMultiSelectActive }
 
-    func hitTestResizeHandle(at point: CGPoint) -> ResizeHandle? {
-        guard resizeHandlesActive,
-              let selectedID,
-              let region = regions.first(where: { $0.id == selectedID })
-        else { return nil }
 
-        let rect = pdfNormalizedToOverlay(region.normalizedRect)
-        return Self.resolveResizeHandle(
+    // MARK: - Hit Testing
+
+    /// What a touch picks: a handle of the selected region, or a region.
+    enum CanvasHitTarget: Equatable {
+        case handle(ResizeHandle)
+        case region(UUID)
+    }
+
+    /// The one rule for which region or handle a touch picks, in overlay
+    /// points. In order: the selected region's handle, when `selected` is
+    /// given and the point is in no other region's body; else the smallest
+    /// region whose body holds the point (the later one on a tie); else,
+    /// within `halo` of a region, the region whose edge is nearest (the
+    /// later one on a tie). `regions` is in append order.
+    static func resolveHitTarget(
+        at point: CGPoint,
+        regions: [(id: UUID, rect: CGRect)],
+        selected: (id: UUID, rect: CGRect)?,
+        halo: CGFloat,
+        handleSize: CGFloat,
+        minimumHandleSize: CGFloat,
+        containerBounds: CGRect?
+    ) -> CanvasHitTarget? {
+        if let selected,
+           !regions.contains(where: { $0.id != selected.id && $0.rect.contains(point) }),
+           let handle = resolveResizeHandle(
+               at: point, regionRect: selected.rect, targetHandleSize: handleSize,
+               minimumHandleSize: minimumHandleSize, containerBounds: containerBounds) {
+            return .handle(handle)
+        }
+        var best: (id: UUID, key: CGFloat)?
+        for region in regions where region.rect.contains(point) {
+            let area = region.rect.width * region.rect.height
+            if best == nil || area <= best!.key { best = (region.id, area) }
+        }
+        if let best { return .region(best.id) }
+        for region in regions where region.rect.insetBy(dx: -halo, dy: -halo).contains(point) {
+            let dx = max(region.rect.minX - point.x, 0, point.x - region.rect.maxX)
+            let dy = max(region.rect.minY - point.y, 0, point.y - region.rect.maxY)
+            let distance = (dx * dx + dy * dy).squareRoot()
+            if best == nil || distance <= best!.key { best = (region.id, distance) }
+        }
+        return best.map { .region($0.id) }
+    }
+
+    /// The touch's target on this overlay: `handles` false asks for a
+    /// region only (the menu, hover, the canvas tap).
+    func hitTarget(at point: CGPoint, handles: Bool) -> CanvasHitTarget? {
+        let selected: (id: UUID, rect: CGRect)? = handles && resizeHandlesActive
+            ? selectedID.flatMap { id in
+                regions.first { $0.id == id }.map { (id, pdfNormalizedToOverlay($0.normalizedRect)) }
+            }
+            : nil
+        return Self.resolveHitTarget(
             at: point,
-            regionRect: rect,
-            targetHandleSize: ResectaTokens.TouchTarget.minimum * fingerScale,
+            regions: regions.map { ($0.id, pdfNormalizedToOverlay($0.normalizedRect)) },
+            selected: selected,
+            halo: 8 * fingerScale,
+            handleSize: ResectaTokens.TouchTarget.minimum * fingerScale,
             minimumHandleSize: 22 * fingerScale,
-            containerBounds: bounds
-        )
+            containerBounds: bounds)
+    }
+
+    func hitTestRegion(at point: CGPoint) -> RedactionRegion? {
+        guard case .region(let id)? = hitTarget(at: point, handles: false) else { return nil }
+        return regions.first { $0.id == id }
+    }
+
+    func hitTestResizeHandle(at point: CGPoint) -> ResizeHandle? {
+        guard case .handle(let handle)? = hitTarget(at: point, handles: true) else { return nil }
+        return handle
     }
 }
