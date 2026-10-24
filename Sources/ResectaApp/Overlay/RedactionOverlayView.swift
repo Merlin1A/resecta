@@ -313,8 +313,10 @@ class RedactionOverlayView: UIView {
 
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
         // Pass through to PDFView for pan/zoom unless the overlay owns the
-        // point (`claimsTouch(at:)`).
-        guard claimsTouch(at: point) else { return nil }
+        // point (`claimsTouch(at:)`); a touch it claims never scrolls.
+        let claimed = claimsTouch(at: point)
+        coordinator?.setCanvasHoldsTouch(claimed)
+        guard claimed else { return nil }
         // Hit-testing runs at touch-down, before
         // the gesture environment dispatches the touch, so this is the
         // timing-proof seam to wire the failure requirement against a
@@ -413,10 +415,7 @@ class RedactionOverlayView: UIView {
 
         // Priority 1: Resize handle of selected region
         if let handle = hitTestResizeHandle(at: point) {
-            activeResizeHandle = handle
-            preResizeNormalizedRect = selectedID.flatMap { id in regions.first { $0.id == id }?.normalizedRect }
-            dragStartPoint = point
-            isActivelyDragging = true
+            beginResize(handle, at: point)
             return
         }
 
@@ -667,6 +666,7 @@ class RedactionOverlayView: UIView {
     }
 
     private func resetDragState() {
+        coordinator?.setCanvasHoldsTouch(false)
         primaryTouch = nil
         dragOrigin = nil
         currentDragRect = nil

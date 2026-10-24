@@ -1,8 +1,9 @@
 import XCTest
 
 /// Reads the canvas from a screenshot, since regions are drawn and not in
-/// the accessibility tree: where the page sits at the fit zoom, and the
-/// tint at a point (a manual region is red, a selected one blue, a
+/// the accessibility tree: where the page sits at the fit zoom, whether a
+/// point shows the canvas background or the page (the zoom's proof), and
+/// where a tint lies (a manual region is red, a selected one blue, a
 /// search-applied one green). All points are window points.
 ///
 /// nonisolated: an XCUITest drives a separate process and touches no
@@ -55,6 +56,14 @@ nonisolated struct CanvasPixelProbe {
         return (Int(data[i]), Int(data[i + 1]), Int(data[i + 2]))
     }
 
+    /// The canvas background (the grouped background, light or dark), not
+    /// the page: just above the fit page it reads background, and page-white
+    /// once the page is zoomed past it.
+    func isBackground(_ p: CGPoint) -> Bool {
+        let (r, g, b) = rgb(p.x, p.y)
+        return (abs(r - 242) < 6 && abs(g - 242) < 6 && abs(b - 247) < 6) || (r < 12 && g < 12 && b < 12)
+    }
+
     private func isWhite(_ c: (Int, Int, Int)) -> Bool { c.0 >= 250 && c.1 >= 250 && c.2 >= 250 }
 
     /// The fit page: the longest white vertical run at x = 12 gives the top,
@@ -82,5 +91,26 @@ nonisolated struct CanvasPixelProbe {
         let left = CGFloat(hr.0), pageWidth = CGFloat(hr.1 - hr.0)
         if left <= 0 && pageWidth >= windowSize.width - 1 { return nil }
         return CGRect(x: left, y: top, width: pageWidth, height: pageWidth * 792 / 612)
+    }
+
+    /// The bounds of a tint inside `rect`, nil under 12 matching points.
+    func tintBounds(_ tint: Tint, in rect: CGRect) -> CGRect? {
+        var minX = CGFloat.infinity, minY = CGFloat.infinity, maxX = -CGFloat.infinity, maxY = -CGFloat.infinity
+        var n = 0
+        var y = max(rect.minY, 0)
+        while y < min(rect.maxY, windowSize.height) {
+            var x = max(rect.minX, 0)
+            while x < min(rect.maxX, windowSize.width) {
+                let (r, g, b) = rgb(x, y)
+                if tint.matches(r, g, b) {
+                    n += 1
+                    minX = min(minX, x); minY = min(minY, y); maxX = max(maxX, x); maxY = max(maxY, y)
+                }
+                x += 1
+            }
+            y += 1
+        }
+        guard n >= 12 else { return nil }
+        return CGRect(x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1)
     }
 }

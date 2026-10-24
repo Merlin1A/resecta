@@ -399,8 +399,9 @@ enum ResectaTokens {
         static let tileAX: CGFloat = 44
         static let tileRadiusAX: CGFloat = 11
         static let tileGlyphAX: CGFloat = 22
-        /// The mark's height in the masthead, the gate and the overlay.
-        static let markHeight: CGFloat = 48
+        /// The mark's tile side in the masthead, the gate and the overlay:
+        /// about the width of the 'Resecta' title, so the two read as one.
+        static let markTile: CGFloat = 96
         /// The tagline's width cap.
         static let taglineMaxWidth: CGFloat = 320
         /// The stack's vertical padding at every size.
@@ -479,26 +480,60 @@ enum ResectaTokens {
 
     // MARK: - The mark
 
-    /// The app icon's redaction-bars mark, drawn in code: two label-colour
-    /// bars, one teal bar and twelve grey text runs. Decorative colours, no
-    /// contrast floor.
+    /// The app icon, drawn in code: its paper field, two ink bars, one teal
+    /// bar and twelve grey text runs, in the icon's own colours (measured from
+    /// the 1024 px icons, light and dark). Decorative colours, no contrast
+    /// floor; under Increase Contrast the ink goes to pure black or white and
+    /// the tile's edge darkens.
     nonisolated enum BrandMark {
-        /// The third bar. Light #138696 · Dark #1A9AAE.
-        static let teal: Color = Color(
-            uiColor: UIColor { trait in
-                trait.userInterfaceStyle == .dark
-                    ? UIColor(red: 0x1A/255, green: 0x9A/255, blue: 0xAE/255, alpha: 1)
-                    : UIColor(red: 0x13/255, green: 0x86/255, blue: 0x96/255, alpha: 1)
-            }
-        )
-        /// The text runs. Light #8C8A82 · Dark #A6A49D.
-        static let runs: Color = Color(
-            uiColor: UIColor { trait in
-                trait.userInterfaceStyle == .dark
-                    ? UIColor(red: 0xA6/255, green: 0xA4/255, blue: 0x9D/255, alpha: 1)
-                    : UIColor(red: 0x8C/255, green: 0x8A/255, blue: 0x82/255, alpha: 1)
-            }
-        )
+        /// The tile's field. Light #FBFAF6 · Dark #000000.
+        static let field: Color = dynamic(light: 0xFBFAF6, dark: 0x000000)
+        /// Bars one and two. Light #0E0E14 · Dark #F2F1EC; Increase
+        /// Contrast #000000 · #FFFFFF.
+        static let ink: Color = dynamic(light: 0x0E0E14, dark: 0xF2F1EC, lightHigh: 0x000000, darkHigh: 0xFFFFFF)
+        /// The third bar. Light #128697 · Dark #1799AC.
+        static let teal: Color = dynamic(light: 0x128697, dark: 0x1799AC)
+        /// The text runs. Light #8B887F · Dark #A5A39B.
+        static let runs: Color = dynamic(light: 0x8B887F, dark: 0xA5A39B)
+        /// The tile's 0.5 pt edge, top to bottom: a black hairline in light
+        /// (0.07; 0.20 at Increase Contrast); in dark a white rim, brightest at
+        /// the top, that keeps the black tile's outline on a black screen
+        /// (0.32 · 0.14 · 0.20; 0.55 · 0.40 · 0.45).
+        static let edge: [Color] = [
+            edgeColor(light: 0.07, dark: 0.32, lightHigh: 0.20, darkHigh: 0.55),
+            edgeColor(light: 0.07, dark: 0.14, lightHigh: 0.20, darkHigh: 0.40),
+            edgeColor(light: 0.07, dark: 0.20, lightHigh: 0.20, darkHigh: 0.45),
+        ]
+        /// The tile's shadow: the resting card's black 0.10 in light; none in
+        /// dark, where a glow beneath a top-lit tile would read as lit from
+        /// below.
+        static let shadow: Color = Color(uiColor: UIColor { trait in
+            trait.userInterfaceStyle == .dark ? .clear : UIColor.black.withAlphaComponent(0.10)
+        })
+
+        private static func dynamic(light: UInt32, dark: UInt32, lightHigh: UInt32? = nil, darkHigh: UInt32? = nil) -> Color {
+            Color(uiColor: UIColor { trait in
+                let high = trait.accessibilityContrast == .high
+                let hex = trait.userInterfaceStyle == .dark
+                    ? (high ? darkHigh ?? dark : dark)
+                    : (high ? lightHigh ?? light : light)
+                return UIColor(
+                    red: CGFloat((hex >> 16) & 0xFF) / 255,
+                    green: CGFloat((hex >> 8) & 0xFF) / 255,
+                    blue: CGFloat(hex & 0xFF) / 255,
+                    alpha: 1
+                )
+            })
+        }
+
+        private static func edgeColor(light: CGFloat, dark: CGFloat, lightHigh: CGFloat, darkHigh: CGFloat) -> Color {
+            Color(uiColor: UIColor { trait in
+                let high = trait.accessibilityContrast == .high
+                return trait.userInterfaceStyle == .dark
+                    ? UIColor.white.withAlphaComponent(high ? darkHigh : dark)
+                    : UIColor.black.withAlphaComponent(high ? lightHigh : light)
+            })
+        }
     }
 
     // MARK: - Animation Presets

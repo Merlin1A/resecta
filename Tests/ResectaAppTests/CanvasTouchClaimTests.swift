@@ -94,7 +94,7 @@ struct CanvasTouchClaimTests {
             return
         }
         let body = source[hit.upperBound..<claims.lowerBound]
-        #expect(body.contains("guard claimsTouch(at: point) else { return nil }"))
+        #expect(body.contains("let claimed = claimsTouch(at: point)") && body.contains("guard claimed else { return nil }"))
         #expect(body.contains("reconcileWindowPanDeference()"))
         guard let moved = source.range(of: "override func didMoveToWindow() {") else {
             Issue.record("Could not locate didMoveToWindow")

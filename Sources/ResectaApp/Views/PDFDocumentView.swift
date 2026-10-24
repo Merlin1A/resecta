@@ -359,23 +359,25 @@ final class FitFlooredPDFView: PDFView {
     /// coordinator decides whether it clears the region selection.
     var onSingleTap: (@MainActor (CGPoint) -> Void)?
 
-    /// Return a zoomed-in page to the fit scale — the double tap's
-    /// action. At fit it does nothing.
+    /// Return a zoomed-in page to the fit scale, animated — the double
+    /// tap's action. At fit it does nothing.
     @objc func returnToFit() {
         let fit = scaleFactorForSizeToFit
         guard fit > 0, scaleFactor > fit * (1 + Self.floorTolerance) else { return }
-        scaleFactor = fit
+        UIView.animate(withDuration: 0.25) { self.scaleFactor = fit }
     }
 
-    /// The double tap returns to fit; the single tap waits for it to fail.
-    /// Neither cancels nor delays the touches beneath it, so a tap on a
-    /// region still reaches the overlay.
+    /// The double tap returns to fit, only on empty page (this view is its
+    /// one delegate); the single tap waits for it to fail. Neither cancels
+    /// nor delays the touches beneath it, so a tap on a region still
+    /// reaches the overlay.
     private func addTapGestures() {
         let doubleTap = UITapGestureRecognizer(target: self, action: #selector(returnToFit))
         doubleTap.numberOfTapsRequired = 2
         doubleTap.cancelsTouchesInView = false
         doubleTap.delaysTouchesEnded = false
         doubleTap.name = Self.returnToFitGestureName
+        doubleTap.delegate = self
         addGestureRecognizer(doubleTap)
 
         let singleTap = UITapGestureRecognizer(target: self, action: #selector(handleSingleTap(_:)))
@@ -423,5 +425,31 @@ final class FitFlooredPDFView: PDFView {
                 self?.applyFitFloor()
             }
         }
+    }
+}
+
+extension FitFlooredPDFView {
+    /// VoiceOver reaches the canvas's regions. Each page's overlay builds
+    /// one element per region, but the page view PDFKit hosts the overlay
+    /// in serves none of them; this view serves its own content (PDFKit's
+    /// answer, else its subviews) followed by the overlays it hosts.
+    override var accessibilityElements: [Any]? {
+        get { (super.accessibilityElements ?? subviews) + Self.regionOverlays(in: self) }
+        set { super.accessibilityElements = newValue }
+    }
+
+    private static func regionOverlays(in view: UIView) -> [RedactionOverlayView] {
+        view.subviews.flatMap { ($0 as? RedactionOverlayView).map { [$0] } ?? regionOverlays(in: $0) }
+    }
+
+    /// The double tap's one delegate: a touch the canvas overlay claims (a
+    /// region, a handle, every draw and Add to Selection touch) is never a
+    /// double tap; a touch on the page is. PDFKit's own recognizers keep
+    /// PDFView's answer.
+    override func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        guard gestureRecognizer.name == Self.returnToFitGestureName else {
+            return super.gestureRecognizer(gestureRecognizer, shouldReceive: touch)
+        }
+        return !(touch.view is RedactionOverlayView)
     }
 }
