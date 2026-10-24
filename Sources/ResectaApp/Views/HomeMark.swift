@@ -1,12 +1,14 @@
 import SwiftUI
 
-/// The app icon's redaction-bars mark, drawn from shapes on the icon's own
-/// unit grid (821 × 434): two label-colour bars, one teal bar and twelve
-/// grey text runs. The frame is the ink box — bar 1 starts at unit 0 and the
-/// last run ends at unit 821, the top bar starts at 0 and the third bar ends
-/// at 434 — so centring the frame centres the whole drawing. Decorative:
-/// hidden from accessibility. Home, the first-launch gate and the
-/// app-switcher overlay draw it.
+/// The app icon, drawn from shapes: the icon's paper field as a tile with the
+/// iOS 26 icon outline (continuous corners at 0.26 of the side), and on it
+/// the redaction-bars mark at the icon's own place and scale — two ink bars,
+/// one teal bar and twelve grey text runs on the icon's 821 × 435 unit grid,
+/// whose ink box sits at (106, 286) on the icon's 1024 canvas. A 0.5 pt edge
+/// (a hairline in light, a top-lit rim in dark) and, in light, the cards'
+/// resting shadow give it the depth of an icon. Decorative: hidden from
+/// accessibility, and kept out of Smart Invert like any icon. Home, the
+/// first-launch gate and the app-switcher overlay draw it.
 struct HomeMark: View {
     /// One shape on the unit grid.
     struct Shape: Equatable {
@@ -21,17 +23,24 @@ struct HomeMark: View {
         let bar: Int?
     }
 
-    /// The icon's unit grid.
+    /// The icon's unit grid: the mark's ink box.
     static let gridWidth: CGFloat = 821
-    static let gridHeight: CGFloat = 434
+    static let gridHeight: CGFloat = 435
 
-    /// The fifteen shapes: three bars (height 102, radius 22) and twelve
-    /// runs (35 × 44, radius 8).
+    /// The icon's canvas, and where the ink box sits on it.
+    static let canvas: CGFloat = 1024
+    static let inkOrigin = CGPoint(x: 106, y: 286)
+
+    /// The tile's corner radius as a fraction of its side (the iOS 26 icon).
+    static let cornerFraction: CGFloat = 0.26
+
+    /// The fifteen shapes: three bars (height 103, radius 25) and twelve
+    /// runs (35 × 45, radius 9), as measured on the icon.
     static let shapes: [Shape] = {
         var list: [Shape] = [
-            Shape(kind: .bar, x: 0, y: 0, width: 703, height: 102, radius: 22, bar: 0),
-            Shape(kind: .bar, x: 0, y: 166, width: 571, height: 102, radius: 22, bar: 1),
-            Shape(kind: .bar, x: 0, y: 332, width: 411, height: 102, radius: 22, bar: 2),
+            Shape(kind: .bar, x: 0, y: 0, width: 703, height: 103, radius: 25, bar: 0),
+            Shape(kind: .bar, x: 0, y: 166, width: 571, height: 103, radius: 25, bar: 1),
+            Shape(kind: .bar, x: 0, y: 332, width: 411, height: 103, radius: 25, bar: 2),
         ]
         let rows: [(y: CGFloat, xs: [CGFloat])] = [
             (29, [734, 786]),
@@ -40,42 +49,56 @@ struct HomeMark: View {
         ]
         for row in rows {
             for x in row.xs {
-                list.append(Shape(kind: .run, x: x, y: row.y, width: 35, height: 44, radius: 8, bar: nil))
+                list.append(Shape(kind: .run, x: x, y: row.y, width: 35, height: 45, radius: 9, bar: nil))
             }
         }
         return list
     }()
 
-    /// The drawn height; the width follows the grid's ratio.
-    let height: CGFloat
+    /// The tile's side; the mark inside follows the icon's proportions.
+    let size: CGFloat
 
-    init(height: CGFloat) {
-        self.height = height
+    init(size: CGFloat) {
+        self.size = size
     }
 
-    /// The drawn width for a height.
-    static func width(forHeight height: CGFloat) -> CGFloat {
-        height * gridWidth / gridHeight
-    }
+    private var scale: CGFloat { size / Self.canvas }
 
-    private var scale: CGFloat { height / Self.gridHeight }
+    private var outline: RoundedRectangle {
+        RoundedRectangle(cornerRadius: size * Self.cornerFraction, style: .continuous)
+    }
 
     var body: some View {
         ZStack(alignment: .topLeading) {
+            // The shadow sits on the field alone, so the shapes on it cast none.
+            outline
+                .fill(ResectaTokens.BrandMark.field)
+                .shadow(
+                    color: ResectaTokens.BrandMark.shadow,
+                    radius: ResectaTokens.Shadow.subtle.radius,
+                    x: ResectaTokens.Shadow.subtle.x,
+                    y: ResectaTokens.Shadow.subtle.y
+                )
             ForEach(Array(Self.shapes.enumerated()), id: \.offset) { _, shape in
                 RoundedRectangle(cornerRadius: shape.radius * scale, style: .circular)
                     .fill(Self.color(for: shape))
                     .frame(width: shape.width * scale, height: shape.height * scale)
-                    .offset(x: shape.x * scale, y: shape.y * scale)
+                    .offset(x: (Self.inkOrigin.x + shape.x) * scale, y: (Self.inkOrigin.y + shape.y) * scale)
             }
+            outline
+                .strokeBorder(
+                    LinearGradient(colors: ResectaTokens.BrandMark.edge, startPoint: .top, endPoint: .bottom),
+                    lineWidth: ResectaTokens.Border.subtle
+                )
         }
-        .frame(width: Self.width(forHeight: height), height: height, alignment: .topLeading)
+        .frame(width: size, height: size, alignment: .topLeading)
+        .accessibilityIgnoresInvertColors()
         .accessibilityHidden(true)
     }
 
     private static func color(for shape: Shape) -> Color {
         switch shape.kind {
-        case .bar: return shape.bar == 2 ? ResectaTokens.BrandMark.teal : .primary
+        case .bar: return shape.bar == 2 ? ResectaTokens.BrandMark.teal : ResectaTokens.BrandMark.ink
         case .run: return ResectaTokens.BrandMark.runs
         }
     }
