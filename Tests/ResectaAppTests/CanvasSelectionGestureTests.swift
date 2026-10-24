@@ -2,6 +2,7 @@ import Testing
 import Foundation
 import CoreGraphics
 import UIKit
+import PDFKit
 import RedactionEngine
 @testable import ResectaApp
 
@@ -147,6 +148,72 @@ struct CanvasSelectionGestureTests {
         m.overlay.isMultiSelectActive = true
         cancelled(m.overlay, at: Self.centreOfB)
         #expect(m.state.selectedRegionIDs == [regions[0].id])
+        m.state.checkInvariants()
+    }
+
+    // MARK: - A hold never moves a region
+
+    /// The overlay as PDFKit mounts it: created by the real coordinator for
+    /// page 0 of a one-page view, so the coordinator refreshes it after a
+    /// selection change, as in the editor.
+    private func registeredOverlay(
+        regions: [RedactionRegion], selectedIDs: Set<UUID>
+    ) -> (overlay: RedactionOverlayView, coordinator: PDFViewCoordinator,
+          state: RedactionState, view: FitFlooredPDFView, window: UIWindow) {
+        let state = RedactionState()
+        for region in regions { state.addRegion(region, page: 0, undoManager: nil) }
+        state.selectedRegionIDs = selectedIDs
+        let coordinator = PDFViewCoordinator()
+        coordinator.redactionState = state
+        let window = UIWindow(frame: CGRect(origin: .zero, size: Self.overlaySize))
+        let view = FitFlooredPDFView(frame: window.bounds)
+        let renderer = UIGraphicsPDFRenderer(bounds: CGRect(origin: .zero, size: Self.overlaySize))
+        view.document = PDFDocument(data: renderer.pdfData { ctx in ctx.beginPage() })
+        window.addSubview(view)
+        window.isHidden = false
+        let overlay = coordinator.pdfView(view, overlayViewFor: view.document!.page(at: 0)!) as! RedactionOverlayView
+        overlay.frame = view.bounds
+        overlay.snapZoomScaleOverride = 1
+        view.addSubview(overlay)
+        return (overlay, coordinator, state, view, window)
+    }
+
+    @Test("Holding an unselected region, then dragging it, selects it and moves nothing")
+    func holdThenDragOnAnUnselectedRegionDoesNotMove() {
+        let regions = Self.threeRegions()
+        let m = registeredOverlay(regions: regions, selectedIDs: [])
+        let before = m.state.regions[0]?.first { $0.id == regions[1].id }?.normalizedRect
+        let version = m.state.regionVersion
+        let start = Self.centreOfB
+        let touch = StubTouch(location: start, view: m.overlay)
+        m.overlay.touchesBegan([touch], with: nil)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+        for dx in [20.0, 40.0, 60.0] {
+            touch.move(to: CGPoint(x: start.x + dx, y: start.y))
+            m.overlay.touchesMoved([touch], with: nil)
+        }
+        m.overlay.touchesEnded([touch], with: nil)
+        #expect(m.state.selectedRegionIDs == [regions[1].id], "the touch selects it")
+        #expect(m.state.regions[0]?.first { $0.id == regions[1].id }?.normalizedRect == before, "it does not move")
+        #expect(m.state.regionVersion == version)
+        m.state.checkInvariants()
+    }
+
+    @Test("Dragging a region selected beforehand moves it")
+    func dragOnASelectedRegionMoves() {
+        let regions = Self.threeRegions()
+        let m = registeredOverlay(regions: regions, selectedIDs: [regions[1].id])
+        let before = m.state.regions[0]?.first { $0.id == regions[1].id }?.normalizedRect
+        let start = Self.centreOfB
+        let touch = StubTouch(location: start, view: m.overlay)
+        m.overlay.touchesBegan([touch], with: nil)
+        for dx in [20.0, 40.0, 60.0] {
+            touch.move(to: CGPoint(x: start.x + dx, y: start.y))
+            m.overlay.touchesMoved([touch], with: nil)
+        }
+        m.overlay.touchesEnded([touch], with: nil)
+        let after = m.state.regions[0]?.first { $0.id == regions[1].id }?.normalizedRect
+        #expect(after != before, "the selected region moves")
         m.state.checkInvariants()
     }
 }
