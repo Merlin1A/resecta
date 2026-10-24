@@ -64,11 +64,17 @@ struct PageRasterizerHiddenTextTests {
         ("near-white", TestFixtures.nearWhiteTextPDF()),
         ("low-alpha", TestFixtures.lowAlphaTextPDF()),
         ("translucent-box", TestFixtures.translucentBoxCoveredTextPDF()),
+        // Eight levels from the page: inside the band with room to spare.
+        ("faint-grey", rawPage("0.97 g BT /F1 9 Tf 72 700 Td (Faint grey text 0123456789) Tj ET")),
     ]
 
     static let inkedFixtures: [(String, Data)] = [
         ("ordinary-12pt", rawPage("BT /F1 12 Tf 72 700 Td (Ordinary twelve point line 0123456789) Tj ET")),
         ("pale-grey", rawPage("0.90 g BT /F1 9 Tf 72 700 Td (Pale ninety percent grey text 0123456789) Tj ET")),
+        // Light but inked: a footer or a watermark one level lighter than the
+        // pale-grey line (24 levels from the page). The band's first edge, 24,
+        // read it as inkless and sent the page image-only.
+        ("light-grey", rawPage("0.905 g BT /F1 9 Tf 72 700 Td (Light grey footer text 0123456789) Tj ET")),
         ("small-4pt", rawPage("BT /F1 4 Tf 72 700 Td (Small four point text 0123456789 abcdefghij) Tj ET")),
         ("nbsp-runs",
          rawPage("BT /F1 12 Tf 72 700 Td (Words\\240\\240\\240\\240separated\\240\\240by\\240runs) Tj ET")),
