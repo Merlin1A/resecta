@@ -109,8 +109,8 @@ struct CompactDetentAnchoredRowTests {
     @Test("The bottom toast hosts lift by the hug while the sheet is parked at the compact float")
     func toastClearanceFollowsTheHug() {
         // The clearance is the bottom-chrome model's (`ParkedChromeLayout`);
-        // the page bar stays beside the live walk, so it is the hug plus
-        // the bar.
+        // the page bar steps aside while the walk is live, so it is the hug
+        // alone.
         func clearance(_ detent: PresentationDetent) -> CGFloat {
             ParkedChromeLayout(
                 sheetPresented: true, detent: detent, walkLive: true,
@@ -118,7 +118,7 @@ struct CompactDetentAnchoredRowTests {
                 hugHeight: CompactFloatDetent.hug(for: .large)
             ).toastClearance
         }
-        #expect(clearance(.compactFloat) == CompactFloatDetent.hugHeight + ParkedChromeLayout.pageBarClearance)
+        #expect(clearance(.compactFloat) == CompactFloatDetent.hugHeight)
         #expect(clearance(.medium) == 0)
         #expect(clearance(.large) == 0)
     }

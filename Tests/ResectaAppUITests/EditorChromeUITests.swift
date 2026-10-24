@@ -2,8 +2,7 @@ import XCTest
 
 /// UI tests for the editor's chrome: the page bar's whole-page control as a
 /// per-page toggle that keeps its place, the page bar on a one-page
-/// document, and the parked match walk letting go of a match the page bar
-/// pages away from.
+/// document, and the page bar back once a parked match walk ends.
 ///
 /// Launch arguments only; every assertion reads identifiers and labels.
 /// nonisolated for the same reason as `SearchDetentLayoutUITests`: an
@@ -83,9 +82,11 @@ nonisolated final class EditorChromeUITests: XCTestCase {
         attachScreenshot(named: "chrome-page-bar-one-page")
     }
 
-    // MARK: - The parked walk follows the page bar
+    // MARK: - The page bar comes back when the walk ends
 
-    func testParkedWalk_pagingAwayTurnsApplyOff() {
+    /// The bar steps aside while the walk is parked and is back, usable,
+    /// once the sheet is dismissed and the walk ends.
+    func testWalkEnds_pageBarReturns() {
         app.launchArguments = [
             "--uitesting", "--loadTestDocument", "--multipageDoc",
             "--openSearchSheet", "--searchQuery=Amount", "--searchDetent=medium",
@@ -94,16 +95,36 @@ nonisolated final class EditorChromeUITests: XCTestCase {
         let next = app.buttons["resultNavNext"]
         XCTAssertTrue(next.waitForExistence(timeout: 30), "The seeded query returned nothing or the sheet never presented.")
         next.tap()
-        let apply = app.buttons["applyCurrentResultButton"]
-        XCTAssertTrue(apply.waitForExistence(timeout: 10), "The parked strip's Apply never appeared.")
-        XCTAssertTrue(apply.isEnabled, "Parked on a match, Apply must be enabled.")
+        XCTAssertTrue(element("compactFloatStrip").waitForExistence(timeout: 10), "The first chevron tap did not park the sheet.")
+        let pageBar = element("pageNav")
+        let gone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: pageBar)
+        XCTAssertEqual(XCTWaiter().wait(for: [gone], timeout: 10), .completed, "The page bar must step aside while the walk is parked.")
 
+        let dismiss = raiseSheetToDismiss()
+        XCTAssertNotNil(dismiss, "The sheet's Dismiss never appeared after the raise.")
+        dismiss?.tap()
         let pageNext = app.buttons["pageNavNext"]
-        XCTAssertTrue(pageNext.waitForExistence(timeout: 5), "The page bar's next control is missing while parked.")
-        for _ in 0..<3 { pageNext.tap() }
-        let disabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isEnabled == false"), object: apply)
-        XCTAssertEqual(XCTWaiter().wait(for: [disabled], timeout: 8), .completed,
-                       "Paging away from the current match must turn the strip's Apply off.")
-        attachScreenshot(named: "chrome-parked-walk-paged-away")
+        XCTAssertTrue(pageNext.waitForExistence(timeout: 10), "The page bar must be back once the walk ends.")
+        XCTAssertTrue(pageNext.isHittable, "The page bar's next control must be usable once the walk ends.")
+        let counter = element("pageNavCounter")
+        let before = counter.label
+        pageNext.tap()
+        let paged = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label != %@", before), object: counter)
+        XCTAssertEqual(XCTWaiter().wait(for: [paged], timeout: 8), .completed, "The returned page bar must page.")
+        attachScreenshot(named: "chrome-walk-ended-page-bar-back")
+    }
+
+    /// Grabber drag from the parked strip up until the sheet's Dismiss
+    /// shows (`ResultWalkUITests`' idiom); the Dismiss, or nil.
+    private func raiseSheetToDismiss() -> XCUIElement? {
+        let window = app.windows.firstMatch
+        let dismiss = app.buttons["searchDismissButton"].firstMatch
+        for _ in 0..<3 {
+            let start = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95))
+            let end = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45))
+            start.press(forDuration: 0.1, thenDragTo: end)
+            if dismiss.waitForExistence(timeout: 3), dismiss.isHittable { return dismiss }
+        }
+        return nil
     }
 }
