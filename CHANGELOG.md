@@ -221,6 +221,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - The size label, the region outlines, the lift shadow and the handle rings keep one on-screen size at every zoom, and the lift shadow shows in dark appearance.
 - A tap on a selected region no longer moves or reshapes it, and a resize keeps the edge where it was grabbed.
 - A region moved against the page edge stays on the page when it aligns to a guide.
+- When zoomed in, dragging a selected region moves it instead of scrolling the page; two fingers scroll.
 
 ### Internal
 
