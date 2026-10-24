@@ -5,9 +5,8 @@ import RedactionEngine
 // (the hub) from its `// MARK: - Move Helpers` seam: beginning a move on a
 // selected region, beginning a group move, updating either as the finger
 // travels, ending a group move, and committing an Add to Selection toggle on
-// lift. The hub's touch handling calls them; the long-press helpers stay in
-// the hub. The drag state they read and write is stored on the hub (an
-// extension adds no storage).
+// lift. The hub's touch handling calls them. The drag state they read and
+// write is stored on the hub (an extension adds no storage).
 
 extension RedactionOverlayView {
 
