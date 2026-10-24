@@ -400,6 +400,12 @@ struct SearchAndRedactSheet: View {
         .onChange(of: searchState.livePreview) { _, _ in
             resolveAndPublishLivePreviewRects()
         }
+        // A page whose text is a hidden layer over a page image is read in
+        // the background the first time the preview boxes it; when the read
+        // lands, the highlight moves onto the ink Apply will paint.
+        .onReceive(NotificationCenter.default.publisher(for: DocumentSearcher.inkFitDidUpdate)) { _ in
+            resolveAndPublishLivePreviewRects()
+        }
         // Page change refreshes preview rects (visible page changed).
         .onChange(of: documentState.currentPageIndex) { _, _ in
             // Page change invalidates current rects; if the new page has no

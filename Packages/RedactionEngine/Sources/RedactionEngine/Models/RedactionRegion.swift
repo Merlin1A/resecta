@@ -27,16 +27,31 @@ public struct RedactionRegion: Sendable, Identifiable, Equatable, Codable {
     public let id: UUID
     public var normalizedRect: CGRect  // 0–1, bottom-left origin
     public let source: Source
+    /// The hidden glyphs' own box when the region came from a match on a page
+    /// whose text is an invisible layer over a page image
+    /// (`SearchResult.textLayerRect`): a Searchable export strips the text
+    /// layer under it as well as under `normalizedRect`; the fill paints
+    /// `normalizedRect` alone. It stays put when the region is moved or
+    /// resized, because the hidden glyphs do not move. nil for every other
+    /// region; an encoded region without it decodes as nil.
+    public let textLayerRect: CGRect?
 
     public init(
         id: UUID,
         normalizedRect: CGRect,
-        source: Source
+        source: Source,
+        textLayerRect: CGRect? = nil
     ) {
         self.id = id
         self.normalizedRect = normalizedRect
         self.source = source
+        self.textLayerRect = textLayerRect
     }
+
+    /// The rects a Searchable export strips the text layer under: the box,
+    /// then the hidden glyphs' box when there is one (a second rect, not a
+    /// union, so the space between them keeps its text).
+    public var textRemovalRects: [CGRect] { [normalizedRect] + (textLayerRect.map { [$0] } ?? []) }
 
     public enum Source: Sendable, Equatable, Codable {
         case manual

@@ -271,16 +271,16 @@ public actor DocumentSearcher {
     private func assembledAddressMatches(
         lines: [OCREngine.TextLine],
         haystack: NSString
-    ) -> (matches: [PIIDetector.PIIMatch], spatialRectByText: [String: CGRect]) {
+    ) -> (matches: [PIIDetector.PIIMatch], spatialRectByText: [String: TextLayerBox]) {
         let assembled = addressAssembler.assemble(lines: lines)
         guard !assembled.isEmpty else { return ([], [:]) }
 
         var matches: [PIIDetector.PIIMatch] = []
-        var spatialRectByText: [String: CGRect] = [:]
+        var spatialRectByText: [String: TextLayerBox] = [:]
         let sentinelLocation = haystack.length
         for address in assembled {
             if spatialRectByText[address.text] == nil {
-                spatialRectByText[address.text] = address.unionRect
+                spatialRectByText[address.text] = TextLayerBox(rect: address.unionRect, textLayerRect: address.textLayerUnionRect)
             }
             let searchRange = NSRange(location: 0, length: sentinelLocation)
             let located = haystack.range(of: address.text, options: [], range: searchRange)
@@ -938,7 +938,7 @@ public actor DocumentSearcher {
                 }
             ) { matchRange in
                 guard let rawRange = regexPage.rawNSRange(matchRange),
-                      let rects = lineRects(for: rawRange, page: sendablePage.page) else {
+                      let rects = textLayerLines(for: rawRange, page: sendablePage.page) else {
                     return false
                 }
                 let matchedText = nsString.substring(with: matchRange)
@@ -948,17 +948,17 @@ public actor DocumentSearcher {
                 )
                 // One result per line the match touches (the counting rule).
                 let occurrence = rects.count > 1 ? UUID() : nil
-                pageRects.append(contentsOf: rects)
-                for normalizedRect in rects {
+                pageRects.append(contentsOf: rects.map(\.rect))
+                for line in rects {
                     continuation.yield(SearchResult(
                         pageIndex: pageIndex,
-                        normalizedRect: normalizedRect,
+                        normalizedRect: line.rect,
                         matchedText: matchedText,
                         contextSnippet: window.snippet,
                         source: .textLayer,
                         term: pattern,
                         matchRangeInSnippet: window.matchRange,
-                        occurrenceID: occurrence
+                        occurrenceID: occurrence, textLayerRect: line.textLayerRect
                     ))
                 }
                 return true
@@ -1145,7 +1145,7 @@ public actor DocumentSearcher {
                 // → y-bucketed lines, displayed-space normalized) —
                 // so Search and the detection path see identical line
                 // geometry for the same page.
-                var spatialRectByText: [String: CGRect] = [:]
+                var spatialRectByText: [String: TextLayerBox] = [:]
                 if categories.contains(.address),
                    let embedded = EmbeddedTextSource.make(from: page, fitLines: true) {
                     let assembly = assembledAddressMatches(
@@ -1177,12 +1177,12 @@ public actor DocumentSearcher {
                     // selection exists) or the located anchor text (whose
                     // selection would cover only part of the block). Every
                     // other match keeps PDFKit selection geometry unchanged.
-                    let normalizedRect: CGRect
-                    if let spatialRect =
+                    let box: TextLayerBox
+                    if let spatialBox =
                         (match.kind == .address ? spatialRectByText[match.text] : nil) {
-                        normalizedRect = spatialRect
-                    } else if let charRect = boundingRect(for: match.range, page: page) {
-                        normalizedRect = charRect
+                        box = spatialBox
+                    } else if let charBox = textLayerBox(for: match.range, page: page) {
+                        box = charBox
                     } else {
                         continue
                     }
@@ -1194,10 +1194,10 @@ public actor DocumentSearcher {
                         ? contextSnippet(text: pageText, matchNSRange: match.range)
                         : ContextWindow(snippet: match.text, matchRange: 0..<match.text.count)
 
-                    pageRects.append(normalizedRect)
+                    pageRects.append(box.rect)
                     continuation.yield(SearchResult(
                         pageIndex: pageIndex,
-                        normalizedRect: normalizedRect,
+                        normalizedRect: box.rect,
                         matchedText: match.text,
                         contextSnippet: window.snippet,
                         source: .textLayer,
@@ -1205,7 +1205,7 @@ public actor DocumentSearcher {
                         piiCategory: match.category,
                         piiConfidence: match.confidence,
                         rationale: match.rationale,
-                        matchRangeInSnippet: window.matchRange
+                        matchRangeInSnippet: window.matchRange, textLayerRect: box.textLayerRect
                     ))
                     totalYielded += 1
                 }
@@ -1223,8 +1223,8 @@ public actor DocumentSearcher {
                     )
                     for hit in alwaysFlagResult.hits {
                         if Task.isCancelled || totalYielded >= Self.maxResults { break }
-                        guard let normalizedRect = boundingRect(for: hit.range, page: page) else { continue }
-                        pageRects.append(normalizedRect)
+                        guard let box = textLayerBox(for: hit.range, page: page) else { continue }
+                        pageRects.append(box.rect)
                         let ns = pageText as NSString
                         let matchedText = ns.substring(with: hit.range)
                         let window = contextSnippet(
@@ -1232,7 +1232,7 @@ public actor DocumentSearcher {
                         )
                         continuation.yield(SearchResult(
                             pageIndex: pageIndex,
-                            normalizedRect: normalizedRect,
+                            normalizedRect: box.rect,
                             matchedText: matchedText,
                             contextSnippet: window.snippet,
                             source: .textLayer,
@@ -1243,7 +1243,7 @@ public actor DocumentSearcher {
                                 ruleID: "user.alwaysFlag", preThresholdScore: 1.0,
                                 signals: [.userAlwaysFlag(pattern: hit.pattern)]
                             ).build(finalScore: 1.0),
-                            matchRangeInSnippet: window.matchRange
+                            matchRangeInSnippet: window.matchRange, textLayerRect: box.textLayerRect
                         ))
                         totalYielded += 1
                     }
@@ -1333,7 +1333,7 @@ public actor DocumentSearcher {
         // before resolveOverlaps, mirroring the text leg; the haystack is
         // the normalized concatenation so a located
         // range stays consistent with `lineOffsets`.
-        var spatialRectByText: [String: CGRect] = [:]
+        var spatialRectByText: [String: TextLayerBox] = [:]
         if categories.contains(.address) {
             let assemblerLines = lineOffsets.map { entry in
                 OCREngine.TextLine(
@@ -1391,7 +1391,7 @@ public actor DocumentSearcher {
             for match: PIIDetector.PIIMatch
         ) -> (rect: CGRect, window: ContextWindow, ocrConfidence: Float)? {
             guard let spatialRect =
-                (match.kind == .address ? spatialRectByText[match.text] : nil) else {
+                (match.kind == .address ? spatialRectByText[match.text]?.rect : nil) else {
                 return mapToOCR(match.range)
             }
             if let mapped = mapToOCR(match.range) {
@@ -1842,7 +1842,7 @@ public actor DocumentSearcher {
             let (baseStartOffset, baseLength) = span.baseOffsets
             // The rect's range on the RAW page text.
             guard let nsRange = prepared.rawNSRange(of: span) else { continue }
-            if let rects = lineRects(for: nsRange, page: page) {
+            if let rects = textLayerLines(for: nsRange, page: page) {
                 // Display span re-slices from the case-preserved
                 // analog at the already-mapped base offsets; matching stays
                 // on the normalized text. The
@@ -1869,16 +1869,16 @@ public actor DocumentSearcher {
 
                 // One result per line the match touches (the counting rule).
                 let occurrence = rects.count > 1 ? UUID() : nil
-                for normalizedRect in rects {
+                for line in rects {
                     results.append(SearchResult(
                         pageIndex: pageIndex,
-                        normalizedRect: normalizedRect,
+                        normalizedRect: line.rect,
                         matchedText: matchedText,
                         contextSnippet: window.snippet,
                         source: .textLayer,
                         term: term,
                         matchRangeInSnippet: window.matchRange,
-                        occurrenceID: occurrence
+                        occurrenceID: occurrence, textLayerRect: line.textLayerRect
                     ))
                 }
             }

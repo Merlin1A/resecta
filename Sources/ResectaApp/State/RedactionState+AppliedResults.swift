@@ -58,8 +58,9 @@ extension RedactionState {
         let applied = liveAppliedSearchResultIDs.intersection(results.map(\.id))
         var covered: Set<UUID> = []
         for result in results where !applied.contains(result.id) {
-            let rects = regions[result.pageIndex]?.map(\.normalizedRect) ?? []
-            if resultIsCovered(result.normalizedRect, by: rects) { covered.insert(result.id) }
+            let pageRegions = regions[result.pageIndex] ?? []
+            if resultIsCovered(result, paints: pageRegions.map(\.normalizedRect),
+                               strips: pageRegions.compactMap(\.textLayerRect)) { covered.insert(result.id) }
         }
         return (applied, covered)
     }
