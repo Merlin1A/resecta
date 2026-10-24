@@ -253,10 +253,19 @@ nonisolated final class UXFixesUITests: XCTestCase {
         let dismiss = app.buttons["searchDismissButton"]
         XCTAssertTrue(dismiss.waitForExistence(timeout: 30), "The sheet never presented under --openSearchSheet.")
 
+        // Park the way a person does: a slow drag from the sheet's grabber
+        // (just above the header row, clear of its buttons) to just above the
+        // compact float, so the sheet settles at the nearest detent. A quick
+        // fling to the screen's foot can carry the sheet past the compact
+        // float and dismiss it.
         for _ in 0..<2 where !compactFloatStrip.exists {
-            window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-                .press(forDuration: 0.1, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.97)))
+            let origin = window.coordinate(withNormalizedOffset: .zero)
+            let x = window.frame.midX - window.frame.minX
+            let grabber = origin.withOffset(CGVector(dx: x, dy: dismiss.frame.minY - window.frame.minY - 6))
+            let aboveCompact = origin.withOffset(CGVector(dx: x, dy: window.frame.height - 140))
+            grabber.press(forDuration: 0.3, thenDragTo: aboveCompact, withVelocity: .slow, thenHoldForDuration: 0.3)
             sleep(2)
+            XCTAssertTrue(dismiss.exists || compactFloatStrip.exists, "The park drag dismissed the sheet instead of parking it.")
         }
         XCTAssertTrue(compactFloatStrip.waitForExistence(timeout: 10), "The sheet did not park at the compact float.")
 
