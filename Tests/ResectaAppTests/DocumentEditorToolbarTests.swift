@@ -75,6 +75,18 @@ struct DocumentEditorToolbarTests {
         #expect(regions.first?.normalizedRect == PageNavigationBar.wholePageRegion().normalizedRect)
     }
 
+    @Test("The … menu's whole-page row is the page bar's toggle: Mark, then Unmark, on the page in view")
+    func overflowTogglesTheWholePage() {
+        let coordinator = makeCoordinator()
+        coordinator.documentState.sourceDocument = makeMultiPagePDFDocument(pages: 1)
+        coordinator.documentState.currentPageIndex = 0
+        let toolbar = toolbar(for: coordinator)
+        toolbar.toggleWholePage()
+        #expect(PageNavigationBar.isWholePageMarked(page: 0, in: coordinator.redactionState))
+        toolbar.toggleWholePage()
+        #expect((coordinator.redactionState.regions[0] ?? []).isEmpty, "the row unmarks a marked page")
+    }
+
     @Test("The … menu mounts Mark Whole Page last among the selection rows (layout + source pin)")
     func overflowMountsMarkWholePage() throws {
         let source = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorToolbar.swift")
