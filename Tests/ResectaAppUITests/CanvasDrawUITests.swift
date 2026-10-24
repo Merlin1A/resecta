@@ -164,29 +164,32 @@ nonisolated final class CanvasDrawUITests: XCTestCase {
         }
         attachScreenshot(named: "canvasdraw-t5-fit")
 
-        // Pinch the canvas (the tallest scroll view is PDFKit's); two
-        // honest attempts, each proven by the band drag committing.
+        // Pinch the canvas (the tallest scroll view is PDFKit's), proven by
+        // the page's colour: the canvas background just above the fit page
+        // turns page-white once the page is zoomed past it. A pinch that
+        // does not zoom in two attempts fails the leg.
+        let fitShot = try XCTUnwrap(CanvasPixelProbe(XCUIScreen.main.screenshot(), windowSize: window.frame.size))
+        let page = try XCTUnwrap(fitShot.fitPage(), "the page at fit is measurable")
+        let aboveTop = CGPoint(x: page.midX, y: page.minY - 8)
+        XCTAssertTrue(fitShot.isBackground(aboveTop), "the canvas background shows above the fit page")
         let canvas = tallestScrollView()
         var zoomed = false
-        for attempt in 1...2 {
+        for _ in 1...2 {
             canvas.pinch(withScale: 2.0, velocity: 1.0)
-            // Let PDFKit's zoom settle before the finger lands.
             sleep(3)
-            drag(fromNormalized: bandMid, byPoints: 24, 24)
-            if waitForRegionCount(1, timeout: 5) {
+            if let shot = CanvasPixelProbe(XCUIScreen.main.screenshot(), windowSize: window.frame.size),
+               !shot.isBackground(aboveTop) {
                 zoomed = true
                 break
             }
-            attachScreenshot(named: "canvasdraw-t5-pinch-attempt-\(attempt)")
         }
         attachScreenshot(named: "canvasdraw-t5-zoomed")
-        guard zoomed else {
-            throw XCTSkip(
-                "The zoom leg did not prove out in two attempts on this simulator (the pinch did not zoom, or the post-pinch drag was dropped — see the attached stills); the leg stays with the unit-level snapZoomScaleOverride proofs (DrawWinsTests) and the device pass."
-            )
-        }
+        XCTAssertTrue(zoomed, "the pinch zooms the page")
+        drag(fromNormalized: bandMid, byPoints: 24, 24)
+        XCTAssertTrue(waitForRegionCount(1, timeout: 5),
+                      "at zoom the band beneath the fit page lies on the page, and a 24 × 24 drag there commits")
 
-        // Zoomed: 9 × 9 screen pt stays under the 20-pt commit floor …
+        // Zoomed: 9 × 9 screen pt stays under the commit floor …
         drag(fromNormalized: bandLeft, byPoints: 9, 9)
         sleep(2)
         XCTAssertEqual(
