@@ -947,7 +947,7 @@ public actor DocumentSearcher {
                 }
             ) { matchRange in
                 guard let rawRange = regexPage.rawNSRange(matchRange),
-                      let normalizedRect = boundingRect(for: rawRange, page: sendablePage.page) else {
+                      let rects = lineRects(for: rawRange, page: sendablePage.page) else {
                     return false
                 }
                 let matchedText = nsString.substring(with: matchRange)
@@ -955,16 +955,20 @@ public actor DocumentSearcher {
                     text: searchText,
                     matchNSRange: matchRange
                 )
-
-                continuation.yield(SearchResult(
-                    pageIndex: pageIndex,
-                    normalizedRect: normalizedRect,
-                    matchedText: matchedText,
-                    contextSnippet: window.snippet,
-                    source: .textLayer,
-                    term: pattern,
-                    matchRangeInSnippet: window.matchRange
-                ))
+                // One result per line the match touches (the counting rule).
+                let occurrence = rects.count > 1 ? UUID() : nil
+                for normalizedRect in rects {
+                    continuation.yield(SearchResult(
+                        pageIndex: pageIndex,
+                        normalizedRect: normalizedRect,
+                        matchedText: matchedText,
+                        contextSnippet: window.snippet,
+                        source: .textLayer,
+                        term: pattern,
+                        matchRangeInSnippet: window.matchRange,
+                        occurrenceID: occurrence
+                    ))
+                }
                 return true
             }
             totalYielded += yielded
@@ -999,16 +1003,17 @@ public actor DocumentSearcher {
             return
         }
 
-        // AND mode requires accumulate-then-filter-then-stream.
+        // AND mode filters each page as it completes, then streams it: a
+        // page is kept when every term matched on it, and the result cap
+        // counts the survivors, so a page dense in one term alone cannot
+        // use up the cap for the pages that carry every term.
         // OR mode (default) streams results directly as before (zero behavior change).
         if options.multiTermConjunction {
-            // Accumulation phase: collect all per-term results up to maxResults.
-            // Peak memory is bounded by the existing cap — no page-streaming
-            // variant is needed.
-            var accumulated: [SearchResult] = []
+            let allTerms = Set(terms)
+            var totalYielded = 0
 
             for pageIndex in 0..<pageCount {
-                if Task.isCancelled || accumulated.count >= Self.maxResults { break }
+                if Task.isCancelled || totalYielded >= Self.maxResults { break }
                 // Per-page yield (mirrors searchRegex) so
                 // queued actor setters drain on each page boundary; the .rich
                 // text-layer arm otherwise holds the actor for the whole document.
@@ -1025,27 +1030,20 @@ public actor DocumentSearcher {
                 let useTextLayer = !pageText.isEmpty && pageHasRichTextLayer(pageIndex)
                 if useTextLayer { pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer)) }
 
+                var pageHits: [SearchResult] = []
                 for term in terms {
-                    if Task.isCancelled || accumulated.count >= Self.maxResults { break }
+                    if Task.isCancelled { break }
 
                     if useTextLayer {
-                        let hits = findTextMatches(
+                        pageHits.append(contentsOf: findTextMatches(
                             pageText: pageText, query: term, options: options,
                             page: page, pageIndex: pageIndex, term: term
-                        )
-                        for hit in hits {
-                            if accumulated.count >= Self.maxResults { break }
-                            accumulated.append(hit)
-                        }
+                        ))
                     } else if options.includeOCR {
-                        let ocrHits = await searchPageViaOCR(
+                        pageHits.append(contentsOf: await searchPageViaOCR(
                             page: page, pageIndex: pageIndex,
                             query: term, options: options, term: term
-                        )
-                        for hit in ocrHits {
-                            if accumulated.count >= Self.maxResults { break }
-                            accumulated.append(hit)
-                        }
+                        ))
                     }
                 }
                 // Scanned region (`.sparse`/`.none`) with OCR
@@ -1053,20 +1051,15 @@ public actor DocumentSearcher {
                 if !pageHasRichTextLayer(pageIndex) && !options.includeOCR {
                     scannedRegionNotAnalyzedSink?(pageIndex)
                 }
-            }
 
-            // Conjunction filter: retain only pages where every term has
-            // at least one result.
-            let allTerms = Set(terms)
-            let pageResults = Dictionary(grouping: accumulated, by: \.pageIndex)
-            let conjunctPages = pageResults.filter { _, pageHits in
-                let termsOnPage = Set(pageHits.map(\.term))
-                return allTerms.isSubset(of: termsOnPage)
-            }
-            let filteredResults = accumulated.filter { conjunctPages[$0.pageIndex] != nil }
-
-            for result in filteredResults {
-                continuation.yield(result)
+                // The conjunction: the page streams only when every term
+                // matched on it; the cap counts what streams.
+                guard allTerms.isSubset(of: Set(pageHits.map(\.term))) else { continue }
+                for hit in pageHits {
+                    if totalYielded >= Self.maxResults { break }
+                    continuation.yield(hit)
+                    totalYielded += 1
+                }
             }
 
             continuation.finish()
@@ -1389,21 +1382,9 @@ public actor DocumentSearcher {
         func mapToOCR(
             _ range: NSRange
         ) -> (rect: CGRect, window: ContextWindow, ocrConfidence: Float)? {
-            let matchStart = range.location
-            let matchEnd = matchStart + range.length
-
-            let overlappingLines = lineOffsets.filter { entry in
-                let lineEnd = entry.start + entry.normalizedText.utf16.count + 1
-                return entry.start < matchEnd && lineEnd > matchStart
-            }
-            guard let firstLine = overlappingLines.first else { return nil }
-
-            var unionRect = firstLine.normalizedRect
-            for entry in overlappingLines.dropFirst() {
-                unionRect = unionRect.union(entry.normalizedRect)
-            }
-
-            let paddedRect = Self.paddedNormalizedRect(unionRect, in: page)
+            guard let (paddedRect, overlappingLines) = ocrUnionRect(
+                forUTF16Range: range, lineOffsets: lineOffsets, page: page
+            ) else { return nil }
 
             // The canonical context window over the
             // normalized concatenation the detector matched in — the same
@@ -1411,7 +1392,7 @@ public actor DocumentSearcher {
             // with the match located inside it.
             let window = contextSnippet(text: concatenated, matchNSRange: range)
 
-            let ocrConfidence = overlappingLines.map(\.confidence).min() ?? firstLine.confidence
+            let ocrConfidence = overlappingLines.map(\.confidence).min() ?? 1.0
             return (paddedRect, window, ocrConfidence)
         }
 
@@ -1532,9 +1513,7 @@ public actor DocumentSearcher {
 
         // Search within OCR results
         var results: [SearchResult] = []
-        let normalizedQuery = options.normalizeUnicode
-            ? TextNormalizer.normalizeForSearch(query, caseSensitive: options.caseSensitive)
-            : (options.caseSensitive ? query : query.lowercased())
+        let normalizedQuery = SearchCore.normalizedText(query, options: options)
 
         for line in textLines {
             // Apply OCR confusable normalization BEFORE
@@ -1545,9 +1524,7 @@ public actor DocumentSearcher {
             // Manual-search per-line normalization stays in-loop — no
             // ocrNormalizedConcat writes (the PII path owns that cache).
             let ocrNormalizedText = self.ocrNormalizer.normalize(line.text)
-            let nfkcLineText = options.normalizeUnicode
-                ? TextNormalizer.normalizeForSearch(ocrNormalizedText, caseSensitive: options.caseSensitive)
-                : (options.caseSensitive ? ocrNormalizedText : ocrNormalizedText.lowercased())
+            let nfkcLineText = SearchCore.normalizedText(ocrNormalizedText, options: options)
 
             // Recall extensions on the OCR literal
             // path. The rect below is the whole LINE box (not offset-
@@ -1573,7 +1550,7 @@ public actor DocumentSearcher {
                 if options.normalizeSmartPunctuation {
                     display = TextNormalizer.normalizeSmartPunctuation(display)
                 }
-                return Array(display)
+                return Array(TextNormalizer.foldWhitespaceRuns(display))
             }()
             let displayLineText = String(displayLineChars)
 
@@ -1757,11 +1734,20 @@ public actor DocumentSearcher {
         var searchText = normalizedLines.joined(separator: "\n")
         guard !searchText.isEmpty else { return [] }
         // Page-side smart punctuation, same contract as the
-        // text-layer regex path. 1:1 substitution keeps both UTF-16
-        // NSRanges and the Character-offset line walk in ocrLineRect
-        // aligned with the per-line lengths.
+        // text-layer regex path. 1:1 substitution keeps the UTF-16
+        // NSRanges aligned with the per-line offsets below.
         if options.normalizeSmartPunctuation {
             searchText = TextNormalizer.normalizeSmartPunctuation(searchText)
+        }
+        // Each line's start in the joined text, in UTF-16 units (one line
+        // feed after each line), for the line union behind every rect.
+        var lineOffsets: [NormalizedLineEntry] = []
+        var cursor = 0
+        for (line, normalizedText) in zip(lines, normalizedLines) {
+            lineOffsets.append(NormalizedLineEntry(
+                start: cursor, normalizedText: normalizedText,
+                normalizedRect: line.normalizedRect, confidence: line.confidence))
+            cursor += normalizedText.utf16.count + 1
         }
 
         let nsString = searchText as NSString
@@ -1789,27 +1775,11 @@ public actor DocumentSearcher {
             timeout: effectiveTimeout, startTime: startTime,
             onTimeout: { snapshotTimeoutSink?(pageIndex) }
         ) { matchRange in
-            // Map the match start character offset to the containing OCR
-            // line's bounding rect. The NSRange location is a UTF-16 offset;
-            // convert to a Character offset first for the line-walk cursor.
-            // NOTE: OCRTextNormalizer is same-length by construction, so
-            // Character offset == UTF-16 offset for all ASCII-range confusable
-            // substitutions. For robustness, use String.index conversion.
-            let charOffset: Int
-            if let swiftRange = Range(matchRange, in: searchText) {
-                charOffset = searchText.distance(
-                    from: searchText.startIndex, to: swiftRange.lowerBound
-                )
-            } else {
-                charOffset = matchRange.location
-            }
-
-            guard let normalizedRect = ocrLineRect(
-                forCharOffset: charOffset,
-                inText: searchText,
-                lines: lines,
-                page: sendablePage.page
+            // The union of every recognised line the match overlaps.
+            guard let mapped = ocrUnionRect(
+                forUTF16Range: matchRange, lineOffsets: lineOffsets, page: sendablePage.page
             ) else { return false }
+            let normalizedRect = mapped.rect
 
             let matchedText = nsString.substring(with: matchRange)
             let window = contextSnippet(text: searchText, matchNSRange: matchRange)
@@ -1872,7 +1842,7 @@ public actor DocumentSearcher {
             if effectiveOptions.normalizeSmartPunctuation {
                 display = TextNormalizer.normalizeSmartPunctuation(display)
             }
-            return Array(display)
+            return Array(TextNormalizer.foldWhitespaceRuns(display))
         }()
         let displayBaseText = String(displayBaseChars)
 
@@ -1897,7 +1867,7 @@ public actor DocumentSearcher {
 
             // The rect's range on the RAW page text (`PreparedPage.rawNSRange`).
             guard let nsRange = prepared.rawNSRange(baseStart: baseStartOffset, length: baseLength) else { continue }
-            if let normalizedRect = boundingRect(for: nsRange, page: page) {
+            if let rects = lineRects(for: nsRange, page: page) {
                 // Display span re-slices from the case-preserved
                 // analog at the already-mapped base offsets; matching stays
                 // on the normalized text. The
@@ -1922,15 +1892,20 @@ public actor DocumentSearcher {
                     searchedText: searchPageText, searchedStart: matchStartOffset, searchedLength: matchLength
                 )
 
-                results.append(SearchResult(
-                    pageIndex: pageIndex,
-                    normalizedRect: normalizedRect,
-                    matchedText: matchedText,
-                    contextSnippet: window.snippet,
-                    source: .textLayer,
-                    term: term,
-                    matchRangeInSnippet: window.matchRange
-                ))
+                // One result per line the match touches (the counting rule).
+                let occurrence = rects.count > 1 ? UUID() : nil
+                for normalizedRect in rects {
+                    results.append(SearchResult(
+                        pageIndex: pageIndex,
+                        normalizedRect: normalizedRect,
+                        matchedText: matchedText,
+                        contextSnippet: window.snippet,
+                        source: .textLayer,
+                        term: term,
+                        matchRangeInSnippet: window.matchRange,
+                        occurrenceID: occurrence
+                    ))
+                }
             }
         }
 
