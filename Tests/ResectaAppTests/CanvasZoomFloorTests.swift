@@ -1,6 +1,7 @@
 import Testing
 import UIKit
 import PDFKit
+import RedactionEngine
 @testable import ResectaApp
 
 // The document view's zoom floor. `FitFlooredPDFView`
@@ -164,5 +165,69 @@ struct CanvasZoomFloorTests {
         #expect(doubleTaps.first?.cancelsTouchesInView == false, "region taps underneath still land")
         view.returnToFit()
         #expect(near(view.scaleFactor, fit), "scale \(view.scaleFactor) after a double tap vs fit \(fit)")
+    }
+
+    // MARK: - One finger draws, two fingers scroll
+
+    private static func scrollViews(in view: UIView) -> [UIScrollView] {
+        view.subviews.flatMap { sub -> [UIScrollView] in
+            ((sub as? UIScrollView).map { [$0] } ?? []) + scrollViews(in: sub)
+        }
+    }
+
+    @Test("With the Rectangle tool on, PDFKit's scroll pan needs two fingers, wherever PDFKit nests its scroll view")
+    func drawModeScrollNeedsTwoFingers() throws {
+        let (view, _) = makeView()
+        let coordinator = PDFViewCoordinator()
+        coordinator.pdfView = view
+        let pans = Self.scrollViews(in: view).map(\.panGestureRecognizer)
+        try #require(!pans.isEmpty, "PDFKit's view carries a scroll view")
+        coordinator.updateDrawingMode(true, isDrawing: true)
+        #expect(pans.contains { $0.minimumNumberOfTouches == 2 }, "one finger draws")
+        coordinator.updateDrawingMode(true, isDrawing: false)
+        #expect(pans.allSatisfy { $0.minimumNumberOfTouches == 1 }, "the tool off, one finger scrolls again")
+        withExtendedLifetime(coordinator) {}
+    }
+
+    @Test("A one-finger touch the overlay claims never scrolls; a touch on empty page scrolls with one finger; the pinch is untouched")
+    func claimedTouchNeedsTwoFingersToScroll() throws {
+        let (view, _) = makeView()
+        let state = RedactionState()
+        let region = RedactionRegion(id: UUID(), normalizedRect: CGRect(x: 0.2, y: 0.5, width: 0.3, height: 0.1), source: .manual)
+        state.addRegion(region, page: 0, undoManager: nil)
+        let coordinator = PDFViewCoordinator()
+        coordinator.redactionState = state
+        coordinator.pdfView = view
+        let page = try #require(view.document?.page(at: 0))
+        let overlay = try #require(coordinator.pdfView(view, overlayViewFor: page) as? RedactionOverlayView)
+        overlay.frame = CGRect(origin: .zero, size: Self.letter)
+        coordinator.updateDrawingMode(true, isDrawing: false)
+        let scrolls = Self.scrollViews(in: view)
+        try #require(!scrolls.isEmpty)
+        let box = overlay.pdfNormalizedToOverlay(region.normalizedRect)
+
+        #expect(overlay.hitTest(CGPoint(x: box.midX, y: box.midY), with: nil) === overlay, "the overlay claims a touch on a region")
+        #expect(scrolls.contains { $0.panGestureRecognizer.minimumNumberOfTouches == 2 }, "from that touch-down one finger does not scroll")
+        #expect(scrolls.allSatisfy { $0.pinchGestureRecognizer?.isEnabled ?? true }, "the pinch is untouched")
+
+        #expect(overlay.hitTest(CGPoint(x: 20, y: 20), with: nil) == nil, "empty page is PDFKit's")
+        #expect(scrolls.allSatisfy { $0.panGestureRecognizer.minimumNumberOfTouches == 1 }, "a touch on empty page scrolls with one finger")
+        withExtendedLifetime((coordinator, overlay)) {}
+    }
+
+    @Test("The double tap is for empty page: it refuses a touch the canvas overlay claims and takes one on the page")
+    func doubleTapRefusesTheOverlaysTouches() throws {
+        let (view, _) = makeView()
+        let doubleTap = try #require((view.gestureRecognizers ?? []).first { $0.name == FitFlooredPDFView.returnToFitGestureName })
+        let overlay = RedactionOverlayView(frame: CGRect(origin: .zero, size: Self.letter))
+        func receives(_ touchView: UIView) -> Bool {
+            doubleTap.delegate?.gestureRecognizer?(doubleTap, shouldReceive: StubTouch(location: .zero, view: touchView)) ?? true
+        }
+        #expect(receives(overlay) == false, "a region, a handle, a draw or an Add to Selection touch is never a double tap")
+        #expect(receives(view), "a touch on the page is")
+        view.scaleFactor = view.scaleFactorForSizeToFit * 2
+        view.returnToFit()
+        settle(view)
+        #expect(near(view.scaleFactor, view.scaleFactorForSizeToFit), "the double tap ends at fit")
     }
 }

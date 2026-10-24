@@ -13,8 +13,9 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Settings: a "Rate Resecta on the App Store" row under Support opens the App Store's review page for the app.
 - Acknowledgements: the third-party data and typeface notices the app ships (the repo-root NOTICE) are bundled and readable in-app, from the first-launch gate beside the EULA and Privacy Policy and from Settings.
 - Photos and images (JPEG, PNG and HEIC) can be opened from the system Photos picker (up to 20 at a time, in the order chosen), from Files, or by a drop onto an open document; each image becomes one page of a new PDF, redrawn from its decoded pixels at 300 pixels per inch, so the image's embedded metadata is not carried into the document.
-- Double-tap the page to return to the fit zoom.
 - Page bar: Mark Whole Page covers the page on screen with one region, through the same path a drawn region takes, and no search term is captured from it; on a marked page the control reads Unmark Whole Page and removes it, each way one undo step, and it keeps its place when the count changes; it is hidden on a one-page document, where the … menu keeps it. Marking a page that is already marked, from the bar or the menu, adds nothing.
+- Double-tap an empty part of the page to return to the fit zoom.
+- Page bar: a Mark Whole Page control beside the page chevrons adds one redaction region covering the page on screen, through the same path a drawn region takes — the counter reads "1 region", Undo removes it in one step, and no search term is captured from it.
 - Import: a password-protected PDF can be opened by entering its password; the import checks run on the unlocked document, and the redacted copy is not password-protected. The password is held in memory while the document is open and released when the session closes; the failed-state card beneath the password sheet reads as locked rather than damaged. A document that was encrypted — one opened with a password, or one carrying only an owner password — shows a notice at import and a caption on the Share card saying the redacted copy carries neither the password nor the original's usage restrictions.
 - With Differentiate Without Color on, every region of a multi-region selection also carries a dashed outline.
 
@@ -228,6 +229,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - The size label, the region outlines, the lift shadow and the handle rings keep one on-screen size at every zoom, and the lift shadow shows in dark appearance.
 - A tap on a selected region no longer moves or reshapes it, and a resize keeps the edge where it was grabbed.
 - A region moved against the page edge stays on the page when it aligns to a guide.
+- When zoomed in, dragging a selected region moves it instead of scrolling the page; two fingers scroll.
 
 ### Internal
 

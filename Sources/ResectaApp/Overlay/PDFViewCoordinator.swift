@@ -410,8 +410,7 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
         refreshAllOverlays()
     }
 
-    /// Update drawing mode on all active overlays.
-    /// Also configures two-finger scroll when draw mode is active.
+    /// Update drawing mode on all active overlays, and the scroll's fingers.
     func updateDrawingMode(_ enabled: Bool, isDrawing: Bool) {
         isDrawingEnabled = enabled
         isDrawingMode = isDrawing
@@ -420,11 +419,27 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
             overlay.isDrawingMode = isDrawing
         }
 
-        // Two-finger scroll in draw mode — universal iOS annotation pattern.
-        // When draw is active, single-finger pans are used for drawing, so scroll
-        // requires two fingers. Reset to one finger when draw is inactive.
+        applyScrollFingers()
+    }
+
+    /// Whether the overlay claimed the touch now down (a region, a
+    /// handle, a draw, a marquee), reported by its hit test at each
+    /// touch-down and cleared when the touch ends.
+    private var canvasHoldsTouch = false
+
+    func setCanvasHoldsTouch(_ held: Bool) {
+        guard held != canvasHoldsTouch else { return }
+        canvasHoldsTouch = held
+        applyScrollFingers()
+    }
+
+    /// The one home for when one finger scrolls: while the Rectangle tool
+    /// is on, or while the overlay holds a one-finger touch it claimed, one
+    /// finger draws, moves or resizes, so PDFKit's scroll pan needs two
+    /// fingers. The pinch is untouched.
+    private func applyScrollFingers() {
         if let scrollView = pdfView?.subviews.first(where: { $0 is UIScrollView }) as? UIScrollView {
-            scrollView.panGestureRecognizer.minimumNumberOfTouches = isDrawing ? 2 : 1
+            scrollView.panGestureRecognizer.minimumNumberOfTouches = isDrawingMode || canvasHoldsTouch ? 2 : 1
         }
     }
 

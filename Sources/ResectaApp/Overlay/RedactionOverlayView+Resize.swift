@@ -12,6 +12,15 @@ extension RedactionOverlayView {
 
     // MARK: - Resize
 
+    /// Begin a resize on the selected region's `handle`: the rect it starts
+    /// from is the drag's anchor and the cancel's restore.
+    func beginResize(_ handle: ResizeHandle, at point: CGPoint) {
+        activeResizeHandle = handle
+        preResizeNormalizedRect = selectedID.flatMap { id in regions.first { $0.id == id }?.normalizedRect }
+        dragStartPoint = point
+        isActivelyDragging = true
+    }
+
     /// Resize the selected region toward the dragged handle. The rect the
     /// resize began with is the anchor for the whole drag, and the handle
     /// keeps the offset from the finger it was grabbed at; a finger past
