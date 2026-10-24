@@ -13,17 +13,21 @@ extension RedactionOverlayView {
     // MARK: - Resize
 
     /// Resize the selected region toward the dragged handle. The rect the
-    /// resize began with is the anchor for the whole drag; a finger past
+    /// resize began with is the anchor for the whole drag, and the handle
+    /// keeps the offset from the finger it was grabbed at; a finger past
     /// the opposite edge flips the box about that edge; the snap acts on the
     /// edges that now move, and the size floor holds after it, on those
     /// axes only.
     func updateSelectedRegionForResize(handle: ResizeHandle, to point: CGPoint) {
-        guard let selectedID,
+        guard passStartSlop(to: point), let selectedID,
               let idx = regions.firstIndex(where: { $0.id == selectedID }),
-              let start = preResizeNormalizedRect
+              let start = preResizeNormalizedRect, let touchDown = dragStartPoint
         else { return }
 
-        let resized = Self.resizedRect(pdfNormalizedToOverlay(start), handle: handle, to: point)
+        let startRect = pdfNormalizedToOverlay(start)
+        let grabbed = Self.handlePoint(handle, in: startRect)
+        let edge = CGPoint(x: point.x + grabbed.x - touchDown.x, y: point.y + grabbed.y - touchDown.y)
+        let resized = Self.resizedRect(startRect, handle: handle, to: edge)
         var newRect = snapEngine.applyResizeSnapping(
             to: resized.rect, handle: resized.handle, excluding: selectedID, in: snapPage)
         newRect = Self.flooredRect(newRect, handle: resized.handle,
@@ -49,6 +53,13 @@ extension RedactionOverlayView {
         case .leftCenter: return (true, false, false, false)
         case .rightCenter: return (false, true, false, false)
         }
+    }
+
+    /// Where a handle sits on `rect`.
+    static func handlePoint(_ handle: ResizeHandle, in rect: CGRect) -> CGPoint {
+        let edges = movingEdges(handle)
+        return CGPoint(x: edges.left ? rect.minX : edges.right ? rect.maxX : rect.midX,
+                       y: edges.top ? rect.minY : edges.bottom ? rect.maxY : rect.midY)
     }
 
     /// The handle that moves exactly these edges.

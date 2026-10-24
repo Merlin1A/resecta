@@ -102,8 +102,11 @@ class RedactionOverlayView: UIView {
     var isGroupMoving: Bool = false
     /// Pre-drag normalized rects for all regions in the group move, for cancel restoration.
     var preDragGroupRects: [UUID: CGRect] = [:]
-    /// Touch start point for computing group move delta.
-    var groupMoveStart: CGPoint?
+    /// Where the touch went down for a move, a group move or a resize: the
+    /// start slop and the grab offset read it.
+    var dragStartPoint: CGPoint?
+    /// True once the finger has travelled past the start slop (`+Move`).
+    var hasPassedStartSlop = false
     /// The member the group move's touch landed on.
     var groupMoveTouchedID: UUID?
     /// The region an Add to Selection touch landed on, toggled on lift.
@@ -420,6 +423,7 @@ class RedactionOverlayView: UIView {
         if let handle = hitTestResizeHandle(at: point) {
             activeResizeHandle = handle
             preResizeNormalizedRect = selectedID.flatMap { id in regions.first { $0.id == id }?.normalizedRect }
+            dragStartPoint = point
             isActivelyDragging = true
             return
         }
@@ -601,7 +605,7 @@ class RedactionOverlayView: UIView {
         }
 
         // Commit single move
-        if isDraggingExistingRegion, let id = selectedID,
+        if isDraggingExistingRegion, hasPassedStartSlop, let id = selectedID,
            let region = regions.first(where: { $0.id == id }) {
             moveCommitFeedback.impactOccurred()
             coordinator?.commitMove(id, page: pageIndex,
@@ -611,7 +615,7 @@ class RedactionOverlayView: UIView {
         }
 
         // Commit resize
-        if activeResizeHandle != nil, let id = selectedID,
+        if activeResizeHandle != nil, hasPassedStartSlop, let id = selectedID,
            let region = regions.first(where: { $0.id == id }) {
             moveCommitFeedback.impactOccurred(intensity: 0.4)  // a light tick: the resize landed
             coordinator?.commitResize(id, page: pageIndex,
@@ -685,7 +689,8 @@ class RedactionOverlayView: UIView {
         // Group move cleanup
         isGroupMoving = false
         preDragGroupRects = [:]
-        groupMoveStart = nil
+        dragStartPoint = nil
+        hasPassedStartSlop = false
         groupMoveTouchedID = nil
         pendingToggleID = nil
         // Snap state cleanup
