@@ -16,13 +16,16 @@ extension DocumentSearcher {
         /// The hidden glyphs' selection box on a page with a hidden layer
         /// over a page image; nil elsewhere.
         let textLayerRect: CGRect?
+        /// The fit could not read the page in time: `rect` is the drift
+        /// envelope around the hidden glyphs, not the ink they name.
+        var degraded = false
     }
 
     /// One box per line the range's selection touches (the `lineRects`
     /// counting rule), each with its hidden glyphs' box where the page has one.
     nonisolated func textLayerLines(for nsRange: NSRange, page: PDFPage) -> [TextLayerBox]? {
         if let split = textLayerAndInkRects(for: nsRange, page: page) {
-            return zip(split.paint, split.strip).map { TextLayerBox(rect: $0, textLayerRect: $1) }
+            return zip(split.paint, split.strip).map { TextLayerBox(rect: $0, textLayerRect: $1, degraded: split.degraded) }
         }
         return lineRects(for: nsRange, page: page)?.map { TextLayerBox(rect: $0, textLayerRect: nil) }
     }
@@ -33,7 +36,8 @@ extension DocumentSearcher {
         if let split = textLayerAndInkRects(for: nsRange, page: page), let paint = split.paint.first,
            let strip = split.strip.first {
             return TextLayerBox(rect: split.paint.dropFirst().reduce(paint) { $0.union($1) },
-                                textLayerRect: split.strip.dropFirst().reduce(strip) { $0.union($1) })
+                                textLayerRect: split.strip.dropFirst().reduce(strip) { $0.union($1) },
+                                degraded: split.degraded)
         }
         return boundingRect(for: nsRange, page: page).map { TextLayerBox(rect: $0, textLayerRect: nil) }
     }

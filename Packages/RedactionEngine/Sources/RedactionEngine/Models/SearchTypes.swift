@@ -291,6 +291,10 @@ public struct SearchResult: Sendable, Identifiable, Equatable {
     /// names: a Searchable export strips the text layer under both, and the
     /// fill paints `normalizedRect` alone. nil on every other page.
     public let textLayerRect: CGRect?
+    /// The ink fit could not read the page in time, so `normalizedRect` is
+    /// the drift envelope around the hidden glyphs (a larger box, never a
+    /// smaller one). false on every other result.
+    public let inkFitDegraded: Bool
 
     public init(
         id: UUID = UUID(),
@@ -306,7 +310,8 @@ public struct SearchResult: Sendable, Identifiable, Equatable {
         rationale: MatchRationale? = nil,
         matchRangeInSnippet: Range<Int>? = nil,
         occurrenceID: UUID? = nil,
-        textLayerRect: CGRect? = nil
+        textLayerRect: CGRect? = nil,
+        inkFitDegraded: Bool = false
     ) {
         self.id = id
         self.pageIndex = pageIndex
@@ -322,6 +327,7 @@ public struct SearchResult: Sendable, Identifiable, Equatable {
         self.matchRangeInSnippet = matchRangeInSnippet
         self.occurrenceID = occurrenceID
         self.textLayerRect = textLayerRect
+        self.inkFitDegraded = inkFitDegraded
     }
 }
 

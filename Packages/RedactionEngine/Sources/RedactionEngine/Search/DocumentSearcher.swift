@@ -280,7 +280,7 @@ public actor DocumentSearcher {
         let sentinelLocation = haystack.length
         for address in assembled {
             if spatialRectByText[address.text] == nil {
-                spatialRectByText[address.text] = TextLayerBox(rect: address.unionRect, textLayerRect: address.textLayerUnionRect)
+                spatialRectByText[address.text] = TextLayerBox(rect: address.unionRect, textLayerRect: address.textLayerUnionRect, degraded: address.inkFitDegraded)
             }
             let searchRange = NSRange(location: 0, length: sentinelLocation)
             let located = haystack.range(of: address.text, options: [], range: searchRange)
@@ -958,7 +958,7 @@ public actor DocumentSearcher {
                         source: .textLayer,
                         term: pattern,
                         matchRangeInSnippet: window.matchRange,
-                        occurrenceID: occurrence, textLayerRect: line.textLayerRect
+                        occurrenceID: occurrence, textLayerRect: line.textLayerRect, inkFitDegraded: line.degraded
                     ))
                 }
                 return true
@@ -1205,7 +1205,7 @@ public actor DocumentSearcher {
                         piiCategory: match.category,
                         piiConfidence: match.confidence,
                         rationale: match.rationale,
-                        matchRangeInSnippet: window.matchRange, textLayerRect: box.textLayerRect
+                        matchRangeInSnippet: window.matchRange, textLayerRect: box.textLayerRect, inkFitDegraded: box.degraded
                     ))
                     totalYielded += 1
                 }
@@ -1243,7 +1243,7 @@ public actor DocumentSearcher {
                                 ruleID: "user.alwaysFlag", preThresholdScore: 1.0,
                                 signals: [.userAlwaysFlag(pattern: hit.pattern)]
                             ).build(finalScore: 1.0),
-                            matchRangeInSnippet: window.matchRange, textLayerRect: box.textLayerRect
+                            matchRangeInSnippet: window.matchRange, textLayerRect: box.textLayerRect, inkFitDegraded: box.degraded
                         ))
                         totalYielded += 1
                     }
@@ -1878,7 +1878,7 @@ public actor DocumentSearcher {
                         source: .textLayer,
                         term: term,
                         matchRangeInSnippet: window.matchRange,
-                        occurrenceID: occurrence, textLayerRect: line.textLayerRect
+                        occurrenceID: occurrence, textLayerRect: line.textLayerRect, inkFitDegraded: line.degraded
                     ))
                 }
             }

@@ -228,6 +228,12 @@ nonisolated func resultIsCovered(_ resultRect: CGRect, by rects: [CGRect]) -> Bo
 /// of a character can sit outside a box that counts as covering it.
 nonisolated let coverageEdgeTolerance: CGFloat = 0.000_001
 
+/// The regions' painted boxes and hidden glyphs' boxes per page: the apply's
+/// covering snapshot, taken on MainActor before the detached prepare.
+nonisolated func coveringRectsByPage(_ regions: [Int: [RedactionRegion]]) -> (paints: [Int: [CGRect]], strips: [Int: [CGRect]]) {
+    (regions.mapValues { $0.map(\.normalizedRect) }, regions.mapValues { $0.compactMap(\.textLayerRect) })
+}
+
 /// The coverage rule for a search result: its box held whole by one of the
 /// regions' painted boxes alone (the rule above), and its hidden glyphs' box,
 /// when it has one, held whole by one painted or stripped box, by the same rule.

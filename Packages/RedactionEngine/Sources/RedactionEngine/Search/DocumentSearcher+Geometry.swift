@@ -88,12 +88,13 @@ extension DocumentSearcher {
     /// bitmap produced by renderPage()/getDrawingTransform().
     ///
     /// SECURITY NOTE: Wrong normalization = fill at wrong pixel position = data leak.
-    /// On a page whose text lies over a page-scale image the box is fitted
-    /// to the ink under it (`inkFittedRect`).
+    /// On a page whose text lies over a page-scale image the box is the ink
+    /// under it alone (`inkFittedRect`, paint only), the box Apply paints; the
+    /// hidden glyphs' own box rides on the result (`textLayerAndInkRects`).
     public nonisolated func boundingRect(for nsRange: NSRange, page: PDFPage) -> CGRect? {
         guard let selection = page.selection(for: nsRange) else { return nil }
         return normalizedRect(for: selection, page: page).map {
-            Self.inkFittedRect($0, page: page, text: selection.string, range: nsRange)
+            Self.inkFittedRect($0, page: page, text: selection.string, range: nsRange, paintOnly: true)
         }
     }
 
@@ -108,7 +109,7 @@ extension DocumentSearcher {
         let rects = lines.compactMap { line in
             normalizedRect(for: line, page: page).map {
                 Self.inkFittedRect($0, page: page, text: line.string,
-                                   range: lines.count == 1 ? nsRange : line.range(at: 0, on: page))
+                                   range: lines.count == 1 ? nsRange : line.range(at: 0, on: page), paintOnly: true)
             }
         }
         return rects.isEmpty ? nil : rects

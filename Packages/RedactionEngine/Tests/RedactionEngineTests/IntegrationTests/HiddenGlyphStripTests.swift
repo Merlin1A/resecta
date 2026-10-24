@@ -190,6 +190,88 @@ struct HiddenGlyphStripTests {
                 "the fixture no longer leaves an address glyph past the painted box; the test above proves nothing")
     }
 
+    @Test("on a re-imported export the address hit carries its hidden glyphs' box and is painted clear of the next line")
+    func addressHitOnReimportedExport() async throws {
+        let (export, _) = try await PageImageInkFitTests.reimportedExport()
+        let page = try #require(export.page(at: 0))
+        var options = SearchOptions()
+        options.includeOCR = false
+        var hits: [SearchResult] = []
+        for await result in DocumentSearcher().search(SendablePDFDocument(export),
+                                                      mode: .piiScan(categories: [.address], options: options),
+                                                      progress: { _, _ in }) where result.pageIndex == 0 {
+            hits.append(result)
+        }
+        // The holder's address line the scan reports on the re-imported page.
+        let hit = try #require(hits.first { $0.matchedText.contains("83702") }, "the address on page 1: \(hits.map(\.matchedText))")
+        let strip = try #require(hit.textLayerRect, "the address carries its hidden glyphs' box")
+        // Every hidden glyph of the address lies inside it.
+        let text = (page.string ?? "") as NSString
+        let searcher = DocumentSearcher()
+        for word in ["Boise, ID 83702", "83702"] {
+            let range = text.range(of: word)
+            try #require(range.location != NSNotFound, "\(word) is in the hidden layer")
+            let selection = try #require(page.selection(for: range))
+            let box = try #require(searcher.normalizedRect(for: selection, page: page))
+            #expect(strip.insetBy(dx: -0.0005, dy: -0.0005).contains(box), "\(word): \(box) outside \(strip)")
+        }
+        // The paint is the address's ink: it reaches no glyph of the line after it.
+        let next = try #require(await PageImageInkFitTests.hits(export, "Account Summary", includeOCR: false)
+            .first { $0.pageIndex == 0 })
+        let overlap = hit.normalizedRect.intersection(next.normalizedRect)
+        #expect(overlap.isNull || overlap.height * page.bounds(for: .cropBox).height < 0.5,
+                "the address paint \(hit.normalizedRect) reaches the next line \(next.normalizedRect)")
+    }
+
+    @Test("a search over a stalled page read marks its results degraded with the drift envelope, and keeps none of it")
+    func stalledFitMarksResultsDegraded() async throws {
+        // An export of this test's own (two words redacted), so its page
+        // content key is no other test's.
+        let data = try TestFixtures.sampleStatementPDF()
+        let source = try #require(PDFDocument(data: data))
+        var regions: [Int: [RedactionRegion]] = [:]
+        for hit in await PageImageInkFitTests.hits(source, "Sample", includeOCR: false)
+            + (await PageImageInkFitTests.hits(source, "Summary", includeOCR: false)) {
+            regions[hit.pageIndex, default: []].append(
+                RedactionRegion(id: UUID(), normalizedRect: hit.normalizedRect, source: .manual))
+        }
+        let url = try await TestPipeline.processAndExport(data, mode: .searchableRedaction, regions: regions, dpi: 300)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let export = try #require(PDFDocument(data: try Data(contentsOf: url)))
+        let page = try #require(export.page(at: 0))
+        let key = InkTokenCache.key(page: page, cgPage: try #require(page.pageRef), visual: page.bounds(for: .cropBox).size)
+        DocumentSearcher.inkFitInjectedStalls.set((3.0, 0.5), for: key)
+        let stalled = await PageImageInkFitTests.hits(export, "Hartwell", includeOCR: false).filter { $0.pageIndex == 0 }
+        DocumentSearcher.inkFitInjectedStalls.set(nil, for: key)
+        try #require(!stalled.isEmpty)
+        let size = page.bounds(for: .cropBox).size
+        for result in stalled {
+            #expect(result.inkFitDegraded, "the result says its box is the drift envelope")
+            let strip = try #require(result.textLayerRect)
+            // The drift envelope at its smallest (the line's start, no wide
+            // characters before it): the hidden glyphs' box grown by the drift
+            // bound along the line and across it, on the page.
+            let box = CGRect(x: strip.minX * size.width, y: strip.minY * size.height,
+                             width: strip.width * size.width, height: strip.height * size.height)
+            let grown = DocumentSearcher.driftBound(around: box)
+                .intersection(CGRect(origin: .zero, size: size))
+            let envelope = CGRect(x: grown.minX / size.width, y: grown.minY / size.height,
+                                  width: grown.width / size.width, height: grown.height / size.height)
+            #expect(result.normalizedRect.insetBy(dx: -1e-6, dy: -1e-6).contains(envelope),
+                    "the degraded paint \(result.normalizedRect) covers the envelope \(envelope)")
+        }
+        // Nothing degraded was kept: once the stalled read is done, the same
+        // search fits every box. The read's end is waited on, not timed.
+        var fitted: [SearchResult] = []
+        let deadline = Date().addingTimeInterval(30)
+        repeat {
+            try await Task.sleep(for: .milliseconds(500))
+            fitted = await PageImageInkFitTests.hits(export, "Hartwell", includeOCR: false).filter { $0.pageIndex == 0 }
+        } while fitted.contains(where: \.inkFitDegraded) && Date() < deadline
+        #expect(fitted.count == stalled.count)
+        #expect(fitted.allSatisfy { !$0.inkFitDegraded }, "a degraded box was served from a cache")
+    }
+
     @Test("Secure output is the same with or without the hidden glyphs' box")
     func secureUnchanged() async throws {
         let f = try Self.fixture()
