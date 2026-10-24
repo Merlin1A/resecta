@@ -116,8 +116,16 @@ extension VerificationEngine {
         let allMatches = termAutomaton.tokenFilteredMatches(in: data)
         if !allMatches.isEmpty {
             let streamRanges = findStreamRanges(data)
+            // Only bytes inside a STRING object (a literal `( … )` or a hex
+            // `< … >`) can carry text a user redacted; a name, a number or a
+            // keyword is the file's own syntax — a manual term "Page" or
+            // "612" matches `/Type /Page` and `/MediaBox [0 0 612 792]` in
+            // every correct file (2026-10-22). A match outside a string
+            // object is no structural result.
+            let stringRanges = Self.stringObjectRanges(data, excluding: streamRanges)
             let structuralMatches = allMatches.filter { match in
                 !streamRanges.contains { $0.contains(match.position) }
+                    && stringRanges.contains { $0.contains(match.position) }
             }
             if !structuralMatches.isEmpty {
                 // Token-boundary rule ("verify matches are complete PDF
@@ -256,6 +264,52 @@ extension VerificationEngine {
     /// no ranges at all, so a malformed writer's streams are still excluded
     /// rather than raw-byte-scanned (malformed-file tolerance; compressed
     /// stream bytes as false-positive fodder is the worse failure there).
+    /// The byte ranges of the string objects outside `streams`: a literal
+    /// string from its `(` through its balancing `)` (nested parentheses
+    /// counted, a backslash escaping the next byte) and a hex string from a
+    /// `<` that does not open a dictionary through its `>`. A comment (`%`
+    /// to the end of the line) outside a string is skipped. An unterminated
+    /// string runs to the end of the data. `static` so the scanner has a
+    /// direct test.
+    static func stringObjectRanges(_ data: Data, excluding streams: [Range<Int>]) -> [Range<Int>] {
+        let skip = streams.sorted { $0.lowerBound < $1.lowerBound }
+        var out: [Range<Int>] = []
+        data.withUnsafeBytes { raw in
+            let b = raw.bindMemory(to: UInt8.self)
+            let n = b.count
+            var i = 0, s = 0
+            while i < n {
+                while s < skip.count && skip[s].upperBound <= i { s += 1 }
+                if s < skip.count && skip[s].contains(i) { i = skip[s].upperBound; continue }
+                switch b[i] {
+                case 0x25:   // % comment
+                    while i < n && b[i] != 0x0A && b[i] != 0x0D { i += 1 }
+                case 0x28:   // ( literal string
+                    let start = i
+                    var depth = 0
+                    while i < n {
+                        let c = b[i]
+                        if c == 0x5C { i += 2; continue }
+                        if c == 0x28 { depth += 1 } else if c == 0x29 { depth -= 1; if depth == 0 { i += 1; break } }
+                        i += 1
+                    }
+                    i = min(i, n)
+                    out.append(start..<i)
+                case 0x3C:   // < hex string, or << a dictionary
+                    if i + 1 < n && b[i + 1] == 0x3C { i += 2; continue }
+                    let start = i
+                    i += 1
+                    while i < n && b[i] != 0x3E { i += 1 }
+                    i = min(i + 1, n)
+                    out.append(start..<i)
+                default:
+                    i += 1
+                }
+            }
+        }
+        return out
+    }
+
     private func findStreamRanges(_ data: Data) -> [Range<Int>] {
         let strict = scanStreamRanges(data, requireKeywordEOL: true)
         if !strict.isEmpty { return strict }

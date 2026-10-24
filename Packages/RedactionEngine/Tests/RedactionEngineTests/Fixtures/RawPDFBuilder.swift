@@ -1460,7 +1460,7 @@ enum TestFixtures {
     /// stream range reaching the real stream's `endstream`, swallowing the
     /// term-bearing object — Layer 3's structural pass then reported
     /// nothing. With the gate, only the real stream is excluded and the
-    /// structural term FAILs as a complete token.
+    /// structural term (a string object) FAILs as a complete token.
     static func downstreamPhantomRange(term: String) -> Data {
         buildRawPDF(objects: [
             PDFObject(id: 1, content: "<< /Type /Catalog /Pages 2 0 R >>"),
@@ -1473,7 +1473,7 @@ enum TestFixtures {
                 /Contents 5 0 R /Resources << >> \
                 /PieceInfo << /Marker /Downstream >> >>
                 """),
-            PDFObject(id: 4, content: "<< /Note /\(term) >>"),
+            PDFObject(id: 4, content: "<< /Note (\(term)) >>"),
             PDFObject(id: 5, content: "<< /Length 0 >>\nstream\n\nendstream"),
         ], rootId: 1)
     }
