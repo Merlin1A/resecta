@@ -238,6 +238,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - When zoomed in, dragging a selected region moves it instead of scrolling the page; two fingers scroll.
 - The zoom you set stays when the search sheet is raised, parked or dismissed, and when you move to another page.
 - VoiceOver reaches each redaction region on the page, the whole-page region included.
+- Search: the live highlight drawn while typing sits on the box Apply will place, on pages whose text the search normalizes and on a match that wraps onto a second line.
 
 ### Internal
 
