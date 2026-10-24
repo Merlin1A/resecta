@@ -340,11 +340,8 @@ class RedactionOverlayView: UIView {
         // `isMultiSelectActive && empty touch-down`, so this hit-test gate
         // only widens the routing — it does not commit a marquee on its own.
         if isMultiSelectActive { return true }
-        // Without drawing mode, intercept touches on handles, regions, or selected
-        // region body (for move).
-        if hitTestResizeHandle(at: point) != nil { return true }
-        if hitTestRegion(at: point) != nil { return true }
-        return false
+        // Without drawing mode, intercept touches on a handle or a region.
+        return hitTarget(at: point, handles: true) != nil
     }
 
     override func didMoveToWindow() {

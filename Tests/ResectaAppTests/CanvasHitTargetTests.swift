@@ -138,4 +138,40 @@ struct CanvasHitTargetTests {
         #expect(m.state.selectedRegionIDs == [small.id])
         withExtendedLifetime(m) {}
     }
+
+    // MARK: - The rule itself
+
+    private static let halo: CGFloat = 12.5
+
+    private func resolve(_ point: CGPoint, _ boxes: [(UUID, CGRect)], selected: (UUID, CGRect)? = nil) -> RedactionOverlayView.CanvasHitTarget? {
+        RedactionOverlayView.resolveHitTarget(
+            at: point, regions: boxes.map { (id: $0.0, rect: $0.1) },
+            selected: selected.map { (id: $0.0, rect: $0.1) }, halo: Self.halo,
+            handleSize: 44 / Self.fitScale, minimumHandleSize: 22 / Self.fitScale,
+            containerBounds: CGRect(origin: .zero, size: Self.pageSize))
+    }
+
+    @Test("The rule: the body before the halo, the smallest body, the nearest edge, the later box on a tie")
+    func theRuleInOrder() {
+        let a = UUID(), b = UUID(), c = UUID()
+        let big = CGRect(x: 0, y: 0, width: 300, height: 300), small = CGRect(x: 100, y: 100, width: 20, height: 20)
+        #expect(resolve(CGPoint(x: 110, y: 110), [(a, small), (b, big)]) == .region(a), "the smallest body, whatever the order")
+        #expect(resolve(CGPoint(x: 110, y: 110), [(b, big), (a, small)]) == .region(a))
+        let same = CGRect(x: 0, y: 0, width: 50, height: 50)
+        #expect(resolve(CGPoint(x: 10, y: 10), [(a, same), (b, same)]) == .region(b), "equal areas: the later one")
+        let upper = CGRect(x: 0, y: 0, width: 100, height: 10), lower = CGRect(x: 0, y: 30, width: 100, height: 10)
+        #expect(resolve(CGPoint(x: 50, y: 14), [(a, upper), (b, lower)]) == .region(a), "the nearer edge in the halo")
+        #expect(resolve(CGPoint(x: 50, y: 26), [(a, upper), (b, lower)]) == .region(b))
+        #expect(resolve(CGPoint(x: 50, y: 60), [(a, upper), (b, lower), (c, CGRect(x: 0, y: 200, width: 10, height: 10))]) == nil, "outside every halo")
+    }
+
+    @Test("The rule: the selected box's handle only off every other box's body")
+    func handleOffOtherBodies() {
+        let sel = UUID(), other = UUID()
+        let selRect = CGRect(x: 100, y: 300, width: 200, height: 100)
+        let otherRect = CGRect(x: 290, y: 395, width: 60, height: 20)
+        #expect(resolve(CGPoint(x: 296, y: 388), [(sel, selRect), (other, otherRect)], selected: (sel, selRect)) == .handle(.bottomRight))
+        #expect(resolve(CGPoint(x: 305, y: 405), [(sel, selRect), (other, otherRect)], selected: (sel, selRect)) == .region(other))
+        #expect(resolve(CGPoint(x: 200, y: 350), [(sel, selRect), (other, otherRect)], selected: (sel, selRect)) == .region(sel), "the selected box's own body is the body")
+    }
 }

@@ -214,6 +214,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - The Run Verification card's full run holds the Redact gate too: with selected matches not applied it shows the hint instead of dropping the session.
 - A refused drop on the results screen or an error screen names that screen's way back: Keep Editing, Return to Editor, Return to Results, Choose Another File or Re-open Document.
 - A document dropped over an open one starts with an empty undo history, the redaction mode set in Settings and no notices from the previous document; a drop on the results or error screen is refused with a notice instead of doing nothing.
+- A tap or a hold on stacked one-line regions picks the region under the finger instead of the one below it, and a whole-page region no longer takes touches meant for the regions inside it.
 
 ### Internal
 
