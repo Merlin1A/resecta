@@ -376,19 +376,13 @@ enum ResectaTokens {
 
     // MARK: - Home entries
 
-    /// The home screen's entries: the two cards, the sample row, the mark
-    /// and the stack's spacing. The tile sizes are fixed points (the glyphs
+    /// The home screen's entries: the three cards, the mark and the
+    /// stack's spacing. The tile sizes are fixed points (the glyphs
     /// do not scale with Dynamic Type); the accessibility sizes restack
     /// every entry with the smaller tile above its text.
     enum HomeEntry {
         /// Between entries.
         static let gap: CGFloat = 12
-        /// The sample row's vertical padding.
-        static let rowPadV: CGFloat = 12
-        /// The sample row's tile, its radius and glyph.
-        static let rowTile: CGFloat = 34
-        static let rowTileRadius: CGFloat = 9
-        static let rowGlyph: CGFloat = 17
         /// The slot every tile sits in, so the text starts on one edge.
         static let slot: CGFloat = 56
         /// A card's tile, its radius and glyph.
