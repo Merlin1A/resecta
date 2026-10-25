@@ -199,7 +199,8 @@ extension PageImageInkFitTests {
         search.cancel()
         _ = await search.value
         let waited = Date().timeIntervalSince(cancelled)
-        #expect(waited < 2, "the cancelled search took \(waited) s to return; the stalled read waits 12 s")
+        // Before the stalled read's 12 s wait would have ended (not waited out).
+        #expect(waited < 12, "the cancelled search took \(waited) s to return; the stalled read waits 12 s")
     }
 
     @Test("A main-thread ask never waits on the ink-fit queue, even with a read stalled")

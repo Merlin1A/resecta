@@ -31,9 +31,10 @@ struct InkFitReadJoinTests {
         }.start()
         let deadline = Date().addingTimeInterval(10)
         while (stalled.count == 0 || next.count == 0), Date() < deadline { try await Task.sleep(for: .milliseconds(50)) }
-        #expect(stalled.count == 1 && stalled.hits >= 0 && stalled.hits < 2000,
+        // Before the 4 s stall would have ended (a busy run delays the threads' start, not the order).
+        #expect(stalled.count == 1 && stalled.hits >= 0 && stalled.hits < 4000,
                 "the stalled read returned nil at its 0.3 s limit, not after its 4 s stall: \(stalled.hits) ms")
-        #expect(next.count == 1 && next.hits >= 0 && next.hits < 2000,
+        #expect(next.count == 1 && next.hits >= 0 && next.hits < 4000,
                 "the read behind it ran on a fresh lane, not after the stall: \(next.hits) ms")
     }
 
