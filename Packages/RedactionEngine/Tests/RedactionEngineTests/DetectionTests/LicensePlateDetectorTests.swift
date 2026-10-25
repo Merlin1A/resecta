@@ -33,6 +33,19 @@ struct LicensePlateDetectorTests {
         #expect(plate.contains { $0.kind == .licensePlate && $0.text.hasSuffix("7ABC123") })
     }
 
+    @Test("A vanity plate and a plate split by a non-breaking space or a line break are plates")
+    func vanityAndWhitespaceSplitPlatesArePlates() async {
+        for value in ["LUVBUGS", "ABC\u{00A0}1234", "ABC\n1234", "ABC 1234", "ABC-1234"] {
+            let hits = await detector.detect(in: "Vehicle License plate: \(value) noted at the scene.", doctype: .court)
+            #expect(hits.contains { $0.kind == .licensePlate && $0.text.hasSuffix(value) }, "\(value.debugDescription)")
+        }
+        #expect(LicensePlateDetector.isPlateValue("LUVBUGS"))
+        #expect(LicensePlateDetector.isPlateValue("AB 12"), "a digit is enough")
+        #expect(!LicensePlateDetector.isPlateValue("AB CD"), "two-capital runs alone are not a plate")
+        #expect(!LicensePlateDetector.isPlateValue("abc123"), "a lower-case value is prose")
+        #expect(!LicensePlateDetector.isPlateValue("ABC.123"))
+    }
+
     // MARK: - Doctype gating
 
     @Test("Suppressed on medical doctype")

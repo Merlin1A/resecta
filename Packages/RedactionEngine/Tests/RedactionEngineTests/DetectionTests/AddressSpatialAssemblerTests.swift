@@ -49,6 +49,20 @@ struct AddressSpatialAssemblerTests {
         #expect(hits.count == 1, "the prefix 035 reads NH; the shipped override says ME")
     }
 
+    @Test("An override ZIP assembles with its prefix state too; a third state is still refused")
+    func overrideZIPAcceptsEitherState() {
+        let nh = assembler.assemble(lines: [
+            line("45 Lake Road", x: 0.1, y: 0.85),
+            line("Errol, NH 03579", x: 0.1, y: 0.82),
+        ])
+        #expect(nh.count == 1, "03579 lies across the ME/NH line; its prefix 035 reads NH")
+        let tx = assembler.assemble(lines: [
+            line("45 Lake Road", x: 0.1, y: 0.85),
+            line("Errol, TX 03579", x: 0.1, y: 0.82),
+        ])
+        #expect(tx.isEmpty)
+    }
+
     @Test("ZIP/state mismatch rejected")
     func zipStateMismatch() {
         // 90210 is California; pairing with TX should fail the SCF cross-check.

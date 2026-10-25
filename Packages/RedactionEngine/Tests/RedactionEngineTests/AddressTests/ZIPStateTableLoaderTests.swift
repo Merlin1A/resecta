@@ -26,6 +26,16 @@ struct ZIPStateTableLoaderTests {
         #expect(ZIPStateTable.state(forZIP: "03579") == "ME")
     }
 
+    @Test("An override ZIP may be written with either state; another ZIP with its prefix state")
+    func overrideZIPReadsBothStates() throws {
+        let loader = try ZIPStateTableLoader()
+        #expect(loader.states(forZIP: "03579") == ["ME", "NH"])
+        #expect(loader.states(forZIP: "03579-1234") == ["ME", "NH"])
+        #expect(loader.states(forZIP: "03580") == ["NH"])
+        #expect(loader.states(forZIP: "00012").isEmpty)
+        #expect(ZIPStateTable.states(forZIP: "03579") == ["ME", "NH"])
+    }
+
     @Test("Prefix lookup returns nil for unassigned / malformed prefixes")
     func testPrefixLookup() throws {
         let loader = try ZIPStateTableLoader()

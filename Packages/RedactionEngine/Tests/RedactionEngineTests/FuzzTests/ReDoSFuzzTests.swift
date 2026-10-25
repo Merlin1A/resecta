@@ -47,6 +47,7 @@ struct ReDoSFuzzTests {
     /// Updated when Phase-3 adds NPI/DEA/Address-spatial/DOB/Account detectors.
     static let piiPatterns: [(name: String, pattern: NSRegularExpression)] = [
         ("creditCard", CreditCardDetector.ccPattern),
+        ("creditCard.digitRun", CreditCardDetector.digitRunPattern),
         ("email",      EmailDetector.emailPattern),
         ("phone",      PhoneDetector.phonePattern),
         ("address",    AddressDetector.addressPattern),
