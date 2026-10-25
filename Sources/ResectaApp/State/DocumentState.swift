@@ -237,6 +237,10 @@ class DocumentState {
     var searchTextLayerStatus: [Int: TextLayerStatus] {
         textLayerStatus.merging(searchUnreadablePages.map { ($0, .sparse) }) { _, unreadable in unreadable }
     }
+    /// Whether Search would read some page by OCR: a page with no usable text
+    /// layer, or one whose text layer Search cannot read. The toolbar's OCR
+    /// controls and caption read this, so they show for such a page too.
+    var anyPageAwaitsOCRForSearch: Bool { searchTextLayerStatus.values.contains { $0 != .rich } }
 
     /// Doc-level OCG hidden-layer presence, precomputed at import time.
     /// `PDFDocument(data:)` (every production import path) returns a

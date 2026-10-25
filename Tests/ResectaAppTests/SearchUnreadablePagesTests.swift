@@ -55,5 +55,19 @@ struct SearchUnreadablePagesTests {
         state.searchUnreadablePages = loaded.facts.searchUnreadablePages
         #expect(state.searchTextLayerStatus == [0: .rich, 1: .sparse])
         #expect(state.textLayerStatus == [0: .rich, 1: .rich])
+        // The toolbar's OCR controls and caption show for the unreadable page.
+        #expect(state.anyPageAwaitsOCRForSearch)
+        state.searchUnreadablePages = []
+        #expect(!state.anyPageAwaitsOCRForSearch, "an all-rich document routes no page to OCR")
+    }
+
+    @Test("the toolbar reads which pages await OCR from the search map, not the text-layer status")
+    func toolbarReadsTheSearchMap() throws {
+        let root = URL(fileURLWithPath: "\(#filePath)").deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let text = try String(contentsOf: root.appendingPathComponent("Sources/ResectaApp/Views/Search/SearchToolbarSection+Scan.swift"),
+                              encoding: .utf8)
+        #expect(text.components(separatedBy: "anyPageAwaitsOCR: documentState.anyPageAwaitsOCRForSearch").count - 1 == 3)
+        #expect(!text.contains("textLayerStatus.values"))
     }
 }
