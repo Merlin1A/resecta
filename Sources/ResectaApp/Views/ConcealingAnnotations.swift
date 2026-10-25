@@ -27,26 +27,55 @@ enum ConcealingAnnotations {
     /// a highlight painted over the text instead of multiplied with it.
     nonisolated static let coverWhenOpaqueSubtypes: Set<String> = ["Widget", "Highlight"]
 
-    /// Whether `annotation` can cover content: a concealing subtype, or a
-    /// widget or highlight that draws an opaque cover.
-    nonisolated static func conceals(_ annotation: PDFAnnotation) -> Bool {
-        let subtype = annotation.type ?? ""
-        if concealingSubtypes.contains(subtype) { return true }
-        return coverWhenOpaqueSubtypes.contains(subtype) && drawsOpaqueCover(annotation)
-    }
-
     /// Whether `annotation`'s own drawing hides what is under it: a widget
-    /// with an opaque background colour (`/MK /BG`), or a drawing that
-    /// decides at least 60 % of its rect (`hiddenFraction`). A field that
-    /// draws only its value or a border does not count (its value is the
-    /// import notice's filled-field sentence), nor does a light highlight
-    /// multiplied over the text.
+    /// with a dark opaque background colour (`/MK /BG`, luminance under
+    /// one half), or a drawing that decides at least 60 % of its rect
+    /// (`hiddenFraction`). A white or light field background is left to
+    /// the drawing; whether it hides anything is the content test's call
+    /// (`areaOverContent`), as an ordinary form's fields sit on blank
+    /// boxes. A field that draws only its value or a border does not count
+    /// (its value is the import notice's filled-field sentence), nor does a
+    /// light highlight multiplied over the text.
     nonisolated static func drawsOpaqueCover(_ annotation: PDFAnnotation) -> Bool {
         if annotation.type == "Widget", let background = annotation.backgroundColor,
-           background.cgColor.alpha > 0.5 {
+           isDarkAndOpaque(background.cgColor) {
             return true
         }
         return hiddenFraction(of: annotation) >= 0.6
+    }
+
+    /// Whether `color` is at least half opaque with a relative luminance
+    /// (sRGB) under one half.
+    nonisolated private static func isDarkAndOpaque(_ color: CGColor) -> Bool {
+        guard color.alpha > 0.5,
+              let sRGB = CGColorSpace(name: CGColorSpace.sRGB),
+              let converted = color.converted(to: sRGB, intent: .defaultIntent, options: nil),
+              let components = converted.components, components.count >= 3 else { return false }
+        return 0.2126 * components[0] + 0.7152 * components[1] + 0.0722 * components[2] < 0.5
+    }
+
+    /// The part of `annotation` on the page's crop box, when page content
+    /// lies beneath it: on a page whose text layer reads (`readsText`),
+    /// text a selection of that area reads; on a sparse or empty page,
+    /// where the printed content is in the page image, any such part. Nil
+    /// otherwise. The import count and the share confirm both ask it, so
+    /// they name the same annotations.
+    nonisolated static func areaOverContent(
+        _ annotation: PDFAnnotation, on page: PDFPage, crop: CGRect, readsText: Bool
+    ) -> CGRect? {
+        let area = annotation.bounds.intersection(crop)
+        guard !area.isNull, area.width > 0, area.height > 0 else { return nil }
+        if readsText {
+            guard let text = page.selection(for: area)?.string,
+                  !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        }
+        return area
+    }
+
+    /// Whether the page's text layer reads: its import status is rich, or,
+    /// with no status, it carries text.
+    nonisolated static func readsText(_ page: PDFPage, status: TextLayerStatus?) -> Bool {
+        status.map { $0 == .rich } ?? !(page.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     /// The share of `annotation`'s rect where its drawing decides the pixel
@@ -92,16 +121,40 @@ enum ConcealingAnnotations {
                                          count: width * height * 4))
     }
 
-    /// Form widgets in `document` that draw an opaque cover
-    /// (`drawsOpaqueCover`), counted at import for the notice: the analyzer
-    /// skips widgets, and the export does not draw them.
-    nonisolated static func coverWidgetCount(in document: PDFDocument) -> Int {
+    /// Form widgets in `document` that lie over page content
+    /// (`areaOverContent`) and draw an opaque cover (`drawsOpaqueCover`),
+    /// counted at import for the notice: the analyzer skips widgets, and
+    /// the export does not draw them. `textLayerStatus` is the import's
+    /// per-page status; the content test runs first, so only the fields
+    /// over content are drawn.
+    nonisolated static func coverWidgetCount(
+        in document: PDFDocument, textLayerStatus: [Int: TextLayerStatus] = [:]
+    ) -> Int {
         var count = 0
         for index in 0..<document.pageCount {
             guard let page = document.page(at: index) else { continue }
-            count += page.annotations.count { $0.type == "Widget" && drawsOpaqueCover($0) }
+            let crop = page.bounds(for: .cropBox)
+            guard crop.width > 0, crop.height > 0 else { continue }
+            let reads = readsText(page, status: textLayerStatus[index])
+            count += page.annotations.count {
+                $0.type == "Widget"
+                    && areaOverContent($0, on: page, crop: crop, readsText: reads) != nil
+                    && drawsOpaqueCover($0)
+            }
         }
         return count
+    }
+
+    /// `drawsOpaqueCover`, kept per annotation for the share tap: the
+    /// annotations of the open document do not change, and the keys are
+    /// held weakly, so the entries go with the document.
+    private static let opaqueCoverCache = NSMapTable<PDFAnnotation, NSNumber>.weakToStrongObjects()
+
+    private static func cachedDrawsOpaqueCover(_ annotation: PDFAnnotation) -> Bool {
+        if let known = opaqueCoverCache.object(forKey: annotation) { return known.boolValue }
+        let draws = drawsOpaqueCover(annotation)
+        opaqueCoverCache.setObject(NSNumber(value: draws), forKey: annotation)
+        return draws
     }
 
     /// 0-based pages of `document` where a concealing annotation covers
@@ -110,8 +163,10 @@ enum ConcealingAnnotations {
     /// sparse or empty page (`textLayerStatus`, the import's per-page
     /// status) the printed content is in the page image, where no selection
     /// reads it, so any uncovered concealing annotation is named. A page
-    /// with no status counts as rich when it carries text. Empty for no
-    /// document.
+    /// with no status counts as rich when it carries text. The cheap tests
+    /// run first (the subtype, the content beneath, the boxes), so only a
+    /// widget or highlight still in question is drawn, once per annotation
+    /// (`cachedDrawsOpaqueCover`). Empty for no document.
     static func pages(
         in document: PDFDocument?, regions: [Int: [RedactionRegion]],
         textLayerStatus: [Int: TextLayerStatus] = [:]
@@ -122,21 +177,19 @@ enum ConcealingAnnotations {
             guard let page = document.page(at: index) else { continue }
             let crop = page.bounds(for: .cropBox)
             guard crop.width > 0, crop.height > 0 else { continue }
-            let readsText = textLayerStatus[index].map { $0 == .rich }
-                ?? !(page.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            let reads = readsText(page, status: textLayerStatus[index])
             let boxes = regions[index] ?? []
-            for annotation in page.annotations where conceals(annotation) {
-                let area = annotation.bounds.intersection(crop)
-                guard !area.isNull, area.width > 0, area.height > 0 else { continue }
-                if readsText {
-                    guard let text = page.selection(for: area)?.string,
-                          !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
-                }
-                guard let normalized = displayNormalized(area, crop: crop, rotation: page.rotation) else { continue }
-                if !covered(normalized, by: boxes) {
-                    out.append(index)
-                    break
-                }
+            for annotation in page.annotations {
+                let subtype = annotation.type ?? ""
+                let whenOpaque = coverWhenOpaqueSubtypes.contains(subtype)
+                guard whenOpaque || concealingSubtypes.contains(subtype),
+                      let area = areaOverContent(annotation, on: page, crop: crop, readsText: reads),
+                      let normalized = displayNormalized(area, crop: crop, rotation: page.rotation),
+                      !covered(normalized, by: boxes) else { continue }
+                // The drawing test last: it draws the annotation twice.
+                if whenOpaque && !cachedDrawsOpaqueCover(annotation) { continue }
+                out.append(index)
+                break
             }
         }
         return out

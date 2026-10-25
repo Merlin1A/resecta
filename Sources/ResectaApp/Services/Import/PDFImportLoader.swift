@@ -145,12 +145,12 @@ extension ImportService {
         // document-level entry beside the analyzer's stages the fact for
         // the same notice.
         var findings = annotationResult.findings
-        // Form fields that draw an opaque cover (an empty black field used
-        // as a redaction): the analyzer skips widgets, and the export does
-        // not draw them, so the text under one prints. One entry in the
-        // analyzer's id form stages them for the notice's annotation
-        // sentences.
-        let coverWidgets = ConcealingAnnotations.coverWidgetCount(in: doc)
+        // Form fields over page content that draw an opaque cover (an empty
+        // black field used as a redaction): the analyzer skips widgets, and
+        // the export does not draw them, so the text under one prints. One
+        // entry in the analyzer's id form stages them for the notice's
+        // annotation sentences.
+        let coverWidgets = ConcealingAnnotations.coverWidgetCount(in: doc, textLayerStatus: textLayerStatus)
         if coverWidgets > 0 {
             findings.append(PDFFinding(
                 id: ImportAnnotationNoticeBanner.coverWidgetFindingID,
