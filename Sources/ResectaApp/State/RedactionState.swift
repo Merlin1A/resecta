@@ -117,6 +117,7 @@ class RedactionState {
         DeselectionSnapshot(merging: pendingRunDeselectionParts.map(\.snapshot))
     }
     private(set) var pendingRunDeselectionParts: [RunDeselectionPart] = []
+    var coveredSearchRecords: [CoveredSearchRecord] = [] // searches whose every result a box held (`noteCoveredSearch`)
 
     /// Set when any gazetteer / context-keywords loader failed to
     /// initialize for this session. Drives the persistent degrade
@@ -369,11 +370,9 @@ class RedactionState {
     private func resetDocumentSession() {
         regionVersion += 1
         clearOutput()
-        // The apply-commit deselection facts describe search results on
-        // the PRIOR document; `clearOutput()` deliberately leaves them
-        // alone (they survive pipeline retries), so the document boundary
-        // is where they are dropped.
-        pendingRunDeselectionParts = []
+        // The apply-commit deselection facts and covered-search records describe the PRIOR document;
+        // `clearOutput()` leaves them (they survive pipeline retries), so the document boundary drops them.
+        (pendingRunDeselectionParts, coveredSearchRecords) = ([], [])
         // A full-document reset: no regions remain, so "regions modified
         // since verification" is logically false.
         regionsModifiedSinceVerification = false
@@ -525,6 +524,7 @@ class RedactionState {
         // deselection facts still join the run's, as an apply's always do.
         guard prepared.appliedCount > 0 else {
             pendingRunDeselectionParts = runDeselectionParts(after: search)
+            noteCoveredSearch(searchRecord, selected: selected, covered: prepared.coveredResultIDs, at: appliedAt)
             return outcome
         }
 

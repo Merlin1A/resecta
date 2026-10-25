@@ -105,6 +105,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Document canvas: with a hardware keyboard, Select All then Copy (⌘A, ⌘C) no longer places the document's text on the system pasteboard. The canvas view refuses the copy, cut, paste, select and select-all actions and builds its menu without the edit, look-up, learn and share groups; in 1.2.0 that keyboard path copied the whole document's text with no selection shown.
 ### Fixed
 
+- Search: a result counts as already covered, and Apply skips it, only when one box holds the whole of it. A box that stops a letter short of a name no longer leaves that letter printed; the result is applied, the Redact gate waits for it, and the draw nudge offers it. A search whose every result was already covered is still re-checked when you redact.
 - A marquee selection is no longer an undo step: Undo after a marquee undoes the last edit to the regions.
 - With Add to Selection on, a region joins or leaves the selection when the finger lifts; holding it for its menu, pinching or scrolling from it no longer changes the selection.
 - Undoing a delete selects the deleted regions again if they were selected.
