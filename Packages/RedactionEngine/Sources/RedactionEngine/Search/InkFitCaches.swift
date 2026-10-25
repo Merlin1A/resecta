@@ -5,28 +5,28 @@ import PDFKitGuard
 
 // The ink fit's caches and queue state (`DocumentSearcher+InkFit.swift`).
 
-/// One serial queue for the ink fit's reads and renders, and the job at its
+/// One serial queue for the ink fit's page reads (Vision), and the job at its
 /// head: its page content key, how long it may run, and when it started.
 final class InkFitLane: @unchecked Sendable {
     /// Set on every lane's queue: a job already on a lane runs nested work inline.
     static let tag = DispatchSpecificKey<Bool>()
     let queue: DispatchQueue
     private let lock = NSLock()
-    private var head: (key: Int?, drawing: CGPDFDocument?, limit: TimeInterval, started: Date)?
-    init(number: Int, label: String = "render") {
+    private var head: (key: Int?, limit: TimeInterval, started: Date)?
+    init(number: Int, label: String) {
         queue = DispatchQueue(label: "com.resecta.search.inkfit.\(label).\(number)", qos: .userInitiated)
         queue.setSpecific(key: Self.tag, value: true)
     }
-    func began(key: Int?, drawing: CGPDFDocument?, limit: TimeInterval) {
-        lock.lock(); head = (key, drawing, limit, Date()); lock.unlock()
+    func began(key: Int?, limit: TimeInterval) {
+        lock.lock(); head = (key, limit, Date()); lock.unlock()
     }
     func ended() { lock.lock(); head = nil; lock.unlock() }
-    /// The head job, when it has run past its own limit: its page key and the
-    /// document it draws from (either may be nil), and that limit.
-    func overrun() -> (key: Int?, drawing: CGPDFDocument?, limit: TimeInterval)? {
+    /// The head job, when it has run past its own limit: its page key (may
+    /// be nil) and that limit.
+    func overrun() -> (key: Int?, limit: TimeInterval)? {
         lock.lock(); defer { lock.unlock() }
         guard let head, Date().timeIntervalSince(head.started) > head.limit else { return nil }
-        return (head.key, head.drawing, head.limit)
+        return (head.key, head.limit)
     }
 }
 
@@ -36,12 +36,11 @@ final class InkFitLane: @unchecked Sendable {
 /// fitting. Past `hungLaneCap` lanes hung at once, every fit answers at once
 /// (hung page reads are not left to pile up).
 final class InkFitQueueState: @unchecked Sendable {
-    /// The render lanes (page draws, of the private copies).
-    static let shared = InkFitQueueState()
-    /// The Vision lanes (page reads, drawing nothing).
+    /// The Vision lanes (page reads, drawing nothing). The renders run on
+    /// their caller's thread (`InkFitDrawLock`).
     static let vision = InkFitQueueState(label: "vision")
     private let label: String
-    init(label: String = "render") { self.label = label; lane = InkFitLane(number: 0, label: label) }
+    init(label: String) { self.label = label; lane = InkFitLane(number: 0, label: label) }
     static let hungLaneCap = 2
     private let lock = NSLock()
     private var made = 0
@@ -55,15 +54,12 @@ final class InkFitQueueState: @unchecked Sendable {
         return hung.count >= Self.hungLaneCap || (key != nil && hung.values.contains { $0 == key })
     }
     /// `old`'s head job (page `key`) ran past its limit: later jobs go to a
-    /// fresh lane, and the private copy it draws from is dropped, so the fresh
-    /// lane draws from a copy of its own, never from one the hung job still draws.
-    func retire(_ old: InkFitLane, key: Int?, drawing: CGPDFDocument?) {
-        lock.lock()
-        guard hung[ObjectIdentifier(old)] == nil else { lock.unlock(); return }
+    /// fresh lane.
+    func retire(_ old: InkFitLane, key: Int?) {
+        lock.lock(); defer { lock.unlock() }
+        guard hung[ObjectIdentifier(old)] == nil else { return }
         hung[ObjectIdentifier(old)] = .some(key)
         if old === lane { made += 1; lane = InkFitLane(number: made, label: label) }
-        lock.unlock()
-        if let drawing { PrivatePDFCopies.shared.drop(drawing) }
     }
     /// A job on `lane` ended: a hung lane's job ending frees its page.
     func ended(on lane: InkFitLane) {
@@ -81,7 +77,7 @@ final class InkFitStalls: @unchecked Sendable {
 }
 #endif
 
-/// A page image crossing from the render lane to the Vision lane by value.
+/// A page image crossing from its render to the Vision lane by value.
 struct InkFitImage: @unchecked Sendable { let image: CGImage }
 
 /// A value an ink-fit queue job hands back, and its done signal. A job runs
@@ -231,21 +227,28 @@ final class PrivatePDFCopies: @unchecked Sendable {
     static let shared = PrivatePDFCopies()
     private let lock = NSLock()
     private let table = NSMapTable<PDFDocument, CGPDFDocumentBox>.weakToStrongObjects()
-    final class CGPDFDocumentBox { let document: CGPDFDocument; init(_ d: CGPDFDocument) { document = d } }
+    final class CGPDFDocumentBox {
+        let document: CGPDFDocument
+        /// One draw of the copy at a time.
+        let drawLock = InkFitDrawLock()
+        init(_ d: CGPDFDocument) { document = d }
+    }
+
+    /// For a copy made by `copy(of:)` (else one lock shared by every other document).
+    func drawLock(for copy: CGPDFDocument?) -> InkFitDrawLock {
+        lock.lock(); defer { lock.unlock() }
+        guard let copy else { return Self.otherDraws }
+        for case let box as CGPDFDocumentBox in table.objectEnumerator()?.allObjects ?? [] where box.document === copy {
+            return box.drawLock
+        }
+        return Self.otherDraws
+    }
+    private static let otherDraws = InkFitDrawLock()
 
     /// Called on the thread that owns `document`; made once per document (the
     /// lock is held across the write, so two first calls do not both write it).
     /// An encrypted copy that an empty password does not open gives nil: the
     /// fit then falls back to the drift envelope, reported as degraded.
-    /// Forgets the copy `copy` (a hung job still draws from it): the next
-    /// fit of its document opens a new one.
-    func drop(_ copy: CGPDFDocument) {
-        lock.lock(); defer { lock.unlock() }
-        for case let key as PDFDocument in table.keyEnumerator().allObjects where table.object(forKey: key)?.document === copy {
-            table.removeObject(forKey: key)
-        }
-    }
-
     func copy(of document: PDFDocument) -> CGPDFDocument? {
         lock.lock(); defer { lock.unlock() }
         if let known = table.object(forKey: document) { return known.document }
@@ -295,7 +298,31 @@ struct InkFitPage: @unchecked Sendable {
     let page: CGPDFPage
     /// Held so the page's document outlives a job that outlives its wait.
     let document: CGPDFDocument?
-    init(_ page: CGPDFPage) { self.page = page; document = page.document }
+    /// The lock its document's draws take.
+    let drawLock: InkFitDrawLock
+    init(_ page: CGPDFPage) {
+        self.page = page; document = page.document
+        drawLock = PrivatePDFCopies.shared.drawLock(for: page.document)
+    }
+}
+
+/// One draw of a private copy at a time, on the drawing caller's own thread
+/// (a render is CPU work that waits on nothing else, so no task thread waits
+/// on a lane for it). A caller waits a bounded time for the lock; while a
+/// draw has held it past that (a hung draw), later callers answer at once.
+final class InkFitDrawLock: @unchecked Sendable {
+    private let drawing = NSLock()
+    private let lock = NSLock()
+    private var heldSince: Date?
+    /// `work` with the lock held; nil when the lock is not had within `wait`,
+    /// or at once while a draw has held it longer than `wait`.
+    func draw<T>(wait: TimeInterval, _ work: () -> T) -> T? {
+        if let since = lock.withLock({ heldSince }), Date().timeIntervalSince(since) > wait { return nil }
+        guard drawing.lock(before: Date().addingTimeInterval(wait)) else { return nil }
+        lock.withLock { heldSince = Date() }
+        defer { lock.withLock { heldSince = nil }; drawing.unlock() }
+        return work()
+    }
 }
 
 /// Per-page answers of `carriesHiddenTextOverImage`, held weakly by page.

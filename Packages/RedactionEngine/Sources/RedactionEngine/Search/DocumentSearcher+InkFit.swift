@@ -183,11 +183,20 @@ extension DocumentSearcher {
             inkFitLogger.log("ink fit: no read or render in time; the box is the selection grown by the drift bound")
             return job.envelope()
         }
-        // A search's matching run before its page was read: the envelope for
-        // now, and the read noted (`withInkFitRead`).
-        if let deferral = InkFitDeferral.current, InkTokenCache.shared.value(for: job.pageKey) == nil {
-            deferral.want()
-            return job.envelope()
+        // A cancelled search's remaining words: the envelope, with no render.
+        if Task.isCancelled { return job.envelope() }
+        if InkTokenCache.shared.value(for: job.pageKey) == nil {
+            // A search's matching run before its page was read: the envelope
+            // for now, and the read noted (`withInkFitRead`).
+            if let deferral = InkFitDeferral.current { deferral.want(); return job.envelope() }
+            // A task thread never waits on a page read (Vision finishes its
+            // work on the task pool, which threads waiting on it can starve):
+            // a page whose awaited read failed, timed out or never ran takes
+            // the envelope at once. The next search awaits the read again.
+            if withUnsafeCurrentTask(body: { $0 != nil }) {
+                inkFitLogger.log("ink fit: the page was not read before its fit; the box is the drift envelope")
+                return job.envelope()
+            }
         }
         // Read in the reading frame: Vision sees the text upright, and its
         // boxes come back in this frame.
@@ -388,18 +397,21 @@ extension DocumentSearcher {
         let window = seed.insetBy(dx: -hPad, dy: -vPad).intersection(CGRect(origin: .zero, size: size))
         var fitted = anchor?.rect ?? box
         let page = InkFitPage(cgPage)
-        var renderTimeout: TimeInterval? = nil, renderQueue: DispatchQueue? = nil, renderStall: TimeInterval = 0
+        var stalled = false
         #if DEBUG
+        // A stalled render (the test seam) only stalls, on a queue of its own.
         if let injected = inkFitInjectedRenderStalls.value(for: job.pageKey) {
-            (renderStall, renderTimeout) = injected
-            renderQueue = DispatchQueue(label: "com.resecta.search.inkfit.stalled-render")
+            _ = onInkFitQueue(key: job.pageKey, timeout: injected.timeout,
+                              queue: DispatchQueue(label: "com.resecta.search.inkfit.stalled-render")) {
+                Thread.sleep(forTimeInterval: injected.stall)
+            }
+            stalled = true
         }
         #endif
-        let rendered: GrayBitmap?? = window.isNull || window.width <= 0 || window.height <= 0 ? .some(nil)
-            : onInkFitQueue(key: job.pageKey, drawing: page.document, timeout: renderTimeout, queue: renderQueue) {
-                if renderStall > 0 { Thread.sleep(forTimeInterval: renderStall); return nil }
+        let rendered: GrayBitmap?? = stalled ? nil : window.isNull || window.width <= 0 || window.height <= 0 ? .some(nil)
+            : drawn(page) {
                 // A failed render is tried once more before it counts.
-                return renderGray(page.page, rotation: job.rotation, visual: visual, window: window, frame: frame)
+                renderGray(page.page, rotation: job.rotation, visual: visual, window: window, frame: frame)
                     ?? renderGray(page.page, rotation: job.rotation, visual: visual, window: window, frame: frame)
             }
         // No render (in time, or at all): the envelope, even with a read word
@@ -475,13 +487,8 @@ extension DocumentSearcher {
         return tokens
     }
 
-    /// The ink fit's page reads and renders run on this one serial queue, off
-    /// Swift's cooperative pool (concurrent searches each calling Vision on
-    /// pool threads were seen to stall together), and a caller waits at most
-    /// `inkFitTimeout` for them.
-
-    /// How long a caller waits for a page read or a render before it falls
-    /// back to the box without the fit.
+    /// How long a caller waits for a page read before it falls back to the
+    /// box without the fit.
     static let inkFitTimeout: TimeInterval = 30
 
     #if DEBUG
@@ -492,21 +499,22 @@ extension DocumentSearcher {
     static let inkFitInjectedStalls = InkFitStalls()
     /// Test seam: the same for the fit's renders on a page (and a token's glyph runs), after its read.
     static let inkFitInjectedRenderStalls = InkFitStalls()
-    /// Test seam: a stall in place of every job for a page on the shared
+    /// Test seam: a stall in place of every job for a page on the Vision
     /// lane, and that job's limit there.
     static let inkFitInjectedLaneStalls = InkFitStalls()
     #endif
 
-    /// `work` on an ink-fit lane (`InkFitQueueState`); nil on a timeout, a
+    /// `work` on an ink-fit Vision lane (`InkFitQueueState`); nil on a timeout, a
     /// stuck page or a cancelled task. The wait times the job at the head of
     /// the lane against its own limit (`timeout`, else `inkFitTimeout`), not
     /// the time spent behind other jobs. A head job past its limit retires its
     /// lane and marks its page `key` stuck: a caller whose job is that one
     /// gets nil, the others move to the fresh lane. A caller waits at most
     /// `inkFitWaitCeiling` on lanes that move. On a queue of the caller's own
-    /// (`queue`) it waits at most `timeout`.
-    nonisolated static func onInkFitQueue<T>(key: Int? = nil, drawing: CGPDFDocument? = nil, timeout: TimeInterval? = nil,
-                                             queue: DispatchQueue? = nil, state: InkFitQueueState = .shared,
+    /// (`queue`) it waits at most `timeout`. Never called from a task thread
+    /// (`fit`): the caller is a dispatch thread (`InkFitPendingRead.run`).
+    nonisolated static func onInkFitQueue<T>(key: Int? = nil, timeout: TimeInterval? = nil,
+                                             queue: DispatchQueue? = nil, state: InkFitQueueState = .vision,
                                              _ work: @escaping () -> T) -> T? {
         if DispatchQueue.getSpecific(key: InkFitLane.tag) == true { return work() }
         if Task.isCancelled { return nil }
@@ -522,13 +530,13 @@ extension DocumentSearcher {
         if state.isStuck(key: key) { return nil }
         var limit = timeout ?? inkFitTimeout, stall: TimeInterval = 0
         #if DEBUG
-        if state === InkFitQueueState.shared, let key, let injected = inkFitInjectedLaneStalls.value(for: key) { (stall, limit) = injected }
+        if state === InkFitQueueState.vision, let key, let injected = inkFitInjectedLaneStalls.value(for: key) { (stall, limit) = injected }
         #endif
         let runLimit = limit, runStall = stall
         func enqueue(on lane: InkFitLane) {
             lane.queue.async {
                 guard box.claim() else { return }
-                lane.began(key: key, drawing: drawing, limit: runLimit)
+                lane.began(key: key, limit: runLimit)
                 // A stalled job (the test seam) only stalls: it adds no reader beside the lane.
                 if runStall > 0 { Thread.sleep(forTimeInterval: runStall) } else { box.value = work() }
                 lane.ended()
@@ -541,17 +549,17 @@ extension DocumentSearcher {
         enqueue(on: lane)
         while box.done.wait(timeout: .now() + 0.25) != .success {
             if let hung = lane.overrun() {
-                state.retire(lane, key: hung.key, drawing: hung.drawing)
+                state.retire(lane, key: hung.key)
                 if box.isRunning {
                     inkFitLogger.log("ink fit: a page read or render ran past its timeout; the box is the drift envelope")
                     return nil
                 }
-                // A job that draws from the copy the hung job draws from does
-                // not move: the fresh lane would draw that copy alongside it.
-                if state.isStuck(key: key) || (drawing != nil && drawing === hung.drawing) {
+                // A job for the hung job's page does not move: it would only
+                // hang beside it.
+                if state.isStuck(key: key) {
                     box.abandon()
                     if box.isRunning { continue }
-                    inkFitLogger.log("ink fit: a job behind a hung one shares its page or its copy; the box is the drift envelope")
+                    inkFitLogger.log("ink fit: a job behind a hung one shares its page; the box is the drift envelope")
                     return nil
                 }
                 lane = state.current
@@ -587,21 +595,20 @@ extension DocumentSearcher {
             _ = onInkFitQueue(key: key, timeout: timeout, queue: queue) { Thread.sleep(forTimeInterval: stall) }
             return nil
         }
-        // The page drawn on the render lane (it draws the private copy), then
-        // read on the Vision lane: a wait for a render never waits on Vision.
-        // A failed render or read is tried once more before it counts; one
-        // that timed out, or failed both times, is no read (the caller falls
-        // back to the envelope, and nothing is cached).
+        // The page drawn on this thread (under its copy's draw lock), then
+        // read on the Vision lane. A failed render or read is tried once more
+        // before it counts; one that timed out, or failed both times, is no
+        // read (the caller falls back to the envelope, and nothing is cached).
         for attempt in 1...2 {
-            let drawn = onInkFitQueue(key: key, drawing: page.document) {
+            let image = drawn(page, wait: inkFitTimeout) {
                 renderGrayImage(page.page, rotation: rotation, visual: visual, frame: frame).map(InkFitImage.init)
             }
-            guard let drawn else { return nil }
-            guard let image = drawn else {
+            guard let image else { return nil }
+            guard let image else {
                 inkFitLogger.log("ink fit: the page did not render for its read (attempt \(attempt))")
                 continue
             }
-            let read: [OCREngine.Token]?? = onInkFitQueue(key: key, state: .vision) {
+            let read: [OCREngine.Token]?? = onInkFitQueue(key: key) {
                 do { return try OCREngine.recognizeTokens(in: image.image, languages: languages) } catch {
                     inkFitLogger.log("ink fit: the page read failed (attempt \(attempt)): \(error.localizedDescription, privacy: .public)")
                     return nil

@@ -26,6 +26,22 @@ extension DocumentSearcher {
         }
     }
 
+    /// How long a render waits for another draw of its private copy before
+    /// the fit falls back (the read word's box, degraded).
+    static let inkFitDrawWait: TimeInterval = 2
+
+    /// `work`, a draw of `page`, on the caller's own thread under its copy's
+    /// draw lock; nil in a cancelled task (a cancelled search renders nothing
+    /// more), or when the lock is not had within `wait`.
+    nonisolated static func drawn<T>(_ page: InkFitPage, wait: TimeInterval = inkFitDrawWait, _ work: () -> T) -> T? {
+        if Task.isCancelled { return nil }
+        guard let value = page.drawLock.draw(wait: wait, work) else {
+            inkFitLogger.log("ink fit: another draw of the page's copy held it past its wait")
+            return nil
+        }
+        return value
+    }
+
     /// The page drawn as the rasterizer draws it (`PageRasterizer.drawingTransform`
     /// in PDFKit's rotation frame), cropped to `window` (visual points).
     nonisolated static func renderGray(_ cgPage: CGPDFPage, rotation: Int, visual: CGSize, window: CGRect,
@@ -76,7 +92,7 @@ extension DocumentSearcher {
             .intersection(CGRect(origin: .zero, size: frame?.size ?? visual))
         let page = InkFitPage(cgPage)
         guard !window.isNull, window.width > 0, window.height > 0,
-              let rendered = onInkFitQueue(key: key, drawing: page.document, {
+              let rendered = drawn(page, {
                   renderGray(page.page, rotation: rotation, visual: visual, window: window, frame: frame) }),
               let bitmap = rendered else { return nil }
         let s = inkFitScale

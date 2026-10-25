@@ -7,9 +7,9 @@ import PDFKit
 // that blocked their threads on the lane while Vision's text recognitions
 // waited on threads of their own were seen to stall together: Vision finishes
 // a text recognition on the task pool, so a pool whose threads all wait never
-// lets one end. The page is drawn and read on the lane, handed over from a
-// dispatch thread; the fits that follow read the tokens from the cache. A page that
-// is not gated never waits.
+// lets one end. The page is drawn on a dispatch thread and read on the lane;
+// the fits that follow read the tokens from the cache (a fit on a task thread
+// never reads, `fit`). A page that is not gated never waits.
 
 /// Set while a search's matching runs before its page was read: a fit that
 /// has no tokens returns the envelope at once and notes the read wanted.
@@ -110,11 +110,11 @@ extension DocumentSearcher {
 }
 
 extension InkFitPendingRead {
-    /// Reads the page on the ink-fit lane (drawn and read there, as a fit
-    /// reads it), handed over from a dispatch thread, never a task thread:
-    /// Vision's text recognition finishes its work on the task pool, so a
-    /// pool whose threads all wait (on Vision, or on the lane) never lets a
-    /// read end. Waited for within `inkFitTimeout`; nothing is cached on a miss.
+    /// Reads the page (drawn on a dispatch thread, read on the Vision lane),
+    /// never on a task thread: Vision's text recognition finishes its work
+    /// on the task pool, so a pool whose threads all wait (on Vision, or on
+    /// the lane) never lets a read end. Waited for within `inkFitTimeout`;
+    /// nothing is cached on a miss.
     func run() async {
         if InkTokenCache.shared.value(for: key) != nil { return }
         guard !Task.isCancelled else { return }

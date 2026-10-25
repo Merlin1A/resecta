@@ -32,10 +32,13 @@ extension PageImageInkFitTests {
         let range = ((page.string ?? "") as NSString).range(of: "Hartwell")
         let selection = try #require(page.selection(for: range))
         let raw = try #require(DocumentSearcher().normalizedRect(for: selection, page: page))
+        // The read awaited (as a search awaits it) stalls; the fit after it
+        // does not read again.
         let started = Date()
+        await DocumentSearcher.prepareInkFit(page)
         let rect = DocumentSearcher.inkFittedRect(raw, page: page, text: "Hartwell", range: range)
         let elapsed = Date().timeIntervalSince(started)
-        #expect(elapsed < 2.5, "the fit waited \(elapsed) s for a stalled read; the wait is 0.5 s")
+        #expect(elapsed < 2.5, "the read and fit waited \(elapsed) s for a stalled read; the wait is 0.5 s")
         #expect(rect.contains(raw), "the fallback covers the selection box")
         #expect(InkTokenCache.shared.value(for: key) == nil, "a stalled read leaves nothing cached")
         // The fallback is the drift envelope: the word's ink lies inside it.
@@ -88,7 +91,7 @@ extension PageImageInkFitTests {
         #expect(width <= rawWidth + 20, "the fallback (\(width) pt) is the read word's box, not an envelope (selection \(rawWidth) pt)")
     }
 
-    @Test("A job that stalls on the shared lane degrades only its own page: another page fits on time, not degraded")
+    @Test("A page read that stalls on the Vision lane degrades only its own page: another page reads and fits on time, not degraded")
     func stallOnOnePageLeavesOthersFitted() async throws {
         // An export of this test's own: a small mark in a blank corner of
         // both pages makes their content keys no other test's, so the
@@ -112,28 +115,24 @@ extension PageImageInkFitTests {
         // fits returning well inside it shows that neither waited it out.
         DocumentSearcher.inkFitInjectedLaneStalls.set((30.0, 0.5), for: keyA)
         defer { DocumentSearcher.inkFitInjectedLaneStalls.set(nil, for: keyA) }
-        @Sendable func fit(_ shared: SendablePDFDocument, _ index: Int) -> (rect: CGRect, degraded: Bool, raw: CGRect, seconds: TimeInterval)? {
+        @Sendable func fit(_ shared: SendablePDFDocument, _ index: Int) async -> (rect: CGRect, degraded: Bool, raw: CGRect, seconds: TimeInterval)? {
             guard let page = shared.document.page(at: index) else { return nil }
             let range = ((page.string ?? "") as NSString).range(of: "Hartwell")
             guard let raw = page.selection(for: range).flatMap({ DocumentSearcher().normalizedRect(for: $0, page: page) }) else { return nil }
             let started = Date()
+            // Read as a search reads it (awaited), then fitted.
+            await DocumentSearcher.prepareInkFit(page)
             let fit = DocumentSearcher.inkFit(raw, page: page, text: "Hartwell", range: range, paintOnly: true)
             return (fit.rect, fit.degraded, raw, Date().timeIntervalSince(started))
         }
-        // Page A's read takes the lane and stalls there; page B queues behind it.
-        let a = Task.detached { fit(stalled, 1) }
+        // Page A's read takes the Vision lane and stalls there; page B's read queues behind it.
+        let a = Task.detached { await fit(stalled, 1) }
         try await Task.sleep(for: .milliseconds(150))
-        let b = try #require(await Task.detached { Self.settled({ fit(other, 2) }, degraded: \.degraded) }.value)
+        let b = try #require(await Task.detached { await fit(other, 2) }.value)
         let aResult = try #require(await a.value)
         #expect(aResult.degraded, "the stalled page's fit is degraded")
         #expect(aResult.seconds < 20, "the stalled page's fit waited \(aResult.seconds) s; its limit is 0.5 s, its stall 30 s")
         #expect(!b.degraded, "the other page's fit is not degraded by page A's stall")
-        // The hung job's copy is dropped: the stalled document's next fit
-        // draws from a copy of its own, not the one still being drawn.
-        let before = PrivatePDFCopies.shared.madeCount(of: stalled.document)
-        _ = PrivatePDFCopies.shared.copy(of: stalled.document)
-        #expect(PrivatePDFCopies.shared.madeCount(of: stalled.document) == before + 1,
-                "the stalled document's copy was dropped when its lane was retired")
         #expect(b.seconds < 20, "the other page's fit took \(b.seconds) s, as if it waited out page A's 30 s stall")
         let page = try #require(other.document.page(at: 2))
         let size = page.bounds(for: .cropBox).size
