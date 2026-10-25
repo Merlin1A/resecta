@@ -46,7 +46,36 @@ struct PageImageCensusTests {
         #expect(PageImageCensus.carriesImageContent(try Self.page(TestFixtures.stampedScanPDF(scanWidth: 300, scanHeight: 400))),
                 "a scan placed small under a stamp-thin text layer")
         #expect(!PageImageCensus.carriesImageContent(try Self.page(TestFixtures.letterWithLogoPDF())), "a letter with a small logo")
+        // An image pasted into a typed letter, below half the page: an ID at a
+        // word processor's 220 ppi, a mail client's medium photo. A letterhead
+        // logo below the pixel floor stays out.
+        #expect(PageImageCensus.carriesImageContent(try Self.page(TestFixtures.letterWithImagePDF(width: 741, height: 469))),
+                "a letter with a pasted ID (348k px)")
+        #expect(PageImageCensus.carriesImageContent(try Self.page(TestFixtures.letterWithImagePDF(width: 640, height: 480))),
+                "a letter with a pasted photo (307k px)")
+        #expect(!PageImageCensus.carriesImageContent(try Self.page(TestFixtures.letterWithImagePDF(width: 600, height: 300))),
+                "a letter with a letterhead logo (180k px)")
         #expect(!PageImageCensus.carriesImageContent(try Self.page(TestFixtures.shortTitlePagePDF())), "a short page with no image")
+    }
+
+    @Test("Search time on a typed letter with a pasted photo vs a logo (env-gated measurement)",
+          .enabled(if: ProcessInfo.processInfo.environment["RESECTA_HYBRID_TIMING"] != nil))
+    func hybridSearchTiming() async throws {
+        var options = SearchOptions()
+        options.includeOCR = true
+        for (name, data) in [("logo 120x60", TestFixtures.letterWithLogoPDF()),
+                             ("photo 741x469", TestFixtures.letterWithImagePDF(width: 741, height: 469))] {
+            let doc = try #require(PDFDocument(data: data))
+            var times: [Double] = []
+            for _ in 0..<3 {
+                let start = Date()
+                for await _ in DocumentSearcher().search(SendablePDFDocument(doc), mode: .text("records", options: options), progress: { _, _ in }) {}
+                times.append(Date().timeIntervalSince(start) * 1000)
+            }
+            print(String(format: "[HYBRID-TIMING] %@ · hybrid %@ · search ms %@", name,
+                         "\(PageImageCensus.carriesImageContent(try #require(doc.page(at: 0))))",
+                         times.map { String(format: "%.0f", $0) }.joined(separator: " / ")))
+        }
     }
 
     @Test("Corpus census (env-gated): status, text density and the largest image per page",

@@ -124,6 +124,10 @@ nonisolated struct ImportFacts: Sendable {
     /// permission: copying, printing, changes, assembly, commenting, form
     /// entry or content accessibility.
     let hadRestrictions: Bool
+    /// Pages with a text layer Search cannot read (garbled encoding, or glyphs
+    /// with no geometry; `TextLayerDetector.unreadableForSearch`): Search reads
+    /// them by OCR. Export and verification keep `textLayerStatus`.
+    var searchUnreadablePages: Set<Int> = []
 
     /// The part of the record the editor keeps for the session.
     struct Summary: Sendable, Equatable {

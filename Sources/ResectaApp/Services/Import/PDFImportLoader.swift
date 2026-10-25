@@ -123,11 +123,13 @@ extension ImportService {
         // autoreleased text machinery would otherwise accumulate across
         // every page of the document before draining.
         var textLayerStatus: [Int: TextLayerStatus] = [:]
+        var searchUnreadablePages: Set<Int> = []
         for i in 0..<doc.pageCount {
             try Task.checkCancellation()
             autoreleasepool {
                 guard let page = doc.page(at: i) else { return }
                 textLayerStatus[i] = TextLayerDetector.detectTextLayer(page)
+                if textLayerStatus[i] == .rich, TextLayerDetector.unreadableForSearch(page) { searchUnreadablePages.insert(i) }
             }
         }
 
@@ -171,7 +173,8 @@ extension ImportService {
             annotationFindings: findings,
             filledFormFieldCount: filledFormFieldCount,
             wasEncrypted: wasEncrypted,
-            hadRestrictions: hadRestrictions
+            hadRestrictions: hadRestrictions,
+            searchUnreadablePages: searchUnreadablePages
         )
         return LoadedDocument(document: SendablePDFDocument(doc), facts: facts)
     }

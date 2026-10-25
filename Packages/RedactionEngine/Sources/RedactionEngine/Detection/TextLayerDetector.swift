@@ -31,6 +31,18 @@ public enum TextLayerDetector {
     /// needed, nil if the page can proceed with Searchable Redaction.
     ///
     /// Called after detectTextLayer() returns .rich.
+    /// A page whose text layer Search cannot read although it holds text: an
+    /// unresolved or symbol encoding, a CJK encoding failure, or glyphs with
+    /// no geometry (`checkFallbackTriggers`). Search reads such a page by OCR,
+    /// or reports it not analysed with OCR off; the export's and the
+    /// verification's statuses for it are unchanged.
+    public static func unreadableForSearch(_ page: PDFPage) -> Bool {
+        switch checkFallbackTriggers(page) {
+        case .cjkEncodingFailure, .unresolvedEncoding, .zeroSizeBounds: true
+        default: false
+        }
+    }
+
     public static func checkFallbackTriggers(_ page: PDFPage) -> FallbackReason? {
         guard let text = page.string, !text.isEmpty else {
             return .noExtractableText

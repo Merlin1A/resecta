@@ -1,4 +1,5 @@
 import CoreGraphics
+import Foundation
 import Vision
 
 // Vision OCR for PII detection pipeline.
@@ -23,6 +24,35 @@ public struct OCREngine: Sendable {
         /// The fit fell back to the drift envelope (`DocumentSearcher.inkFit`):
         /// the caller reports the page as not fully analysed.
         var inkFitDegraded: Bool = false
+        /// The line's whitespace-separated words with their own boxes
+        /// (Vision's `boundingBox(for:)`), by UTF-16 range in `text`; empty
+        /// where Vision gave none. A match that crosses lines is boxed on
+        /// these, not on the whole line.
+        var wordBoxes: [WordBox] = []
+    }
+
+    /// One word of a recognised line: its UTF-16 range in the line's text and
+    /// its box in normalized coordinates (0–1, bottom-left origin).
+    struct WordBox: Sendable {
+        let range: NSRange
+        let normalizedRect: CGRect
+    }
+
+    /// The words of a recognised line with their boxes; a word Vision gives
+    /// no box for is left out.
+    static func wordBoxes(of candidate: VNRecognizedText) -> [WordBox] {
+        let line = candidate.string
+        var boxes: [WordBox] = []
+        var index = line.startIndex
+        while index < line.endIndex {
+            guard let start = line[index...].firstIndex(where: { !$0.isWhitespace }) else { break }
+            let end = line[start...].firstIndex(where: \.isWhitespace) ?? line.endIndex
+            if let box = try? candidate.boundingBox(for: start..<end)?.boundingBox {
+                boxes.append(WordBox(range: NSRange(start..<end, in: line), normalizedRect: box))
+            }
+            index = end
+        }
+        return boxes
     }
 
     /// One whitespace-separated token of a recognised line, with its own box
@@ -95,7 +125,8 @@ public struct OCREngine: Sendable {
                     return TextLine(
                         text: topCandidate.string,
                         normalizedRect: obs.boundingBox,
-                        confidence: obs.confidence
+                        confidence: obs.confidence,
+                        wordBoxes: Self.wordBoxes(of: topCandidate)
                     )
                 })
             }

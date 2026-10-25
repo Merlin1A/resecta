@@ -278,7 +278,7 @@ concurrent entry points. The working rules, checkable by grep:
   convention is a written rationale at the declaration site saying why the
   access is safe.
 - Logging goes through `os.Logger`, and what a log line may carry is
-  counted: 60 log interpolations are marked `privacy: .public` across the
+  counted: 61 log interpolations are marked `privacy: .public` across the
   app and engine source, each one a mechanism value — an asset, file or
   preference-key name, a metadata key name, a pipeline phase, a page index,
   a count or a pixel size, a detector or table name, an issuer or state code
