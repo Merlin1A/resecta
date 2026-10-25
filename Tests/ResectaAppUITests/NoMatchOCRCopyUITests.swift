@@ -44,6 +44,9 @@ nonisolated final class NoMatchOCRCopyUITests: XCTestCase {
         let copy = description(Self.qualified)
         XCTAssertTrue(copy.waitForExistence(timeout: 60), "The no-match on the scanned page never read as qualified.")
         XCTAssertFalse(description(Self.unqualified).exists, "The unqualified no-match shows beside the qualified one.")
+        // The OCR controls' caption no longer awaits once the run has completed.
+        let caption = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "No results from text recognition")).firstMatch
+        XCTAssertTrue(caption.waitForExistence(timeout: 10), "The OCR caption still awaits after the completed run.")
         awaitImportNoticeGone()
         attachScreenshot(named: "no-match-ocr-page")
     }
