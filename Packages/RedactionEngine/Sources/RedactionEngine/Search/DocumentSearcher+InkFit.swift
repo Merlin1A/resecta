@@ -311,6 +311,9 @@ extension DocumentSearcher {
             let low = row.map(\.rect.minY).min() ?? a.rect.minY, high = row.map(\.rect.maxY).max() ?? a.rect.maxY
             let bottom = max(min(low, a.rect.minY), a.rect.minY - a.rect.height)
             let top = min(max(high, a.rect.maxY), a.rect.maxY + a.rect.height)
+            // A side cut from a longer token takes half a margin: past its
+            // verified glyph runs, or past a share cut, which already reaches
+            // a character beyond its share (`alignedBox`, `tokenBox`).
             let left: CGFloat = a.growLeft ? inkFitAnchorMargin : inkFitMargin / 2
             let right: CGFloat = a.growRight ? inkFitAnchorMargin : inkFitMargin / 2
             let grown = CGRect(x: a.rect.minX - left, y: bottom - inkFitMargin / 2,
@@ -375,7 +378,7 @@ extension DocumentSearcher {
                                                  key: job.pageKey, frame: frame)
                 else { exact = false; continue }
                 runs.append((cut, columns))
-                guard columns.count == cut.token.raw.count, cut.rawLo <= cut.rawHi, cut.rawHi < columns.count
+                guard glyphRunsMatch(cut.token.raw, columns), cut.rawLo <= cut.rawHi, cut.rawHi < columns.count
                 else { exact = false; continue }
                 // A cut side takes half the blank gap to the next glyph, at
                 // most half the margin: a render a pixel off from this one
@@ -520,7 +523,7 @@ extension DocumentSearcher {
     /// does no work after its stall (no second reader beside the lane), so
     /// other pages, and other tests, are untouched.
     static let inkFitInjectedStalls = InkFitStalls()
-    /// Test seam: the same for the fit's renders on a page, after its read.
+    /// Test seam: the same for the fit's renders on a page (and a token's glyph runs), after its read.
     static let inkFitInjectedRenderStalls = InkFitStalls()
     /// Test seam: a stall in place of every job for a page on the shared
     /// lane, and that job's limit there.

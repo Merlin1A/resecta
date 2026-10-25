@@ -489,6 +489,21 @@ struct PageImageInkFitTests {
         #expect(made == 1, "made \(made) copies of one document")
     }
 
+    @Test("A token's glyph runs count as its characters only when their widths agree: a split $ and a touching 7. do not")
+    func glyphRunsMatchTheirCharacters() {
+        func runs(_ pairs: [(CGFloat, CGFloat)]) -> [ClosedRange<CGFloat>] { pairs.map { $0.0...$0.1 } }
+        // "$2,847.13." on a multi-column export: ten runs for ten characters,
+        // but the $ split in two and "7." touching (measured).
+        #expect(!DocumentSearcher.glyphRunsMatch("$2,847.13.", runs([(436.0, 438.1), (439.6, 445.1), (445.6, 451.3), (452.1, 454.0),
+            (455.2, 461.2), (461.4, 467.2), (467.7, 475.1), (476.1, 479.7), (480.6, 486.4), (487.3, 488.8)])))
+        // Runs that are the characters: a table cell, an amount, a date (measured).
+        #expect(DocumentSearcher.glyphRunsMatch("INDN:DELIA", runs([(87.0, 87.5), (89.2, 94.0), (95.6, 100.2), (101.9, 106.7),
+            (108.1, 108.8), (110.5, 115.1), (116.5, 120.1), (121.8, 125.2), (126.6, 127.1), (128.3, 133.3)])))
+        #expect(DocumentSearcher.glyphRunsMatch("$75.00", runs([(544.7, 549.0), (550.4, 554.3), (555.9, 559.8), (561.2, 562.2),
+            (563.4, 567.7), (568.9, 573.2)])))
+        #expect(DocumentSearcher.glyphRunsMatch("05/24", runs([(330.7, 334.8), (336.0, 340.1), (341.0, 343.7), (344.6, 348.7), (349.9, 354.5)])))
+    }
+
     @Test("A page without a page-scale image keeps its selection boxes")
     func plainPageKeepsItsBoxes() async throws {
         let source = try #require(PDFDocument(data: try TestFixtures.sampleStatementPDF()))

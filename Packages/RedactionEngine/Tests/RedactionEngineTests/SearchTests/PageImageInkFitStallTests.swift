@@ -202,4 +202,39 @@ extension PageImageInkFitTests {
         }
         #expect(elapsed < 0.05, "a main-thread ask took \(elapsed * 1000) ms with the queue stalled")
     }
+
+    @Test("With the render stalled, a word cut from a longer token by character share keeps a character's margin: DELIA's ink is held")
+    func stalledRenderShareCutHoldsTheWord() async throws {
+        // An export of this test's own (a mark in a blank corner of page 1),
+        // so the stall reaches no other test's pages.
+        let data = try TestFixtures.sampleStatementPDF()
+        let source = try #require(PDFDocument(data: data))
+        var regions: [Int: [RedactionRegion]] = [:]
+        for hit in await Self.hits(source, "Sample", includeOCR: false) {
+            regions[hit.pageIndex, default: []].append(RedactionRegion(id: UUID(), normalizedRect: hit.normalizedRect, source: .manual))
+        }
+        regions[0, default: []].append(RedactionRegion(id: UUID(), normalizedRect: CGRect(x: 0.014, y: 0.011, width: 0.018, height: 0.009), source: .manual))
+        let url = try await TestPipeline.processAndExport(data, mode: .searchableRedaction, regions: regions, dpi: 300)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let export = try #require(PDFDocument(data: try Data(contentsOf: url)))
+        let page = try #require(export.page(at: 0)), sourcePage = try #require(source.page(at: 0))
+        let cgPage = try #require(page.pageRef)
+        let size = page.bounds(for: .cropBox).size
+        // Read first; then the page's renders stall (the fit's render and its glyph runs).
+        await DocumentSearcher.prepareInkFit(page)
+        let key = InkTokenCache.key(page: page, cgPage: cgPage, visual: size)
+        DocumentSearcher.inkFitInjectedRenderStalls.set((2.0, 0.3), for: key)
+        defer { DocumentSearcher.inkFitInjectedRenderStalls.set(nil, for: key) }
+        let text = (page.string ?? "") as NSString, sourceText = (sourcePage.string ?? "") as NSString
+        let token = text.range(of: "INDN:DELIA"), sourceToken = sourceText.range(of: "INDN:DELIA")
+        try #require(token.location != NSNotFound && sourceToken.location != NSNotFound)
+        let range = NSRange(location: token.location + 5, length: 5)
+        let raw = try #require(page.selection(for: range).flatMap { DocumentSearcher().normalizedRect(for: $0, page: page) })
+        let truth = try #require(sourcePage.selection(for: NSRange(location: sourceToken.location + 5, length: 5))
+            .flatMap { DocumentSearcher().normalizedRect(for: $0, page: sourcePage) })
+        let fit = DocumentSearcher.inkFit(raw, page: page, text: "DELIA", range: range, paintOnly: true)
+        #expect(fit.degraded, "a fit without its render is degraded")
+        let outside = try Self.inkOutside(page, word: Self.points(truth, size), boxes: [Self.points(fit.rect, size)])
+        #expect(outside.share == 0, "DELIA's ink outside its box with the render stalled: \(outside.share * 100)%, up to \(outside.reach) pt")
+    }
 }

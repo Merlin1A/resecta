@@ -61,6 +61,17 @@ extension DocumentSearcher {
     /// Nil when the box cannot be rendered.
     nonisolated static func glyphColumns(of token: InkToken, cgPage: CGPDFPage, rotation: Int, visual: CGSize,
                                          key: Int? = nil, frame: InkFitFrame? = nil) -> [ClosedRange<CGFloat>]? {
+        #if DEBUG
+        // The render-stall seam covers a token's glyph runs too (a queue of
+        // its own; the stalled job only stalls).
+        if let key, let injected = inkFitInjectedRenderStalls.value(for: key) {
+            _ = onInkFitQueue(key: key, timeout: injected.timeout,
+                              queue: DispatchQueue(label: "com.resecta.search.inkfit.stalled-columns")) {
+                Thread.sleep(forTimeInterval: injected.stall)
+            }
+            return nil
+        }
+        #endif
         let window = token.rect.insetBy(dx: -1, dy: -0.6 * token.rect.height)
             .intersection(CGRect(origin: .zero, size: frame?.size ?? visual))
         let page = InkFitPage(cgPage)
@@ -92,6 +103,28 @@ extension DocumentSearcher {
             }
         }
         return runs
+    }
+
+    /// Whether a token's glyph runs are its characters one by one: as many
+    /// runs as characters, and each run as wide as its character can be (a
+    /// narrow run is punctuation, a wide one is not; a character that can be
+    /// either, like i or 1, takes any). A count that agrees by chance (one
+    /// glyph split in two where two others touch) fails on the widths.
+    nonisolated static func glyphRunsMatch(_ raw: String, _ columns: [ClosedRange<CGFloat>]) -> Bool {
+        let characters = Array(raw)
+        guard !columns.isEmpty, characters.count == columns.count else { return false }
+        let widths = columns.map { $0.upperBound - $0.lowerBound }
+        let median = widths.sorted()[widths.count / 2]
+        let narrow: Set<Character> = [".", ",", ":", ";", "'", "\u{2019}", "`", "|", "!"]
+        let either: Set<Character> = ["i", "l", "I", "1", "j", "t", "f", "r", "(", ")", "[", "]", "-", "/", "*", "\""]
+        for (character, width) in zip(characters, widths) {
+            if narrow.contains(character) {
+                if width > 0.8 * median { return false }
+            } else if !either.contains(character), width < 0.5 * median {
+                return false
+            }
+        }
+        return true
     }
 
     enum InkFitOutcome: Equatable { case fitted, capped, noInk, darkGround, otherLine }
