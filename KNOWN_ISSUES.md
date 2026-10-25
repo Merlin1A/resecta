@@ -95,6 +95,15 @@ A password that contains accented Latin letters, such as ä or é, does not open
 
 ---
 
+### KI-13: Some Images on Typed Pages Are Not Read by Search (Low–Medium)
+**Affects:** Search (typed pages that also carry images)
+
+On a page with a text layer, Search also reads the page's images for text when one image holds at least 250,000 pixels or covers about half the page. It does not read text in a smaller image (a thumbnail-sized photo), in an image written inline in the page's drawing instructions, or in text drawn as outlines rather than as characters. The check after export still reads every page of the redacted copy for the terms you searched for, so a typed search term left in such an image is reported there. Names found by Scan are not checked that way.
+
+**Workaround:** Draw a region over the image.
+
+---
+
 ## Fixed
 
 ### KI-8: Duplicate Regions from Multiple Scan Runs (Low) — FIXED (entry moved 2026-10-01)

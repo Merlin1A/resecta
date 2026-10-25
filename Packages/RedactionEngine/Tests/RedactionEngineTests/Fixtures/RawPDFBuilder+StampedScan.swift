@@ -105,6 +105,17 @@ extension TestFixtures {
 
     /// A born-digital letter of about 1,200 visible characters with a 120 × 60
     /// px logo in the corner: not image content in the census's sense.
+    /// The same typed letter with one image of `width` × `height` pixels
+    /// drawn at 3.4 × 2.1 inches (an ID card, a photo) beside the text.
+    static func letterWithImagePDF(width: Int, height: Int) -> Data {
+        let line = "Dear Counsel, please see enclosed the records you requested on Monday"
+        let lines = (0..<17).map { "BT /F1 10 Tf 72 \(700 - $0 * 14) Td (\(line)) Tj ET" }.joined(separator: "\n")
+        return onePage(
+            stream: "q 245 0 0 151 300 80 cm /Im1 Do Q\n\(lines)",
+            resources: "/Font << /F1 5 0 R >> /XObject << /Im1 6 0 R >>",
+            extra: [imageXObject(id: 6, width: width, height: height)])
+    }
+
     static func letterWithLogoPDF() -> Data {
         let line = "Dear Counsel, please see enclosed the records you requested on Monday"
         let lines = (0..<17).map { "BT /F1 10 Tf 72 \(700 - $0 * 14) Td (\(line)) Tj ET" }.joined(separator: "\n")
