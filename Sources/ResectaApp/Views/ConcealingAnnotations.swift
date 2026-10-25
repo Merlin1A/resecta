@@ -4,7 +4,8 @@ import PDFKit
 import RedactionEngine
 
 /// Annotations in a received PDF that can sit over page content — a black
-/// square, a stamp, an unapplied redaction mark — and the text under them.
+/// square, a stamp, an unapplied redaction mark, a watermark, a form field
+/// or a highlight drawn opaque — and the text under them.
 /// The on-screen view draws an annotation; the exported file is rebuilt
 /// from the page content, which does not include annotations, so text an
 /// annotation covered appears in the export unless a redaction box covers
@@ -14,9 +15,94 @@ import RedactionEngine
 enum ConcealingAnnotations {
 
     /// Annotation subtypes that can cover content (`PDFAnnotation.type`).
-    /// Links, notes, pop-ups, text markup and form widgets are excluded:
-    /// they do not hide what is under them.
-    static let concealingSubtypes: Set<String> = ["Square", "Circle", "Polygon", "Ink", "Stamp", "FreeText", "Redact"]
+    /// Links, notes, pop-ups and the other text markup are excluded: they
+    /// do not hide what is under them. A form widget and a highlight
+    /// conceal only when they draw an opaque cover (`coverWhenOpaqueSubtypes`).
+    nonisolated static let concealingSubtypes: Set<String> = [
+        "Square", "Circle", "Polygon", "Ink", "Stamp", "FreeText", "Redact", "Watermark",
+    ]
+
+    /// Subtypes that conceal when they draw an opaque cover
+    /// (`drawsOpaqueCover`): an empty black form field used as a redaction,
+    /// a highlight painted over the text instead of multiplied with it.
+    nonisolated static let coverWhenOpaqueSubtypes: Set<String> = ["Widget", "Highlight"]
+
+    /// Whether `annotation` can cover content: a concealing subtype, or a
+    /// widget or highlight that draws an opaque cover.
+    nonisolated static func conceals(_ annotation: PDFAnnotation) -> Bool {
+        let subtype = annotation.type ?? ""
+        if concealingSubtypes.contains(subtype) { return true }
+        return coverWhenOpaqueSubtypes.contains(subtype) && drawsOpaqueCover(annotation)
+    }
+
+    /// Whether `annotation`'s own drawing hides what is under it: a widget
+    /// with an opaque background colour (`/MK /BG`), or a drawing that
+    /// decides at least 60 % of its rect (`hiddenFraction`). A field that
+    /// draws only its value or a border does not count (its value is the
+    /// import notice's filled-field sentence), nor does a light highlight
+    /// multiplied over the text.
+    nonisolated static func drawsOpaqueCover(_ annotation: PDFAnnotation) -> Bool {
+        if annotation.type == "Widget", let background = annotation.backgroundColor,
+           background.cgColor.alpha > 0.5 {
+            return true
+        }
+        return hiddenFraction(of: annotation) >= 0.6
+    }
+
+    /// The share of `annotation`'s rect where its drawing decides the pixel
+    /// whatever lies beneath: drawn once over white and once over black
+    /// (48 × 16 samples), the two results differ there by less than a
+    /// quarter of full scale. An opaque fill decides its pixels, whatever
+    /// the colour; a multiplied highlight leaves black text black, unless
+    /// the highlight is itself dark. Zero for an empty rect.
+    nonisolated private static func hiddenFraction(of annotation: PDFAnnotation) -> Double {
+        let width = 48, height = 16
+        guard let overWhite = rendered(annotation, over: 1, width: width, height: height),
+              let overBlack = rendered(annotation, over: 0, width: width, height: height) else { return 0 }
+        var hidden = 0
+        for pixel in 0..<(width * height) {
+            var difference = 0
+            for channel in 0..<3 {
+                difference += abs(Int(overWhite[pixel * 4 + channel]) - Int(overBlack[pixel * 4 + channel]))
+            }
+            if difference / 3 < 64 { hidden += 1 }
+        }
+        return Double(hidden) / Double(width * height)
+    }
+
+    /// `annotation` drawn over a grey fill of `gray` (0 black, 1 white),
+    /// its rect scaled to `width` × `height` RGBA pixels. Nil for an empty
+    /// rect.
+    nonisolated private static func rendered(
+        _ annotation: PDFAnnotation, over gray: CGFloat, width: Int, height: Int
+    ) -> [UInt8]? {
+        let bounds = annotation.bounds
+        guard bounds.width > 0, bounds.height > 0,
+              let context = CGContext(
+                data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+        else { return nil }
+        context.setFillColor(gray: gray, alpha: 1)
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        context.scaleBy(x: CGFloat(width) / bounds.width, y: CGFloat(height) / bounds.height)
+        context.translateBy(x: -bounds.minX, y: -bounds.minY)
+        annotation.draw(with: .mediaBox, in: context)
+        guard let data = context.data else { return nil }
+        return Array(UnsafeBufferPointer(start: data.bindMemory(to: UInt8.self, capacity: width * height * 4),
+                                         count: width * height * 4))
+    }
+
+    /// Form widgets in `document` that draw an opaque cover
+    /// (`drawsOpaqueCover`), counted at import for the notice: the analyzer
+    /// skips widgets, and the export does not draw them.
+    nonisolated static func coverWidgetCount(in document: PDFDocument) -> Int {
+        var count = 0
+        for index in 0..<document.pageCount {
+            guard let page = document.page(at: index) else { continue }
+            count += page.annotations.count { $0.type == "Widget" && drawsOpaqueCover($0) }
+        }
+        return count
+    }
 
     /// 0-based pages of `document` where a concealing annotation covers
     /// content that the page's redaction boxes do not cover. On a page whose
@@ -39,7 +125,7 @@ enum ConcealingAnnotations {
             let readsText = textLayerStatus[index].map { $0 == .rich }
                 ?? !(page.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             let boxes = regions[index] ?? []
-            for annotation in page.annotations where concealingSubtypes.contains(annotation.type ?? "") {
+            for annotation in page.annotations where conceals(annotation) {
                 let area = annotation.bounds.intersection(crop)
                 guard !area.isNull, area.width > 0, area.height > 0 else { continue }
                 if readsText {

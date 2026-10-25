@@ -43,6 +43,21 @@ extension VerificationResultsView {
         return parts.joined(separator: " ")
     }
 
+    /// The VoiceOver line at the end of a run: the status's spoken label,
+    /// except on a PASS with rows that did not pass (a check that had
+    /// nothing to check, a note), where "All checks completed without
+    /// issues" would contradict the header; that run reads the masthead's
+    /// title and counts instead. Never the masthead sentence: it can quote
+    /// the review terms, and an announcement speaks document text aloud.
+    static func completionAnnouncement(report: VerificationReport) -> String {
+        let partition = partition(report)
+        guard case .pass = report.overallStatus, let line2 = partition.summaryLine2 else {
+            return "Verification complete. \(report.overallStatus.accessibilityLabel)"
+        }
+        let counts = line2.replacingOccurrences(of: " · ", with: ", ")
+        return "Verification complete. \(mastheadTitle(report: report)). \(partition.summaryLine1). \(counts)."
+    }
+
     /// The run's mode as the SKIPPED sentences need it: a Secure run had
     /// every page rasterized by choice (no fallback reason); anything else,
     /// or no record of the run, reads as Searchable.
@@ -162,6 +177,12 @@ extension VerificationResultsView {
             return (searches.count == 1
                 ? "\(keepEditing) and run your search again with OCR on."
                 : "\(keepEditing) and run your searches again with OCR on.", false)
+        }
+        // The Detection Sweep lists no terms, and what it reads may sit in
+        // a page image text search does not reach: the sentence points to
+        // Scan, as the sweep row's "Open Scan to review." does.
+        if report.layers.contains(where: { $0.status.isAttention && $0.layer == .detectionSweep }) {
+            return ("\(keepEditing), then open Scan to review the pages below.", false)
         }
         return ("\(lead) the terms below.", false)
     }

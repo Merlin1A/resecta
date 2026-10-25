@@ -101,7 +101,9 @@ nonisolated struct ImportFacts: Sendable {
     /// documentURL). Drives `TextLayerExtractor.pageReferencesHiddenOCG`.
     let hasHiddenOCG: Bool
     /// Non-Widget source annotations, one entry per subtype, from the
-    /// engine's `AnnotationAnalyzer`, plus one document-level entry
+    /// engine's `AnnotationAnalyzer`, plus one entry for form fields drawn
+    /// as an opaque cover (`ImportAnnotationNoticeBanner.coverWidgetFindingID`)
+    /// and one document-level entry
     /// (`ImportAnnotationNoticeBanner.formDataOrAttachmentsFindingID`) when
     /// the source carries XFA form data or an embedded file. Drives the
     /// import notice banner: annotations are drawn by the on-screen PDFKit

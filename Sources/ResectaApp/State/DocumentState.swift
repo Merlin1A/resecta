@@ -249,7 +249,8 @@ class DocumentState {
 
     /// Non-Widget annotations present in the imported source, one entry
     /// per annotation subtype, computed at import time by the engine's
-    /// `AnnotationAnalyzer`. Annotations are drawn by the on-screen
+    /// `AnnotationAnalyzer`, plus one entry for form fields drawn as an
+    /// opaque cover (`ImportAnnotationNoticeBanner.coverWidgetFindingID`). Annotations are drawn by the on-screen
     /// PDFKit view but are not part of the page content stream the
     /// export raster is built from, so their presence drives the import
     /// notice banner in `DocumentEditorView`. Empty for image imports —

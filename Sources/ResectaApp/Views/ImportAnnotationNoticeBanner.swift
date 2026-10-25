@@ -9,7 +9,7 @@ import RedactionEngine
 // the page content stream, which includes neither, and the rebuilt file
 // carries no XFA packet and no attachment. When the imported source carries
 // a non-Widget annotation whose subtype can sit over page content, a form
-// field that carries a value, or XFA form data or an embedded file, this
+// field drawn as an opaque cover, a form field that carries a value, or XFA form data or an embedded file, this
 // banner names that mechanism so the user can check the preview before
 // sharing. One surface for all of them: the paragraph grows a sentence, it
 // never becomes a second notice.
@@ -97,6 +97,14 @@ struct ImportAnnotationNoticeBanner: View {
         return false
     }
 
+    /// The id of the entry the import loader stages beside the analyzer's
+    /// findings for form fields drawn as an opaque cover
+    /// (`ConcealingAnnotations.coverWidgetCount(in:)`), in the analyzer's
+    /// "annotation-<subtype>" form. It counts toward `noticeWorthyCount`, so
+    /// the annotation sentences name it: a cover field is an annotation the
+    /// export does not draw.
+    nonisolated static let coverWidgetFindingID = "annotation-widget"
+
     /// The staged entries carry the document-level one.
     nonisolated static func carriesFormDataOrAttachments(_ findings: [PDFFinding]) -> Bool {
         findings.contains { $0.id == formDataOrAttachmentsFindingID }
@@ -118,7 +126,8 @@ struct ImportAnnotationNoticeBanner: View {
     /// `widgetStringValue` is PDFKit's read of the field's `/V`; a
     /// whitespace-only value and a button at its `Off` state do not
     /// count. Widgets are the one subtype `AnnotationAnalyzer` skips, so
-    /// this walk is the notice's only read of them. Runs off the main
+    /// this walk and the cover-widget count are the notice's only reads of
+    /// them. Runs off the main
     /// actor at import, beside the analyzer.
     nonisolated static func filledFormFieldCount(in document: PDFDocument) -> Int {
         var count = 0
