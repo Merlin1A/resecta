@@ -241,6 +241,9 @@ final class PrivatePDFCopies: @unchecked Sendable {
         for case let box as CGPDFDocumentBox in table.objectEnumerator()?.allObjects ?? [] where box.document === copy {
             return box.drawLock
         }
+        // Every fit draws from a copy made here; one not found (its document
+        // gone while a fit still draws) shares the one lock.
+        DocumentSearcher.inkFitLogger.log("ink fit: a draw of a document with no private copy; it takes the shared draw lock")
         return Self.otherDraws
     }
     private static let otherDraws = InkFitDrawLock()
@@ -322,6 +325,26 @@ final class InkFitDrawLock: @unchecked Sendable {
         lock.withLock { heldSince = Date() }
         defer { lock.withLock { heldSince = nil }; drawing.unlock() }
         return work()
+    }
+}
+
+/// The draws running now, by page content key, and when each began. A draw
+/// that never returns holds its thread for good (it runs inline, with no lane
+/// to retire): a page with a draw running past `inkFitTimeout` is not drawn
+/// again, from any copy, so it holds one thread at most.
+final class InkFitDrawsInFlight: @unchecked Sendable {
+    static let shared = InkFitDrawsInFlight()
+    private let lock = NSLock()
+    private var draws: [Int: [Int: Date]] = [:]
+    private var next = 0
+    func begin(_ key: Int) -> Int {
+        lock.withLock { next += 1; draws[key, default: [:]][next] = Date(); return next }
+    }
+    func end(_ key: Int, _ id: Int) {
+        lock.withLock { draws[key]?[id] = nil; if draws[key]?.isEmpty == true { draws[key] = nil } }
+    }
+    func isHung(_ key: Int, past limit: TimeInterval) -> Bool {
+        lock.withLock { draws[key]?.values.contains { Date().timeIntervalSince($0) > limit } ?? false }
     }
 }
 

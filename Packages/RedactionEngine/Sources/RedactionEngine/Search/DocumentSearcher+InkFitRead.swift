@@ -69,7 +69,8 @@ extension DocumentSearcher {
     /// tokens read first when a fit in it wants them: run once with fits
     /// deferred; when one wanted the read, the read is awaited and `body`
     /// runs again. Without a read in time the second run's fits are the
-    /// envelope (degraded); no thread waits on the lane.
+    /// envelope (degraded, and shown as such: no longer deferred); no
+    /// thread waits on the lane.
     func withInkFitRead<T>(_ page: PDFPage, _ body: () -> T) async -> T {
         guard let read = Self.pendingInkRead(page) else { return body() }
         let deferral = InkFitDeferral()
@@ -78,7 +79,7 @@ extension DocumentSearcher {
         await read.run()
         // A cancelled search keeps its first run (the envelopes); it is not emitted.
         if Task.isCancelled { return first }
-        return InkFitDeferral.$current.withValue(InkFitDeferral()) { body() }
+        return body()
     }
 
     /// The page, its tokens read first when it is gated (for matching that

@@ -30,12 +30,23 @@ extension DocumentSearcher {
     /// the fit falls back (the read word's box, degraded).
     static let inkFitDrawWait: TimeInterval = 2
 
-    /// `work`, a draw of `page`, on the caller's own thread under its copy's
-    /// draw lock; nil in a cancelled task (a cancelled search renders nothing
-    /// more), or when the lock is not had within `wait`.
-    nonisolated static func drawn<T>(_ page: InkFitPage, wait: TimeInterval = inkFitDrawWait, _ work: () -> T) -> T? {
+    /// `work`, a draw of `page` (content `key`), on the caller's own thread
+    /// under its copy's draw lock; nil in a cancelled task (a cancelled search
+    /// renders nothing more), when the lock is not had within `wait`, or when
+    /// a draw of the same page has run past `hungAfter` (`InkFitDrawsInFlight`).
+    nonisolated static func drawn<T>(_ page: InkFitPage, key: Int?, wait: TimeInterval = inkFitDrawWait,
+                                     hungAfter: TimeInterval = inkFitTimeout, _ work: () -> T) -> T? {
         if Task.isCancelled { return nil }
-        guard let value = page.drawLock.draw(wait: wait, work) else {
+        if let key, InkFitDrawsInFlight.shared.isHung(key, past: hungAfter) {
+            inkFitLogger.log("ink fit: a draw of this page has not returned; the page is not drawn again")
+            return nil
+        }
+        guard let value = page.drawLock.draw(wait: wait, {
+            guard let key else { return work() }
+            let id = InkFitDrawsInFlight.shared.begin(key)
+            defer { InkFitDrawsInFlight.shared.end(key, id) }
+            return work()
+        }) else {
             inkFitLogger.log("ink fit: another draw of the page's copy held it past its wait")
             return nil
         }
@@ -92,7 +103,7 @@ extension DocumentSearcher {
             .intersection(CGRect(origin: .zero, size: frame?.size ?? visual))
         let page = InkFitPage(cgPage)
         guard !window.isNull, window.width > 0, window.height > 0,
-              let rendered = drawn(page, {
+              let rendered = drawn(page, key: key, {
                   renderGray(page.page, rotation: rotation, visual: visual, window: window, frame: frame) }),
               let bitmap = rendered else { return nil }
         let s = inkFitScale

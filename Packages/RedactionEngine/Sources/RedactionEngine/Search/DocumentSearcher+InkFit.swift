@@ -409,7 +409,7 @@ extension DocumentSearcher {
         }
         #endif
         let rendered: GrayBitmap?? = stalled ? nil : window.isNull || window.width <= 0 || window.height <= 0 ? .some(nil)
-            : drawn(page) {
+            : drawn(page, key: job.pageKey) {
                 // A failed render is tried once more before it counts.
                 renderGray(page.page, rotation: job.rotation, visual: visual, window: window, frame: frame)
                     ?? renderGray(page.page, rotation: job.rotation, visual: visual, window: window, frame: frame)
@@ -600,7 +600,7 @@ extension DocumentSearcher {
         // before it counts; one that timed out, or failed both times, is no
         // read (the caller falls back to the envelope, and nothing is cached).
         for attempt in 1...2 {
-            let image = drawn(page, wait: inkFitTimeout) {
+            let image = drawn(page, key: key, wait: inkFitTimeout) {
                 renderGrayImage(page.page, rotation: rotation, visual: visual, frame: frame).map(InkFitImage.init)
             }
             guard let image else { return nil }

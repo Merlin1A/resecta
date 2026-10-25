@@ -368,7 +368,15 @@ struct PageImageInkFitTests {
     func concurrentFitsAndPreviewAsks() async throws {
         let (export, _) = try await Self.reimportedExport()
         let data = try #require(export.dataRepresentation())
-        let reference = await Self.hits(try #require(PDFDocument(data: data)), "delia", includeOCR: false).map(\.normalizedRect)
+        // The reference settled as the copies are: its pages read first
+        // (awaited), and searched again while a busy run left a box degraded.
+        let referenceDoc = try #require(PDFDocument(data: data))
+        for index in 0..<referenceDoc.pageCount { if let page = referenceDoc.page(at: index) { await DocumentSearcher.prepareInkFit(page) } }
+        var referenceHits = await Self.hits(referenceDoc, "delia", includeOCR: false)
+        for _ in 0..<3 where referenceHits.contains(where: { $0.inkFitDegraded }) {
+            referenceHits = await Self.hits(referenceDoc, "delia", includeOCR: false)
+        }
+        let reference = referenceHits.map(\.normalizedRect)
         let preview = SendablePDFDocument(try #require(PDFDocument(data: data)))
         try await withThrowingTaskGroup(of: [CGRect].self) { group in
             for _ in 0..<4 {
