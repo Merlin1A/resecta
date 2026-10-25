@@ -1232,7 +1232,7 @@ final class SearchState: Identifiable {
         let current = pendingResults.filter { $0.run == runToken }.map(\.result)
         pendingResults.removeAll()
         guard !current.isEmpty else { return }
-        results.append(contentsOf: current)
+        results.append(contentsOf: Self.landing(current))
         resultVersion += 1
     }
 

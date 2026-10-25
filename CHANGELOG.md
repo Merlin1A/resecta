@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ### Added
 
+- Search: when the text could not be fitted to the printed word, a box is drawn wider than the word; the results sheet names the pages holding such a box, and the page in view says so above the page, before and after the boxes are applied, asking to keep such a box wide: shrinking it back to the word can leave part of the word readable.
 - Editor: the iPhone overflow menu offers Mark Whole Page for the page in view, on one-page documents too — or Unmark Whole Page, checked, on a marked page — through the page bar's own toggle.
 - At the accessibility text sizes the page bar's counter shows its position above its region count, each on one line, instead of wrapping a letter at a time.
 - Password sheet: when a refused password holds an accented letter, a line beneath the refusal says such a password may not open the document in Resecta even when it is correct (Known Issues KI-12).

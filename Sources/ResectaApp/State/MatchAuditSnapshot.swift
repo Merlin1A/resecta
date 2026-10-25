@@ -53,6 +53,9 @@ nonisolated struct MatchAuditSnapshot: Sendable, Equatable {
     /// build the Search Re-check requests. The display texts inside are
     /// never logged or persisted; the export surfaces do not read it.
     let searchRecord: AppliedSearchRecord?
+    /// The applied box is the widened envelope, not the word's ink
+    /// (`SearchResult.inkFitDegraded`): the page keeps its notice.
+    let inkFitDegraded: Bool
 
     /// Search-origin memberwise shape (field-for-field what
     /// `prepareApply` always recorded).
@@ -68,7 +71,8 @@ nonisolated struct MatchAuditSnapshot: Sendable, Equatable {
         rationale: MatchRationale?,
         term: String?,
         appliedAt: Date,
-        searchRecord: AppliedSearchRecord? = nil
+        searchRecord: AppliedSearchRecord? = nil,
+        inkFitDegraded: Bool = false
     ) {
         self.origin = origin
         self.resultID = resultID
@@ -82,5 +86,6 @@ nonisolated struct MatchAuditSnapshot: Sendable, Equatable {
         self.term = term
         self.appliedAt = appliedAt
         self.searchRecord = searchRecord
+        self.inkFitDegraded = inkFitDegraded
     }
 }

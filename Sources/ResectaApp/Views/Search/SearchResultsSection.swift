@@ -126,6 +126,11 @@ struct SearchResultsSection: View {
                 SearchOCRSkipBanner(searchState: searchState)
             }
 
+            // Per-page widened-box banner: a result's box was drawn wider
+            // than its word (`SearchWidenedBoxBanner`).
+            let widened = searchState.widenedBoxPages
+            if !widened.isEmpty { SearchWidenedBoxBanner(pages: widened) }
+
             // Live preview row (counts + saturation/invalid signal).
             livePreviewRow
 

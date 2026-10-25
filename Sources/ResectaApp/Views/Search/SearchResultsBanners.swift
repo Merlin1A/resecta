@@ -125,6 +125,34 @@ struct SearchOCRSkipBanner: View {
     }
 }
 
+    /// Surfaces when a result's box was drawn wider than its word: the
+    /// text could not be fitted to the printed word, so the box covers
+    /// where the word can be (`SearchResult.inkFitDegraded`). Same shape
+    /// as the banners above; names only page numbers. Pinned by
+    /// `WidenedBoxNoticeTests`.
+struct SearchWidenedBoxBanner: View {
+    let pages: Set<Int>
+
+    var body: some View {
+        let headline = SearchResultsSection.widenedBoxBannerHeadline(pages: pages.sorted())
+        return HStack(alignment: .top, spacing: ResectaTokens.Spacing.sm) {
+            Image(systemName: "arrow.left.and.right.square")
+                .foregroundStyle(.secondary)
+            Text(headline)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: ResectaTokens.Spacing.xs)
+        }
+        .padding(.horizontal, ResectaTokens.Spacing.md)
+        .padding(.vertical, ResectaTokens.Spacing.xs)
+        .background(Color.orange.opacity(0.08))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(headline)
+        .accessibilityIdentifier("widenedBoxBanner")
+    }
+}
+
 // MARK: - Banner headline builders
 
 extension SearchResultsSection {
@@ -143,6 +171,14 @@ extension SearchResultsSection {
         let list = formatPageList(oneBased)
         let pageNoun = oneBased.count == 1 ? "Page \(list) was" : "Pages \(list) were"
         return "\(pageNoun) too large to scan for text — image content there was not searched."
+    }
+    /// Banner headline. Pages are 0-indexed internally; rendered as
+    /// 1-based page numbers for the user.
+    static func widenedBoxBannerHeadline(pages: [Int]) -> String {
+        let oneBased = pages.map { $0 + 1 }
+        let pageNoun = oneBased.count == 1 ? "page" : "pages"
+        return "Some boxes on \(pageNoun) \(formatPageList(oneBased)) were drawn wider than their words, because the "
+            + "text could not be fitted to the printed words. Keep them wide: shrinking one can leave part of a word readable."
     }
     /// English-list formatter for page numbers. "3" / "3 and 5"
     /// / "3, 5, and 7". Caller passes 1-based numbers.
