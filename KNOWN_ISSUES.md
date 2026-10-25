@@ -104,6 +104,15 @@ On a page with a text layer, Search also reads the page's images for text when o
 
 ---
 
+### KI-14: The No-Match Message Does Not Qualify Another App's OCR Text (Medium)
+**Affects:** Search (scanned PDFs whose text layer was made by another app's OCR)
+
+When Search reads pages by text recognition and a search returns no match, the message says how many pages were read that way, because a misread word does not match. A scanned PDF whose invisible text layer was made by another app's OCR is read as a page with text, so a search with no match on it shows the plain "No occurrences in the document" message, although that layer can hold the same misreads. Search's no-match message doesn't yet qualify pages whose text layer came from another app's OCR; check scanned pages by eye.
+
+**Workaround:** Check scanned pages by eye, or search a shorter part of the term.
+
+---
+
 ## Fixed
 
 ### KI-8: Duplicate Regions from Multiple Scan Runs (Low) — FIXED (entry moved 2026-10-01)
