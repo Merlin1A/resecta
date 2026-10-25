@@ -68,6 +68,18 @@ final class InkFitQueueState: @unchecked Sendable {
 }
 
 #if DEBUG
+/// Test seam: when a key's read reached the Vision lane's head, and when
+/// its lane was retired under it (the latest of each).
+final class InkFitLaneTimes: @unchecked Sendable {
+    static let shared = InkFitLaneTimes()
+    private let lock = NSLock()
+    private var began: [Int: Date] = [:], retired: [Int: Date] = [:]
+    func didBegin(_ key: Int?) { guard let key else { return }; lock.withLock { began[key] = Date() } }
+    func didRetire(_ key: Int?) { guard let key else { return }; lock.withLock { retired[key] = Date() } }
+    func began(_ key: Int) -> Date? { lock.withLock { began[key] } }
+    func retired(_ key: Int) -> Date? { lock.withLock { retired[key] } }
+}
+
 /// The test seam's stalls, by page content key.
 final class InkFitStalls: @unchecked Sendable {
     private let lock = NSLock()

@@ -540,6 +540,9 @@ extension DocumentSearcher {
             lane.queue.async {
                 guard box.claim() else { return }
                 lane.began(key: key, limit: runLimit)
+                #if DEBUG
+                InkFitLaneTimes.shared.didBegin(key)
+                #endif
                 // A stalled job (the test seam) only stalls: it adds no reader beside the lane.
                 if runStall > 0 { Thread.sleep(forTimeInterval: runStall) } else { box.value = work() }
                 lane.ended()
@@ -553,6 +556,9 @@ extension DocumentSearcher {
         while box.done.wait(timeout: .now() + 0.25) != .success {
             if let hung = lane.overrun() {
                 state.retire(lane, key: hung.key)
+                #if DEBUG
+                InkFitLaneTimes.shared.didRetire(hung.key)
+                #endif
                 if box.isRunning {
                     inkFitLogger.log("ink fit: a page read or render ran past its timeout; the box is the drift envelope")
                     return nil

@@ -256,14 +256,24 @@ extension InkFitPendingRead {
             await withCheckedContinuation { continuation in
                 box.set(continuation)
                 if InkFitReadJoin.shared.join(read.key, box) {
-                    let submitted = InkFitReadThreads.shared.submit {
+                    var stalled = false
+                    #if DEBUG
+                    // A stalled read (the test seam) answers after its wait on a
+                    // queue of its own, taking no read thread (it reads nothing).
+                    if let injected = DocumentSearcher.inkFitInjectedStalls.value(for: read.key) {
+                        DocumentSearcher.inkFitReadTimers.asyncAfter(deadline: .now() + injected.timeout) {
+                            InkFitReadJoin.shared.finish(read.key, nil)
+                        }
+                        stalled = true
+                    }
+                    #endif
+                    if !stalled, !InkFitReadThreads.shared.submit({
                         let result = DocumentSearcher.readTokens(read.page.page, rotation: read.rotation, visual: read.visual,
                                                                  key: read.key, languages: read.languages, frame: read.frame)
                         if let result { InkTokenCache.shared.set(result, for: read.key) }
                         InkFitReadJoin.shared.finish(read.key, result)
-                    }
-                    // Every read thread held by a draw that never returned: no read.
-                    if !submitted {
+                    }) {
+                        // Every read thread held by a draw that never returned: no read.
                         DocumentSearcher.inkFitLogger.log("ink fit: every read thread is held by a draw that has not returned; no read")
                         InkFitReadJoin.shared.finish(read.key, nil)
                     }
