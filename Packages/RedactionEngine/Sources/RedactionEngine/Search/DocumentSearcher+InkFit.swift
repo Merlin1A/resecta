@@ -215,41 +215,6 @@ extension DocumentSearcher {
                     dy: -max(1.5 * box.height, inkFitDriftAcross))
     }
 
-    /// The points from the start of the line of `range` (its first letter
-    /// that is not a space, in the layer) to the end of `box` (reading frame).
-    nonisolated static func distanceFromLineStart(of range: NSRange?, box: CGRect, page: PDFPage,
-                                                  visual: CGSize, frame: InkFitFrame) -> CGFloat {
-        guard let range, range.location != NSNotFound else { return box.width }
-        let text = (page.string ?? "") as NSString
-        guard NSMaxRange(range) <= text.length else { return box.width }
-        let line = text.lineRange(for: NSRange(location: range.location, length: 0))
-        var first = line.location
-        while first < range.location,
-              let scalar = Unicode.Scalar(text.character(at: first)), CharacterSet.whitespaces.contains(scalar) { first += 1 }
-        guard let start = page.selection(for: NSRange(location: first, length: 1))
-                .flatMap({ DocumentSearcher().normalizedRect(for: $0, page: page) }) else { return box.width }
-        let startBox = frame.toReading(CGRect(x: start.minX * visual.width, y: start.minY * visual.height,
-                                              width: start.width * visual.width, height: start.height * visual.height))
-        return max(box.maxX - startBox.minX, 0)
-    }
-
-    /// The wide (CJK) characters on the line of `range` in `text`, from the
-    /// line's start to the range's end.
-    nonisolated static func wideCharacters(before range: NSRange?, in text: String) -> Int {
-        guard let range, range.location != NSNotFound else { return 0 }
-        let ns = text as NSString
-        guard NSMaxRange(range) <= ns.length else { return 0 }
-        let line = ns.lineRange(for: NSRange(location: range.location, length: 0))
-        let span = ns.substring(with: NSRange(location: line.location, length: NSMaxRange(range) - line.location))
-        return span.unicodeScalars.reduce(0) { count, scalar in
-            switch scalar.value {
-            case 0x1100...0x11FF, 0x2E80...0x303F, 0x3040...0x33FF, 0x3400...0x4DBF, 0x4E00...0x9FFF,
-                 0xAC00...0xD7AF, 0xF900...0xFAFF, 0xFF00...0xFF60, 0xFFE0...0xFFE6: count + 1
-            default: count
-            }
-        }
-    }
-
     /// Fits in the job's reading frame (`InkFitFrame`): the selection box,
     /// the read tokens, the renders and the fitted box are turned into it,
     /// and the fitted box turned back.
@@ -310,6 +275,36 @@ extension DocumentSearcher {
             let tail = probe.reversed().prefix(24).lazy.compactMap { l in onBand(l.text).map { ($0, l.read) } }.first
             if let head, let tail, tail.0.midX - head.0.midX > 1 { ends = (head, tail) }
         }
+        // Where the line's drift puts the word, and how far a true word was
+        // measured to sit from that (the residual): one cell (the layer
+        // word's width over its characters, for the fixed-pitch grid's
+        // saw-tooth) and a constant on top, sized on the measured inputs.
+        var prediction: (center: CGFloat, residual: CGFloat, scale: CGFloat)?
+        if let (first, last) = ends {
+            let scale = (last.1 - first.1) / (last.0.midX - first.0.midX)
+            let cell = box.width / CGFloat(max(job.range?.length ?? job.text.map { ($0 as NSString).length } ?? 1, 1))
+            prediction = (first.1 + (box.midX - first.0.midX) * scale,
+                          max(0.75 * box.height, 5) + 0.5 * box.width + cell + inkFitResidualSlack, scale)
+        }
+        // The envelope for a word whose line has a drift model: around the
+        // predicted place, the residual and half the word (at the line's
+        // scale) along the line, the drift bound across it, and never wider
+        // than the drift envelope. A line without one: the drift envelope.
+        func lineEnvelope() -> CGRect {
+            let wide = job.envelope()
+            guard let p = prediction else { return wide }
+            let half = 0.5 * box.width * max(p.scale, 1) + inkFitMargin
+            let across = box.insetBy(dx: 0, dy: -max(1.5 * box.height, inkFitDriftAcross))
+            let around = CGRect(x: p.center - p.residual - half, y: across.minY,
+                                width: 2 * (p.residual + half), height: across.height)
+                .intersection(CGRect(origin: .zero, size: size))
+            guard !around.isNull, !around.isEmpty else { return wide }
+            let back = frame.toVisual(around)
+            let normalized = CGRect(x: back.minX / visual.width, y: back.minY / visual.height,
+                                    width: back.width / visual.width, height: back.height / visual.height)
+            let held = normalized.intersection(wide)
+            return held.isNull || held.isEmpty ? wide : held.clampedToNormalized()
+        }
         // The same occurrence of its text in the layer and in the read row,
         // or not this word (a repeated word read in another place). The
         // layer's occurrences count on the match's own printed row: a layer
@@ -320,22 +315,12 @@ extension DocumentSearcher {
             return onRow.count == model.readTotal && onRow.filter { $0 < model.matchText }.count == model.readBefore
         }
         if aligned, let model, !sameOrdinal(model) {
-            inkFitLogger.log("ink fit: the read word placed is another occurrence of its text; the box is the drift envelope")
-            return job.envelope()
+            inkFitLogger.log("ink fit: the read word placed is another occurrence of its text; the box is the envelope"); return lineEnvelope()
         }
-        if let (first, last) = ends {
-            let scale = (last.1 - first.1) / (last.0.midX - first.0.midX)
-            let predicted = first.1 + (box.midX - first.0.midX) * scale
-            // The layer snaps runs to its fixed-pitch grid, so its drift
-            // saw-tooths along the line by up to a cell: one cell (the layer
-            // word's width over its characters) and a constant on top of
-            // the residual, sized on the measured inputs with headroom.
-            let cell = box.width / CGFloat(max(job.range?.length ?? job.text.map { ($0 as NSString).length } ?? 1, 1))
-            let residual = max(0.75 * box.height, 5) + 0.5 * box.width + cell + inkFitResidualSlack
-            guard abs(placed.rect.midX - predicted) <= residual,
+        if let p = prediction {
+            guard abs(placed.rect.midX - p.center) <= p.residual,
                   abs(placed.rect.midY - box.midY) <= max(1.5 * box.height, inkFitDriftAcross) else {
-                inkFitLogger.log("ink fit: the read word placed is off its line's drift; the box is the drift envelope")
-                return job.envelope()
+                inkFitLogger.log("ink fit: the read word placed is off its line's drift; the box is the envelope"); return lineEnvelope()
             }
         } else {
             let fixed = driftBound(around: box, wideBefore: job.wideBefore).insetBy(dx: -inkFitMargin, dy: -inkFitMargin)
@@ -417,7 +402,9 @@ extension DocumentSearcher {
         // No render (in time, or at all): the envelope, even with a read word
         // to stand on. Vision's word box alone can leave a glyph's top or foot
         // outside; only the render's ink rows close it.
-        guard let finished = rendered, let bitmap = finished else { return envelope() }
+        guard let finished = rendered, let bitmap = finished else {
+            inkFitLogger.log("ink fit: no render in time; the box is the envelope"); return lineEnvelope()
+        }
         // The ink rows: at the ink threshold; text lighter than it (grey
         // labels, a faint scan) read again at `inkFitLightThreshold`; light
         // text on a dark ground read as light ink.
@@ -438,11 +425,10 @@ extension DocumentSearcher {
         // alone can leave a glyph's top or foot outside. The envelope.
         guard let ink = reading.box else {
             switch reading.outcome {
-            case .darkGround: inkFitLogger.log("ink fit: dark ground around a text-layer box; the box is the drift envelope")
-            case .otherLine: inkFitLogger.log("ink fit: no inked line overlaps half the box; the box is the drift envelope")
-            default: inkFitLogger.log("ink fit: no ink read on the box; the box is the drift envelope")
+            case .darkGround: inkFitLogger.log("ink fit: dark ground around a text-layer box; the box is the envelope"); return lineEnvelope()
+            case .otherLine: inkFitLogger.log("ink fit: no inked line overlaps half the box; the box is the envelope"); return lineEnvelope()
+            default: inkFitLogger.log("ink fit: no ink read on the box; the box is the envelope"); return lineEnvelope()
             }
-            return job.envelope()
         }
         if reading.outcome == .capped { inkFitLogger.log("ink fit reached its window: the box grew to the cap") }
         // The height is the ink's own rows: Vision's box can reach past its
@@ -462,8 +448,7 @@ extension DocumentSearcher {
         // The fit past its read word's window (a render that grew onto
         // another word): the envelope.
         guard window.insetBy(dx: -inkFitMargin, dy: -inkFitMargin).contains(fitted) else {
-            inkFitLogger.log("ink fit: the fitted box reaches past its window; the box is the drift envelope")
-            return job.envelope()
+            inkFitLogger.log("ink fit: the fitted box reaches past its window; the box is the envelope"); return lineEnvelope()
         }
         if !job.paintOnly { fitted = fitted.union(box) }
         let back = frame.toVisual(fitted)
@@ -582,24 +567,6 @@ extension DocumentSearcher {
 
     /// The longest a caller waits behind other jobs on a queue that is still moving.
     static let inkFitWaitCeiling: TimeInterval = 90
-
-    /// The languages a page's read uses: the CJK ones its layer's script
-    /// names, else Vision's default (nil).
-    nonisolated static func inkFitLanguages(for pageText: String) -> [String]? {
-        var han = false, kana = false, hangul = false
-        for scalar in pageText.unicodeScalars {
-            switch scalar.value {
-            case 0x3040...0x30FF, 0x31F0...0x31FF: kana = true
-            case 0xAC00...0xD7AF, 0x1100...0x11FF, 0x3130...0x318F: hangul = true
-            case 0x4E00...0x9FFF, 0x3400...0x4DBF, 0xF900...0xFAFF: han = true
-            default: continue
-            }
-        }
-        if kana { return ["ja-JP", "en-US"] }
-        if hangul { return ["ko-KR", "en-US"] }
-        if han { return ["zh-Hans", "zh-Hant", "en-US"] }
-        return nil
-    }
 
     nonisolated static func readTokens(_ cgPage: CGPDFPage, rotation: Int, visual: CGSize, key: Int? = nil,
                                        languages: [String]? = nil, frame: InkFitFrame? = nil) -> [InkToken]? {
