@@ -97,6 +97,25 @@ struct SearchToolbarSectionTests {
         #expect(!noLeg.lowercased().contains("awaiting"))
     }
 
+    @Test("After a completed run with no OCR results the caption stops awaiting")
+    func ocrDisabledCaptionAfterCompletedRun() {
+        // The run finished and its OCR leg produced nothing: "awaiting"
+        // would contradict the no-match copy beside it.
+        let done = SearchToolbarSection.ocrDisabledCaption(anyPageAwaitsOCR: true, runCompleted: true)
+        #expect(done == "No results from text recognition")
+        #expect(SearchToolbarSection.ocrDisabledCaption(anyPageAwaitsOCR: true, runCompleted: false)
+                == SearchToolbarSection.awaitingOCRResultsCaption)
+        // No OCR leg at all keeps its own caption, run or not.
+        #expect(SearchToolbarSection.ocrDisabledCaption(anyPageAwaitsOCR: false, runCompleted: true)
+                == SearchToolbarSection.ocrDisabledCaption(anyPageAwaitsOCR: false))
+        // The row passes the run state.
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let row = (try? String(contentsOf: root.appendingPathComponent(
+            "Sources/ResectaApp/Views/Search/SearchToolbarSection+Scan.swift"), encoding: .utf8)) ?? ""
+        #expect(row.contains("runCompleted: searchState.hasCompletedRunSinceClear"))
+    }
+
     @Test("PII Scan mode mirrors the OCR-controls visibility via shared static gates")
     func wu87PIIScanReusesWU08Gates() {
         // `piiScanOptions` reuses the

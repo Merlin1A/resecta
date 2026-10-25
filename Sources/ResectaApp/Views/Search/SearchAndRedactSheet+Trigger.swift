@@ -292,6 +292,8 @@ extension SearchAndRedactSheet {
         if isPIIScan {
             searchState.lastRunDetectorCount = enabledCategories.count
         }
+        searchState.lastRunOCRPageCount = SearchEmptyStateCopy.ocrReadPageCount(  // the no-match copy's page count
+            textLayerStatus, includeOCR: searchState.options.includeOCR, isScan: isPIIScan)
         // The configuration this Scan runs with, kept on the session so the
         // applied record reproduces the run (the blob, not the compiled
         // index — the record is a value). Nil for a typed run.

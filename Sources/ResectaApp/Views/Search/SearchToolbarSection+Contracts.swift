@@ -71,12 +71,14 @@ extension SearchToolbarSection {
     /// ever arrive and the caption promised something that never comes.
     /// `anyPageAwaitsOCR` is true when at least one page classified
     /// `.sparse`/`.none` — only then is "awaiting" a real state.
+    /// Once a run has completed with no OCR results (`runCompleted`), the
+    /// leg ran and produced nothing: the caption says so instead of
+    /// awaiting, beside the no-match copy.
     /// Factual mechanism description, not a promise.
     /// Pinned by `SearchToolbarSectionTests`.
-    static func ocrDisabledCaption(anyPageAwaitsOCR: Bool) -> String {
-        anyPageAwaitsOCR
-            ? awaitingOCRResultsCaption
-            : "OCR not needed — this document's pages read as searchable text"
+    static func ocrDisabledCaption(anyPageAwaitsOCR: Bool, runCompleted: Bool = false) -> String {
+        guard anyPageAwaitsOCR else { return "OCR not needed — this document's pages read as searchable text" }
+        return runCompleted ? "No results from text recognition" : awaitingOCRResultsCaption
     }
 
     // MARK: - OCR-block visibility contracts

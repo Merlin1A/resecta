@@ -110,7 +110,8 @@ extension SearchToolbarSection {
                 // The caption is conditional: "awaiting" only
                 // when at least one page will actually route to OCR.
                 let caption = Self.ocrDisabledCaption(
-                    anyPageAwaitsOCR: documentState.anyPageAwaitsOCRForSearch
+                    anyPageAwaitsOCR: documentState.anyPageAwaitsOCRForSearch,
+                    runCompleted: searchState.hasCompletedRunSinceClear
                 )
                 Text(caption)
                     .font(.caption2)

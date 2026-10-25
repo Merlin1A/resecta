@@ -456,7 +456,7 @@ struct SearchResultsSection: View {
                 // String variable hits the verbatim overload and renders
                 // the asterisks literally (screenshot evidence) — the
                 // explicit `.init` routes back to the markdown-aware path.
-                Text(.init(SearchEmptyStateCopy.description(for: context)))
+                Text(.init(SearchEmptyStateCopy.description(for: context, ocrReadPages: searchState.lastRunOCRPageCount)))
                 if context == .multiTermPreSearchWithRecents {
                     multiTermRecallChips
                 }

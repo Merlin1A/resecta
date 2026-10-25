@@ -181,8 +181,14 @@ enum SearchEmptyStateCopy {
     }
 
     /// Description per branch. Mechanism-description copy — describes
-    /// the engine path or the affordance, not a verdict.
-    static func description(for context: EmptyContext) -> String {
+    /// the engine path or the affordance, not a verdict. `ocrReadPages`
+    /// is the run's count of pages read by text recognition
+    /// (`ocrReadPageCount`); above zero, a no-match branch takes its
+    /// qualified copy (`ocrNoMatchDescription`).
+    static func description(for context: EmptyContext, ocrReadPages: Int = 0) -> String {
+        if ocrReadPages > 0, let qualified = ocrNoMatchDescription(for: context, pages: ocrReadPages) {
+            return qualified
+        }
         switch context {
         case .textPreSearch:
             return "Type a word, phrase, or pattern to match against the document text."
@@ -232,6 +238,53 @@ enum SearchEmptyStateCopy {
             let suffix = pageCount == 1 ? "" : "s"
             return "Detection stopped after \(pagesScanned) of \(pageCount) page\(suffix) — the remaining pages weren't scanned."
         }
+    }
+
+    // MARK: No-match over pages read by text recognition
+    //
+    // A no-match over a page read by OCR is not a statement about that
+    // page: Vision can misread a name or drop punctuation, and the
+    // misread word does not match. The no-match branches then say what
+    // was searched and point at the page itself, in the voice of the
+    // Scan side's calibration line below. Pinned by `NoMatchOCRCopyTests`.
+
+    /// The pages a typed run reads by text recognition: those whose
+    /// search status is not `.rich` (the engine sends `.sparse` and
+    /// `.none` to OCR; a page absent from the map takes the text layer),
+    /// with Include OCR on. Zero for a Scan, which has its own
+    /// zero-result copy.
+    static func ocrReadPageCount(_ status: [Int: TextLayerStatus], includeOCR: Bool, isScan: Bool) -> Int {
+        guard includeOCR, !isScan else { return 0 }
+        return status.values.filter { $0 != .rich }.count
+    }
+
+    /// The no-match description when the run read `pages` pages by text
+    /// recognition; nil for a branch that is not a no-match.
+    static func ocrNoMatchDescription(for context: EmptyContext, pages: Int) -> String? {
+        let lead: String
+        let recourse: String
+        switch context {
+        case .textNoMatch:
+            lead = "No matches in the text Resecta could read."
+            recourse = "Check those pages by eye, or search a shorter part of the term."
+        case .regexNoMatch:
+            lead = "The active pattern produced no matches in the text Resecta could read."
+            recourse = "Check those pages by eye, or loosen the pattern."
+        case .multiTermNoMatch:
+            lead = "No matches for any of the active terms in the text Resecta could read."
+            recourse = "Check those pages by eye, or search a shorter part of a term."
+        case .multiTermNoMatchConjunction:
+            lead = "No page contains all of the active terms together in the text Resecta could read."
+            recourse = "Check those pages by eye, or turn off \"All terms must match\" to see per-term occurrences."
+        case .textPreSearch, .textNotRun, .regexPreSearch, .regexNotRun,
+             .multiTermPreSearchNoRecents, .multiTermPreSearchWithRecents, .multiTermNotRun,
+             .piiScanPreScan, .piiScanStartFailed, .piiScanPostScanZero, .piiScanCancelled:
+            return nil
+        }
+        let read = pages == 1
+            ? "1 page was read by text recognition"
+            : "\(pages) pages were read by text recognition"
+        return "\(lead) \(read), and a misread word won't match. \(recourse)"
     }
 
     // MARK: Post-scan-zero recourse
