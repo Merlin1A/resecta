@@ -667,7 +667,8 @@ final class PipelineCoordinator: @unchecked Sendable {
         Self.appliedSearches(
             fromRegions: redactionState.regions,
             audit: redactionState.appliedMatchAudit,
-            deselected: deselected
+            deselected: deselected,
+            covered: redactionState.coveredSearchRecords
         )
     }
 

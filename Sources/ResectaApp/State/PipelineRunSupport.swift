@@ -235,7 +235,8 @@ extension PipelineCoordinator {
     nonisolated static func appliedSearches(
         fromRegions regions: [Int: [RedactionRegion]],
         audit: [UUID: MatchAuditSnapshot],
-        deselected: [SearchResult] = []
+        deselected: [SearchResult] = [],
+        covered: [CoveredSearchRecord] = []
     ) -> [SearchRecheckRequest] {
         struct Group {
             var record: AppliedSearchRecord
@@ -268,6 +269,13 @@ extension PipelineCoordinator {
                     order.append(query)
                 }
             }
+        }
+        // A search whose every result a box already held created no region:
+        // it is re-run too, with no region citing it (`noteCoveredSearch`).
+        for entry in covered where groups[entry.record.query] == nil {
+            groups[entry.record.query] = Group(record: entry.record, recordAppliedAt: entry.appliedAt,
+                                               appliedCount: 0, appliedPages: entry.pages)
+            order.append(entry.record.query)
         }
         return order.compactMap { query in
             guard let group = groups[query] else { return nil }
