@@ -86,6 +86,24 @@ struct InkFitReadJoinTests {
         #expect(ran.count == 1, "the accepted read ran")
     }
 
+    @Test("With every draw slot held by a draw that has not returned, a new read's draw fails at once, though threads are free")
+    func hungDrawSlotsFailNewDraws() async throws {
+        // Four threads, one draw slot, a draw judged hung past 0.3 s.
+        let threads = InkFitReadThreads(count: 4, draws: 1, hungAfter: 0.3)
+        #expect(threads.submit { _ = threads.drawing { Thread.sleep(forTimeInterval: 3) } })
+        try await Task.sleep(for: .milliseconds(700))
+        let outcome = OCRLegConcurrencyTests.ResultBox()
+        let asked = Date()
+        let submitted = threads.submit { outcome.add(threads.drawing { 1 } == nil ? Int(Date().timeIntervalSince(asked) * 1000) : -1) }
+        if submitted {
+            let deadline = Date().addingTimeInterval(5)
+            while outcome.count == 0, Date() < deadline { try await Task.sleep(for: .milliseconds(20)) }
+            #expect(outcome.count == 1 && outcome.hits >= 0 && outcome.hits < 400,
+                    "the second read's draw failed at once, not after its slot wait: \(outcome.hits) ms")
+        }
+        #expect(Date().timeIntervalSince(asked) < 1, "the second read waited behind the hung draw")
+    }
+
     @Test("Searches of one page at once take one read of it, and each fits from it")
     func concurrentSearchesOfOnePageShareOneRead() async throws {
         let data = try await InkFitBusyPoolTests.export(mark: CGRect(x: 0.024, y: 0.012, width: 0.011, height: 0.008))

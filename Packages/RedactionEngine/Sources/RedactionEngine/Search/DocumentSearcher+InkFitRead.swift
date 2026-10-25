@@ -160,11 +160,14 @@ final class InkFitReadThreads: @unchecked Sendable {
     private var jobs: [() -> Void] = []
     private var idle = 0
     private var drawingSince: [Int: Date] = [:]
+    /// When each held draw slot was taken, by thread.
+    private var slotSince: [Int: Date] = [:]
     private let count: Int, hungAfter: TimeInterval
-    private let drawSlots: DispatchSemaphore
+    private let drawSlots: DispatchSemaphore, drawLimit: Int
     init(count: Int, draws: Int? = nil, hungAfter: TimeInterval) {
         self.count = count; self.hungAfter = hungAfter
-        drawSlots = DispatchSemaphore(value: draws ?? count)
+        drawLimit = draws ?? count
+        drawSlots = DispatchSemaphore(value: drawLimit)
         for number in 0..<count {
             let thread = Thread { [unowned self] in self.serve(number) }
             thread.name = "\(Self.numberKey).\(number)"
@@ -173,20 +176,33 @@ final class InkFitReadThreads: @unchecked Sendable {
         }
     }
     /// `job` on a read thread; false (and nothing runs) when no thread is
-    /// free and each is held by a draw running past `hungAfter`.
+    /// free and each is held by a draw running past `hungAfter`, or every
+    /// draw slot is.
     func submit(_ job: @escaping () -> Void) -> Bool {
         condition.lock(); defer { condition.unlock() }
+        if slotsHung { return false }
         if idle == 0, drawingSince.count == count,
            drawingSince.values.allSatisfy({ Date().timeIntervalSince($0) > hungAfter }) { return false }
         jobs.append(job); condition.signal()
         return true
     }
-    /// `work` (a read's draw), noted while it runs on one of these threads.
-    func drawing<T>(_ work: () -> T) -> T {
+    /// Every draw slot held by a draw running past `hungAfter` (the lock held).
+    private var slotsHung: Bool {
+        slotSince.count == drawLimit && slotSince.values.allSatisfy { Date().timeIntervalSince($0) > hungAfter }
+    }
+    /// `work` (a read's draw), noted while it runs on one of these threads;
+    /// nil, with nothing drawn, when no draw slot comes free within
+    /// `hungAfter` (or every slot is held by a draw past it).
+    func drawing<T>(_ work: () -> T) -> T? {
         guard let number = Thread.current.threadDictionary[Self.numberKey] as? Int else { return work() }
-        condition.lock(); drawingSince[number] = Date(); condition.unlock()
-        drawSlots.wait()
-        defer { drawSlots.signal(); condition.lock(); drawingSince[number] = nil; condition.unlock() }
+        condition.lock()
+        if slotsHung { condition.unlock(); return nil }
+        drawingSince[number] = Date()
+        condition.unlock()
+        defer { condition.lock(); drawingSince[number] = nil; condition.unlock() }
+        guard drawSlots.wait(timeout: .now() + hungAfter) == .success else { return nil }
+        condition.lock(); slotSince[number] = Date(); condition.unlock()
+        defer { condition.lock(); slotSince[number] = nil; condition.unlock(); drawSlots.signal() }
         return work()
     }
     private func serve(_ number: Int) {

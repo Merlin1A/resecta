@@ -601,11 +601,12 @@ extension DocumentSearcher {
         // before it counts; one that timed out, or failed both times, is no
         // read (the caller falls back to the envelope, and nothing is cached).
         for attempt in 1...2 {
-            let image = InkFitReadThreads.shared.drawing {
+            // Nil: no draw slot or lock in time (no read); nil inside: no render.
+            let image: InkFitImage?? = InkFitReadThreads.shared.drawing {
                 drawn(page, key: key, wait: inkFitTimeout) {
                     renderGrayImage(page.page, rotation: rotation, visual: visual, frame: frame).map(InkFitImage.init)
                 }
-            }
+            } ?? nil
             guard let image else { return nil }
             guard let image else {
                 inkFitLogger.log("ink fit: the page did not render for its read (attempt \(attempt))")
