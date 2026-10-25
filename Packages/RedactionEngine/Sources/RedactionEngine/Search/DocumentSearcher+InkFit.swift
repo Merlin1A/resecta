@@ -57,6 +57,14 @@ extension DocumentSearcher {
     /// with 1.25 of headroom.
     static let inkFitResidualSlack: CGFloat = 3.5
 
+    /// The line scales a drift model may have (read along the line over the
+    /// layer along it); past them the model is not used.
+    static let inkFitScaleRange: ClosedRange<CGFloat> = 0.5...2
+
+    /// The margin (points) on an open side of a read word's box when its ink
+    /// was not verified (half `inkFitMargin` on a side cut from a longer token).
+    static let inkFitAnchorMargin: CGFloat = 1.5
+
     /// Text lighter than the ink threshold (a grey label, a faint scan) is
     /// read again with a pixel this dark (of 255) as its ink.
     static let inkFitLightThreshold: UInt8 = 232
@@ -280,8 +288,8 @@ extension DocumentSearcher {
         // word's width over its characters, for the fixed-pitch grid's
         // saw-tooth) and a constant on top, sized on the measured inputs.
         var prediction: (center: CGFloat, residual: CGFloat, scale: CGFloat)?
-        if let (first, last) = ends {
-            let scale = (last.1 - first.1) / (last.0.midX - first.0.midX)
+        if let (first, last) = ends, case let scale = (last.1 - first.1) / (last.0.midX - first.0.midX),
+           inkFitScaleRange.contains(scale) {
             let cell = box.width / CGFloat(max(job.range?.length ?? job.text.map { ($0 as NSString).length } ?? 1, 1))
             prediction = (first.1 + (box.midX - first.0.midX) * scale,
                           max(0.75 * box.height, 5) + 0.5 * box.width + cell + inkFitResidualSlack, scale)
@@ -290,6 +298,29 @@ extension DocumentSearcher {
         // predicted place, the residual and half the word (at the line's
         // scale) along the line, the drift bound across it, and never wider
         // than the drift envelope. A line without one: the drift envelope.
+        // A placed read word whose ink the render did not verify: its box,
+        // grown to its printed line's band (the read words beside it at its
+        // height: ascenders and descenders), with a margin, degraded.
+        func anchorEnvelope() -> CGRect {
+            let wide = job.envelope()
+            guard let a = anchor else { return wide }
+            let row = tokens.filter { t in
+                let overlap = min(t.rect.maxY, a.rect.maxY) - max(t.rect.minY, a.rect.minY)
+                return overlap >= 0.5 * min(t.rect.height, a.rect.height) && abs(t.rect.midX - a.rect.midX) <= 200
+            }
+            let low = row.map(\.rect.minY).min() ?? a.rect.minY, high = row.map(\.rect.maxY).max() ?? a.rect.maxY
+            let bottom = max(min(low, a.rect.minY), a.rect.minY - a.rect.height)
+            let top = min(max(high, a.rect.maxY), a.rect.maxY + a.rect.height)
+            let left: CGFloat = a.growLeft ? inkFitAnchorMargin : inkFitMargin / 2
+            let right: CGFloat = a.growRight ? inkFitAnchorMargin : inkFitMargin / 2
+            let grown = CGRect(x: a.rect.minX - left, y: bottom - inkFitMargin / 2,
+                               width: a.rect.width + left + right, height: top - bottom + inkFitMargin)
+                .intersection(CGRect(origin: .zero, size: size))
+            guard !grown.isNull, !grown.isEmpty else { return wide }
+            let back = frame.toVisual(grown)
+            return CGRect(x: back.minX / visual.width, y: back.minY / visual.height,
+                          width: back.width / visual.width, height: back.height / visual.height).clampedToNormalized()
+        }
         func lineEnvelope() -> CGRect {
             let wide = job.envelope()
             guard let p = prediction else { return wide }
@@ -320,7 +351,9 @@ extension DocumentSearcher {
         if let p = prediction {
             guard abs(placed.rect.midX - p.center) <= p.residual,
                   abs(placed.rect.midY - box.midY) <= max(1.5 * box.height, inkFitDriftAcross) else {
-                inkFitLogger.log("ink fit: the read word placed is off its line's drift; the box is the envelope"); return lineEnvelope()
+                // The line's model and the read word disagree: neither places
+                // the word, so the box is the drift envelope.
+                inkFitLogger.log("ink fit: the read word placed is off its line's drift; the box is the drift envelope"); return job.envelope()
             }
         } else {
             let fixed = driftBound(around: box, wideBefore: job.wideBefore).insetBy(dx: -inkFitMargin, dy: -inkFitMargin)
@@ -403,7 +436,7 @@ extension DocumentSearcher {
         // to stand on. Vision's word box alone can leave a glyph's top or foot
         // outside; only the render's ink rows close it.
         guard let finished = rendered, let bitmap = finished else {
-            inkFitLogger.log("ink fit: no render in time; the box is the envelope"); return lineEnvelope()
+            inkFitLogger.log("ink fit: no render in time; the box is the read word's box, degraded"); return anchorEnvelope()
         }
         // The ink rows: at the ink threshold; text lighter than it (grey
         // labels, a faint scan) read again at `inkFitLightThreshold`; light
@@ -425,9 +458,9 @@ extension DocumentSearcher {
         // alone can leave a glyph's top or foot outside. The envelope.
         guard let ink = reading.box else {
             switch reading.outcome {
-            case .darkGround: inkFitLogger.log("ink fit: dark ground around a text-layer box; the box is the envelope"); return lineEnvelope()
-            case .otherLine: inkFitLogger.log("ink fit: no inked line overlaps half the box; the box is the envelope"); return lineEnvelope()
-            default: inkFitLogger.log("ink fit: no ink read on the box; the box is the envelope"); return lineEnvelope()
+            case .darkGround: inkFitLogger.log("ink fit: dark ground around a text-layer box; the box is the read word's box, degraded"); return anchorEnvelope()
+            case .otherLine: inkFitLogger.log("ink fit: no inked line overlaps half the box; the box is the read word's box, degraded"); return anchorEnvelope()
+            default: inkFitLogger.log("ink fit: no ink read on the box; the box is the read word's box, degraded"); return anchorEnvelope()
             }
         }
         if reading.outcome == .capped { inkFitLogger.log("ink fit reached its window: the box grew to the cap") }
@@ -448,7 +481,7 @@ extension DocumentSearcher {
         // The fit past its read word's window (a render that grew onto
         // another word): the envelope.
         guard window.insetBy(dx: -inkFitMargin, dy: -inkFitMargin).contains(fitted) else {
-            inkFitLogger.log("ink fit: the fitted box reaches past its window; the box is the envelope"); return lineEnvelope()
+            inkFitLogger.log("ink fit: the fitted box reaches past its window; the box is the read word's box, degraded"); return anchorEnvelope()
         }
         if !job.paintOnly { fitted = fitted.union(box) }
         let back = frame.toVisual(fitted)

@@ -45,7 +45,7 @@ extension PageImageInkFitTests {
         #expect(outside.share == 0, "the stalled word's ink outside the fallback: \(outside.share * 100)%")
     }
 
-    @Test("A render that stalls after the page was read gives an envelope, degraded, never the read word's box alone")
+    @Test("A render that stalls after the page was read gives the read word's box on its line, degraded")
     func stalledRenderFallsBackToTheEnvelope() async throws {
         // An export of this test's own (two more words redacted), so its page
         // content key is no other test's.
@@ -81,13 +81,11 @@ extension PageImageInkFitTests {
         let truth = try #require(sourcePage.selection(for: sourceRange).flatMap { DocumentSearcher().normalizedRect(for: $0, page: sourcePage) })
         let outside = try Self.inkOutside(page, word: Self.points(truth, size), boxes: [Self.points(fit.rect, size)])
         #expect(outside.share == 0, "the word's ink outside the fallback: \(outside.share * 100)%")
-        // The line has a drift model, so the envelope sits on the word's
-        // predicted place: wider than the read word's box alone, no wider
-        // than the drift envelope around the selection.
+        // The word was read and placed, only its render is missing: the
+        // fallback is the read word's own box on its line's band, degraded,
+        // not an envelope across its neighbours.
         let width = fit.rect.width * size.width, rawWidth = Self.points(raw, size).width
-        #expect(width >= rawWidth + 10, "the fallback (\(width) pt) is an envelope, not the read word's box (\(rawWidth) pt)")
-        #expect(width <= rawWidth + 2 * DocumentSearcher.inkFitDriftBound + 0.9 * 612 + 1,
-                "the fallback (\(width) pt) is no wider than the drift envelope")
+        #expect(width <= rawWidth + 20, "the fallback (\(width) pt) is the read word's box, not an envelope (selection \(rawWidth) pt)")
     }
 
     @Test("A job that stalls on the shared lane degrades only its own page: another page fits on time, not degraded")
