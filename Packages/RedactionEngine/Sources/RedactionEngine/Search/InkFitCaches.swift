@@ -93,12 +93,18 @@ final class InkFitStalls: @unchecked Sendable {
 struct InkFitImage: @unchecked Sendable { let image: CGImage }
 
 /// A value an ink-fit queue job hands back, and its done signal. A job runs
-/// at most once: a lane claims it before it runs, and a waiter that gives up
-/// abandons it (moved or abandoned copies left on another lane do nothing).
+/// at most once: a lane claims it before it runs (a moved job's copy left on
+/// its old lane can claim it first), and a waiter that gives up abandons it
+/// (the copies not claimed do nothing).
 final class InkFitResult<T>: @unchecked Sendable {
     private let lock = NSLock()
     private var state = 0  // 0 waiting, 1 running, 2 abandoned
-    func claim() -> Bool { lock.lock(); defer { lock.unlock() }; if state == 0 { state = 1; return true }; return false }
+    private var claimedOn: InkFitLane?
+    func claim(on lane: InkFitLane) -> Bool {
+        lock.lock(); defer { lock.unlock() }; if state == 0 { state = 1; claimedOn = lane; return true }; return false
+    }
+    /// The lane the job runs on, once claimed.
+    var lane: InkFitLane? { lock.lock(); defer { lock.unlock() }; return claimedOn }
     func abandon() { lock.lock(); if state == 0 { state = 2 }; lock.unlock() }
     var isRunning: Bool { lock.lock(); defer { lock.unlock() }; return state == 1 }
     var value: T?

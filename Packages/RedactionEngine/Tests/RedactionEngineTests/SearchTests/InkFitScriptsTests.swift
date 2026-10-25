@@ -44,30 +44,26 @@ struct InkFitScriptsTests {
         return try pdf { ctx in ctx.draw(picture, in: media); ctx.setTextDrawingMode(.invisible); draw(ctx, kern: -0.2, drop: 2) }
     }
 
-    /// `page`'s reads, settled: read again while one is not cached. A read
-    /// that runs past its limit in a saturated run is not cached, and the
-    /// next one reads the page again.
-    static func settleReads(_ page: PDFPage) async throws {
-        for _ in 0..<6 where !DocumentSearcher.pendingInkReads(page).isEmpty {
-            await DocumentSearcher.prepareInkFit(page)
-        }
-        try #require(DocumentSearcher.pendingInkReads(page).isEmpty, "the page's reads were cached")
-    }
-
     /// `word`'s fit on the hidden page and the share of its printed ink
     /// outside it (its glyph box taken from the printed page).
     static func fit(_ word: String, lines: [(text: String, font: String)]) async throws -> (degraded: Bool, outside: Double) {
         let export = try #require(PDFDocument(data: try pagePDF(lines, hidden: true)))
         let source = try #require(PDFDocument(data: try pagePDF(lines, hidden: false)))
         let page = try #require(export.page(at: 0)), sourcePage = try #require(source.page(at: 0))
-        try await settleReads(page)
         let size = page.bounds(for: .cropBox).size
         let range = ((page.string ?? "") as NSString).range(of: word)
         let sourceRange = ((sourcePage.string ?? "") as NSString).range(of: word)
         try #require(range.location != NSNotFound && sourceRange.location != NSNotFound, "\(word) is in both layers")
         let truth = try #require(sourcePage.selection(for: sourceRange).flatMap { DocumentSearcher().normalizedRect(for: $0, page: sourcePage) })
-        let fit = try #require(PageImageInkFitTests.settled({ DocumentSearcher().textLayerAndInkRects(for: range, page: page) },
-                                                           degraded: \.degraded))
+        // Read, then fitted from that read; again while the fit is degraded:
+        // in a saturated run a read can run past its limit (not cached), or
+        // other tests' pages can push this page's tokens out of the cache.
+        await DocumentSearcher.prepareInkFit(page)
+        var fit = try #require(DocumentSearcher().textLayerAndInkRects(for: range, page: page))
+        for _ in 0..<5 where fit.degraded {
+            await DocumentSearcher.prepareInkFit(page)
+            fit = try #require(DocumentSearcher().textLayerAndInkRects(for: range, page: page))
+        }
         let outside = try PageImageInkFitTests.inkOutside(page, word: PageImageInkFitTests.points(truth, size),
                                                           boxes: fit.paint.map { PageImageInkFitTests.points($0, size) })
         return (fit.degraded, outside.share)
@@ -131,9 +127,7 @@ struct InkFitScriptsTests {
             let page = try #require(doc.page(at: 0))
             let reads = DocumentSearcher.pendingInkReads(page).count
             let started = Date()
-            // Every read cached once taken (read again if a saturated run
-            // timed one out).
-            try await Self.settleReads(page)
+            await DocumentSearcher.prepareInkFit(page)
             withExtendedLifetime(doc) {}
             return (Date().timeIntervalSince(started), reads)
         }

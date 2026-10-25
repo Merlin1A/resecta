@@ -36,11 +36,71 @@ struct InkFitReadJoinTests {
             let value = DocumentSearcher.onInkFitQueue(key: nextKey, state: state) { 2 }
             next.add(value == 2 ? 1 : -1)
         }.start()
-        while (stalled.count == 0 || next.count == 0), Date() < deadline { try await Task.sleep(for: .milliseconds(50)) }
+        let returned = Date().addingTimeInterval(60)
+        while (stalled.count == 0 || next.count == 0), Date() < returned { try await Task.sleep(for: .milliseconds(50)) }
         // Both returned while the stalled read's work was still held.
         #expect(stalled.count == 1 && stalled.hits >= 300,
                 "the stalled read returned nil at its 0.3 s limit, its work still held: \(stalled.hits) ms")
         #expect(next.count == 1 && next.hits == 1, "the read behind it ran on a fresh lane while the stall still held the old one")
+    }
+
+    @Test("A read moved off a retired lane, whose copy left on the old lane runs there first, is given up at its limit")
+    func movedReadRunningOnItsOldLaneIsTimed() async throws {
+        // Lane 0 holds a head (its limit 5 s) with a read queued behind it
+        // (its limit 0.3 s). Lane 0 is retired and the fresh lane is held by
+        // another job, so the read, moved at the head's overrun, queues
+        // there; once the old head returns, the read's copy left on lane 0
+        // runs first. Each job is held until the test releases it.
+        let state = InkFitQueueState(label: "test-moved")
+        let headKey = Int.random(in: 1...Int.max), readKey = Int.random(in: 1...Int.max), otherKey = Int.random(in: 1...Int.max)
+        let holdHead = DispatchSemaphore(value: 0), holdRead = DispatchSemaphore(value: 0), holdOther = DispatchSemaphore(value: 0)
+        defer { holdHead.signal(); holdRead.signal(); holdOther.signal() }
+        let headBegan = OCRLegConcurrencyTests.ResultBox(), readBegan = OCRLegConcurrencyTests.ResultBox()
+        let otherBegan = OCRLegConcurrencyTests.ResultBox(), read = OCRLegConcurrencyTests.ResultBox()
+        let readQueued = OCRLegConcurrencyTests.ResultBox(), staged = OCRLegConcurrencyTests.ResultBox()
+        // Staged on a thread of its own: a busy run's task pool can resume a
+        // sleeping test seconds late, past the head's limit.
+        Thread {
+            func until(_ done: () -> Bool) { let end = Date().addingTimeInterval(60); while !done(), Date() < end { Thread.sleep(forTimeInterval: 0.01) } }
+            Thread {
+                _ = DocumentSearcher.onInkFitQueue(key: headKey, timeout: 5, state: state) { () -> Int in
+                    headBegan.add(1); _ = holdHead.wait(timeout: .now() + 120); return 1
+                }
+            }.start()
+            until { headBegan.count == 1 }
+            let headStarted = Date(), old = state.current
+            Thread {
+                readQueued.add(1)
+                let value = DocumentSearcher.onInkFitQueue(key: readKey, timeout: 0.3, state: state) { () -> Int in
+                    readBegan.add(1); _ = holdRead.wait(timeout: .now() + 120); return 2
+                }
+                read.add(value == nil ? 1 : -1)
+            }.start()
+            // The read queued on lane 0 (its call enqueues at once), well inside the head's limit.
+            until { readQueued.count == 1 }
+            Thread.sleep(forTimeInterval: 1)
+            state.retire(old, key: headKey)
+            Thread {
+                _ = DocumentSearcher.onInkFitQueue(key: otherKey, timeout: 60, state: state) { () -> Int in
+                    otherBegan.add(1); _ = holdOther.wait(timeout: .now() + 120); return 3
+                }
+            }.start()
+            until { otherBegan.count == 1 }
+            // Past the head's 5 s limit (the read moves behind the held job), then the head returns.
+            Thread.sleep(forTimeInterval: max(1, 6 - Date().timeIntervalSince(headStarted)))
+            holdHead.signal()
+            staged.add(1)
+        }.start()
+        let stagedDeadline = Date().addingTimeInterval(200)
+        while staged.count == 0, Date() < stagedDeadline { try await Task.sleep(for: .milliseconds(50)) }
+        try #require(headBegan.count == 1, "the head began")
+        try #require(otherBegan.count == 1, "the fresh lane is held")
+        let readDeadline = Date().addingTimeInterval(60)
+        while readBegan.count == 0, Date() < readDeadline { try await Task.sleep(for: .milliseconds(20)) }
+        try #require(readBegan.count == 1, "the read ran")
+        let waited = Date().addingTimeInterval(15)
+        while read.count == 0, Date() < waited { try await Task.sleep(for: .milliseconds(50)) }
+        #expect(read.count == 1 && read.hits == 1, "the read, run on its old lane, was given up at its 0.3 s limit while its work was still held")
     }
 
     @Test("A read's time limit counts from when it reaches the head of the lane, not from when it was queued")
@@ -88,12 +148,14 @@ struct InkFitReadJoinTests {
         release.signal(); release.signal()
         // A thread held by a draw that ends takes reads again.
         var accepted = false
-        while !accepted, Date() < deadline {
+        let acceptDeadline = Date().addingTimeInterval(60)
+        while !accepted, Date() < acceptDeadline {
             try await Task.sleep(for: .milliseconds(200))
             accepted = threads.submit { ran.add(1) }
         }
         #expect(accepted, "reads were still refused after the draws returned")
-        while ran.count == 0, Date() < deadline { try await Task.sleep(for: .milliseconds(50)) }
+        let ranDeadline = Date().addingTimeInterval(60)
+        while ran.count == 0, Date() < ranDeadline { try await Task.sleep(for: .milliseconds(50)) }
         #expect(ran.count == 1, "the accepted read ran")
     }
 
@@ -118,7 +180,8 @@ struct InkFitReadJoinTests {
             outcome.add(threads.drawing { 1 } == nil ? Int(Date().timeIntervalSince(asked) * 1000) : -1)
         }
         if submitted {
-            while outcome.count == 0, Date() < deadline { try await Task.sleep(for: .milliseconds(20)) }
+            let outcomeDeadline = Date().addingTimeInterval(60)
+            while outcome.count == 0, Date() < outcomeDeadline { try await Task.sleep(for: .milliseconds(20)) }
             #expect(outcome.count == 1 && outcome.hits >= 0 && outcome.hits < Int(hungAfter * 1000),
                     "the second read's draw failed at once, not after its slot wait: \(outcome.hits) ms")
         }

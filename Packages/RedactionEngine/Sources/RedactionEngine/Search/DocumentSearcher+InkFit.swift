@@ -538,7 +538,7 @@ extension DocumentSearcher {
         let runLimit = limit, runStall = stall
         func enqueue(on lane: InkFitLane) {
             lane.queue.async {
-                guard box.claim() else { return }
+                guard box.claim(on: lane) else { return }
                 lane.began(key: key, limit: runLimit)
                 #if DEBUG
                 InkFitLaneTimes.shared.didBegin(key)
@@ -554,12 +554,18 @@ extension DocumentSearcher {
         var lane = state.current
         enqueue(on: lane)
         while box.done.wait(timeout: .now() + 0.25) != .success {
-            if let hung = lane.overrun() {
-                state.retire(lane, key: hung.key)
+            // The lane the job runs on once claimed, else the one it waits on:
+            // a moved job's copy left on its old lane can run there first,
+            // and its limit is timed on that lane.
+            let watched = box.lane ?? lane
+            if let hung = watched.overrun() {
+                state.retire(watched, key: hung.key)
                 #if DEBUG
                 InkFitLaneTimes.shared.didRetire(hung.key)
                 #endif
                 if box.isRunning {
+                    // Claimed on another lane since: timed there from the next turn.
+                    if box.lane !== watched { continue }
                     inkFitLogger.log("ink fit: a page read or render ran past its timeout; the box is the drift envelope")
                     return nil
                 }
