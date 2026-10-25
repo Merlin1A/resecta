@@ -8,10 +8,26 @@ import CoreText
 // lane, a cancelled search, and the main thread, each bounded.
 
 extension PageImageInkFitTests {
+    /// A mark of a test's own in a blank corner of every page, so each page
+    /// of its export (one with none of the redacted words too) has a
+    /// content key of its own.
+    static func markEveryPage(_ regions: inout [Int: [RedactionRegion]], of source: PDFDocument, at mark: CGRect) {
+        for index in 0..<source.pageCount {
+            regions[index, default: []].append(RedactionRegion(id: UUID(), normalizedRect: mark, source: .manual))
+        }
+    }
+
+    /// The export's page content keys share none with the shared re-imported
+    /// export's: a stall set on them reaches no other test.
+    static func requireOwnKeys(_ export: PDFDocument) async throws {
+        let shared = try HybridDedupTests.pageKeys(try await reimportedExport().export)
+        try #require(Set(try HybridDedupTests.pageKeys(export)).isDisjoint(with: shared),
+                     "a stalled page shares its key with the shared re-imported export")
+    }
     @Test("A page read that stalls past the timeout falls back to the safe box in time, uncached")
     func stalledReadFallsBackInTime() async throws {
-        // An export of this test's own (one more word redacted), so its page
-        // content key is no other test's.
+        // An export of this test's own (one more word redacted, and a corner mark
+        // on every page), so its page content keys are no other test's.
         let data = try TestFixtures.sampleStatementPDF()
         let source = try #require(PDFDocument(data: data))
         var regions: [Int: [RedactionRegion]] = [:]
@@ -19,9 +35,11 @@ extension PageImageInkFitTests {
             regions[hit.pageIndex, default: []].append(
                 RedactionRegion(id: UUID(), normalizedRect: hit.normalizedRect, source: .manual))
         }
+        Self.markEveryPage(&regions, of: source, at: CGRect(x: 0.021, y: 0.011, width: 0.013, height: 0.008))
         let url = try await TestPipeline.processAndExport(data, mode: .searchableRedaction, regions: regions, dpi: 300)
         defer { try? FileManager.default.removeItem(at: url) }
         let export = try #require(PDFDocument(data: try Data(contentsOf: url)))
+        try await Self.requireOwnKeys(export)
         let page = try #require(export.page(at: 2))
         let sourcePage = try #require(source.page(at: 2))
         let cgPage = try #require(page.pageRef)
@@ -50,8 +68,8 @@ extension PageImageInkFitTests {
 
     @Test("A render that stalls after the page was read gives the read word's box on its line, degraded")
     func stalledRenderFallsBackToTheEnvelope() async throws {
-        // An export of this test's own (two more words redacted), so its page
-        // content key is no other test's.
+        // An export of this test's own (two more words redacted, and a corner mark
+        // on every page), so its page content keys are no other test's.
         let data = try TestFixtures.sampleStatementPDF()
         let source = try #require(PDFDocument(data: data))
         var regions: [Int: [RedactionRegion]] = [:]
@@ -59,9 +77,11 @@ extension PageImageInkFitTests {
             regions[hit.pageIndex, default: []].append(
                 RedactionRegion(id: UUID(), normalizedRect: hit.normalizedRect, source: .manual))
         }
+        Self.markEveryPage(&regions, of: source, at: CGRect(x: 0.022, y: 0.014, width: 0.012, height: 0.007))
         let url = try await TestPipeline.processAndExport(data, mode: .searchableRedaction, regions: regions, dpi: 300)
         defer { try? FileManager.default.removeItem(at: url) }
         let export = try #require(PDFDocument(data: try Data(contentsOf: url)))
+        try await Self.requireOwnKeys(export)
         let page = try #require(export.page(at: 2))
         let sourcePage = try #require(source.page(at: 2))
         let cgPage = try #require(page.pageRef)
@@ -182,9 +202,11 @@ extension PageImageInkFitTests {
             regions[hit.pageIndex, default: []].append(
                 RedactionRegion(id: UUID(), normalizedRect: hit.normalizedRect, source: .manual))
         }
+        Self.markEveryPage(&regions, of: source, at: CGRect(x: 0.018, y: 0.015, width: 0.016, height: 0.006))
         let url = try await TestPipeline.processAndExport(data, mode: .searchableRedaction, regions: regions, dpi: 300)
         defer { try? FileManager.default.removeItem(at: url) }
         let shared = SendablePDFDocument(try #require(PDFDocument(data: try Data(contentsOf: url))))
+        try await Self.requireOwnKeys(shared.document)
         let page = try #require(shared.document.page(at: 1))
         let cgPage = try #require(page.pageRef)
         let key = InkTokenCache.key(page: page, cgPage: cgPage, visual: page.bounds(for: .cropBox).size)
