@@ -68,14 +68,18 @@ final class InkFitQueueState: @unchecked Sendable {
 }
 
 #if DEBUG
-/// Test seam: when a key's read reached the Vision lane's head, and when
-/// its lane was retired under it (the latest of each); how often its job
-/// moved to a fresh lane.
+/// Test seam: when a key's read reached a Vision lane's head and on which
+/// lane, and when its lane was retired under it (the latest of each); how
+/// often its job moved to a fresh lane.
 final class InkFitLaneTimes: @unchecked Sendable {
     static let shared = InkFitLaneTimes()
     private let lock = NSLock()
     private var began: [Int: Date] = [:], retired: [Int: Date] = [:], moved: [Int: Int] = [:]
-    func didBegin(_ key: Int?) { guard let key else { return }; lock.withLock { began[key] = Date() } }
+    private var lanes: [Int: ObjectIdentifier] = [:]
+    func didBegin(_ key: Int?, on lane: InkFitLane) {
+        guard let key else { return }; lock.withLock { began[key] = Date(); lanes[key] = ObjectIdentifier(lane) }
+    }
+    func lane(_ key: Int) -> ObjectIdentifier? { lock.withLock { lanes[key] } }
     func didRetire(_ key: Int?) { guard let key else { return }; lock.withLock { retired[key] = Date() } }
     func began(_ key: Int) -> Date? { lock.withLock { began[key] } }
     func retired(_ key: Int) -> Date? { lock.withLock { retired[key] } }

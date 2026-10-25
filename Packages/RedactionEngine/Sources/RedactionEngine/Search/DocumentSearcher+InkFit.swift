@@ -541,7 +541,7 @@ extension DocumentSearcher {
                 guard box.claim(on: lane) else { return }
                 lane.began(key: key, limit: runLimit)
                 #if DEBUG
-                InkFitLaneTimes.shared.didBegin(key)
+                InkFitLaneTimes.shared.didBegin(key, on: lane)
                 #endif
                 // A stalled job (the test seam) only stalls: it adds no reader beside the lane.
                 if runStall > 0 { Thread.sleep(forTimeInterval: runStall) } else { box.value = work() }

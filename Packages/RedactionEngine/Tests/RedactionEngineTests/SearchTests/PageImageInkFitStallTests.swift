@@ -113,7 +113,7 @@ extension PageImageInkFitTests {
         #expect(width <= rawWidth + 20, "the fallback (\(width) pt) is the read word's box, not an envelope (selection \(rawWidth) pt)")
     }
 
-    @Test("A page read that stalls on the Vision lane degrades only its own page: another page reads and fits on time, not degraded")
+    @Test("A page read that stalls on the Vision lane degrades only its own page: another page reads off the stalled lane and fits, not degraded")
     func stallOnOnePageLeavesOthersFitted() async throws {
         // An export of this test's own: a small mark in a blank corner of
         // both pages makes their content keys no other test's, so the
@@ -155,12 +155,18 @@ extension PageImageInkFitTests {
         #expect(aResult.degraded, "the stalled page's fit is degraded")
         // Measured from page A's turn at the lane's head (time queued behind
         // other reads is a busy run's, not the stall's): A is released within
-        // its 0.5 s limit (and a second's slack); B ends before A's 30 s stall would.
+        // its 0.5 s limit (and a second's slack). B's read is not run behind
+        // A's stall: it ran on another lane, or ahead of A on A's. How long B
+        // queues behind other reads is a busy run's, so no time is judged.
         let aBegan = try #require(InkFitLaneTimes.shared.began(keyA), "page A's read reached the lane's head")
         let aHeld = aResult.ended.timeIntervalSince(aBegan)
         #expect(aHeld < 1.5, "the stalled page's fit was held \(aHeld) s after its read reached the head; its limit is 0.5 s, its stall 30 s")
         #expect(!b.degraded, "the other page's fit is not degraded by page A's stall")
-        #expect(b.ended < aBegan.addingTimeInterval(30), "the other page's fit ended after page A's 30 s stall would have")
+        let pageB = try #require(other.document.page(at: 2)), cgB = try #require(pageB.pageRef)
+        let keyB = InkTokenCache.key(page: pageB, cgPage: cgB, visual: pageB.bounds(for: .cropBox).size)
+        let aLane = try #require(InkFitLaneTimes.shared.lane(keyA)), bLane = try #require(InkFitLaneTimes.shared.lane(keyB), "page B's read reached a lane's head")
+        let bBegan = try #require(InkFitLaneTimes.shared.began(keyB))
+        #expect(bLane != aLane || bBegan < aBegan, "page B's read ran on page A's stalled lane, behind its stall")
         print("stall pin: A queued \(aResult.seconds - aHeld) s, held \(aHeld) s at the head; B took \(b.seconds) s, "
               + "\(InkFitLaneTimes.shared.retired(keyA).map { b.ended.timeIntervalSince($0) } ?? -1) s after A's retirement")
         let page = try #require(other.document.page(at: 2))
