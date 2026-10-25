@@ -10,13 +10,15 @@ import Foundation
 @Suite("Verification completion announcement")
 struct VerificationAnnouncementTests {
 
-    @Test("The runner announces the status label, never the masthead (source pin)")
+    @Test("The runner announces the completion line, never the masthead label (source pin)")
     func announcesTheStatusOnly() throws {
         let runner = URL(fileURLWithPath: "\(#filePath)")
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .appendingPathComponent("Sources/ResectaApp/State/PipelineRunner.swift")
         let source = try String(contentsOf: runner, encoding: .utf8)
-        #expect(source.contains(".announce(\"Verification complete. \\(report.overallStatus.accessibilityLabel)\")"))
+        #expect(source.contains(".announce(VerificationResultsView.completionAnnouncement(report: report))"))
+        #expect(!source.contains("Verification complete. \\(report.overallStatus.accessibilityLabel)"),
+                "a bare PASS label says \"without issues\" over rows that had nothing to check")
         #expect(!source.contains("mastheadAccessibilityLabel"), "the masthead label quotes review terms")
     }
 

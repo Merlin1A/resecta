@@ -139,6 +139,26 @@ struct VerificationMastheadTests {
         #expect(Results.mastheadSubtitleIsPrivacySensitive(report: Fixtures.searchableAttentionLong) == false)
     }
 
+    @Test("ATTENTION from the Detection Sweep alone points to Scan, as its row does; a term or a search row still wins")
+    func sweepOnlyAttentionPointsToScan() {
+        let sweep = Self.row(.attention("Ran the detectors on the output — 2 possible items remain on page 2. Open Scan to review."),
+                             .detectionSweep, pages: [1])
+        let sweepOnly = Self.report(.attention("a"), [Self.row(.pass, .structureCheck), sweep])
+        let shown = Results.mastheadSubtitle(report: sweepOnly)
+        #expect(shown == "\(Self.keepEditing), then open Scan to review the pages below.")
+        #expect(!(shown ?? "").contains("text\u{00A0}search"), "no terms are listed, and text search is the wrong tool")
+        #expect((shown ?? "").count <= Results.mastheadSentenceLimit)
+        #expect(Results.mastheadSubtitleIsPrivacySensitive(report: sweepOnly) == false)
+        let withTerms = Self.report(.attention("a"), [Self.row(.attention("a"), .ocrCheck, terms: ["Fox"]), sweep])
+        #expect(Results.mastheadSubtitle(report: withTerms)
+                == "\(Self.keepEditing), then use text\u{00A0}search to redact \u{201C}Fox\u{201D}.")
+        let line = SearchRecheckQueryLine(label: "\u{201C}Delia\u{201D}", foundCount: 2, foundHitCap: false,
+                                          appliedCount: 1, remainingCount: 1, route: .textLayer)
+        let withSearch = Self.report(.attention("a"), [Self.row(.attention("a"), .searchRecheck, pages: [0], lines: [line]), sweep])
+        #expect(Results.mastheadSubtitle(report: withSearch)
+                == "\(Self.keepEditing) and run your search again with OCR on.")
+    }
+
     @Test("Output missing: the arms that name Preview or Run Verification give way; the others stay")
     func outputMissingSubstitution() {
         let missing = "\(Self.keepEditing), then run Redact again to share the PDF."
