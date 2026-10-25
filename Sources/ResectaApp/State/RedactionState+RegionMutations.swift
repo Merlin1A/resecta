@@ -65,7 +65,8 @@ extension RedactionState {
                 appliedIDs: appliedSnapshot,
                 suppressed: manualDrawNudgeSuppressedForSession,
                 proximityNormalized: RedactionState.manualDrawNudgeProximityNormalized,
-                coveringRects: regions[page]?.map(\.normalizedRect) ?? []
+                coveringRects: regions[page]?.map(\.normalizedRect) ?? [],
+                coveringStripRects: regions[page]?.compactMap(\.textLayerRect) ?? []
             ) {
                 pendingManualDrawNudge = match
             }

@@ -491,7 +491,7 @@ class RedactionState {
 
         // Snapshot existing rects per page so the overlap test can run
         // off-MainActor without re-entering actor state.
-        let existingRectsByPage: [Int: [CGRect]] = regions.mapValues { $0.map(\.normalizedRect) }
+        let (existingRectsByPage, existingStripRectsByPage) = coveringRectsByPage(regions)
         let appliedAt = Date()
         // The session's applied-search record, read on MainActor before
         // the detached prepare like the rects snapshot: it is stamped on
@@ -502,7 +502,7 @@ class RedactionState {
         let prepared = await Task.detached(priority: .userInitiated) {
             prepareApply(
                 selected: selected,
-                existingRectsByPage: existingRectsByPage,
+                existingRectsByPage: existingRectsByPage, existingStripRectsByPage: existingStripRectsByPage,
                 appliedAt: appliedAt,
                 searchRecord: searchRecord
             )
@@ -582,10 +582,10 @@ class RedactionState {
         guard let search = activeSearch else { return nil }
         guard let result = search.results.first(where: { $0.id == id }) else { return nil }
 
-        let existingRectsByPage: [Int: [CGRect]] = regions.mapValues { $0.map(\.normalizedRect) }
+        let (existingRectsByPage, existingStripRectsByPage) = coveringRectsByPage(regions)
         let prepared = prepareApply(
             selected: [result],
-            existingRectsByPage: existingRectsByPage,
+            existingRectsByPage: existingRectsByPage, existingStripRectsByPage: existingStripRectsByPage,
             appliedAt: Date(),
             searchRecord: search.appliedSearchRecord()
         )
@@ -723,7 +723,7 @@ class RedactionState {
         appliedIDs: Set<UUID>,
         suppressed: Bool,
         proximityNormalized: CGFloat,
-        coveringRects: [CGRect] = []
+        coveringRects: [CGRect] = [], coveringStripRects: [CGRect] = []
     ) -> SearchResult? {
         guard !suppressed else { return nil }
         guard !results.isEmpty else { return nil }
@@ -733,7 +733,7 @@ class RedactionState {
             guard result.piiCategory != nil else { continue }
             guard !appliedIDs.contains(result.id) else { continue }
             let resultRect = result.normalizedRect
-            if resultIsCovered(resultRect, by: [addedRect] + coveringRects) { continue }
+            if resultIsCovered(result, paints: [addedRect] + coveringRects, strips: coveringStripRects) { continue }
             let dx = max(0, max(addedRect.minX - resultRect.maxX,
                                 resultRect.minX - addedRect.maxX))
             let dy = max(0, max(addedRect.minY - resultRect.maxY,
@@ -768,7 +768,7 @@ class RedactionState {
         let region = RedactionRegion(
             id: UUID(),
             normalizedRect: nudge.normalizedRect,
-            source: .searchMatch(term: nudge.term, rationale: nudge.rationale)
+            source: .searchMatch(term: nudge.term, rationale: nudge.rationale), textLayerRect: nudge.textLayerRect
         )
         // Category stamp — mirrors `prepareApply` so a nudge-accepted
         // region stays indistinguishable from a sheet-applied region.

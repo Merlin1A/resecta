@@ -104,14 +104,25 @@ struct AddressSpatialAssembler: Sendable {
         let text: String
         let unionRect: CGRect
         let confidence: Double
+        /// The union of the participating lines' text-layer boxes when any
+        /// line was fitted to its ink (`OCREngine.TextLine.textLayerRect`): the
+        /// hidden glyphs a Searchable export strips. Nil otherwise.
+        var textLayerUnionRect: CGRect? = nil
+        /// Some participating line's fit fell back to the drift envelope: the
+        /// caller reports the page as not fully analysed.
+        var inkFitDegraded: Bool = false
     }
 
     func assemble(lines: [OCREngine.TextLine]) -> [Assembled] {
         guard !lines.isEmpty else { return [] }
 
+        // Lines group and join on the text layer's own geometry
+        // (`textLayerRect`, set when a line was fitted to its ink), never on
+        // the painted box: a fit or a drift envelope must not move the join.
+        func place(_ line: OCREngine.TextLine) -> CGRect { line.textLayerRect ?? line.normalizedRect }
         // Sort by y descending (Vision coords: y=1 top, y=0 bottom).
         let sorted = lines.enumerated().sorted {
-            $0.element.normalizedRect.minY > $1.element.normalizedRect.minY
+            place($0.element).minY > place($1.element).minY
         }
 
         var results: [Assembled] = []
@@ -150,10 +161,10 @@ struct AddressSpatialAssembler: Sendable {
             var steps = 0
             while back >= 0 && steps < 3 {
                 let candidate = sorted[back].element
-                let yGap = candidate.normalizedRect.minY - hit.element.normalizedRect.minY
+                let yGap = place(candidate).minY - place(hit.element).minY
                 guard yGap >= 0, yGap <= 0.08 else { break }
                 // x-alignment: line lefts within 5% page width.
-                let dx = abs(candidate.normalizedRect.minX - hit.element.normalizedRect.minX)
+                let dx = abs(place(candidate).minX - place(hit.element).minX)
                 guard dx <= 0.05 else { break }
 
                 participants.insert(candidate, at: 0)
@@ -195,10 +206,17 @@ struct AddressSpatialAssembler: Sendable {
                !gazetteer.containsCity(city) {
                 baseConfidence = max(0.30, baseConfidence - 0.20)
             }
+            let textLayerUnionRect = participants.contains { $0.textLayerRect != nil }
+                ? participants.dropFirst().reduce(participants[0].textLayerRect ?? participants[0].normalizedRect) {
+                    $0.union($1.textLayerRect ?? $1.normalizedRect)
+                }
+                : nil
             results.append(Assembled(
                 text: assembledText,
                 unionRect: unionRect,
-                confidence: baseConfidence
+                confidence: baseConfidence,
+                textLayerUnionRect: textLayerUnionRect,
+                inkFitDegraded: participants.contains(where: \.inkFitDegraded)
             ))
         }
         return results

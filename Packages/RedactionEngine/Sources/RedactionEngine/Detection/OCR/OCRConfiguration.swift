@@ -94,6 +94,17 @@ struct OCRConfiguration: Sendable {
         )
     }
 
+    /// The ink fit's token read (`DocumentSearcher.inkTokens`): one .accurate
+    /// pass over a page whose text layer is hidden over its image, read for
+    /// where each word's ink lies, so no language-model correction (a
+    /// corrected token would not align with the layer's text). The revision
+    /// pin applies.
+    static let inkFitTokens = OCRConfiguration(
+        recognitionLevel: .accurate,
+        usesLanguageCorrection: false,
+        revision: pinnedTextRecognitionRevision
+    )
+
     /// Layer-2 output verification (VerificationEngine.runLayer2OCR).
     /// FROZEN: .fast + usesLanguageCorrection=false + the revision
     /// pin, nothing else — the verifier's behavior must stay byte-identical

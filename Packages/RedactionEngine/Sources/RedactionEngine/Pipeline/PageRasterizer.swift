@@ -224,8 +224,11 @@ public final class PageRasterizer: @unchecked Sendable {
                     // `filterResult.toDigest(redactionRects:)`. Never give the
                     // digest an independent conversion.
                     let pageBounds = CGRect(origin: .zero, size: effectiveSize)
-                    let redactionRectsInPoints = page.regions.map {
-                        normalizedToPDFPageCoordinates($0.normalizedRect, pageRect: pageBounds)
+                    // A region over a hidden layer strips under its hidden
+                    // glyphs' box too (`textRemovalRects`); the fill below
+                    // paints `normalizedRect` alone.
+                    let redactionRectsInPoints = page.regions.flatMap(\.textRemovalRects).map {
+                        normalizedToPDFPageCoordinates($0, pageRect: pageBounds)
                     }
 
                     // Region shapes in output-page points: the rects

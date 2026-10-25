@@ -228,6 +228,24 @@ nonisolated func resultIsCovered(_ resultRect: CGRect, by rects: [CGRect]) -> Bo
 /// of a character can sit outside a box that counts as covering it.
 nonisolated let coverageEdgeTolerance: CGFloat = 0.000_001
 
+/// The regions' painted boxes and hidden glyphs' boxes per page: the apply's
+/// covering snapshot, taken on MainActor before the detached prepare.
+nonisolated func coveringRectsByPage(_ regions: [Int: [RedactionRegion]]) -> (paints: [Int: [CGRect]], strips: [Int: [CGRect]]) {
+    (regions.mapValues { $0.map(\.normalizedRect) }, regions.mapValues { $0.compactMap(\.textLayerRect) })
+}
+
+/// The coverage rule for a search result: its box held whole by one of the
+/// regions' painted boxes alone (the rule above), and its hidden glyphs' box,
+/// when it has one, held whole by one painted or stripped box, by the same rule.
+/// A stripped box never counts toward paint (on a drifted layer it can lie over
+/// the next word's ink), and a part of the hidden glyphs' box left outside could
+/// hold a whole glyph.
+nonisolated func resultIsCovered(_ result: SearchResult, paints: [CGRect], strips: [CGRect]) -> Bool {
+    guard resultIsCovered(result.normalizedRect, by: paints) else { return false }
+    guard let strip = result.textLayerRect else { return true }
+    return resultIsCovered(strip, by: paints + strips)
+}
+
 /// The confidence a region stores for the result it came from, for the
 /// apply and the nudge accept alike: the detector's score when the result
 /// has one, else its source's (1.0 for the text layer, the recognizer's
@@ -284,6 +302,7 @@ struct PreparedApply: Sendable {
 nonisolated func prepareApply(
     selected: [SearchResult],
     existingRectsByPage: [Int: [CGRect]],
+    existingStripRectsByPage: [Int: [CGRect]] = [:],
     appliedAt: Date,
     searchRecord: AppliedSearchRecord?
 ) -> PreparedApply {
@@ -298,10 +317,12 @@ nonisolated func prepareApply(
     // The covering rects grow with each region this pass creates, so two
     // results over the same text make one region.
     var coveringRectsByPage = existingRectsByPage
+    var coveringStripRectsByPage = existingStripRectsByPage
 
     for result in selected {
         // Skip results an existing or just-created region already covers.
-        if resultIsCovered(result.normalizedRect, by: coveringRectsByPage[result.pageIndex] ?? []) {
+        if resultIsCovered(result, paints: coveringRectsByPage[result.pageIndex] ?? [],
+                           strips: coveringStripRectsByPage[result.pageIndex] ?? []) {
             skippedOverlaps += 1
             coveredResultIDs.insert(result.id)
             continue
@@ -314,10 +335,12 @@ nonisolated func prepareApply(
         let region = RedactionRegion(
             id: UUID(),
             normalizedRect: result.normalizedRect,
-            source: .searchMatch(term: result.term, rationale: result.rationale)
+            source: .searchMatch(term: result.term, rationale: result.rationale),
+            textLayerRect: result.textLayerRect
         )
         createdRegions[result.pageIndex, default: []].append(region)
         coveringRectsByPage[result.pageIndex, default: []].append(result.normalizedRect)
+        if let strip = result.textLayerRect { coveringStripRectsByPage[result.pageIndex, default: []].append(strip) }
         appliedResultIDs.insert(result.id)
 
         // A PII-scan result carries its detected category —

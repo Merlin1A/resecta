@@ -119,8 +119,10 @@ extension VerificationEngine {
             // Convert regions to output page coordinates (output pages
             // always have zero-origin bounds)
             let outputBounds = page.bounds(for: .cropBox)
-            let rectsInPoints = pageRegions.map {
-                normalizedToPDFPageCoordinates($0.normalizedRect, pageRect: outputBounds)
+            // The strip's own rects (`textRemovalRects`), so the exclusion
+            // reads the hidden glyphs' box a region stripped as well.
+            let rectsInPoints = pageRegions.flatMap(\.textRemovalRects).map {
+                normalizedToPDFPageCoordinates($0, pageRect: outputBounds)
             }
             // `bounds` carries the un-expanded rect (the unconditional 0pt
             // floor + the band gate) and `expandedBounds` the filter's
