@@ -57,6 +57,10 @@ extension DocumentSearcher {
     /// with 1.25 of headroom.
     static let inkFitResidualSlack: CGFloat = 3.5
 
+    /// Text lighter than the ink threshold (a grey label, a faint scan) is
+    /// read again with a pixel this dark (of 255) as its ink.
+    static let inkFitLightThreshold: UInt8 = 232
+
     /// A pixel this dark (of 255, DeviceGray) is ink.
     static let inkFitThreshold: UInt8 = 128
 
@@ -414,25 +418,37 @@ extension DocumentSearcher {
         // to stand on. Vision's word box alone can leave a glyph's top or foot
         // outside; only the render's ink rows close it.
         guard let finished = rendered, let bitmap = finished else { return envelope() }
-        let reading = inkBox(in: bitmap, box: seed, window: window,
-                             growLeft: anchor?.growLeft ?? true, growRight: anchor?.growRight ?? true)
-        switch reading.outcome {
-        case .darkGround: inkFitLogger.log("ink fit: dark ground around a text-layer box; no render fit")
-        case .otherLine: inkFitLogger.log("ink fit: no inked line overlaps half the box; no render fit")
-        case .capped: inkFitLogger.log("ink fit reached its window: the box grew to the cap")
-        case .fitted, .noInk: break
+        // The ink rows: at the ink threshold; text lighter than it (grey
+        // labels, a faint scan) read again at `inkFitLightThreshold`; light
+        // text on a dark ground read as light ink.
+        func read(_ map: GrayBitmap) -> (box: CGRect?, outcome: InkFitOutcome) {
+            inkBox(in: map, box: seed, window: window,
+                   growLeft: anchor?.growLeft ?? true, growRight: anchor?.growRight ?? true)
         }
-        if let ink = reading.box {
+        var reading = read(bitmap)
+        if reading.box == nil, reading.outcome == .darkGround {
+            reading = read(bitmap.reading(threshold: inkFitThreshold, light: true))
+        } else if reading.box == nil {
+            let light = read(bitmap.reading(threshold: inkFitLightThreshold))
+            if light.box != nil { reading = light }
+        }
+        // No ink rows read for the word (text lighter than the ink
+        // threshold, light text on a dark ground, or no inked line on the
+        // box): nothing verifies a box against its glyphs, and Vision's box
+        // alone can leave a glyph's top or foot outside. The envelope.
+        guard let ink = reading.box else {
             switch reading.outcome {
-            case .fitted, .capped:
-                // The height is the ink's own rows: Vision's box can reach
-                // past its line's ink into the leading, toward the next line.
-                let minX = min(fitted.minX, ink.minX), maxX = max(fitted.maxX, ink.maxX)
-                fitted = CGRect(x: minX, y: ink.minY, width: maxX - minX, height: ink.height)
-            case .noInk, .darkGround, .otherLine:
-                fitted = fitted.union(ink)
+            case .darkGround: inkFitLogger.log("ink fit: dark ground around a text-layer box; the box is the drift envelope")
+            case .otherLine: inkFitLogger.log("ink fit: no inked line overlaps half the box; the box is the drift envelope")
+            default: inkFitLogger.log("ink fit: no ink read on the box; the box is the drift envelope")
             }
+            return job.envelope()
         }
+        if reading.outcome == .capped { inkFitLogger.log("ink fit reached its window: the box grew to the cap") }
+        // The height is the ink's own rows: Vision's box can reach past its
+        // line's ink into the leading, toward the next line.
+        let minX = min(fitted.minX, ink.minX), maxX = max(fitted.maxX, ink.maxX)
+        fitted = CGRect(x: minX, y: ink.minY, width: maxX - minX, height: ink.height)
         // A margin past the ink on every side the box may grow (a render's
         // half-inked edge, a round letter's overshoot): never on a side cut
         // from a longer token, which would paint its next letter.

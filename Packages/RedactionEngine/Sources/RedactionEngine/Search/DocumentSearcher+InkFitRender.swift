@@ -11,9 +11,18 @@ extension DocumentSearcher {
         let pixels: [UInt8]
         let width: Int
         let height: Int
+        /// A pixel darker than this is ink; with `light`, a pixel lighter than
+        /// 255 minus it (light text on a dark ground).
+        var threshold: UInt8 = DocumentSearcher.inkFitThreshold
+        var light = false
         /// `x`, `y` in pixels from the window's bottom-left.
         func isInk(_ x: Int, _ y: Int) -> Bool {
-            pixels[(height - 1 - y) * width + x] < DocumentSearcher.inkFitThreshold
+            let value = pixels[(height - 1 - y) * width + x]
+            return light ? value > 255 - threshold : value < threshold
+        }
+        /// The same pixels read with another ink rule.
+        func reading(threshold: UInt8, light: Bool = false) -> GrayBitmap {
+            GrayBitmap(pixels: pixels, width: width, height: height, threshold: threshold, light: light)
         }
     }
 
