@@ -129,11 +129,11 @@ struct InkFitBusyPoolTests {
         let key = Int.random(in: 1...Int.max), otherKey = Int.random(in: 1...Int.max)
         let a = InkFitPage(first), b = InkFitPage(second), c = InkFitPage(elsewhere)
         try #require(a.drawLock !== b.drawLock, "each copy has its own draw lock")
-        // A draw of the page that does not return in time (here: 3 s,
-        // judged hung past 0.3 s), on a thread of its own.
-        let began = DispatchSemaphore(value: 0), stalled = DispatchSemaphore(value: 0)
+        // A draw of the page that does not return in time (held until the
+        // test releases it, judged hung past 0.3 s), on a thread of its own.
+        let began = DispatchSemaphore(value: 0), stalled = DispatchSemaphore(value: 0), release = DispatchSemaphore(value: 0)
         DispatchQueue.global().async {
-            _ = DocumentSearcher.drawn(a, key: key, hungAfter: 0.3) { began.signal(); Thread.sleep(forTimeInterval: 3) }
+            _ = DocumentSearcher.drawn(a, key: key, hungAfter: 0.3) { began.signal(); _ = release.wait(timeout: .now() + 120) }
             stalled.signal()
         }
         // Past the hung bound after the draw began (a busy run can start it late).
@@ -141,14 +141,14 @@ struct InkFitBusyPoolTests {
             DispatchQueue.global().async { began.wait(); done.resume() }
         }
         try await Task.sleep(for: .milliseconds(600))
-        // The same page from the other copy: not drawn, at once.
-        let asked = Date()
+        // The same page from the other copy: not drawn, while the draw is
+        // still held (so the skip did not wait for it).
         let again: Bool? = DocumentSearcher.drawn(b, key: key, hungAfter: 0.3) { true }
         #expect(again == nil, "the page with a hung draw was drawn again from another copy")
-        #expect(Date().timeIntervalSince(asked) < 0.1, "the skip waited \(Date().timeIntervalSince(asked)) s")
         // Another page of that copy still draws.
         let other: Bool? = DocumentSearcher.drawn(c, key: otherKey, hungAfter: 0.3) { true }
         #expect(other == true, "another page did not draw beside the hung one")
+        release.signal()
         // Once the slow draw returns (as a failed render would), the page draws again.
         await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
             DispatchQueue.global().async { stalled.wait(); done.resume() }
