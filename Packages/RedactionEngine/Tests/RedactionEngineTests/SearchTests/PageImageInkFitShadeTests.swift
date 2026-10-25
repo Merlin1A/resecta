@@ -94,8 +94,9 @@ extension PageImageInkFitTests {
                 "\(word): the painted box \(painted) does not hold its glyphs \(held) (degraded \(fit.degraded))")
     }
 
-    @Test("With the render stalled, a lone word with an ascender and a descender keeps them inside its read box")
-    func stalledRenderReadBoxHoldsAscenders() async throws {
+    @Test("With the render stalled, a word's ascenders and descenders stay inside its read box, alone or with a row just above",
+          arguments: [CGFloat?.none, 13])
+    func stalledRenderReadBoxHoldsAscenders(rowAbove: CGFloat?) async throws {
         // One lower-case word alone on its line (no taller neighbour to widen
         // the band), drawn as ink and as a picture under a drifted layer.
         func page(hidden: Bool) throws -> Data {
@@ -107,6 +108,14 @@ extension PageImageInkFitTests {
                     NSAttributedString.Key(kCTKernAttributeName as String): kern])
                 ctx.textPosition = CGPoint(x: 200, y: 600 - drop)
                 CTLineDraw(CTLineCreateWithAttributedString(attributed), ctx)
+                if let rowAbove {
+                    // A printed row a line above, with tight leading.
+                    let above = NSAttributedString(string: "Hold balance", attributes: [
+                        NSAttributedString.Key(kCTFontAttributeName as String): font,
+                        NSAttributedString.Key(kCTKernAttributeName as String): kern])
+                    ctx.textPosition = CGPoint(x: 196, y: 600 + rowAbove - drop)
+                    CTLineDraw(CTLineCreateWithAttributedString(above), ctx)
+                }
             }
             func pdf(_ body: (CGContext) -> Void) throws -> Data {
                 let data = NSMutableData()

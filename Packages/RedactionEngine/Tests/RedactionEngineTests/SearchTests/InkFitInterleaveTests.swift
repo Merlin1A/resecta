@@ -51,7 +51,7 @@ struct InkFitInterleaveTests {
         }
     }
 
-    @Test("A word matched inside an interleaved layer line gets its printed band, degraded, and the page is reported not fully analysed")
+    @Test("A word matched inside an interleaved layer line gets its printed band, degraded, with no OCR-off report")
     func interleavedLineGetsItsBandAndThePageIsReported() async throws {
         let sourceDoc = try #require(PDFDocument(data: try Self.pagePDF(hidden: false)))
         let export = try #require(PDFDocument(data: try Self.pagePDF(hidden: true)))
@@ -74,14 +74,26 @@ struct InkFitInterleaveTests {
         let wages = ((page.string ?? "") as NSString).range(of: "Wages")
         let ordinary = try #require(DocumentSearcher().textLayerAndInkRects(for: wages, page: page))
         #expect(!ordinary.degraded, "a line the read agrees with is fitted")
-        // The search reports the page as not fully analysed.
+        // A whole line fitted by its text (as an address line is): the band too.
+        let lineRange = ((page.string ?? "") as NSString).lineRange(for: NSRange(location: range.location, length: 0))
+        let lineText = ((page.string ?? "") as NSString).substring(with: lineRange).trimmingCharacters(in: .newlines)
+        let lineBox = try #require(page.selection(for: lineRange).flatMap { DocumentSearcher().normalizedRect(for: $0, page: page) })
+        let whole = DocumentSearcher.inkFit(lineBox, page: page, text: lineText, range: nil, paintOnly: true)
+        #expect(whole.degraded, "an interleaved line fitted by its text is degraded")
+        let wholeOutside = try PageImageInkFitTests.inkOutside(page, word: PageImageInkFitTests.points(truth, size),
+                                                               boxes: [PageImageInkFitTests.points(whole.rect, size)])
+        #expect(wholeOutside.share == 0, "the printed \"and\" outside the line's band: \(wholeOutside.share * 100)%")
+        // The degraded box carries the notice; the OCR-off report (whose text
+        // names OCR) is not raised for it.
         let reported = Reported()
         let searcher = DocumentSearcher()
         await searcher.setScannedRegionNotAnalyzedSink { reported.add($0) }
+        // Recognition on, so the search's own OCR-off report (for a page with
+        // image content searched without it) is not in play.
         var options = SearchOptions()
-        options.includeOCR = false
+        options.includeOCR = true
         for await _ in searcher.search(SendablePDFDocument(export), mode: .text("and", options: options), progress: { _, _ in }) {}
-        #expect(reported.pages.contains(0), "the page with an interleaved layer line is reported not fully analysed")
+        #expect(reported.pages.isEmpty, "no OCR-off report for an interleaved layer line: \(reported.pages)")
     }
 
     final class Reported: @unchecked Sendable {

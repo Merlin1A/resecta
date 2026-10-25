@@ -320,15 +320,16 @@ extension DocumentSearcher {
             let reach = inkFitAnchorReach * a.rect.height
             var bottom = max(min(low, a.rect.minY - reach), a.rect.minY - a.rect.height)
             var top = min(max(high, a.rect.maxY + reach), a.rect.maxY + a.rect.height)
-            // Never past halfway to the printed rows above and below (a
-            // column of figures sits a line apart): the reach is for the
-            // word's own ascenders and descenders.
+            // Never into the printed rows above and below (a column of
+            // figures sits a line apart): the reach stops at their read
+            // boxes' edges, and the word's own ascenders and descenders, in
+            // the gap between, stay inside.
             let column = tokens.filter { $0.rect.maxX > a.rect.minX - a.rect.width && $0.rect.minX < a.rect.maxX + a.rect.width }
             if let above = column.filter({ $0.rect.midY > a.rect.maxY }).map(\.rect.minY).min() {
-                top = min(top, max(a.rect.maxY, (a.rect.maxY + above) / 2))
+                top = min(top, max(a.rect.maxY, above))
             }
             if let below = column.filter({ $0.rect.midY < a.rect.minY }).map(\.rect.maxY).max() {
-                bottom = max(bottom, min(a.rect.minY, (a.rect.minY + below) / 2))
+                bottom = max(bottom, min(a.rect.minY, below))
             }
             // A side cut from a longer token takes half a margin: past its
             // verified glyph runs, or past a share cut, which already reaches

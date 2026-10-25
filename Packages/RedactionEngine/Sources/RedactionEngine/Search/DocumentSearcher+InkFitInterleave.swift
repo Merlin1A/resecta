@@ -6,7 +6,7 @@ import PDFKit
 // an exporter that interleaved two runs sharing a band, character by character,
 // wrote a line no read row agrees with. A word matched there (as a substring of a
 // garbled token) has no place on the page: its box is the line's whole printed
-// band, degraded, and the page is reported as not fully analysed.
+// band, degraded (the widened-box notice tells the user).
 
 /// Per page content key: the starts (in the page text) of its interleaved
 /// layer lines, and the pages found to have any.
@@ -40,6 +40,20 @@ extension DocumentSearcher {
         return rows.map { $0.sorted { $0.rect.minX < $1.rect.minX } }
     }
 
+    /// Whether a layer line's letters (`lineKey`, long enough to judge) agree
+    /// with no read row on the band of `box`, where Vision read at least half
+    /// as many letters there.
+    nonisolated static func interleaved(_ lineKey: [Character], near box: CGRect, tokens: [InkToken]) -> Bool {
+        guard lineKey.count >= inkFitInterleaveMinimum else { return false }
+        let rows = readRows(near: box, tokens: tokens)
+        let read = rows.map { $0.map(\.key).joined().count }.max() ?? 0
+        guard read * 2 >= lineKey.count else { return false }
+        return !rows.contains { row in
+            let readKey = Array(row.map(\.key).joined())
+            return !readKey.isEmpty && align(lineKey, readKey).score * 2 >= min(lineKey.count, readKey.count)
+        }
+    }
+
     /// The page's interleaved layer lines (their starts in `pageText`): a line
     /// long enough to judge whose letters agree with no read row on its band
     /// (less than half of the shorter, where Vision read at least half as
@@ -59,14 +73,7 @@ extension DocumentSearcher {
             while first < NSMaxRange(line), let scalar = Unicode.Scalar(pageText.character(at: first)),
                   !CharacterSet.alphanumerics.contains(scalar) { first += 1 }
             guard first < NSMaxRange(line), let band = layerBox(first) else { continue }
-            let rows = readRows(near: band, tokens: tokens)
-            let read = rows.map { $0.map(\.key).joined().count }.max() ?? 0
-            guard read * 2 >= lineKey.count else { continue }
-            let agrees = rows.contains { row in
-                let readKey = Array(row.map(\.key).joined())
-                return !readKey.isEmpty && align(lineKey, readKey).score * 2 >= min(lineKey.count, readKey.count)
-            }
-            if !agrees { found.insert(line.location) }
+            if interleaved(lineKey, near: band, tokens: tokens) { found.insert(line.location) }
         }
         InkFitInterleaveCache.shared.set(found, for: pageKey)
         return found
@@ -75,7 +82,8 @@ extension DocumentSearcher {
     /// The printed band of a layer line around `box` (reading frame): every
     /// read word on it, the layer's box, a margin, clamped to `size`.
     nonisolated static func printedBand(around box: CGRect, tokens: [InkToken], size: CGSize) -> CGRect {
-        let reach = max(box.height, 4)
+        // As far across as a layer was measured to sit from its ink.
+        let reach = max(box.height, inkFitDriftAcross)
         let band = tokens.filter { abs($0.rect.midY - box.midY) <= reach }.map(\.rect).reduce(box) { $0.union($1) }
         return band.insetBy(dx: -inkFitAnchorMargin, dy: -inkFitAnchorReach * box.height)
             .intersection(CGRect(origin: .zero, size: size))
@@ -84,33 +92,21 @@ extension DocumentSearcher {
     /// The box of a match on an interleaved layer line: the line's whole
     /// printed band, degraded. Nil when the match's line is not interleaved.
     nonisolated static func interleavedBand(_ job: InkFitJob, tokens: [InkToken], box: CGRect) -> CGRect? {
-        guard let range = job.range else { return nil }
-        let text = job.pageText as NSString
-        let lineStart = text.lineRange(for: NSRange(location: range.location, length: 0)).location
-        guard interleavedLines(pageKey: job.pageKey, pageText: text, tokens: tokens, layerBox: job.layerBox).contains(lineStart)
-        else { return nil }
+        if let range = job.range {
+            let text = job.pageText as NSString
+            let lineStart = text.lineRange(for: NSRange(location: range.location, length: 0)).location
+            guard interleavedLines(pageKey: job.pageKey, pageText: text, tokens: tokens, layerBox: job.layerBox).contains(lineStart)
+            else { return nil }
+        } else {
+            // A whole line fitted by its text (an address line): judged by
+            // its own letters against the read rows on its band.
+            guard let text = job.text, interleaved(Array(alignmentKey(Substring(text))), near: box, tokens: tokens) else { return nil }
+        }
         inkFitLogger.log("ink fit: the layer's line is interleaved; the box is the line's printed band, degraded")
         let wide = job.envelope()
         let band = job.frame.toVisual(printedBand(around: box, tokens: tokens, size: job.frame.size))
         guard !band.isNull, !band.isEmpty else { return wide }
         return CGRect(x: band.minX / job.visual.width, y: band.minY / job.visual.height,
                       width: band.width / job.visual.width, height: band.height / job.visual.height).clampedToNormalized()
-    }
-
-    /// Reports `page` as not fully analysed when its layer has an interleaved
-    /// line (the search's own not-analysed signal; consumers dedupe by page).
-    func reportInterleavedLines(_ page: PDFPage) {
-        guard let cgPage = page.pageRef, Self.carriesHiddenTextOverImage(page, cgPage: cgPage),
-              let document = page.document, case let index = document.index(for: page), index != NSNotFound else { return }
-        let visual = effectiveBounds(page.bounds(for: .cropBox), rotation: page.rotation).size
-        let key = InkTokenCache.key(page: page, cgPage: cgPage, visual: visual)
-        guard let tokens = InkTokenCache.shared.value(for: key) else { return }
-        let frame = Self.readingFrame(of: page, visual: visual)
-        let lines = Self.interleavedLines(pageKey: key, pageText: (page.string ?? "") as NSString, tokens: tokens) { i in
-            page.selection(for: NSRange(location: i, length: 1)).flatMap { DocumentSearcher().normalizedRect(for: $0, page: page) }
-                .map { frame.toReading(CGRect(x: $0.minX * visual.width, y: $0.minY * visual.height,
-                                              width: $0.width * visual.width, height: $0.height * visual.height)) }
-        }
-        if !lines.isEmpty { scannedRegionNotAnalyzedSink?(index) }
     }
 }

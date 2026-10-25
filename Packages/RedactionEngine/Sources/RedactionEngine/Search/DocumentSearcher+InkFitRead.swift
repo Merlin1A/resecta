@@ -71,7 +71,6 @@ extension DocumentSearcher {
     /// runs again. Without a read in time the second run's fits are the
     /// envelope (degraded); no thread waits on the lane.
     func withInkFitRead<T>(_ page: PDFPage, _ body: () -> T) async -> T {
-        defer { reportInterleavedLines(page) }
         guard let read = Self.pendingInkRead(page) else { return body() }
         let deferral = InkFitDeferral()
         let first = InkFitDeferral.$current.withValue(deferral) { body() }
@@ -86,14 +85,12 @@ extension DocumentSearcher {
     /// reports as it goes and cannot run twice).
     func preparedForInkFit(_ page: PDFPage) async -> SendablePDFPage {
         if let read = Self.pendingInkRead(page) { await read.run() }
-        reportInterleavedLines(page)
         return SendablePDFPage(page)
     }
 
     /// `value`, after the page's tokens are read when it is gated.
     func afterInkFitRead<T>(_ page: PDFPage, _ value: @autoclosure () async -> T) async -> T {
         if let read = Self.pendingInkRead(page) { await read.run() }
-        reportInterleavedLines(page)
         return await value()
     }
 
