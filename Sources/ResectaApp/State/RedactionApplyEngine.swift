@@ -368,7 +368,7 @@ nonisolated func prepareApply(
             rationale: result.rationale,
             term: result.term,
             appliedAt: appliedAt,
-            searchRecord: searchRecord
+            searchRecord: searchRecord, inkFitDegraded: result.inkFitDegraded
         )
     }
 

@@ -5,7 +5,9 @@ import SwiftUI
 // responsibility; the hub's body mounts `captionOverlay` in the bottom
 // overlay slot it always held. One capsule at a time: the drawing caption
 // while the Rectangle tool is on, or the Add to Selection capsule — the
-// mode, the selection's count, and a Done button that turns the mode off.
+// mode, the selection's count, and a Done button that turns the mode off —
+// or, on a page holding a box drawn wider than its word, the widened-box
+// notice (`RedactionState+WidenedBoxes`).
 
 extension DocumentEditorView {
 
@@ -62,20 +64,38 @@ extension DocumentEditorView {
             : "Adding to selection, \(selectedCount) selected"
     }
 
+    // MARK: - Widened-box capsule
+
+    /// The capsule's words: shorter at accessibility sizes.
+    static func widenedBoxCaption(accessibilitySize: Bool) -> String {
+        accessibilitySize
+            ? "Wide boxes: keep them wide"
+            : "Some boxes here are wider than their words. Keep them wide."
+    }
+
+    /// The capsule as VoiceOver reads it: the reason and the ask.
+    static let widenedBoxAccessibilityLabel = "Some boxes on this page were drawn wider than their words, because the "
+        + "text could not be fitted to the printed words. Keep them wide: shrinking one can leave part of a word readable."
+
     /// Which capsule the host shows.
     enum BottomCapsule: Equatable {
         case drawing
         case addToSelection
+        case widenedBoxes
     }
 
     /// One capsule at a time, only while editing: the drawing caption while
     /// the Rectangle tool is on, else the Add to Selection capsule while
-    /// that mode is on. (Entering either turns the other off.)
+    /// that mode is on (entering either turns the other off), else the
+    /// widened-box notice while the page in view holds a widened box.
     static func bottomCapsule(
-        activeTool: DrawingTool?, addToSelection: Bool, phaseKind: DocumentState.PhaseKind
+        activeTool: DrawingTool?, addToSelection: Bool, phaseKind: DocumentState.PhaseKind,
+        widenedOnPage: Bool = false
     ) -> BottomCapsule? {
         if drawingModeCaptionShouldShow(activeTool: activeTool, phaseKind: phaseKind) { return .drawing }
-        return addToSelection && phaseKind == .editing ? .addToSelection : nil
+        guard phaseKind == .editing else { return nil }
+        if addToSelection { return .addToSelection }
+        return widenedOnPage ? .widenedBoxes : nil
     }
 
     /// The capsules' text stops growing at Accessibility 1: past it the
@@ -88,10 +108,12 @@ extension DocumentEditorView {
     var captionOverlay: some View {
         Group {
             switch Self.bottomCapsule(
-                activeTool: activeTool, addToSelection: isMultiSelectActive, phaseKind: documentState.phaseKind
+                activeTool: activeTool, addToSelection: isMultiSelectActive, phaseKind: documentState.phaseKind,
+                widenedOnPage: redactionState.pageHoldsWidenedBox(documentState.currentPageIndex)
             ) {
             case .drawing?: drawingCaptionCapsule
             case .addToSelection?: addModeCapsule
+            case .widenedBoxes?: widenedBoxCapsule
             case nil: EmptyView()
             }
         }
@@ -126,6 +148,28 @@ extension DocumentEditorView {
         .accessibilityElement(children: .contain)
         .accessibilityLabel(Self.addModeAccessibilityLabel(selectedCount: count))
         .accessibilityIdentifier("addModeCapsule")
+        .transition(.opacity)
+    }
+
+    /// The widened-box notice: the page in view holds a box drawn wider
+    /// than its word. It takes no touches.
+    private var widenedBoxCapsule: some View {
+        HStack(spacing: ResectaTokens.Spacing.xs) {
+            Image(systemName: "arrow.left.and.right.square")
+            Text(Self.widenedBoxCaption(accessibilitySize: dynamicTypeSize.isAccessibilitySize))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .font(.caption.weight(.medium))
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, ResectaTokens.Spacing.md)
+        .padding(.vertical, ResectaTokens.Spacing.xs)
+        .background(.regularMaterial, in: Capsule())
+        .padding(.horizontal, ResectaTokens.Spacing.md)
+        .padding(.bottom, ResectaTokens.Spacing.lg + parkedChromeLayout.hintCapsuleLift)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Self.widenedBoxAccessibilityLabel)
+        .accessibilityIdentifier("widenedBoxCapsule")
+        .allowsHitTesting(false)
         .transition(.opacity)
     }
 

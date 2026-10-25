@@ -795,7 +795,7 @@ class RedactionState {
             // A nudge is a PII-scan-origin match by predicate (the
             // detector's category, never a typed query) — no search to
             // re-run, so the Search Re-check never sees it.
-            searchRecord: nil
+            searchRecord: nil, inkFitDegraded: nudge.inkFitDegraded
         )
         addRegion(region, page: nudge.pageIndex, undoManager: undoManager, actionName: UndoName.addNearbyMatch)
         regionMetadata[region.id] = metadata
