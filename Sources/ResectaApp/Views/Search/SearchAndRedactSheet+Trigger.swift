@@ -259,7 +259,7 @@ extension SearchAndRedactSheet {
         // routes to OCR instead of having its body suppressed by the thin
         // layer. Snapshot here, like the threshold vector, so the scan runs
         // against a stable copy.
-        let textLayerStatus: [Int: TextLayerStatus] = documentState.textLayerStatus
+        let textLayerStatus: [Int: TextLayerStatus] = documentState.searchTextLayerStatus
 
         // Snapshot + compile user terms once per kickoff. Compile is
         // cheap (≤100+100 patterns, most literal), same lifecycle as

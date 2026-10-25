@@ -228,6 +228,15 @@ class DocumentState {
 
     /// Per-page text layer detection results, populated during import.
     var textLayerStatus: [Int: TextLayerStatus] = [:]
+    /// Pages Search reads by OCR although their status is `.rich`: the text
+    /// layer is garbled or has no geometry (`ImportFacts.searchUnreadablePages`).
+    var searchUnreadablePages: Set<Int> = []
+    /// The statuses Search routes by: `textLayerStatus`, with each page Search
+    /// cannot read as `.sparse`, so it is read by OCR (or reported not analysed
+    /// with OCR off). Export and verification read `textLayerStatus` itself.
+    var searchTextLayerStatus: [Int: TextLayerStatus] {
+        textLayerStatus.merging(searchUnreadablePages.map { ($0, .sparse) }) { _, unreadable in unreadable }
+    }
 
     /// Doc-level OCG hidden-layer presence, precomputed at import time.
     /// `PDFDocument(data:)` (every production import path) returns a
@@ -652,6 +661,7 @@ class DocumentState {
         ThumbnailCache.clear()   // the closed document's page images leave memory with it
         sourceFacts = ImportFacts.Summary()
         textLayerStatus = [:]
+        searchUnreadablePages = []
         sourceAnnotationFindings = []
         sourceFilledFormFieldCount = 0
         annotationNoticeDismissed = false
