@@ -321,8 +321,13 @@ extension DocumentSearcher {
             // A side cut from a longer token takes half a margin: past its
             // verified glyph runs, or past a share cut, which already reaches
             // a character beyond its share (`alignedBox`, `tokenBox`).
-            let left: CGFloat = a.growLeft ? inkFitAnchorMargin : inkFitMargin / 2
-            let right: CGFloat = a.growRight ? inkFitAnchorMargin : inkFitMargin / 2
+            // An open side's margin; a CJK word's read box is placed less
+            // closely across a character, so half a character there.
+            let characters = max(job.text.map { ($0 as NSString).length } ?? job.range?.length ?? 1, 1)
+            let cjk = job.text.map { wideCharacters(before: NSRange(location: 0, length: ($0 as NSString).length), in: $0) > 0 } ?? false
+            let open = cjk ? max(inkFitAnchorMargin, 0.5 * a.rect.width / CGFloat(characters)) : inkFitAnchorMargin
+            let left: CGFloat = a.growLeft ? open : inkFitMargin / 2
+            let right: CGFloat = a.growRight ? open : inkFitMargin / 2
             let grown = CGRect(x: a.rect.minX - left, y: bottom - inkFitMargin / 2,
                                width: a.rect.width + left + right, height: top - bottom + inkFitMargin)
                 .intersection(CGRect(origin: .zero, size: size))
