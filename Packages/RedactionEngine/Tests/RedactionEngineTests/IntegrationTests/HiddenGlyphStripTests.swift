@@ -225,11 +225,11 @@ struct HiddenGlyphStripTests {
 
     @Test("a search over a stalled page read marks its results degraded with the drift envelope, and keeps none of it")
     func stalledFitMarksResultsDegraded() async throws {
-        // An export of this test's own (two words redacted), so its page
-        // content key is no other test's.
+        // An export of this test's own (two words redacted, and the corner
+        // mark on its page 1), so its page content key is no other test's.
         let data = try TestFixtures.sampleStatementPDF()
         let source = try #require(PDFDocument(data: data))
-        var regions: [Int: [RedactionRegion]] = [:]
+        var regions: [Int: [RedactionRegion]] = [0: [RedactionRegion(id: UUID(), normalizedRect: HybridDedupTests.mark, source: .manual)]]
         for hit in await PageImageInkFitTests.hits(source, "Sample", includeOCR: false)
             + (await PageImageInkFitTests.hits(source, "Summary", includeOCR: false)) {
             regions[hit.pageIndex, default: []].append(
@@ -240,6 +240,8 @@ struct HiddenGlyphStripTests {
         let export = try #require(PDFDocument(data: try Data(contentsOf: url)))
         let page = try #require(export.page(at: 0))
         let key = InkTokenCache.key(page: page, cgPage: try #require(page.pageRef), visual: page.bounds(for: .cropBox).size)
+        try #require(!(try HybridDedupTests.pageKeys(try await PageImageInkFitTests.reimportedExport().export)).contains(key),
+                     "the stalled page shares its key with the shared re-imported export")
         DocumentSearcher.inkFitInjectedStalls.set((3.0, 0.5), for: key)
         let stalled = await PageImageInkFitTests.hits(export, "Hartwell", includeOCR: false).filter { $0.pageIndex == 0 }
         DocumentSearcher.inkFitInjectedStalls.set(nil, for: key)

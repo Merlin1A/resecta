@@ -50,10 +50,16 @@ struct HybridDedupTests {
 
     @Test("a search with recognition on reports the same results when every page read stalls as when none does")
     func sameResultsUnderAStall() async throws {
-        // An export of this test's own (two words redacted), so its page keys are no other test's.
+        // An export of this test's own: two words redacted and a small mark in
+        // a blank corner of every page. The page content key is the page's text
+        // and image, so without the mark a page with neither word carries the
+        // shared re-imported export's key, and this test's stalls reach its readers.
         let data = try TestFixtures.sampleStatementPDF()
         let source = try #require(PDFDocument(data: data))
         var regions: [Int: [RedactionRegion]] = [:]
+        for index in 0..<source.pageCount {
+            regions[index] = [RedactionRegion(id: UUID(), normalizedRect: Self.mark, source: .manual)]
+        }
         for hit in await PageImageInkFitTests.hits(source, "Sample", includeOCR: false)
             + (await PageImageInkFitTests.hits(source, "Balance", includeOCR: false)) {
             regions[hit.pageIndex, default: []].append(
@@ -62,14 +68,11 @@ struct HybridDedupTests {
         let url = try await TestPipeline.processAndExport(data, mode: .searchableRedaction, regions: regions, dpi: 300)
         defer { try? FileManager.default.removeItem(at: url) }
         let export = try #require(PDFDocument(data: try Data(contentsOf: url)))
+        let keys = try Self.pageKeys(export)
+        let shared = try Self.pageKeys(try await PageImageInkFitTests.reimportedExport().export)
+        try #require(Set(keys).isDisjoint(with: shared), "a stalled page shares its key with the shared re-imported export")
         // Stalled first, before anything on these pages is read or cached.
-        var keys: [Int] = []
-        for index in 0..<export.pageCount {
-            let page = try #require(export.page(at: index))
-            let key = InkTokenCache.key(page: page, cgPage: try #require(page.pageRef), visual: page.bounds(for: .cropBox).size)
-            keys.append(key)
-            DocumentSearcher.inkFitInjectedStalls.set((6.0, 0.2), for: key)
-        }
+        for key in keys { DocumentSearcher.inkFitInjectedStalls.set((6.0, 0.2), for: key) }
         let stalled = await PageImageInkFitTests.hits(export, "delia", includeOCR: true)
         for key in keys { DocumentSearcher.inkFitInjectedStalls.set(nil, for: key) }
         #expect(stalled.contains { $0.inkFitDegraded }, "the stall degraded the fits")
@@ -78,5 +81,16 @@ struct HybridDedupTests {
         try await Task.sleep(for: .seconds(8))   // the stalled reads finish
         let normal = await PageImageInkFitTests.hits(export, "delia", includeOCR: true)
         #expect(normal.count == 9 && normal.allSatisfy { $0.source == .textLayer })
+    }
+
+    /// The corner mark, clear of the corner the stall pins mark.
+    static let mark = CGRect(x: 0.012, y: 0.030, width: 0.020, height: 0.010)
+
+    /// Each page's ink-fit content key.
+    static func pageKeys(_ doc: PDFDocument) throws -> [Int] {
+        try (0..<doc.pageCount).map { index in
+            let page = try #require(doc.page(at: index))
+            return InkTokenCache.key(page: page, cgPage: try #require(page.pageRef), visual: page.bounds(for: .cropBox).size)
+        }
     }
 }
