@@ -274,11 +274,11 @@ concurrent entry points. The working rules, checkable by grep:
   queue for writes to the in-memory thumbnail cache) and **zero** `.main.async`
   calls — main-thread work is expressed through actor isolation, not queue hops.
 - Isolation opt-outs are rare and deliberate: 19 `nonisolated(unsafe)`
-  declarations across ~65,000 lines of app + engine source, and the working
+  declarations across ~68,000 lines of app + engine source, and the working
   convention is a written rationale at the declaration site saying why the
   access is safe.
 - Logging goes through `os.Logger`, and what a log line may carry is
-  counted: 59 log interpolations are marked `privacy: .public` across the
+  counted: 60 log interpolations are marked `privacy: .public` across the
   app and engine source, each one a mechanism value — an asset, file or
   preference-key name, a metadata key name, a pipeline phase, a page index,
   a count or a pixel size, a detector or table name, an issuer or state code
@@ -439,7 +439,7 @@ If you review one path end-to-end, make it this one:
 `Pipeline/PDFStreamReconstructor.swift` (rebuild) →
 `Verification/VerificationEngine.swift` (the layered pass over the output) →
 `SecurityTests/FakeRedactionTests.swift` (the named attack, pinned). The test
-tree is larger than the source tree — about 65,000 lines of source to about
+tree is larger than the source tree — about 68,000 lines of source to about
 109,000 lines of tests; counts and structure are in the README's Testing
 section — and the suites above are the reason I trust my own output enough to
 ship it.
