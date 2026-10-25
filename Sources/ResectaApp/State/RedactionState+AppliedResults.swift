@@ -80,3 +80,25 @@ extension RedactionState.DeselectionSnapshot {
         self.init(items: parts.flatMap(\.items), totalCount: parts.reduce(0) { $0 + $1.totalCount })
     }
 }
+
+/// A typed search applied while a box already held every result it selected:
+/// no region carries its record, so the run's re-check reads it from here
+/// (`PipelineCoordinator.appliedSearches(fromRegions:audit:deselected:covered:)`).
+struct CoveredSearchRecord: Equatable {
+    let record: AppliedSearchRecord
+    let appliedAt: Date
+    let pages: Set<Int>
+}
+
+extension RedactionState {
+
+    /// Keep the record of a search whose apply created nothing because a box
+    /// already held every selected result, so the verifier still re-runs it.
+    func noteCoveredSearch(_ record: AppliedSearchRecord?, selected: [SearchResult],
+                           covered: Set<UUID>, at appliedAt: Date) {
+        guard let record, !covered.isEmpty else { return }
+        let pages = Set(selected.filter { covered.contains($0.id) }.map(\.pageIndex))
+        coveredSearchRecords.removeAll { $0.record.query == record.query }
+        coveredSearchRecords.append(CoveredSearchRecord(record: record, appliedAt: appliedAt, pages: pages))
+    }
+}

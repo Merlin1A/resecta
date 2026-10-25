@@ -213,15 +213,20 @@ extension RedactionState {
 
 // MARK: - Apply prepare helper
 
-/// The one coverage rule the apply's skip and the draw nudge share: a
-/// result is covered when a single rect overlaps more than 80 % of its area.
+/// The one coverage rule the apply's skip, the sheet's covered markers (and
+/// the gates they feed) and the draw nudge share: a result is covered only
+/// when one rect holds the whole of it, within `coverageEdgeTolerance`. A box
+/// that stops a letter short of the word leaves that letter printed, so the
+/// result is applied and the two regions overlap.
 nonisolated func resultIsCovered(_ resultRect: CGRect, by rects: [CGRect]) -> Bool {
-    let resultArea = resultRect.width * resultRect.height
-    return resultArea > 0 && rects.contains { rect in
-        let overlap = resultRect.intersection(rect)
-        return !overlap.isNull && overlap.width * overlap.height / resultArea > 0.8
-    }
+    guard resultRect.width > 0, resultRect.height > 0 else { return false }
+    return rects.contains { $0.insetBy(dx: -coverageEdgeTolerance, dy: -coverageEdgeTolerance).contains(resultRect) }
 }
+
+/// The slack (page-normalized) on a covering rect's edges: floating-point
+/// noise only, under a thousandth of a point on any page, so no printed part
+/// of a character can sit outside a box that counts as covering it.
+nonisolated let coverageEdgeTolerance: CGFloat = 0.000_001
 
 /// The confidence a region stores for the result it came from, for the
 /// apply and the nudge accept alike: the detector's score when the result
