@@ -68,16 +68,23 @@ final class InkFitQueueState: @unchecked Sendable {
 }
 
 #if DEBUG
-/// Test seam: when a key's read reached the Vision lane's head, and when
-/// its lane was retired under it (the latest of each).
+/// Test seam: when a key's read reached a Vision lane's head and on which
+/// lane, and when its lane was retired under it (the latest of each); how
+/// often its job moved to a fresh lane.
 final class InkFitLaneTimes: @unchecked Sendable {
     static let shared = InkFitLaneTimes()
     private let lock = NSLock()
-    private var began: [Int: Date] = [:], retired: [Int: Date] = [:]
-    func didBegin(_ key: Int?) { guard let key else { return }; lock.withLock { began[key] = Date() } }
+    private var began: [Int: Date] = [:], retired: [Int: Date] = [:], moved: [Int: Int] = [:]
+    private var lanes: [Int: ObjectIdentifier] = [:]
+    func didBegin(_ key: Int?, on lane: InkFitLane) {
+        guard let key else { return }; lock.withLock { began[key] = Date(); lanes[key] = ObjectIdentifier(lane) }
+    }
+    func lane(_ key: Int) -> ObjectIdentifier? { lock.withLock { lanes[key] } }
     func didRetire(_ key: Int?) { guard let key else { return }; lock.withLock { retired[key] = Date() } }
     func began(_ key: Int) -> Date? { lock.withLock { began[key] } }
     func retired(_ key: Int) -> Date? { lock.withLock { retired[key] } }
+    func didMove(_ key: Int?) { guard let key else { return }; lock.withLock { moved[key, default: 0] += 1 } }
+    func moves(_ key: Int) -> Int { lock.withLock { moved[key] ?? 0 } }
 }
 
 /// The test seam's stalls, by page content key.
@@ -93,12 +100,18 @@ final class InkFitStalls: @unchecked Sendable {
 struct InkFitImage: @unchecked Sendable { let image: CGImage }
 
 /// A value an ink-fit queue job hands back, and its done signal. A job runs
-/// at most once: a lane claims it before it runs, and a waiter that gives up
-/// abandons it (moved or abandoned copies left on another lane do nothing).
+/// at most once: a lane claims it before it runs (a moved job's copy left on
+/// its old lane can claim it first), and a waiter that gives up abandons it
+/// (the copies not claimed do nothing).
 final class InkFitResult<T>: @unchecked Sendable {
     private let lock = NSLock()
     private var state = 0  // 0 waiting, 1 running, 2 abandoned
-    func claim() -> Bool { lock.lock(); defer { lock.unlock() }; if state == 0 { state = 1; return true }; return false }
+    private var claimedOn: InkFitLane?
+    func claim(on lane: InkFitLane) -> Bool {
+        lock.lock(); defer { lock.unlock() }; if state == 0 { state = 1; claimedOn = lane; return true }; return false
+    }
+    /// The lane the job runs on, once claimed.
+    var lane: InkFitLane? { lock.lock(); defer { lock.unlock() }; return claimedOn }
     func abandon() { lock.lock(); if state == 0 { state = 2 }; lock.unlock() }
     var isRunning: Bool { lock.lock(); defer { lock.unlock() }; return state == 1 }
     var value: T?

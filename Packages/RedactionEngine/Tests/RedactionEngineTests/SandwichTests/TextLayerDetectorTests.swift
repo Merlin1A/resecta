@@ -89,6 +89,16 @@ struct TextLayerDetectorTests {
         return TextLayerDetector.checkFallbackTriggers(page)
     }
 
+    @Test("Search reads a garbled text layer by OCR; ordinary, RTL and vertical text it reads as text")
+    func unreadableForSearch() throws {
+        func unreadable(_ text: String) throws -> Bool {
+            let page = try #require(PDFDocument(data: TestFixtures.textLayerPDF(text: text, fontSize: 12))?.page(at: 0))
+            return TextLayerDetector.unreadableForSearch(page)
+        }
+        #expect(try unreadable(String(repeating: "ababa cbcbc ", count: 6)), "an unresolved encoding")
+        #expect(try !unreadable("Dear Counsel, please see enclosed the records you requested on Monday"), "ordinary text")
+    }
+
     @Test("Repeated-glyph garbage trips unresolvedEncoding (floor target)")
     func repeatedGlyphGarbageTrips() throws {
         // 4 distinct characters over ≥50 — the extraction-failure signature.

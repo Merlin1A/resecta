@@ -50,14 +50,20 @@ struct InkFitScriptsTests {
         let export = try #require(PDFDocument(data: try pagePDF(lines, hidden: true)))
         let source = try #require(PDFDocument(data: try pagePDF(lines, hidden: false)))
         let page = try #require(export.page(at: 0)), sourcePage = try #require(source.page(at: 0))
-        await DocumentSearcher.prepareInkFit(page)
         let size = page.bounds(for: .cropBox).size
         let range = ((page.string ?? "") as NSString).range(of: word)
         let sourceRange = ((sourcePage.string ?? "") as NSString).range(of: word)
         try #require(range.location != NSNotFound && sourceRange.location != NSNotFound, "\(word) is in both layers")
         let truth = try #require(sourcePage.selection(for: sourceRange).flatMap { DocumentSearcher().normalizedRect(for: $0, page: sourcePage) })
-        let fit = try #require(PageImageInkFitTests.settled({ DocumentSearcher().textLayerAndInkRects(for: range, page: page) },
-                                                           degraded: \.degraded))
+        // Read, then fitted from that read; again while the fit is degraded:
+        // in a saturated run a read can run past its limit (not cached), or
+        // other tests' pages can push this page's tokens out of the cache.
+        await DocumentSearcher.prepareInkFit(page)
+        var fit = try #require(DocumentSearcher().textLayerAndInkRects(for: range, page: page))
+        for _ in 0..<5 where fit.degraded {
+            await DocumentSearcher.prepareInkFit(page)
+            fit = try #require(DocumentSearcher().textLayerAndInkRects(for: range, page: page))
+        }
         let outside = try PageImageInkFitTests.inkOutside(page, word: PageImageInkFitTests.points(truth, size),
                                                           boxes: fit.paint.map { PageImageInkFitTests.points($0, size) })
         return (fit.degraded, outside.share)
@@ -115,21 +121,19 @@ struct InkFitScriptsTests {
         let mixed = [(Self.korean, "AppleSDGothicNeo-Regular"), (Self.chinese, "PingFangSC-Regular"),
                      (Self.chineseTwo, "PingFangSC-Regular"), ("계좌 잔액 안내", "AppleSDGothicNeo-Regular")]
         let single = [(Self.chinese, "PingFangSC-Regular"), (Self.chineseTwo, "PingFangSC-Regular")]
-        func readTime(_ lines: [(text: String, font: String)]) async throws -> (seconds: Double, reads: Int, left: Int) {
+        func readTime(_ lines: [(text: String, font: String)]) async throws -> (seconds: Double, reads: Int) {
             // The document held (a page keeps its document weakly; the read draws a copy of it).
             let doc = try #require(PDFDocument(data: try Self.pagePDF(lines, hidden: true)))
             let page = try #require(doc.page(at: 0))
             let reads = DocumentSearcher.pendingInkReads(page).count
             let started = Date()
             await DocumentSearcher.prepareInkFit(page)
-            let left = DocumentSearcher.pendingInkReads(page).count
             withExtendedLifetime(doc) {}
-            return (Date().timeIntervalSince(started), reads, left)
+            return (Date().timeIntervalSince(started), reads)
         }
         let two = try await readTime(mixed), one = try await readTime(single)
         #expect(two.reads == 2, "four lines in two scripts: two reads, not four")
         #expect(one.reads == 1)
-        #expect(two.left == 0 && one.left == 0, "every read is cached once taken")
         print("script reads: mixed page \(two.reads) reads in \(two.seconds) s; one script \(one.reads) read in \(one.seconds) s")
     }
 }

@@ -31,8 +31,7 @@ extension SearchToolbarSection {
             // documents the engine never runs OCR, so the controls carry
             // no information there. Fail-open on an unknown map.
             if Self.piiScanOCRBlockShouldShow(
-                anyPageAwaitsOCR: documentState.textLayerStatus.values
-                    .contains { $0 != .rich },
+                anyPageAwaitsOCR: documentState.anyPageAwaitsOCRForSearch,
                 statusKnown: !documentState.textLayerStatus.isEmpty,
                 sourceFilter: searchState.sourceFilter
             ) {
@@ -71,8 +70,7 @@ extension SearchToolbarSection {
     var ocrControlsRow: some View {
         if Self.ocrControlsShouldShow(
             includeOCR: searchState.options.includeOCR,
-            anyPageAwaitsOCR: documentState.textLayerStatus.values
-                .contains { $0 != .rich },
+            anyPageAwaitsOCR: documentState.anyPageAwaitsOCRForSearch,
             statusKnown: !documentState.textLayerStatus.isEmpty,
             sourceFilter: searchState.sourceFilter
         ) {
@@ -112,8 +110,7 @@ extension SearchToolbarSection {
                 // The caption is conditional: "awaiting" only
                 // when at least one page will actually route to OCR.
                 let caption = Self.ocrDisabledCaption(
-                    anyPageAwaitsOCR: documentState.textLayerStatus.values
-                        .contains { $0 != .rich }
+                    anyPageAwaitsOCR: documentState.anyPageAwaitsOCRForSearch
                 )
                 Text(caption)
                     .font(.caption2)

@@ -380,6 +380,7 @@ enum ImportService {
         }
         documentState.currentPageIndex = 0
         documentState.textLayerStatus = loaded.facts.textLayerStatus
+        documentState.searchUnreadablePages = loaded.facts.searchUnreadablePages
         documentState.sourceHasHiddenOCG = loaded.facts.hasHiddenOCG
         documentState.sourceAnnotationFindings = loaded.facts.annotationFindings
         documentState.sourceFilledFormFieldCount = loaded.facts.filledFormFieldCount

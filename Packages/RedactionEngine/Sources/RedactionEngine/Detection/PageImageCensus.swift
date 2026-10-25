@@ -5,7 +5,9 @@ import CoreGraphics
 /// Whether a page with a text layer also carries content its text layer does
 /// not hold. The page must reach an image object, and either the image covers
 /// at least half the page at 100 dpi (a scan under a stamp or a vendor text
-/// layer, a pasted photo of an ID), or the text layer is too thin for the page
+/// layer), or it holds at least `imagePixelFloor` pixels (an ID or a photo
+/// pasted into a typed letter: 741 × 469 at a word processor's 220 ppi, or a
+/// mail client's 640 × 480), or the text layer is too thin for the page
 /// (fewer than about 200 characters on a letter page: a Bates line, a court
 /// header or a stamp over a scan placed small). A page with no image object
 /// carries nothing to recognise beyond its text layer, however short. Search
@@ -19,6 +21,10 @@ enum PageImageCensus {
 
     /// The share of the page's pixel area at 100 dpi an image object must cover.
     static let imageShareFloor = 0.5
+    /// The pixel count at which an image object alone makes a typed page carry
+    /// image content, whatever share of the page it covers: above a letterhead
+    /// logo's (600 × 300 is 180,000), below a pasted ID's or photo's.
+    static let imagePixelFloor = 250_000
     /// Meaningful characters per 10⁶ pt² below which a text layer reads as a stamp alone.
     static let densityFloor = 410.0
     /// Bound on form objects nested inside one another.
@@ -29,7 +35,7 @@ enum PageImageCensus {
         let crop = page.bounds(for: .cropBox)
         guard crop.width > 0, crop.height > 0 else { return false }
         guard let cgPage = page.pageRef, let pixels = largestImagePixelArea(of: cgPage) else { return false }
-        if imageShare(pixelArea: pixels, cropBox: crop) >= imageShareFloor { return true }
+        if pixels >= imagePixelFloor || imageShare(pixelArea: pixels, cropBox: crop) >= imageShareFloor { return true }
         let meaningful = (page.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines).count
         return textDensity(meaningfulCount: meaningful, cropBox: crop) < densityFloor
     }
