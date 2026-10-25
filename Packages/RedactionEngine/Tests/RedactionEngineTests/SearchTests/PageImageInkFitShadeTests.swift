@@ -93,4 +93,55 @@ extension PageImageInkFitTests {
         #expect(painted.contains { $0.contains(held) },
                 "\(word): the painted box \(painted) does not hold its glyphs \(held) (degraded \(fit.degraded))")
     }
+
+    @Test("With the render stalled, a lone word with an ascender and a descender keeps them inside its read box")
+    func stalledRenderReadBoxHoldsAscenders() async throws {
+        // One lower-case word alone on its line (no taller neighbour to widen
+        // the band), drawn as ink and as a picture under a drifted layer.
+        func page(hidden: Bool) throws -> Data {
+            var media = CGRect(x: 0, y: 0, width: 612, height: 792)
+            let font = CTFontCreateWithName("Helvetica" as CFString, 12, nil)
+            func draw(_ ctx: CGContext, kern: CGFloat, drop: CGFloat) {
+                let attributed = NSAttributedString(string: "period", attributes: [
+                    NSAttributedString.Key(kCTFontAttributeName as String): font,
+                    NSAttributedString.Key(kCTKernAttributeName as String): kern])
+                ctx.textPosition = CGPoint(x: 200, y: 600 - drop)
+                CTLineDraw(CTLineCreateWithAttributedString(attributed), ctx)
+            }
+            func pdf(_ body: (CGContext) -> Void) throws -> Data {
+                let data = NSMutableData()
+                let consumer = try #require(CGDataConsumer(data: data as CFMutableData))
+                let ctx = try #require(CGContext(consumer: consumer, mediaBox: &media, nil))
+                ctx.beginPDFPage(nil); body(ctx); ctx.endPDFPage(); ctx.closePDF()
+                return data as Data
+            }
+            let ink = try pdf { draw($0, kern: 0, drop: 0) }
+            guard hidden else { return ink }
+            let cg = try #require(PDFDocument(data: ink)?.page(at: 0)?.pageRef)
+            let scale: CGFloat = 300 / 72
+            let bitmap = try #require(CGContext(data: nil, width: Int(612 * scale), height: Int(792 * scale), bitsPerComponent: 8,
+                                                bytesPerRow: 0, space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue))
+            bitmap.setFillColor(gray: 1, alpha: 1); bitmap.fill(CGRect(x: 0, y: 0, width: 612 * scale, height: 792 * scale))
+            bitmap.scaleBy(x: scale, y: scale); bitmap.drawPDFPage(cg)
+            let picture = try #require(bitmap.makeImage())
+            return try pdf { ctx in ctx.draw(picture, in: media); ctx.setTextDrawingMode(.invisible); draw(ctx, kern: -0.3, drop: 3) }
+        }
+        let source = try #require(PDFDocument(data: try page(hidden: false)))
+        let export = try #require(PDFDocument(data: try page(hidden: true)))
+        let exportPage = try #require(export.page(at: 0)), sourcePage = try #require(source.page(at: 0))
+        let cgPage = try #require(exportPage.pageRef)
+        let size = exportPage.bounds(for: .cropBox).size
+        await DocumentSearcher.prepareInkFit(exportPage)
+        let key = InkTokenCache.key(page: exportPage, cgPage: cgPage, visual: size)
+        DocumentSearcher.inkFitInjectedRenderStalls.set((2.0, 0.3), for: key)
+        defer { DocumentSearcher.inkFitInjectedRenderStalls.set(nil, for: key) }
+        let range = ((exportPage.string ?? "") as NSString).range(of: "period")
+        let raw = try #require(exportPage.selection(for: range).flatMap { DocumentSearcher().normalizedRect(for: $0, page: exportPage) })
+        let truth = try #require(sourcePage.selection(for: ((sourcePage.string ?? "") as NSString).range(of: "period"))
+            .flatMap { DocumentSearcher().normalizedRect(for: $0, page: sourcePage) })
+        let fit = DocumentSearcher.inkFit(raw, page: exportPage, text: "period", range: range, paintOnly: true)
+        #expect(fit.degraded, "a fit without its render is degraded")
+        let outside = try Self.inkOutside(exportPage, word: Self.points(truth, size), boxes: [Self.points(fit.rect, size)])
+        #expect(outside.share == 0, "period's ascender and descender ink outside its box: \(outside.share * 100)%, up to \(outside.reach) pt")
+    }
 }

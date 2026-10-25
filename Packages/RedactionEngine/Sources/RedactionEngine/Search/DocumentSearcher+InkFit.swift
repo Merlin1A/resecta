@@ -65,6 +65,10 @@ extension DocumentSearcher {
     /// was not verified (half `inkFitMargin` on a side cut from a longer token).
     static let inkFitAnchorMargin: CGFloat = 1.5
 
+    /// How far (as a share of its height) a read word's box whose ink was not
+    /// verified reaches above and below it at the least.
+    static let inkFitAnchorReach: CGFloat = 0.3
+
     /// Text lighter than the ink threshold (a grey label, a faint scan) is
     /// read again with a pixel this dark (of 255) as its ink.
     static let inkFitLightThreshold: UInt8 = 232
@@ -309,8 +313,11 @@ extension DocumentSearcher {
                 return overlap >= 0.5 * min(t.rect.height, a.rect.height) && abs(t.rect.midX - a.rect.midX) <= 200
             }
             let low = row.map(\.rect.minY).min() ?? a.rect.minY, high = row.map(\.rect.maxY).max() ?? a.rect.maxY
-            let bottom = max(min(low, a.rect.minY), a.rect.minY - a.rect.height)
-            let top = min(max(high, a.rect.maxY), a.rect.maxY + a.rect.height)
+            // At least an ascender's or a descender's reach past the read
+            // box (Vision's box can stop at the x-height's neighbours).
+            let reach = inkFitAnchorReach * a.rect.height
+            let bottom = max(min(low, a.rect.minY - reach), a.rect.minY - a.rect.height)
+            let top = min(max(high, a.rect.maxY + reach), a.rect.maxY + a.rect.height)
             // A side cut from a longer token takes half a margin: past its
             // verified glyph runs, or past a share cut, which already reaches
             // a character beyond its share (`alignedBox`, `tokenBox`).
