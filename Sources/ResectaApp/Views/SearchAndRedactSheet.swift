@@ -397,9 +397,9 @@ struct SearchAndRedactSheet: View {
         // Resolve live-preview NSRanges → normalized rects whenever a
         // new preview snapshot arrives. Only the visible page's ranges are
         // populated by the engine, so we resolve against the visible page.
-        .onChange(of: searchState.livePreview) { _, _ in
-            resolveAndPublishLivePreviewRects()
-        }
+        .onChange(of: searchState.livePreview) { _, _ in resolveAndPublishLivePreviewRects() }
+        // …and again when a search's ink fit lands (a hidden layer over a page image), so the highlight sits on Apply's box.
+        .onReceive(NotificationCenter.default.publisher(for: DocumentSearcher.inkFitDidUpdate)) { _ in resolveAndPublishLivePreviewRects() }
         // Page change refreshes preview rects (visible page changed).
         .onChange(of: documentState.currentPageIndex) { _, _ in
             // Page change invalidates current rects; if the new page has no

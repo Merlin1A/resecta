@@ -28,13 +28,27 @@ extension DocumentSearcher {
         return Self.mergeHybridResults(textLayerRects: textLayerRects, ocr: await ocr())
     }
 
+    /// The OCR leg's results less those that repeat a text-layer result. An
+    /// OCR result repeats a text-layer rect when their overlap covers
+    /// `hybridOverlapFloor` of the smaller, or when the text-layer rect's centre
+    /// lies inside it. The centre test does not depend on the text-layer rect's
+    /// size: a box fitted to the ink, and the drift envelope a page read too
+    /// slowly gets (taller than the line, centred where the word should be), both
+    /// have their centre on the recognised line. Each text-layer rect accounts
+    /// for at most one OCR result, so a second occurrence on the same line, which
+    /// the text layer does not hold, keeps its OCR result.
     static func mergeHybridResults(textLayerRects: [CGRect], ocr: [SearchResult]) -> [SearchResult] {
         func area(_ rect: CGRect) -> CGFloat { rect.isNull ? 0 : rect.width * rect.height }
+        func repeats(_ rect: CGRect, _ ocrRect: CGRect) -> Bool {
+            let smaller = min(area(rect), area(ocrRect))
+            if smaller > 0 && area(rect.intersection(ocrRect)) >= hybridOverlapFloor * smaller { return true }
+            return !rect.isEmpty && ocrRect.contains(CGPoint(x: rect.midX, y: rect.midY))
+        }
+        var unmatched = textLayerRects
         return ocr.filter { result in
-            !textLayerRects.contains { rect in
-                let smaller = min(area(rect), area(result.normalizedRect))
-                return smaller > 0 && area(rect.intersection(result.normalizedRect)) >= hybridOverlapFloor * smaller
-            }
+            guard let index = unmatched.firstIndex(where: { repeats($0, result.normalizedRect) }) else { return true }
+            unmatched.remove(at: index)
+            return false
         }
     }
 

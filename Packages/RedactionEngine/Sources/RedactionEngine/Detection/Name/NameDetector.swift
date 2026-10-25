@@ -98,12 +98,13 @@ struct NameDetector: FamilyDetector {
         var results: [PIIMatch] = []
 
         let originalNS = original as NSString
+        let textNS = text as NSString
         // Production invariant: Pass 1 passes
         // `original` itself and Pass 2 passes `nerShadow(original)`, which
         // substitutes and case-folds in place without inserting or removing
         // UTF-16 units — so a tagger range on `text` indexes `original`
         // directly. Only the DEBUG test seam can supply a cross-length pair.
-        let offsetsAligned = (text as NSString).length == originalNS.length
+        let offsetsAligned = textNS.length == originalNS.length
 
         tagger.enumerateTags(in: text.startIndex..<text.endIndex,
                              unit: .word, scheme: .nameType) { tag, range in
@@ -161,8 +162,11 @@ struct NameDetector: FamilyDetector {
                 // shadow) pass suppresses candidates the gazetteer didn't
                 // recognize at all (`hadAnyHit`); the first pass suppresses
                 // candidates the inventory does not SUPPORT (`hadSupport`:
-                // an exact surname hit that is not a curated common word, or
-                // a fuzzy hit) — the mirror of the strict gate, so a
+                // an exact surname hit that is not a curated common word; a
+                // one-edit fuzzy hit of five letters or more is support only
+                // right after a listed given name, the OCR misread "John
+                // Smlth") — the mirror of
+                // the strict gate, so a
                 // Title-case pair the inventory has never seen no longer
                 // surfaces at 0.70 on the tagger's word alone. The prefix
                 // pass is untouched. nil-gazetteer → fall through so
@@ -175,8 +179,14 @@ struct NameDetector: FamilyDetector {
                 // either pass; the boost table is unchanged (given-only
                 // carries no boost).
                 var givenNameOnlyHit = false
+                // Five letters at least: a one-edit neighbour of a short word
+                // is noise ("Ln", "Pl", "Blvd" after "Jefferson" or "Adams").
+                let fuzzyAfterGivenName = !strict && verdict.fuzzySurnameHit && !verdict.hadSupport
+                    && name.count >= 5
+                    && Self.precedingWord(in: textNS, before: shadowRange.location)
+                        .map { nameGazetteer?.contains(givenName: $0) == true } == true
                 if let gazetteer = nameGazetteer,
-                   strict ? !verdict.hadAnyHit : !verdict.hadSupport {
+                   strict ? !verdict.hadAnyHit : !(verdict.hadSupport || fuzzyAfterGivenName) {
                     givenNameOnlyHit = !name.contains(" ")
                         && gazetteer.contains(givenName: name)
                     if !givenNameOnlyHit {
@@ -200,6 +210,24 @@ struct NameDetector: FamilyDetector {
             return true
         }
         return results
+    }
+
+    /// The letters of the word that ends right before `location`, across
+    /// spaces or tabs only (not a line break or punctuation); nil when none.
+    static func precedingWord(in text: NSString, before location: Int) -> String? {
+        var end = location
+        while end > 0, let scalar = Unicode.Scalar(text.character(at: end - 1)),
+              scalar == " " || scalar == "\t" {
+            end -= 1
+        }
+        guard end < location else { return nil }
+        var start = end
+        while start > 0, let scalar = Unicode.Scalar(text.character(at: start - 1)),
+              scalar.properties.isAlphabetic {
+            start -= 1
+        }
+        guard start < end else { return nil }
+        return text.substring(with: NSRange(location: start, length: end - start))
     }
 
     // MARK: - Name Stop Tokens

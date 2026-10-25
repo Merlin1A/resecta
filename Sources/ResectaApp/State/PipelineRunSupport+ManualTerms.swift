@@ -76,6 +76,9 @@ extension PipelineCoordinator {
             let page = document.page(at: pageIndex)
             // The page's words are read once, on its first capturable region.
             var words: ManualCapturePageWords??
+            // A `.manual` region carries no hidden glyphs' box (`textLayerRect`:
+            // the canvas draw, the whole-page region and Duplicate all make
+            // one without it), so its one rect is all the filter removes under.
             for region in pageRegions where region.source == .manual {
                 let rect = region.normalizedRect.clampedToNormalized()
                 if rect.width * rect.height >= Self.wholePageRegionArea {

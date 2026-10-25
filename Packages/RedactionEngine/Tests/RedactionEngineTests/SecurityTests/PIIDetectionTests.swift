@@ -603,6 +603,7 @@ struct PIIDetectionTests {
         // but this test makes that guarantee explicit and CI-enforced.
         let patterns: [NSRegularExpression] = [
             CreditCardDetector.ccPattern,
+            CreditCardDetector.digitRunPattern,
             EmailDetector.emailPattern,
             PhoneDetector.phonePattern,
             AddressDetector.addressPattern,

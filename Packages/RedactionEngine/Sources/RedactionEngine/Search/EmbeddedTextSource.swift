@@ -58,15 +58,18 @@ public struct EmbeddedTextSource: Sendable {
     /// area. On a typical text page words do not overlap, and letter-spacing
     /// whitespace is not counted. Returns `nil` if the page has no
     /// extractable text or has a zero-size cropBox.
-    public static func make(from page: PDFPage) -> EmbeddedTextSource? {
+    /// `fitLines`: box each line on its ink on a hidden layer over a page image
+    /// (`DocumentSearcher.inkFittedRect`), for the callers that read `lines`'
+    /// rects (the address assembly); the word bounds are never fitted.
+    public static func make(from page: PDFPage, fitLines: Bool = false) -> EmbeddedTextSource? {
         let cropBox = page.bounds(for: .cropBox)
-        return make(from: page, cropBox: cropBox)
+        return make(from: page, cropBox: cropBox, fitLines: fitLines)
     }
 
     /// Variant that takes a pre-computed cropBox (avoids redundant PDFKit
     /// trips in callers that already have it).
     public static func make(
-        from page: PDFPage, cropBox: CGRect
+        from page: PDFPage, cropBox: CGRect, fitLines: Bool = false
     ) -> EmbeddedTextSource? {
         let pageArea = cropBox.width * cropBox.height
         guard pageArea > 0,
@@ -155,10 +158,17 @@ public struct EmbeddedTextSource: Sendable {
                         unionRect, cropBox: cropBox,
                         effectiveSize: effectiveSize, rotation: normalizedRotation
                     )
+                // On a hidden layer over a page image the line is boxed on
+                // its ink alone; the layer's own box rides beside it, the
+                // hidden glyphs a Searchable export strips.
+                let fit = !fitLines || normalized == .zero ? (rect: normalized, degraded: false)
+                    : DocumentSearcher.inkFit(normalized, page: page, text: lineText, paintOnly: true)
                 return OCREngine.TextLine(
                     text: lineText,
-                    normalizedRect: normalized,
-                    confidence: 1.0
+                    normalizedRect: fit.rect,
+                    confidence: 1.0,
+                    textLayerRect: fit.rect == normalized ? nil : normalized,
+                    inkFitDegraded: fit.degraded
                 )
             }
 
