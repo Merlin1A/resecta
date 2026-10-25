@@ -33,7 +33,7 @@ struct InkFitPendingRead: @unchecked Sendable {
 
 /// The awaited read's continuation, resumed once by the first answer (the
 /// read, the timeout or a cancellation), even one that comes before it is set.
-private final class InkFitContinuation: @unchecked Sendable {
+final class InkFitContinuation: @unchecked Sendable {
     typealias Value = [DocumentSearcher.InkToken]?
     private let lock = NSLock()
     private var continuation: CheckedContinuation<Value, Never>?
@@ -110,29 +110,143 @@ extension DocumentSearcher {
     }
 }
 
+/// The reads in flight, by read key (`inkFitReadKey`: the page's content,
+/// its image and box, and the read's script): a search of a page already
+/// being read awaits that read rather than queuing another for the same
+/// tokens. Each waiter keeps its own cancellation and backstop; a read in
+/// flight past the backstop (its draw never returned) is not joined, so a
+/// later search starts a read of its own (which skips the hung draw).
+final class InkFitReadJoin: @unchecked Sendable {
+    static let shared = InkFitReadJoin()
+    private let lock = NSLock()
+    private var waiting: [Int: (started: Date, boxes: [InkFitContinuation])] = [:]
+    /// Adds `box` to the read of `key`: true when none was in flight (the caller starts it).
+    func join(_ key: Int, _ box: InkFitContinuation) -> Bool {
+        lock.withLock {
+            let first = waiting[key].map { Date().timeIntervalSince($0.started) > DocumentSearcher.inkFitReadBackstop } ?? true
+            if first { waiting[key] = (Date(), [box]) } else { waiting[key]?.boxes.append(box) }
+            #if DEBUG
+            if first { started[key, default: 0] += 1 }
+            #endif
+            return first
+        }
+    }
+    #if DEBUG
+    /// Test seam: how many reads of `key` were started (joins not counted).
+    private var started: [Int: Int] = [:]
+    func startedCount(_ key: Int) -> Int { lock.withLock { started[key] ?? 0 } }
+    #endif
+    /// The read of `key` ended: every waiter on it gets its tokens (nil on a miss).
+    func finish(_ key: Int, _ tokens: [DocumentSearcher.InkToken]?) {
+        let boxes = lock.withLock { waiting.removeValue(forKey: key)?.boxes ?? [] }
+        for box in boxes { box.resume(tokens) }
+    }
+}
+
+/// A few long-lived threads that run the page reads (each read's draw, and
+/// its wait on the Vision lane), off every dispatch and task queue: a busy
+/// global queue never delays a read's start, and a stalled read holds one of
+/// them while the others go on. Each read waits on the serial Vision lane
+/// on its thread, so there are enough of them for the reads of busy runs to
+/// wait side by side, and a few page draws at a time (`draws`: the read's
+/// full-page draw is its memory). A draw that never returns holds its thread
+/// for good: once every thread is held by a draw (or a wait for one) running
+/// past `hungAfter`, a new read is refused at once (its fits take the
+/// envelope) instead of queuing behind them.
+final class InkFitReadThreads: @unchecked Sendable {
+    static let shared = InkFitReadThreads(count: 16, draws: 4, hungAfter: DocumentSearcher.inkFitTimeout)
+    private static let numberKey = "com.resecta.search.inkfit.read"
+    private let condition = NSCondition()
+    private var jobs: [() -> Void] = []
+    private var idle = 0
+    private var drawingSince: [Int: Date] = [:]
+    private let count: Int, hungAfter: TimeInterval
+    private let drawSlots: DispatchSemaphore
+    init(count: Int, draws: Int? = nil, hungAfter: TimeInterval) {
+        self.count = count; self.hungAfter = hungAfter
+        drawSlots = DispatchSemaphore(value: draws ?? count)
+        for number in 0..<count {
+            let thread = Thread { [unowned self] in self.serve(number) }
+            thread.name = "\(Self.numberKey).\(number)"
+            thread.qualityOfService = .userInitiated
+            thread.start()
+        }
+    }
+    /// `job` on a read thread; false (and nothing runs) when no thread is
+    /// free and each is held by a draw running past `hungAfter`.
+    func submit(_ job: @escaping () -> Void) -> Bool {
+        condition.lock(); defer { condition.unlock() }
+        if idle == 0, drawingSince.count == count,
+           drawingSince.values.allSatisfy({ Date().timeIntervalSince($0) > hungAfter }) { return false }
+        jobs.append(job); condition.signal()
+        return true
+    }
+    /// `work` (a read's draw), noted while it runs on one of these threads.
+    func drawing<T>(_ work: () -> T) -> T {
+        guard let number = Thread.current.threadDictionary[Self.numberKey] as? Int else { return work() }
+        condition.lock(); drawingSince[number] = Date(); condition.unlock()
+        drawSlots.wait()
+        defer { drawSlots.signal(); condition.lock(); drawingSince[number] = nil; condition.unlock() }
+        return work()
+    }
+    private func serve(_ number: Int) {
+        Thread.current.threadDictionary[Self.numberKey] = number
+        while true {
+            condition.lock()
+            idle += 1
+            while jobs.isEmpty { condition.wait() }
+            idle -= 1
+            let job = jobs.removeFirst()
+            condition.unlock()
+            job()
+        }
+    }
+}
+
+extension DocumentSearcher {
+    /// The longest a search awaits a page read before its fits take the
+    /// envelope: a backstop above the read's own bounds (the draw lock's
+    /// wait, `inkFitWaitCeiling` behind reads that move, and `inkFitTimeout`
+    /// once the read is at the Vision lane's head, where a stalled one is
+    /// retired at its limit).
+    static let inkFitReadBackstop: TimeInterval = inkFitTimeout + inkFitWaitCeiling + inkFitTimeout
+
+    /// The read backstop's timer, on a queue of its own.
+    static let inkFitReadTimers = DispatchQueue(label: "com.resecta.search.inkfit.read-timers", qos: .utility)
+}
+
 extension InkFitPendingRead {
-    /// Reads the page (drawn on a dispatch thread, read on the Vision lane),
-    /// never on a task thread: Vision's text recognition finishes its work
-    /// on the task pool, so a pool whose threads all wait (on Vision, or on
-    /// the lane) never lets a read end. Waited for within `inkFitTimeout`;
-    /// nothing is cached on a miss.
+    /// Reads the page (drawn and waited for on an ink-fit read thread, read
+    /// on the Vision lane), never on a task thread: Vision's text recognition
+    /// finishes its work on the task pool, so a pool whose threads all wait
+    /// (on Vision, or on the lane) never lets a read end. A read of the same
+    /// page already in flight is joined. The read's time limit counts from
+    /// when it reaches the Vision lane's head (`onInkFitQueue`); the search
+    /// waits at most `inkFitReadBackstop`. Nothing is cached on a miss.
     func run() async {
         if InkTokenCache.shared.value(for: key) != nil { return }
         guard !Task.isCancelled else { return }
         let read = self
         let box = InkFitContinuation()
-        // A cancelled search stops waiting at once (the read, if it runs, ends
-        // on its lane and is cached for the next search).
+        // A cancelled search stops waiting at once, queued or joined (the
+        // read, if it runs, ends on its lane and is cached for the next search).
         let tokens: [DocumentSearcher.InkToken]? = await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
                 box.set(continuation)
-                DispatchQueue.global(qos: .userInitiated).async {
-                    let result = DocumentSearcher.readTokens(read.page.page, rotation: read.rotation, visual: read.visual,
-                                                             key: read.key, languages: read.languages, frame: read.frame)
-                    if let result { InkTokenCache.shared.set(result, for: read.key) }
-                    box.resume(result)
+                if InkFitReadJoin.shared.join(read.key, box) {
+                    let submitted = InkFitReadThreads.shared.submit {
+                        let result = DocumentSearcher.readTokens(read.page.page, rotation: read.rotation, visual: read.visual,
+                                                                 key: read.key, languages: read.languages, frame: read.frame)
+                        if let result { InkTokenCache.shared.set(result, for: read.key) }
+                        InkFitReadJoin.shared.finish(read.key, result)
+                    }
+                    // Every read thread held by a draw that never returned: no read.
+                    if !submitted {
+                        DocumentSearcher.inkFitLogger.log("ink fit: every read thread is held by a draw that has not returned; no read")
+                        InkFitReadJoin.shared.finish(read.key, nil)
+                    }
                 }
-                DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + DocumentSearcher.inkFitTimeout) {
+                DocumentSearcher.inkFitReadTimers.asyncAfter(deadline: .now() + DocumentSearcher.inkFitReadBackstop) {
                     box.resume(nil)
                 }
             }

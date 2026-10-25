@@ -50,8 +50,10 @@ extension PageImageInkFitTests {
         let range = ((page.string ?? "") as NSString).range(of: "Hartwell")
         let selection = try #require(page.selection(for: range))
         let raw = try #require(DocumentSearcher().normalizedRect(for: selection, page: page))
-        // The read awaited (as a search awaits it) stalls; the fit after it
-        // does not read again.
+        // The private copy opened once ahead (its cost is the document's, paid
+        // on the first ask of a session), then the read awaited (as a search
+        // awaits it) stalls; the fit after it does not read again.
+        _ = PrivatePDFCopies.shared.copy(of: export)
         let started = Date()
         await DocumentSearcher.prepareInkFit(page)
         let rect = DocumentSearcher.inkFittedRect(raw, page: page, text: "Hartwell", range: range)

@@ -487,8 +487,9 @@ extension DocumentSearcher {
         return tokens
     }
 
-    /// How long a caller waits for a page read before it falls back to the
-    /// box without the fit.
+    /// How long a page read may run once at the Vision lane's head (and a
+    /// read's draw waits for its copy) before the read is given up and its
+    /// fits fall back to the box without the fit (`inkFitReadBackstop`).
     static let inkFitTimeout: TimeInterval = 30
 
     #if DEBUG
@@ -600,8 +601,10 @@ extension DocumentSearcher {
         // before it counts; one that timed out, or failed both times, is no
         // read (the caller falls back to the envelope, and nothing is cached).
         for attempt in 1...2 {
-            let image = drawn(page, key: key, wait: inkFitTimeout) {
-                renderGrayImage(page.page, rotation: rotation, visual: visual, frame: frame).map(InkFitImage.init)
+            let image = InkFitReadThreads.shared.drawing {
+                drawn(page, key: key, wait: inkFitTimeout) {
+                    renderGrayImage(page.page, rotation: rotation, visual: visual, frame: frame).map(InkFitImage.init)
+                }
             }
             guard let image else { return nil }
             guard let image else {
