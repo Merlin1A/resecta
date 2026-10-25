@@ -21,12 +21,13 @@ struct DeveloperNoteView: View {
     /// One string per paragraph. The address is plain text, not a link: the
     /// note adds no hand-off of its own (Settings keeps Send Feedback).
     static let paragraphs: [String] = [
-        "Hi, I\u{2019}m Jesse. Thank you for trying Resecta.",
-        "I build and maintain Resecta on my own. There is no company behind it and no team, and every decision in it is mine.",
-        "The paperwork that matters most, like a tax form, a lease or a letter from an insurer, carries numbers that tie it to you. Before a copy goes anywhere, those should come off. And redacted has to mean removed: a black box drawn over a PDF can leave the text underneath readable.",
-        "On the Mac, Preview can redact. On iPhone and iPad, as far as I can tell, there is still no built-in way to, so I set out to build one: on your device, free, and open to inspection.",
-        "Resecta is designed to remove the text in the regions you mark, then it checks the finished file before you share it. It makes no network requests of its own, and there is no account, no ads and no analytics. It is free because a step that costs money gets skipped. The code is open source, so you can check all of this instead of taking my word for it.",
-        "It suggests; you decide. Detection can miss things, so the last look is always yours.",
+        "Hi, I\u{2019}m Jesse, & thank you for trying Resecta.",
+        "For more than a year, I\u{2019}ve used AI models to help with legal, tax and other paperwork of my own, checking their work as I went. They do best with the original document in front of them, but they rarely need the Social Security number, account numbers or date of birth printed on it to be useful. As the models improve, I expect many more people to see their value. The risks haven\u{2019}t gone away, though, and protecting those numbers is still up to each of us, individually.",
+        "Every copy you send is one more place those numbers can leak from. AI companies have had leaks of their own, and the models are getting better at breaking in: one company that builds them has said they can beat all but the most skilled humans at finding and exploiting software vulnerabilities.", // LegalPhrases:safe (the models finding vulnerabilities, not a claim about Resecta)
+        "I built Resecta to take identifiers off a PDF before a copy goes anywhere, on the phone you already carry. Redacted has to mean removed, not covered. Resecta is designed to remove the text in the regions you mark, and then it checks the finished file before you share it.",
+        "This objective turned out to be difficult, for many reasons. PDFs vary enormously, and a phone has tighter limits on memory and processing than a computer. Everything still happens on your device. Resecta makes no network requests of its own, and there is no account, no ads and no analytics.",
+        "Resecta will stay free, with no in-app purchases, ever. It is open source, so anyone can check all of this. I built it on my own, toward one goal: to provide a useful share of what professional redaction software does, in your pocket. This release is a step, and the work continues.",
+        "No software is perfect, so the last look is always yours.",
         "If something looks wrong, or you have an idea, write to me at jesse@resecta.app.",
     ]
 
