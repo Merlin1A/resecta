@@ -171,9 +171,19 @@ final class InkFitCache: @unchecked Sendable {
     private var order: [Int] = []
     private var inFlight: Set<Int> = []
 
+    /// The last degraded box a search returned, for display only (the main
+    /// thread's live preview shows what will be applied); never a fit.
+    private var displayedByKey: [Int: CGRect] = [:]
+    private var displayedOrder: [Int] = []
+
     func fitted(for key: Int) -> CGRect? {
         lock.lock(); defer { lock.unlock() }
         return fittedByKey[key]
+    }
+
+    func displayed(for key: Int) -> CGRect? {
+        lock.lock(); defer { lock.unlock() }
+        return displayedByKey[key]
     }
 
     /// True when the caller should start the fit (none is running for `key`).
@@ -182,12 +192,18 @@ final class InkFitCache: @unchecked Sendable {
         return inFlight.insert(key).inserted
     }
 
-    func finish(_ key: Int, fitted: CGRect?) {
+    /// A fit (cached), or a degraded box (`displayed`, kept for display only).
+    func finish(_ key: Int, fitted: CGRect?, displayed: CGRect? = nil) {
         lock.lock(); defer { lock.unlock() }
         inFlight.remove(key)
-        guard let fitted else { return }
-        if fittedByKey.updateValue(fitted, forKey: key) == nil { order.append(key) }
-        while order.count > Self.capacity { fittedByKey.removeValue(forKey: order.removeFirst()) }
+        if let fitted {
+            if fittedByKey.updateValue(fitted, forKey: key) == nil { order.append(key) }
+            while order.count > Self.capacity { fittedByKey.removeValue(forKey: order.removeFirst()) }
+            if displayedByKey.removeValue(forKey: key) != nil { displayedOrder.removeAll { $0 == key } }
+        } else if let displayed {
+            if displayedByKey.updateValue(displayed, forKey: key) == nil { displayedOrder.append(key) }
+            while displayedOrder.count > Self.capacity { displayedByKey.removeValue(forKey: displayedOrder.removeFirst()) }
+        }
     }
 }
 

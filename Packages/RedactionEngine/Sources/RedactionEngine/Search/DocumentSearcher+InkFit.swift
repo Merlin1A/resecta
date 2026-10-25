@@ -119,6 +119,14 @@ extension DocumentSearcher {
                                 : wideCharacters(before: NSRange(location: 0, length: ((text ?? "") as NSString).length), in: text ?? ""),
                             fromLineStart: 0)
         if let known = InkFitCache.shared.fitted(for: job.key) { return (known, false) }
+        // The main thread (the live preview) reads only what a search returned
+        // off the main thread: its fit, or the degraded box it painted (so the
+        // preview shows what will be applied). It renders, reads and copies
+        // nothing, and asks again on `inkFitDidUpdate`.
+        if Thread.isMainThread {
+            if let shown = InkFitCache.shared.displayed(for: job.key) { return (shown, true) }
+            return (rect, false)
+        }
         let readingBox = job.frame.toReading(CGRect(x: rect.minX * visual.width, y: rect.minY * visual.height,
                                                     width: rect.width * visual.width, height: rect.height * visual.height))
         job.fromLineStart = distanceFromLineStart(of: range, box: readingBox, page: page, visual: visual, frame: job.frame)
@@ -128,10 +136,6 @@ extension DocumentSearcher {
                 .map { frame.toReading(CGRect(x: $0.minX * visual.width, y: $0.minY * visual.height,
                                               width: $0.width * visual.width, height: $0.height * visual.height)) }
         }
-        // The main thread (the live preview) reads only what a search fitted
-        // off the main thread; it renders, reads and copies nothing, and asks
-        // again on `inkFitDidUpdate`.
-        if Thread.isMainThread { return (rect, false) }
         // A search, on its own copy of the document: the queue draws from a
         // private copy of that copy, made here on the copy's own thread through
         // the guarded data path, so a job that outlives its wait never touches
@@ -140,81 +144,19 @@ extension DocumentSearcher {
               let privateCopy = PrivatePDFCopies.shared.copy(of: document),
               let privatePage = privateCopy.page(at: index + 1) else {
             inkFitLogger.log("ink fit: no private copy of the document to draw from; the box is the drift envelope")
-            return (job.envelope(), true)
+            let wide = job.envelope()
+            InkFitCache.shared.finish(job.key, fitted: nil, displayed: wide)
+            InkFitUpdates.shared.post()
+            return (wide, true)
         }
         let onCopy = job.with(privatePage)
         let fitted = onCopy.run()
         let degraded = onCopy.uncached.isRaised
-        InkFitCache.shared.finish(job.key, fitted: degraded ? nil : fitted)
-        if !degraded { InkFitUpdates.shared.post() }
+        // A deferred run's envelope stands in until the page is read: not shown.
+        let placeholder = InkFitDeferral.current != nil && degraded
+        InkFitCache.shared.finish(job.key, fitted: degraded ? nil : fitted, displayed: degraded && !placeholder ? fitted : nil)
+        if !placeholder { InkFitUpdates.shared.post() }
         return (fitted, degraded)
-    }
-
-    /// One fit, with everything it reads taken from the page up front (the
-    /// fit runs on any thread; `PDFPage` stays on its caller's).
-    struct InkFitJob: @unchecked Sendable {
-        let rect: CGRect
-        let cgPage: CGPDFPage
-        let rotation: Int
-        let visual: CGSize
-        let pageKey: Int
-        let pageText: String
-        let text: String?
-        let range: NSRange?
-        let paintOnly: Bool
-        /// The page's reading frame (`readingFrame`).
-        let frame: InkFitFrame
-        /// Wide (CJK) characters on the match's line up to its end, and the
-        /// points from the line's start to the match's end in the reading
-        /// frame (`driftBound`).
-        var wideBefore: Int = 0
-        var fromLineStart: CGFloat = 0
-        /// A layer character's box in the reading frame, by its index in the
-        /// page text (read on the caller's thread, from its page).
-        var layerBox: (Int) -> CGRect? = { _ in nil }
-        /// Set by a fit that fell back on a timeout: its box is not cached.
-        let uncached = Flag()
-        final class Flag: @unchecked Sendable {
-            private let lock = NSLock()
-            private var set = false
-            func raise() { lock.lock(); set = true; lock.unlock() }
-            var isRaised: Bool { lock.lock(); defer { lock.unlock() }; return set }
-        }
-        func markUncached() { uncached.raise() }
-
-        var key: Int {
-            var hasher = Hasher()
-            hasher.combine(pageKey)
-            hasher.combine(rect.minX); hasher.combine(rect.minY); hasher.combine(rect.width); hasher.combine(rect.height)
-            hasher.combine(text)
-            hasher.combine(range?.location); hasher.combine(range?.length)
-            hasher.combine(paintOnly)
-            return hasher.finalize()
-        }
-
-        /// The selection box grown by the drift bound in the reading frame (a
-        /// line height above and below its line, `inkFitDriftBound` along it),
-        /// clamped to the page.
-        func envelope() -> CGRect {
-            markUncached()
-            let box = CGRect(x: rect.minX * visual.width, y: rect.minY * visual.height,
-                             width: rect.width * visual.width, height: rect.height * visual.height)
-            let grown = frame.toVisual(DocumentSearcher.driftBound(around: frame.toReading(box), wideBefore: wideBefore,
-                                                                   fromLineStart: fromLineStart)
-                .intersection(CGRect(origin: .zero, size: frame.size)))
-            return CGRect(x: grown.minX / visual.width, y: grown.minY / visual.height,
-                          width: grown.width / visual.width, height: grown.height / visual.height).clampedToNormalized()
-        }
-
-        func with(_ page: CGPDFPage) -> InkFitJob {
-            InkFitJob(rect: rect, cgPage: page, rotation: rotation, visual: visual, pageKey: pageKey,
-                      pageText: pageText, text: text, range: range, paintOnly: paintOnly, frame: frame,
-                      wideBefore: wideBefore, fromLineStart: fromLineStart, layerBox: layerBox)
-        }
-
-        func run() -> CGRect {
-            DocumentSearcher.fit(self)
-        }
     }
 
     /// Where the ink of a match whose layer box is `box` (reading frame) can

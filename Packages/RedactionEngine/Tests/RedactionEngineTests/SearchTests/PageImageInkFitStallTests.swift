@@ -237,4 +237,32 @@ extension PageImageInkFitTests {
         let outside = try Self.inkOutside(page, word: Self.points(truth, size), boxes: [Self.points(fit.rect, size)])
         #expect(outside.share == 0, "DELIA's ink outside its box with the render stalled: \(outside.share * 100)%, up to \(outside.reach) pt")
     }
+
+    @Test("On a page whose fit degraded, the main thread's live preview shows the box the search returned, not the selection")
+    func previewShowsTheDegradedBox() async throws {
+        // An export of this test's own (a mark in a blank corner of page 1).
+        let data = try TestFixtures.sampleStatementPDF()
+        let mark = RedactionRegion(id: UUID(), normalizedRect: CGRect(x: 0.016, y: 0.012, width: 0.017, height: 0.008), source: .manual)
+        let url = try await TestPipeline.processAndExport(data, mode: .searchableRedaction, regions: [0: [mark]], dpi: 300)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let shared = SendablePDFDocument(try #require(PDFDocument(data: try Data(contentsOf: url))))
+        let page = try #require(shared.document.page(at: 0)), cgPage = try #require(page.pageRef)
+        let size = page.bounds(for: .cropBox).size
+        await DocumentSearcher.prepareInkFit(page)
+        let key = InkTokenCache.key(page: page, cgPage: cgPage, visual: size)
+        DocumentSearcher.inkFitInjectedRenderStalls.set((2.0, 0.3), for: key)
+        defer { DocumentSearcher.inkFitInjectedRenderStalls.set(nil, for: key) }
+        let range = ((page.string ?? "") as NSString).range(of: "Hartwell")
+        let raw = try #require(page.selection(for: range).flatMap { DocumentSearcher().normalizedRect(for: $0, page: page) })
+        // The search's fit (off the main thread) degrades: its render stalls.
+        let searched = DocumentSearcher.inkFit(raw, page: page, text: "Hartwell", range: range)
+        #expect(searched.degraded, "the stalled render degrades the fit")
+        #expect(searched.rect != raw, "the degraded box is not the selection")
+        // The live preview on the main thread shows that same box.
+        let shown: CGRect = await MainActor.run {
+            guard let p = shared.document.page(at: 0) else { return .null }
+            return DocumentSearcher.inkFittedRect(raw, page: p, text: "Hartwell", range: range)
+        }
+        #expect(shown == searched.rect, "the preview shows \(shown), the search returned \(searched.rect)")
+    }
 }
