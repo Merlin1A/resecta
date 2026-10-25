@@ -222,7 +222,7 @@ public actor DocumentSearcher {
     var ocrPageCache = OCRPageCache()
     private typealias NormalizedOCRPage = OCRPageCache.NormalizedPage
     private typealias NormalizedLineEntry = OCRPageCache.NormalizedLineEntry
-    private let ocrNormalizer = OCRTextNormalizer()
+    let ocrNormalizer = OCRTextNormalizer()
 
     public init(
         ocrEngine: OCREngine = OCREngine(),
@@ -1617,7 +1617,7 @@ public actor DocumentSearcher {
             }
         }
 
-        return results
+        return results + crossLineOCRMatches(lines: textLines, query: query, options: options, page: page, pageIndex: pageIndex, term: term)
     }
 
     // MARK: - OCR page lines (the one render→cache→evict body for every OCR path)
