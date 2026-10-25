@@ -72,11 +72,12 @@ extension DocumentSearcher {
     /// envelope (degraded, and shown as such: no longer deferred); no
     /// thread waits on the lane.
     func withInkFitRead<T>(_ page: PDFPage, _ body: () -> T) async -> T {
-        guard let read = Self.pendingInkRead(page) else { return body() }
+        let reads = Self.pendingInkReads(page)
+        guard !reads.isEmpty else { return body() }
         let deferral = InkFitDeferral()
         let first = InkFitDeferral.$current.withValue(deferral) { body() }
         guard deferral.wanted else { return first }
-        await read.run()
+        for read in reads { await read.run() }
         // A cancelled search keeps its first run (the envelopes); it is not emitted.
         if Task.isCancelled { return first }
         return body()
@@ -85,28 +86,33 @@ extension DocumentSearcher {
     /// The page, its tokens read first when it is gated (for matching that
     /// reports as it goes and cannot run twice).
     func preparedForInkFit(_ page: PDFPage) async -> SendablePDFPage {
-        if let read = Self.pendingInkRead(page) { await read.run() }
+        for read in Self.pendingInkReads(page) { await read.run() }
         return SendablePDFPage(page)
     }
 
     /// `value`, after the page's tokens are read when it is gated.
     func afterInkFitRead<T>(_ page: PDFPage, _ value: @autoclosure () async -> T) async -> T {
-        if let read = Self.pendingInkRead(page) { await read.run() }
+        for read in Self.pendingInkReads(page) { await read.run() }
         return await value()
     }
 
-    /// The read `page` still needs: nil when it is not gated, its tokens are
-    /// cached, or it has no private copy to draw from (the fits fall back).
-    nonisolated static func pendingInkRead(_ page: PDFPage) -> InkFitPendingRead? {
-        guard !Thread.isMainThread, let cgPage = page.pageRef, carriesHiddenTextOverImage(page, cgPage: cgPage) else { return nil }
+    /// The reads `page` still needs (one per script, `inkFitReads`): none
+    /// when it is not gated, its tokens are cached, or it has no private copy
+    /// to draw from (the fits fall back).
+    nonisolated static func pendingInkReads(_ page: PDFPage) -> [InkFitPendingRead] {
+        guard !Thread.isMainThread, let cgPage = page.pageRef, carriesHiddenTextOverImage(page, cgPage: cgPage) else { return [] }
         let visual = effectiveBounds(page.bounds(for: .cropBox), rotation: page.rotation).size
-        guard visual.width > 0, visual.height > 0 else { return nil }
-        let key = InkTokenCache.key(page: page, cgPage: cgPage, visual: visual)
-        guard InkTokenCache.shared.value(for: key) == nil,
+        guard visual.width > 0, visual.height > 0 else { return [] }
+        let pageKey = InkTokenCache.key(page: page, cgPage: cgPage, visual: visual)
+        let missing = inkFitReads(for: page.string ?? "").enumerated()
+            .map { (key: inkFitReadKey(pageKey: pageKey, read: $0.offset), languages: $0.element) }
+            .filter { InkTokenCache.shared.value(for: $0.key) == nil }
+        guard !missing.isEmpty,
               let document = page.document, case let index = document.index(for: page), index != NSNotFound,
-              let privatePage = PrivatePDFCopies.shared.copy(of: document)?.page(at: index + 1) else { return nil }
-        return InkFitPendingRead(key: key, page: InkFitPage(privatePage), rotation: page.rotation, visual: visual,
-                                 frame: readingFrame(of: page, visual: visual), languages: inkFitLanguages(for: page.string ?? ""))
+              let privatePage = PrivatePDFCopies.shared.copy(of: document)?.page(at: index + 1) else { return [] }
+        let frame = readingFrame(of: page, visual: visual)
+        return missing.map { InkFitPendingRead(key: $0.key, page: InkFitPage(privatePage), rotation: page.rotation, visual: visual,
+                                                frame: frame, languages: $0.languages) }
     }
 }
 
@@ -281,7 +287,7 @@ extension DocumentSearcher {
     /// A gated page's tokens read ahead by awaiting them, for a caller that
     /// fits outside a search (it would otherwise wait on the lane).
     nonisolated static func prepareInkFit(_ page: PDFPage) async {
-        if let read = pendingInkRead(page) { await read.run() }
+        for read in pendingInkReads(page) { await read.run() }
     }
 }
 

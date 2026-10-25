@@ -8,8 +8,8 @@ import PDFKit
 // garbled token) has no place on the page: its box is the line's whole printed
 // band, degraded (the widened-box notice tells the user).
 
-/// Per page content key: the starts (in the page text) of its interleaved
-/// layer lines, and the pages found to have any.
+/// Per read (`inkFitReadKey`; a page's own key for its first): the starts
+/// (in the page text) of the layer lines judged interleaved on that read.
 final class InkFitInterleaveCache: @unchecked Sendable {
     static let shared = InkFitInterleaveCache()
     private let lock = NSLock()
@@ -57,7 +57,8 @@ extension DocumentSearcher {
     /// The page's interleaved layer lines (their starts in `pageText`): a line
     /// long enough to judge whose letters agree with no read row on its band
     /// (less than half of the shorter, where Vision read at least half as
-    /// many letters there). Read once per page content, from its tokens.
+    /// many letters there). Judged once per read, from its tokens (only the
+    /// lines fitted on that read ask it).
     nonisolated static func interleavedLines(pageKey: Int, pageText: NSString, tokens: [InkToken],
                                              layerBox: (Int) -> CGRect?) -> Set<Int> {
         if let known = InkFitInterleaveCache.shared.value(for: pageKey) { return known }
@@ -91,11 +92,12 @@ extension DocumentSearcher {
 
     /// The box of a match on an interleaved layer line: the line's whole
     /// printed band, degraded. Nil when the match's line is not interleaved.
-    nonisolated static func interleavedBand(_ job: InkFitJob, tokens: [InkToken], box: CGRect) -> CGRect? {
+    /// `tokens` are the read `readKey` names (the line's script's).
+    nonisolated static func interleavedBand(_ job: InkFitJob, readKey: Int, tokens: [InkToken], box: CGRect) -> CGRect? {
         if let range = job.range {
             let text = job.pageText as NSString
             let lineStart = text.lineRange(for: NSRange(location: range.location, length: 0)).location
-            guard interleavedLines(pageKey: job.pageKey, pageText: text, tokens: tokens, layerBox: job.layerBox).contains(lineStart)
+            guard interleavedLines(pageKey: readKey, pageText: text, tokens: tokens, layerBox: job.layerBox).contains(lineStart)
             else { return nil }
         } else {
             // A whole line fitted by its text (an address line): judged by

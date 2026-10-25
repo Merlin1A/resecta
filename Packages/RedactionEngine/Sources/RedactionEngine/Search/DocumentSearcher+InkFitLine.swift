@@ -4,7 +4,7 @@ import PDFKit
 
 // The ink fit's line measures (`DocumentSearcher+InkFit.swift`): a match's
 // distance from its line's start, the wide characters before it there, and
-// the languages a page's read uses.
+// the reads a page takes (one per CJK script).
 
 extension DocumentSearcher {
     /// The points from the start of the line of `range` (its first letter
@@ -42,21 +42,72 @@ extension DocumentSearcher {
         }
     }
 
-    /// The languages a page's read uses: the CJK ones its layer's script
-    /// names, else Vision's default (nil).
-    nonisolated static func inkFitLanguages(for pageText: String) -> [String]? {
-        var han = false, kana = false, hangul = false
-        for scalar in pageText.unicodeScalars {
+    /// The CJK scripts a text holds.
+    struct InkFitScripts: OptionSet {
+        let rawValue: Int
+        static let kana = InkFitScripts(rawValue: 1), hangul = InkFitScripts(rawValue: 2), han = InkFitScripts(rawValue: 4)
+    }
+
+    nonisolated static func inkFitScripts<S: StringProtocol>(in text: S) -> InkFitScripts {
+        var found: InkFitScripts = []
+        for scalar in text.unicodeScalars {
             switch scalar.value {
-            case 0x3040...0x30FF, 0x31F0...0x31FF: kana = true
-            case 0xAC00...0xD7AF, 0x1100...0x11FF, 0x3130...0x318F: hangul = true
-            case 0x4E00...0x9FFF, 0x3400...0x4DBF, 0xF900...0xFAFF: han = true
+            case 0x3040...0x30FF, 0x31F0...0x31FF: found.insert(.kana)
+            case 0xAC00...0xD7AF, 0x1100...0x11FF, 0x3130...0x318F: found.insert(.hangul)
+            case 0x4E00...0x9FFF, 0x3400...0x4DBF, 0xF900...0xFAFF: found.insert(.han)
             default: continue
             }
         }
-        if kana { return ["ja-JP", "en-US"] }
-        if hangul { return ["ko-KR", "en-US"] }
-        if han { return ["zh-Hans", "zh-Hant", "en-US"] }
-        return nil
+        return found
+    }
+
+    /// The reads a page takes, one per CJK script its layer uses (one
+    /// script's model misreads another's lines: a Korean read of a Chinese
+    /// line is noise): Japanese for kana (and the Han among it), Korean for
+    /// Hangul, Chinese for Han on a page without kana. A page with none reads
+    /// once in Vision's default languages (nil). The first is the page's own
+    /// read (`inkFitReadKey`).
+    nonisolated static func inkFitReads(for pageText: String) -> [[String]?] {
+        let scripts = inkFitScripts(in: pageText)
+        var reads: [[String]?] = []
+        if scripts.contains(.kana) { reads.append(["ja-JP", "en-US"]) }
+        if scripts.contains(.hangul) { reads.append(["ko-KR", "en-US"]) }
+        if scripts.contains(.han), !scripts.contains(.kana) { reads.append(["zh-Hans", "zh-Hant", "en-US"]) }
+        return reads.isEmpty ? [nil] : reads
+    }
+
+    /// Which of `reads` a layer line is fitted on: the read of its own
+    /// script, else the page's first (a Latin line reads alike in each).
+    nonisolated static func inkFitRead<S: StringProtocol>(forLine line: S, reads: [[String]?]) -> Int {
+        guard reads.count > 1 else { return 0 }
+        let scripts = inkFitScripts(in: line)
+        let wanted = scripts.contains(.kana) ? "ja-JP" : scripts.contains(.hangul) ? "ko-KR"
+            : scripts.contains(.han) ? (reads.contains { $0?.first == "ja-JP" } ? "ja-JP" : "zh-Hans") : nil
+        return reads.firstIndex { $0?.first == wanted } ?? 0
+    }
+
+    /// The token key of a page's `read`-th read: the page's own key for its
+    /// first (a page with one script reads as before).
+    nonisolated static func inkFitReadKey(pageKey: Int, read: Int) -> Int {
+        guard read > 0 else { return pageKey }
+        var hasher = Hasher()
+        hasher.combine(pageKey)
+        hasher.combine(read)
+        return hasher.finalize()
+    }
+}
+
+extension DocumentSearcher.InkFitJob {
+    /// The read this job's line is fitted on: its token key and languages.
+    var read: (key: Int, languages: [String]?) {
+        let reads = DocumentSearcher.inkFitReads(for: pageText)
+        let line: String
+        if let range, range.location != NSNotFound, NSMaxRange(range) <= (pageText as NSString).length {
+            line = (pageText as NSString).substring(with: (pageText as NSString).lineRange(for: range))
+        } else {
+            line = text ?? ""
+        }
+        let index = DocumentSearcher.inkFitRead(forLine: line, reads: reads)
+        return (DocumentSearcher.inkFitReadKey(pageKey: pageKey, read: index), reads[index])
     }
 }

@@ -185,7 +185,9 @@ extension DocumentSearcher {
         }
         // A cancelled search's remaining words: the envelope, with no render.
         if Task.isCancelled { return job.envelope() }
-        if InkTokenCache.shared.value(for: job.pageKey) == nil {
+        // The read of the match's line (its script's, on a page of several).
+        let lineRead = job.read
+        if InkTokenCache.shared.value(for: lineRead.key) == nil {
             // A search's matching run before its page was read: the envelope
             // for now, and the read noted (`withInkFitRead`).
             if let deferral = InkFitDeferral.current { deferral.want(); return job.envelope() }
@@ -200,12 +202,12 @@ extension DocumentSearcher {
         }
         // Read in the reading frame: Vision sees the text upright, and its
         // boxes come back in this frame.
-        guard let tokens = inkTokens(key: job.pageKey, cgPage: cgPage, rotation: job.rotation, visual: visual,
-                                     languages: inkFitLanguages(for: job.pageText), frame: frame) else {
+        guard let tokens = inkTokens(key: lineRead.key, cgPage: cgPage, rotation: job.rotation, visual: visual,
+                                     languages: lineRead.languages, frame: frame) else {
             return envelope()
         }
         // A match on an interleaved layer line has no place of its own.
-        if let band = interleavedBand(job, tokens: tokens, box: box) { return band }
+        if let band = interleavedBand(job, readKey: lineRead.key, tokens: tokens, box: box) { return band }
         // The read word's own box when the alignment places it: the painted box
         // is then the word's ink alone. It may grow past a side where Vision's
         // box ends (a letter the box clipped), never into the rest of a longer
