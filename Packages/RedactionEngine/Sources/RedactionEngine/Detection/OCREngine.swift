@@ -58,29 +58,47 @@ public struct OCREngine: Sendable {
         return tokens
     }
 
+    /// The queue Vision's text recognition is performed on: never a thread
+    /// of Swift's task pool, which Vision needs free to finish a recognition
+    /// (searches whose recognitions blocked every pool thread were seen to
+    /// stall together).
+    private static let visionQueue = DispatchQueue(label: "com.resecta.ocr.vision", qos: .userInitiated, attributes: .concurrent)
+
+    /// A page image crossing to the Vision queue by value.
+    private struct VisionImage: @unchecked Sendable { let image: CGImage }
+
     /// Run OCR on a page image. Returns recognized text lines with positions.
     /// Request parameters route through `OCRConfiguration.search` (OCR
-    /// quality program) — one config type per call site.
+    /// quality program) — one config type per call site. Performed on
+    /// `visionQueue` and awaited, so the caller's task thread does not block.
     @concurrent
     func recognizeText(
         in image: CGImage,
         recognitionLevel: VNRequestTextRecognitionLevel = .fast
     ) async throws -> [TextLine] {
-        let request = OCRConfiguration
-            .search(recognitionLevel: recognitionLevel)
-            .makeRequest()
-
-        let handler = VNImageRequestHandler(cgImage: image)
-        try handler.perform([request])
-
-        let observations = request.results ?? []
-        return observations.compactMap { obs -> TextLine? in
-            guard let topCandidate = obs.topCandidates(1).first else { return nil }
-            return TextLine(
-                text: topCandidate.string,
-                normalizedRect: obs.boundingBox,
-                confidence: obs.confidence
-            )
+        let boxed = VisionImage(image: image)
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<[TextLine], Error>) in
+            Self.visionQueue.async {
+                let request = OCRConfiguration
+                    .search(recognitionLevel: recognitionLevel)
+                    .makeRequest()
+                let handler = VNImageRequestHandler(cgImage: boxed.image)
+                do {
+                    try handler.perform([request])
+                } catch {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                let observations = request.results ?? []
+                continuation.resume(returning: observations.compactMap { obs -> TextLine? in
+                    guard let topCandidate = obs.topCandidates(1).first else { return nil }
+                    return TextLine(
+                        text: topCandidate.string,
+                        normalizedRect: obs.boundingBox,
+                        confidence: obs.confidence
+                    )
+                })
+            }
         }
     }
 }
