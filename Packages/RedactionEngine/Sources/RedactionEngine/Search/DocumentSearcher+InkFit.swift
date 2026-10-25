@@ -578,6 +578,9 @@ extension DocumentSearcher {
                     return nil
                 }
                 lane = state.current
+                #if DEBUG
+                InkFitLaneTimes.shared.didMove(key)
+                #endif
                 enqueue(on: lane)
                 continue
             }

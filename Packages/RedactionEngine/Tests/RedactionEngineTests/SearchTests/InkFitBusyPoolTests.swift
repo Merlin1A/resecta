@@ -64,7 +64,8 @@ struct InkFitBusyPoolTests {
             }
         }
         // An unrelated regex scan, started while the searches fit and
-        // cancelled at once: it returns only once a pool thread runs it.
+        // cancelled at once: it returns only once a pool thread runs it,
+        // which a pool held by waits gives it only after the searches end.
         try await Task.sleep(for: .milliseconds(300))
         let plain = SendablePDFDocument(try #require(PDFDocument(data: try TestFixtures.sampleStatementPDF())))
         let cancelled = ContinuousClock.now
@@ -76,7 +77,9 @@ struct InkFitBusyPoolTests {
         scan.cancel()
         _ = await scan.value
         let waited = ContinuousClock.now - cancelled
-        #expect(waited < .seconds(2), "the cancelled regex scan took \(waited) to return beside \(count) fitting searches")
+        let finishedBeforeScan = finished.count
+        #expect(finishedBeforeScan < count,
+                "the cancelled regex scan returned (after \(waited)) only once all \(count) fitting searches had finished")
         // Bounded: a pool held by waits on a lane would finish late or never.
         let deadline = Date().addingTimeInterval(120)
         while finished.count < count, Date() < deadline { try await Task.sleep(for: .milliseconds(200)) }

@@ -68,7 +68,7 @@ struct InkFitReadJoinTests {
                 }
             }.start()
             until { headBegan.count == 1 }
-            let headStarted = Date(), old = state.current
+            let old = state.current
             Thread {
                 readQueued.add(1)
                 let value = DocumentSearcher.onInkFitQueue(key: readKey, timeout: 0.3, state: state) { () -> Int in
@@ -86,8 +86,8 @@ struct InkFitReadJoinTests {
                 }
             }.start()
             until { otherBegan.count == 1 }
-            // Past the head's 5 s limit (the read moves behind the held job), then the head returns.
-            Thread.sleep(forTimeInterval: max(1, 6 - Date().timeIntervalSince(headStarted)))
+            // Past the head's 5 s limit the read moves behind the held job; then the head returns.
+            until { InkFitLaneTimes.shared.moves(readKey) >= 1 }
             holdHead.signal()
             staged.add(1)
         }.start()
@@ -95,6 +95,7 @@ struct InkFitReadJoinTests {
         while staged.count == 0, Date() < stagedDeadline { try await Task.sleep(for: .milliseconds(50)) }
         try #require(headBegan.count == 1, "the head began")
         try #require(otherBegan.count == 1, "the fresh lane is held")
+        try #require(InkFitLaneTimes.shared.moves(readKey) >= 1, "the read moved to the fresh lane before the head returned")
         let readDeadline = Date().addingTimeInterval(60)
         while readBegan.count == 0, Date() < readDeadline { try await Task.sleep(for: .milliseconds(20)) }
         try #require(readBegan.count == 1, "the read ran")
