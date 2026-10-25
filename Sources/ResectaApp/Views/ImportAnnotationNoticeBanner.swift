@@ -98,9 +98,9 @@ struct ImportAnnotationNoticeBanner: View {
     }
 
     /// The id of the entry the import loader stages beside the analyzer's
-    /// findings for form fields drawn as an opaque cover
-    /// (`ConcealingAnnotations.coverWidgetCount(in:)`), in the analyzer's
-    /// "annotation-<subtype>" form. It counts toward `noticeWorthyCount`, so
+    /// findings for form fields over page content drawn as an opaque cover
+    /// (`ConcealingAnnotations.coverWidgetCount(in:textLayerStatus:)`), in
+    /// the analyzer's "annotation-<subtype>" form. It counts toward `noticeWorthyCount`, so
     /// the annotation sentences name it: a cover field is an annotation the
     /// export does not draw.
     nonisolated static let coverWidgetFindingID = "annotation-widget"

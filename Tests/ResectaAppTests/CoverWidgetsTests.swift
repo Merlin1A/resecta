@@ -130,6 +130,53 @@ struct CoverWidgetsTests {
             "the share confirm")
     }
 
+    /// A field's rect over blank page space, below the printed line.
+    private static let blankRect = "[300 400 500 424]"
+
+    /// The I-9's shape: a combo-box choice field with a white background,
+    /// over blank space (PDFKit drops a choice field with no `/Opt`).
+    static let whiteFieldOverBlank = coveredPDF(
+        "<< /Type /Annot /Subtype /Widget /FT /Ch /Ff 131072 /Opt [(CA) (NY)] /T (state) /Rect \(blankRect) /F 4 "
+        + "/MK << /BG [1 1 1] >> /DA (/Helv 12 Tf 0 g) /P 3 0 R >>")
+
+    /// The SF-2809's shape: a text field with a light-grey background, over blank space.
+    static let greyFieldOverBlank = coveredPDF(
+        "<< /Type /Annot /Subtype /Widget /FT /Tx /T (name) /Rect \(blankRect) /F 4 "
+        + "/MK << /BG [0.85 0.85 0.85] >> /DA (/Helv 12 Tf 0 g) /P 3 0 R >>")
+
+    /// A white-background field over the printed line: a white-out.
+    static let whiteFieldOverText = coveredPDF(
+        "<< /Type /Annot /Subtype /Widget /FT /Tx /T (cover) /Rect \(coverRect) /F 4 "
+        + "/MK << /BG [1 1 1] >> /DA (/Helv 12 Tf 0 g) /P 3 0 R >>")
+
+    @Test("An ordinary form's white or light-grey fields over blank space raise no import notice and no share confirm")
+    func lightFieldsOverBlankStayQuiet() async throws {
+        for (name, data) in [("white", Self.whiteFieldOverBlank), ("grey", Self.greyFieldOverBlank)] {
+            let document = try document(data)
+            #expect(ConcealingAnnotations.coverWidgetCount(in: document) == 0, "\(name)")
+            #expect(ConcealingAnnotations.pages(in: document, regions: [:]).isEmpty, "\(name)")
+
+            let doc = DocumentState()
+            await ImportService.importDocument(
+                data: data, suggestedType: "pdf", documentState: doc, redactionState: RedactionState())
+            #expect(doc.phaseKind == .editing)
+            let annotationCount = ImportAnnotationNoticeBanner.noticeWorthyCount(doc.sourceAnnotationFindings)
+            #expect(!ImportAnnotationNoticeBanner.isVisible(
+                phaseKind: .editing, annotationTypeCount: annotationCount,
+                filledFormFieldCount: doc.sourceFilledFormFieldCount, dismissed: false),
+                "\(name): no field lies over page content")
+        }
+    }
+
+    @Test("A white field over text hides it, so it still counts; a black one over text still counts")
+    func fieldsOverTextStillCount() throws {
+        for (name, data) in [("white", Self.whiteFieldOverText), ("black", Self.blackBackgroundField)] {
+            let document = try document(data)
+            #expect(ConcealingAnnotations.coverWidgetCount(in: document) == 1, "\(name)")
+            #expect(ConcealingAnnotations.pages(in: document, regions: [:]) == [0], "\(name)")
+        }
+    }
+
     @Test("A black watermark over text raises the import notice; an empty field raises nothing")
     func watermarkNoticeAndEmptyFieldQuiet() async throws {
         let doc = DocumentState()
