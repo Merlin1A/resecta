@@ -98,6 +98,28 @@ struct OCRCrossLinePhraseTests {
         #expect(await Self.search(doc, .text("Doe Street", options: Self.ocrOptions())).count == 1, "the right column is read")
     }
 
+    @Test("an indented first line joins the line under it")
+    func indentedFirstLineJoins() async throws {
+        let width = 1600, height = 1200
+        let ctx = try #require(createBitmapContext(width: width, height: height))
+        ctx.setFillColor(red: 1, green: 1, blue: 1, alpha: 1)
+        ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        ctx.setFillColor(red: 0, green: 0, blue: 0, alpha: 1)
+        ctx.textMatrix = .identity
+        let font = CTFontCreateWithName("Helvetica-Bold" as CFString, 72, nil)
+        // A 0.5 in indent on a letter page: 0.059 of its width.
+        for (text, x, y) in [("Please contact Jane", 0.059 + 0.05, 0.62), ("Doe about the claim", 0.05, 0.42)] {
+            let line = CTLineCreateWithAttributedString(NSAttributedString(
+                string: text, attributes: [kCTFontAttributeName as NSAttributedString.Key: font]))
+            ctx.textPosition = CGPoint(x: CGFloat(width) * x, y: CGFloat(height) * y)
+            CTLineDraw(line, ctx)
+        }
+        let (doc, url) = try await TestFixtures.imagePagesPDF([try #require(ctx.makeImage())],
+                                                              size: CGSize(width: width, height: height), prefix: "crossindent_")
+        defer { try? FileManager.default.removeItem(at: url) }
+        #expect(await Self.search(doc, .text("Jane Doe", options: Self.ocrOptions())).count == 2)
+    }
+
     @Test("a phrase inside one recognised line is found as before: one result, no occurrence")
     func singleLinePhraseUnchanged() async throws {
         let (doc, url) = try await Self.scannedPage()

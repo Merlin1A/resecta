@@ -8,10 +8,10 @@ import PDFKit
 // its own, so it cannot see such a phrase. This pass searches the page's
 // lines joined in reading order, one line feed between them, through the
 // literal tier's own preparation, where a line feed folds to a space as on a
-// text-layer page. Two lines join only when the next one starts below the
-// previous one and within `crossLineColumnTolerance` of its left edge (the
-// address assembler's alignment): lines of different columns are kept apart
-// by a character no query holds. It keeps only the matches that cross a line; a match
+// text-layer page. Two lines join only when the next one lies below the
+// previous one and their spans across the page overlap: lines of different
+// columns never overlap and are kept apart by a character no query holds,
+// while an indented first line, a centred line or a short last line joins. It keeps only the matches that cross a line; a match
 // inside one line is the per-line matcher's, unchanged. Each crossing match
 // is boxed on every line it touches (the counting rule of a wrapped
 // text-layer match): one result per line, one shared occurrence. Each line's
@@ -24,14 +24,11 @@ private let crossLineLogger = Logger(subsystem: "com.resecta.app", category: "se
 
 extension DocumentSearcher {
 
-    /// How far (page widths) a recognised line's left edge may sit from the
-    /// previous line's for a phrase to run from one into the other.
-    nonisolated static let crossLineColumnTolerance: CGFloat = 0.05
-
     /// Whether a phrase may run from the end of `line` into the start of `next`:
-    /// `next` starts below `line` in the same column.
+    /// `next` lies below `line` and the two lines' spans across the page
+    /// overlap (one column).
     nonisolated static func linesJoin(_ line: CGRect, _ next: CGRect) -> Bool {
-        next.midY < line.midY && abs(next.minX - line.minX) <= crossLineColumnTolerance
+        next.midY < line.midY && next.minX < line.maxX && line.minX < next.maxX
     }
 
     /// The box of the part `local` (UTF-16, in the line's text) of a match on
