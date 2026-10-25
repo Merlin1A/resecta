@@ -253,6 +253,8 @@ extension DocumentSearcher {
                                      languages: inkFitLanguages(for: job.pageText), frame: frame) else {
             return envelope()
         }
+        // A match on an interleaved layer line has no place of its own.
+        if let band = interleavedBand(job, tokens: tokens, box: box) { return band }
         // The read word's own box when the alignment places it: the painted box
         // is then the word's ink alone. It may grow past a side where Vision's
         // box ends (a letter the box clipped), never into the rest of a longer
@@ -660,24 +662,6 @@ extension DocumentSearcher {
 
     /// The whole page as a DeviceGray image at the fit's scale, under the OCR
     /// leg's pixel ceiling.
-    /// Vision's tokens as the fit reads them: their boxes in points of a
-    /// page (or reading frame) of `size`, their alignment keys, and for each
-    /// key letter its character in the token as read.
-    nonisolated static func inkTokens(from read: [OCREngine.Token], size: CGSize) -> [InkToken] {
-        read.map { t in
-            var keyToRaw: [Int] = []
-            // One entry per key letter: a ligature read as one character
-            // gives its key several letters.
-            for (index, character) in t.text.enumerated() {
-                keyToRaw += Array(repeating: index, count: alignmentKey(Substring(String(character))).count)
-            }
-            return InkToken(key: alignmentKey(Substring(t.text)),
-                            rect: CGRect(x: t.normalizedRect.minX * size.width, y: t.normalizedRect.minY * size.height,
-                                         width: t.normalizedRect.width * size.width, height: t.normalizedRect.height * size.height),
-                            line: t.line, raw: t.text, keyToRaw: keyToRaw)
-        }
-    }
-
     /// The whole page at the fit's scale, turned into `frame` when given.
     nonisolated static func renderGrayImage(_ cgPage: CGPDFPage, rotation: Int, visual: CGSize,
                                             frame: InkFitFrame? = nil) -> CGImage? {

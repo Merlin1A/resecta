@@ -71,6 +71,7 @@ extension DocumentSearcher {
     /// runs again. Without a read in time the second run's fits are the
     /// envelope (degraded); no thread waits on the lane.
     func withInkFitRead<T>(_ page: PDFPage, _ body: () -> T) async -> T {
+        defer { reportInterleavedLines(page) }
         guard let read = Self.pendingInkRead(page) else { return body() }
         let deferral = InkFitDeferral()
         let first = InkFitDeferral.$current.withValue(deferral) { body() }
@@ -85,12 +86,14 @@ extension DocumentSearcher {
     /// reports as it goes and cannot run twice).
     func preparedForInkFit(_ page: PDFPage) async -> SendablePDFPage {
         if let read = Self.pendingInkRead(page) { await read.run() }
+        reportInterleavedLines(page)
         return SendablePDFPage(page)
     }
 
     /// `value`, after the page's tokens are read when it is gated.
     func afterInkFitRead<T>(_ page: PDFPage, _ value: @autoclosure () async -> T) async -> T {
         if let read = Self.pendingInkRead(page) { await read.run() }
+        reportInterleavedLines(page)
         return await value()
     }
 
@@ -151,5 +154,25 @@ extension DocumentSearcher {
     /// fits outside a search (it would otherwise wait on the lane).
     nonisolated static func prepareInkFit(_ page: PDFPage) async {
         if let read = pendingInkRead(page) { await read.run() }
+    }
+}
+
+extension DocumentSearcher {
+    /// Vision's tokens as the fit reads them: their boxes in points of a
+    /// page (or reading frame) of `size`, their alignment keys, and for each
+    /// key letter its character in the token as read.
+    nonisolated static func inkTokens(from read: [OCREngine.Token], size: CGSize) -> [InkToken] {
+        read.map { t in
+            var keyToRaw: [Int] = []
+            // One entry per key letter: a ligature read as one character
+            // gives its key several letters.
+            for (index, character) in t.text.enumerated() {
+                keyToRaw += Array(repeating: index, count: alignmentKey(Substring(String(character))).count)
+            }
+            return InkToken(key: alignmentKey(Substring(t.text)),
+                            rect: CGRect(x: t.normalizedRect.minX * size.width, y: t.normalizedRect.minY * size.height,
+                                         width: t.normalizedRect.width * size.width, height: t.normalizedRect.height * size.height),
+                            line: t.line, raw: t.text, keyToRaw: keyToRaw)
+        }
     }
 }
