@@ -106,14 +106,14 @@ final class SearchState: Identifiable {
     /// `clearResults()` — every trigger clears before its guards run.
     var scanStartFailed = false
 
-    /// Detector count of the category set the last Scan run
-    /// actually executed with (snapshotted at kickoff, mirroring the
-    /// engine query's own `enabledCategories` snapshot). The zero-state
-    /// completion copy renders from this, never from the live chip
-    /// state, so a post-hoc chip toggle cannot rewrite the description
-    /// of a run that already happened. nil until a run kicks off; reset
-    /// by `clearResults()`.
+    /// The last run's kickoff snapshots, so a later chip or option change
+    /// cannot rewrite the description of a run that already happened: the
+    /// Scan's detector count (the engine query's own `enabledCategories`;
+    /// nil until a Scan kicks off, reset by `clearResults()`) and the pages
+    /// a typed run reads by text recognition (set at every kickoff; the
+    /// no-match copy, `SearchEmptyStateCopy.ocrReadPageCount`).
     var lastRunDetectorCount: Int?
+    var lastRunOCRPageCount = 0
 
     /// Search options (toggles in UI).
     var options: SearchOptions = SearchOptions()
