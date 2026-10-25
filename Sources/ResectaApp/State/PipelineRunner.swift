@@ -473,10 +473,11 @@ struct PipelineRunner {
         )
 
         sink(.verified(report, burnedRegionVersion: burnedRegionVersion))
-        // VoiceOver overall announcement: the status only. The masthead's
-        // label quotes the review terms on a needs-review result, and an
+        // VoiceOver overall announcement: the status, and on a PASS with
+        // rows that did not pass, the header's counts. The masthead's label
+        // quotes the review terms on a needs-review result, and an
         // announcement speaks document text aloud.
-        sink(.announce("Verification complete. \(report.overallStatus.accessibilityLabel)"))
+        sink(.announce(VerificationResultsView.completionAnnouncement(report: report)))
         return .completed
     }
 }

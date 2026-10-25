@@ -72,11 +72,12 @@ struct VerificationMastheadTests {
         ("securePassRidingNote", "Read the note below before you share the PDF."),
         ("secureWarningOnly", "Read the warning below before you share the PDF."),
         ("searchableSkippedCancelled", "Stopped early. Run\u{00A0}Verification, or run Redact for all checks."),
+        ("searchableSweepReview", "\(keepEditing), then open Scan to review the pages below."),
     ]
 
     @Test("Every forged report shows its sentence of record, at most 70 characters")
     func fixtureSentencesOfRecord() throws {
-        #expect(Self.fixtureSentences.count == 16)
+        #expect(Self.fixtureSentences.count == 17)
         for (name, sentence) in Self.fixtureSentences {
             let report = try #require(Fixtures.all[name], "\(name)")
             let shown = Results.mastheadSubtitle(report: report)

@@ -29,6 +29,7 @@ enum VerificationDebugFixtures {
         "searchableAttentionLong": searchableAttentionLong,
         "secureAllFailed": secureAllFailed,
         "securePassRidingNote": securePassRidingNote,
+        "searchableSweepReview": searchableSweepReview,
     ]
 
     /// The run each fixture stands for, as the results screen reads it
@@ -262,6 +263,25 @@ enum VerificationDebugFixtures {
             layers: rows(coreSearchable, recheck: recheck, sweep: sweepPass),
             overallStatus: .attention(message), durationSeconds: 6.8,
             perPageModes: [.searchableRedaction, .searchableRedaction, .searchableRedaction, .searchableRedaction])
+    }()
+
+    /// Needs review from the Detection Sweep alone: a leftover in a
+    /// category the scan applied, no term listed.
+    static let searchableSweepReview: VerificationReport = {
+        let message = "Ran the detectors on the output — 2 possible items remain on page 2. Open Scan to review."
+        let sweep = row(
+            .detectionSweep, .attention(message), short: message,
+            detail: "Detection Sweep ran every detector on the output. \(bothLegsRoute) Names and addresses are not swept. "
+                + "2 possible items remain on page 2.",
+            pages: [1],
+            lines: [SearchRecheckQueryLine(
+                label: "Scan (17 detectors)", foundCount: 0, foundHitCap: false, appliedCount: 0,
+                remainingCount: 2, route: .mixed(textPages: 3, ocrPages: 3),
+                perTerm: [.init(term: "Social Security number", found: nil, applied: nil, remaining: 2)])],
+            seconds: 2.1)
+        return VerificationReport(
+            layers: rows(coreSearchable, recheck: recheckIdle, sweep: sweep),
+            overallStatus: .attention(message), durationSeconds: 6.2, perPageModes: searchable)
     }()
 
     /// The mixed report, fuller: two terms on two pages, the content

@@ -133,7 +133,7 @@ extension ImportService {
 
         // Walk source annotations through the engine's analyzer (skips
         // Widget/form annotations by design), then count the form fields
-        // that carry a value. The on-screen PDFKit view draws annotations
+        // that carry a value and those drawn as an opaque cover. The on-screen PDFKit view draws annotations
         // and field values; the export raster is built from the page
         // content stream, which includes neither — both results feed the
         // import notice banner so the user hears that mechanism before
@@ -145,6 +145,18 @@ extension ImportService {
         // document-level entry beside the analyzer's stages the fact for
         // the same notice.
         var findings = annotationResult.findings
+        // Form fields that draw an opaque cover (an empty black field used
+        // as a redaction): the analyzer skips widgets, and the export does
+        // not draw them, so the text under one prints. One entry in the
+        // analyzer's id form stages them for the notice's annotation
+        // sentences.
+        let coverWidgets = ConcealingAnnotations.coverWidgetCount(in: doc)
+        if coverWidgets > 0 {
+            findings.append(PDFFinding(
+                id: ImportAnnotationNoticeBanner.coverWidgetFindingID,
+                summary: "\(coverWidgets) form field\(coverWidgets == 1 ? "" : "s") drawn as an opaque cover over page content",
+                severity: .info))
+        }
         if ImportAnnotationNoticeBanner.carriesFormDataOrAttachments(in: doc) {
             findings.append(PDFFinding(
                 id: ImportAnnotationNoticeBanner.formDataOrAttachmentsFindingID,
