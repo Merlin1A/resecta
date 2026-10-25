@@ -75,6 +75,29 @@ struct OCRCrossLinePhraseTests {
         #expect(multi.filter { $0.term == "Jane Doe" }.count == 2)
     }
 
+    @Test("lines of different columns do not join: a left column's last word and a right column's first are not one phrase")
+    func columnsDoNotJoin() async throws {
+        let width = 1600, height = 1200
+        let ctx = try #require(createBitmapContext(width: width, height: height))
+        ctx.setFillColor(red: 1, green: 1, blue: 1, alpha: 1)
+        ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        ctx.setFillColor(red: 0, green: 0, blue: 0, alpha: 1)
+        ctx.textMatrix = .identity
+        let font = CTFontCreateWithName("Helvetica-Bold" as CFString, 72, nil)
+        for (text, x, y) in [("Please contact", 0.05, 0.62), ("about the claim", 0.05, 0.42), ("Doe Street office", 0.55, 0.62)] {
+            let line = CTLineCreateWithAttributedString(NSAttributedString(
+                string: text, attributes: [kCTFontAttributeName as NSAttributedString.Key: font]))
+            ctx.textPosition = CGPoint(x: CGFloat(width) * x, y: CGFloat(height) * y)
+            CTLineDraw(line, ctx)
+        }
+        let (doc, url) = try await TestFixtures.imagePagesPDF([try #require(ctx.makeImage())],
+                                                              size: CGSize(width: width, height: height), prefix: "crosscol_")
+        defer { try? FileManager.default.removeItem(at: url) }
+        #expect(await Self.search(doc, .text("claim Doe", options: Self.ocrOptions())).isEmpty,
+                "the left column's last line and the right column's first line are not one phrase")
+        #expect(await Self.search(doc, .text("Doe Street", options: Self.ocrOptions())).count == 1, "the right column is read")
+    }
+
     @Test("a phrase inside one recognised line is found as before: one result, no occurrence")
     func singleLinePhraseUnchanged() async throws {
         let (doc, url) = try await Self.scannedPage()
