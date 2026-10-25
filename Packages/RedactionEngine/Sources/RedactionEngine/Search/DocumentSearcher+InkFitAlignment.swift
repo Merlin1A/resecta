@@ -201,11 +201,18 @@ extension DocumentSearcher {
                 }
                 return (total, before)
             }
+            // Counted only over the stretch the alignment matched, on both
+            // sides: a read row can hold another column's text the layer
+            // wrote as a line of its own, and a layer line can hold a cell's
+            // wrapped lines read as rows of their own (the fit keeps the
+            // layer's occurrences on the match's own band).
             let word = lineKey[start..<(start + length)]
-            let inRead = occurrences(readKey, of: word, in: 0...(readKey.count - 1), before: first)
+            let layerSpan = min(k0, start)...max(k1, start + length - 1)
+            let readSpan = min(map[k0], first)...max(map[k1], last)
+            let inRead = occurrences(readKey, of: word, in: readSpan, before: first)
             var layerStarts: [Int] = []
-            var i = 0
-            while i + word.count <= lineKey.count {
+            var i = layerSpan.lowerBound
+            while i + word.count - 1 <= layerSpan.upperBound {
                 if lineKey[i..<(i + word.count)].elementsEqual(word), i < textIndex.count { layerStarts.append(textIndex[i]) }
                 i += 1
             }
