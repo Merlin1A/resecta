@@ -74,6 +74,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Verification: a check that had nothing to check reports Not applicable instead of passing or adding a note — the Search Re-check and the Detection Sweep when no search or scan was applied, the two term searches when no redacted term was captured, and Character Count, Monospace Fonts and Character Sequence when every page was rasterized. A Not applicable check neither passes the document nor lowers its result.
 - Verification: the Detection Sweep reports Needs review when an item remains on the output in a category your applied scan covered and you did not leave unselected, such as an SSN in an image after an SSN scan. Before, it read as a note. An item only in a category no applied scan covered stays a note.
 - The first launch after updating asks for agreement to the End-User License Agreement and Privacy Policy again, as both have changed since 1.2.0.
+- The privacy policy describes photo and image input, password-protected PDFs and the fixed export file name, and lists the values the app stores.
 
 ### Removed
 
