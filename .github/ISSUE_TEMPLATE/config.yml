@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Questions and support
+    url: https://resecta.app/support/
+    about: For questions about using Resecta, email support@resecta.app.
+  - name: Report a security vulnerability
+    url: https://github.com/Merlin1A/resecta/security/advisories/new
+    about: Report it privately here or to security@resecta.app, not as a public issue.
