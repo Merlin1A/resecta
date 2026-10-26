@@ -47,6 +47,10 @@ targets:
         # dyld read-only: the dynamic loader's data stays read-only after launch. Reporting
         # under the hardened-process family's soft posture; not observable on the simulator.
         com.apple.security.hardened-process.dyld-ro: true
+        # Enhanced Security version: App Store Connect rejects an upload carrying the keys
+        # above without it (error 91155). A string, not a number: "1" is Xcode 26's Enhanced
+        # Security template default (AppExtension-EnhancedSecurity.entitlements in Xcode.app).
+        com.apple.security.hardened-process.enhanced-security-version-string: "1"
     type: application
     platform: iOS
     sources:
