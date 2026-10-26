@@ -10,7 +10,7 @@ On-device iOS 26 PDF redaction. Free, open-source, zero data collection — all 
 
 **License:** [Apache License 2.0](./LICENSE)
 
-**Latest release:** 1.2.0 — see the [CHANGELOG](./CHANGELOG.md).
+**Latest release:** 1.3.0 — see the [CHANGELOG](./CHANGELOG.md).
 
 ---
 
