@@ -356,8 +356,69 @@ struct ReconstructionTests {
 
         let doc = PDFDocument(url: tempURL)!
         #expect(doc.pageCount == 3)
-        // CGPDFContext may adjust page dimensions during re-encoding;
-        // page count preservation is the critical invariant.
+        for (index, s) in sizes.enumerated() {
+            #expect(doc.page(at: index)?.bounds(for: .mediaBox).size == CGSize(width: s.w, height: s.h),
+                    "page \(index + 1)")
+        }
+    }
+
+    @Test("Each output page keeps its own media box: a page larger than the first is not cut to the first's size")
+    func perPageMediaBox() async throws {
+        let tempURL = makeTempURL()
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+
+        // A Letter page 1, then a taller page (Legal), a landscape page and
+        // a portrait Letter page stored with /Rotate 90, which the rasterizer
+        // hands over upright at its displayed size (792 x 612).
+        let pages: [(size: CGSize, rotation: Int)] = [
+            (CGSize(width: 612, height: 792), 0),
+            (CGSize(width: 612, height: 1008), 0),
+            (CGSize(width: 792, height: 612), 0),
+            (CGSize(width: 792, height: 612), 90),
+        ]
+        let recon = PDFStreamReconstructor(tempURL: tempURL)
+        try await recon.begin(firstPageSize: pages[0].size)
+        for page in pages {
+            let image = try makeTestImage(width: Int(page.size.width), height: Int(page.size.height))
+            try await recon.appendPage(PageOutput(
+                image: image, size: page.size, textLayerEntries: nil, rotation: page.rotation))
+        }
+        await recon.finalize()
+
+        let doc = try #require(CGPDFDocument(tempURL as CFURL))
+        #expect(doc.numberOfPages == pages.count)
+        for (index, page) in pages.enumerated() {
+            let out = try #require(doc.page(at: index + 1))
+            #expect(out.getBoxRect(.mediaBox) == CGRect(origin: .zero, size: page.size), "page \(index + 1)")
+            #expect(out.rotationAngle == 0, "page \(index + 1) is drawn upright")
+        }
+    }
+
+    @Test("A page the size of page 1 inherits the document's box, so a one-size document is written as before the per-page box")
+    func samePageSizeInheritsMediaBox() async throws {
+        let tempURL = makeTempURL()
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+
+        let letter = CGSize(width: 612, height: 792), legal = CGSize(width: 612, height: 1008)
+        let recon = PDFStreamReconstructor(tempURL: tempURL)
+        try await recon.begin(firstPageSize: letter)
+        for size in [letter, legal, letter] {
+            let image = try makeTestImage(width: Int(size.width), height: Int(size.height))
+            try await recon.appendPage(PageOutput(image: image, size: size, textLayerEntries: nil))
+        }
+        await recon.finalize()
+
+        // The Secure-output digests pinned across the corpus (every corpus
+        // document is one page size) stay put only while a page the size
+        // of page 1 carries no /MediaBox of its own.
+        let doc = try #require(CGPDFDocument(tempURL as CFURL))
+        var own: [Bool] = []
+        for index in 1...doc.numberOfPages {
+            let dict = try #require(doc.page(at: index)?.dictionary)
+            var box: CGPDFArrayRef?
+            own.append(CGPDFDictionaryGetArray(dict, "MediaBox", &box))
+        }
+        #expect(own == [false, true, false])
     }
 
     // MARK: - EOF Marker Count

@@ -146,6 +146,15 @@ public actor PDFStreamReconstructor {
     /// strict concurrency, so the count is bumped outside the closure.
     private func drawBufferedPage(_ page: BufferedPage) {
         guard let ctx = openContextIfNeeded() else { return }
+        // A page whose size differs from page 1's gets its own media box,
+        // as CFData holding the CGRect: the form CGPDFContext reads (an
+        // NSValue is ignored, and the page falls back to the context's box,
+        // page 1's, which cuts off any page larger than the first). A page
+        // the size of page 1 passes none and inherits the context's box, so
+        // a document of one page size is written byte for byte as before.
+        var pageBox = CGRect(origin: .zero, size: page.size)
+        let ownMediaBox: Data? = page.size == firstPageSize
+            ? nil : Data(bytes: &pageBox, count: MemoryLayout<CGRect>.size)
         let didWrite: Bool = autoreleasepool {
             // Decode the buffered JPEG. CGPDFContext
             // re-encodes any drawn image, so passthrough is not preserved in
@@ -159,18 +168,8 @@ public actor PDFStreamReconstructor {
                       intent: .defaultIntent
                   ) else { return false }
 
-            let pageBox = CGRect(origin: .zero, size: page.size)
-            #if canImport(UIKit)
-            ctx.beginPDFPage([
-                kCGPDFContextMediaBox: NSValue(cgRect: pageBox)
-            ] as CFDictionary)
-            #else
-            // macOS tooling destination: NSValue(cgRect:) is the UIKit
-            // spelling; NSRect == CGRect here so NSValue(rect:) is identical.
-            ctx.beginPDFPage([
-                kCGPDFContextMediaBox: NSValue(rect: pageBox)
-            ] as CFDictionary)
-            #endif
+            let pageInfo: [CFString: Any] = ownMediaBox.map { [kCGPDFContextMediaBox: $0] } ?? [:]
+            ctx.beginPDFPage(pageInfo as CFDictionary)
 
             ctx.draw(jpegImage, in: pageBox)
 
