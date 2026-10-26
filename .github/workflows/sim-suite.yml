@@ -24,11 +24,12 @@
 # never returns on it, and neither does the engine's OCR sweep or re-check
 # over rasterized pages: 900 seconds of silence with no output, and the
 # test's own time limit cannot end a hang inside a system framework. The
-# five suites that run such a pass are left out on this runtime
-# (TEST_BATCHED_EXCLUDE below; named in every verdict; the pre-push hook
-# runs them on every push), the runner's stall watchdog is widened
-# (TEST_BATCHED_STALL_SECS) for the OCR-heavy tests that merely run slowly
-# here, and a recovery reboots the simulator instead of erasing it.
+# five suites that run such a pass, and two ink-fit timing pins, are left
+# out on this runtime (TEST_BATCHED_EXCLUDE below; named in every verdict;
+# the pre-push hook runs them on every push), the runner's stall watchdog
+# is widened (TEST_BATCHED_STALL_SECS) for the OCR-heavy tests that merely
+# run slowly here, and a recovery reboots the simulator instead of erasing
+# it.
 name: sim-suite
 
 on:
@@ -91,7 +92,15 @@ jobs:
       # time; the two that call Vision directly, OCREngineTests and
       # OCRCacheCoherenceTests, are left out here with the 12-page, 12-layer
       # searchable preflight (PacketSearchableProbeTests).
-      TEST_BATCHED_EXCLUDE: ${{ matrix.scheme == 'ResectaApp' && 'PipelineCoordinatorSecurityTests PageParallelRasterizationTests' || 'PacketOCRQualityRoleTests SearchRecheckOCRTests SearchRecheckParallelismTests PacketSearchableProbeTests OCREngineTests OCRCacheCoherenceTests' }}
+      # Added 2026-10-26: two ink-fit timing pins, PageImageInkFitTests (the
+      # whole suite, with its stall and shade extensions) and
+      # InkFitBusyPoolTests, judge the pool's release in seconds and fail
+      # here while their behaviour holds (the stalled page's fit held
+      # 2.3–4.0 s against a 1.5 s limit; a cancelled search returning after
+      # 11 s against 0.5 s) on the weekly run at 10ab90dd and on the v1.3.0
+      # tag run and its re-run; they pass on the pre-push hook's local run.
+      # Left out here until the pins judge gates, not a clock.
+      TEST_BATCHED_EXCLUDE: ${{ matrix.scheme == 'ResectaApp' && 'PipelineCoordinatorSecurityTests PageParallelRasterizationTests' || 'PacketOCRQualityRoleTests SearchRecheckOCRTests SearchRecheckParallelismTests PacketSearchableProbeTests OCREngineTests OCRCacheCoherenceTests PageImageInkFitTests InkFitBusyPoolTests' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
