@@ -10,5 +10,7 @@
 	<true/>
 	<key>com.apple.security.hardened-process.dyld-ro</key>
 	<true/>
+	<key>com.apple.security.hardened-process.enhanced-security-version-string</key>
+	<string>1</string>
 </dict>
 </plist>
