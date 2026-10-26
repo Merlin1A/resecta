@@ -11,7 +11,7 @@ import XCTest
 ///
 /// Launch uses the DEBUG `--resetEULA` hook (the inverse of `--uitesting`),
 /// which clears the current agreement key (`FirstLaunchFlow.agreementKey`)
-/// and the note's flag before the scene body reads them, so
+/// before the scene body reads it, so
 /// each test starts from a virgin gate regardless of what earlier suites did
 /// to the shared simulator app container.
 // nonisolated: XCUITest driving a separate process, no @MainActor app state —

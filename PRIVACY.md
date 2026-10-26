@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Effective date:** 2026-10-15
+**Effective date:** 2026-10-26
 
 Resecta is an on-device document-redaction app for iOS. This Privacy Policy
 describes how Resecta handles information. It is written to satisfy Apple's
@@ -49,6 +49,12 @@ document you import are not followed. Once you follow one of those links, the
 practices of the website, mail provider or App Store you reach apply, not this
 policy.
 
+Resecta does not request access to your photo library: the system Photos picker
+runs in its own process and gives the app only the photos you select. If a
+photo you pick, or a file you choose in Files, is stored only in iCloud, iOS
+may download it before handing it to Resecta; Resecta itself makes no network
+requests.
+
 ## On-device storage
 
 Some preferences and data you create are stored locally on your device. Your
@@ -58,13 +64,14 @@ the iOS "complete" file-protection class applied and a system flag that
 excludes them from device backups, so they are not copied into iCloud or
 computer backups.
 Your remaining preferences — your settings (export resolution, fill colour,
-default redaction mode, detection sensitivity, appearance, the automatic
-verification and Paranoid Mode switches, and a snap-to-text value whose switch
-was removed in 1.1.0), an export counter, the last search filter you used (its
-source, confidence and sort order), and your acceptance of the in-app
-agreement — are stored in the system `UserDefaults` store, which participates
-in your device backups the way ordinary app preference data does. None of them
-holds document content or text you typed.
+default redaction mode, detection sensitivity, appearance, and the automatic
+verification and Paranoid Mode switches), the app version that last asked for
+an App Store rating, the last search filter you used (its source, confidence
+and sort order), and your acceptance of the in-app agreement — are stored in
+the system `UserDefaults` store, which participates in your device backups the
+way ordinary app preference data does. None of them holds document content or
+text you typed. A snap-to-text value and an export counter that earlier
+versions stored are deleted the first time the updated app opens.
 
 This data is not transmitted anywhere by the app and is removed when you
 delete the app; Custom Terms, the saved-regex library, and the saved-search and
@@ -75,13 +82,17 @@ receives it, and it is not associated with any identity. For that reason the
 app's App Store privacy disclosure reports "Data Not Collected" for every
 category.
 
-Documents you import are held for the duration of your editing session. The
-redacted output is written to a per-session workspace in the app's private
-container as the redaction run proceeds, and that workspace is removed when the
-session closes; if the app is interrupted before then, a sweep at the next
-launch and on each return to the foreground removes what the interrupted
-session left behind once it is more than an hour old. Nothing is retained by
-the app after that.
+Documents you import are held for the duration of your editing session. If a
+PDF needs a password to open, the password you enter is held in memory while
+the document is open and is not stored; the app lets go of it when the editing
+session closes. The redacted copy is not password-protected and carries none of
+the original's usage restrictions; the app says so when you import such a
+document and on the Share card. The redacted output is written to a per-session
+workspace in the app's private container as the redaction run proceeds, and
+that workspace is removed when the session closes; if the app is interrupted
+before then, a sweep at the next launch and on each return to the foreground
+removes what the interrupted session left behind once it is more than an hour
+old. Nothing is retained by the app after that.
 
 ## What an exported file contains
 
@@ -104,16 +115,18 @@ finished file in place; if the writer's output is not in the shape a patch
 expects, that value stays as the writer wrote it, the export still completes,
 and the metadata check in the verification pass, when it runs, reports the value
 that was not replaced. The export therefore carries much less metadata than
-a typical PDF, but it is not metadata-free. The file name of a shared copy
-records when you exported it.
+a typical PDF, but it is not metadata-free. The file name of a shared copy is
+redacted.pdf for every export and does not record when you exported it.
 
-Resecta 1.2.0 opens PDF files only. Images inside a PDF you open reach the
-exported file only as redrawn page pixels.
+Resecta opens PDF files, and JPEG, PNG and HEIC images chosen in Files or in
+the system Photos picker, or dropped onto an open document. Each image becomes
+one page built from its redrawn pixels: the photo's own embedded metadata, such
+as EXIF data or GPS location, is not carried into the file Resecta produces.
+Images inside a PDF you open reach the exported file only as redrawn page
+pixels.
 
-In releases that imported images (1.0.0 and 1.1.0), an image you imported could
-carry its own embedded metadata, such as EXIF or GPS location data. Resecta
-redrew imported images from their pixels before they entered the document, so
-that embedded metadata was not carried into the file Resecta produced.
+Versions 1.0.0 and 1.1.0 also imported images and redrew them from their pixels
+in the same way; version 1.2.0 opened PDF files only.
 
 ## On-device detection
 
@@ -158,9 +171,10 @@ itself collect:
   through your device's Analytics & Improvements settings, which Apple mediates
   and anonymizes.
 - A rating, if you respond to Apple's standard App Store rating prompt, which
-  Resecta may present after a few successful exports. Any rating you submit goes
-  to Apple's App Store, not to the developer, and the app transmits no data as
-  part of that prompt. Resecta is free and contains no in-app purchases.
+  Resecta may present once per app version, after the first share of a document
+  whose checks passed. Any rating you submit goes to Apple's App Store, not to
+  the developer, and the app transmits no data as part of that prompt. Resecta
+  is free and contains no in-app purchases.
 
 Resecta does not collect any of this information itself.
 
