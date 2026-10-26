@@ -151,6 +151,7 @@ The commands that run both suites locally, and what the batched runner reports, 
 - Read [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the gates every change passes and the changes that need an agreed plan before they land.
 - Open bugs and implementation constraints are tracked in [`KNOWN_ISSUES.md`](./KNOWN_ISSUES.md).
 - Security issues: please use [`SECURITY.md`](./SECURITY.md) — do not file public issues for vulnerabilities.
+- Questions and support: support@resecta.app. Bugs: [GitHub issues](https://github.com/Merlin1A/resecta/issues); please don't attach real documents.
 
 ## License
 
