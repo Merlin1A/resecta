@@ -10,7 +10,7 @@ On-device iOS 26 PDF redaction. Free, open-source, zero data collection — all 
 
 **License:** [Apache License 2.0](./LICENSE)
 
-**Latest release:** 1.2.0 — see the [CHANGELOG](./CHANGELOG.md).
+**Latest release:** 1.3.0 — see the [CHANGELOG](./CHANGELOG.md).
 
 ---
 
@@ -26,9 +26,9 @@ The core workflow is:
 
 **Import → View → Mark → Apply → Verify → Export**
 
-1. **Import** a PDF from Files, or open the bundled sample document.
+1. **Import** a PDF from Files, or JPEG, PNG and HEIC images from Files or Photos, one page each; or open the bundled sample document. A password-protected PDF opens with its password; the redacted copy is not password-protected.
 2. **View** pages and navigate the document.
-3. **Mark** regions for redaction by drawing rectangles, or by selecting and applying results from Search (text, pattern, and multi-term matching) or Scan (on-device text detection).
+3. **Mark** regions for redaction by drawing rectangles, by marking a whole page from the page bar, or by selecting and applying results from Search (text, pattern, and multi-term matching) or Scan (on-device text detection).
 4. **Apply** redaction. Every page is rasterized, marked or not — vector text and images are converted into flat bitmap data, marked regions are overwritten in those pixels, and the rebuilt file is designed to leave the original text layer out. Source metadata (author, editing history and the rest) is stripped; the rebuilt file carries a producer tag replaced with a fixed value, timestamps rewritten to a fixed date and a file identifier derived from the file's own bytes, so the export is not metadata-free — see [`PRIVACY.md`](./PRIVACY.md).
 5. **Verify.** By default, a multi-layer verification engine then scans the output for residual content using text extraction, OCR, binary string search across multiple encodings, structural analysis, and metadata checks, re-runs each search you applied, and runs a detection sweep on the output.
 6. **Export** via the system share sheet.
@@ -36,7 +36,7 @@ The core workflow is:
 ## Two modes
 
 - **Secure Rasterization** — produces image-only output and is the simplest approach for high-sensitivity documents. Verification runs as a 7-layer check.
-- **Searchable Redaction** — preserves non-redacted text for selectability and search, using a fresh monospace font designed to reduce the glyph-positioning side channels identified in academic research. Verification runs as a 12-layer check (the five additional checks cover the preserved-text layer). If any unmarked text on a page shows no ink — white on white, invisible, or under a box drawn into the page — that page is exported as an image only. The stated limit: text covered by a picture in the page can still enter the text layer.
+- **Searchable Redaction** — preserves non-redacted text for selectability and search, using a fresh monospace font designed to reduce the glyph-positioning side channels identified in academic research. Verification runs as a 12-layer check (the five additional checks cover the preserved-text layer). If any unmarked text on a page shows no ink or almost none — white or near-white on white, invisible or nearly transparent, or under or nearly under a box drawn into the page — that page is exported as an image only. The stated limit: text covered by a picture in the page can still enter the text layer.
 
 Both modes share the same pixel-destruction core. Settings holds the default mode and each document can override it; Paranoid Mode pins Secure Rasterization.
 
@@ -46,10 +46,10 @@ The end-to-end pipeline. The mode shapes the applied output and selects the veri
 
 ```mermaid
 flowchart LR
-  A[Import PDF] --> B[View]
+  A[Import PDF or image] --> B[View]
   B --> C[Mark: search, scan, or draw regions]
   C --> E{Mode}
-  E -->|Secure Rasterization| D1[Apply: rasterize / fill / strip metadata]
+  E -->|Secure Rasterization| D1[Apply: rasterize / fill / strip document metadata]
   E -->|Searchable Redaction| D2[Apply: the same, plus a rebuilt text layer]
   D1 --> F[Verify - 7-layer pass]
   D2 --> G[Verify - 12-layer pass]
