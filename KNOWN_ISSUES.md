@@ -113,6 +113,33 @@ When Search reads pages by text recognition and a search returns no match, the m
 
 ---
 
+### KI-15: A Word Split by a Hyphen Across Two Lines Is Not Matched Whole (Low)
+**Affects:** Search
+
+A word that a hyphen splits across two lines is matched as two separate words, so a search for the whole word does not match it.
+
+**Workaround:** Search for each part, or draw a region over the word.
+
+---
+
+### KI-16: A Photo Kept Only in iCloud Does Not Import Offline (Low)
+**Affects:** Import (Photos)
+
+A photo whose full-size copy is kept only in iCloud, as with Optimize iPhone Storage, has to be downloaded by iOS before Resecta can read it. Without a network, iOS cannot download it, and the import stops with "The file could not be read. It may be damaged, locked by another app, or temporarily unavailable." One such photo stops the whole pick.
+
+**Workaround:** Connect to a network and pick the photos again, or open each photo in the Photos app first so iOS downloads it.
+
+---
+
+### KI-17: On a Photo or Scanned Page, a Search Box Covers the Whole Line (Low–Medium)
+**Affects:** Search (text read from a picture: a photo, a screenshot, a scan, or a photo on a typed page)
+
+On a page that is a picture, such as a photo, a screenshot or a scan without its own text, Search reads the text with on-device text recognition, which reports where each line is rather than each word. A box placed from a Search match on such a page covers the whole line that holds the match, so the other words on that line are covered too.
+
+**Workaround:** Before you tap Redact, select the box and drag its handles in to the word.
+
+---
+
 ## Fixed
 
 ### KI-8: Duplicate Regions from Multiple Scan Runs (Low) — FIXED (entry moved 2026-10-01)

@@ -105,6 +105,7 @@ A password-protected PDF opens with its password, a photo or an image becomes on
 
 ### Fixed
 
+- The redacted copy keeps each page's own size; a page larger than the first, turned from it, or rotated could be cut off.
 - Search: a text, regex or multi-term search with no results on a document whose pages were read by text recognition no longer says the term is not in the document. It says the search covered the text Resecta could read, how many pages were read by text recognition, and that a misread word won't match, and suggests checking those pages by eye. After such a run the OCR controls' caption reads "No results from text recognition" instead of "Awaiting OCR results". A document whose pages all have a text layer keeps the earlier message (Known Issues KI-14).
 - Import and Share: a form field drawn as an opaque cover — an empty black field placed over text — counts as an annotation, so the import notice names it; the share confirmation names the pages where such a field, a highlight painted opaque or dark over the text, or a watermark covers text that no redaction box covers. The export does not draw annotations, so that text is visible in the exported file.
 - VoiceOver: when verification passes with checks that had nothing to check or with a note, the announcement at the end of the run speaks the results header's title and counts ("Checks Passed. 9 of 12 checks passed. 3 had nothing to check.") instead of "All checks completed without issues."
