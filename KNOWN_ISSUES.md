@@ -131,6 +131,15 @@ A photo whose full-size copy is kept only in iCloud, as with Optimize iPhone Sto
 
 ---
 
+### KI-17: On a Photo or Scanned Page, a Search Box Covers the Whole Line (Low–Medium)
+**Affects:** Search (text read from a picture: a photo, a screenshot, a scan, or a photo on a typed page)
+
+On a page that is a picture, such as a photo, a screenshot or a scan without its own text, Search reads the text with on-device text recognition, which reports where each line is rather than each word. A box placed from a Search match on such a page covers the whole line that holds the match, so the other words on that line are covered too.
+
+**Workaround:** Before you tap Redact, select the box and drag its handles in to the word.
+
+---
+
 ## Fixed
 
 ### KI-8: Duplicate Regions from Multiple Scan Runs (Low) — FIXED (entry moved 2026-10-01)
