@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+## [1.3.0] — 2026-10-26
+
+A password-protected PDF opens with its password, a photo or an image becomes one page of a new PDF you can redact, and a document the app cannot read in full, or whose pages it cannot render, is refused at import rather than opened unscanned. In the editor, Mark Whole Page covers the page on screen with one region and a double-tap returns to the fit zoom. Verification re-runs each applied search and scan on the original page and the OCR check reports a term's start or end read beside a box, so a box placed off its text no longer passes every check; the results list groups each check by its outcome and counts only passing checks as passed. The app opts into Apple's hardened-process protections in their reporting mode, the engine's public surface narrows to the document-runner API, and the surfaces no shipped build reached — the search sheet's disabled diagnostics, the in-editor importer, the paused-detection resume path, and the face, barcode, and signature detectors — are removed.
+
 ### Added
 
 - Search: when the text could not be fitted to the printed word, a box is drawn wider than the word; the results sheet names the pages holding such a box, and the page in view says so above the page, before and after the boxes are applied, asking to keep such a box wide: shrinking it back to the word can leave part of the word readable.
@@ -44,7 +48,6 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - A light haptic on adding or resizing a region.
 - Share: when annotations in the original document — a black box, a stamp, an unapplied redaction mark — cover text that no redaction box covers, the share confirmation names those pages before the file is shared, whatever the verification result. Annotations are not part of the page image, so that text is visible in the exported file. On a scanned page, where the printed text is in the page image, any such annotation that no redaction box covers is named; on a rotated page an annotation is compared with the boxes as the page is shown.
 - The App Store rating prompt asks once per app version, after the first share of a document whose checks passed, instead of after the third export.
-- Verification results: the outcome titles follow the check list's words: Attention Needed reads Needs Review, Issues Found reads Checks Failed, and Completed with Notes reads Completed with Warnings, or Some Checks Incomplete when a check could not run in full.
 - Home: the app's mark replaces the document glyph; the three entries — Open a Document, Import Photos and Try the Sample — are cards of one size, centred on the screen, without link lines. VoiceOver reads each entry's title and description with a hint, the masthead as a heading and the trust words as one line; under Reduce Motion a press shades the card instead of shrinking it, and under Reduce Transparency the cards are opaque. The first-launch agreement fades into the home screen and keeps I Agree pinned while its text scrolls beneath; the app-switcher placeholder shows the mark on the home screen's grey; the verification progress screen's trust words read as one line.
 - Search sheet: the recent-search recall chips, the per-term section headers of the results list and the saved-search names are marked privacy-sensitive, matching the result rows and the saved-query previews.
 - Import: a file over the 50 MB cap is refused by its size on disk before any byte is read, from the Files picker and from a drop alike; a dropped file arrives as a file and is read inside its transfer rather than as 50 MB of memory.
@@ -261,14 +264,14 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - The import robustness suite and the output allow-list test cover image sources.
 - The app's unit tests build their settings on a scratch defaults suite: the shared coordinator helpers take a fresh suite by default, and the source check that lists tests reading the shared defaults domain now fails on any such site.
 - The engine package's test copy of the app's per-page mode choice is removed; the app's tests check the production choice through the coordinator, on a right-to-left page and on every page of the bundled sample.
-- App tests: the six trapping requires in the mode-switch toast tests are throwing requires, and the hosting and transition smoke tests assert what they name; the two review-dismiss UI tests call their survival check from the test body.
+- App tests: the six trapping requires in the mode-switch toast tests are throwing requires, and the hosting and transition smoke tests assert what they name.
 - Context-scored pattern matches build their explanation through one factory; the signal order is unchanged.
 - Decoded fields nothing reads are dropped: the per-filter manifest entries and the unapplied document-type temperature; the temperature file is read only for the startup diagnostics.
 - Detection loaders: the context keyword sets switch over the typed scored families; the context keyword loader and the driver's-licence and passport pattern tables share one version check and one loading path; the state-code pattern is compiled once.
 - The output re-check's page extraction runs off the main actor (`@concurrent`), one reader on the output document at a time; the rasterizer's test seam keeps a page failing for a given number of attempts, so the per-page retry's second-failure branch is driven through the production wrapper.
 - The engine's password message names the missing password rather than unsupported encryption; the import checks read one parser's view of the document (the walks inspect the parsed document's own reader, unlocked with the same password, instead of a second parse of the bytes). The robustness mirror and the verification corpus runner take the same password; the runner gains two plain seed documents and three locked twins whose outputs must match their seeds byte for byte.
 - `Scripts/release-flag-check.sh` censuses the remaining debug-only launch argument, the saved-searches sim-drive hook, as its positive control.
-- The search sheet's row display contracts, copy catalogs, banners and Scan options sit in their own files (`SearchResultRow+Contracts.swift`, `SearchResultsCopy.swift`, `SearchResultsBanners.swift`, `SearchToolbarSection+Scan.swift`), the copy catalogs under names that say what they hold; one detection-kind label table serves the canvas badge and the review surfaces; the two search-preparation guards share one failure path.
+- The search sheet's row display contracts, copy catalogs, banners and Scan options sit in their own files (`SearchResultRow+Contracts.swift`, `SearchResultsCopy.swift`, `SearchResultsBanners.swift`, `SearchToolbarSection+Scan.swift`), the copy catalogs under names that say what they hold; one detection-kind label table serves the canvas badge and its VoiceOver description; the two search-preparation guards share one failure path.
 - The pull-request gate counts the engine package's `public` and `open` declaration lines and fails a change whose count exceeds the cap the script carries, printing the count, the headroom under the cap and the release line caps on the largest source files (`Scripts/engine-public-surface-check.sh`); a change that adds to the count names the declarations in its description.
 - The growth ratchet tracks the two test trees as well as the source trees: a test file over 800 lines at the base of a change may not grow.
 - The audit lint's shorthand check reads five more shapes on added Swift and string-catalog lines: a section sign with no standard or repository document named beside it, a Markdown file name the repository does not track, and, in comments, planning-process words, step tokens and the maintainer's first name.
@@ -459,7 +462,8 @@ Initial public release.
 - **Pixel-destruction core shared by both modes.** Every page is rasterized, marked or not; vector text and images are converted into flat bitmap data, and the redaction process is designed to remove the original text layer from marked regions.
 - **Searchable Redaction text-layer design.** The reconstructed text layer uses a fresh monospace font with uniform spacing, designed to remove the glyph-positioning side channels identified in academic research on sandwich PDFs.
 
-[Unreleased]: https://github.com/Merlin1A/resecta/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/Merlin1A/resecta/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/Merlin1A/resecta/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/Merlin1A/resecta/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Merlin1A/resecta/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Merlin1A/resecta/releases/tag/v1.0.0
