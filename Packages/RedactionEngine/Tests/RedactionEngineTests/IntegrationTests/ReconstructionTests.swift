@@ -394,6 +394,33 @@ struct ReconstructionTests {
         }
     }
 
+    @Test("A page the size of page 1 inherits the document's box, so a one-size document is written as before the per-page box")
+    func samePageSizeInheritsMediaBox() async throws {
+        let tempURL = makeTempURL()
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+
+        let letter = CGSize(width: 612, height: 792), legal = CGSize(width: 612, height: 1008)
+        let recon = PDFStreamReconstructor(tempURL: tempURL)
+        try await recon.begin(firstPageSize: letter)
+        for size in [letter, legal, letter] {
+            let image = try makeTestImage(width: Int(size.width), height: Int(size.height))
+            try await recon.appendPage(PageOutput(image: image, size: size, textLayerEntries: nil))
+        }
+        await recon.finalize()
+
+        // The Secure-output digests pinned across the corpus (every corpus
+        // document is one page size) stay put only while a page the size
+        // of page 1 carries no /MediaBox of its own.
+        let doc = try #require(CGPDFDocument(tempURL as CFURL))
+        var own: [Bool] = []
+        for index in 1...doc.numberOfPages {
+            let dict = try #require(doc.page(at: index)?.dictionary)
+            var box: CGPDFArrayRef?
+            own.append(CGPDFDictionaryGetArray(dict, "MediaBox", &box))
+        }
+        #expect(own == [false, true, false])
+    }
+
     // MARK: - EOF Marker Count
 
     @Test("Multi-page output has single %%EOF marker")
