@@ -12,7 +12,7 @@ The threat model this policy is written against — what the app protects, whom 
 | Earlier releases | Best effort |
 | Pre-release builds | No |
 
-When reproducing a report, please use the synthetic test corpus bundled with the repository (the Hartwell loan-packet and sample bank statement fixtures) rather than real personal documents — reports should never contain real PII.
+When reproducing a report, please use the bundled sample document (Home → Try the Sample, `Resources/SampleDocument.pdf`) or the synthetic sample bank statement in the engine's test fixtures (`Packages/RedactionEngine/Tests/RedactionEngineTests/Fixtures/TestResources/sample-bank-statement.pdf`) rather than real personal documents — reports should never contain real PII.
 
 ## Verifying a release tag
 
