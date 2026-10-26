@@ -8,11 +8,10 @@ import RedactionEngine
 struct ResectaApp: App {
     // Persist EULA acceptance. @AppStorage is fine in App struct —
     // it only prohibits @AppStorage inside @Observable classes.
-    // Versioned key for EULA re-acceptance on terms change; the key, its
-    // history and the note's key live in `FirstLaunchFlow`, shared with
-    // EULAGateView (the acceptance site) and DeveloperNoteView.
+    // Versioned key for EULA re-acceptance on terms change; the key and its
+    // history live in `FirstLaunchFlow`, shared with EULAGateView (the
+    // acceptance site).
     @AppStorage(FirstLaunchFlow.agreementKey) private var disclaimerAccepted = false
-    @AppStorage(FirstLaunchFlow.noteSeenKey) private var developerNoteSeen = false
     @State private var settingsState: SettingsState
     @State private var savedRegexStore: SavedRegexStore
     @State private var userTermsStore: UserTermsStore
@@ -75,8 +74,8 @@ struct ResectaApp: App {
 
     #if DEBUG
     /// Handle launch arguments for UI testing.
-    /// --uitesting: Auto-accept EULA and mark the developer's note seen to
-    ///   bypass both first-launch screens, and clear the
+    /// --uitesting: Auto-accept EULA to bypass the first-launch gate, and
+    ///   clear the
     ///   persisted last-filter shape so every test launch opens the
     ///   search sheet at the default Source=All. The cross-session
     ///   filter persistence is a shipped feature; a non-default source
@@ -88,10 +87,9 @@ struct ResectaApp: App {
     /// --resetEULA: Clear the acceptance flag so the gate PRESENTS — the
     ///   gate-links UI tests drive the un-accepted gate itself, the
     ///   inverse of --uitesting. DEBUG-only, and it only ever forces the
-    ///   gate ON; it adds no path past it. It also clears the note's
-    ///   flag, so Agree leads to the note as on a fresh install.
+    ///   gate ON; it adds no path past it.
     /// --seedLegacyAcceptance: The state of a 1.2.0 install — the old
-    ///   agreement key accepted, the current one and the note unseen — so
+    ///   agreement key accepted, the current one unseen — so
     ///   the upgrade path can be driven. Forces the gate ON, like the above.
     /// --searchSourceFilter=ocr: Write a persisted Source = OCR filter
     ///   AFTER the --uitesting clear, so the next search sheet opens
@@ -104,13 +102,10 @@ struct ResectaApp: App {
                 defaults.set(true, forKey: key)
             }
             defaults.removeObject(forKey: FirstLaunchFlow.agreementKey)
-            defaults.removeObject(forKey: FirstLaunchFlow.noteSeenKey)
         } else if CommandLine.arguments.contains("--resetEULA") {
             defaults.set(false, forKey: FirstLaunchFlow.agreementKey)
-            defaults.removeObject(forKey: FirstLaunchFlow.noteSeenKey)
         } else if CommandLine.arguments.contains("--uitesting") {
             defaults.set(true, forKey: FirstLaunchFlow.agreementKey)
-            defaults.set(true, forKey: FirstLaunchFlow.noteSeenKey)
             defaults.removeObject(forKey: "search.lastFilter.v1")
         }
         if CommandLine.arguments.contains("--searchSourceFilter=ocr"),
@@ -179,8 +174,7 @@ struct ResectaApp: App {
                 // EULA gate — show clickwrap before any app content; the
                 // host fades the gate out and the app in.
                 RootGate(screen: FirstLaunchFlow.screen(
-                    agreementAccepted: disclaimerAccepted,
-                    noteSeen: developerNoteSeen)) {
+                    agreementAccepted: disclaimerAccepted)) {
                     ContentView()
                         .environment(settingsState)
                         .environment(savedRegexStore)
@@ -379,11 +373,10 @@ struct ResectaApp: App {
     }
 }
 
-/// The root swap between the first-launch screens (the gate, then the
-/// developer's note) and the app, with the fade between them: each screen
-/// fades out, then the next fades in after it is gone, so two marks never
-/// show together; under Reduce Motion one plain cross-fade. Hosted as a
-/// view so it reads the environment.
+/// The root swap between the first-launch gate and the app, with the fade
+/// between them: the gate fades out, then the app fades in after it is
+/// gone, so two marks never show together; under Reduce Motion one plain
+/// cross-fade. Hosted as a view so it reads the environment.
 private struct RootGate<Content: View>: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let screen: FirstLaunchFlow.Screen
@@ -395,9 +388,6 @@ private struct RootGate<Content: View>: View {
             case .app:
                 content()
                     .transition(.asymmetric(insertion: fadeInAfterRemoval, removal: .opacity))
-            case .note:
-                DeveloperNoteView()
-                    .transition(.asymmetric(insertion: fadeInAfterRemoval, removal: fadeOut))
             case .agreement:
                 EULAGateView()
                     .transition(.asymmetric(
