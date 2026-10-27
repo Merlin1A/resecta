@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Documentation: the threat model, the engineering notes and the README's claims map narrow the detection-data signature claim to what the key holder signed — the bytes the detector reads are the bytes the maintainer's signing run listed — and leave the installed app's integrity to the app-bundle code signature.
 - Documentation: the engineering notes describe the fake-redaction suite's control, which asserts that the text survives when nothing is marked.
 - Share confirm: a second share of the same results asks again, so each send of a file with reported issues, unrun checks or covered text gets its own confirmation.
+- Results: an annotation in the original that hides text no box covers is listed under the results with its pages, and the text-layer check is titled for the redacted PDF it reads.
 
 ### Fixed
 

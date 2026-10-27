@@ -27,7 +27,7 @@ struct ShareRiskConfirmCopyTests {
         #expect(DocumentEditorView.atRiskItemLines(report: Fixtures.pageCountGate)
                 == ["Page Count: failed"] + DocumentEditorView.couldNotVerifyItemLines(report: Fixtures.pageCountGate))
         #expect(DocumentEditorView.atRiskItemLines(report: Fixtures.secureFail)
-                == ["Text Layer & Annotations: failed on\u{00A0}page\u{00A0}1"]
+                == ["Text & Annotations in the Redacted PDF: failed on\u{00A0}page\u{00A0}1"]
                     + DocumentEditorView.couldNotVerifyItemLines(report: Fixtures.secureFail))
         for line in DocumentEditorView.atRiskItemLines(report: Fixtures.secureAllFailed) {
             #expect(line.count <= 90, "\(line)")

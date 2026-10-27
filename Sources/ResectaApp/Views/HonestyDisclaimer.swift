@@ -33,7 +33,7 @@ struct HonestyDisclaimer: View {
         case .unredacted:
             "This audit checks for known structural elements and metadata patterns. It is designed to assist with document review but may not detect all forms of embedded or hidden content."
         case .redacted:
-            "This audit checks redaction marks for known failure patterns including text under overlays, recoverable document history, and metadata remnants. Verification is designed to help identify potential issues but cannot guarantee that all content has been successfully removed. Users are responsible for verifying that redaction output meets their specific requirements."
+            "This audit checks redaction marks for known failure patterns including text under the boxes you drew, recoverable document history, and metadata remnants. Verification is designed to help identify potential issues but cannot guarantee that all content has been successfully removed. Users are responsible for verifying that redaction output meets their specific requirements." // LegalPhrases:safe
         }
     }
 }

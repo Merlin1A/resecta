@@ -29,10 +29,12 @@ extension VerificationResultsView {
     /// spoken as commas) and the sentence; on SKIPPED, the title and the
     /// sentence.
     static func mastheadAccessibilityLabel(
-        report: VerificationReport, outputExists: Bool = true, mode: RunMode = .searchableOrUnknown
+        report: VerificationReport, outputExists: Bool = true, mode: RunMode = .searchableOrUnknown,
+        findingCount: Int = 0
     ) -> String {
         let title = mastheadTitle(report: report)
-        let sentence = mastheadSubtitle(report: report, outputExists: outputExists, mode: mode) ?? ""
+        let sentence = mastheadSubtitle(
+            report: report, outputExists: outputExists, mode: mode, findingCount: findingCount) ?? ""
         guard !report.overallStatus.isSkipped else { return "\(title). \(sentence)" }
         let partition = partition(report)
         var parts = ["\(title).", "\(partition.summaryLine1)."]
@@ -103,15 +105,18 @@ extension VerificationResultsView {
     }
 
     /// The masthead sentence, by verdict and the rows behind it. Never nil
-    /// (the optional is the shipped call sites' shape). Static so every arm
-    /// is unit-testable without a SwiftUI host.
+    /// (the optional is the shipped call sites' shape). `findingCount` is
+    /// the number of the results screen's findings the checks cannot see
+    /// (`ResultsFindings`); a passing run counts them as notes. Static so
+    /// every arm is unit-testable without a SwiftUI host.
     static func mastheadSubtitle(
-        report: VerificationReport, outputExists: Bool = true, mode: RunMode = .searchableOrUnknown
+        report: VerificationReport, outputExists: Bool = true, mode: RunMode = .searchableOrUnknown,
+        findingCount: Int = 0
     ) -> String? {
         let partition = partition(report)
         switch report.overallStatus {
         case .pass, .info, .notApplicable:
-            let notes = visibleNoteCount(partition)
+            let notes = visibleNoteCount(partition) + findingCount
             switch notes {
             case 0:
                 return outputExists
@@ -227,9 +232,12 @@ struct VerificationMasthead: View {
     let report: VerificationReport
     let outputExists: Bool
     let mode: VerificationResultsView.RunMode
+    /// The number of the results screen's findings (`ResultsFindings`).
+    var findingCount: Int = 0
 
     var body: some View {
-        let sentence = VerificationResultsView.mastheadSubtitle(report: report, outputExists: outputExists, mode: mode)
+        let sentence = VerificationResultsView.mastheadSubtitle(
+            report: report, outputExists: outputExists, mode: mode, findingCount: findingCount)
         let quotesTerms = VerificationResultsView.mastheadSubtitleIsPrivacySensitive(report: report)
         VStack(spacing: 0) {
             CountRing(content: VerificationMasthead.ringContent(report: report),
@@ -258,7 +266,7 @@ struct VerificationMasthead: View {
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(VerificationResultsView.mastheadAccessibilityLabel(
-            report: report, outputExists: outputExists, mode: mode))
+            report: report, outputExists: outputExists, mode: mode, findingCount: findingCount))
         .accessibilityAddTraits(.isHeader)
         .accessibilityIdentifier("verificationMasthead")
         .privacySensitive(quotesTerms)
