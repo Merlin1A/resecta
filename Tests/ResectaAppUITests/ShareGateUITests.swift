@@ -60,23 +60,45 @@ nonisolated final class ShareGateUITests: XCTestCase {
         attachScreenshot(named: "after-slide")
     }
 
+    /// A completed send (Copy in the share sheet) spends the confirm for
+    /// that send only: the next Share of the same results asks again.
+    func testSecondShareOfTheSameResultsAsksAgain() {
+        openSkippedConfirm()
+        app.slideToShare(confirmIdentifier: "shareSkippedConfirm")
+        XCTAssertTrue(app.shareStarted(within: 10), "The slide must open the share sheet.")
+        let copyCell = app.cells["Copy"]
+        let copy = copyCell.waitForExistence(timeout: 10) ? copyCell : app.buttons["Copy"]
+        XCTAssertTrue(copy.waitForExistence(timeout: 10), "Copy never appeared in the share sheet.")
+        copy.tap()
+        XCTAssertTrue(app.staticTexts["Shared."].waitForExistence(timeout: 10), "The send was never announced.")
+        tapShare()
+        XCTAssertTrue(
+            app.staticTexts[Self.skippedTitle].waitForExistence(timeout: 10),
+            "A second share of the same results must ask again.")
+        XCTAssertFalse(app.shareStarted(within: 1), "A second share must not go straight to the share sheet.")
+    }
+
     // MARK: - Route
 
     private func openSkippedConfirm() {
         app.terminate()
         app.launchArguments = ["--uitesting", "--seedVerifiedReport=secureSkippedOff", "--seedOutput"]
         app.launch()
-        let share = app.buttons
-            .matching(NSPredicate(format: "label BEGINSWITH 'Share Document'"))
-            .firstMatch
-        XCTAssertTrue(share.waitForExistence(timeout: 30), "Share card not found on the seeded results.")
-        share.tap()
+        tapShare()
         XCTAssertTrue(
             app.staticTexts[Self.skippedTitle].waitForExistence(timeout: 10),
             "The skipped confirm never presented.")
         XCTAssertTrue(
             app.buttons["shareRiskConfirmGoBack"].waitForExistence(timeout: 5),
             "Go back never appeared on the confirm.")
+    }
+
+    private func tapShare() {
+        let share = app.buttons
+            .matching(NSPredicate(format: "label BEGINSWITH 'Share Document'"))
+            .firstMatch
+        XCTAssertTrue(share.waitForExistence(timeout: 30), "Share card not found on the seeded results.")
+        share.tap()
     }
 }
 

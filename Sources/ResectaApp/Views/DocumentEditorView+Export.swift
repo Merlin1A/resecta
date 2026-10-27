@@ -121,25 +121,21 @@ extension DocumentEditorView {
     /// The share sheet's `completionWithItemsHandler`
     /// routes through this pure static so the re-arm / announce /
     /// record-export decision is unit-testable without
-    /// `UIActivityViewController`. `completed == false` means the user
-    /// backed out of the sheet without sending — the share-risk confirms
-    /// are spent only for a send that actually happened, so a cancelled
-    /// attempt re-arms all three (`DocumentState.rearmShareRiskConfirms()`)
-    /// for the next Share tap on the same report. `completed ==
-    /// true` announces the share and then records it — the App Store
-    /// review-request check (`ReviewPromptGate`) — leaving the confirms spent
-    /// for this report; a fresh report re-arms via `transition(to:)`'s
-    /// reset instead of this function.
+    /// `UIActivityViewController`. One confirm per send: the risk a confirm
+    /// names is per recipient, so every completion re-arms the share-risk
+    /// confirms (`DocumentState.rearmShareRiskConfirms()`) and the next
+    /// Share tap on the same report asks again, whether this attempt sent
+    /// (`completed == true`) or the user backed out without sending. Only a
+    /// completed send announces the share and then records it — the App
+    /// Store review-request check (`ReviewPromptGate`).
     static func handleShareSheetCompletion(
         completed: Bool,
         documentState: DocumentState,
         announceShared: () -> Void,
         recordSuccessfulExport: () -> Void
     ) {
-        guard completed else {
-            documentState.rearmShareRiskConfirms()
-            return
-        }
+        documentState.rearmShareRiskConfirms()
+        guard completed else { return }
         announceShared()
         recordSuccessfulExport()
     }

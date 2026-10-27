@@ -991,7 +991,7 @@ struct ShareRiskRearmAndAcknowledgmentTests {
         #expect(doc.failShareAcknowledged == false)
     }
 
-    @Test("handleShareSheetCompletion(completed: true) announces exactly once, records the export, and leaves the flags spent")
+    @Test("handleShareSheetCompletion(completed: true) announces exactly once, records the export, and re-arms the flags")
     func completionTrueAnnouncesAndRecordsLeavingFlagsSpent() {
         let doc = DocumentState()
         let original = VerificationReport(layers: [], overallStatus: .fail("x"), durationSeconds: 0)
@@ -1010,10 +1010,10 @@ struct ShareRiskRearmAndAcknowledgmentTests {
 
         #expect(announceCount == 1)
         #expect(recordCount == 1)
-        // A completed send leaves the shadow spent for THIS report — only a
-        // cancelled attempt re-arms; a fresh report re-arms via
-        // transition(to:)'s reset instead.
-        #expect(doc.failShareAcknowledged == true)
+        // One confirm per send: a completed send re-arms the shadow too,
+        // so the next Share of the same report asks again (the risk is per
+        // recipient), as a cancelled attempt does.
+        #expect(doc.failShareAcknowledged == false)
     }
 
     @Test("sharedAcknowledgmentToast exact text")
