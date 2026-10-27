@@ -801,6 +801,7 @@ public actor DocumentSearcher {
         continuation: AsyncStream<SearchResult>.Continuation
     ) async {
         var totalYielded = 0
+        var seam: SeamPage? = nil
 
         for pageIndex in 0..<pageCount {
             if Task.isCancelled { break }
@@ -827,7 +828,9 @@ public actor DocumentSearcher {
                 ) }
                 let hybrid = await hybridOCRLeg(page: page, pageIndex: pageIndex, textLayerRects: results.map(\.normalizedRect),
                     includeOCR: options.includeOCR) { await self.searchPageViaOCR(page: page, pageIndex: pageIndex, query: query, options: options, term: query) }
-                emitCapped(results + hybrid, into: continuation, total: &totalYielded)
+                let seamHits = await pageSeamMatches(from: seam, to: page, pageIndex: pageIndex, pageText: pageText, query: query, options: options, term: query)
+                emitCapped(results + hybrid + seamHits, into: continuation, total: &totalYielded)
+                seam = SeamPage(index: pageIndex, page: page, text: pageText)
             } else if options.includeOCR {
                 // OCR fallback path — page has no usable text layer
                 // (empty, or a `.sparse`/`.none` layer over a scanned body)
@@ -1005,6 +1008,7 @@ public actor DocumentSearcher {
         if options.multiTermConjunction {
             let allTerms = Set(terms)
             var totalYielded = 0
+            var seam: SeamPage? = nil
 
             for pageIndex in 0..<pageCount {
                 if Task.isCancelled || totalYielded >= Self.maxResults { break }
@@ -1032,6 +1036,7 @@ public actor DocumentSearcher {
                         let hits = await withInkFitRead(page) { findTextMatches(pageText: pageText, query: term, options: options, page: page, pageIndex: pageIndex, term: term) }
                         pageHits += hits + (await hybridOCRLeg(page: page, pageIndex: pageIndex, textLayerRects: hits.map(\.normalizedRect), includeOCR: options.includeOCR,
                             reportsWhenOff: term == terms.first) { await self.searchPageViaOCR(page: page, pageIndex: pageIndex, query: term, options: options, term: term) })
+                        pageHits += await pageSeamMatches(from: seam, to: page, pageIndex: pageIndex, pageText: pageText, query: term, options: options, term: term)
                     } else if options.includeOCR {
                         pageHits.append(contentsOf: await searchPageViaOCR(
                             page: page, pageIndex: pageIndex,
@@ -1039,6 +1044,7 @@ public actor DocumentSearcher {
                         ))
                     }
                 }
+                if useTextLayer { seam = SeamPage(index: pageIndex, page: page, text: pageText) }
                 // Scanned region (`.sparse`/`.none`) with OCR
                 // off: not analyzed. Fire once per page, after all terms.
                 if !pageHasRichTextLayer(pageIndex) && !options.includeOCR {
@@ -1056,8 +1062,8 @@ public actor DocumentSearcher {
         }
 
         // OR mode: stream results directly as terms match, page-first.
-        // This arm is unchanged from the pre-AND-mode implementation.
         var totalYielded = 0
+        var seam: SeamPage? = nil
 
         // Page-first iteration: load each page once, search all terms.
         // Fixes progress resetting per-term and improves text locality.
@@ -1088,7 +1094,8 @@ public actor DocumentSearcher {
                     ) }
                     let hybrid = await hybridOCRLeg(page: page, pageIndex: pageIndex, textLayerRects: results.map(\.normalizedRect), includeOCR: options.includeOCR,
                         reportsWhenOff: term == terms.first) { await self.searchPageViaOCR(page: page, pageIndex: pageIndex, query: term, options: options, term: term) }
-                    emitCapped(results + hybrid, into: continuation, total: &totalYielded)
+                    let seamHits = await pageSeamMatches(from: seam, to: page, pageIndex: pageIndex, pageText: pageText, query: term, options: options, term: term)
+                    emitCapped(results + hybrid + seamHits, into: continuation, total: &totalYielded)
                 } else if options.includeOCR {
                     let ocrResults = await searchPageViaOCR(
                         page: page, pageIndex: pageIndex,
@@ -1097,6 +1104,7 @@ public actor DocumentSearcher {
                     emitCapped(ocrResults, into: continuation, total: &totalYielded)
                 }
             }
+            if useTextLayer { seam = SeamPage(index: pageIndex, page: page, text: pageText) }
             // Scanned region (`.sparse`/`.none`) with OCR off:
             // not analyzed. Fire once per page, after all terms.
             if !pageHasRichTextLayer(pageIndex) && !options.includeOCR {
