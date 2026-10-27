@@ -55,6 +55,10 @@ final class PipelineCoordinator: @unchecked Sendable {
     /// output is promoted to its URL (after `finalize()`); never read by
     /// production code. `StopDuringFinalizeTests` takes Stop from it.
     var beforeOutputPromotionSeam: (() -> Void)?
+    /// Test seam: runs on the run's task as verification starts, before
+    /// its detached loads; never read by production code.
+    /// `StopAfterTheCopyTests` takes Stop from it.
+    var beforeVerificationLoadsSeam: (() -> Void)?
     #endif
 
     #if DEBUG

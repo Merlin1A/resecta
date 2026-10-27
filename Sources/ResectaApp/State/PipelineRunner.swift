@@ -399,6 +399,9 @@ struct PipelineRunner {
         runContext: PipelineCoordinator.PipelineRunContext, effectiveMode: PipelineMode,
         burnedRegionVersion: Int
     ) async throws -> PipelineRunOutcome {
+        #if DEBUG
+        coordinator.beforeVerificationLoadsSeam?()
+        #endif
         // `PDFDocument(url:)` is CPU-bound on large outputs; routing
         // through `Task.detached` keeps the MainActor-isolated run free
         // to drive the progress UI.
