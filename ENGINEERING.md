@@ -273,6 +273,9 @@ and declares no collected data types and no tracking, matching `PRIVACY.md`
 tractable: the app's only dependency is its own engine package — there is no
 third-party SDK to audit.
 
+The check without a computer is airplane mode: redaction works unchanged,
+which shows that it needs no network, not what the app does while online.
+
 ## 7. Concurrency and reliability discipline
 
 Both targets build under Swift 6.2 strict concurrency: the app target is
