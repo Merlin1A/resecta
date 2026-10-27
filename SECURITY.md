@@ -135,6 +135,6 @@ The App Store offers only the current version, so a fix reaches you as an update
 
 ## Advisory history
 
-No security advisories have been published for Resecta as of this document's last update. Fixes that came out of the project's own security reviews are recorded in [`CHANGELOG.md`](./CHANGELOG.md), under a release's `Security` heading where it has one.
+No security advisories have been published for Resecta as of this document's last update. The GitHub API's `repos/Merlin1A/resecta/security-advisories` lists the published ones and answers without a login. Fixes that came out of the project's own security reviews are recorded in [`CHANGELOG.md`](./CHANGELOG.md), under a release's `Security` heading where it has one.
 
 Thank you for helping keep Resecta and its users safe.
