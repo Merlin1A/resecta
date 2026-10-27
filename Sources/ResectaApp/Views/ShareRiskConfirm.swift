@@ -276,7 +276,7 @@ enum ShareRiskConfirmKind: Identifiable {
     }
 
     /// Accessibility identifier of the element that completes the share —
-    /// the hidden-but-accessible Button inside `SlideToShareControl`.
+    /// the slide (`SlideToShareControl`), one accessibility element.
     /// `shareAnywayConfirm` / `shareSkippedConfirm` are the former
     /// `.alert` Share buttons' identifiers, kept stable across the
     /// alert→sheet restructure; `shareIncompleteWarnConfirm` is new.
@@ -481,12 +481,13 @@ struct ShareRiskConfirmSheet: View {
 }
 
 /// Engagement control: a swipe-class, cheap-but-physical slide track
-/// (never type-to-confirm). The visible track is the touch
-/// path; a hidden-but-accessible `Button` overlaid at a single point off
-/// the track's hit area carries the family's stable accessibility
-/// identifier and is the VoiceOver / XCUI completion path — VoiceOver
-/// activation and XCUITest's `.tap()` both reach a Button directly, where
-/// neither can replay a physical drag.
+/// (never type-to-confirm). Two completion paths and nothing else: the
+/// visible track is the touch path (drag the knob to the end), and the
+/// track is one accessibility element whose default action completes it,
+/// the assistive path (VoiceOver's double-tap, Switch Control's select).
+/// Nothing invisible is hit-testable, so a tap on the confirm's blank
+/// space never completes it. The element carries the family's stable
+/// accessibility identifier; a UI test completes it by dragging.
 struct SlideToShareControl: View {
     let label: String
     let accessibilityIdentifier: String
@@ -525,33 +526,11 @@ struct SlideToShareControl: View {
                     .onChange(of: geo.size.width) { _, newValue in trackWidth = newValue }
             }
         )
-        .accessibilityHidden(true)
-        // The completion Button is sized to
-        // `ResectaTokens.TouchTarget.minimum` — a real touch target, not
-        // a 1×1 point — because the 1×1 target proved unreliable for a
-        // coordinate-driven activation (XCUITest's `.tap()` on a
-        // re-presented sheet; the same reasoning covers Switch Control
-        // and a pointer click). It stays out of sight by placement, not
-        // by size: anchored to this view's own bottom-leading corner and
-        // pushed further down still, clear of the footer's "Go back"
-        // row, so it lands beneath that row rather than inside the
-        // knob's sweep band (which stays within this view's own height
-        // as it drags) or the "Go back" pill itself (centered, well
-        // short of the row's full width, leaving the space beside and
-        // below it open). No sighted tap lands where this sits.
-        .overlay(alignment: .bottomLeading) {
-            Button(label, action: complete)
-                .frame(
-                    width: ResectaTokens.TouchTarget.minimum,
-                    height: ResectaTokens.TouchTarget.minimum
-                )
-                .contentShape(Rectangle())
-                .opacity(0.02)
-                .offset(y: ResectaTokens.TouchTarget.minimum
-                    + ResectaTokens.Spacing.md
-                    + 34) // clears the "Go back" row
-                .accessibilityIdentifier(accessibilityIdentifier)
-        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier(accessibilityIdentifier)
+        .accessibilityAction { complete() }
     }
 
     private var dragGesture: some Gesture {

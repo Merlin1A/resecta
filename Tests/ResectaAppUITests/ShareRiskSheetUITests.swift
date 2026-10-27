@@ -2,22 +2,19 @@ import XCTest
 
 /// UI test for the share-risk confirm sheet's completion path.
 ///
-/// `SlideToShareControl` (DocumentEditorView.swift) is the
-/// slide-to-confirm control on the share-risk sheet. Its VoiceOver /
-/// XCUITest completion path is a hidden-but-accessible `Button`
-/// overlaid on the visible track, carrying the family's stable
-/// accessibility identifier (`shareAnywayConfirm` / `shareSkippedConfirm`
-/// / `shareIncompleteWarnConfirm`). Measured on the frozen 1.1.0 build: a
-/// 1×1-pt hidden target answered a coordinate `.tap()` on a freshly
-/// presented sheet but not on a RE-presented one. The fix widened the
-/// target to `ResectaTokens.TouchTarget.minimum`, moved into dead space
-/// below the footer's "Go back" row.
+/// `SlideToShareControl` (ShareRiskConfirm.swift) is the
+/// slide-to-confirm control on the share-risk sheet. The slide is one
+/// accessibility element carrying the family's stable accessibility
+/// identifier (`shareAnywayConfirm` / `shareSkippedConfirm` /
+/// `shareIncompleteWarnConfirm`); a UI test completes it by dragging the
+/// knob to the end of the track (`slideToShare(confirmIdentifier:)`,
+/// `ShareGateUITests.swift`), the touch path a user takes.
 ///
 /// This test drives the SKIPPED family end to end, twice, on the real
 /// device tree (no `@testable import` — this is a black-box XCUITest):
 /// once on a freshly presented sheet, once on the sheet re-presented
 /// after backing out of the system share sheet without completing the
-/// share (the exact re-arm path the former 1×1 target failed on).
+/// share (the re-arm path).
 ///
 /// Route to SKIPPED: flip "Verify Before Export" off in Settings so a
 /// redact-without-verify run lands on `.skipped`, which routes Share
@@ -51,7 +48,7 @@ nonisolated final class ShareRiskSheetUITests: XCTestCase {
 
     // MARK: - Test
 
-    func testShareSkippedConfirm_hiddenButtonWorksOnFreshAndRepresentedSheet() {
+    func testShareSkippedConfirm_slideWorksOnFreshAndRepresentedSheet() {
         setVerifyBeforeExport(on: false)
 
         app.terminate()
@@ -77,8 +74,8 @@ nonisolated final class ShareRiskSheetUITests: XCTestCase {
         logMeasuredGeometry()
 
         // First activation, on the freshly presented sheet.
-        app.buttons["shareSkippedConfirm"].tap()
-        attachScreenshot(named: "after-first-hidden-button-tap")
+        app.slideToShare(confirmIdentifier: "shareSkippedConfirm")
+        attachScreenshot(named: "after-first-slide")
         assertSystemShareSheetPresented()
 
         dismissSystemShareSheetWithSwipeDown()
@@ -96,9 +93,8 @@ nonisolated final class ShareRiskSheetUITests: XCTestCase {
         shareCard.tap()
         assertShareRiskSheetPresented()
 
-        // Second activation, on the RE-PRESENTED sheet — the case the
-        // former 1×1 hidden target failed on.
-        app.buttons["shareSkippedConfirm"].tap()
+        // Second activation, on the RE-PRESENTED sheet.
+        app.slideToShare(confirmIdentifier: "shareSkippedConfirm")
         assertSystemShareSheetPresented()
 
         let copyCell = app.cells["Copy"]
@@ -206,8 +202,8 @@ nonisolated final class ShareRiskSheetUITests: XCTestCase {
             "Share-risk confirm sheet title never appeared."
         )
         XCTAssertTrue(
-            app.buttons["shareSkippedConfirm"].waitForExistence(timeout: 10),
-            "shareSkippedConfirm hidden completion Button never appeared."
+            app.descendants(matching: .any)["shareSkippedConfirm"].waitForExistence(timeout: 10),
+            "shareSkippedConfirm slide never appeared."
         )
     }
 
@@ -231,12 +227,12 @@ nonisolated final class ShareRiskSheetUITests: XCTestCase {
 
     // MARK: - Placement measurement (logged once, not asserted)
 
-    /// Prints the hidden Button's frame, the "Go back" row's frame, and
+    /// Prints the slide's frame, the "Go back" row's frame, and
     /// the window frame — the geometry is measured rather than
     /// hardcoded, since the sheet's own render scale is device/OS
     /// dependent.
     private func logMeasuredGeometry() {
-        let confirmFrame = app.buttons["shareSkippedConfirm"].frame
+        let confirmFrame = app.descendants(matching: .any)["shareSkippedConfirm"].frame
         let goBackFrame = app.buttons["shareRiskConfirmGoBack"].frame
         let windowFrame = app.windows.firstMatch.frame
         print("[measured geometry] shareSkippedConfirm.frame = \(confirmFrame)")
