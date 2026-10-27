@@ -148,6 +148,10 @@ asserts the pipeline destroys them
   properties: the text layer no longer contains
   the string; the raw output bytes do not contain the string in UTF-8,
   UTF-16BE, or UTF-16LE; and zero annotations survive into the output.
+- As a control, the same fixture runs through the same path with nothing
+  marked, and the test asserts that the text does survive into the
+  Searchable Redaction output's text layer, so the assertions above depend
+  on the redaction rather than on a read-back that could not see the text.
 
 The same directory carries the wider adversarial set: pixel-destruction
 checks, adversarial verification suites that attack the *checker* rather than
