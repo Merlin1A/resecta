@@ -34,8 +34,9 @@ hook, and the hosted `sim-suite` workflow calls it too.
   other work on the same machine run inside the batches, report-only.
 - **Hosted exclusions** (`TEST_BATCHED_EXCLUDE` in
   `.github/workflows/sim-suite.yml`). Suites whose full verification or OCR
-  pass never returns on the hosted virtual machine are left out there and
-  named in its verdict; local runs and the pre-push hook run them.
+  pass never returns on the hosted virtual machine, and timing pins whose
+  limits that machine cannot meet, are left out there and named in its
+  verdict; local runs and the pre-push hook run them.
 - **Disabled.** A test carrying `.disabled("…")` does not run anywhere. A
   new one says in its reason string why, and what would bring it back.
 
