@@ -72,8 +72,8 @@ and pass the shared `Models/` types between them.
   (`VerificationLayer`) — text extraction, OCR of the rendered output, a
   byte-level string search, structure and metadata checks, five
   text-layer checks in Searchable mode, then a re-run of the applied
-  searches and a sweep of the structured detectors (names and addresses
-  are not swept).
+  searches on the output and, for coverage, on the original page, and a
+  sweep of the structured detectors (names and addresses are not swept).
 
 ## Privacy contract
 
@@ -92,8 +92,8 @@ runtime.
   context snippets, page indices, and normalized rectangles are
   produced per scan and held in memory; no engine API writes them to
   disk. The audit exporter returns CSV / JSON bytes that can carry matched
-  text and page indices, and the app surface that would write them is
-  switched off in Release builds. In the app target, the intra-session
+  text and page indices; no app surface calls it (the search sheet's
+  disabled audit-export surface was removed in 1.3.0). In the app target, the intra-session
   result-diff fingerprint is composed from page, geometry and category
   only — never a hash or copy of matched text.
 - **Saved-search payloads carry query shape only.** In the app target,
