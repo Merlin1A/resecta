@@ -71,9 +71,9 @@ Each of the following is true of the current design and is accepted rather than 
 10. The detection sweep at the end of verification reads the structured categories; names and addresses are not swept, so a name or address you did not mark is not something the sweep reports.
 11. The checks read the text the app can read: the rebuilt text layer where one exists, and OCR of the rendered pages otherwise. A page OCR could not read is listed as not checked, not counted as clear; text that OCR misread is text the checks did not see.
 
-## 7. Security posture as of 2026-10-27 (commit 05b7ae0a)
+## 7. Security posture
 
-Each line names how a reader can check the state without trusting this document. States are what was true on the date above; the repository's settings pages and the files named are the source of truth after that. The state is recorded for the three public repositories (the app, the data pipeline and the sample-document generator) unless a line says otherwise.
+As of 2026-10-27 (commit 05b7ae0a). Each line names how a reader can check the state without trusting this document. States are what was true on that date; the repository's settings pages and the files named are the source of truth after that. The state is recorded for the three public repositories (the app, the data pipeline and the sample-document generator) unless a line says otherwise.
 
 | Control | State | How to check |
 |---|---|---|
@@ -106,4 +106,4 @@ Suspected vulnerabilities go through the channels in [`SECURITY.md`](./SECURITY.
 
 ## About this document
 
-The project keeps an internal review record (issues and evidence) that is not published. What is published is this model, the code, the tests named here, and the changelog's security entries. This document changes when the model changes, and the posture section is re-dated whenever it is re-checked.
+The project keeps an internal review record (issues and evidence) that is not published. What is published is this model, the code, the tests named here, and the changelog's security entries. This document changes when the model changes, and the posture section is re-dated whenever it is re-checked: the date and commit in its first sentence change, and its heading does not, so a link to the section holds.
