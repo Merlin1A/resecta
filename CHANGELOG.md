@@ -14,7 +14,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ### Fixed
 
-- Verification: when a search match runs onto a second line and only one line's box is applied, or one of its boxes is removed, the Search Re-check now reports the match as only partly covered. Before, the line left without a box was read as a match the user chose not to redact, and the checks passed.
+- Verification: when a search match runs onto a second line and only one line's box is applied, or one of its boxes is removed, the Search Re-check now reports the match as only partly covered. Before, the line left without a box was read as a match the user chose not to redact, and the checks passed. The OCR check also reads the words of a redacted search match that open the next line after a box, or end the line before one, as part of the match.
 
 ### Security
 
