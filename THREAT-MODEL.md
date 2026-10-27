@@ -71,7 +71,7 @@ Each of the following is true of the current design and is accepted rather than 
 10. The detection sweep at the end of verification reads the structured categories; names and addresses are not swept, so a name or address you did not mark is not something the sweep reports.
 11. The checks read the text the app can read: the rebuilt text layer where one exists, and OCR of the rendered pages otherwise. A page OCR could not read is listed as not checked, not counted as clear; text that OCR misread is text the checks did not see.
 
-## 7. Security posture as of 2026-10-20 (commit 28b9a777)
+## 7. Security posture as of 2026-10-27 (commit 05b7ae0a)
 
 Each line names how a reader can check the state without trusting this document. States are what was true on the date above; the repository's settings pages and the files named are the source of truth after that. The state is recorded for the three public repositories (the app, the data pipeline and the sample-document generator) unless a line says otherwise.
 
@@ -91,9 +91,9 @@ Each line names how a reader can check the state without trusting this document.
 | Signed detection-data manifest with per-asset digests, and a pinned public-key fingerprint | On | In the engine package: `Detection/GazetteerLoader.swift`, `Detection/Gazetteer/AssetIntegrity.swift`; the `SignedManifestTests`, `AssetTamperMatrixTests` and `ManifestPublicKeyPinTests` suites |
 | Signing-key custody documented (location, backup, rotation, compromise procedure) | On | `KEY-MANAGEMENT.md` in the data pipeline repository |
 | Release build checked for named debug-only launch arguments and for bundled test fixtures before submission | On (a recorded release step) | `Scripts/release-flag-check.sh --archive` |
-| Identity record of the archived release build: executable UUID and digest, linked libraries, imported symbols checked for networking symbols, entitlements, Info.plist keys, privacy manifest, per-file digests | On from 1.2.0 (a recorded release step; the 1.2.0 record was produced from the archive after submission) | `Scripts/release-identity.sh --archive`; `RELEASES/1.2.0-identity.md` |
+| Identity record of the archived release build: executable UUID and digest, linked libraries, imported symbols checked for networking symbols, entitlements, Info.plist keys, privacy manifest, per-file digests | On from 1.2.0 (a recorded release step; the 1.2.0 and 1.3.0 records were each produced from the archive after submission) | `Scripts/release-identity.sh --archive`; `RELEASES/1.2.0-identity.md`, `RELEASES/1.3.0-identity.md` |
 | Signed release tag | `v1.0.0` is a signed annotated tag; `v1.1.0` is an unsigned lightweight tag; release tags from `v1.2.0` on are signed | `git tag -v <tag>` after `git config gpg.ssh.allowedSignersFile .github/allowed_signers` (the recipe in `SECURITY.md`; the key is also published at `https://api.github.com/users/Merlin1A/ssh_signing_keys`); the tag's Verified badge on GitHub |
-| Immutable releases in the app repository: a published release's tag and assets cannot change | On since 2026-10-20 | `gh release verify <tag>` for a release published after the setting was turned on; no release has been published after it yet |
+| Immutable releases in the app repository: a published release's tag and assets cannot change | On since 2026-10-20 | `gh release verify v1.3.0`: v1.3.0, published 2026-10-27, is the first release published after the setting was turned on |
 | Reproducible build of the App Store binary | None | §4 Build and distribution, §6 item 8 |
 | Public threat model | On (this document) | This file |
 | `security.txt` and a published disclosure policy | On | `https://resecta.app/.well-known/security.txt` (expires 2027-04-19) |

@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+### Security
+
+- `THREAT-MODEL.md` §7 re-dated at `05b7ae0a` (2026-10-27), each row re-checked: the identity-record row names the 1.3.0 record beside the 1.2.0 one, and the immutable-releases row names `gh release verify v1.3.0`, the first release published after the setting was turned on.
+
 ## [1.3.0] — 2026-10-26
 
 A password-protected PDF opens with its password, a photo or an image becomes one page of a new PDF you can redact, and a document the app cannot read in full, or whose pages it cannot render, is refused at import rather than opened unscanned. In the editor, Mark Whole Page covers the page on screen with one region and a double-tap returns to the fit zoom. Verification re-runs each applied search and scan on the original page and the OCR check reports a term's start or end read beside a box, so a box placed off its text no longer passes every check; the results list groups each check by its outcome and counts only passing checks as passed. The app opts into Apple's hardened-process protections in their reporting mode, the engine's public surface narrows to the document-runner API, and the surfaces no shipped build reached — the search sheet's disabled diagnostics, the in-editor importer, the paused-detection resume path, and the face, barcode, and signature detectors — are removed.
