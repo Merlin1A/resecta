@@ -353,9 +353,9 @@ assets. The contract between the two repos is enforced, not eyeballed:
   size, and each file is checked against its entry once per process
   (`Detection/Gazetteer/AssetIntegrity.swift`). **Runtime tamper detection of
   the installed app is the app-bundle code signature, which seals these same
-  files.** The manifest's per-asset digests are pipeline-to-bundle provenance,
-  verified at first load, so the bytes the detector reads are the bytes the
-  pipeline shipped. On any verification failure, detection degrades with a
+  files.** The manifest's per-asset digests, verified at first load, show
+  that the bytes the detector reads are the bytes the maintainer's signing run
+  listed. On any verification failure, detection degrades with a
   visible banner — never silently.
 - What that verdict governs, precisely: one memoized verdict
   (`Detection/Gazetteer/GazetteerTrust.swift`, computed once per process) is
