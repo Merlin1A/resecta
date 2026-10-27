@@ -7,8 +7,8 @@ import PDFKit
 // per-line matcher (`searchPageViaOCR`) searches each Vision observation on
 // its own, so it cannot see such a phrase. This pass searches the page's
 // lines joined in reading order, one line feed between them, through the
-// literal tier's own preparation, where a line feed folds to a space as on a
-// text-layer page. Two lines join only when the next one lies below the
+// literal tier's own preparation, where a line feed folds as on a text-layer
+// page (to a space, or to nothing after a word's own hyphen). Two lines join only when the next one lies below the
 // previous one and their spans across the page overlap: lines of different
 // columns never overlap and are kept apart by a character no query holds,
 // while an indented first line, a centred line or a short last line joins. It keeps only the matches that cross a line; a match
@@ -74,7 +74,7 @@ extension DocumentSearcher {
             guard let raw = prepared.rawNSRange(of: match) else { continue }
             let touched = spans.indices.filter { spans[$0].lowerBound < NSMaxRange(raw) && spans[$0].upperBound > raw.location }
             guard touched.count > 1 else { continue }
-            let matchedText = text.substring(with: raw).replacingOccurrences(of: "\n", with: " ")
+            let matchedText = TextNormalizer.foldWhitespaceRuns(text.substring(with: raw))
             let window = contextSnippet(text: joined, matchNSRange: raw)
             let occurrence = UUID()
             for index in touched {
