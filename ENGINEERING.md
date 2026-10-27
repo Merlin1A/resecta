@@ -148,6 +148,10 @@ asserts the pipeline destroys them
   properties: the text layer no longer contains
   the string; the raw output bytes do not contain the string in UTF-8,
   UTF-16BE, or UTF-16LE; and zero annotations survive into the output.
+- As a control, the same fixture runs through the same path with nothing
+  marked, and the test asserts that the text does survive into the
+  Searchable Redaction output's text layer, so the assertions above depend
+  on the redaction rather than on a read-back that could not see the text.
 
 The same directory carries the wider adversarial set: pixel-destruction
 checks, adversarial verification suites that attack the *checker* rather than
@@ -269,6 +273,9 @@ and declares no collected data types and no tracking, matching `PRIVACY.md`
 tractable: the app's only dependency is its own engine package — there is no
 third-party SDK to audit.
 
+The check without a computer is airplane mode: redaction works unchanged,
+which shows that it needs no network, not what the app does while online.
+
 ## 7. Concurrency and reliability discipline
 
 Both targets build under Swift 6.2 strict concurrency: the app target is
@@ -349,9 +356,9 @@ assets. The contract between the two repos is enforced, not eyeballed:
   size, and each file is checked against its entry once per process
   (`Detection/Gazetteer/AssetIntegrity.swift`). **Runtime tamper detection of
   the installed app is the app-bundle code signature, which seals these same
-  files.** The manifest's per-asset digests are pipeline-to-bundle provenance,
-  verified at first load, so the bytes the detector reads are the bytes the
-  pipeline shipped. On any verification failure, detection degrades with a
+  files.** The manifest's per-asset digests, verified at first load, show
+  that the bytes the detector reads are the bytes the maintainer's signing run
+  listed. On any verification failure, detection degrades with a
   visible banner — never silently.
 - What that verdict governs, precisely: one memoized verdict
   (`Detection/Gazetteer/GazetteerTrust.swift`, computed once per process) is

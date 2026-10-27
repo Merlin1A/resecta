@@ -32,6 +32,8 @@ Good "git" signature for security@resecta.app with ED25519 key SHA256:WVeaeef/Q5
 
 Release tags from `v1.2.0` on are signed with this key; `v1.0.0` is a signed annotated tag that verifies the same way, and `v1.1.0` is an unsigned lightweight tag. The same key is published at `https://api.github.com/users/Merlin1A/ssh_signing_keys`.
 
+The key file was added after the `v1.2.0` tag, so for `v1.0.0` and `v1.2.0` the recipe runs from a clone of `main`, as above; from `v1.3.0` the file is in the tagged tree itself, so that tag also verifies against the key file it carries.
+
 ## Reporting a vulnerability
 
 Please report suspected vulnerabilities through either of the following channels:
@@ -88,6 +90,12 @@ The detection-data pipeline ([`resecta-datapipeline`](https://github.com/Merlin1
 - Issues requiring a compromised device, compromised Apple ID, or physical access to an unlocked device.
 - Missing security headers on external websites not controlled by this project.
 
+## What this project is not
+
+- **Not audited.** No third-party security audit has been performed to date.
+- **Not a bounty program.** There is no bug bounty; reporters are credited, as described under Coordinated disclosure below.
+- **Not a compliance or certification product.** Resecta makes no compliance claims and holds no certification against any standard.
+
 ## Safe harbor for good-faith research
 
 Resecta's safe-harbor position is informed by the following authorities:
@@ -135,6 +143,6 @@ The App Store offers only the current version, so a fix reaches you as an update
 
 ## Advisory history
 
-No security advisories have been published for Resecta as of this document's last update. Fixes that came out of the project's own security reviews are recorded in [`CHANGELOG.md`](./CHANGELOG.md), under a release's `Security` heading where it has one.
+No security advisories have been published for Resecta as of this document's last update. The GitHub API's `repos/Merlin1A/resecta/security-advisories` lists the published ones and answers without a login. Fixes that came out of the project's own security reviews are recorded in [`CHANGELOG.md`](./CHANGELOG.md), under a release's `Security` heading where it has one.
 
 Thank you for helping keep Resecta and its users safe.
