@@ -10,6 +10,9 @@ import PDFKit
 // own question, not this one's. The comparison is geometric, so it reads a
 // glyph OCR cannot (a lone digit beside a black box) and is independent of
 // the output's rebuilt text layer, which drops the glyphs a box clips.
+// A match that wraps onto a second line is one occurrence, judged whole:
+// once a search's box touches one of its line pieces, a piece left bare is
+// a shortfall, not a match left unselected (`RegionCoverage+Occurrences`).
 
 struct RegionCoverage: Sendable {
 
@@ -72,11 +75,13 @@ struct RegionCoverage: Sendable {
 
     /// One re-run match on a page: the request it came from, its rect,
     /// and the term the searcher reported for it (a typed search's term, a
-    /// scan's category name) — the term an applied box records.
+    /// scan's category name) — the term an applied box records — and the
+    /// occurrence it is a line piece of, for a match that wraps.
     struct PageMatch {
         let requestIndex: Int
         let rect: CGRect
         var term: String = ""
+        var occurrence: UUID? = nil
     }
 
     /// Whether `region` is a box a search or scan placed for a match of
@@ -105,22 +110,25 @@ struct RegionCoverage: Sendable {
     /// placed for a match and drifted clear of it; each such box pairs with
     /// one untouched match OF THE TERM IT RECORDS, in request then page
     /// order, as a shortfall — a box placed for one term never vouches for
-    /// another term's match left unselected.
+    /// another term's match left unselected. The `settled` line pieces of
+    /// occurrences the occurrence rule judged are not judged again, but
+    /// still count as the matches a box touches or covers.
     static func pageShortfalls(
-        page: Int, matches: [PageMatch], boxes: [RedactionRegion]
+        page: Int, matches: [PageMatch], boxes: [RedactionRegion], settled: [PageMatch] = []
     ) -> [Shortfall] {
         guard !boxes.isEmpty, !matches.isEmpty else { return [] }
         var found: [Shortfall] = []
         var untouched: [(Int, PageMatch, CGFloat)] = []
-        let touches: [[Bool]] = matches.map { match in boxes.map { coveredFraction(of: match.rect, by: [$0]) >= touchedThreshold } }
-        let covers: [[Bool]] = matches.map { match in boxes.map { coveredFraction(of: match.rect, by: [$0]) >= coveredThreshold } }
+        let all = matches + settled
+        let touches: [[Bool]] = all.map { match in boxes.map { coveredFraction(of: match.rect, by: [$0]) >= touchedThreshold } }
+        let covers: [[Bool]] = all.map { match in boxes.map { coveredFraction(of: match.rect, by: [$0]) >= coveredThreshold } }
         for (m, match) in matches.enumerated() {
             let fraction = coveredFraction(of: match.rect, by: boxes)
             if fraction >= coveredThreshold { continue }
             if fraction >= touchedThreshold {
                 let touching = boxes.indices.filter { touches[m][$0] }
                 let onlyNeighbours = touching.allSatisfy { b in
-                    matches.indices.contains { $0 != m && covers[$0][b] }
+                    all.indices.contains { $0 != m && covers[$0][b] }
                 }
                 if !onlyNeighbours {
                     found.append(Shortfall(pageIndex: page, requestIndex: match.requestIndex, coveredFraction: fraction))
@@ -130,7 +138,7 @@ struct RegionCoverage: Sendable {
             }
         }
         let driftedBoxes = boxes.indices.filter { b in
-            isSearchPlaced(boxes[b]) && !matches.indices.contains { touches[$0][b] }
+            isSearchPlaced(boxes[b]) && !all.indices.contains { touches[$0][b] }
         }
         var ordered = untouched.sorted {
             ($0.1.requestIndex, $0.1.rect.minY, $0.1.rect.minX) < ($1.1.requestIndex, $1.1.rect.minY, $1.1.rect.minX)
@@ -188,6 +196,10 @@ struct RegionCoverage: Sendable {
         let searcher = DocumentSearcher(textLayerStatusByPage: status)
         let pagesWithRegions = Set(regions.filter { !$0.value.isEmpty }.keys)
         var matchesByPage: [Int: [PageMatch]] = [:]
+        // Every line piece of a wrapping occurrence, across pages: a piece
+        // off the pages compared still counts when another piece of its
+        // occurrence is compared, so the occurrence is judged whole.
+        var pieces: [PlacedPiece] = []
         for (index, request) in requests.enumerated() where request.origin == .applied {
             if Task.isCancelled { break }
             let configuration = request.record.scanConfiguration
@@ -206,22 +218,39 @@ struct RegionCoverage: Sendable {
             await searcher.setUserTermsTimeoutSink { page, _ in reads.timedOut(page) }
             await searcher.setRegexRejectionSink { _ in reads.refused() }
             let stream = searcher.search(source, mode: request.record.query.searchMode, progress: { _, _ in })
+            var strays: [PlacedPiece] = []
+            var comparedOccurrences = Set<UUID>()
             for await result in stream {
                 if Task.isCancelled { break }
-                if !request.appliedPages.isEmpty, !request.appliedPages.contains(result.pageIndex) { continue }
-                guard let pageRegions = regions[result.pageIndex], !pageRegions.isEmpty else { continue }
-                matchesByPage[result.pageIndex, default: []].append(
-                    PageMatch(requestIndex: index, rect: result.normalizedRect.clampedToNormalized(), term: result.term))
+                let match = PageMatch(
+                    requestIndex: index, rect: result.normalizedRect.clampedToNormalized(),
+                    term: result.term, occurrence: result.occurrenceID)
+                let onAppliedPage = request.appliedPages.isEmpty || request.appliedPages.contains(result.pageIndex)
+                guard onAppliedPage, !(regions[result.pageIndex] ?? []).isEmpty else {
+                    if result.occurrenceID != nil { strays.append(PlacedPiece(page: result.pageIndex, match: match)) }
+                    continue
+                }
+                matchesByPage[result.pageIndex, default: []].append(match)
+                if let occurrence = result.occurrenceID {
+                    comparedOccurrences.insert(occurrence)
+                    pieces.append(PlacedPiece(page: result.pageIndex, match: match))
+                }
             }
+            pieces.append(contentsOf: strays.filter { $0.match.occurrence.map(comparedOccurrences.contains) ?? false })
             await searcher.setPageCoverageSink(nil)
             await searcher.setRegexTimeoutSink(nil)
             await searcher.setUserTermsTimeoutSink(nil)
             await searcher.setRegexRejectionSink(nil)
             unread.formUnion(reads.unreadPages(among: candidates))
         }
-        var found: [Shortfall] = []
+        let occurrences = occurrenceShortfalls(pieces: pieces, regions: regions)
+        var found = occurrences.shortfalls
         for page in matchesByPage.keys.sorted() {
-            found.append(contentsOf: pageShortfalls(page: page, matches: matchesByPage[page] ?? [], boxes: regions[page] ?? []))
+            let onPage = matchesByPage[page] ?? []
+            let isSettled = { (match: PageMatch) in match.occurrence.map(occurrences.settled.contains) ?? false }
+            found.append(contentsOf: pageShortfalls(
+                page: page, matches: onPage.filter { !isSettled($0) }, boxes: regions[page] ?? [],
+                settled: onPage.filter(isSettled)))
         }
         let compared = matchesByPage.values.reduce(0) { $0 + $1.count }
         return Outcome(shortfalls: found, unreadPages: unread.sorted(), comparedMatches: compared)

@@ -108,4 +108,89 @@ struct OccurrenceCoverageTests {
         let unselected = try await Self.recheck(data, request: request, regions: [manual])
         #expect(!unselected.status.isFail, "got \(unselected.status)")
     }
+
+    // MARK: - The pairing rule over hand-built pieces
+
+    private static let upper = CGRect(x: 0.40, y: 0.60, width: 0.12, height: 0.02)
+    private static let lower = CGRect(x: 0.10, y: 0.575, width: 0.14, height: 0.02)
+
+    private static func piece(_ rect: CGRect, page: Int = 0, occurrence: UUID?, term: String = name) -> RegionCoverage.PlacedPiece {
+        RegionCoverage.PlacedPiece(page: page, match: RegionCoverage.PageMatch(requestIndex: 0, rect: rect, term: term, occurrence: occurrence))
+    }
+
+    private static func searchBox(_ rect: CGRect, term: String = name) -> RedactionRegion {
+        RedactionRegion(id: UUID(), normalizedRect: rect, source: .searchMatch(term: term))
+    }
+
+    @Test("Two pieces of one occurrence, the first under its search box and the second bare: one shortfall on the bare piece's page; without an occurrence, nothing (left unselected)")
+    func onePieceBoxed() {
+        let id = UUID()
+        let result = RegionCoverage.occurrenceShortfalls(
+            pieces: [Self.piece(Self.upper, occurrence: id), Self.piece(Self.lower, occurrence: id)],
+            regions: [0: [Self.searchBox(Self.upper)]])
+        #expect(result.shortfalls.count == 1 && result.shortfalls.first?.pageIndex == 0, "\(result.shortfalls)")
+        #expect(result.settled == [id])
+        // Area-weighted over the occurrence: the boxed piece is 12/26 of its area.
+        let fraction = result.shortfalls.first?.coveredFraction ?? 0
+        #expect(abs(fraction - 12.0 / 26.0) < 0.03, "\(fraction)")
+        let none = RegionCoverage.occurrenceShortfalls(
+            pieces: [Self.piece(Self.upper, occurrence: nil), Self.piece(Self.lower, occurrence: nil)],
+            regions: [0: [Self.searchBox(Self.upper)]])
+        #expect(none.shortfalls.isEmpty && none.settled.isEmpty)
+    }
+
+    @Test("Both pieces covered: settled, no shortfall; neither touched: not settled, so the pieces stay with the per-page rule (and its drifted-box pairing)")
+    func coveredAndUntouched() {
+        let id = UUID()
+        let pieces = [Self.piece(Self.upper, occurrence: id), Self.piece(Self.lower, occurrence: id)]
+        let both = RegionCoverage.occurrenceShortfalls(pieces: pieces, regions: [0: [Self.searchBox(Self.upper), Self.searchBox(Self.lower)]])
+        #expect(both.shortfalls.isEmpty && both.settled == [id])
+        let drifted = Self.searchBox(CGRect(x: 0.70, y: 0.30, width: 0.12, height: 0.02))
+        let neither = RegionCoverage.occurrenceShortfalls(pieces: pieces, regions: [0: [drifted]])
+        #expect(neither.shortfalls.isEmpty && neither.settled.isEmpty)
+        // The per-page rule still pairs the drifted box with an untouched piece of its term.
+        let perPage = RegionCoverage.pageShortfalls(page: 0, matches: pieces.map(\.match), boxes: [drifted])
+        #expect(perPage.count == 1, "\(perPage)")
+    }
+
+    @Test("Three pieces, one bare: one shortfall; pieces on two pages: one shortfall on the bare piece's page")
+    func threePiecesAndTwoPages() {
+        let id = UUID()
+        let middle = CGRect(x: 0.10, y: 0.55, width: 0.30, height: 0.02)
+        let three = RegionCoverage.occurrenceShortfalls(
+            pieces: [Self.piece(Self.upper, occurrence: id), Self.piece(middle, occurrence: id), Self.piece(Self.lower.offsetBy(dx: 0, dy: -0.05), occurrence: id)],
+            regions: [0: [Self.searchBox(Self.upper), Self.searchBox(middle)]])
+        #expect(three.shortfalls.count == 1, "\(three.shortfalls)")
+        let seam = UUID()
+        let pages = RegionCoverage.occurrenceShortfalls(
+            pieces: [Self.piece(CGRect(x: 0.40, y: 0.05, width: 0.12, height: 0.02), page: 2, occurrence: seam),
+                     Self.piece(CGRect(x: 0.10, y: 0.92, width: 0.14, height: 0.02), page: 3, occurrence: seam)],
+            regions: [2: [Self.searchBox(CGRect(x: 0.40, y: 0.05, width: 0.12, height: 0.02))]])
+        #expect(pages.shortfalls.map(\.pageIndex) == [3], "\(pages.shortfalls)")
+    }
+
+    @Test("A hand box never vouches for a search occurrence; a box placed for another term neither")
+    func handAndOtherTermBoxes() {
+        let id = UUID()
+        let pieces = [Self.piece(Self.upper, occurrence: id), Self.piece(Self.lower, occurrence: id)]
+        let hand = RedactionRegion(id: UUID(), normalizedRect: Self.upper, source: .manual)
+        let byHand = RegionCoverage.occurrenceShortfalls(pieces: pieces, regions: [0: [hand]])
+        #expect(byHand.shortfalls.isEmpty && byHand.settled.isEmpty)
+        let other = RegionCoverage.occurrenceShortfalls(pieces: pieces, regions: [0: [Self.searchBox(Self.upper, term: "OTHER")]])
+        #expect(other.shortfalls.isEmpty && other.settled.isEmpty)
+    }
+
+    @Test("A neighbour's box grazing the bare piece: still one shortfall; and a box over a settled piece is never read as drifted by the per-page rule")
+    func grazingAndSettledPieces() {
+        let id = UUID()
+        let pieces = [Self.piece(Self.upper, occurrence: id), Self.piece(Self.lower, occurrence: id)]
+        let neighbour = Self.searchBox(CGRect(x: 0.23, y: 0.575, width: 0.20, height: 0.02), term: "OTHER")
+        let grazed = RegionCoverage.occurrenceShortfalls(pieces: pieces, regions: [0: [Self.searchBox(Self.upper), neighbour]])
+        #expect(grazed.shortfalls.count == 1, "\(grazed.shortfalls)")
+        // The page also carries another match of the name, left unselected. With the occurrence settled, the
+        // box over its first piece touches a settled match, so it is not a drifted box vouching for that match.
+        let elsewhere = RegionCoverage.PageMatch(requestIndex: 0, rect: CGRect(x: 0.10, y: 0.30, width: 0.26, height: 0.02), term: Self.name)
+        let settled = RegionCoverage.pageShortfalls(page: 0, matches: [elsewhere], boxes: [Self.searchBox(Self.upper)], settled: pieces.map(\.match))
+        #expect(settled.isEmpty, "\(settled)")
+    }
 }
