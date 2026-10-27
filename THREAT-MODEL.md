@@ -31,7 +31,7 @@ Resecta is offline and single-user, so the remote attacker of most threat models
 - **Import.** Untrusted bytes arrive as a PDF or an image (JPEG, PNG or HEIC) from Files, as photos from the system Photos picker, or dropped onto an open document, and are parsed by Apple's PDFKit, Core Graphics and Image I/O; text recognition runs through Apple's Vision framework. At the boundary, in the order the checks run:
   - a dropped payload whose leading bytes carry an image signature other than JPEG, PNG or HEIC is declined;
   - a file over 50 MB is refused;
-  - the file is routed by its leading bytes, then validated by parsing its content; a dropped payload that does not parse as a PDF is declined here;
+  - the file is routed by its leading bytes (the type its extension declares is recorded, not trusted), then validated by parsing its content; a dropped payload that does not parse as a PDF is declined here;
   - an image is decoded only when Image I/O reports one of the accepted types, as a single still image (for HEIC, its primary image), with pixel dimensions inside the decode limit; an animated, incomplete or oversized image is refused; larger photos are downsampled at decode; the decoded image is redrawn from its pixels into a new page at 300 pixels per inch, so embedded metadata, thumbnails, auxiliary images and a Live Photo's video are not carried into the document;
   - a PDF that needs a password to open is opened only with the password you enter, and is refused if, once unlocked, it cannot be read in full; a PDF protected only by an owner password opens without a prompt and the app says so; the redacted copy is not password-protected;
   - page-count and page-dimension limits apply;
