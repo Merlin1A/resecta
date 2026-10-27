@@ -32,6 +32,8 @@ Good "git" signature for security@resecta.app with ED25519 key SHA256:WVeaeef/Q5
 
 Release tags from `v1.2.0` on are signed with this key; `v1.0.0` is a signed annotated tag that verifies the same way, and `v1.1.0` is an unsigned lightweight tag. The same key is published at `https://api.github.com/users/Merlin1A/ssh_signing_keys`.
 
+The key file was added after the `v1.2.0` tag, so for `v1.0.0` and `v1.2.0` the recipe runs from a clone of `main`, as above; from `v1.3.0` the file is in the tagged tree itself, so that tag also verifies against the key file it carries.
+
 ## Reporting a vulnerability
 
 Please report suspected vulnerabilities through either of the following channels:
