@@ -14,14 +14,16 @@ extension DocumentState {
         phaseKind == .editing && activePipelineTask != nil
     }
 
-    /// The phase the editor's chrome shows.
+    /// The phase the editor's chrome shows: a pending run reads as
+    /// `.redacting`, so the toolbar offers Stop, the progress card covers
+    /// the canvas and leaving the app pauses the run from the Redact tap.
     var runChromePhaseKind: PhaseKind {
-        phaseKind
+        isRunPending ? .redacting : phaseKind
     }
 
-    /// Region edits are open to the editor's doors.
+    /// Region edits are open: the phase admits them and no run is pending.
     var regionEditsOpen: Bool {
-        canMutateRegions
+        canMutateRegions && !isRunPending
     }
 
     /// The canvas is locked: disabled, blurred and under the progress card.
