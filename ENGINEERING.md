@@ -64,7 +64,8 @@ Rasterization output gets seven layers, numbered here in the engine's order:
 
 1. text extraction over every page;
 2. OCR of the rendered output, with word-level boxes gated against the
-   redacted regions;
+   redacted regions, which also reports the start or the end of a redacted
+   term read beside a box;
 3. a byte-level sweep of the raw file outside its stream data, plus a re-scan
    of each page's decoded text, for the sensitive terms that were redacted;
 4. structural checks for active content and tampering (JavaScript, automatic
@@ -74,7 +75,9 @@ Rasterization output gets seven layers, numbered here in the engine's order:
 5. metadata checks;
 6. a search re-check that re-runs each search you applied through the search
    engine itself against the output (OCR of the rendered pages in this mode)
-   and reports what it observed per search;
+   and reports what it observed per search, and re-runs each applied search
+   and scan on the original page to fail a box that leaves part of its match
+   uncovered;
 7. a detection sweep that runs the app's structured detectors on the output
    through the search engine (by OCR in this mode; names and addresses are
    not swept) and reports what remains in those categories, minus what you
@@ -105,7 +108,9 @@ Details a reviewer should know exist:
   lines or states, never folded into a pass.
 - The verdict tiers are calibrated against alarm fatigue: conditions that are
   expected under the chosen mode read as passing checks with a detail line,
-  while every could-not-verify condition keeps its severity. A warning tier
+  a check that had nothing to check is listed under Nothing to check and
+  neither passes the document nor lowers its result, and every
+  could-not-verify condition keeps its severity. A warning tier
   that fires on every normal document carries no information.
 - Verification is advisory by design. A failed or attention-level verdict, a
   check that reports something it could not verify, any skipped check, or a
@@ -270,11 +275,13 @@ Both targets build under Swift 6.2 strict concurrency: the app target is
 MainActor-by-default, the engine package is non-MainActor with explicitly
 concurrent entry points. The working rules, checkable by grep:
 
-- The app target contains **one** `DispatchQueue` reference (a labeled serial
-  queue for writes to the in-memory thumbnail cache) and **zero** `.main.async`
-  calls — main-thread work is expressed through actor isolation, not queue hops.
+- The app target contains **two** `DispatchQueue` references: a labeled
+  serial queue for writes to the in-memory thumbnail cache, and one
+  `.main.async` hop in the results screen's preview, which waits for the PDF
+  view's first layout before it opens a linked page. Main-thread work is
+  otherwise expressed through actor isolation, not queue hops.
 - Isolation opt-outs are rare and deliberate: 19 `nonisolated(unsafe)`
-  declarations across ~68,000 lines of app + engine source, and the working
+  declarations across ~69,000 lines of app + engine source, and the working
   convention is a written rationale at the declaration site saying why the
   access is safe.
 - Logging goes through `os.Logger`, and what a log line may carry is
@@ -405,7 +412,7 @@ search, rebuild, verify and export without the app's view code:
 - Export: `TempExportDirectory` · `TempFileHardening` · `ExportMetadata` ·
   `MatchAuditExporter`
 
-`TextSpan.words(fullyInside:polygon:on:)` returns the words of a page's text
+`TextSpan.words(fullyInside:on:)` returns the words of a page's text
 layer fully inside a region, in the displayed frame. At the start of each run
 the app captures a manual region's words, on pages with a usable text layer,
 as terms the verification pass searches for. It takes the words the
@@ -413,8 +420,9 @@ searchable redaction would touch, line by line. A region over exactly one
 word keeps that word as one bounded term. Otherwise each captured line of two
 or more words becomes one term, the page text's own span from its first word
 to its last, and each word of the line joins as a bounded term when it holds
-a digit or has four characters or more and is not on the stop list of common
-words. Lines never join across. A region covering the whole page adds no
+a digit, is a capitalized word of two or three letters (a short surname such
+as Lee or Ng), or has four characters or more, and is not on the stop list of
+common words. Lines never join across. A region covering the whole page adds no
 term, and a region on a page without a usable text layer is counted, not
 captured.
 
@@ -439,8 +447,8 @@ If you review one path end-to-end, make it this one:
 `Pipeline/PDFStreamReconstructor.swift` (rebuild) →
 `Verification/VerificationEngine.swift` (the layered pass over the output) →
 `SecurityTests/FakeRedactionTests.swift` (the named attack, pinned). The test
-tree is larger than the source tree — about 68,000 lines of source to about
-112,000 lines of tests; counts and structure are in the README's Testing
+tree is larger than the source tree — about 69,000 lines of source to about
+114,000 lines of tests; counts and structure are in the README's Testing
 section — and the suites above are the reason I trust my own output enough to
 ship it.
 
