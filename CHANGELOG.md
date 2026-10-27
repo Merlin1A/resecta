@@ -37,6 +37,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 - Search: a name or number broken at its own hyphen across two lines, such as a surname a word processor wraps after the hyphen, is now found as typed, with a box on each line. A soft hyphen inside a word is now ignored, so the word matches without it. Before, the line break after a hyphen read as a space and the phrase was not found.
 - Search: a phrase that starts at the end of one page and continues at the top of the next, past a repeated page header or footer, is now found, with a box on each page. Before, each page was searched on its own.
+- Stop, or leaving the app, in the moment after the redacted copy is built keeps the copy and shows the results as Verification Skipped, instead of discarding the copy.
 
 ### Security
 

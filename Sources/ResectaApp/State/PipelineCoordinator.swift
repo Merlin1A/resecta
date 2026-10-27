@@ -275,18 +275,8 @@ final class PipelineCoordinator: @unchecked Sendable {
         // the first per-layer transition) lands on the legal
         // .verifying → .failed pair instead of the not-listed
         // .verified → .failed pair (see DocumentState.legalTransitions).
-        // The initial layer count is taken from the verifier so the
-        // progress UI shows the correct total from frame 0.
-        let verifier = VerificationEngine()
-        let scheduledLayers = verifier.layers(for: effectiveMode)
         documentState.transition(to: .verifying(
-            progress: .init(
-                currentLayer: 1,
-                totalLayers: scheduledLayers.count,
-                layerName: scheduledLayers.first?.name ?? "",
-                completedLayers: []
-            )
-        ))
+            progress: PipelineRunner.initialVerifyingProgress(for: effectiveMode)))
 
         launch(.verifyOnly(outputURL: outputURL, effectiveMode: effectiveMode))
     }
