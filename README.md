@@ -4,7 +4,7 @@
 
 [![Download on the App Store](https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/black/en-us?releaseDate=1786492800)](https://apps.apple.com/us/app/resecta/id6786922787)
 
-On-device iOS 26 PDF redaction. Free, open-source, zero data collection — all processing happens on your device.
+Resecta is a free, open-source iPhone app that redacts PDFs on-device and verifies the output. It runs on iOS 26, collects no data, and makes no network requests of its own.
 
 **App Store:** [apps.apple.com/us/app/resecta/id6786922787](https://apps.apple.com/us/app/resecta/id6786922787) · **Website:** [resecta.app](https://resecta.app)
 
@@ -30,7 +30,7 @@ The core workflow is:
 2. **View** pages and navigate the document.
 3. **Mark** regions for redaction by drawing rectangles, by marking a whole page from the page bar, or by selecting and applying results from Search (text, pattern, and multi-term matching) or Scan (on-device text detection).
 4. **Apply** redaction. Every page is rasterized, marked or not — vector text and images are converted into flat bitmap data, marked regions are overwritten in those pixels, and the rebuilt file is designed to leave the original text layer out. Source metadata (author, editing history and the rest) is stripped; the rebuilt file carries a producer tag replaced with a fixed value, timestamps rewritten to a fixed date and a file identifier derived from the file's own bytes, so the export is not metadata-free — see [`PRIVACY.md`](./PRIVACY.md).
-5. **Verify.** By default, a multi-layer verification engine then scans the output for residual content using text extraction, OCR, binary string search across multiple encodings, structural analysis, and metadata checks, re-runs each search you applied, and runs a detection sweep on the output.
+5. **Verify.** By default, a multi-layer verification engine then scans the output for residual content using text extraction, OCR, binary string search across multiple encodings, structural analysis, and metadata checks, re-runs each search you applied on the output, checks on the original page that each box covers the whole match it came from, and runs a detection sweep on the output. The results list groups each check by its outcome and counts only passing checks as passed.
 6. **Export** via the system share sheet.
 
 ## Two modes
@@ -134,13 +134,13 @@ Tests and gates: [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
 ## Testing
 
-The test tree is larger than the source tree: roughly 68,000 lines of Swift source to roughly 112,000 lines of test code, about 1.6×. Counted from the current tree:
+The test tree is larger than the source tree: roughly 69,000 lines of Swift source to roughly 114,000 lines of test code, about 1.6×. Counted from the current tree:
 
 - **Engine package** (`Packages/RedactionEngine/Tests`) — 2,100 Swift Testing `@Test` functions across 291 suites: the pipeline and rasterization, the verification layers, the security suites (fake redaction, pixel destruction, rotated-page coordinates, adversarial verification), search, detection, and the corpus measurement harnesses.
 - **App target** (`Tests/ResectaAppTests`) — 2,033 `@Test` functions across 312 suites: the pipeline state machine, cancellation and restart races, view-level predicates, and the honesty guards that keep the docs and UI copy accurate.
 - **UI / end-to-end** (`Tests/ResectaAppUITests`) — 83 XCUITest methods that drive the built app on a simulator (run from Xcode; the batched runner and CI build them without running them): the first-launch legal gate, search-to-redaction flows, the search re-check on the results screen, and the editor's handling of links inside a document.
 
-Together the suites carry about 11,400 `#expect`/`#require` assertions. Beyond ordinary coverage, they pin the things this project cannot afford to regress: the named fake-redaction attacks (text under an opaque annotation must be destroyed at the text-layer, byte, and annotation level), the rotation × geometry placement matrix, fill-readback edge cases, cancellation and restart races, and the app's own copy — overclaiming is treated as a defect class with its own red tests. The reasoning behind that structure is in [`ENGINEERING.md`](./ENGINEERING.md).
+Together the suites carry about 11,600 `#expect`/`#require` assertions. Beyond ordinary coverage, they pin the things this project cannot afford to regress: the named fake-redaction attacks (text under an opaque annotation must be destroyed at the text-layer, byte, and annotation level), the rotation × geometry placement matrix, fill-readback edge cases, cancellation and restart races, and the app's own copy — overclaiming is treated as a defect class with its own red tests. The reasoning behind that structure is in [`ENGINEERING.md`](./ENGINEERING.md).
 
 The commands that run both suites locally, and what the batched runner reports, are in [`CONTRIBUTING.md`](./CONTRIBUTING.md#running-the-tests).
 

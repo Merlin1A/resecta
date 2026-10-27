@@ -21,7 +21,7 @@ Release tags are signed with an SSH key. [`.github/allowed_signers`](./.github/a
 ```sh
 git clone https://github.com/Merlin1A/resecta.git && cd resecta
 git config gpg.ssh.allowedSignersFile .github/allowed_signers
-git tag -v v1.2.0
+git tag -v v1.3.0
 ```
 
 The first line of the output reads:
