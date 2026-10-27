@@ -80,7 +80,7 @@ As of 2026-10-27 (commit 05b7ae0a). Each line names how a reader can check the s
 | Secret scanning | On | Each repository's Settings → Code security; or the GitHub API `security_and_analysis` field |
 | Push protection | On | The same page |
 | Dependabot alerts and security updates | On | The same page; `.github/dependabot.yml` lists the ecosystems that receive version updates |
-| Private vulnerability reporting | On | Each repository's Security tab shows "Report a vulnerability" |
+| Private vulnerability reporting | On | Each repository's Security tab shows "Report a vulnerability"; the GitHub API's `repos/Merlin1A/resecta/private-vulnerability-reporting`, readable without a login, answers `"enabled": true`, and the other two repositories answer at the same path |
 | CodeQL code scanning | On; in the app repository the analysis runs from a workflow in the repository that builds the Xcode project, so the app target and the engine package are both in the Swift database; the data-pipeline and sample-document repositories stay on the default setup (Actions and Python) | Each repository's Security tab → Code scanning; the Swift database's file list, through the code-scanning API; `.github/workflows/codeql.yml` in the app repository |
 | GitHub Actions allow-listed and pinned to full commit SHAs (the repository setting requires the pins) | On | Each repository's Settings → Actions → General; read any workflow file under `.github/workflows` |
 | Branch rules on `main`: pull requests only; the required checks must pass on an up-to-date branch (`pr-gate` in the app, `gate` in the data pipeline, `build` and `lint` in the sample-document generator); no force-push or deletion | On; the admin role may bypass the ruleset on a pull request | Each repository's Settings → Rules; the GitHub API's `repos/Merlin1A/resecta/rulesets`, readable without a login, lists the rulesets, and each ruleset's rules are at `rulesets/<id>` under that path (the bypass list shows only to a repository role); the other two repositories answer at the same paths |
@@ -98,7 +98,7 @@ As of 2026-10-27 (commit 05b7ae0a). Each line names how a reader can check the s
 | Public threat model | On (this document) | This file |
 | `security.txt` and a published disclosure policy | On | `https://resecta.app/.well-known/security.txt` (expires 2027-04-19) |
 | Mail authentication on the reporting domain | DMARC `p=reject`; SPF `-all` (since 2026-10-20) | `dig +short TXT _dmarc.resecta.app` and `dig +short TXT resecta.app` |
-| Secrets and access on the public repositories | No Actions secrets; one collaborator; no deploy keys or webhooks | The GitHub API `actions/secrets`, `collaborators`, `keys`, `hooks` endpoints |
+| Secrets and access on the public repositories | No Actions secrets, variables or environments, so no workflow can sign or upload a build; one collaborator; no deploy keys or webhooks | The GitHub API's `actions/secrets`, `actions/variables`, `collaborators`, `keys` and `hooks` endpoints answer only to a repository role, and its `environments` endpoint answers without a login; the public contributors graph (the repository's Insights → Contributors, or the API's `repos/Merlin1A/resecta/contributors`) shows who has committed |
 
 ## 8. How to report
 
