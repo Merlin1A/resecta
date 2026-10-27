@@ -90,6 +90,12 @@ The detection-data pipeline ([`resecta-datapipeline`](https://github.com/Merlin1
 - Issues requiring a compromised device, compromised Apple ID, or physical access to an unlocked device.
 - Missing security headers on external websites not controlled by this project.
 
+## What this project is not
+
+- **Not audited.** No third-party security audit has been performed to date.
+- **Not a bounty program.** There is no bug bounty; reporters are credited, as described under Coordinated disclosure below.
+- **Not a compliance or certification product.** Resecta makes no compliance claims and holds no certification against any standard.
+
 ## Safe harbor for good-faith research
 
 Resecta's safe-harbor position is informed by the following authorities:
