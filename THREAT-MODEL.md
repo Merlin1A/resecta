@@ -2,7 +2,7 @@
 
 This document states what Resecta is built to protect, whom it is built to protect it from, where its trust boundaries lie, and what it does not claim to handle. It is the model the project's own security work is measured against, and it is published so that anyone can hold the code to it. It describes design intent and mechanisms. It is not a promise of any outcome: no tool can confirm that a redaction is complete, and the verification pass is a check, not a substitute for your own review.
 
-Companion documents: [`SECURITY.md`](./SECURITY.md) (how to report a vulnerability, scope, safe harbor), [`PRIVACY.md`](./PRIVACY.md) (what the app stores and what it does not), [`ENGINEERING.md`](./ENGINEERING.md) (how each load-bearing claim is checked in this repository).
+Companion documents: [`SECURITY.md`](./SECURITY.md) (how to report a vulnerability, scope, safe harbor), [`PRIVACY.md`](./PRIVACY.md) (what the app stores and what it does not), [`ENGINEERING.md`](./ENGINEERING.md) (how each load-bearing claim is checked in this repository), [`RELEASES/`](./RELEASES/) (the release identity records, such as `RELEASES/1.3.0-identity.md`: what the archived build of a release is, field by field), and the data pipeline's [`KEY-MANAGEMENT.md`](https://github.com/Merlin1A/resecta-datapipeline/blob/main/KEY-MANAGEMENT.md) (what the detection-data signature proves, and the key's custody).
 
 ## 1. The promise, and why the promise is the threat
 
