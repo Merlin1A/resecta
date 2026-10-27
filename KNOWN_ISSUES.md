@@ -75,7 +75,7 @@ page when the draw completes; no output is produced from a failed run.
 ### KI-10: Rectangle Edges Do Not Align to Text Rows (Low)
 **Affects:** Rectangle draw tool
 
-While drawing, rectangle edges align to other boxes and page guides; alignment to recognized text rows is not available in this release.
+While drawing, rectangle edges align to other boxes and page guides; alignment to recognized text rows is not available.
 
 ---
 
@@ -136,7 +136,7 @@ A photo whose full-size copy is kept only in iCloud, as with Optimize iPhone Sto
 
 On a page that is a picture, such as a photo, a screenshot or a scan without its own text, Search reads the text with on-device text recognition, which reports where each line is rather than each word. A box placed from a Search match on such a page covers the whole line that holds the match, so the other words on that line are covered too.
 
-**Workaround:** Before you tap Redact, select the box and drag its handles in to the word.
+**Workaround:** Before you tap Redact, select the box and drag its handles in to the word, leaving a margin around its letters: a box drawn to the edges of the letters can leave part of them readable. Check the page in the preview before you share.
 
 ---
 
@@ -179,5 +179,5 @@ toast with `actionLabel: "Re-run"` that invokes
 
 ### Earlier review fixes
 
-- 2026-05-12 — regex pathological-shape gate and cooperative cancellation in regex search; image-import decode moved off the main actor (image input later removed in 1.2.0); overlay long-press timer invalidated on view recycling.
+- 2026-05-12 — regex pathological-shape gate and cooperative cancellation in regex search; image-import decode moved off the main actor (image input was removed in 1.2.0 and returned in 1.3.0 through a new loader); overlay long-press timer invalidated on view recycling.
 - 2026-05-13 — whole-word regex range mapping fixed for non-ASCII text (a crash); the detection review's dismiss ordering fixed.
