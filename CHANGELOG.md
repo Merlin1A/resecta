@@ -6,8 +6,16 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+### Changed
+
+- Documentation: the threat model names the import caps — 500 pages, 5,000 points on a side, and an image that declares more than 100 million pixels refused before it is decoded — and its network notes name the name-recognition model iOS fetches on its own and the iCloud download of a photo or a file stored only there.
+- Documentation: the threat model, the engineering notes and the README's claims map word the detection-data signature as the key-management document does: the bytes the detector reads are the bytes the maintainer's signing run listed.
+- Documentation: the engineering notes describe the fake-redaction suite's control, which asserts that the text survives when nothing is marked.
+
 ### Security
 
+- `THREAT-MODEL.md` §7 is headed "Security posture", with its date and commit in its first sentence, so a link to it holds across re-dates. The branch-rules row names each repository's required check, the up-to-date-branch rule and the `rulesets/<id>` path, and says the admin role may bypass the ruleset on a pull request; the reporting and secrets rows give their public API paths and the contributors graph; the flag-check row names one launch argument. No state changed, and the section keeps its 2026-10-27 date.
+- `SECURITY.md` says why `v1.0.0` and `v1.2.0` verify from a clone of `main`, names the public API path that lists published advisories, and states that the project has had no third-party security audit, runs no bug bounty, and makes no compliance claims.
 - `THREAT-MODEL.md` §7 re-dated at `05b7ae0a` (2026-10-27), each row re-checked: the identity-record row names the 1.3.0 record beside the 1.2.0 one, and the immutable-releases row names `gh release verify v1.3.0`, the first release published after the setting was turned on.
 
 ## [1.3.0] — 2026-10-26
