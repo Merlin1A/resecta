@@ -137,7 +137,7 @@ struct ContentView: View {
     /// captured BEFORE the cancel transitions away, so the banner can offer
     /// the matching pipeline (detect-only vs. full redact).
     static func cancelForBackground(documentState: DocumentState, redactionState: RedactionState) {
-        let kind = documentState.phaseKind
+        let kind = documentState.runChromePhaseKind
         guard kind.isCancellable else { return }
         if kind.raisesResumeBanner { documentState.pausedFromPhase = kind }
         documentState.cancelActivePipeline(redactionState: redactionState)

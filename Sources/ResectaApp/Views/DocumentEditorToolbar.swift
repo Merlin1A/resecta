@@ -55,7 +55,7 @@ struct DocumentEditorToolbar {
     @ViewBuilder
     var leadingToolbarItems: some View {
         Group {
-        switch documentState.phaseKind {
+        switch documentState.runChromePhaseKind {
         case .editing:
             // Drawing tools.
             // iPhone nav-bar overflow: keep a CONSTANT-width glyph per draw tool
@@ -96,8 +96,7 @@ struct DocumentEditorToolbar {
                 searchSheetDetent = .medium
                 redactionState.activeSearch = state
             }
-            .disabled(documentState.phaseKind != .editing
-                      || redactionState.activeSearch != nil)
+            .disabled(Self.searchEntriesDisabled(documentState: documentState, redactionState: redactionState))
             // Identifier is PLUMBING and carries over from the
             // Auto-Detect entry this button renames — UI tests anchor
             // on it, and it is deliberately not the display string.
@@ -109,8 +108,7 @@ struct DocumentEditorToolbar {
                 searchSheetDetent = .medium
                 redactionState.activeSearch = SearchState()
             }
-            .disabled(documentState.phaseKind != .editing
-                      || redactionState.activeSearch != nil)
+            .disabled(Self.searchEntriesDisabled(documentState: documentState, redactionState: redactionState))
             .keyboardShortcut("f", modifiers: .command)
             .accessibilityIdentifier("searchRedact")
         case .verified:
@@ -145,7 +143,7 @@ struct DocumentEditorToolbar {
     @ViewBuilder
     var trailingToolbarItems: some View {
         Group {
-        switch documentState.phaseKind {
+        switch documentState.runChromePhaseKind {
         case .editing:
             // The iPad's editing bar (an iPhone's lays out through
             // `EditorToolbarContent`): Undo, the selection controls, Redact,
@@ -265,7 +263,7 @@ struct DocumentEditorToolbar {
 
     /// The iPhone editing bar: compact width, the editing phase.
     var isCompactEditing: Bool {
-        documentState.phaseKind == .editing && horizontalSizeClass == .compact
+        documentState.runChromePhaseKind == .editing && horizontalSizeClass == .compact
     }
 
     // MARK: - Toolbar Components
@@ -413,6 +411,12 @@ struct DocumentEditorToolbar {
         let outcome = RegionDeleteRule.deleteSelection(
             redactionState: redactionState, undoManager: undoManager, toastManager: coordinator.toastManager)
         if outcome.endsAddToSelection { resetCanvasTools() }
+    }
+
+    /// Search and Scan open the one search sheet: closed while the chrome
+    /// shows a run, and while a sheet is already up.
+    static func searchEntriesDisabled(documentState: DocumentState, redactionState: RedactionState) -> Bool {
+        documentState.runChromePhaseKind != .editing || redactionState.activeSearch != nil
     }
 
     /// The delete's words, shared by the toolbar and the long-press menu.
