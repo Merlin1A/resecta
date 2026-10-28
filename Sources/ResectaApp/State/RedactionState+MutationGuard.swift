@@ -24,12 +24,11 @@ extension RedactionState {
         handler: @escaping @MainActor (RedactionState) -> Void
     ) {
         guard undoManager.isUndoing else { return }
-        nonisolated(unsafe) let manager = undoManager
         Task { @MainActor [weak self] in
             guard let self else { return }
-            manager.beginUndoGrouping()
-            self.registerUndo(manager, actionName, handler: handler)
-            manager.endUndoGrouping()
+            undoManager.beginUndoGrouping()
+            self.registerUndo(undoManager, actionName, handler: handler)
+            undoManager.endUndoGrouping()
         }
     }
 }

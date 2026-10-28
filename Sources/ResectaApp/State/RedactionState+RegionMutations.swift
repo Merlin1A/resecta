@@ -300,13 +300,12 @@ extension RedactionState {
     ) {
         guard let undoManager else { return }
         nonisolated(unsafe) let target = self
-        nonisolated(unsafe) let manager = undoManager
         MainActor.assumeIsolated {
             undoManager.registerUndo(withTarget: target) { target in
                 MainActor.assumeIsolated {
                     // A run owns the regions: the step waits (+MutationGuard).
                     guard target.mayRunRegionStep else {
-                        target.holdRefusedRegionStep(manager, actionName, handler: handler)
+                        target.holdRefusedRegionStep(undoManager, actionName, handler: handler)
                         return
                     }
                     let before = target.regions
