@@ -22,6 +22,11 @@ extension DocumentEditorView {
     /// nothing about when or from what it was made.
     static let shareCopyFileName = "redacted.pdf"
 
+    /// The share copy's name for the redacted output at `output`.
+    static func shareCopyFileName(forOutput output: URL) throws -> String {
+        shareCopyFileName
+    }
+
     /// The redacted output the export reads: its URL while the file is on
     /// disk. When iOS reclaimed it in the background (Known Issues KI-4),
     /// the output is discarded the way every discard clears it
