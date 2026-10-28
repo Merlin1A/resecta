@@ -318,8 +318,7 @@ class RedactionState {
         clearOutput()
     }
 
-    /// Called by the pipeline runner after successful verification completes.
-    /// This is the ONLY public path for setting the flag to false.
+    /// The one public path that clears the flag; a run reaches it through the burned-version guard.
     func markVerificationCurrent() {
         regionsModifiedSinceVerification = false
     }
@@ -845,6 +844,7 @@ class RedactionState {
     /// closes it.
     var lastUndoRedo: UndoRedoStep?
     @ObservationIgnored var undoRedoStepOpen = false
+    @ObservationIgnored weak var mutationGate: DocumentState?  // whether a region step may run now (+MutationGuard)
 }
 
 // MARK: - Detection-degrade copy
