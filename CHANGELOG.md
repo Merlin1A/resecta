@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 ### Added
 
 - Results: filled form values the export does not carry, and hand-drawn regions on pages with no text layer, which no check can read, are listed with the results.
+- Results: the Detection Sweep's note offers Review in Scan, which returns to the editor and runs Scan so the remaining items can be reviewed.
 
 ### Changed
 
