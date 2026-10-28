@@ -4,8 +4,9 @@ import XCTest
 /// 23-page fixture prints, on every page, a line ending "…exercise
 /// multipage" and the next beginning "rendering, …": the phrase
 /// "multipage rendering" wraps once per page, so the search returns 46
-/// line pieces for 23 matches. The sheet counts the matches — "23 found",
-/// "0 of 23 selected" — and Select All then Apply marks 23.
+/// line pieces for 23 matches. The sheet counts the matches — "0 of 23
+/// selected" — while the canvas still highlights both lines of page 1's
+/// match, and Select All then Apply marks 23.
 ///
 /// nonisolated for the same reason as `ShareRiskSheetUITests`: an
 /// XCUITest drives a separate process and touches no @MainActor app state.
@@ -30,10 +31,11 @@ nonisolated final class SearchWrappedOccurrenceUITests: XCTestCase {
         app.launch()
 
         XCTAssertTrue(
-            app.staticTexts["23 found"].waitForExistence(timeout: 60),
-            "The toolbar never read 23 found — one per wrapped match, not one per line."
+            app.staticTexts["0 of 23 selected"].waitForExistence(timeout: 60),
+            "The footer never read 0 of 23 selected — one per wrapped match, not one per line."
         )
-        XCTAssertTrue(app.staticTexts["0 of 23 selected"].waitForExistence(timeout: 10), "Footer count")
+        let highlights = app.descendants(matching: .any).matching(NSPredicate(format: #"label == "Search highlight, page 1""#))
+        XCTAssertEqual(highlights.count, 2, "Both lines of page 1's match stay highlighted on the canvas.")
 
         let selectAll = app.buttons["Select All"]
         XCTAssertTrue(selectAll.waitForExistence(timeout: 10), "Footer 'Select All' button not found.")
