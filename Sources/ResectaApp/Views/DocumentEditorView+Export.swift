@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import StoreKit
+import CryptoKit
 import RedactionEngine
 
 // The export flow, moved out of `DocumentEditorView.swift` (the hub) along
@@ -17,10 +18,17 @@ extension DocumentEditorView {
 
     // MARK: - The export source and the share copy
 
-    /// The share copy's one name. It carries no export time and no part of
-    /// the source document's name, so the file a recipient sees says
-    /// nothing about when or from what it was made.
-    static let shareCopyFileName = "redacted.pdf"
+    /// The share copy's name: `redacted-` and the first eight hex of a
+    /// SHA-256 of the redacted file itself, so copies of different
+    /// documents saved into one folder do not replace each other, and the
+    /// same file always gets the same name. It carries no export time and
+    /// no part of the source document's name, so the file a recipient sees
+    /// says nothing about when or from what it was made.
+    static func shareCopyFileName(forOutput output: URL) throws -> String {
+        let bytes = try Data(contentsOf: output, options: .alwaysMapped)
+        let code = SHA256.hash(data: bytes).prefix(4).map { String(format: "%02x", $0) }.joined()
+        return "redacted-\(code).pdf"
+    }
 
     /// The redacted output the export reads: its URL while the file is on
     /// disk. When iOS reclaimed it in the background (Known Issues KI-4),
@@ -101,7 +109,7 @@ extension DocumentEditorView {
     /// Copy `output` to the share copy in the session's protected
     /// directory, replacing a copy an earlier share left at that URL.
     static func makeShareCopy(of output: URL, in directory: TempExportDirectory) throws -> URL {
-        let copy = try directory.childURL(named: shareCopyFileName)
+        let copy = try directory.childURL(named: shareCopyFileName(forOutput: output))
         if FileManager.default.fileExists(atPath: copy.path) {
             try FileManager.default.removeItem(at: copy)
         }
@@ -281,8 +289,9 @@ struct DocumentEditorExportFlow {
     func cancelExport() {
         guard let report = exportingReport,
               let attempt = documentState.liveShareAttempt,
-              let copy = try? coordinator.tempExportDirectory.childURL(
-                named: DocumentEditorView.shareCopyFileName)
+              let output = redactionState.outputURL,
+              let name = try? DocumentEditorView.shareCopyFileName(forOutput: output),
+              let copy = try? coordinator.tempExportDirectory.childURL(named: name)
         else { return }
         DocumentEditorView.abandonShare(
             copy: copy, report: report, attempt: attempt, documentState: documentState)

@@ -74,9 +74,9 @@ struct ShareCopyExportTests {
 
         let copy = try DocumentEditorView.makeShareCopy(of: output, in: dir)
 
-        #expect(copy.lastPathComponent == DocumentEditorView.shareCopyFileName)
-        #expect(copy.lastPathComponent.range(of: #"\d"#, options: .regularExpression) == nil,
-                "today `redacted_yyyy-MM-dd_HH-mm-ss.pdf` (exportFormatter)")
+        #expect(copy.lastPathComponent == (try DocumentEditorView.shareCopyFileName(forOutput: output)))
+        #expect(copy.lastPathComponent.range(of: #"^redacted-[0-9a-f]{8}\.pdf$"#, options: .regularExpression) != nil,
+                "a code from the file's bytes only, never `redacted_yyyy-MM-dd_HH-mm-ss.pdf` (exportFormatter)")
         #expect(copy.deletingLastPathComponent().standardizedFileURL.path
                     == dir.url.standardizedFileURL.path,
                 "the copy stays in the session's protected directory")
@@ -95,11 +95,16 @@ struct ShareCopyExportTests {
         // The first share's sheet never removed its copy.
         #expect(FileManager.default.fileExists(atPath: first.path))
 
+        // The same output is shared again over the leftover.
+        let again = try DocumentEditorView.makeShareCopy(of: output, in: dir)
+        #expect(again == first, "the same file gets the same name")
+        #expect(try Data(contentsOf: again) == Data("first run".utf8))
+
         // A re-run replaced the output; the user shares again.
         try Data("second run".utf8).write(to: output, options: .atomic)
         let second = try DocumentEditorView.makeShareCopy(of: output, in: dir)
 
-        #expect(second == first)
+        #expect(second != first, "a different file gets its own name")
         #expect(try Data(contentsOf: second) == Data("second run".utf8),
                 "the copy is the current output, not the leftover")
     }
