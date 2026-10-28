@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ### Changed
 
+- Share: the shared copy is named with a short code made from the redacted file itself (for example redacted-3f9a1c07.pdf), so saving several documents in one folder no longer asks to replace the last one; the name still carries nothing from the original document and no export time.
 - Documentation: the threat model names the import caps (500 pages, 5,000 points on a side, and an image that declares more than 100 million pixels refused before it is decoded); its network notes name the name-recognition model iOS fetches on its own and the iCloud download of a photo or a file stored only there; and its persistence note says the redacted output is moved into place in a single step and that a change to your regions deletes the previous output file at once.
 - Documentation: the threat model, the engineering notes and the README's claims map narrow the detection-data signature claim to what the key holder signed — the bytes the detector reads are the bytes the maintainer's signing run listed — and leave the installed app's integrity to the app-bundle code signature.
 - Documentation: the engineering notes describe the fake-redaction suite's control, which asserts that the text survives when nothing is marked.
