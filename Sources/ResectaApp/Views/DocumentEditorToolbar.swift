@@ -161,17 +161,11 @@ struct DocumentEditorToolbar {
 
             settingsButton
 
-        case .detecting, .redacting:
-            // Single cancel button
-            Button("Stop Processing", systemImage: "stop.circle") {
-                documentState.cancelActivePipeline(redactionState: redactionState)
-            }
-            .accessibilityIdentifier("stopProcessing")
-            .accessibilityHint("Stops processing. Your document is preserved.")
-
-        case .verifying:
-            // Single cancel button
-            Button("Stop Verification", systemImage: "stop.circle") {
+        case .detecting, .redacting, .verifying:
+            // ONE Stop for the whole run: its title follows the phase, the
+            // button keeps its place at the processing to verifying hand-off,
+            // so a tap in flight lands on it.
+            Button(Self.stopLabel(for: documentState.runChromePhaseKind) ?? "", systemImage: "stop.circle") {
                 documentState.cancelActivePipeline(redactionState: redactionState)
             }
             .accessibilityIdentifier("stopProcessing")
@@ -411,6 +405,17 @@ struct DocumentEditorToolbar {
         let outcome = RegionDeleteRule.deleteSelection(
             redactionState: redactionState, undoManager: undoManager, toastManager: coordinator.toastManager)
         if outcome.endsAddToSelection { resetCanvasTools() }
+    }
+
+    /// The run's Stop title: processing while pages are detected or
+    /// redacted (and from the Redact tap), verification while they are
+    /// checked; nil where no run can be stopped.
+    static func stopLabel(for kind: DocumentState.PhaseKind) -> String? {
+        switch kind {
+        case .detecting, .redacting: "Stop Processing"
+        case .verifying: "Stop Verification"
+        case .empty, .importing, .editing, .verified, .exporting, .failed: nil
+        }
     }
 
     /// Search and Scan open the one search sheet: closed while the chrome

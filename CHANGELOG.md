@@ -41,6 +41,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - From the Redact tap the editor locks: Search, Scan, Undo and the canvas wait for the run, Stop is offered at once, and leaving the app pauses the run as it does once pages are processing.
 - An undo or redo that arrives while a run is in progress, such as the system's three-finger gesture, no longer changes the regions under the run or discards its redacted copy; an undo stays available for when the run ends.
 - Verification checks the regions the run actually redacted, as burned into the page, not the editor's regions as they stand when verification starts.
+- Stop keeps its place when processing turns into verification, so a tap at that moment is not lost.
 
 ### Security
 
