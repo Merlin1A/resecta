@@ -382,12 +382,17 @@ struct LayerResultRow: View {
     /// privacy-sensitive.
     static let detectionSweepGateCaption = "Names and addresses are not swept."
 
-    /// The collapsed row's gate line: the gate sentence for the Detection
-    /// Sweep — keyed on the layer's identity, never on its label text — and
-    /// nil for every other row. Static so the composition is unit-testable
-    /// without a SwiftUI host.
+    /// What else the sweep does not read, after the engine's sentence.
+    static let detectionSweepUnreadCaption =
+        "Photos, signatures and numbers in formats it does not know are not read either."
+
+    /// The collapsed row's gate line: for the Detection Sweep — keyed on the
+    /// layer's identity, never on its label text — the engine's gate
+    /// sentence, then what else it does not read, on every outcome (a PASS
+    /// included); nil for every other row. Static so the composition is
+    /// unit-testable without a SwiftUI host.
     static func rowCaptionText(layer: LayerResult) -> String? {
-        layer.layer == .detectionSweep ? detectionSweepGateCaption : nil
+        layer.layer == .detectionSweep ? "\(detectionSweepGateCaption) \(detectionSweepUnreadCaption)" : nil
     }
 
     // MARK: - Search Re-check query lines (static for unit testability)
