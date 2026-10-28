@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+### Added
+
+- Results: filled form values the export does not carry, and hand-drawn regions on pages with no text layer, which no check can read, are listed with the results.
+
 ### Changed
 
 - Documentation: the threat model names the import caps (500 pages, 5,000 points on a side, and an image that declares more than 100 million pixels refused before it is decoded); its network notes name the name-recognition model iOS fetches on its own and the iCloud download of a photo or a file stored only there; and its persistence note says the redacted output is moved into place in a single step and that a change to your regions deletes the previous output file at once.
