@@ -123,7 +123,9 @@ extension PipelineCoordinator {
             perPageModes: perPageModes,
             perPageFallbackReasons: perPageFallbackReasons,
             sensitiveTerms: sensitiveTerms,
-            appliedSearches: appliedSearches
+            appliedSearches: appliedSearches,
+            burnedRegions: Dictionary(uniqueKeysWithValues: pages.compactMap {
+                $0.regions.isEmpty ? nil : ($0.pageIndex, $0.regions) })
         )
     }
 

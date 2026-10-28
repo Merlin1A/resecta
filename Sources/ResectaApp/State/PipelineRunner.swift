@@ -379,7 +379,10 @@ struct PipelineRunner {
             perPageModes: perPageModes,
             perPageFallbackReasons: perPageFallbackReasons,
             sensitiveTerms: sensitiveTerms,
-            appliedSearches: appliedSearches
+            appliedSearches: appliedSearches,
+            // Verify-only runs only on an output that is not stale, so the
+            // live regions are the ones it burned.
+            burnedRegions: coordinator.redactionState.regions
         )
         return try await verify(
             runContext: runContext, effectiveMode: effectiveMode,
@@ -446,7 +449,6 @@ struct PipelineRunner {
         // `.verified` transition below, (.redacting,.verified) and
         // (.verifying,.verified), are legal transitions (no table change).
         let sourcePageCount = coordinator.documentState.pageCount
-        let regionsSnapshot = coordinator.redactionState.regions
         // The Search Re-check's coverage check re-runs each applied search
         // on the ORIGINAL pages: it reads its own copy of the source (the
         // per-consumer discipline of the search path — the live instance
@@ -462,12 +464,12 @@ struct PipelineRunner {
         }.value
 
         #if DEBUG
-        coordinator.verificationRegionsSeam?(regionsSnapshot)
+        coordinator.verificationRegionsSeam?(runContext.burnedRegions)
         #endif
         let report = try await VerificationOrchestrator().run(
             outputDocument: wrappedDoc,
             sourcePageCount: sourcePageCount,
-            regions: regionsSnapshot,
+            regions: runContext.burnedRegions,
             sensitiveTerms: runContext.sensitiveTerms.terms,
             pipelineMode: effectiveMode,
             filterDigests: runContext.filterDigests,

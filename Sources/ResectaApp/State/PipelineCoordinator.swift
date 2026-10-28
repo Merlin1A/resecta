@@ -123,6 +123,8 @@ final class PipelineCoordinator: @unchecked Sendable {
         /// audit); the verify-only path re-feeds the retained
         /// `lastRunInputs` or re-derives the same way.
         let appliedSearches: [SearchRecheckRequest]
+        /// The regions the run burned, per page, as burned (clamped, floor-filtered); verification checks these.
+        let burnedRegions: [Int: [RedactionRegion]]
     }
 
     /// Snapshot of pipeline-affecting settings, captured once
