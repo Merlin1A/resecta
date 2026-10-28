@@ -74,8 +74,10 @@ extension DocumentEditorView {
     /// SKIPPED report (the redaction was never verified), an incomplete WARN
     /// (skipped digest-dependent layers or a could-not-verify WARN) — the
     /// three exclusive by `overallStatus` — then, on any verdict, source
-    /// annotations over text no box covers (`concealedPages`), whose line
-    /// the first three families' sheets carry as well.
+    /// annotations over text no box covers (`concealedPages`), then possible
+    /// items left (`shareNeedsPossibleItemsConfirm`); every family's sheet
+    /// carries the last two families' lines as well. One gate for every
+    /// reason to ask before a send.
     static func shareConfirmKind(
         report: VerificationReport, documentState: DocumentState, concealedPages: [Int]
     ) -> ShareRiskConfirmKind? {
@@ -92,7 +94,33 @@ extension DocumentEditorView {
             pages: concealedPages, acknowledged: documentState.concealedAnnotationsShareAcknowledged) {
             return .concealedAnnotations(report)
         }
+        if shareNeedsPossibleItemsConfirm(
+            report: report, formFieldCount: documentState.sourceFilledFormFieldCount,
+            acknowledged: documentState.possibleItemsShareAcknowledged) {
+            return .possibleItems(report)
+        }
         return nil
+    }
+
+    /// Possible-items confirm predicate: the Detection Sweep reports possible
+    /// items remaining on the output (`possibleItemLines`), or the original's
+    /// filled form values were not carried into it, not yet acknowledged for
+    /// this send — on every verdict, PASS included.
+    static func shareNeedsPossibleItemsConfirm(report: VerificationReport, formFieldCount: Int, acknowledged: Bool) -> Bool {
+        !acknowledged && !possibleItemLines(report: report, formFieldCount: formFieldCount).isEmpty
+    }
+
+    /// The possible-items lines, the same words as the results screen: the
+    /// sweep's remaining-items sentence under its title, and the form values'
+    /// results sentence. Empty when neither applies.
+    static func possibleItemLines(report: VerificationReport, formFieldCount: Int) -> [String] {
+        var lines = report.layers.filter(VerificationRowModel.hasItemsRemaining).map {
+            "\(VerificationRowModel.title(for: $0)): \(VerificationRowModel.sweepRemainingCaption($0))"
+        }
+        if formFieldCount > 0 {
+            lines.append(ResultsFinding.filledFormValuesNotCarried(count: formFieldCount).sentence)
+        }
+        return lines
     }
 
     /// Concealing-annotations confirm predicate: annotations in the source
@@ -119,6 +147,7 @@ extension DocumentEditorView {
     static let shareRiskConfirmTitle = "Share with reported issues?"
     static let shareIncompleteConfirmTitle = "Share with incomplete checks?"
     static let shareSkippedConfirmTitle = "Share without verification?"
+    static let sharePossibleItemsConfirmTitle = "Share with possible items left?"
 
     /// List headers: the FAIL/ATTENTION family's, and the incomplete-WARN
     /// family's.
@@ -224,12 +253,14 @@ extension DocumentEditorView {
             documentState.acknowledgeSkippedShare()
         case .incompleteWarn:
             documentState.acknowledgeIncompleteWarnShare()
-        case .concealedAnnotations:
+        case .concealedAnnotations, .possibleItems:
             break
         }
-        // Every family's sheet carries the concealing-annotations line when
-        // it applies, so a completed confirm acknowledges it as well.
+        // Every family's sheet carries the concealing-annotations and the
+        // possible-items lines when they apply, so a completed confirm
+        // acknowledges them as well.
         documentState.acknowledgeConcealedAnnotationsShare()
+        documentState.acknowledgePossibleItemsShare()
         shareRiskConfirmHaptic()
         if case .verified(let report) = documentState.phase {
             beginExport(report)
@@ -258,6 +289,9 @@ enum ShareRiskConfirmKind: Identifiable {
     /// Annotations in the source covered text no redaction box covers, and
     /// no other family applies (`ConcealingAnnotations`).
     case concealedAnnotations(VerificationReport)
+    /// The Detection Sweep left possible items, or form values were not
+    /// carried over, and no other family applies (`possibleItemLines`).
+    case possibleItems(VerificationReport)
 
     var id: String {
         switch self {
@@ -265,13 +299,15 @@ enum ShareRiskConfirmKind: Identifiable {
         case .skipped: "skipped"
         case .incompleteWarn: "incompleteWarn"
         case .concealedAnnotations: "concealedAnnotations"
+        case .possibleItems: "possibleItems"
         }
     }
 
     /// The captured report, for display derivation.
     var report: VerificationReport {
         switch self {
-        case .failOrAttention(let r), .skipped(let r), .incompleteWarn(let r), .concealedAnnotations(let r): r
+        case .failOrAttention(let r), .skipped(let r), .incompleteWarn(let r), .concealedAnnotations(let r),
+             .possibleItems(let r): r
         }
     }
 
@@ -286,6 +322,7 @@ enum ShareRiskConfirmKind: Identifiable {
         case .skipped: "shareSkippedConfirm"
         case .incompleteWarn: "shareIncompleteWarnConfirm"
         case .concealedAnnotations: "shareConcealedAnnotationsConfirm"
+        case .possibleItems: "sharePossibleItemsConfirm"
         }
     }
 
@@ -296,6 +333,7 @@ enum ShareRiskConfirmKind: Identifiable {
         case .incompleteWarn: DocumentEditorView.shareIncompleteConfirmTitle
         case .skipped: DocumentEditorView.shareSkippedConfirmTitle
         case .concealedAnnotations: ConcealingAnnotations.confirmTitle
+        case .possibleItems: DocumentEditorView.sharePossibleItemsConfirmTitle
         }
     }
 
@@ -305,7 +343,7 @@ enum ShareRiskConfirmKind: Identifiable {
         switch self {
         case .failOrAttention: DocumentEditorView.shareRiskConfirmListHeader
         case .incompleteWarn: DocumentEditorView.shareIncompleteListHeader
-        case .skipped, .concealedAnnotations: nil
+        case .skipped, .concealedAnnotations, .possibleItems: nil
         }
     }
 
@@ -320,7 +358,7 @@ enum ShareRiskConfirmKind: Identifiable {
             DocumentEditorView.atRiskItemLines(report: report)
         case .incompleteWarn(let report):
             DocumentEditorView.couldNotVerifyItemLines(report: report)
-        case .skipped, .concealedAnnotations:
+        case .skipped, .concealedAnnotations, .possibleItems:
             []
         }
     }
@@ -372,6 +410,7 @@ struct ShareRiskConfirmPresentation: ViewModifier {
                     kind: activeKind,
                     deselectionSnapshot: deselectionSnapshot,
                     concealedPages: concealedPages,
+                    formFieldCount: documentState.sourceFilledFormFieldCount,
                     onConfirm: {
                         confirmed = activeKind
                         kind = nil
@@ -390,6 +429,8 @@ struct ShareRiskConfirmSheet: View {
     let kind: ShareRiskConfirmKind
     let deselectionSnapshot: RedactionState.DeselectionSnapshot?
     var concealedPages: [Int] = []
+    /// The original's filled form fields (`DocumentState.sourceFilledFormFieldCount`).
+    var formFieldCount: Int = 0
     let onConfirm: () -> Void
     let onCancel: () -> Void
 
@@ -437,8 +478,8 @@ struct ShareRiskConfirmSheet: View {
                         // never the masthead's sentence, which points at
                         // the results below the sheet.
                         itemList
-                    case .concealedAnnotations:
-                        EmptyView()   // its line is the cross-cutting one below
+                    case .concealedAnnotations, .possibleItems:
+                        EmptyView()   // their lines are the cross-cutting ones below
                     }
 
                     // Cross-cutting like the deselection line: the source's
@@ -446,6 +487,12 @@ struct ShareRiskConfirmSheet: View {
                     if !concealedPages.isEmpty {
                         Text(ConcealingAnnotations.confirmLine(pages: concealedPages))
                             .font(.subheadline)
+                    }
+                    // Cross-cutting too: the sweep's possible items and the
+                    // form values not carried over.
+                    ForEach(DocumentEditorView.possibleItemLines(report: kind.report, formFieldCount: formFieldCount),
+                            id: \.self) { line in
+                        Text(line).font(.subheadline)
                     }
 
                     // The share reminder keeps its own rule — any item left

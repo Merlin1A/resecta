@@ -42,20 +42,27 @@ extension DocumentState {
         incompleteWarnShareAcknowledged = true
     }
 
-    /// Re-arm the four share confirms when the user backs out of the share
-    /// sheet without sending: an acknowledgement covers one send attempt, so
-    /// the NEXT Share tap for the same report confirms again (a completed
-    /// send leaves them spent by design; a fresh report re-arms them in
+    /// Mark the possible-items line acknowledged for this send attempt — any
+    /// confirm family that showed it.
+    func acknowledgePossibleItemsShare() {
+        possibleItemsShareAcknowledged = true
+    }
+
+    /// Re-arm the five share confirms after every share sheet completion,
+    /// sent or not: an acknowledgement covers one send, so the NEXT Share tap
+    /// for the same report confirms again (a fresh report re-arms them in
     /// `transition(to:)`). Clears every shadow, then — under the `.verified`
     /// guard, the only phase with a report to mirror into — sets
     /// `userOverrodeFailure` / `userAcknowledgedSkippedShare` back to false
-    /// so mirror and shadow never disagree. The incomplete-WARN and
-    /// concealing-annotations flags have no report-side mirror.
+    /// so mirror and shadow never disagree. The incomplete-WARN,
+    /// concealing-annotations and possible-items flags have no report-side
+    /// mirror.
     func rearmShareRiskConfirms() {
         failShareAcknowledged = false
         skippedShareAcknowledged = false
         incompleteWarnShareAcknowledged = false
         concealedAnnotationsShareAcknowledged = false
+        possibleItemsShareAcknowledged = false
         guard case .verified(var report) = phase else { return }
         report.userOverrodeFailure = false
         report.userAcknowledgedSkippedShare = false

@@ -436,13 +436,14 @@ class DocumentState {
     /// Packages/RedactionEngine, which is fenced for this sprint, so
     /// a third field there was never an option; it has lived here
     /// since the shadow was introduced. `transition(to:)` below resets all three whenever a
-    /// genuinely fresh report lands; `rearmShareRiskConfirms()` further
-    /// down additionally re-arms them (and the two mirrors) when the user
-    /// backs out of the share sheet without sending.
+    /// genuinely fresh report lands; `rearmShareRiskConfirms()`
+    /// (`DocumentState+ShareAcknowledgements.swift`) re-arms them (and the
+    /// two mirrors) after every share sheet completion, sent or not.
     var failShareAcknowledged: Bool = false
     var skippedShareAcknowledged: Bool = false
     var incompleteWarnShareAcknowledged: Bool = false
     var concealedAnnotationsShareAcknowledged: Bool = false   // DocumentState+ConcealedAnnotations.swift
+    var possibleItemsShareAcknowledged: Bool = false   // DocumentState+ShareAcknowledgements.swift
 
     /// The share in flight: a fresh token per share, set when its sheet is
     /// about to present and cleared when the share finishes or is
@@ -536,6 +537,7 @@ class DocumentState {
                 skippedShareAcknowledged = false
                 incompleteWarnShareAcknowledged = false
                 concealedAnnotationsShareAcknowledged = false
+                possibleItemsShareAcknowledged = false
             }
             syncProgress(from: newPhase)
         }
