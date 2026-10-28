@@ -70,11 +70,14 @@ extension SearchState {
     }
 
     /// Occurrences none of whose lines produced a region or was already
-    /// covered by one — the matches a clear loses.
+    /// covered by one — the matches a clear loses. An applied id no result
+    /// carries (briefly, between a re-run and the region-version reset)
+    /// still counts as one applied match, as the per-line count did; the
+    /// caller clamps at zero.
     var unappliedOccurrenceCount: Int {
         let done = appliedResultIDs.union(coveredResultIDs)
-        let touched = Set(results.filter { done.contains($0.id) }.map(Self.occurrenceKey))
-        return Self.occurrenceCount(results) - touched.count
+        let known = results.filter { done.contains($0.id) }
+        return Self.occurrenceCount(results) - Self.occurrenceCount(known) - (done.count - known.count)
     }
 
     /// `count` (regions or results) less the extra lines of the wrapped
