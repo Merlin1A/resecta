@@ -232,6 +232,60 @@ struct RegexSearchOCRFallbackTests {
         #expect(hit.normalizedRect.maxX >= expected.maxX - 0.0005,
                 "the box reaches the number line's right edge: \(hit.normalizedRect) vs \(expected)")
     }
+
+    // MARK: - The two readings
+
+    @Test("A digit pattern matches a letter-majority line through the raw reading: Room \\d+ on Room 101")
+    func rawReadingMatchesDigits() async throws {
+        let doc = try #require(PDFDocument(data: imageOnlyPDF()))
+        let searcher = DocumentSearcher()
+        await searcher._testSeedOCRLines([stubLine("Case No. 18-115 filed in Room 101")], forPageIndex: 0)
+        let stream = searcher.search(
+            SendablePDFDocument(doc),
+            mode: .regex(#"Room \d+"#, options: SearchOptions(includeOCR: true)),
+            progress: { _, _ in })
+        var results: [SearchResult] = []
+        for await result in stream { results.append(result) }
+        #expect(results.map(\.matchedText) == ["Room 101"], "the line as Vision read it; the corrected reading says Room IOI")
+    }
+
+    @Test("A digit pattern still matches the corrected reading of a misread digit, once")
+    func correctedReadingKept() async throws {
+        let doc = try #require(PDFDocument(data: imageOnlyPDF()))
+        let searcher = DocumentSearcher()
+        await searcher._testSeedOCRLines([stubLine("SSN 123-45-67B9")], forPageIndex: 0)
+        let stream = searcher.search(
+            SendablePDFDocument(doc),
+            mode: .regex(#"\d{3}-\d{2}-\d{4}"#, options: SearchOptions(includeOCR: true)),
+            progress: { _, _ in })
+        var results: [SearchResult] = []
+        for await result in stream { results.append(result) }
+        #expect(results.count == 1, "\(results.map(\.matchedText))")
+        #expect(results.first?.matchedText == "123-45-6789")
+    }
+
+    @Test("A match both readings hold is kept once")
+    func bothReadingsOnce() async throws {
+        let doc = try #require(PDFDocument(data: imageOnlyPDF()))
+        let searcher = DocumentSearcher()
+        await searcher._testSeedOCRLines([stubLine("Call 414-555-0193 now")], forPageIndex: 0)
+        let stream = searcher.search(
+            SendablePDFDocument(doc),
+            mode: .regex(#"\d{3}-\d{3}-\d{4}"#, options: SearchOptions(includeOCR: true)),
+            progress: { _, _ in })
+        var results: [SearchResult] = []
+        for await result in stream { results.append(result) }
+        #expect(results.count == 1, "\(results.map(\.matchedText))")
+    }
+
+    @Test("The confusable correction keeps every line's UTF-16 length, so one set of line offsets serves both readings")
+    func correctionKeepsLength() {
+        let normalizer = OCRTextNormalizer()
+        for line in ["Suite 100, Lakeport, IL 61099", "Case No. 18-115 filed in Room 101", "Total due: $1,000 for Apt 4B",
+                     "Member ID SO5518 since 2015", "Interpreter: Iñaki Zubizarreta-Núñez", "SSN 123-45-67B9", "l23-4S-6789"] {
+            #expect(normalizer.normalize(line).utf16.count == line.utf16.count, "\(line)")
+        }
+    }
 }
 
 /// Thread-safe collector for timeout sink callbacks.
