@@ -1576,8 +1576,9 @@ public actor DocumentSearcher {
     /// page's text layer is empty.
     ///
     /// Normalization ordering:
-    ///   1. OCRTextNormalizer corrects confusable glyphs per-line.
-    ///   2. Lines are joined with "\n" preserving line offsets.
+    ///   1. Two readings: the lines as Vision read them, and the lines
+    ///      through OCRTextNormalizer's confusable correction.
+    ///   2. Each reading's lines are joined with "\n" preserving line offsets.
     ///   3. NFKC (normalizeUnicode option) is NOT applied here — the regex
     ///      pattern was authored by the user for literal match; applying NFKC
     ///      to the body only (not the pattern) would silently break ASCII
@@ -1594,31 +1595,28 @@ public actor DocumentSearcher {
         let lines = await ocrLines(for: page, pageIndex: pageIndex)
         guard !lines.isEmpty else { return [] }
 
-        // Normalize each line through OCRTextNormalizer (confusable correction)
-        // then join with "\n" to build the searchable text. The per-line
-        // normalize step preserves line offsets for rect mapping below.
-        let normalizedLines = lines.map { self.ocrNormalizer.normalize($0.text) }
-        var searchText = normalizedLines.joined(separator: "\n")
-        guard !searchText.isEmpty else { return [] }
-        // Page-side smart punctuation, same contract as the
-        // text-layer regex path. 1:1 substitution keeps the UTF-16
-        // NSRanges aligned with the per-line offsets below.
-        if options.normalizeSmartPunctuation {
-            searchText = TextNormalizer.normalizeSmartPunctuation(searchText)
+        // The two readings (`ocrReadings`), each its lines joined with "\n":
+        // `Room \d+` matches the "Room 101" Vision read, which the
+        // correction turns into "Room IOI", and a digit pattern still
+        // matches a digit the correction restored ("67B9" → "6789").
+        let (rawLines, correctedLines) = ocrReadings(lines)
+        // Page-side smart punctuation, same contract as the text-layer regex
+        // path: 1:1, so the UTF-16 NSRanges stay aligned with the offsets.
+        let readings = [rawLines, correctedLines].map { lines -> String in
+            let joined = lines.joined(separator: "\n")
+            return options.normalizeSmartPunctuation ? TextNormalizer.normalizeSmartPunctuation(joined) : joined
         }
+        guard !readings[0].isEmpty else { return [] }
         // Each line's start in the joined text, in UTF-16 units (one line
         // feed after each line), for the line union behind every rect.
         var lineOffsets: [NormalizedLineEntry] = []
         var cursor = 0
-        for (line, normalizedText) in zip(lines, normalizedLines) {
+        for (line, text) in zip(lines, rawLines) {
             lineOffsets.append(NormalizedLineEntry(
-                start: cursor, normalizedText: normalizedText,
+                start: cursor, normalizedText: text,
                 normalizedRect: line.normalizedRect, confidence: line.confidence))
-            cursor += normalizedText.utf16.count + 1
+            cursor += text.utf16.count + 1
         }
-
-        let nsString = searchText as NSString
-        let fullRange = NSRange(location: 0, length: nsString.length)
 
         var results: [SearchResult] = []
         let avgConfidence = averageOCRConfidence(lines)
@@ -1634,33 +1632,41 @@ public actor DocumentSearcher {
         // Snapshot the timeout sink — invoked synchronously inside the
         // enumerateMatches closure where actor re-entry is not permitted.
         let snapshotTimeoutSink = self.regexTimeoutSink
+        // One time budget across both readings; a range both readings match
+        // is kept once (the raw reading's).
+        var timedOut = false
+        var kept = Set<NSRange>()
 
-        SearchCore.enumerateRegexMatches(
-            in: searchText, regex: regex,
-            wholeWord: options.wholeWord, unconvertibleRangePasses: false,
-            cap: nil,
-            timeout: effectiveTimeout, startTime: startTime,
-            onTimeout: { snapshotTimeoutSink?(pageIndex) }
-        ) { matchRange in
-            // The union of every recognised line the match overlaps.
-            guard let mapped = ocrUnionRect(
-                forUTF16Range: matchRange, lineOffsets: lineOffsets, page: sendablePage.page
-            ) else { return false }
-            let normalizedRect = mapped.rect
+        for (index, searchText) in readings.enumerated() where !timedOut && (index == 0 || searchText != readings[0]) {
+            let nsString = searchText as NSString
+            SearchCore.enumerateRegexMatches(
+                in: searchText, regex: regex,
+                wholeWord: options.wholeWord, unconvertibleRangePasses: false,
+                cap: nil,
+                timeout: effectiveTimeout, startTime: startTime,
+                onTimeout: { timedOut = true; snapshotTimeoutSink?(pageIndex) }
+            ) { matchRange in
+                guard kept.insert(matchRange).inserted else { return false }
+                // The union of every recognised line the match overlaps.
+                guard let mapped = ocrUnionRect(
+                    forUTF16Range: matchRange, lineOffsets: lineOffsets, page: sendablePage.page
+                ) else { return false }
+                let normalizedRect = mapped.rect
 
-            let matchedText = nsString.substring(with: matchRange)
-            let window = contextSnippet(text: searchText, matchNSRange: matchRange)
+                let matchedText = nsString.substring(with: matchRange)
+                let window = contextSnippet(text: searchText, matchNSRange: matchRange)
 
-            results.append(SearchResult(
-                pageIndex: pageIndex,
-                normalizedRect: normalizedRect,
-                matchedText: matchedText,
-                contextSnippet: window.snippet,
-                source: .ocr(confidence: avgConfidence),
-                term: regex.pattern,
-                matchRangeInSnippet: window.matchRange
-            ))
-            return true
+                results.append(SearchResult(
+                    pageIndex: pageIndex,
+                    normalizedRect: normalizedRect,
+                    matchedText: matchedText,
+                    contextSnippet: window.snippet,
+                    source: .ocr(confidence: avgConfidence),
+                    term: regex.pattern,
+                    matchRangeInSnippet: window.matchRange
+                ))
+                return true
+            }
         }
 
         return results
