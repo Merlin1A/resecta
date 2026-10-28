@@ -67,7 +67,7 @@ struct VerificationMastheadTests {
         ("searchableRecheckReview", "\(keepEditing) and run your searches again with OCR on."),
         ("secureFail", "\(keepEditing) to fix what failed, or share after review."),
         ("secureAllFailed", "\(keepEditing) to fix what failed, or share after review."),
-        ("searchableSkipInduced", "Run Redact again from \(keepEditing) to include the skipped checks."),
+        ("searchableSkipInduced", "Run Redact with Verify Before Export on to include the skipped checks."),
         ("pageCountGate", "\(keepEditing) and run Redact again; the other checks did not run."),
         ("securePassRidingNote", "Read the note below before you share the PDF."),
         ("secureWarningOnly", "Read the warning below before you share the PDF."),
@@ -102,7 +102,7 @@ struct VerificationMastheadTests {
         #expect(sentence([cnv, skipped, warning])
                 == "2 checks could not run in full; read them below before you share.")
         #expect(sentence([skipped, warning])
-                == "Run Redact again from \(Self.keepEditing) to include the skipped check.")
+                == "Run Redact with Verify Before Export on to include the skipped check.")
     }
 
     @Test("ATTENTION: every term, then the first and a count, then the terms below — never a cut term")

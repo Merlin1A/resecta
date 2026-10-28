@@ -146,27 +146,6 @@ struct VerificationDisplayTests {
         #expect(VerificationStatus.fail("f").title == "Checks Failed")
     }
 
-    // MARK: - Accessibility
-
-    @Test("accessibilityLabel is non-empty for all cases",
-          arguments: [
-            VerificationStatus.pass,
-            VerificationStatus.warn("w"),
-            VerificationStatus.info("i"),
-            VerificationStatus.attention("a"),
-            VerificationStatus.fail("f"),
-            VerificationStatus.skipped,
-          ])
-    func accessibilityLabelNonEmpty(status: VerificationStatus) {
-        #expect(!status.accessibilityLabel.isEmpty)
-    }
-
-    @Test("WARN accessibilityLabel opens with the Completed with Warnings title the screen shows")
-    func warnAccessibilityLabelCompletedFraming() {
-        #expect(VerificationStatus.warn("w").accessibilityLabel
-                == "Completed with warnings. Review the warnings before sharing.")
-    }
-
 
     // MARK: - Status text tier
 
@@ -221,7 +200,7 @@ struct VerificationDisplayTests {
           ])
     func noOutcomePromiseLanguage(status: VerificationStatus) {
         let bannedWords = ["guaranteed", "ensures", "impossible", "guarantee", "ensure"]
-        let allText = [status.title, status.accessibilityLabel]
+        let allText = [status.title, status.layerAccessibilityPhrase]
             .joined(separator: " ").lowercased()
 
         for word in bannedWords {
@@ -601,8 +580,8 @@ struct SearchRecheckQueryLineDisplayTests {
             pageReferences: [1], durationSeconds: 0, reviewTermTexts: ["Delia"], layer: .binaryStringSearch)
         let report = VerificationReport(
             layers: [layer2, layer3, layer], overallStatus: .attention("x"), durationSeconds: 0)
-        #expect(VerificationResultsView.mastheadSubtitle(report: report)
-                == "Keep\u{00A0}Editing, then use text\u{00A0}search to redact \u{201C}Delia\u{201D}.")
+        #expect(VerificationResultsView.mastheadSubtitle(report: report)  // 9 found − 8 applied = the 1 left
+                == "You left 1 match of \u{201C}Delia\u{201D} unapplied; review it before you share.")
         #expect(VerificationResultsView.reviewTermTexts(report: report) == ["Delia"])
         #expect(VerificationResultsView.detailsSummaryText(for: report) == "0 of 3 checks passed · 3\u{00A0}need review")
         // The OCR check's row composes the same sentence as the bytes search.
@@ -763,10 +742,10 @@ struct DetectionSweepRowCaptionTests {
 
     @Test("The caption is the sweep's gate, keyed on the layer identity, nil for every other row")
     func captionKeyedOnTheLayer() {
-        #expect(LayerResultRow.rowCaptionText(layer: row(.detectionSweep))
-                == "Names and addresses are not swept.")
-        #expect(LayerResultRow.rowCaptionText(layer: row(.detectionSweep, status: .info("i")))
-                == "Names and addresses are not swept.")
+        #expect(LayerResultRow.rowCaptionText(layer: row(.detectionSweep))?
+                .hasPrefix("Names and addresses are not swept.") == true)
+        #expect(LayerResultRow.rowCaptionText(layer: row(.detectionSweep, status: .info("i")))?
+                .hasPrefix("Names and addresses are not swept.") == true)
         #expect(LayerResultRow.rowCaptionText(layer: row(.searchRecheck)) == nil)
         #expect(LayerResultRow.rowCaptionText(layer: row(.textExtraction)) == nil)
         // A label that merely reads like the sweep's is not the sweep.

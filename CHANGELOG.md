@@ -17,6 +17,9 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 ### Fixed
 
 - Share confirm: only the slide, or the accessibility action that VoiceOver and Switch Control offer, completes it; a tap on the card's blank corner no longer opens the share sheet.
+- VoiceOver's end-of-run line says the same title as the results screen, such as Some Checks Incomplete.
+- With Verify Before Export off, the results advice names that setting instead of suggesting a Redact that would skip the checks again.
+- A match you left unapplied on purpose is described as left unapplied, not as one to redact.
 
 ### Security
 
