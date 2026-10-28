@@ -219,7 +219,7 @@ nonisolated struct VerificationRowModel: Equatable {
             return layer.name == pageCountGateName ? "Page Count" : layer.name
         }
         switch identity {
-        case .textExtraction:       return "Text Layer & Annotations"
+        case .textExtraction:       return "Text & Annotations in the Redacted PDF"
         case .ocrCheck:             return "OCR of Page Images"
         case .binaryStringSearch:   return "Terms in Text & Bytes"
         case .structureCheck:       return "Active Content & Structure"

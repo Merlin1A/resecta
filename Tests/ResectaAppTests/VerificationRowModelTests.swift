@@ -282,7 +282,7 @@ struct VerificationRowModelTests {
     // MARK: - The copy
 
     static let titles: [(VerificationLayer?, String)] = [
-        (.textExtraction, "Text Layer & Annotations"),
+        (.textExtraction, "Text & Annotations in the Redacted PDF"),
         (.ocrCheck, "OCR of Page Images"),
         (.binaryStringSearch, "Terms in Text & Bytes"),
         (.structureCheck, "Active Content & Structure"),

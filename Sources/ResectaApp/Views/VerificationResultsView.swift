@@ -54,10 +54,14 @@ struct VerificationResultsView: View {
     var runFacts: RunFacts = RunFacts()
 
     @Environment(DocumentState.self) private var documentState
+    @Environment(RedactionState.self) private var redactionState
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var previewPage: PreviewPage?
+    /// The findings the checks cannot see (`ResultsFindings`), derived when
+    /// the screen appears and again when the boxes change.
+    @State private var findings: [ResultsFinding] = []
 
     /// A page the Preview opens at (0-based), pushed on this view's stack.
     struct PreviewPage: Hashable, Identifiable {
@@ -73,12 +77,14 @@ struct VerificationResultsView: View {
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 0) {
                         VerificationMasthead(report: report, outputExists: outputExists,
-                                             mode: runFacts.runMode)
+                                             mode: runFacts.runMode, findingCount: findings.count)
                         VerificationResultsActions(
                             report: report, canExport: canExport, outputExists: outputExists,
                             isVerificationStale: isVerificationStale, previewAvailable: previewAvailable,
                             onExport: onExport, onRunVerification: onRunVerification)
                             .padding(.top, ResectaTokens.Results.blockGap)
+                        ResultsFindingsSection(
+                            findings: findings, pagesOnChips: previewAvailable, onOpenPage: openPreview(at:))
                         VerificationDetailsSection(
                             report: report, deselectionSnapshot: deselectionSnapshot,
                             runFactsLines: runFactsLines, previewAvailable: previewAvailable,
@@ -100,6 +106,9 @@ struct VerificationResultsView: View {
             .navigationDestination(item: $previewPage) { page in
                 RedactedPreviewView(verdict: report.overallStatus, page: page.index)
             }
+        }
+        .task(id: redactionState.regionVersion) {
+            findings = ResultsFindings.derive(documentState: documentState, redactionState: redactionState)
         }
         // VerificationActionBar is placed by the phase router in
         // DocumentEditorView as .safeAreaInset, not embedded here. Export
