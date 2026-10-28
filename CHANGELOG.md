@@ -39,6 +39,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Search: a phrase that starts at the end of one page and continues at the top of the next, past a repeated page header or footer, is now found, with a box on each page. Before, each page was searched on its own.
 - Stop, or leaving the app, in the moment after the redacted copy is built keeps the copy and shows the results as Verification Skipped, instead of discarding the copy.
 - From the Redact tap the editor locks: Search, Scan, Undo and the canvas wait for the run, Stop is offered at once, and leaving the app pauses the run as it does once pages are processing.
+- An undo or redo that arrives while a run is in progress, such as the system's three-finger gesture, no longer changes the regions under the run or discards its redacted copy; an undo stays available for when the run ends.
 
 ### Security
 
