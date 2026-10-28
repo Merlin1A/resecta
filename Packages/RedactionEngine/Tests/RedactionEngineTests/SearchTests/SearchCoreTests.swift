@@ -205,8 +205,8 @@ struct SearchCoreTests {
     /// decomposed accent, the non-BMP letter, CR LF), an expansion (the
     /// ligature), an expansion balanced by a contraction (the compatibility
     /// jamo pair composes), a cluster that re-forms across a boundary, a
-    /// jamo pair whose pieces re-cluster, and a soft hyphen whose fold to
-    /// "-" joins the combining mark after it.
+    /// jamo pair whose pieces re-cluster, and a soft hyphen whose drop joins
+    /// the combining mark after it to the letter before it.
     static let mappedPages: [(String, String)] = [
         ("emoji before", "\u{1F464} SSN 123-45-6789"),
         ("decomposed accent before", "Jose\u{0301} 123-45-6789"),
