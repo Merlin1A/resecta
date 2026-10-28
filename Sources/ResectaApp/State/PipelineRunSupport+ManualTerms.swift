@@ -17,14 +17,21 @@ import RedactionEngine
 
 /// The verifier's term input for one run: the terms and the count of manual
 /// regions that added no term — a whole-page region, or one whose page
-/// carried no text layer to capture from.
+/// carried no text layer to capture from. The second cause is kept apart,
+/// app-side, as the page of each such region (`manualRegionPagesWithoutText`):
+/// the results screen names those regions, which no check can read; the
+/// engine receives the sum unchanged.
 nonisolated struct SensitiveTermSet: Sendable, Equatable {
     let terms: [SensitiveTerm]
     let manualRegionsWithoutText: Int
+    /// 0-based page of each manual region, short of a whole page, on a page
+    /// whose text layer is not rich; one entry per region.
+    let manualRegionPagesWithoutText: [Int]
 
-    init(terms: [SensitiveTerm], manualRegionsWithoutText: Int = 0) {
+    init(terms: [SensitiveTerm], manualRegionsWithoutText: Int = 0, manualRegionPagesWithoutText: [Int] = []) {
         self.terms = terms
         self.manualRegionsWithoutText = manualRegionsWithoutText
+        self.manualRegionPagesWithoutText = manualRegionPagesWithoutText
     }
 
     static let empty = SensitiveTermSet(terms: [])
@@ -72,6 +79,7 @@ extension PipelineCoordinator {
             insert(term.text, requiresTokenBoundary: term.requiresTokenBoundary)
         }
         var withoutText = 0
+        var pagesWithoutText: [Int] = []
         for (pageIndex, pageRegions) in regions.sorted(by: { $0.key < $1.key }) {
             let page = document.page(at: pageIndex)
             // The page's words are read once, on its first capturable region.
@@ -87,6 +95,7 @@ extension PipelineCoordinator {
                 }
                 guard textLayerStatus[pageIndex] == .rich, let page else {
                     withoutText += 1
+                    if textLayerStatus[pageIndex] != .rich { pagesWithoutText.append(pageIndex) }
                     continue
                 }
                 if words == nil { words = .some(pageWords(page)) }
@@ -109,7 +118,8 @@ extension PipelineCoordinator {
         let terms = requiresBoundaryByText.map {
             SensitiveTerm(text: $0.key, requiresTokenBoundary: $0.value)
         }.sorted { $0.text < $1.text }
-        return SensitiveTermSet(terms: terms, manualRegionsWithoutText: withoutText)
+        return SensitiveTermSet(
+            terms: terms, manualRegionsWithoutText: withoutText, manualRegionPagesWithoutText: pagesWithoutText)
     }
 
     /// The term set for a run starting now: the applied terms

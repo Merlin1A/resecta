@@ -92,9 +92,7 @@ struct DocumentEditorToolbar {
             // second confirm. The run is trigger-driven from there
             // (chips / options configure the NEXT run).
             Button("Scan", systemImage: "doc.viewfinder") {
-                let state = SearchState()
-                state.searchModeType = .piiScan
-                state.pendingAutoRunScan = true
+                let state = SearchState.scanSession()
                 searchSheetDetent = .medium
                 redactionState.activeSearch = state
             }

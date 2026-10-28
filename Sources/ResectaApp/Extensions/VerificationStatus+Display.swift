@@ -85,27 +85,13 @@ extension VerificationStatus {
 
     // MARK: - Accessibility
 
-    /// The spoken label opens with the title the screen shows (pinned:
-    /// VoiceOver says what is on screen), then the one sentence of advice.
-    var accessibilityLabel: String {
-        switch self {
-        case .pass:    "Checks passed. All checks completed without issues."
-        case .warn:    "Completed with warnings. Review the warnings before sharing."
-        case .info:    "Document metadata note. Informational only."
-        case .attention: "Needs review. Unredacted text remains — review before sharing."
-        case .fail:    "Checks failed. Review the issues below before sharing."
-        case .skipped: "Verification skipped. Consider verifying before sharing."
-        case .notApplicable: "Not applicable. The check had nothing to check."
-        }
-    }
-
     /// Layer-scoped VoiceOver phrase for a single check, in the Verification
-    /// Details words (a skipped check could not verify). `accessibilityLabel`
-    /// above describes the OVERALL run ("All checks completed without
-    /// issues.") — spoken per-layer mid-run, that phrasing is the same
+    /// Details words (a skipped check could not verify). Never a phrase about
+    /// the OVERALL run: spoken per-layer mid-run, that would be the same
     /// premature-confidence anchoring problem intermediateColor exists to
-    /// prevent. The coordinator's layer-completion announcements speak this
-    /// instead; the finished rows speak their outcome's word.
+    /// prevent. The run's end is spoken by
+    /// `VerificationResultsView.completionAnnouncement(report:)`, in the
+    /// masthead's words; the finished rows speak their outcome's word.
     var layerAccessibilityPhrase: String {
         switch self {
         case .pass:      "Passed."

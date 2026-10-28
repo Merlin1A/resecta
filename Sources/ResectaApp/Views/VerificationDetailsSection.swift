@@ -23,6 +23,8 @@ struct VerificationDetailsSection: View {
     var previewAvailable: Bool = false
     /// Push the Preview at a page (0-based) on the results view's stack.
     var onOpenPage: (Int) -> Void = { _ in }
+    /// Back to the editor with Scan running (the sweep's Review in Scan).
+    var onReviewInScan: () -> Void = {}
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
@@ -123,6 +125,7 @@ struct VerificationDetailsSection: View {
             isExpanded: openItem == .layer(index),
             onTap: { toggle(.layer(index)) },
             onPageTap: { page in onOpenPage(page) },
+            onReviewInScan: onReviewInScan,
             chrome: .grouped,
             perPageModes: report.perPageModes,
             groupedLayout: layout,

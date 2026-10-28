@@ -67,6 +67,9 @@ struct LayerResultRow: View {
     /// Called when a page reference number is tapped. Nil during .verifying phase
     /// (page navigation from in-progress verification is not supported).
     var onPageTap: ((Int) -> Void)? = nil
+    /// Review in Scan, offered on a Detection Sweep row with possible items
+    /// remaining (`offersReviewInScan`); nil where it is not offered.
+    var onReviewInScan: (() -> Void)? = nil
 
     /// False in VerificationProgressView, where rows are display-only
     /// (`isExpanded: false, onTap: {}`) — a "Tap to expand details" hint
@@ -382,12 +385,26 @@ struct LayerResultRow: View {
     /// privacy-sensitive.
     static let detectionSweepGateCaption = "Names and addresses are not swept."
 
-    /// The collapsed row's gate line: the gate sentence for the Detection
-    /// Sweep — keyed on the layer's identity, never on its label text — and
-    /// nil for every other row. Static so the composition is unit-testable
-    /// without a SwiftUI host.
+    /// What else the sweep does not read, after the engine's sentence.
+    static let detectionSweepUnreadCaption =
+        "Photos, signatures and numbers in formats it does not know are not read either."
+
+    /// The collapsed row's gate line: for the Detection Sweep — keyed on the
+    /// layer's identity, never on its label text — the engine's gate
+    /// sentence, then what else it does not read, on every outcome (a PASS
+    /// included); nil for every other row. Static so the composition is
+    /// unit-testable without a SwiftUI host.
+    static let reviewInScanLabel = "Review in Scan"
+
+    /// Review in Scan shows on a Detection Sweep row that reports possible
+    /// items remaining — the row whose page links open a Preview with
+    /// nothing marked (the sweep keeps pages, not locations).
+    static func offersReviewInScan(layer: LayerResult) -> Bool {
+        VerificationRowModel.hasItemsRemaining(layer)
+    }
+
     static func rowCaptionText(layer: LayerResult) -> String? {
-        layer.layer == .detectionSweep ? detectionSweepGateCaption : nil
+        layer.layer == .detectionSweep ? "\(detectionSweepGateCaption) \(detectionSweepUnreadCaption)" : nil
     }
 
     // MARK: - Search Re-check query lines (static for unit testability)
@@ -540,6 +557,9 @@ struct LayerResultRow: View {
                     Button("Go to page \(page + 1)") { onPageTap(page) }
                 }
             }
+            if !isExpanded, let onReviewInScan, Self.offersReviewInScan(layer: layer) {
+                Button(Self.reviewInScanLabel, action: onReviewInScan)
+            }
         }
     }
 
@@ -666,6 +686,11 @@ struct LayerResultRow: View {
                         }
                     }
                 }
+            }
+            if let onReviewInScan, Self.offersReviewInScan(layer: layer) {
+                Button(Self.reviewInScanLabel, action: onReviewInScan)
+                    .font(.subheadline.weight(.semibold))
+                    .accessibilityIdentifier("reviewInScanButton")
             }
         }
         .padding(.leading, groupedLayout == .bare ? ResectaTokens.Spacing.md : ResectaTokens.Results.titleInset)
