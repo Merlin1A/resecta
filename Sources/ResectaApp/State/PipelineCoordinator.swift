@@ -59,6 +59,9 @@ final class PipelineCoordinator: @unchecked Sendable {
     /// its detached loads; never read by production code.
     /// `StopAfterTheCopyTests` takes Stop from it.
     var beforeVerificationLoadsSeam: (() -> Void)?
+    /// Test seam: receives the regions verification checks, as it hands
+    /// them to the checks; never read by production code.
+    var verificationRegionsSeam: (([Int: [RedactionRegion]]) -> Void)?
     #endif
 
     #if DEBUG

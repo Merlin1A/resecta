@@ -461,6 +461,9 @@ struct PipelineRunner {
             Self.verificationSourceCopy(of: liveSource, unlockingWith: passwordHolder)
         }.value
 
+        #if DEBUG
+        coordinator.verificationRegionsSeam?(regionsSnapshot)
+        #endif
         let report = try await VerificationOrchestrator().run(
             outputDocument: wrappedDoc,
             sourcePageCount: sourcePageCount,
