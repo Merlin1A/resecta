@@ -12,6 +12,10 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Documentation: the threat model, the engineering notes and the README's claims map narrow the detection-data signature claim to what the key holder signed — the bytes the detector reads are the bytes the maintainer's signing run listed — and leave the installed app's integrity to the app-bundle code signature.
 - Documentation: the engineering notes describe the fake-redaction suite's control, which asserts that the text survives when nothing is marked.
 
+### Fixed
+
+- Verification: when a search match runs onto a second line and only one line's box is applied, or one of its boxes is removed, the Search Re-check now reports the match as only partly covered. Before, the line left without a box was read as a match the user chose not to redact, and the checks passed. The OCR check also reads the words of a redacted search match that open the next line after a box, or end the line before one, as part of the match.
+
 ### Security
 
 - `THREAT-MODEL.md` §7 is headed "Security posture", with its date and commit in its first sentence, so a link to it holds across re-dates. The branch-rules row names each repository's required check, the up-to-date-branch rule and the `rulesets/<id>` path, and says the admin role may bypass the ruleset on a pull request; the reporting and secrets rows give their public API paths and the contributors graph; the flag-check row names one launch argument. The rows the site's posture sheet also shows read as the site's do, and a note beneath the table names the checks that need a role on the repository. No state changed, and the section keeps its 2026-10-27 date.
