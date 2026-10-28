@@ -726,9 +726,9 @@ final class SearchState: Identifiable {
         return filtered
     }
 
-    /// Total selected count.
+    /// Total selected count (matches: a wrapped match counts once).
     var selectedCount: Int {
-        results.count { $0.isSelected }
+        Self.occurrenceCount(results.filter(\.isSelected))
     }
 
     /// True when the selection is non-empty and every selected result

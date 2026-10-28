@@ -78,6 +78,7 @@ struct SearchStateOccurrenceRowsTests {
         state.toggleSelectAll()
         expectWhole(state, wrapped)
         #expect(state.selectedFilteredCount == 2)
+        #expect(state.selectedCount == 2, "the Apply button and the footer's hidden count read matches")
         state.toggleSelection(for: wrapped[0].id)
         expectWhole(state, wrapped)
         #expect(state.results.filter(\.isSelected).map(\.id) == [single.id])
