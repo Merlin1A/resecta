@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 - Search: a name or number broken at its own hyphen across two lines, such as a surname a word processor wraps after the hyphen, is now found as typed, with a box on each line. A soft hyphen inside a word is now ignored, so the word matches without it. Before, the line break after a hyphen read as a space and the phrase was not found.
 - Search: a phrase that starts at the end of one page and continues at the top of the next, past a repeated page header or footer, is now found, with a box on each page. Before, each page was searched on its own.
+- Search: on a scanned page, a typed number or code made of digits that look like letters, such as a suite, room or case number, an amount or a member ID, is now found, and an accented name matches with or without its accents. Each match is boxed on the words it covers rather than the whole recognised line. Before, the recognised line was corrected toward letters while the typed text was not, so such numbers never matched.
 
 ### Security
 

@@ -1490,9 +1490,10 @@ public actor DocumentSearcher {
 
     // MARK: - OCR Search Path
 
-    /// Search a page via OCR when no text layer is available.
-    /// Uses existing OCREngine with .accurate recognition level.
-    /// Results cached per-session keyed by page index.
+    /// The literal matches on a page read by OCR (no usable text layer, or
+    /// the hybrid leg of a text-layer page): the page's recognised lines,
+    /// from the per-session cache when present, through the one OCR literal
+    /// matcher (`ocrLiteralMatches`).
     private func searchPageViaOCR(
         page: PDFPage,
         pageIndex: Int,
@@ -1500,132 +1501,8 @@ public actor DocumentSearcher {
         options: SearchOptions,
         term: String
     ) async -> [SearchResult] {
-        // Get or compute OCR results for this page
         let textLines = await ocrLines(for: page, pageIndex: pageIndex)
-
-        // Search within OCR results
-        var results: [SearchResult] = []
-        let normalizedQuery = SearchCore.normalizedText(query, options: options)
-
-        for line in textLines {
-            // Apply OCR confusable normalization BEFORE
-            // NFKC (TextNormalizer.normalizeForSearch) so corrected digit
-            // sequences survive NFKC unchanged. The raw line object
-            // (bounding rect) is untouched; the same-length property of
-            // OCRTextNormalizer keeps character offsets valid.
-            // Manual-search per-line normalization stays in-loop — no
-            // ocrNormalizedConcat writes (the PII path owns that cache).
-            let ocrNormalizedText = self.ocrNormalizer.normalize(line.text)
-            let nfkcLineText = SearchCore.normalizedText(ocrNormalizedText, options: options)
-
-            // Recall extensions on the OCR literal
-            // path. The rect below is the whole LINE box (not offset-
-            // derived), so length-changing transforms are rect-safe here;
-            // the offset map is still used so whole-word boundaries
-            // evaluate against the pre-strip line text.
-            let ext = TextNormalizer.applySearchExtensions(
-                pageText: nfkcLineText, query: normalizedQuery, options: options
-            )
-            let lineText = ext.pageText
-            let lineQuery = ext.query
-            if lineQuery.isEmpty { continue }
-            let baseLineChars: [Character]? = ext.offsetMap != nil ? Array(ext.baseText) : nil
-
-            // Case-preserved analog of `ext.baseText`, used only
-            // to re-slice the DISPLAYED span (see `displaySlice`). Mirrors
-            // the base chain minus the case fold: confusable-normalized
-            // line → (NFKC) → (smart punctuation).
-            let displayLineChars: [Character] = {
-                var display = options.normalizeUnicode
-                    ? TextNormalizer.normalize(ocrNormalizedText)
-                    : ocrNormalizedText
-                if options.normalizeSmartPunctuation {
-                    display = TextNormalizer.normalizeSmartPunctuation(display)
-                }
-                return Array(TextNormalizer.foldWhitespaceRuns(display))
-            }()
-            let displayLineText = String(displayLineChars)
-
-            var searchStart = lineText.startIndex
-            while searchStart < lineText.endIndex {
-                guard let matchRange = lineText.range(
-                    of: lineQuery,
-                    range: searchStart..<lineText.endIndex
-                ) else { break }
-
-                // The word-boundary check: the base-coordinate variant
-                // when an offset map is active, same as findTextMatches.
-                if options.wholeWord {
-                    let isBoundaried: Bool
-                    if let baseLineChars, let map = ext.offsetMap {
-                        let start = lineText.distance(from: lineText.startIndex, to: matchRange.lowerBound)
-                        let len = lineText.distance(from: matchRange.lowerBound, to: matchRange.upperBound)
-                        if let span = SearchCore.baseSpan(start: start, length: len, offsetMap: map) {
-                            isBoundaried = SearchCore.isWholeWordInBase(
-                                chars: baseLineChars, start: span.lowerBound, endExclusive: span.upperBound
-                            )
-                        } else {
-                            isBoundaried = false
-                        }
-                    } else {
-                        isBoundaried = SearchCore.isWholeWord(matchRange, in: lineText)
-                    }
-                    if !isBoundaried {
-                        searchStart = matchRange.upperBound
-                        continue
-                    }
-                }
-
-                // Vision bounding boxes are already normalized 0–1, bottom-left origin.
-                // Add padding for OCR imprecision (2pt in normalized coords).
-                let paddedRect = Self.paddedNormalizedRect(line.normalizedRect, in: page)
-
-                // The display span re-slices from the case-preserved
-                // analog at base offsets; matching stays on the normalized
-                // text. The norm-drift
-                // trap (Character-count drift on heavy-ligature input) is
-                // guarded inside `displaySlice`, which falls back to the
-                // normalized slice.
-                let normalizedSlice = String(lineText[matchRange.lowerBound..<matchRange.upperBound])
-                let displayStart = lineText.distance(
-                    from: lineText.startIndex, to: matchRange.lowerBound)
-                let displayLength = lineText.distance(
-                    from: matchRange.lowerBound, to: matchRange.upperBound)
-                let matchedText = Self.displaySlice(
-                    start: displayStart, length: displayLength,
-                    offsetMap: ext.offsetMap,
-                    displayChars: displayLineChars,
-                    baseCount: ext.baseText.count,
-                    fallback: normalizedSlice)
-                // The canonical context window in place
-                // of the raw line. Built over the same case-preserved
-                // analog `displaySlice` re-sliced from, at the base span,
-                // so the window's match slice IS `matchedText`; when the
-                // display analog drifted (the `displaySlice` fallback) the
-                // window comes from the searched line at the searched
-                // offsets, matching that fallback slice instead.
-                let window = displayWindow(
-                    displayChars: displayLineChars, displayText: displayLineText,
-                    baseCount: ext.baseText.count,
-                    start: displayStart, length: displayLength, offsetMap: ext.offsetMap,
-                    searchedText: lineText, searchedStart: displayStart, searchedLength: displayLength
-                )
-
-                results.append(SearchResult(
-                    pageIndex: pageIndex,
-                    normalizedRect: paddedRect,
-                    matchedText: matchedText,
-                    contextSnippet: window.snippet,
-                    source: .ocr(confidence: line.confidence),
-                    term: term,
-                    matchRangeInSnippet: window.matchRange
-                ))
-
-                searchStart = matchRange.upperBound
-            }
-        }
-
-        return results + crossLineOCRMatches(lines: textLines, query: query, options: options, page: page, pageIndex: pageIndex, term: term)
+        return ocrLiteralMatches(lines: textLines, query: query, options: options, page: page, pageIndex: pageIndex, term: term)
     }
 
     // MARK: - OCR page lines (the one render→cache→evict body for every OCR path)
