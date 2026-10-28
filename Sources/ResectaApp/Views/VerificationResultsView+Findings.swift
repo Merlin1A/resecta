@@ -14,12 +14,23 @@ enum ResultsFinding: Hashable {
     /// covers. The export is rebuilt from the page content, which carries
     /// no annotations, so that text is visible in it (`ConcealingAnnotations`).
     case coveredTextInOriginal(pages: [Int])
+    /// The original's filled form fields: the export is rebuilt from the
+    /// page content and carries no field values (`sourceFilledFormFieldCount`).
+    case filledFormValuesNotCarried(count: Int)
+    /// Hand-drawn regions, short of a whole page, on pages with no text
+    /// layer: no term was captured under them, so no check could read what
+    /// they cover. The page of each region (`SensitiveTermSet`).
+    case handRegionsOnPagesWithoutText(regionPages: [Int])
 
     static let coveredTextTitle = "Covered text in the original"
+    static let formValuesTitle = "Form values not carried over"
+    static let handRegionsTitle = "Hand-drawn regions not checked"
 
     var title: String {
         switch self {
         case .coveredTextInOriginal: Self.coveredTextTitle
+        case .filledFormValuesNotCarried: Self.formValuesTitle
+        case .handRegionsOnPagesWithoutText: Self.handRegionsTitle
         }
     }
 
@@ -28,6 +39,14 @@ enum ResultsFinding: Hashable {
     var sentence: String {
         switch self {
         case .coveredTextInOriginal(let pages): ConcealingAnnotations.confirmLine(pages: pages)
+        case .filledFormValuesNotCarried(let count):
+            count == 1 ? "1 filled form field was not carried into this PDF."
+                : "\(count) filled form fields were not carried into this PDF."
+        case .handRegionsOnPagesWithoutText(let regionPages):
+            regionPages.count == 1
+                ? "1 hand-drawn region sits on a page with no text layer, so no check could read what it covers."
+                : "\(regionPages.count) hand-drawn regions sit on pages with no text layer, "
+                    + "so no check could read what they cover."
         }
     }
 
@@ -35,12 +54,16 @@ enum ResultsFinding: Hashable {
     var pages: [Int] {
         switch self {
         case .coveredTextInOriginal(let pages): pages
+        case .filledFormValuesNotCarried: []
+        case .handRegionsOnPagesWithoutText(let regionPages): Array(Set(regionPages)).sorted()
         }
     }
 
     var accessibilityIdentifier: String {
         switch self {
         case .coveredTextInOriginal: "resultsFinding_coveredText"
+        case .filledFormValuesNotCarried: "resultsFinding_formValues"
+        case .handRegionsOnPagesWithoutText: "resultsFinding_handRegions"
         }
     }
 
@@ -50,15 +73,23 @@ enum ResultsFinding: Hashable {
 }
 
 enum ResultsFindings {
-    /// The findings for the open document, its boxes and its import facts,
-    /// in screen order. `ConcealingAnnotations.pages` is synchronous PDFKit
+    /// The findings for the open document, its boxes, its import facts and
+    /// the run's inputs, in screen order. `ConcealingAnnotations.pages` is synchronous PDFKit
     /// work, the same call the Share tap makes; the results view runs it
     /// when it appears and when the boxes change, never in `body`.
     static func derive(documentState: DocumentState, redactionState: RedactionState) -> [ResultsFinding] {
         let covered = ConcealingAnnotations.pages(
             in: documentState.sourceDocument, regions: redactionState.regions,
             textLayerStatus: documentState.textLayerStatus)
-        return covered.isEmpty ? [] : [.coveredTextInOriginal(pages: covered)]
+        var listed: [ResultsFinding] = covered.isEmpty ? [] : [.coveredTextInOriginal(pages: covered)]
+        if documentState.sourceFilledFormFieldCount > 0 {
+            listed.append(.filledFormValuesNotCarried(count: documentState.sourceFilledFormFieldCount))
+        }
+        if let regionPages = redactionState.lastRunInputs?.sensitiveTerms.manualRegionPagesWithoutText,
+           !regionPages.isEmpty {
+            listed.append(.handRegionsOnPagesWithoutText(regionPages: regionPages))
+        }
+        return listed
     }
 }
 

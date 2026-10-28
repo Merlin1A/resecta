@@ -259,7 +259,7 @@ struct AccessibilityLabelTests {
         // spoken twin of the premature-confidence anchoring that
         // intermediateColor prevents visually.
         #expect(status.layerAccessibilityPhrase == expected)
-        #expect(status.layerAccessibilityPhrase != status.accessibilityLabel)
+        #expect(!status.layerAccessibilityPhrase.contains("without issues"))
     }
 
     // The duration is not spoken: it is not

@@ -84,4 +84,64 @@ struct ResultsFindingsTests {
                               layer: .textExtraction)
         #expect(VerificationRowModel.title(for: row) == "Text & Annotations in the Redacted PDF")
     }
+
+    // MARK: - Form values and hand-drawn regions
+
+    @Test("Filled form values the export does not carry are listed with their count, singular at one")
+    func formValuesNotCarried() {
+        let documentState = DocumentState()
+        documentState.sourceFilledFormFieldCount = 4
+        #expect(ResultsFindings.derive(documentState: documentState, redactionState: RedactionState())
+                == [.filledFormValuesNotCarried(count: 4)])
+        #expect(ResultsFinding.filledFormValuesNotCarried(count: 4).sentence
+                == "4 filled form fields were not carried into this PDF.")
+        #expect(ResultsFinding.filledFormValuesNotCarried(count: 1).sentence
+                == "1 filled form field was not carried into this PDF.")
+        #expect(ResultsFinding.filledFormValuesNotCarried(count: 4).pages.isEmpty)
+    }
+
+    /// A two-page PDF with no text layer.
+    private func blankDocument() throws -> PDFDocument {
+        let data = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 612, height: 792)).pdfData { ctx in
+            ctx.beginPage(); ctx.beginPage()
+        }
+        return try #require(PDFDocument(data: data))
+    }
+
+    @Test("Hand-drawn regions on pages with no text layer are counted with their pages; a whole-page region is not")
+    func handRegionsOnPagesWithoutText() throws {
+        let document = try blankDocument()
+        let box = { (rect: CGRect) in RedactionRegion(id: UUID(), normalizedRect: rect, source: .manual) }
+        let set = PipelineCoordinator.sensitiveTermSet(
+            applied: [],
+            manualRegions: [0: [box(CGRect(x: 0.1, y: 0.1, width: 0.2, height: 0.05)),
+                                box(CGRect(x: 0.1, y: 0.3, width: 0.2, height: 0.05))],
+                            1: [box(CGRect(x: 0, y: 0, width: 1, height: 1))]],
+            in: document, textLayerStatus: [0: .none, 1: .none])
+        #expect(set.manualRegionsWithoutText == 3, "the engine still receives every region that added no term")
+        #expect(set.manualRegionPagesWithoutText == [0, 0])
+
+        let redactionState = RedactionState()
+        redactionState.recordLastRunInputs(.init(
+            perPageModes: [], perPageFallbackReasons: [], sensitiveTerms: set, appliedSearches: [],
+            deselection: nil, ocrSkippedPages: [], degradeFailures: nil))
+        let listed = ResultsFindings.derive(documentState: DocumentState(), redactionState: redactionState)
+        #expect(listed == [.handRegionsOnPagesWithoutText(regionPages: [0, 0])])
+        let item = try #require(listed.first)
+        #expect(item.pages == [0])
+        #expect(item.sentence
+                == "2 hand-drawn regions sit on pages with no text layer, so no check could read what they cover.")
+        #expect(ResultsFinding.handRegionsOnPagesWithoutText(regionPages: [2]).sentence
+                == "1 hand-drawn region sits on a page with no text layer, so no check could read what it covers.")
+    }
+
+    @Test("Each listed item counts in the masthead's note sentence; the verdict and the title are unchanged")
+    func everyItemCountsAsANote() {
+        let documentState = DocumentState()
+        documentState.sourceFilledFormFieldCount = 2
+        let count = ResultsFindings.derive(documentState: documentState, redactionState: RedactionState()).count
+        #expect(VerificationResultsView.mastheadSubtitle(report: Self.passReport, findingCount: count)
+                == "Read the note below before you share the PDF.")
+        #expect(VerificationResultsView.mastheadTitle(report: Self.passReport) == "Checks Passed")
+    }
 }

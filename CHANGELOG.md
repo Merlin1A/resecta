@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+### Added
+
+- Results: filled form values the export does not carry, and hand-drawn regions on pages with no text layer, which no check can read, are listed with the results.
+- Results: the Detection Sweep's note offers Review in Scan, which returns to the editor and runs Scan so the remaining items can be reviewed.
+
 ### Changed
 
 - Share: the shared copy is named with a short code made from the redacted file itself (for example redacted-3f9a1c07.pdf), so saving several documents in one folder no longer asks to replace the last one; the name still carries nothing from the original document and no export time.
@@ -14,10 +19,14 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Documentation: the engineering notes describe the fake-redaction suite's control, which asserts that the text survives when nothing is marked.
 - Share confirm: a second share of the same results asks again, so each send of a file with reported issues, unrun checks or covered text gets its own confirmation.
 - Results: an annotation in the original that hides text no box covers is listed under the results with its pages, and the text-layer check is titled for the redacted PDF it reads.
+- Share: when the Detection Sweep reports possible items or the original's filled form values were not carried over, Share asks first and lists them; the sweep's row also names what it does not read.
 
 ### Fixed
 
 - Share confirm: only the slide, or the accessibility action that VoiceOver and Switch Control offer, completes it; a tap on the card's blank corner no longer opens the share sheet.
+- VoiceOver's end-of-run line says the same title as the results screen, such as Some Checks Incomplete.
+- With Verify Before Export off, the results advice names that setting instead of suggesting a Redact that would skip the checks again.
+- A match you left unapplied on purpose is described as left unapplied, not as one to redact.
 
 ### Security
 

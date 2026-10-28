@@ -408,6 +408,23 @@ nonisolated struct VerificationRowModel: Equatable {
     }
 
     /// The searches that still match on the output.
+    /// The searches whose remaining matches on the output are all ones the
+    /// user left unapplied (`remainingCount ≤ foundCount − appliedCount`, the
+    /// found count measured, not capped): the label without its curly
+    /// quotes, lowercased and whitespace-normalised → the remaining count. A typed search records no deselection,
+    /// so found − applied is the app's only measure of a kept occurrence.
+    static func keptQueries(report: VerificationReport) -> [String: Int] {
+        var kept: [String: Int] = [:]
+        for line in report.layers.filter({ $0.layer == .searchRecheck }).flatMap({ $0.queryLines ?? [] })
+        where !line.unchecked && !line.foundHitCap && line.remainingCount > 0
+            && line.remainingCount <= line.foundCount - line.appliedCount {
+            let unquoted = line.label.trimmingCharacters(in: CharacterSet(charactersIn: "\u{201C}\u{201D}"))
+            guard let label = normalizedTerms([unquoted]).first?.lowercased() else { continue }
+            kept[label, default: 0] += line.remainingCount
+        }
+        return kept
+    }
+
     static func matchingQueryLines(_ layer: LayerResult) -> [SearchRecheckQueryLine] {
         (layer.queryLines ?? []).filter { !$0.unchecked && $0.remainingCount > 0 }
     }

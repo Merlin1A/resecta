@@ -128,7 +128,7 @@ struct VerificationSkipReasonTests {
         #expect(VerificationResultsView.skippedSubtitle(reason: reason, mode: .secure)
                 == "\(cause) Run\u{00A0}Verification below before you share the PDF.")
         #expect(VerificationResultsView.skippedSubtitle(reason: reason, mode: .searchableOrUnknown)
-                == "\(cause) Run\u{00A0}Verification, or run Redact for all checks.")
+                == "\(cause) Run\u{00A0}Verification, or " + (reason == .autoVerifyOff ? "turn on Verify Before Export." : "run Redact for all checks."))
         #expect(VerificationResultsView.skippedSubtitle(reason: reason, mode: .secure).count <= 70)
         #expect(VerificationResultsView.skippedSubtitle(reason: reason).count <= 70)
     }

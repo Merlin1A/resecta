@@ -88,7 +88,10 @@ struct VerificationResultsView: View {
                         VerificationDetailsSection(
                             report: report, deselectionSnapshot: deselectionSnapshot,
                             runFactsLines: runFactsLines, previewAvailable: previewAvailable,
-                            onOpenPage: openPreview(at:))
+                            onOpenPage: openPreview(at:),
+                            onReviewInScan: {
+                                Self.reviewInScan(documentState: documentState, redactionState: redactionState)
+                            })
                         footerBlock
                         trustStrip
                             .padding(.top, ResectaTokens.Spacing.xl)
@@ -121,6 +124,14 @@ struct VerificationResultsView: View {
     private func openPreview(at page: Int) {
         guard previewAvailable, Self.isPageInDocument(page, pageCount: documentState.pageCount) else { return }
         previewPage = PreviewPage(index: page)
+    }
+
+    /// Review in Scan: Keep Editing's transition, then the editor's Scan
+    /// session (`SearchState.scanSession()`), which the editor's sheet slot
+    /// presents and runs over the document.
+    static func reviewInScan(documentState: DocumentState, redactionState: RedactionState) {
+        documentState.transition(to: .editing)
+        redactionState.activeSearch = SearchState.scanSession()
     }
 
     /// Whether a 0-based page exists in a document of `pageCount` pages; an

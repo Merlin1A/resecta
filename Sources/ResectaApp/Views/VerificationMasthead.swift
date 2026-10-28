@@ -11,6 +11,8 @@ extension VerificationResultsView {
     private static let keepEditing = "Keep\u{00A0}Editing"
     private static let textSearch = "text\u{00A0}search"
     private static let runVerification = "Run\u{00A0}Verification"
+    /// The Settings toggle's label (`SettingsView`).
+    private static let verifyBeforeExport = "Verify Before Export"
 
     /// The longest masthead sentence; the term forms fall back past it.
     static let mastheadSentenceLimit = 70
@@ -45,19 +47,21 @@ extension VerificationResultsView {
         return parts.joined(separator: " ")
     }
 
-    /// The VoiceOver line at the end of a run: the status's spoken label,
-    /// except on a PASS with rows that did not pass (a check that had
-    /// nothing to check, a note), where "All checks completed without
-    /// issues" would contradict the header; that run reads the masthead's
-    /// title and counts instead. Never the masthead sentence: it can quote
-    /// the review terms, and an announcement speaks document text aloud.
+    /// The VoiceOver line at the end of a run: the masthead's title, as the
+    /// screen shows it ("Some Checks Incomplete" included), and line 1's
+    /// counts; a PASS with rows that did not pass (a check that had nothing
+    /// to check, a note) adds line 2's counts. A skipped run has no counts.
+    /// Never the masthead sentence: it can quote the review terms, and an
+    /// announcement speaks document text aloud.
     static func completionAnnouncement(report: VerificationReport) -> String {
+        let title = mastheadTitle(report: report)
+        guard !report.overallStatus.isSkipped else { return "Verification complete. \(title)." }
         let partition = partition(report)
-        guard case .pass = report.overallStatus, let line2 = partition.summaryLine2 else {
-            return "Verification complete. \(report.overallStatus.accessibilityLabel)"
+        var line = "Verification complete. \(title). \(partition.summaryLine1)."
+        if case .pass = report.overallStatus, let line2 = partition.summaryLine2 {
+            line += " \(line2.replacingOccurrences(of: " · ", with: ", "))."
         }
-        let counts = line2.replacingOccurrences(of: " · ", with: ", ")
-        return "Verification complete. \(mastheadTitle(report: report)). \(partition.summaryLine1). \(counts)."
+        return line
     }
 
     /// The run's mode as the SKIPPED sentences need it: a Secure run had
@@ -86,9 +90,13 @@ extension VerificationResultsView {
         case .cancelled:     "Stopped early."
         case .error:         "Could not finish."
         }
-        let step = mode == .secure
-            ? "\(runVerification) below before you share the PDF."
-            : "\(runVerification), or run Redact for all checks."
+        // With the setting off, Redact skips the checks again: the full
+        // run's step names the setting instead.
+        let step = switch (mode, reason) {
+        case (.secure, _): "\(runVerification) below before you share the PDF."
+        case (_, .autoVerifyOff): "\(runVerification), or turn on \(verifyBeforeExport)."
+        default: "\(runVerification), or run Redact for all checks."
+        }
         return "\(cause) \(step)"
     }
 
@@ -127,9 +135,11 @@ extension VerificationResultsView {
         case .warn:
             let couldNotVerify = partition.couldNotVerify.map { report.layers[$0] }
             if !couldNotVerify.isEmpty, couldNotVerify.allSatisfy(\.status.isSkipped) {
+                // True whether the setting is on or off: with it off, Redact
+                // would skip the checks again.
                 return couldNotVerify.count == 1
-                    ? "Run Redact again from \(keepEditing) to include the skipped check."
-                    : "Run Redact again from \(keepEditing) to include the skipped checks."
+                    ? "Run Redact with \(verifyBeforeExport) on to include the skipped check."
+                    : "Run Redact with \(verifyBeforeExport) on to include the skipped checks."
             }
             if !couldNotVerify.isEmpty {
                 return couldNotVerify.count == 1
@@ -161,7 +171,14 @@ extension VerificationResultsView {
         }
         let lead = "\(keepEditing), then use \(textSearch) to redact"
         if !termRows.isEmpty {
-            let terms = reviewTermTexts(report: report)
+            // A term whose remaining matches are all ones the user left
+            // unapplied is not one to redact: it is named as left.
+            let kept = VerificationRowModel.keptQueries(report: report)
+            let allTerms = reviewTermTexts(report: report)
+            let terms = allTerms.filter { kept[$0.lowercased()] == nil }
+            if !allTerms.isEmpty, terms.isEmpty {
+                return keptSentence(terms: allTerms, matches: allTerms.compactMap { kept[$0.lowercased()] }.reduce(0, +))
+            }
             let quoted = terms.map { "\u{201C}\($0)\u{201D}" }
             var candidates: [String] = []
             if terms.count == 1 || terms.count == 2 {
@@ -190,6 +207,19 @@ extension VerificationResultsView {
             return ("\(keepEditing), then open Scan to review the pages below.", false)
         }
         return ("\(lead) the terms below.", false)
+    }
+
+    /// The ATTENTION sentence when every review term's remaining matches
+    /// are ones the user left unapplied: the count and the term, else the
+    /// count alone, so a term is never cut.
+    private static func keptSentence(terms: [String], matches: Int) -> (text: String, quotesTerms: Bool) {
+        let count = matches == 1 ? "1 match" : "\(matches) matches"
+        let tail = matches == 1 ? "unapplied; review it before you share." : "unapplied; review them before you share."
+        if terms.count == 1 {
+            let quoted = "You left \(count) of \u{201C}\(terms[0])\u{201D} \(tail)"
+            if quoted.count <= mastheadSentenceLimit { return (quoted, true) }
+        }
+        return ("You left \(count) \(tail)", false)
     }
 
     /// The review terms the ATTENTION sentence may quote: the needs-review
