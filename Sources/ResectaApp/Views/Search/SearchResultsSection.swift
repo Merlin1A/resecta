@@ -293,10 +293,10 @@ struct SearchResultsSection: View {
                     // keeps these page sections (`resultsByPage` groups
                     // the sorted list by page), so the section header
                     // carries the page and no row shows `p.N`.
-                    let pages = searchState.resultsByPage.keys.sorted()
+                    let pages = searchState.rowsByPage.keys.sorted()
                     ForEach(pages, id: \.self) { page in
                         Section("Page \(page + 1)") {
-                            if let pageResults = searchState.resultsByPage[page] {
+                            if let pageResults = searchState.rowsByPage[page] {
                                 ForEach(pageResults) { result in
                                     resultRow(for: result, showTermLabel: isMultiTerm, showsPageLabel: false)
                                 }

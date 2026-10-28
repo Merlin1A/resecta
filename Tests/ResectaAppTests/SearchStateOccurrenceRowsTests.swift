@@ -45,6 +45,8 @@ struct SearchStateOccurrenceRowsTests {
     @Test("Rows: one per occurrence; the canvas list keeps both lines")
     func oneRowPerOccurrence() {
         let (state, wrapped, single) = session()
+        #expect(state.rowsByPage[0]?.map(\.id) == [wrapped[0].id])
+        #expect(state.rowsByPage[1]?.map(\.id) == [single.id])
         #expect(state.resultsByTerm["Marisol Vance-Oduya"]?.count == 2)
         #expect(state.resultsByPage[0]?.count == 2, "both lines stay highlighted")
     }
@@ -56,7 +58,11 @@ struct SearchStateOccurrenceRowsTests {
         #expect(state.filteredCount == 2)
         #expect(state.selectedFilteredCount == 0)
         state.currentResultIndex = state.results.firstIndex { $0.id == wrapped[0].id }
+        #expect(state.currentOccurrenceIndex == 0)
         #expect(state.currentResultFilteredPosition == 1)
+        // The second line, focused from the canvas, is the same occurrence.
+        state.currentResultIndex = state.results.firstIndex { $0.id == wrapped[1].id }
+        #expect(state.currentOccurrenceIndex == 0)
     }
 
     @Test("The row's tick selects and clears both lines; select all then untick the row leaves neither selected")
@@ -98,6 +104,9 @@ struct SearchStateOccurrenceRowsTests {
         #expect(regionCount == 3, "a box on each line of the wrapped name, and the single")
         #expect(redaction.regions[0]?.count == 2)
         #expect(undo.undoActionName == "Mark 2 Instances")
+        let counts = state.markedCounts(outcome)
+        #expect(CommitFeedback.markedMessage(applied: counts.applied, alreadyCovered: counts.alreadyCovered)?
+            .hasPrefix("Marked 2 for redaction") == true)
         #expect(outcome.map { Set(wrapped.map(\.id)).isSubset(of: $0.appliedResultIDs) } == true)
         undo.undo()
         #expect(redaction.regions.values.reduce(0) { $0 + $1.count } == 0)
@@ -111,6 +120,8 @@ struct SearchStateOccurrenceRowsTests {
         let outcome = await redaction.applyFindings(.searchResult(id: wrapped[0].id), undoManager: nil)
         #expect(redaction.regions[0]?.count == 2)
         #expect(outcome?.appliedResultIDs == Set(wrapped.map(\.id)))
+        let counts = state.markedCounts(outcome)
+        #expect(counts.applied == 1)
     }
 
     @Test("Dismiss with the wrapped name unapplied counts it once: 2 unapplied matches")
@@ -150,5 +161,7 @@ struct SearchStateOccurrenceRowsTests {
         }
         state.flushPendingResults()
         #expect(state.totalCount == 3)
+        #expect(state.rowsByPage.values.reduce(0) { $0 + $1.count } == 3)
+        #expect(state.rowsByPage[0]?.count == state.resultsByPage[0]?.count)
     }
 }

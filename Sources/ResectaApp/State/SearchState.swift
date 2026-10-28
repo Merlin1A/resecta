@@ -518,13 +518,13 @@ final class SearchState: Identifiable {
         memo(\.byPage) { Dictionary(grouping: filteredResults, by: \.pageIndex) }
     }
 
-    /// U3: Results grouped by search term, with filters applied.
+    /// U3: Result rows grouped by search term (one per match), filters applied.
     var resultsByTerm: [String: [SearchResult]] {
-        memo(\.byTerm) { Dictionary(grouping: filteredResults, by: \.term) }
+        memo(\.byTerm) { Dictionary(grouping: Self.occurrenceRows(filteredResults), by: \.term) }
     }
 
-    /// Filtered result count (respects source/confidence filters).
-    var filteredCount: Int { filteredResults.count }
+    /// Filtered match count (respects the filters; a wrapped match counts once).
+    var filteredCount: Int { Self.occurrenceCount(filteredResults) }
 
     /// 1-based position of `currentResult` within `filteredResults`.
     /// Returns nil when there is no current result or when the current
@@ -533,12 +533,12 @@ final class SearchState: Identifiable {
     /// to display the position within the visible filtered set.
     var currentResultFilteredPosition: Int? {
         guard let current = currentResult else { return nil }
-        return filteredResults.firstIndex(where: { $0.id == current.id }).map { $0 + 1 }
+        return Self.occurrenceRows(filteredResults).firstIndex { Self.occurrenceKey($0) == Self.occurrenceKey(current) }.map { $0 + 1 }
     }
 
     /// Count of selected results within the currently filtered set.
     var selectedFilteredCount: Int {
-        filteredResults.count { $0.isSelected }
+        Self.occurrenceCount(filteredResults.filter(\.isSelected))
     }
 
     /// Whether any OCR results exist (controls filter UI visibility).
@@ -761,8 +761,8 @@ final class SearchState: Identifiable {
         results.count { !$0.isSelected }
     }
 
-    /// Total result count.
-    var totalCount: Int { results.count }
+    /// Total match count (a match wrapped onto two lines counts once).
+    var totalCount: Int { Self.occurrenceCount(results) }
 
     // MARK: - Progress
 
@@ -905,14 +905,12 @@ final class SearchState: Identifiable {
     /// page the caller currently has loaded.
     /// Sources from `filteredResults` so J/K navigation respects
     /// active source/confidence/category/applied filters — results hidden
-    /// by the filter are skipped during traversal. `navigateToNext` /
-    /// `navigateToPrevious` map back via `results.firstIndex`, which
-    /// remains correct because `filteredResults` is a strict subset of
-    /// `results`.
+    /// by the filter are skipped during traversal. One stop per match: a
+    /// wrapped match is visited at its lead line (`occurrenceRows`).
     func scopedResults(currentPageIndex: Int) -> [SearchResult] {
         switch navigationScope {
-        case .wholeDocument: return filteredResults
-        case .currentPage: return filteredResults.filter { $0.pageIndex == currentPageIndex }
+        case .wholeDocument: return Self.occurrenceRows(filteredResults)
+        case .currentPage: return Self.occurrenceRows(filteredResults).filter { $0.pageIndex == currentPageIndex }
         }
     }
 
@@ -921,8 +919,8 @@ final class SearchState: Identifiable {
     func navigateToNext(currentPageIndex: Int) {
         let scoped = scopedResults(currentPageIndex: currentPageIndex)
         guard !scoped.isEmpty else { return }
-        let currentID = currentResult?.id
-        let scopedIdx = scoped.firstIndex(where: { $0.id == currentID })
+        let currentID = currentResult.map(Self.occurrenceKey)
+        let scopedIdx = scoped.firstIndex(where: { Self.occurrenceKey($0) == currentID })
         let nextScopedIdx: Int
         if let scopedIdx { nextScopedIdx = (scopedIdx + 1) % scoped.count }
         else { nextScopedIdx = 0 }
@@ -935,8 +933,8 @@ final class SearchState: Identifiable {
     func navigateToPrevious(currentPageIndex: Int) {
         let scoped = scopedResults(currentPageIndex: currentPageIndex)
         guard !scoped.isEmpty else { return }
-        let currentID = currentResult?.id
-        let scopedIdx = scoped.firstIndex(where: { $0.id == currentID })
+        let currentID = currentResult.map(Self.occurrenceKey)
+        let scopedIdx = scoped.firstIndex(where: { Self.occurrenceKey($0) == currentID })
         let prevScopedIdx: Int
         if let scopedIdx { prevScopedIdx = (scopedIdx - 1 + scoped.count) % scoped.count }
         else { prevScopedIdx = scoped.count - 1 }
@@ -1138,9 +1136,8 @@ final class SearchState: Identifiable {
     /// per-result observer churn). Performance gate: <100ms on 10k
     /// results — pinned by `SearchStateSelectionTests`.
     func setSelection(where predicate: (SearchResult) -> Bool) {
-        for i in results.indices {
-            results[i].isSelected = predicate(results[i])
-        }
+        let decided = Self.occurrenceSelection(results, where: predicate)
+        for i in results.indices { results[i].isSelected = decided[Self.occurrenceKey(results[i])] ?? false }
         resultVersion += 1
     }
 
@@ -1159,9 +1156,9 @@ final class SearchState: Identifiable {
     }
 
     func toggleSelection(for id: UUID) {
-        guard let index = results.firstIndex(where: { $0.id == id }) else { return }
-        results[index].isSelected.toggle()
-        resultVersion += 1
+        guard let result = results.first(where: { $0.id == id }) else { return }
+        let key = Self.occurrenceKey(result), target = !result.isSelected
+        setSelection { Self.occurrenceKey($0) == key ? target : $0.isSelected }
     }
 
     /// Current index of a result by ID, or nil if removed.

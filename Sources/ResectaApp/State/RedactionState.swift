@@ -538,7 +538,7 @@ class RedactionState {
             createdRegions: prepared.createdRegions,
             createdMetadata: prepared.createdMetadata,
             createdAudit: prepared.createdAudit,
-            actionName: UndoName.mark(prepared.appliedCount),
+            actionName: UndoName.mark(search.countingOccurrences(prepared.appliedCount, ids: prepared.appliedResultIDs)),
             runDeselectionParts: runDeselectionParts(after: search),
             undoManager: undoManager
         )
@@ -584,7 +584,7 @@ class RedactionState {
 
         let (existingRectsByPage, existingStripRectsByPage) = coveringRectsByPage(regions)
         let prepared = prepareApply(
-            selected: [result],
+            selected: search.pieces(of: result.id),
             existingRectsByPage: existingRectsByPage, existingStripRectsByPage: existingStripRectsByPage,
             appliedAt: Date(),
             searchRecord: search.appliedSearchRecord()
