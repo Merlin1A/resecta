@@ -29,8 +29,7 @@ extension SearchAndRedactSheet {
     /// (e.g. between region-version `.onChange` resets).
     @MainActor
     static func unappliedMatchCount(in searchState: SearchState) -> Int {
-        max(0, searchState.results.count
-               - searchState.appliedResultIDs.union(searchState.coveredResultIDs).count)
+        max(0, searchState.unappliedOccurrenceCount)
     }
 
     /// The slice of session state a mode-switch clear destroys

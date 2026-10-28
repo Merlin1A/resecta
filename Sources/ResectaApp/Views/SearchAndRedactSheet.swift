@@ -862,7 +862,7 @@ struct SearchAndRedactSheet: View {
     /// search bar, subheadline on the parked strip).
     @ViewBuilder
     func resultNavCounter(site: ResultNavSite) -> some View {
-        if let idx = searchState.currentResultIndex {
+        if let idx = searchState.currentOccurrenceIndex {
             if searchState.filteredCount == searchState.totalCount {
                 Text("\(idx + 1)/\(searchState.totalCount)")
                     .font(site.counterFont)

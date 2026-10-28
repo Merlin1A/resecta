@@ -726,8 +726,8 @@ extension SearchAndRedactSheet {
                 documentState: documentState
             ) else { return }
             if let message = CommitFeedback.markedMessage(
-                applied: outcome.applied,
-                alreadyCovered: outcome.skippedOverlaps
+                applied: searchState.markedCounts(outcome).applied,
+                alreadyCovered: searchState.markedCounts(outcome).alreadyCovered
             ) {
                 toastManager.enqueue(message, severity: .success)
             }
