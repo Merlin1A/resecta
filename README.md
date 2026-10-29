@@ -36,7 +36,7 @@ The core workflow is:
 ## Two modes
 
 - **Secure Rasterization** — produces image-only output and is the simplest approach for high-sensitivity documents. Verification runs as a 7-layer check.
-- **Searchable Redaction** — preserves non-redacted text for selectability and search, using a fresh monospace font designed to reduce the glyph-positioning side channels identified in academic research. Verification runs as a 12-layer check (the five additional checks cover the preserved-text layer). If any unmarked text on a page shows no ink or almost none — white or near-white on white, invisible or nearly transparent, or under or nearly under a box drawn into the page — that page is exported as an image only. The stated limit: text covered by a picture in the page can still enter the text layer.
+- **Searchable Redaction** — preserves non-redacted text for selectability and search, using a fresh monospace font designed to reduce the glyph-positioning side channels identified in academic research. Verification runs as a 12-layer check (the five additional checks cover the preserved-text layer). If any unmarked text on a page shows no ink or almost none — white or near-white on white, invisible or nearly transparent, or under an opaque box drawn into the page — that page is exported as an image only. The stated limits: text covered by a picture in the page, text under a bar that is part of a scanned picture, and text that shows faintly through a box that is not fully opaque can still enter the text layer (`KNOWN_ISSUES.md` KI-18).
 
 Both modes share the same pixel-destruction core. Settings holds the default mode and each document can override it; Paranoid Mode pins Secure Rasterization.
 

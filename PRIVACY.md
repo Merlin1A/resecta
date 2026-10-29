@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Effective date:** 2026-10-26
+**Effective date:** 2026-10-29
 
 Resecta is an on-device document-redaction app for iOS. This Privacy Policy
 describes how Resecta handles information. It is written to satisfy Apple's
@@ -116,7 +116,9 @@ expects, that value stays as the writer wrote it, the export still completes,
 and the metadata check in the verification pass, when it runs, reports the value
 that was not replaced. The export therefore carries much less metadata than
 a typical PDF, but it is not metadata-free. The file name of a shared copy is
-redacted.pdf for every export and does not record when you exported it.
+redacted- followed by a short code made from the redacted file itself (for
+example redacted-3f9a1c07.pdf). It carries nothing from your document's name
+and does not record when you exported it.
 
 Resecta opens PDF files, and JPEG, PNG and HEIC images chosen in Files or in
 the system Photos picker, or dropped onto an open document. Each image becomes

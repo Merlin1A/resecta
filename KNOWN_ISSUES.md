@@ -132,11 +132,31 @@ A photo whose full-size copy is kept only in iCloud, as with Optimize iPhone Sto
 ---
 
 ### KI-17: On a Photo or Scanned Page, a Search Box Covers the Whole Line (Low–Medium)
-**Affects:** Search (text read from a picture: a photo, a screenshot, a scan, or a photo on a typed page)
+**Affects:** Search (text read from a picture: a photo, a screenshot, a scan, or a photo on a typed page); hand-drawn regions on pages with no text layer
 
 On a page that is a picture, such as a photo, a screenshot or a scan without its own text, Search reads the text with on-device text recognition, which reports where each line is rather than each word. A box placed from a Search match on such a page covers the whole line that holds the match, so the other words on that line are covered too.
 
-**Workaround:** Before you tap Redact, select the box and drag its handles in to the word, leaving a margin around its letters: a box drawn to the edges of the letters can leave part of them readable. Check the page in the preview before you share.
+A region you draw by hand on a page with no text layer (a photo, a screenshot or a scan without its own text) is not read by any check: no words are captured under it, so the checks cannot tell what it covers. The results list each such region that covers less than the whole page under "Hand-drawn regions not checked", with its page.
+
+**Workaround:** Before you tap Redact, select the box and drag its handles in to the word, leaving a margin around its letters: a box drawn to the edges of the letters can leave part of them readable. Check the page in the preview before you share. For a region you drew by hand on a page with no text layer, open its page from that results row and check in the preview that the region covers what you meant.
+
+---
+
+### KI-18: A Bar Already in a Received Page Can Leave Text in a Searchable Export (Medium)
+**Affects:** Searchable Redaction (documents that were blacked out before you opened them)
+
+Searchable Redaction exports a page as an image only when it reads unmarked text there as showing no ink. Two kinds of bar already in a received page can defeat that reading: a dark bar that is part of a scanned picture, whose scanning noise reads as ink, over a word the page's own OCR text layer still holds; and a bar drawn over live text that is not fully opaque, so the text shows through faintly. The page then keeps its text layer, the word under the bar can be selected, copied and searched in the export, and verification reports it only if it is one of the structured categories its final sweep reads; a name or an address is not.
+
+**Workaround:** For a document that was already blacked out, export with Secure Rasterization, which keeps no text layer.
+
+---
+
+### KI-19: A Filled PDF Form Exports with Its Field Values Removed (Low–Medium)
+**Affects:** Export (PDF forms whose fields were filled in before you opened them)
+
+A value typed into a PDF form is kept with its field, not drawn into the page itself. Resecta rebuilds the redacted copy from the page's own content in both export modes, so the copy carries no field values: a filled form exports with its fields blank. Resecta does not yet draw field values into the page it exports. The import notice, the results screen ("Form values not carried over") and the share confirm say how many filled fields were not carried into the copy.
+
+**Workaround:** Flatten the form in another app before you import it, so its values become part of the page, then mark any values you need to redact and check the preview before you share.
 
 ---
 
