@@ -198,11 +198,11 @@ struct DocumentEditorView: View {
                     activeShapeTool: Self.shapeTool(for: activeTool),
                     isMultiSelectActive: isMultiSelectActive
                 )
-                    .disabled(documentState.phaseKind != .editing)
-                    .blur(radius: documentState.phaseKind != .editing ? 3 : 0,
+                    .disabled(documentState.canvasLocked)
+                    .blur(radius: documentState.canvasLocked ? 3 : 0,
                           opaque: false)
                     .overlay {
-                        if documentState.phaseKind != .editing {
+                        if documentState.canvasLocked {
                             PipelineProgressCard(onCancelExport: exportFlow.cancelExport)
                                 .transition(.opacity)
                         }

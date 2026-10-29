@@ -55,6 +55,13 @@ final class PipelineCoordinator: @unchecked Sendable {
     /// output is promoted to its URL (after `finalize()`); never read by
     /// production code. `StopDuringFinalizeTests` takes Stop from it.
     var beforeOutputPromotionSeam: (() -> Void)?
+    /// Test seam: runs on the run's task as verification starts, before
+    /// its detached loads; never read by production code.
+    /// `StopAfterTheCopyTests` takes Stop from it.
+    var beforeVerificationLoadsSeam: (() -> Void)?
+    /// Test seam: receives the regions verification checks, as it hands
+    /// them to the checks; never read by production code.
+    var verificationRegionsSeam: (([Int: [RedactionRegion]]) -> Void)?
     #endif
 
     #if DEBUG
@@ -116,6 +123,8 @@ final class PipelineCoordinator: @unchecked Sendable {
         /// audit); the verify-only path re-feeds the retained
         /// `lastRunInputs` or re-derives the same way.
         let appliedSearches: [SearchRecheckRequest]
+        /// The regions the run burned, per page, as burned (clamped, floor-filtered); verification checks these.
+        let burnedRegions: [Int: [RedactionRegion]]
     }
 
     /// Snapshot of pipeline-affecting settings, captured once
@@ -271,18 +280,8 @@ final class PipelineCoordinator: @unchecked Sendable {
         // the first per-layer transition) lands on the legal
         // .verifying → .failed pair instead of the not-listed
         // .verified → .failed pair (see DocumentState.legalTransitions).
-        // The initial layer count is taken from the verifier so the
-        // progress UI shows the correct total from frame 0.
-        let verifier = VerificationEngine()
-        let scheduledLayers = verifier.layers(for: effectiveMode)
         documentState.transition(to: .verifying(
-            progress: .init(
-                currentLayer: 1,
-                totalLayers: scheduledLayers.count,
-                layerName: scheduledLayers.first?.name ?? "",
-                completedLayers: []
-            )
-        ))
+            progress: PipelineRunner.initialVerifyingProgress(for: effectiveMode)))
 
         launch(.verifyOnly(outputURL: outputURL, effectiveMode: effectiveMode))
     }

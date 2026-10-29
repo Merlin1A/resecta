@@ -303,6 +303,11 @@ extension RedactionState {
         MainActor.assumeIsolated {
             undoManager.registerUndo(withTarget: target) { target in
                 MainActor.assumeIsolated {
+                    // A run owns the regions: the step waits (+MutationGuard).
+                    guard target.mayRunRegionStep else {
+                        target.holdRefusedRegionStep(undoManager, actionName, handler: handler)
+                        return
+                    }
                     let before = target.regions
                     handler(target)
                     target.recordUndoRedo(before: before, name: actionName)
