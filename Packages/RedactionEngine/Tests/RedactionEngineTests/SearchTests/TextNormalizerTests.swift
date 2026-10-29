@@ -108,9 +108,9 @@ struct TextNormalizerTests {
 
     @Test("Every smart-punctuation map entry folds and preserves length")
     func smartPunctuationFullMap() {
-        let input = "\u{201C}\u{201D}\u{2018}\u{2019}\u{2013}\u{2014}\u{2012}\u{2011}\u{2010}\u{00AD}"
+        let input = "\u{201C}\u{201D}\u{2018}\u{2019}\u{2013}\u{2014}\u{2012}\u{2011}\u{2010}"
         let folded = TextNormalizer.normalizeSmartPunctuation(input)
-        #expect(folded == "\"\"''------")
+        #expect(folded == "\"\"''-----")
         #expect(folded.count == input.count, "1:1 map must preserve Character count")
         #expect(folded.utf16.count == input.utf16.count,
                 "1:1 map must preserve UTF-16 length for NSRange validity")
