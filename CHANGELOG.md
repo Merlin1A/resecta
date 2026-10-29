@@ -29,6 +29,15 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - A match you left unapplied on purpose is described as left unapplied, not as one to redact.
 - The ink-fit stall test no longer counts other tests' work as its stall's hold, and it runs alone.
 
+### Fixed
+
+- Verification: when a search match runs onto a second line and only one line's box is applied, or one of its boxes is removed, the Search Re-check now reports the match as only partly covered. Before, the line left without a box was read as a match the user chose not to redact, and the checks passed. The OCR check also reads the words of a redacted search match that open the next line after a box, or end the line before one, as part of the match.
+
+### Fixed
+
+- Search: a name or number broken at its own hyphen across two lines, such as a surname a word processor wraps after the hyphen, is now found as typed, with a box on each line. A soft hyphen inside a word is now ignored, so the word matches without it. Before, the line break after a hyphen read as a space and the phrase was not found.
+- Search: a phrase that starts at the end of one page and continues at the top of the next, past a repeated page header or footer, is now found, with a box on each page. Before, each page was searched on its own.
+
 ### Security
 
 - `THREAT-MODEL.md` §7 is headed "Security posture", with its date and commit in its first sentence, so a link to it holds across re-dates. The branch-rules row names each repository's required check, the up-to-date-branch rule and the `rulesets/<id>` path, and says the admin role may bypass the ruleset on a pull request; the reporting and secrets rows give their public API paths and the contributors graph; the flag-check row names one launch argument. The rows the site's posture sheet also shows read as the site's do, and a note beneath the table names the checks that need a role on the repository. No state changed, and the section keeps its 2026-10-27 date.

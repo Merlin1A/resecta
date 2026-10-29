@@ -107,7 +107,9 @@ extension VerificationEngine {
     /// box: a line of text ending with the start of the term right before a
     /// box, or beginning with its end right after one. That is the shape a
     /// box placed short of its glyphs leaves (the uncovered glyphs stay
-    /// printed beside the fill). ATTENTION with the term texts; the Search
+    /// printed beside the fill) — or, for a search's box that ends or opens
+    /// its line, the term's whole words on the line next to it (a match
+    /// wrapped onto two lines with one line boxed). ATTENTION with the term texts; the Search
     /// Re-check's coverage check is the geometric FAIL for the same box.
     /// `textInRegionAndSensitiveTermFragmentBesideRegion` carries that
     /// fragment beside the page's in-region text, the way the whole-term
@@ -241,11 +243,15 @@ extension VerificationEngine {
             }
             // The same hit read at a box's edge with a fragment of a term:
             // the start of the term ending the line before a box, or its end
-            // beginning the line after one.
+            // beginning the line after one — on the box's own line, or on
+            // the line next to a search's box that ends or opens its line.
             if hitHasOutOfRegionBox,
                hit.confidence >= sensitiveTermFailConfidenceThreshold,
                let text = hit.text,
-               validTerms.contains(where: { fragmentBesideRegion(text: text, box: hit.box, term: $0, pageRegions: pageRegions) }) {
+               validTerms.contains(where: {
+                   fragmentBesideRegion(text: text, box: hit.box, term: $0, pageRegions: pageRegions)
+                       || fragmentAcrossLineBreak(hit: hit, text: text, hits: hits, term: $0, pageRegions: pageRegions)
+               }) {
                 sawSensitiveTermFragmentBesideRegion = true
             }
 
@@ -369,7 +375,8 @@ extension VerificationEngine {
             let boxes = inRegionCandidateBoxes(of: hit)
             guard boxes.contains(where: { !boxLiesInRegion($0, of: pageRegions) }) else { continue }
             for term in validTerms
-            where fragmentBesideRegion(text: text, box: hit.box, term: term, pageRegions: pageRegions)
+            where (fragmentBesideRegion(text: text, box: hit.box, term: term, pageRegions: pageRegions)
+                || fragmentAcrossLineBreak(hit: hit, text: text, hits: hits, term: term, pageRegions: pageRegions))
                 && seen.insert(term.text).inserted {
                 texts.append(term.text)
             }

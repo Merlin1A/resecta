@@ -801,6 +801,7 @@ public actor DocumentSearcher {
         continuation: AsyncStream<SearchResult>.Continuation
     ) async {
         var totalYielded = 0
+        var seam: SeamPage? = nil
 
         for pageIndex in 0..<pageCount {
             if Task.isCancelled { break }
@@ -827,7 +828,9 @@ public actor DocumentSearcher {
                 ) }
                 let hybrid = await hybridOCRLeg(page: page, pageIndex: pageIndex, textLayerRects: results.map(\.normalizedRect),
                     includeOCR: options.includeOCR) { await self.searchPageViaOCR(page: page, pageIndex: pageIndex, query: query, options: options, term: query) }
-                emitCapped(results + hybrid, into: continuation, total: &totalYielded)
+                let seamHits = await pageSeamMatches(from: seam, to: page, pageIndex: pageIndex, pageText: pageText, query: query, options: options, term: query)
+                emitCapped(results + hybrid + seamHits, into: continuation, total: &totalYielded)
+                seam = SeamPage(index: pageIndex, page: page, text: pageText)
             } else if options.includeOCR {
                 // OCR fallback path — page has no usable text layer
                 // (empty, or a `.sparse`/`.none` layer over a scanned body)
@@ -1005,6 +1008,7 @@ public actor DocumentSearcher {
         if options.multiTermConjunction {
             let allTerms = Set(terms)
             var totalYielded = 0
+            var seam: SeamPage? = nil
 
             for pageIndex in 0..<pageCount {
                 if Task.isCancelled || totalYielded >= Self.maxResults { break }
@@ -1032,6 +1036,7 @@ public actor DocumentSearcher {
                         let hits = await withInkFitRead(page) { findTextMatches(pageText: pageText, query: term, options: options, page: page, pageIndex: pageIndex, term: term) }
                         pageHits += hits + (await hybridOCRLeg(page: page, pageIndex: pageIndex, textLayerRects: hits.map(\.normalizedRect), includeOCR: options.includeOCR,
                             reportsWhenOff: term == terms.first) { await self.searchPageViaOCR(page: page, pageIndex: pageIndex, query: term, options: options, term: term) })
+                        pageHits += await pageSeamMatches(from: seam, to: page, pageIndex: pageIndex, pageText: pageText, query: term, options: options, term: term)
                     } else if options.includeOCR {
                         pageHits.append(contentsOf: await searchPageViaOCR(
                             page: page, pageIndex: pageIndex,
@@ -1039,6 +1044,7 @@ public actor DocumentSearcher {
                         ))
                     }
                 }
+                if useTextLayer { seam = SeamPage(index: pageIndex, page: page, text: pageText) }
                 // Scanned region (`.sparse`/`.none`) with OCR
                 // off: not analyzed. Fire once per page, after all terms.
                 if !pageHasRichTextLayer(pageIndex) && !options.includeOCR {
@@ -1056,8 +1062,8 @@ public actor DocumentSearcher {
         }
 
         // OR mode: stream results directly as terms match, page-first.
-        // This arm is unchanged from the pre-AND-mode implementation.
         var totalYielded = 0
+        var seam: SeamPage? = nil
 
         // Page-first iteration: load each page once, search all terms.
         // Fixes progress resetting per-term and improves text locality.
@@ -1088,7 +1094,8 @@ public actor DocumentSearcher {
                     ) }
                     let hybrid = await hybridOCRLeg(page: page, pageIndex: pageIndex, textLayerRects: results.map(\.normalizedRect), includeOCR: options.includeOCR,
                         reportsWhenOff: term == terms.first) { await self.searchPageViaOCR(page: page, pageIndex: pageIndex, query: term, options: options, term: term) }
-                    emitCapped(results + hybrid, into: continuation, total: &totalYielded)
+                    let seamHits = await pageSeamMatches(from: seam, to: page, pageIndex: pageIndex, pageText: pageText, query: term, options: options, term: term)
+                    emitCapped(results + hybrid + seamHits, into: continuation, total: &totalYielded)
                 } else if options.includeOCR {
                     let ocrResults = await searchPageViaOCR(
                         page: page, pageIndex: pageIndex,
@@ -1097,6 +1104,7 @@ public actor DocumentSearcher {
                     emitCapped(ocrResults, into: continuation, total: &totalYielded)
                 }
             }
+            if useTextLayer { seam = SeamPage(index: pageIndex, page: page, text: pageText) }
             // Scanned region (`.sparse`/`.none`) with OCR off:
             // not analyzed. Fire once per page, after all terms.
             if !pageHasRichTextLayer(pageIndex) && !options.includeOCR {
@@ -1776,112 +1784,6 @@ public actor DocumentSearcher {
                 matchRangeInSnippet: window.matchRange
             ))
             return true
-        }
-
-        return results
-    }
-
-    // MARK: - Text Matching Core
-
-    /// Find all substring matches in a page's text and convert to SearchResults.
-    private func findTextMatches(
-        pageText: String,
-        query: String,
-        options: SearchOptions,
-        page: PDFPage,
-        pageIndex: Int,
-        term: String
-    ) -> [SearchResult] {
-        // Per-page CJK detection disables the boundary check (see
-        // `SearchCore.effectiveOptions`); the full tier detects, the preview
-        // does not.
-        let effectiveOptions = SearchCore.effectiveOptions(options, pageText: pageText, detectCJK: true)
-
-        let normalizedQuery = SearchCore.normalizedText(query, options: effectiveOptions)
-        guard !normalizedQuery.isEmpty else { return [] }
-
-        // Recall extensions on top of the NFKC path (the shared
-        // preparation). Smart punctuation is 1:1 (length-preserving), so rect
-        // NSRanges stay in the normalized text's coordinates. Diacritic fold
-        // and separator strip are length-changing: matching runs on the
-        // transformed text and every match range routes through the offset
-        // map back to base coordinates BEFORE the rect is computed (Risk 1: a
-        // wrong rect is a misplaced redaction).
-        let prepared = SearchCore.preparePage(pageText, options: effectiveOptions)
-        let searchPageText = prepared.searchText
-        let searchQuery = SearchCore.preparedQuery(normalized: normalizedQuery, options: effectiveOptions)
-        // The strip path can empty a query made of separators only.
-        guard !searchQuery.isEmpty else { return [] }
-
-        // Case-preserved analog of the base text, used only to
-        // re-slice the DISPLAYED span (see `displaySlice`). Mirrors the
-        // base chain minus the case fold: page text → (ligature/NFKC
-        // normalize) → (smart punctuation).
-        let displayBaseChars: [Character] = {
-            var display = effectiveOptions.normalizeUnicode
-                ? TextNormalizer.normalize(pageText)
-                : pageText
-            if effectiveOptions.normalizeSmartPunctuation {
-                display = TextNormalizer.normalizeSmartPunctuation(display)
-            }
-            return Array(TextNormalizer.foldWhitespaceRuns(display))
-        }()
-        let displayBaseText = String(displayBaseChars)
-
-        var results: [SearchResult] = []
-
-        let (spans, _) = SearchCore.literalSpans(
-            in: prepared, query: searchQuery, comparison: [],
-            wholeWord: effectiveOptions.wholeWord,
-            cap: nil
-        )
-        for span in spans {
-            // Offsets on the searched (most-transformed) text, and the base span.
-            let matchStartOffset = span.searchedCharacters.lowerBound
-            let matchLength = span.searchedCharacters.count
-            let (baseStartOffset, baseLength) = span.baseOffsets
-            // The rect's range on the RAW page text.
-            guard let nsRange = prepared.rawNSRange(of: span) else { continue }
-            if let rects = textLayerLines(for: nsRange, page: page) {
-                // Display span re-slices from the case-preserved
-                // analog at the already-mapped base offsets; matching stays
-                // on the normalized text. The
-                // norm-drift trap is guarded inside `displaySlice`,
-                // which falls back to the normalized slice on drift.
-                let normalizedSlice = String(searchPageText[span.searchedIndices])
-                let matchedText = Self.displaySlice(
-                    start: baseStartOffset, length: baseLength,
-                    offsetMap: nil,
-                    displayChars: displayBaseChars,
-                    baseCount: prepared.baseText.count,
-                    fallback: normalizedSlice)
-                // The context window is built over the
-                // same case-preserved analog `displaySlice` re-sliced from,
-                // at the base span, so its match slice IS `matchedText`; on
-                // display drift (the `displaySlice` fallback) it comes from
-                // the searched text at the searched offsets instead.
-                let window = displayWindow(
-                    displayChars: displayBaseChars, displayText: displayBaseText,
-                    baseCount: prepared.baseText.count,
-                    start: baseStartOffset, length: baseLength, offsetMap: nil,
-                    searchedText: searchPageText, searchedStart: matchStartOffset, searchedLength: matchLength
-                )
-
-                // One result per line the match touches (the counting rule).
-                let occurrence = rects.count > 1 ? UUID() : nil
-                for line in rects {
-                    results.append(SearchResult(
-                        pageIndex: pageIndex,
-                        normalizedRect: line.rect,
-                        matchedText: matchedText,
-                        contextSnippet: window.snippet,
-                        source: .textLayer,
-                        term: term,
-                        matchRangeInSnippet: window.matchRange,
-                        occurrenceID: occurrence, textLayerRect: line.textLayerRect, inkFitDegraded: line.degraded
-                    ))
-                }
-            }
         }
 
         return results
