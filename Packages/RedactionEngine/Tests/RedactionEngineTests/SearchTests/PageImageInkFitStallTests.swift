@@ -4,8 +4,9 @@ import PDFKit
 import CoreText
 @testable import RedactionEngine
 
-// The ink fit's waits (`PageImageInkFitTests`): a stalled read, render or
-// lane, a cancelled search, and the main thread, each bounded.
+// The ink fit's waits (`PageImageInkFitTests`): a stalled read or render, a
+// cancelled search, and the main thread, each bounded; a stalled Vision lane
+// in a suite of its own (`PageImageInkFitStallTests`, below).
 
 extension PageImageInkFitTests {
     /// A mark of a test's own in a blank corner of every page, so each page
@@ -112,76 +113,6 @@ extension PageImageInkFitTests {
         let width = fit.rect.width * size.width, rawWidth = Self.points(raw, size).width
         #expect(width <= rawWidth + 20, "the fallback (\(width) pt) is the read word's box, not an envelope (selection \(rawWidth) pt)")
     }
-
-    @Test("A page read that stalls on the Vision lane degrades only its own page: another page reads off the stalled lane and fits, not degraded")
-    func stallOnOnePageLeavesOthersFitted() async throws {
-        // An export of this test's own: a small mark in a blank corner of
-        // both pages makes their content keys no other test's, so the
-        // injected stall reaches no other test's jobs.
-        let data = try TestFixtures.sampleStatementPDF()
-        let source = try #require(PDFDocument(data: data))
-        var regions: [Int: [RedactionRegion]] = [:]
-        for index in [1, 2] {
-            regions[index] = [RedactionRegion(id: UUID(), normalizedRect: CGRect(x: 0.011, y: 0.012, width: 0.017, height: 0.009),
-                                              source: .manual)]
-        }
-        let url = try await TestPipeline.processAndExport(data, mode: .searchableRedaction, regions: regions, dpi: 300)
-        defer { try? FileManager.default.removeItem(at: url) }
-        let exported = try Data(contentsOf: url)
-        // Each page on a document of its own, so the two fits share no PDF objects.
-        let stalled = SendablePDFDocument(try #require(PDFDocument(data: exported)))
-        let other = SendablePDFDocument(try #require(PDFDocument(data: exported)))
-        let pageA = try #require(stalled.document.page(at: 1)), cgA = try #require(pageA.pageRef)
-        let keyA = InkTokenCache.key(page: pageA, cgPage: cgA, visual: pageA.bounds(for: .cropBox).size)
-        // A stall far longer than any queue wait in a busy test run: both
-        // fits returning well inside it shows that neither waited it out.
-        DocumentSearcher.inkFitInjectedLaneStalls.set((30.0, 0.5), for: keyA)
-        defer { DocumentSearcher.inkFitInjectedLaneStalls.set(nil, for: keyA) }
-        @Sendable func fit(_ shared: SendablePDFDocument, _ index: Int) async -> (rect: CGRect, degraded: Bool, raw: CGRect, seconds: TimeInterval, ended: Date)? {
-            guard let page = shared.document.page(at: index) else { return nil }
-            let range = ((page.string ?? "") as NSString).range(of: "Hartwell")
-            guard let raw = page.selection(for: range).flatMap({ DocumentSearcher().normalizedRect(for: $0, page: page) }) else { return nil }
-            let started = Date()
-            // Read as a search reads it (awaited), then fitted.
-            await DocumentSearcher.prepareInkFit(page)
-            let fit = DocumentSearcher.inkFit(raw, page: page, text: "Hartwell", range: range, paintOnly: true)
-            return (fit.rect, fit.degraded, raw, Date().timeIntervalSince(started), Date())
-        }
-        // Page A's read takes the Vision lane and stalls there; page B's read queues behind it.
-        let a = Task.detached { await fit(stalled, 1) }
-        try await Task.sleep(for: .milliseconds(150))
-        let b = try #require(await Task.detached { await fit(other, 2) }.value)
-        let aResult = try #require(await a.value)
-        #expect(aResult.degraded, "the stalled page's fit is degraded")
-        // Measured from page A's turn at the lane's head (time queued behind
-        // other reads is a busy run's, not the stall's): A is released within
-        // its 0.5 s limit (and a second's slack). B's read is not run behind
-        // A's stall: it ran on another lane, or ahead of A on A's. How long B
-        // queues behind other reads is a busy run's, so no time is judged.
-        let aBegan = try #require(InkFitLaneTimes.shared.began(keyA), "page A's read reached the lane's head")
-        let aHeld = aResult.ended.timeIntervalSince(aBegan)
-        #expect(aHeld < 1.5, "the stalled page's fit was held \(aHeld) s after its read reached the head; its limit is 0.5 s, its stall 30 s")
-        #expect(!b.degraded, "the other page's fit is not degraded by page A's stall")
-        let pageB = try #require(other.document.page(at: 2)), cgB = try #require(pageB.pageRef)
-        let keyB = InkTokenCache.key(page: pageB, cgPage: cgB, visual: pageB.bounds(for: .cropBox).size)
-        let aLane = try #require(InkFitLaneTimes.shared.lane(keyA)), bLane = try #require(InkFitLaneTimes.shared.lane(keyB), "page B's read reached a lane's head")
-        let bBegan = try #require(InkFitLaneTimes.shared.began(keyB))
-        #expect(bLane != aLane || bBegan < aBegan, "page B's read ran on page A's stalled lane, behind its stall")
-        print("stall pin: A queued \(aResult.seconds - aHeld) s, held \(aHeld) s at the head; B took \(b.seconds) s, "
-              + "\(InkFitLaneTimes.shared.retired(keyA).map { b.ended.timeIntervalSince($0) } ?? -1) s after A's retirement")
-        let page = try #require(other.document.page(at: 2))
-        let size = page.bounds(for: .cropBox).size
-        let sourcePage = try #require(source.page(at: 2))
-        let sourceRange = ((sourcePage.string ?? "") as NSString).range(of: "Hartwell")
-        let truth = try #require(sourcePage.selection(for: sourceRange).flatMap { DocumentSearcher().normalizedRect(for: $0, page: sourcePage) })
-        let outside = try Self.inkOutside(page, word: Self.points(truth, size), boxes: [Self.points(b.rect, size)])
-        #expect(outside.share == 0, "the other page's word ink outside its fit: \(outside.share * 100)%")
-        #expect(b.rect.width * size.width < Self.points(b.raw, size).width + Self.inkFitEnvelopeSlack,
-                "the other page's box is a fit, not the drift envelope")
-    }
-
-    /// Narrower than any drift envelope (the selection grown 32 pt each side).
-    static let inkFitEnvelopeSlack: CGFloat = 32
 
     @Test("A search cancelled while its gated page's read is outstanding returns at once, not after the read's wait")
     func cancelledSearchReturnsPromptly() async throws {
@@ -301,5 +232,128 @@ extension PageImageInkFitTests {
             return DocumentSearcher.inkFittedRect(raw, page: p, text: "Hartwell", range: range)
         }
         #expect(shown == searched.rect, "the preview shows \(shown), the search returned \(searched.rect)")
+    }
+}
+
+/// The Vision lane's stall pin, on a suite of its own: the batched runner
+/// runs it completely alone after its batches, still gating
+/// (`Scripts/test-batched.sh`), so no neighbour's reads, renders or fits
+/// share the process while page A's hold is timed. The hold is timed from
+/// page A's stalled read at the lane's head, observed after the stall was
+/// set, to the read's answer to its caller; page B is sent once A's read is
+/// seen at the head, not after a fixed delay.
+@Suite("Page-image ink fit: a stalled Vision lane", .tags(.search))
+struct PageImageInkFitStallTests {
+    /// Narrower than any drift envelope (the selection grown 32 pt each side).
+    static let inkFitEnvelopeSlack: CGFloat = 32
+
+    /// Set once a task has returned.
+    final class Done: @unchecked Sendable {
+        private let lock = NSLock()
+        private var done = false
+        var isSet: Bool { lock.withLock { done } }
+        func set() { lock.withLock { done = true } }
+    }
+
+    struct Fit: Sendable {
+        let rect: CGRect, degraded: Bool, raw: CGRect
+        /// When the fit began, when its read answered (the awaited read
+        /// returned to its caller), and when the fit returned.
+        let started: Date, answered: Date, ended: Date
+    }
+
+    @Test("A page read that stalls on the Vision lane degrades only its own page: another page reads off the stalled lane and fits, not degraded")
+    func stallOnOnePageLeavesOthersFitted() async throws {
+        // An export of this test's own: a small mark in a blank corner of
+        // both pages makes their content keys no other test's, so the
+        // injected stall reaches no other test's jobs.
+        let data = try TestFixtures.sampleStatementPDF()
+        let source = try #require(PDFDocument(data: data))
+        var regions: [Int: [RedactionRegion]] = [:]
+        for index in [1, 2] {
+            regions[index] = [RedactionRegion(id: UUID(), normalizedRect: CGRect(x: 0.011, y: 0.012, width: 0.017, height: 0.009),
+                                              source: .manual)]
+        }
+        let url = try await TestPipeline.processAndExport(data, mode: .searchableRedaction, regions: regions, dpi: 300)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let exported = try Data(contentsOf: url)
+        // Each page on a document of its own, so the two fits share no PDF objects.
+        let stalled = SendablePDFDocument(try #require(PDFDocument(data: exported)))
+        let other = SendablePDFDocument(try #require(PDFDocument(data: exported)))
+        let pageA = try #require(stalled.document.page(at: 1)), cgA = try #require(pageA.pageRef)
+        let keyA = InkTokenCache.key(page: pageA, cgPage: cgA, visual: pageA.bounds(for: .cropBox).size)
+        // A stall far longer than any queue wait in a busy test run: both
+        // fits returning well inside it shows that neither waited it out.
+        let stall: TimeInterval = 30, limit: TimeInterval = 0.5
+        DocumentSearcher.inkFitInjectedLaneStalls.set((stall, limit), for: keyA)
+        defer { DocumentSearcher.inkFitInjectedLaneStalls.set(nil, for: keyA) }
+        // Every Vision job for page A from here on is the stall: a read of
+        // A's at a lane's head after this instant is a stalled one.
+        let armed = Date()
+        @Sendable func fit(_ shared: SendablePDFDocument, _ index: Int) async -> Fit? {
+            guard let page = shared.document.page(at: index) else { return nil }
+            let range = ((page.string ?? "") as NSString).range(of: "Hartwell")
+            guard let raw = page.selection(for: range).flatMap({ DocumentSearcher().normalizedRect(for: $0, page: page) }) else { return nil }
+            let started = Date()
+            // Read as a search reads it (awaited), then fitted.
+            await DocumentSearcher.prepareInkFit(page)
+            let answered = Date()
+            let fit = DocumentSearcher.inkFit(raw, page: page, text: "Hartwell", range: range, paintOnly: true)
+            return Fit(rect: fit.rect, degraded: fit.degraded, raw: raw, started: started, answered: answered, ended: Date())
+        }
+        func stalledHead() -> Date? { InkFitLaneTimes.shared.began(keyA).flatMap { $0 > armed ? $0 : nil } }
+        // Page A's read takes the Vision lane and stalls there; page B's
+        // read is sent once A's is seen at the lane's head, so it is sent
+        // while A's stall holds that lane.
+        let aDone = Done()
+        let a = Task.detached { () -> Fit? in defer { aDone.set() }; return await fit(stalled, 1) }
+        var seen: Date?
+        while seen == nil, !aDone.isSet, Date().timeIntervalSince(armed) < DocumentSearcher.inkFitReadBackstop {
+            if stalledHead() != nil { seen = Date() } else { try await Task.sleep(for: .milliseconds(5)) }
+        }
+        let b = try #require(await Task.detached { await fit(other, 2) }.value)
+        let aResult = try #require(await a.value)
+        #expect(aResult.degraded, "the stalled page's fit is degraded")
+        #expect(!b.degraded, "the other page's fit is not degraded by page A's stall")
+        let page = try #require(other.document.page(at: 2))
+        let size = page.bounds(for: .cropBox).size
+        let sourcePage = try #require(source.page(at: 2))
+        let sourceRange = ((sourcePage.string ?? "") as NSString).range(of: "Hartwell")
+        let truth = try #require(sourcePage.selection(for: sourceRange).flatMap { DocumentSearcher().normalizedRect(for: $0, page: sourcePage) })
+        let outside = try PageImageInkFitTests.inkOutside(page, word: PageImageInkFitTests.points(truth, size),
+                                                          boxes: [PageImageInkFitTests.points(b.rect, size)])
+        #expect(outside.share == 0, "the other page's word ink outside its fit: \(outside.share * 100)%")
+        #expect(b.rect.width * size.width < PageImageInkFitTests.points(b.raw, size).width + Self.inkFitEnvelopeSlack,
+                "the other page's box is a fit, not the drift envelope")
+        // The hold is judged only from a stalled read of A's seen at a
+        // lane's head; a run whose lanes answered A at once (no head) has
+        // no hold to time.
+        guard let aBegan = stalledHead() else {
+            try Test.cancel("page A's read never reached a Vision lane's head after the stall was set, so no hold was timed")
+        }
+        // Measured from page A's turn at the lane's head (time queued behind
+        // other reads is a busy run's, not the stall's) to the read's answer
+        // (the fit after it is the page's own work, not the stall's): A is
+        // released within its 0.5 s limit (and a second's slack), while its
+        // stall still holds the lane.
+        let aHeld = aResult.answered.timeIntervalSince(aBegan)
+        let retired = InkFitLaneTimes.shared.retired(keyA)
+        print("stall pin: A queued \(aBegan.timeIntervalSince(aResult.started)) s, held \(aHeld) s at the head "
+              + "(seen \(seen.map { $0.timeIntervalSince(aBegan) } ?? -1) s after it, lane retired \(retired.map { $0.timeIntervalSince(aBegan) } ?? -1) s after it), "
+              + "fit \(aResult.ended.timeIntervalSince(aResult.answered)) s; B took \(b.ended.timeIntervalSince(b.started)) s, "
+              + "\(retired.map { b.ended.timeIntervalSince($0) } ?? -1) s after A's retirement")
+        #expect(aHeld >= 0, "page A's read reached the head \(-aHeld) s after it answered")
+        #expect(aHeld < 1.5, "the stalled page's read was held \(aHeld) s after it reached the head; its limit is \(limit) s, its stall \(stall) s")
+        // Its lane was retired under it (by its own wait or by a read
+        // queued behind it; the seam keeps the latest).
+        #expect(retired.map { $0 >= aBegan } == true, "the stalled read's lane was retired under it (retired \(String(describing: retired)))")
+        // B's read is not run behind A's stall: it ran on another lane, or
+        // ahead of A on A's. How long B queues behind other reads is a busy
+        // run's, so no time is judged.
+        let pageB = try #require(other.document.page(at: 2)), cgB = try #require(pageB.pageRef)
+        let keyB = InkTokenCache.key(page: pageB, cgPage: cgB, visual: pageB.bounds(for: .cropBox).size)
+        let aLane = try #require(InkFitLaneTimes.shared.lane(keyA)), bLane = try #require(InkFitLaneTimes.shared.lane(keyB), "page B's read reached a lane's head")
+        let bBegan = try #require(InkFitLaneTimes.shared.began(keyB))
+        #expect(bLane != aLane || bBegan < aBegan, "page B's read ran on page A's stalled lane, behind its stall")
     }
 }

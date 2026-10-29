@@ -27,6 +27,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - VoiceOver's end-of-run line says the same title as the results screen, such as Some Checks Incomplete.
 - With Verify Before Export off, the results advice names that setting instead of suggesting a Redact that would skip the checks again.
 - A match you left unapplied on purpose is described as left unapplied, not as one to redact.
+- The ink-fit stall test no longer counts other tests' work as its stall's hold, and it runs alone.
 
 ### Security
 
