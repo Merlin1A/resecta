@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Effective date:** 2026-10-26
+**Effective date:** 2026-10-29
 
 Resecta is an on-device document-redaction app for iOS. This Privacy Policy
 describes how Resecta handles information. It is written to satisfy Apple's
