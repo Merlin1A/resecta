@@ -6,7 +6,7 @@
 # simulator runtime machine-wide three times on 2026-06-11 alone. This runner
 # is the structural avoidance: build once, then serial suite-level batches via
 # `test-without-building`, each under a watchdog, with perf-budget suites run
-# completely alone and report-only.
+# completely alone and report-only (a named few alone and still gating).
 #
 # Perf-budget suites run alone and report-only; known-flaky timing/race
 # suites are excluded from the gating batches by policy.
@@ -97,8 +97,21 @@ GREP=/usr/bin/grep
 # REPORT-ONLY (their reds never set the exit status — a red here is read by
 # hand, never gated). "Completely alone" is load-bearing: StressCorpusTests
 # has been red when paired with even one other suite.
-PERF_ALONE_RedactionEngine="CancellationLatencyTests PixelBufferZeroizeTimingTests ReverseRationalePerformanceTests StressCorpusTests ApplyPhaseMemoryStressTests ParallelLayerExecutionTests DetectionRasterizeOverlapTests Layer2OCRParallelismTests SearchRecheckParallelismTests"
+PERF_ALONE_RedactionEngine="CancellationLatencyTests PixelBufferZeroizeTimingTests ReverseRationalePerformanceTests StressCorpusTests ApplyPhaseMemoryStressTests ParallelLayerExecutionTests DetectionRasterizeOverlapTests Layer2OCRParallelismTests SearchRecheckParallelismTests PageImageInkFitStallTests"
 PERF_ALONE_ResectaApp="PageParallelRasterizationTests"
+
+# ALONE-GATING: perf-alone suites (above) whose reds still gate. Each runs
+# completely alone after the batches like the rest of the list, and a red in
+# it fails the run as a batch red does. Every entry carries a reason, an
+# owner and an end condition.
+# - PageImageInkFitStallTests: a stalled Vision lane releases its own page
+#   within the page's limit while other pages fit; the release is judged in
+#   seconds, and in a batch the other suites' reads and renders delay the
+#   released read's caller past the pin's slack. Owner: Merlin1A. Ends when
+#   the lane reports the stalled read's release itself (the pin reads that,
+#   not a clock), or at the review on 2027-01-31, whichever comes first.
+ALONE_GATING_RedactionEngine="PageImageInkFitStallTests"
+ALONE_GATING_ResectaApp=""
 
 # Exclusion list (suite granularity): reds here do not gate the exit
 # status even inside normal batches.
@@ -427,6 +440,20 @@ STUB
     [ "$got" = "wedged none 1 1" ] || { echo "self-test: a hang after a test started expected 'wedged none 1 1', got '$got'" >&2; n=1; }
     rm -rf "$tdir"
     if [ "$n" -eq 0 ]; then echo "self-test: a launch hang is retried once (launch-retried, not a wedge); a second launch hang and a mid-run hang are wedges OK"; else fails=1; fi
+    # 10. Every alone-gating suite is on its scheme's perf-alone list and off
+    #     the exclusion list, and the alone loop runs it gating.
+    n=0
+    for pat in $ALONE_GATING_RedactionEngine; do
+        case " $PERF_ALONE_RedactionEngine " in *" $pat "*) ;; *) echo "self-test: $pat is alone-gating but not perf-alone" >&2; n=1 ;; esac
+        case " $NON_GATING " in *" $pat "*) echo "self-test: $pat is alone-gating and in NON_GATING" >&2; n=1 ;; esac
+    done
+    for pat in $ALONE_GATING_ResectaApp; do
+        case " $PERF_ALONE_ResectaApp " in *" $pat "*) ;; *) echo "self-test: $pat is alone-gating but not perf-alone" >&2; n=1 ;; esac
+        case " $NON_GATING " in *" $pat "*) echo "self-test: $pat is alone-gating and in NON_GATING" >&2; n=1 ;; esac
+    done
+    $GREP -A2 'if in_list "\$s" "\$ALONE_GATING"; then' "$me" | $GREP -q 'run_invocation "alone-\$s" "gating" "\$s"' \
+        || { echo "self-test: the alone loop does not run an alone-gating suite gating" >&2; n=1; }
+    if [ "$n" -eq 0 ]; then echo "self-test: alone-gating suites are perf-alone, off the exclusion list, and run gating OK"; else fails=1; fi
     [ "$fails" -eq 0 ] && { echo "self-test: PASS"; exit 0; }
     echo "self-test: FAIL" >&2; exit 1
 }
@@ -441,12 +468,14 @@ case "$SCHEME" in
         TEST_TARGET="RedactionEngineTests"
         TEST_SRC="Packages/RedactionEngine/Tests/RedactionEngineTests"
         PERF_ALONE="$PERF_ALONE_RedactionEngine"
+        ALONE_GATING="$ALONE_GATING_RedactionEngine"
         SETTLE_SECS=0
         ;;
     ResectaApp)
         TEST_TARGET="ResectaAppTests"
         TEST_SRC="Tests/ResectaAppTests"
         PERF_ALONE="$PERF_ALONE_ResectaApp"
+        ALONE_GATING="$ALONE_GATING_ResectaApp"
         SETTLE_SECS=10   # app-host relaunch churn trips SBMainWorkspace without a settle
         ;;
     *) echo "unknown scheme: $SCHEME (expected RedactionEngine or ResectaApp)" >&2; usage ;;
@@ -759,8 +788,13 @@ done
 if [ "${#ALONE[@]}" -gt 0 ]; then
     for s in "${ALONE[@]}"; do
         [ "$SETTLE_SECS" -gt 0 ] && sleep "$SETTLE_SECS"
-        echo "perf-alone $s (completely alone, report-only):"
-        run_invocation "alone-$s" "report-only" "$s"
+        if in_list "$s" "$ALONE_GATING"; then
+            echo "perf-alone $s (completely alone, gating):"
+            run_invocation "alone-$s" "gating" "$s"
+        else
+            echo "perf-alone $s (completely alone, report-only):"
+            run_invocation "alone-$s" "report-only" "$s"
+        fi
     done
 fi
 

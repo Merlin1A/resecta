@@ -100,7 +100,13 @@ jobs:
       # 11 s against 0.5 s) on the weekly run at 10ab90dd and on the v1.3.0
       # tag run and its re-run; they pass on the pre-push hook's local run.
       # Left out here until the pins judge gates, not a clock.
-      TEST_BATCHED_EXCLUDE: ${{ matrix.scheme == 'ResectaApp' && 'PipelineCoordinatorSecurityTests PageParallelRasterizationTests' || 'PacketOCRQualityRoleTests SearchRecheckOCRTests SearchRecheckParallelismTests PacketSearchableProbeTests OCREngineTests OCRCacheCoherenceTests PageImageInkFitTests InkFitBusyPoolTests' }}
+      # Added 2026-10-29: PageImageInkFitStallTests, the stalled-lane pin
+      # moved out of PageImageInkFitTests into a suite of its own (the
+      # runner runs it alone, still gating), stays left out with it.
+      # Owner of the 2026-10-26 and 2026-10-29 entries: Merlin1A. They end
+      # when the pins judge gates, not a clock, or at the review on
+      # 2027-01-31, whichever comes first.
+      TEST_BATCHED_EXCLUDE: ${{ matrix.scheme == 'ResectaApp' && 'PipelineCoordinatorSecurityTests PageParallelRasterizationTests' || 'PacketOCRQualityRoleTests SearchRecheckOCRTests SearchRecheckParallelismTests PacketSearchableProbeTests OCREngineTests OCRCacheCoherenceTests PageImageInkFitTests PageImageInkFitStallTests InkFitBusyPoolTests' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 

@@ -490,10 +490,13 @@ struct PageImageInkFitTests {
     func privateCopyIsMadeOnce() async throws {
         let (export, _) = try await Self.reimportedExport()
         let shared = SendablePDFDocument(export)
+        // The count is kept by the document's address, which a document an
+        // earlier test freed may have held: only the copies made here count.
+        let before = PrivatePDFCopies.shared.madeCount(of: shared.document)
         await withTaskGroup(of: Void.self) { group in
             for _ in 0..<8 { group.addTask { _ = PrivatePDFCopies.shared.copy(of: shared.document) } }
         }
-        let made = PrivatePDFCopies.shared.madeCount(of: shared.document)
+        let made = PrivatePDFCopies.shared.madeCount(of: shared.document) - before
         #expect(made == 1, "made \(made) copies of one document")
     }
 
