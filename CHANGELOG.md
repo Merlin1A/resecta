@@ -38,6 +38,11 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 - Search: a name or number broken at its own hyphen across two lines, such as a surname a word processor wraps after the hyphen, is now found as typed, with a box on each line. A soft hyphen inside a word is now ignored, so the word matches without it. Before, the line break after a hyphen read as a space and the phrase was not found.
 - Search: a phrase that starts at the end of one page and continues at the top of the next, past a repeated page header or footer, is now found, with a box on each page. Before, each page was searched on its own.
+- Stop, or leaving the app, in the moment after the redacted copy is built keeps the copy and shows the results as Verification Skipped, instead of discarding the copy.
+- From the Redact tap the editor locks: Search, Scan, Undo and the canvas wait for the run, Stop is offered at once, and leaving the app pauses the run as it does once pages are processing.
+- An undo or redo that arrives while a run is in progress, such as the system's three-finger gesture, no longer changes the regions under the run or discards its redacted copy; an undo stays available for when the run ends.
+- Verification checks the regions the run actually redacted, as burned into the page, not the editor's regions as they stand when verification starts.
+- Stop keeps its place when processing turns into verification, so a tap at that moment is not lost.
 
 ### Security
 

@@ -379,7 +379,10 @@ struct PipelineRunner {
             perPageModes: perPageModes,
             perPageFallbackReasons: perPageFallbackReasons,
             sensitiveTerms: sensitiveTerms,
-            appliedSearches: appliedSearches
+            appliedSearches: appliedSearches,
+            // Verify-only runs only on an output that is not stale, so the
+            // live regions are the ones it burned.
+            burnedRegions: coordinator.redactionState.regions
         )
         return try await verify(
             runContext: runContext, effectiveMode: effectiveMode,
@@ -387,6 +390,19 @@ struct PipelineRunner {
     }
 
     // MARK: - Verification
+
+    /// The first verifying step: the layers the verifier schedules for
+    /// `mode`, the first one current, so the progress shows the right
+    /// total from frame 0. One home for the verify-only entry and the full
+    /// run's hand-off from redacting.
+    static func initialVerifyingProgress(for mode: PipelineMode) -> DocumentState.VerificationProgress {
+        let layers = VerificationEngine().layers(for: mode)
+        return .init(
+            currentLayer: 1,
+            totalLayers: layers.count,
+            layerName: layers.first?.name ?? "",
+            completedLayers: [])
+    }
 
     /// Run every verification layer and publish the report. The schedule —
     /// the page-count gate, the phase partition, the parallel base batch,
@@ -399,6 +415,17 @@ struct PipelineRunner {
         runContext: PipelineCoordinator.PipelineRunContext, effectiveMode: PipelineMode,
         burnedRegionVersion: Int
     ) async throws -> PipelineRunOutcome {
+        // The first verifying step goes out before the loads below suspend.
+        // The redacted copy is built and its inputs recorded, so from here a
+        // Stop or a background pause keeps the copy and lands on the skipped
+        // report, never the redacting cancel that discards it; a load
+        // failure is the legal `.verifying → .failed` pair. The full run's
+        // `(.redacting, .verifying)` and verify-only's `(.verifying,
+        // .verifying)` are both legal.
+        sink(.phase(.verifying(progress: Self.initialVerifyingProgress(for: effectiveMode))))
+        #if DEBUG
+        coordinator.beforeVerificationLoadsSeam?()
+        #endif
         // `PDFDocument(url:)` is CPU-bound on large outputs; routing
         // through `Task.detached` keeps the MainActor-isolated run free
         // to drive the progress UI.
@@ -422,7 +449,6 @@ struct PipelineRunner {
         // `.verified` transition below, (.redacting,.verified) and
         // (.verifying,.verified), are legal transitions (no table change).
         let sourcePageCount = coordinator.documentState.pageCount
-        let regionsSnapshot = coordinator.redactionState.regions
         // The Search Re-check's coverage check re-runs each applied search
         // on the ORIGINAL pages: it reads its own copy of the source (the
         // per-consumer discipline of the search path — the live instance
@@ -437,10 +463,13 @@ struct PipelineRunner {
             Self.verificationSourceCopy(of: liveSource, unlockingWith: passwordHolder)
         }.value
 
+        #if DEBUG
+        coordinator.verificationRegionsSeam?(runContext.burnedRegions)
+        #endif
         let report = try await VerificationOrchestrator().run(
             outputDocument: wrappedDoc,
             sourcePageCount: sourcePageCount,
-            regions: regionsSnapshot,
+            regions: runContext.burnedRegions,
             sensitiveTerms: runContext.sensitiveTerms.terms,
             pipelineMode: effectiveMode,
             filterDigests: runContext.filterDigests,

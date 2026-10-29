@@ -68,7 +68,7 @@ struct DocumentEditorKeyboard: ViewModifier {
 
     private func handleKeyPress(_ press: KeyPress) -> KeyPress.Result {
         // Keyboard-shortcut entry point honors the
-        // phase gate. The `phaseKind == .editing` guard mirrors the
+        // phase gate. The `runChromePhaseKind == .editing` guard mirrors the
         // `canStartPipeline` / `canMutateRegions` discipline so a
         // mid-pipeline arrow / Escape / Cmd-A press cannot mutate
         // `redactionState.regions` while `.detecting / .redacting /
@@ -76,7 +76,7 @@ struct DocumentEditorKeyboard: ViewModifier {
         // (handleEscapeKey, handleSelectAllKey, nudgeSelection)
         // re-asserts the same guard for defense-in-depth. Spot-check
         // passed — no behavioral change needed.
-        guard documentState.phaseKind == .editing else { return .ignored }
+        guard documentState.runChromePhaseKind == .editing else { return .ignored }
 
         switch press.key {
         case .escape:
@@ -98,7 +98,7 @@ struct DocumentEditorKeyboard: ViewModifier {
     }
 
     private func handleEscapeKey() -> KeyPress.Result {
-        guard documentState.phaseKind == .editing else { return .ignored }
+        guard documentState.runChromePhaseKind == .editing else { return .ignored }
         if !redactionState.selectedRegionIDs.isEmpty {
             redactionState.deselectAllRegions()
             return .handled
@@ -115,7 +115,7 @@ struct DocumentEditorKeyboard: ViewModifier {
     }
 
     private func handleSelectAllKey() -> KeyPress.Result {
-        guard documentState.phaseKind == .editing else { return .ignored }
+        guard documentState.runChromePhaseKind == .editing else { return .ignored }
         let page = documentState.currentPageIndex
         guard redactionState.canSelectAllOnPage(page) else { return .ignored }
         redactionState.selectAllOnPage(page)
@@ -131,7 +131,7 @@ struct DocumentEditorKeyboard: ViewModifier {
     }
 
     private func nudgeSelection(dx: CGFloat, dy: CGFloat) -> KeyPress.Result {
-        guard documentState.phaseKind == .editing,
+        guard documentState.runChromePhaseKind == .editing,
               !redactionState.selectedRegionIDs.isEmpty else { return .ignored }
         let page = documentState.currentPageIndex
         let moves: [(id: UUID, newRect: CGRect)] = redactionState.selectedRegionIDs.compactMap { id in

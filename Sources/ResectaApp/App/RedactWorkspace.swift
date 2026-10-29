@@ -19,6 +19,7 @@ final class RedactWorkspace {
     init(settingsState: SettingsState, userTermsStore: UserTermsStore) {
         let doc = DocumentState()
         let red = RedactionState()
+        red.mutationGate = doc
         self.documentState = doc
         self.redactionState = red
         self.coordinator = PipelineCoordinator(
