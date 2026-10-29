@@ -60,7 +60,6 @@ public struct TextNormalizer: Sendable {
         "\u{2012}": "-",   // FIGURE DASH
         "\u{2010}": "-",   // HYPHEN (also NFKC's image of U+2011)
         "\u{2011}": "-",   // NON-BREAKING HYPHEN
-        "\u{00AD}": "-",   // SOFT HYPHEN
     ]
 
     /// Fold smart quotes / dashes to their plain equivalents.
@@ -86,44 +85,78 @@ public struct TextNormalizer: Sendable {
         return character.unicodeScalars.allSatisfy { (0x0000...0x001F).contains($0.value) }
     }
 
-    /// A character a run is made of: a spacing character, or one of the
-    /// zero-width joiners and marks a layout engine leaves between glyphs.
+    /// A character a run is made of: a spacing character, one of the
+    /// zero-width joiners and marks a layout engine leaves between glyphs,
+    /// or a soft hyphen (U+00AD, a break opportunity inside a word).
     static func isRunCharacter(_ character: Character) -> Bool {
         if isSpacingCharacter(character) { return true }
         return character.unicodeScalars.allSatisfy { scalar in
             switch scalar.value {
-            case 0x200B, 0x200C, 0x200D, 0x2060, 0xFEFF: return true
+            case 0x00AD, 0x200B, 0x200C, 0x200D, 0x2060, 0xFEFF: return true
             default: return false
             }
         }
     }
 
-    /// Fold every run of whitespace, zero-width and control characters to one
-    /// space: a line break, a tab, a no-break space, a justified gap or an
-    /// invisible joiner between two words reads as the one space a user
-    /// types. A run of zero-width characters alone (inside a word) is
-    /// dropped, not spaced. Length-changing on a run: the page side folds
-    /// under the raw-text map (`SearchCore.normalizedPage`), which keeps one
-    /// map entry per folded Character; a page without a run is unchanged.
+    /// The hard hyphens a layout engine may break a line after.
+    static let hardHyphens: Set<Character> = ["-", "\u{2010}", "\u{2011}"]
+
+    /// What one maximal run of run characters reads as: the one rule the
+    /// query side (`foldWhitespaceRuns`) and the page side
+    /// (`SearchCore.normalizedPage`) share. `previous` and `beforeThat` are
+    /// the two Characters before the run, `next` the one after it.
+    /// - A run holding a soft hyphen marks a break inside one word: nothing.
+    /// - A run holding a line break right after a hard hyphen, with a letter
+    ///   or digit before the hyphen and after the run ("Vance-" / "Oduya",
+    ///   "18-" / "115"), is the layout engine's break at the hyphen: nothing,
+    ///   so the hyphen stays and the two parts read as typed.
+    /// - Any other run holding a spacing character: one space.
+    /// - A run of zero-width characters alone (inside a word): nothing.
+    static func foldedRun(
+        _ run: Substring, previous: Character?, beforeThat: Character?, next: Character?
+    ) -> String {
+        if run.unicodeScalars.contains("\u{00AD}") { return "" }
+        if run.contains(where: \.isNewline),
+           let previous, hardHyphens.contains(previous),
+           let beforeThat, beforeThat.isLetter || beforeThat.isNumber,
+           let next, next.isLetter || next.isNumber {
+            return ""
+        }
+        return run.contains(where: isSpacingCharacter) ? " " : ""
+    }
+
+    /// Fold every run of whitespace, zero-width and control characters by
+    /// `foldedRun`: a line break, a tab, a no-break space, a justified gap or
+    /// an invisible joiner between two words reads as the one space a user
+    /// types; a break after a word's own hyphen and a soft hyphen read as
+    /// nothing. Length-changing on a run: the page side folds under the
+    /// raw-text map (`SearchCore.normalizedPage`), which keeps one map entry
+    /// per folded Character; a page without a run is unchanged.
     static func foldWhitespaceRuns(_ text: String) -> String {
         var result = ""
         result.reserveCapacity(text.utf8.count)
-        var runHasWhitespace = false
-        var inRun = false
-        for character in text {
+        var run: (start: String.Index, previous: Character?, beforeThat: Character?)? = nil
+        var last: Character? = nil
+        var lastButOne: Character? = nil
+        var index = text.startIndex
+        while index < text.endIndex {
+            let character = text[index]
             if isRunCharacter(character) {
-                inRun = true
-                if isSpacingCharacter(character) { runHasWhitespace = true }
-                continue
+                if run == nil { run = (index, last, lastButOne) }
+            } else {
+                if let open = run {
+                    result += foldedRun(text[open.start..<index], previous: open.previous, beforeThat: open.beforeThat, next: character)
+                    run = nil
+                }
+                result.append(character)
             }
-            if inRun {
-                if runHasWhitespace { result.append(" ") }
-                inRun = false
-                runHasWhitespace = false
-            }
-            result.append(character)
+            lastButOne = last
+            last = character
+            index = text.index(after: index)
         }
-        if inRun, runHasWhitespace { result.append(" ") }
+        if let open = run {
+            result += foldedRun(text[open.start...], previous: open.previous, beforeThat: open.beforeThat, next: nil)
+        }
         return result
     }
 

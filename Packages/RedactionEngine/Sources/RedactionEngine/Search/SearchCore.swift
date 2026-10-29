@@ -199,15 +199,15 @@ enum SearchCore {
         }
     }
 
-    /// The page side of `normalizedText` (plus the smart-punctuation fold,
-    /// which re-clusters at a soft hyphen before a combining mark and so
-    /// belongs under the map) with its route back to the raw text. A page of
+    /// The page side of `normalizedText` (plus the smart-punctuation fold)
+    /// with its route back to the raw text. A page of
     /// single-unit ASCII is normalized whole and carries no map: its
     /// Character offsets are UTF-16 offsets and every step is 1:1 on it.
     /// Every other page is normalized one Character at a time — the searched
     /// text is the pieces joined, which differs from the whole-string
     /// normalization only where a cluster re-forms across a raw boundary (a
-    /// compatibility jamo pair) — and the map is built from the pieces'
+    /// compatibility jamo pair, a combining mark after a dropped soft
+    /// hyphen) — and the map is built from the pieces'
     /// scalars, so such a seam keeps one entry per final Character instead
     /// of desynchronizing the map or dropping it. A rect is never placed
     /// from unmapped offsets on a page that needs the map.
@@ -215,7 +215,8 @@ enum SearchCore {
         _ pageText: String, options: SearchOptions
     ) -> (text: String, rawMap: RawTextMap?) {
         // The fast path holds only when no step changed the length: a run
-        // folded to one space would, so such a page takes the map path.
+        // folded to one space or to nothing would, so such a page takes the
+        // map path.
         if isSingleUnitASCII(pageText) {
             let whole = normalizedText(pageText, options: options)
             if whole.count == pageText.count, isSingleUnitASCII(whole) { return (whole, nil) }
@@ -228,36 +229,41 @@ enum SearchCore {
         scalarRawLast.reserveCapacity(pageText.unicodeScalars.count)
         var utf16: [Int] = [0]
         utf16.reserveCapacity(pageText.count + 1)
-        // A maximal run of whitespace, zero-width or control Characters is one
-        // piece — one space, or nothing when the run is zero-width only —
-        // whose map entry spans the run's first to its last raw Character.
-        var runStart: Int? = nil
-        var runHasWhitespace = false
-        func closeRun(before i: Int) {
-            guard let start = runStart else { return }
-            if runHasWhitespace {
-                text.append(" ")
-                scalarRaw.append(start)
+        // A maximal run of whitespace, zero-width, soft-hyphen or control
+        // Characters is one piece, read by the one run rule
+        // (`TextNormalizer.foldedRun`, over the raw Characters around it):
+        // one space whose map entry spans the run's first to its last raw
+        // Character, or nothing (a break after a word's own hyphen, a soft
+        // hyphen, a zero-width run), where a match across it still covers it.
+        var run: (offset: Int, start: String.Index, previous: Character?, beforeThat: Character?)? = nil
+        var lastCharacter: Character? = nil
+        var lastButOneCharacter: Character? = nil
+        func closeRun(before i: Int, at end: String.Index, next: Character?) {
+            guard let open = run else { return }
+            let piece = TextNormalizer.foldedRun(
+                pageText[open.start..<end], previous: open.previous, beforeThat: open.beforeThat, next: next)
+            if !piece.isEmpty {
+                text.append(piece)
+                scalarRaw.append(open.offset)
                 scalarRawLast.append(i - 1)
             }
-            runStart = nil
-            runHasWhitespace = false
+            run = nil
         }
-        for (i, character) in pageText.enumerated() {
+        for (i, (index, character)) in zip(pageText.indices, pageText).enumerated() {
             utf16.append(utf16[utf16.count - 1] + character.utf16.count)
+            defer { lastButOneCharacter = lastCharacter; lastCharacter = character }
             if TextNormalizer.isRunCharacter(character) {
-                if runStart == nil { runStart = i }
-                if TextNormalizer.isSpacingCharacter(character) { runHasWhitespace = true }
+                if run == nil { run = (i, index, lastCharacter, lastButOneCharacter) }
                 continue
             }
-            closeRun(before: i)
+            closeRun(before: i, at: index, next: character)
             var piece = normalizedText(String(character), options: options)
             if options.normalizeSmartPunctuation { piece = TextNormalizer.normalizeSmartPunctuation(piece) }
             text.append(piece)
             scalarRaw.append(contentsOf: repeatElement(i, count: piece.unicodeScalars.count))
             scalarRawLast.append(contentsOf: repeatElement(i, count: piece.unicodeScalars.count))
         }
-        closeRun(before: pageText.count)
+        closeRun(before: pageText.count, at: pageText.endIndex, next: nil)
         // Appending never changes scalars, only Character boundaries: walk
         // the joined text's Characters over the per-scalar raw indices.
         var first: [Int] = []
