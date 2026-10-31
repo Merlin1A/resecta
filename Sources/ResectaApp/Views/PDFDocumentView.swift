@@ -367,8 +367,12 @@ final class FitFlooredPDFView: PDFView {
         UIView.animate(withDuration: 0.25) { self.scaleFactor = fit }
     }
 
-    /// The double tap returns to fit, only on empty page (this view is its
-    /// one delegate); the single tap waits for it to fail. Neither cancels
+    /// The double tap's delegate. A recognizer holds its delegate weakly,
+    /// so the view keeps it.
+    private let returnToFitDelegate = ReturnToFitTapDelegate()
+
+    /// The double tap returns to fit, only on empty page (its own delegate
+    /// decides); the single tap waits for it to fail. Neither cancels
     /// nor delays the touches beneath it, so a tap on a region still
     /// reaches the overlay.
     private func addTapGestures() {
@@ -377,7 +381,7 @@ final class FitFlooredPDFView: PDFView {
         doubleTap.cancelsTouchesInView = false
         doubleTap.delaysTouchesEnded = false
         doubleTap.name = Self.returnToFitGestureName
-        doubleTap.delegate = self
+        doubleTap.delegate = returnToFitDelegate
         addGestureRecognizer(doubleTap)
 
         let singleTap = UITapGestureRecognizer(target: self, action: #selector(handleSingleTap(_:)))
@@ -441,15 +445,16 @@ extension FitFlooredPDFView {
     private static func regionOverlays(in view: UIView) -> [RedactionOverlayView] {
         view.subviews.flatMap { ($0 as? RedactionOverlayView).map { [$0] } ?? regionOverlays(in: $0) }
     }
+}
 
-    /// The double tap's one delegate: a touch the canvas overlay claims (a
-    /// region, a handle, every draw and Add to Selection touch) is never a
-    /// double tap; a touch on the page is. PDFKit's own recognizers keep
-    /// PDFView's answer.
-    override func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
-        guard gestureRecognizer.name == Self.returnToFitGestureName else {
-            return super.gestureRecognizer(gestureRecognizer, shouldReceive: touch)
-        }
-        return !(touch.view is RedactionOverlayView)
+/// The return-to-fit double tap's delegate: a touch the canvas overlay
+/// claims (a region, a handle, every draw and Add to Selection touch) is
+/// never a double tap; a touch on the page is. It is its own object so the
+/// PDF view implements no gesture delegate method: PDFKit's recognizers
+/// keep PDFKit's own delegate handling, whichever methods PDFView
+/// implements on the running iOS.
+final class ReturnToFitTapDelegate: NSObject, UIGestureRecognizerDelegate {
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        !(touch.view is RedactionOverlayView)
     }
 }
