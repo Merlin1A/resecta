@@ -42,6 +42,14 @@ struct DocumentEditorToolbar {
     /// The iPhone editor's own … menu, on iOS 27.
     static let moreMenuIdentifier = "editorMoreMenu"
 
+    /// The Rectangle tool's accessibility label. iOS 27 drops a toolbar
+    /// button's accessibility value, so there the label also carries
+    /// drawing mode; earlier iOS keeps the plain label and the value says it.
+    static func drawToolAccessibilityLabel(active: Bool) -> String {
+        if #available(iOS 27, *), active { return "Rectangle, Drawing mode active" }
+        return "Rectangle"
+    }
+
     func resetCanvasTools() {
         activeTool = nil
         isMultiSelectActive = false
@@ -80,6 +88,7 @@ struct DocumentEditorToolbar {
             .accessibilityIdentifier("drawTool")
             .accessibilityValue(activeTool == .rectangle
                                 ? "Drawing mode active" : "Tap to enter drawing mode")
+            .accessibilityLabel(Self.drawToolAccessibilityLabel(active: activeTool == .rectangle))
             // A drag cannot draw under VoiceOver: the tool is off, and says why.
             .disabled(UIAccessibility.isVoiceOverRunning)
             .accessibilityHint(UIAccessibility.isVoiceOverRunning ? Self.rectangleVoiceOverHint : "")
