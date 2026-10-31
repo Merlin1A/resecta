@@ -492,7 +492,7 @@ nonisolated final class CanvasDrawUITests: XCTestCase {
     /// Undo lives on the trailing bar; on a width where the bar folds
     /// it resolves through the overflow menu instead.
     private func tapUndo() {
-        let undo = app.buttons["Undo"].firstMatch
+        let undo = app.buttons["undoButton"].firstMatch
         if undo.waitForExistence(timeout: 5), undo.isHittable {
             undo.tap()
             return

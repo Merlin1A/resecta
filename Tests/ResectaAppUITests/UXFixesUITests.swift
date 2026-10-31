@@ -461,7 +461,7 @@ private extension UXFixesUITests {
 
     /// Undo on the trailing bar, or through the overflow where the bar folds.
     nonisolated func tapUndo() {
-        let undo = app.buttons["Undo"].firstMatch
+        let undo = app.buttons["undoButton"].firstMatch
         if undo.waitForExistence(timeout: 5), undo.isHittable {
             undo.tap()
             return

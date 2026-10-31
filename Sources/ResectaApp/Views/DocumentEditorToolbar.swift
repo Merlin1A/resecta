@@ -50,6 +50,24 @@ struct DocumentEditorToolbar {
         return "Rectangle"
     }
 
+    /// The Rectangle tool's full accessibility label: its state, then its
+    /// hint, which only VoiceOver gets.
+    static func drawToolAccessibilityLabel(active: Bool, voiceOverRunning: Bool) -> String {
+        labelWithHint(drawToolAccessibilityLabel(active: active),
+                      hint: voiceOverRunning ? rectangleVoiceOverHint : "")
+    }
+
+    /// A toolbar control's accessibility label. iOS 27 drops a toolbar
+    /// button's accessibility hint, so there a non-empty hint follows the
+    /// label after ", "; earlier iOS keeps the label and speaks the hint.
+    static func labelWithHint(_ label: String, hint: String) -> String {
+        if #available(iOS 27, *), !hint.isEmpty { return "\(label), \(hint)" }
+        return label
+    }
+
+    /// The Stop control's hint while a run or a verification is in flight.
+    static let stopHint = "Stops processing. Your document is preserved."
+
     func resetCanvasTools() {
         activeTool = nil
         isMultiSelectActive = false
@@ -88,7 +106,8 @@ struct DocumentEditorToolbar {
             .accessibilityIdentifier("drawTool")
             .accessibilityValue(activeTool == .rectangle
                                 ? "Drawing mode active" : "Tap to enter drawing mode")
-            .accessibilityLabel(Self.drawToolAccessibilityLabel(active: activeTool == .rectangle))
+            .accessibilityLabel(Self.drawToolAccessibilityLabel(
+                active: activeTool == .rectangle, voiceOverRunning: UIAccessibility.isVoiceOverRunning))
             // A drag cannot draw under VoiceOver: the tool is off, and says why.
             .disabled(UIAccessibility.isVoiceOverRunning)
             .accessibilityHint(UIAccessibility.isVoiceOverRunning ? Self.rectangleVoiceOverHint : "")
@@ -183,7 +202,8 @@ struct DocumentEditorToolbar {
                 documentState.cancelActivePipeline(redactionState: redactionState)
             }
             .accessibilityIdentifier("stopProcessing")
-            .accessibilityHint("Stops processing. Your document is preserved.")
+            .accessibilityLabel(Self.labelWithHint("Stop Processing", hint: Self.stopHint))
+            .accessibilityHint(Self.stopHint)
 
         case .verifying:
             // Single cancel button
@@ -191,7 +211,8 @@ struct DocumentEditorToolbar {
                 documentState.cancelActivePipeline(redactionState: redactionState)
             }
             .accessibilityIdentifier("stopProcessing")
-            .accessibilityHint("Stops processing. Your document is preserved.")
+            .accessibilityLabel(Self.labelWithHint("Stop Verification", hint: Self.stopHint))
+            .accessibilityHint(Self.stopHint)
 
         default:
             // .verified, .failed — settings gear only.
@@ -226,6 +247,7 @@ struct DocumentEditorToolbar {
         .disabled(redactButtonDisabled)
         .keyboardShortcut("r", modifiers: [.command, .shift])
         .accessibilityIdentifier("redactButton")
+        .accessibilityLabel(Self.labelWithHint("Redact", hint: redactButtonHint))
         .accessibilityHint(redactButtonHint)
     }
 
@@ -333,6 +355,7 @@ struct DocumentEditorToolbar {
         }
         .menuOrder(.fixed)
         .disabled(mode == .unavailable)
+        .accessibilityLabel(Self.labelWithHint("Undo", hint: EditorToolbarLayout.undoHint(for: mode)))
         .accessibilityHint(EditorToolbarLayout.undoHint(for: mode))
         .accessibilityIdentifier("undoButton")
     }

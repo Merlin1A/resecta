@@ -95,7 +95,7 @@ nonisolated final class CanvasSelectionUITests: XCTestCase {
         delete.tap()
         XCTAssertTrue(waitForRegionCount(0), "both boxes are deleted at once")
         XCTAssertEqual(app.alerts.count, 0, "no confirmation dialog")
-        app.buttons["Undo"].tap()
+        app.buttons["undoButton"].tap()
         XCTAssertTrue(waitForRegionCount(2), "one Undo brings both back")
     }
 
@@ -107,7 +107,7 @@ nonisolated final class CanvasSelectionUITests: XCTestCase {
         window.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.40))
             .press(forDuration: 0.05, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.53)))
         XCTAssertEqual(deleteRow(), "Delete 2 Regions", "the marquee selects both")
-        app.buttons["Undo"].tap()
+        app.buttons["undoButton"].tap()
         XCTAssertTrue(waitForRegionCount(1), "Undo undoes the last drawing, not the marquee")
     }
 
