@@ -12,7 +12,7 @@ Fixes a crash on iOS 27 when a document's page is touched or scrolled.
 
 ### Fixed
 
-- On iOS 27 the app quit on the first touch on a document's page. The page view answered PDFKit's touch question for its own gestures through a method iOS 27's PDFKit no longer has; the double tap that returns to the fit zoom now has its own handler, and PDFKit's gestures keep PDFKit's handling.
+- Editor: on iOS 27 the app quit at the first touch on an open document's page. The page view passed PDFKit's own gestures to a PDFKit method that iOS 27 no longer has; the double tap that returns to the fit zoom now has its own gesture delegate, so the page view no longer answers for PDFKit's gestures.
 
 ## [1.3.0] — 2026-10-26
 
