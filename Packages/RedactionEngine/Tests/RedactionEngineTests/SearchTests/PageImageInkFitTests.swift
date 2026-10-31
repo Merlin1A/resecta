@@ -483,7 +483,12 @@ struct PageImageInkFitTests {
     @Test("A document PDFKit cannot write (a malformed /Info) gives no private copy and no crash")
     func malformedInfoGivesNoCopy() throws {
         let document = try #require(PDFDocument(data: MalformedInfoDictionaryTests.malformedInfoPDF))
-        #expect(PrivatePDFCopies.shared.copy(of: document) == nil, "the guarded write returns nil; nothing raises")
+        if #available(iOS 27, macOS 27, *) {
+            // iOS 27 and macOS 27 write this file without raising: the private copy is the same document.
+            #expect(PrivatePDFCopies.shared.copy(of: document)?.numberOfPages == document.pageCount)
+        } else {
+            #expect(PrivatePDFCopies.shared.copy(of: document) == nil, "the guarded write returns nil; nothing raises")
+        }
     }
 
     @Test("Concurrent first asks for one document's private copy make exactly one")
