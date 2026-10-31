@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+## [1.3.1] — 2026-10-31
+
+Fixes a crash on iOS 27 when a document's page is touched or scrolled.
+
+### Fixed
+
+- On iOS 27 the app quit on the first touch on a document's page. The page view answered PDFKit's touch question for its own gestures through a method iOS 27's PDFKit no longer has; the double tap that returns to the fit zoom now has its own handler, and PDFKit's gestures keep PDFKit's handling.
+
 ## [1.3.0] — 2026-10-26
 
 A password-protected PDF opens with its password, a photo or an image becomes one page of a new PDF you can redact, and a document the app cannot read in full, or whose pages it cannot render, is refused at import rather than opened unscanned. In the editor, Mark Whole Page covers the page on screen with one region and a double-tap returns to the fit zoom. Verification re-runs each applied search and scan on the original page and the OCR check reports a term's start or end read beside a box, so a box placed off its text no longer passes every check; the results list groups each check by its outcome and counts only passing checks as passed. The app opts into Apple's hardened-process protections in their reporting mode, the engine's public surface narrows to the document-runner API, and the surfaces no shipped build reached — the search sheet's disabled diagnostics, the in-editor importer, the paused-detection resume path, and the face, barcode, and signature detectors — are removed.
@@ -463,7 +471,8 @@ Initial public release.
 - **Pixel-destruction core shared by both modes.** Every page is rasterized, marked or not; vector text and images are converted into flat bitmap data, and the redaction process is designed to remove the original text layer from marked regions.
 - **Searchable Redaction text-layer design.** The reconstructed text layer uses a fresh monospace font with uniform spacing, designed to remove the glyph-positioning side channels identified in academic research on sandwich PDFs.
 
-[Unreleased]: https://github.com/Merlin1A/resecta/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/Merlin1A/resecta/compare/v1.3.1...HEAD
+[1.3.1]: https://github.com/Merlin1A/resecta/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/Merlin1A/resecta/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/Merlin1A/resecta/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Merlin1A/resecta/compare/v1.0.0...v1.1.0
