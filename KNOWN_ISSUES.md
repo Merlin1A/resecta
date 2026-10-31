@@ -140,6 +140,15 @@ On a page that is a picture, such as a photo, a screenshot or a scan without its
 
 ---
 
+### KI-20: On iOS 27, Text Read from Images Can Differ (Medium)
+**Affects:** Search in text read from a picture (a scan, photo or screenshot) on iOS 27
+
+On iOS 27, text read from images (scans and photos) can differ from iOS 26: a word may be read wrongly, or two words read as one, so Search may miss a term on such a page; check the page in the preview before sharing.
+
+**Workaround:** Check each such page in the preview before sharing, and draw a box over anything Search missed.
+
+---
+
 ## Fixed
 
 ### KI-8: Duplicate Regions from Multiple Scan Runs (Low) — FIXED (entry moved 2026-10-01)
