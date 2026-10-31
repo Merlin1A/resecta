@@ -14,6 +14,7 @@ Fixes a crash on iOS 27 when touching or scrolling a document. On iOS 27, export
 
 - Editor: on iOS 27 the app quit at the first touch on an open document's page. The page view passed PDFKit's own gestures to a PDFKit method that iOS 27 no longer has; the double tap that returns to the fit zoom now has its own gesture delegate, so the page view no longer answers for PDFKit's gestures.
 - Export: on iOS 27 the redacted file kept the time it was written in its creation date, and verification reported the metadata as not rewritten; the creation date is now the fixed value, as on iOS 26.
+- Search: on iOS 27, a search on a scanned page or photo could miss text that iOS 26 read, such as a phone number read with a space after a hyphen or a line read as noise; Search now also reads the page a second way and adds what that read matched.
 
 ## [1.3.0] — 2026-10-26
 
