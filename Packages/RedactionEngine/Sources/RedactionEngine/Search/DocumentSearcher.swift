@@ -1507,7 +1507,14 @@ public actor DocumentSearcher {
             // OCRTextNormalizer keeps character offsets valid.
             // Manual-search per-line normalization stays in-loop — no
             // ocrNormalizedConcat writes (the PII path owns that cache).
-            let ocrNormalizedText = self.ocrNormalizer.normalize(line.text)
+            var ocrNormalizedText = self.ocrNormalizer.normalize(line.text)
+            // Text recognition on iOS 27 can read a space beside a separator
+            // inside a digit run; fold it so a typed number still matches.
+            // The match is boxed by the whole line below, so the fold moves
+            // no rect. iOS 26 reads keep their text.
+            if #available(iOS 27, *) {
+                ocrNormalizedText = TextNormalizer.foldOCRSeparatorSpaces(ocrNormalizedText)
+            }
             let nfkcLineText = SearchCore.normalizedText(ocrNormalizedText, options: options)
 
             // Recall extensions on the OCR literal
