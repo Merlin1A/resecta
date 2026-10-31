@@ -20,8 +20,12 @@ struct PhoneDetector: FamilyDetector {
     // `)` glued to the digits (`555)123-4567`) stays outside any match.
     // Bare `+` is dropped (only `+1` leads). A dropped CLOSING parenthesis
     // (`(555 123-4567`) keeps its `(` outside the match.
+    // A separator may carry one space on either side (`800- 555-0199`, the
+    // way text recognition on iOS 27 can read `800-555-0199`); a space
+    // alone still separates, and two separators or two spaces still end
+    // the run.
     static let phonePattern = try! NSRegularExpression(
-        pattern: #"(?<!\d)(?:\+1[\s.-]?)?(?:\(\d{3}\)[\s.-]?\d{3}[\s.-]?\d{4}|\d{3}\)[\s.-]\d{3}[\s.-]?\d{4}|\d{3}[\s.-]?\d{3}[\s.-]?\d{4})(?!\d)"#
+        pattern: #"(?<!\d)(?:\+1(?:\s?[.-]\s?|\s)?)?(?:\(\d{3}\)(?:\s?[.-]\s?|\s)?\d{3}(?:\s?[.-]\s?|\s)?\d{4}|\d{3}\)(?:\s?[.-]\s?|\s)\d{3}(?:\s?[.-]\s?|\s)?\d{4}|\d{3}(?:\s?[.-]\s?|\s)?\d{3}(?:\s?[.-]\s?|\s)?\d{4})(?!\d)"#
     )
 
     /// Keywords that, when found near a 10-digit number, indicate a phone number
