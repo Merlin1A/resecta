@@ -56,7 +56,7 @@ nonisolated final class EditorHomeUITests: XCTestCase {
             "An idle session must close without the confirm dialog."
         )
         XCTAssertTrue(
-            app.buttons["OverflowBarButtonItem"].waitForNonExistence(timeout: 5),
+            app.editorOverflowButton.waitForNonExistence(timeout: 5),
             "The editor's overflow chrome must be gone once HomeView is back."
         )
     }
@@ -77,7 +77,7 @@ nonisolated final class EditorHomeUITests: XCTestCase {
 
         backOutOfCloseDialog(title: title)
         XCTAssertTrue(
-            app.buttons["OverflowBarButtonItem"].waitForExistence(timeout: 10),
+            app.editorOverflowButton.waitForExistence(timeout: 10),
             "Backing out must leave the editor in place."
         )
 
@@ -95,14 +95,14 @@ nonisolated final class EditorHomeUITests: XCTestCase {
 
     private func awaitEditor() {
         XCTAssertTrue(
-            app.buttons["OverflowBarButtonItem"].waitForExistence(timeout: 30),
+            app.editorOverflowButton.waitForExistence(timeout: 30),
             "Editor toolbar overflow never appeared — check the --loadTestDocument launch hook."
         )
     }
 
     /// Open the "…" menu and tap Home — label first, identifier second.
     private func openOverflowAndTapHome() {
-        let overflow = app.buttons["OverflowBarButtonItem"]
+        let overflow = app.editorOverflowButton
         XCTAssertTrue(
             overflow.waitForExistence(timeout: 10),
             "Toolbar overflow button never appeared."

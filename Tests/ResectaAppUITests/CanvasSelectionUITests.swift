@@ -199,7 +199,7 @@ private extension CanvasSelectionUITests {
             tool.tap()
             let deadline = Date().addingTimeInterval(6)
             while Date() < deadline {
-                if (tool.value as? String) == value { return }
+                if tool.drawToolReads(value) { return }
                 usleep(250_000)
             }
         }
@@ -216,7 +216,7 @@ private extension CanvasSelectionUITests {
     }
 
     nonisolated func openOverflow() {
-        let overflow = app.buttons["OverflowBarButtonItem"]
+        let overflow = app.editorOverflowButton
         XCTAssertTrue(overflow.waitForExistence(timeout: 10), "Toolbar overflow button never appeared.")
         overflow.tap()
         XCTAssertTrue(app.buttons["Select Regions"].waitForExistence(timeout: 5)

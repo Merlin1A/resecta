@@ -333,10 +333,10 @@ nonisolated final class CanvasDrawUITests: XCTestCase {
         let tool = app.buttons["drawTool"]
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
-            if (tool.value as? String) == expected { return true }
+            if tool.drawToolReads(expected) { return true }
             usleep(250_000)
         }
-        return (tool.value as? String) == expected
+        return tool.drawToolReads(expected)
     }
 
     /// Leave the Rectangle tool (same retry shape as `enterDrawMode`).
@@ -461,7 +461,7 @@ nonisolated final class CanvasDrawUITests: XCTestCase {
     /// `EditorHomeUITests` / `ShareRiskSheetUITests` precedent),
     /// identifier second.
     private func openOverflowAndTap(label: String, identifier: String) {
-        let overflow = app.buttons["OverflowBarButtonItem"]
+        let overflow = app.editorOverflowButton
         XCTAssertTrue(overflow.waitForExistence(timeout: 10), "Toolbar overflow button never appeared.")
         overflow.tap()
 

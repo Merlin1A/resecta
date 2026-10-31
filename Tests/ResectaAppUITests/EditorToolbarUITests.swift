@@ -54,7 +54,7 @@ nonisolated final class EditorToolbarUITests: XCTestCase {
 
     func testOverflowMenu_listsSelectionActionsFirstAndHomeLast() {
         launchWithOneRegion()
-        let overflow = app.buttons["OverflowBarButtonItem"].firstMatch
+        let overflow = app.editorOverflowButton
         XCTAssertTrue(overflow.waitForExistence(timeout: 10), "The … menu button is missing.")
         overflow.tap()
 
@@ -132,7 +132,7 @@ nonisolated final class EditorToolbarUITests: XCTestCase {
     // MARK: - Add to Selection's capsule
 
     private func openOverflowAndTap(_ label: String) {
-        let overflow = app.buttons["OverflowBarButtonItem"].firstMatch
+        let overflow = app.editorOverflowButton
         XCTAssertTrue(overflow.waitForExistence(timeout: 10), "The … menu button is missing.")
         overflow.tap()
         let row = app.buttons[label].firstMatch.exists ? app.buttons[label].firstMatch : app.switches[label].firstMatch
