@@ -39,6 +39,9 @@ struct DocumentEditorToolbar {
     /// The Rectangle tool's hint while VoiceOver is running.
     static let rectangleVoiceOverHint = "Drawing needs direct touch. Use Search or Scan."
 
+    /// The iPhone editor's own … menu, on iOS 27.
+    static let moreMenuIdentifier = "editorMoreMenu"
+
     func resetCanvasTools() {
         activeTool = nil
         isMultiSelectActive = false
@@ -428,7 +431,7 @@ struct DocumentEditorToolbar {
 }
 
 /// The editor's toolbar content. On iPhone in the editing phase the trailing
-/// side is the layout's pieces — the Undo control, Redact, the system … —
+/// side is the layout's pieces — the Undo control, Redact, the … menu —
 /// each its own item with a fixed spacer between, and the inline title is
 /// hidden (the bar leaves it no room); every other case keeps the trailing
 /// group. The neutral tint is applied inside each item's view, never
@@ -458,8 +461,23 @@ struct EditorToolbarContent: ToolbarContent {
                 }
             }
             ToolbarSpacer(.fixed, placement: .topBarTrailing)
-            ToolbarItemGroup(placement: .secondaryAction) {
-                toolbar.secondaryActionToolbarItems(layout: layout)
+            if #available(iOS 27, *) {
+                // Our own … menu on iOS 27, where the system's
+                // (`.secondaryAction`) shares one capsule with a disabled
+                // Redact. Earlier iOS keeps the system's.
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        toolbar.secondaryActionToolbarItems(layout: layout)
+                    } label: {
+                        Label("More", systemImage: "ellipsis")
+                    }
+                    .tint(.primary)
+                    .accessibilityIdentifier(DocumentEditorToolbar.moreMenuIdentifier)
+                }
+            } else {
+                ToolbarItemGroup(placement: .secondaryAction) {
+                    toolbar.secondaryActionToolbarItems(layout: layout)
+                }
             }
         } else {
             ToolbarItemGroup(placement: .topBarTrailing) {
