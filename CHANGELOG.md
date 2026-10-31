@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [1.3.1] — 2026-10-31
 
-Fixes a crash on iOS 27 when a document's page is touched or scrolled.
+Fixes a crash on iOS 27 when touching or scrolling a document. On iOS 27, exported files now carry the fixed creation date again.
 
 ### Fixed
 
