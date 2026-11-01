@@ -143,7 +143,7 @@ On a page that is a picture, such as a photo, a screenshot or a scan without its
 ### KI-20: On iOS 27, Text Read from Images Can Differ (Medium)
 **Affects:** Search in text read from a picture (a scan, photo or screenshot) on iOS 27
 
-On iOS 27, text read from images (scans and photos) can differ from iOS 26: a word may be read wrongly, or two words read as one, so Search may miss a term on such a page; check the page in the preview before sharing.
+On iOS 27, text read from images (scans and photos) can differ from iOS 26: a word may be read wrongly, or two words read as one, so Search may miss a term on such a page; check the page in the preview before sharing. On a scan or photo that carries its own hidden text, a Search box over a small word next to a border line can be drawn taller than the word on iOS 27, and Resecta then says the box was widened.
 
 **Workaround:** Check each such page in the preview before sharing, and draw a box over anything Search missed.
 
