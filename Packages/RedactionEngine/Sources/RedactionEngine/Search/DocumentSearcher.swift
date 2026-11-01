@@ -1533,7 +1533,14 @@ public actor DocumentSearcher {
 
         // Search within OCR results
         var results: [SearchResult] = []
-        let normalizedQuery = SearchCore.normalizedText(query, options: options)
+        // iOS 27 folds a space beside a separator inside a digit run on each
+        // line below; the query is folded the same way, so a query typed with
+        // that space still matches a line read with it. iOS 26 keeps both.
+        var foldedQuery = query
+        if #available(iOS 27, *) {
+            foldedQuery = TextNormalizer.foldOCRSeparatorSpaces(query)
+        }
+        let normalizedQuery = SearchCore.normalizedText(foldedQuery, options: options)
 
         // iOS 27: the page's fast read follows the accurate one through the
         // same per-line matching; its results start at `firstFastResult`

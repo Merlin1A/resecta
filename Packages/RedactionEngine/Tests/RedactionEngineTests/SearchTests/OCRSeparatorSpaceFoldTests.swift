@@ -58,4 +58,19 @@ struct OCRSeparatorSpaceFoldTests {
             #expect(results.isEmpty, "iOS 26 reads keep their text")
         }
     }
+    @Test("A query typed with a space beside a separator matches a line read the same way, on iOS 27 as on iOS 26")
+    func spacedQueryFindsTheSpacedRead() async throws {
+        let doc = try #require(PDFDocument(data: TestFixtures.imageOnlyPDF()))
+        let searcher = DocumentSearcher()
+        await searcher._testSeedOCRLines(
+            [OCREngine.TextLine(text: "Phone 555 -0147 after five", normalizedRect: CGRect(x: 0.1, y: 0.5, width: 0.8, height: 0.03),
+                                confidence: 0.5)],
+            forPageIndex: 0)
+        var results: [SearchResult] = []
+        for await result in searcher.search(SendablePDFDocument(doc), mode: .text("555 -0147", options: SearchOptions()),
+                                            progress: { _, _ in }) {
+            results.append(result)
+        }
+        #expect(results.count == 1, "the query is folded as the line is: \(results.map(\.matchedText))")
+    }
 }
