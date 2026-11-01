@@ -138,4 +138,101 @@ struct OCRFastUnionTests {
         #expect(accurateOnly == 1, "the zero timeout stops the page's read once")
         #expect(try await timeouts(seedingFast: true) == accurateOnly)
     }
+
+    // MARK: - More fast matches than accurate ones on a line; the order
+
+    @Test("A line the fast read holds more matches on than the accurate read keeps the fast matches, in either order")
+    func moreFastMatchesOnALineKeepTheFastOnes() {
+        // Binary-exact boxes, so a union is compared without rounding.
+        let line = CGRect(x: 0.125, y: 0.5, width: 0.625, height: 0.03125)
+        let left = CGRect(x: 0.125, y: 0.5, width: 0.25, height: 0.03125)
+        let right = CGRect(x: 0.5, y: 0.5, width: 0.25, height: 0.03125)
+        let a = result("delia hartwell", line)
+        for fast in [[result("delia hartwell", left), result("delia hartwell", right)],
+                     [result("delia hartwell", right), result("delia hartwell", left)]] {
+            let merged = DocumentSearcher.unionFastOCRResults(accurate: [a], fast: fast)
+            #expect(Set(merged.map(\.normalizedRect)) == [left, right], "\(merged.map(\.normalizedRect))")
+        }
+        let twoAccurate = DocumentSearcher.unionFastOCRResults(
+            accurate: [a, result("delia hartwell", line)],
+            fast: [result("delia hartwell", left), result("delia hartwell", right)])
+        #expect(twoAccurate.count == 2, "as many accurate matches as fast ones: the accurate ones stay")
+        #expect(twoAccurate.allSatisfy { $0.normalizedRect == line })
+    }
+
+    @Test("Hybrid page: an occurrence only the page image holds is boxed when the fast read holds it, in either order")
+    func hybridImageOnlyOccurrenceIsBoxed() async throws {
+        let doc = try #require(PDFDocument(data: TestFixtures.lineOverScanPDF("Pay Delia Hartwell")))
+        let page = try #require(doc.page(at: 0))
+        let line = CGRect(x: 0.11, y: 0.925, width: 0.60, height: 0.025)
+        let left = CGRect(x: 0.11, y: 0.925, width: 0.28, height: 0.025)
+        let right = CGRect(x: 0.42, y: 0.925, width: 0.29, height: 0.025)
+        for fastOrder in [[("Pay Delia Hartwell", left), ("and Delia Hartwell", right)],
+                          [("and Delia Hartwell", right), ("Pay Delia Hartwell", left)]] {
+            let searcher = DocumentSearcher()
+            await searcher._testSeedOCRLines(
+                [OCREngine.TextLine(text: "Pay Delia Hartwell and Dclia Hartwcll", normalizedRect: line, confidence: 0.6)],
+                forPageIndex: 0)
+            await searcher._testSeedOCRFastLines(
+                fastOrder.map { OCREngine.TextLine(text: $0.0, normalizedRect: $0.1, confidence: 0.5) }, forPageIndex: 0)
+            var results: [SearchResult] = []
+            var options = SearchOptions()
+            options.includeOCR = true
+            for await r in searcher.search(SendablePDFDocument(doc), mode: .text("Delia Hartwell", options: options),
+                                           progress: { _, _ in }) { results.append(r) }
+            let textLayer = results.filter { $0.source == .textLayer }
+            let ocr = results.filter { if case .ocr = $0.source { true } else { false } }
+            #expect(textLayer.count == 1, "the text layer holds the first occurrence")
+            if DocumentSearcher.readsFastOCRBeside {
+                #expect(ocr.map(\.normalizedRect) == [DocumentSearcher.paddedNormalizedRect(right, in: page)],
+                        "the second occurrence, in the image only, is boxed by its fast line: \(ocr.map(\.normalizedRect))")
+            } else {
+                #expect(ocr.isEmpty, "iOS 26 reads one recognition, which misreads the second occurrence")
+            }
+        }
+    }
+
+    @Test("A phrase the accurate read splits across two lines and the fast read holds on one is one occurrence")
+    func crossLineAndFastLineAreOneOccurrence() async throws {
+        let doc = try #require(PDFDocument(data: TestFixtures.imageOnlyPDF()))
+        let searcher = DocumentSearcher()
+        await searcher._testSeedOCRLines([
+            OCREngine.TextLine(text: "Account holder Jane", normalizedRect: CGRect(x: 0.1, y: 0.60, width: 0.5, height: 0.03), confidence: 0.6),
+            OCREngine.TextLine(text: "Doe of Boise", normalizedRect: CGRect(x: 0.1, y: 0.56, width: 0.5, height: 0.03), confidence: 0.6),
+        ], forPageIndex: 0)
+        await searcher._testSeedOCRFastLines([
+            OCREngine.TextLine(text: "Account holder Jane Doe of Boise",
+                               normalizedRect: CGRect(x: 0.1, y: 0.56, width: 0.5, height: 0.07), confidence: 0.5),
+        ], forPageIndex: 0)
+        var results: [SearchResult] = []
+        for await r in searcher.search(SendablePDFDocument(doc), mode: .text("Jane Doe", options: SearchOptions()),
+                                       progress: { _, _ in }) { results.append(r) }
+        #expect(results.count == 2, "one box per line the accurate read splits it over: \(results.map(\.normalizedRect))")
+        #expect(Set(results.map(\.occurrenceID)).count == 1, "one occurrence")
+    }
+
+    @Test("A match only the fast read has takes its place on the page among the others")
+    func fastOnlyMatchIsInPageOrder() async throws {
+        let doc = try #require(PDFDocument(data: TestFixtures.imageOnlyPDF()))
+        let searcher = DocumentSearcher()
+        let r1 = CGRect(x: 0.1, y: 0.70, width: 0.6, height: 0.03)
+        let r2 = CGRect(x: 0.1, y: 0.60, width: 0.6, height: 0.03)
+        let r3 = CGRect(x: 0.1, y: 0.50, width: 0.6, height: 0.03)
+        await searcher._testSeedOCRLines([
+            OCREngine.TextLine(text: "Invoice INV-00731 due", normalizedRect: r1, confidence: 0.6),
+            OCREngine.TextLine(text: "frøn R (00 00", normalizedRect: r2, confidence: 0.3),
+            OCREngine.TextLine(text: "Copy of INV-00733", normalizedRect: r3, confidence: 0.6),
+        ], forPageIndex: 0)
+        await searcher._testSeedOCRFastLines([
+            OCREngine.TextLine(text: "Invoice INV-00731 due", normalizedRect: r1, confidence: 0.5),
+            OCREngine.TextLine(text: "Reissued INV-00732", normalizedRect: r2, confidence: 0.5),
+            OCREngine.TextLine(text: "Copy of INV-00733", normalizedRect: r3, confidence: 0.5),
+        ], forPageIndex: 0)
+        var results: [SearchResult] = []
+        for await r in searcher.search(SendablePDFDocument(doc), mode: .text("INV-0073", options: SearchOptions()),
+                                       progress: { _, _ in }) { results.append(r) }
+        let tops = results.map(\.normalizedRect.midY)
+        #expect(results.count == (DocumentSearcher.readsFastOCRBeside ? 3 : 2))
+        #expect(tops == tops.sorted(by: >), "top to bottom: \(tops)")
+    }
 }

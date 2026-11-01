@@ -16,25 +16,74 @@ extension DocumentSearcher {
     }
 
     /// The union of one route's matches over a page's accurate read and over
-    /// its fast read. A fast match is the same match as an accurate one when
-    /// both carry the same term and their boxes overlap by at least half the
-    /// smaller box: that accurate match is kept, boxed by the union of the
-    /// two boxes (the larger cover). Every other fast match is added.
+    /// its fast read. Accurate matches of one term with one box (the matches
+    /// on one recognised line) form a group; the fast matches of that term
+    /// whose boxes overlap the group's by at least half the smaller box are
+    /// its fast matches, each taken by one group only. When the fast read
+    /// holds MORE matches there than the accurate read, the fast matches
+    /// stand for the group, with their own boxes: the accurate read missed
+    /// an occurrence, and one accurate box would answer for both (a hybrid
+    /// page then drops it as a repeat of the text-layer occurrence, leaving
+    /// the other unboxed). Otherwise each fast match pairs with one accurate
+    /// match, which is kept, boxed by the union of the two (the larger
+    /// cover). Every fast match no group took is added. Added matches take
+    /// their place in page order; the accurate matches keep theirs.
     nonisolated static func unionFastOCRResults(
         accurate: [SearchResult], fast: [SearchResult]
     ) -> [SearchResult] {
-        var merged = accurate
-        for candidate in fast {
-            if let index = accurate.indices.first(where: {
-                accurate[$0].term == candidate.term
-                    && overlapsHalfTheSmaller(accurate[$0].normalizedRect, candidate.normalizedRect)
+        guard !fast.isEmpty else { return accurate }
+        var groups: [[Int]] = []
+        for index in accurate.indices {
+            if let group = groups.firstIndex(where: {
+                accurate[$0[0]].term == accurate[index].term
+                    && accurate[$0[0]].normalizedRect == accurate[index].normalizedRect
             }) {
-                merged[index] = merged[index].boxed(merged[index].normalizedRect.union(candidate.normalizedRect))
+                groups[group].append(index)
             } else {
-                merged.append(candidate)
+                groups.append([index])
             }
         }
-        return merged
+        var merged = accurate
+        var standsInFor = Set<Int>()   // accurate matches the fast ones replace
+        var taken = Set<Int>()         // fast matches a group took
+        var added: [SearchResult] = []
+        for group in groups {
+            let first = accurate[group[0]]
+            let hits = fast.indices.filter {
+                !taken.contains($0) && fast[$0].term == first.term
+                    && overlapsHalfTheSmaller(first.normalizedRect, fast[$0].normalizedRect)
+            }
+            taken.formUnion(hits)
+            if hits.count > group.count {
+                standsInFor.formUnion(group)
+                added += hits.map { fast[$0] }
+            } else {
+                for (a, f) in zip(group, hits) {
+                    merged[a] = merged[a].boxed(merged[a].normalizedRect.union(fast[f].normalizedRect))
+                }
+            }
+        }
+        added += fast.indices.filter { !taken.contains($0) }.map { fast[$0] }
+        var result = merged.indices.filter { !standsInFor.contains($0) }.map { merged[$0] }
+        for match in added { insertInPageOrder(match, into: &result) }
+        return result
+    }
+
+    /// Inserts `match` before the first result below it on the page, or, on
+    /// the same row, before the first result to its right.
+    nonisolated static func insertInPageOrder(_ match: SearchResult, into results: inout [SearchResult]) {
+        let box = match.normalizedRect
+        let index = results.firstIndex { other in
+            let otherBox = other.normalizedRect
+            if sharesRow(box, otherBox) { return box.minX < otherBox.minX }
+            return otherBox.midY < box.midY   // bottom-left origin: lower on the page
+        } ?? results.endIndex
+        results.insert(match, at: index)
+    }
+
+    /// Whether two boxes overlap vertically by at least half the shorter one.
+    nonisolated static func sharesRow(_ a: CGRect, _ b: CGRect) -> Bool {
+        min(a.maxY, b.maxY) - max(a.minY, b.minY) >= 0.5 * min(a.height, b.height)
     }
 
     /// Whether two boxes overlap by at least half the smaller one's area.

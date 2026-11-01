@@ -1676,11 +1676,12 @@ public actor DocumentSearcher {
             }
         }
 
-        if let firstFastResult {
-            results = Self.unionFastOCRResults(
-                accurate: Array(results[..<firstFastResult]), fast: Array(results[firstFastResult...]))
-        }
-        return results + crossLineOCRMatches(lines: textLines, query: query, options: options, page: page, pageIndex: pageIndex, term: term)
+        let crossLine = crossLineOCRMatches(lines: textLines, query: query, options: options, page: page, pageIndex: pageIndex, term: term)
+        // The fast read's matches merge with every accurate match, a phrase
+        // the accurate read splits across two lines included.
+        guard let firstFastResult else { return results + crossLine }
+        return Self.unionFastOCRResults(
+            accurate: Array(results[..<firstFastResult]) + crossLine, fast: Array(results[firstFastResult...]))
     }
 
     // MARK: - OCR page lines (the one render→cache→evict body for every OCR path)
