@@ -47,6 +47,23 @@ nonisolated final class EditorTrailingControlsUITests: XCTestCase {
         }
     }
 
+    /// The … is the app's own menu on iOS 27 only; earlier iOS keeps the
+    /// system's overflow button as shipped. The other lookups accept either,
+    /// so this pins which one each iOS gets.
+    func testTheMoreMenuIsTheAppsOwnOnlyOnIOS27() {
+        let own = app.buttons["editorMoreMenu"]
+        let system = app.buttons
+            .matching(NSPredicate(format: "identifier IN %@", ["OverflowBarButtonItem", "TopOverflowBarButtonItem"]))
+            .firstMatch
+        if #available(iOS 27, *) {
+            XCTAssertTrue(own.waitForExistence(timeout: 10), "on iOS 27 the … is the app's own menu")
+            XCTAssertFalse(system.exists, "on iOS 27 the system's … must not show as well")
+        } else {
+            XCTAssertTrue(system.waitForExistence(timeout: 10), "before iOS 27 the … is the system's, as shipped")
+            XCTAssertFalse(own.exists, "before iOS 27 the app's own … menu must not show")
+        }
+    }
+
     // MARK: - Helpers
 
     private func trailingFrames() -> [CGRect] {
