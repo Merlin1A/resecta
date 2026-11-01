@@ -126,6 +126,10 @@ struct SavedSearchListSheet: View {
                         // re-arm it with the collision message.
                         renameError = Self.duplicateNameMessage
                         renameRetryTarget = search
+                        // Close it here, as Cancel and success do: iOS 27
+                        // does not always write the dismissal back through
+                        // the binding.
+                        if #available(iOS 27, *) { renameTarget = nil }
                     } else {
                         renameError = nil
                         renameTarget = nil
@@ -160,6 +164,9 @@ struct SavedSearchListSheet: View {
                         // `.onChange(of: showSavePrompt)` re-present
                         // re-arms the alert carrying the message.
                         savePromptError = Self.duplicateNameMessage
+                        // Close it here: iOS 27 does not always write the
+                        // dismissal back through the binding.
+                        if #available(iOS 27, *) { showSavePrompt = false }
                     }
                 }
                 // Blank names can't commit — a Save that auto-dismisses
@@ -216,17 +223,31 @@ struct SavedSearchListSheet: View {
             // pending, present it again carrying the message. Cancel and
             // success clear the error before dismissal, so no re-present
             // loop; the typed name survives in state either way.
+            // On iOS 27 a re-arm made while the alert is still leaving is
+            // dropped, so there either signal (the prompt closed, or the
+            // error arrived with the prompt already closed) re-arms once the
+            // dismissal has finished. Earlier iOS re-arms at once, as before.
             .onChange(of: showSavePrompt) { _, isPresented in
-                if !isPresented, savePromptError != nil {
+                if #available(iOS 27, *) {
+                    reArmSavePromptIfRejected()
+                } else if !isPresented, savePromptError != nil {
                     showSavePrompt = true
                 }
             }
+            .onChange(of: savePromptError) { _, _ in
+                if #available(iOS 27, *) { reArmSavePromptIfRejected() }
+            }
             .onChange(of: renameTarget) { _, target in
-                if target == nil, renameError != nil,
-                   let retry = renameRetryTarget {
+                if #available(iOS 27, *) {
+                    reArmRenameIfRejected()
+                } else if target == nil, renameError != nil,
+                          let retry = renameRetryTarget {
                     renameRetryTarget = nil
                     renameTarget = retry
                 }
+            }
+            .onChange(of: renameRetryTarget) { _, _ in
+                if #available(iOS 27, *) { reArmRenameIfRejected() }
             }
         }
         // Saved query previews may themselves be PII — this sheet
@@ -234,6 +255,33 @@ struct SavedSearchListSheet: View {
         // carries its own screen-capture shield for the same reason.
         .shieldedSheetContent(monitor: captureMonitor)
         .presentationBackground(.regularMaterial)
+    }
+
+    /// How long a closing alert takes to leave before the next one can
+    /// present (iOS 27).
+    static let alertDismissalDelay: Duration = .milliseconds(500)
+
+    /// iOS 27: present the save prompt again with its collision message
+    /// once it has closed. Cancel and success clear the error first, so
+    /// this never loops.
+    private func reArmSavePromptIfRejected() {
+        guard !showSavePrompt, savePromptError != nil else { return }
+        Task { @MainActor in
+            try? await Task.sleep(for: Self.alertDismissalDelay)
+            if !showSavePrompt, savePromptError != nil { showSavePrompt = true }
+        }
+    }
+
+    /// iOS 27: present the rename prompt again for the entry whose rename
+    /// collided, once the prompt has closed.
+    private func reArmRenameIfRejected() {
+        guard renameTarget == nil, renameError != nil, renameRetryTarget != nil else { return }
+        Task { @MainActor in
+            try? await Task.sleep(for: Self.alertDismissalDelay)
+            guard renameTarget == nil, renameError != nil, let retry = renameRetryTarget else { return }
+            renameRetryTarget = nil
+            renameTarget = retry
+        }
     }
 
     // MARK: - Delete All

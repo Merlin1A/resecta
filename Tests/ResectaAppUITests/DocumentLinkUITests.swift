@@ -125,10 +125,10 @@ nonisolated final class DocumentLinkUITests: XCTestCase {
         let tool = app.buttons["drawTool"]
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
-            if (tool.value as? String) == expected { return true }
+            if tool.drawToolReads(expected) { return true }
             usleep(250_000)
         }
-        return (tool.value as? String) == expected
+        return tool.drawToolReads(expected)
     }
 
 }

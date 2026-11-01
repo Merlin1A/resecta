@@ -11,13 +11,15 @@ import XCTest
 nonisolated struct CanvasPixelProbe {
 
     enum Tint {
-        case red, blue, green
+        case red, blue, green, teal
 
         func matches(_ r: Int, _ g: Int, _ b: Int) -> Bool {
             switch self {
             case .red: return r > 190 && r - g > 30 && r - b > 30
             case .blue: return b > 190 && b - r > 35 && b - g > 15
             case .green: return g > 150 && g - r > 22 && g - b > 12
+            // The brand teal of an active tool glyph (ResultWalkUITests' ring rule).
+            case .teal: return b - r > 50 && g - r > 50 && r < 90 && (70...175).contains(g) && (80...190).contains(b)
             }
         }
     }

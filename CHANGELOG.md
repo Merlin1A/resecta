@@ -15,6 +15,10 @@ Fixes a crash on iOS 27 when touching or scrolling a document. On iOS 27, export
 - Editor: on iOS 27 the app quit at the first touch on an open document's page. The page view passed PDFKit's own gestures to a PDFKit method that iOS 27 no longer has; the double tap that returns to the fit zoom now has its own gesture delegate, so the page view no longer answers for PDFKit's gestures.
 - Export: on iOS 27 the redacted file kept the time it was written in its creation date, and verification reported the metadata as not rewritten; the creation date is now the fixed value, as on iOS 26.
 - Search: on iOS 27, a search on a scanned page or photo could miss text that iOS 26 read, such as a phone number read with a space after a hyphen or a line read as noise; Search now also reads the page a second way and adds what that read matched.
+- Editor: on iOS 27, before the first region the disabled Redact button and the … menu shared one button shape, and the trailing buttons shifted when the first region arrived; Undo, Redact and More are now three separate buttons in every state, as on iOS 26.
+- Search: on iOS 27, saving or renaming a saved search under a name already in use closed the prompt without saving and without saying why; the alert naming the duplicate appears again, as on iOS 26.
+- Editor: on iOS 27, a zoomed-in page returned to the fit zoom when you stepped through search results, changed page from the page bar, or opened or closed the Search sheet; the zoom now holds, and each result step enlarges and centres the match again, as on iOS 26.
+- Accessibility: on iOS 27, toolbar buttons stopped telling VoiceOver and other assistive technologies their state and hints, such as why Redact is unavailable and whether the Rectangle tool's drawing mode is on; each button's label now carries them.
 
 ## [1.3.0] — 2026-10-26
 
