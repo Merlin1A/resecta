@@ -313,13 +313,16 @@ public actor DocumentSearcher {
     /// then the composed scored survivors) is part of the contract.
     /// `pageText` is the text the detector ran on: the page string on the
     /// text leg, the normalized concatenation on the OCR leg.
+    /// `reportsToSinks` is false for the OCR leg's second pass over the fast
+    /// read on iOS 27, whose drops the accurate pass already counted.
     private func gateAndCompose(
         _ matches: [PIIDetector.PIIMatch],
-        pageText: String
+        pageText: String,
+        reportsToSinks: Bool = true
     ) -> [PIIDetector.PIIMatch] {
         let (scored, rest) = matches.partitionedByScoredFamily()
         let gated = rest.applyingCountingDrops(thresholdVector: thresholdVector)
-        if gated.droppedBelowThreshold > 0 {
+        if reportsToSinks, gated.droppedBelowThreshold > 0 {
             belowThresholdSink?(gated.droppedBelowThreshold)
         }
         return (gated.survivors + composedSurvivors(scored, pageText: pageText))
@@ -1393,7 +1396,7 @@ public actor DocumentSearcher {
         // raw-gated FP for the scored families): the OCR feature text is
         // `concatenated` (the normalized page text the detector ran on),
         // NOT a `pageText` variable.
-        let matches = gateAndCompose(resolution.surviving, pageText: concatenated)
+        let matches = gateAndCompose(resolution.surviving, pageText: concatenated, reportsToSinks: reportsToSinks)
         var results: [SearchResult] = []
 
         // Spatial mapping shared between detector matches and
@@ -1774,23 +1777,28 @@ public actor DocumentSearcher {
         options: SearchOptions
     ) async -> [SearchResult] {
         let lines = await ocrLines(for: page, pageIndex: pageIndex)
-        let accurate = regexOCRMatches(lines: lines, page: page, pageIndex: pageIndex, regex: regex, options: options)
+        let accurate = regexOCRMatches(lines: lines, page: page, pageIndex: pageIndex, regex: regex, options: options,
+                                       reportsToSinks: true)
         // iOS 27: the same pattern over the page's fast read, merged.
         guard Self.readsFastOCRBeside, let fast = ocrPageCache.fastLines(for: pageIndex), !fast.isEmpty else {
             return accurate
         }
         return Self.unionFastOCRResults(
             accurate: accurate,
-            fast: regexOCRMatches(lines: fast, page: page, pageIndex: pageIndex, regex: regex, options: options))
+            fast: regexOCRMatches(lines: fast, page: page, pageIndex: pageIndex, regex: regex, options: options,
+                                  reportsToSinks: false))
     }
 
-    /// The regex fallback over one recognition of a scanned page.
+    /// The regex fallback over one recognition of a scanned page. The page's
+    /// timeout is reported only when `reportsToSinks` (not again for the
+    /// fast read's pass on iOS 27).
     private func regexOCRMatches(
         lines: [OCREngine.TextLine],
         page: PDFPage,
         pageIndex: Int,
         regex: NSRegularExpression,
-        options: SearchOptions
+        options: SearchOptions,
+        reportsToSinks: Bool
     ) -> [SearchResult] {
         guard !lines.isEmpty else { return [] }
 
@@ -1833,7 +1841,7 @@ public actor DocumentSearcher {
         let startTime = ContinuousClock.now
         // Snapshot the timeout sink — invoked synchronously inside the
         // enumerateMatches closure where actor re-entry is not permitted.
-        let snapshotTimeoutSink = self.regexTimeoutSink
+        let snapshotTimeoutSink = reportsToSinks ? self.regexTimeoutSink : nil
 
         SearchCore.enumerateRegexMatches(
             in: searchText, regex: regex,

@@ -86,4 +86,56 @@ struct OCRFastUnionTests {
         let phones = results.filter { $0.piiCategory == .phone }
         #expect(phones.count == (DocumentSearcher.readsFastOCRBeside ? 1 : 0), "\(results.map(\.matchedText))")
     }
+
+    // MARK: - The reports: counted once, not again for the fast read
+
+    final class Counter: @unchecked Sendable {
+        private let lock = NSLock()
+        private var value = 0
+        func add(_ n: Int) { lock.lock(); value += n; lock.unlock() }
+        var total: Int { lock.lock(); defer { lock.unlock() }; return value }
+    }
+
+    @Test("PII Scan: a below-threshold drop is counted once, not again for the fast read")
+    func belowThresholdCountedOnce() async throws {
+        func drops(seedingFast: Bool) async throws -> Int {
+            let doc = try #require(PDFDocument(data: TestFixtures.imageOnlyPDF()))
+            let rect = CGRect(x: 0.1, y: 0.5, width: 0.8, height: 0.03)
+            let searcher = DocumentSearcher()
+            await searcher._testSeedOCRLines([OCREngine.TextLine(text: "SSN 123-45-6789", normalizedRect: rect, confidence: 0.6)], forPageIndex: 0)
+            if seedingFast {
+                await searcher._testSeedOCRFastLines([OCREngine.TextLine(text: "SSN 123-45-6789", normalizedRect: rect, confidence: 0.5)], forPageIndex: 0)
+            }
+            await searcher.setThresholdVector(PresetThresholdVector(thresholdsByWireName: ["ssn": 1.0]))
+            let counter = Counter()
+            await searcher.setBelowThresholdSink { counter.add($0) }
+            for await _ in searcher.search(SendablePDFDocument(doc), mode: .piiScan(categories: [.ssn], options: SearchOptions(includeOCR: true)),
+                                           progress: { _, _ in }) {}
+            return counter.total
+        }
+        let accurateOnly = try await drops(seedingFast: false)
+        #expect(accurateOnly >= 1, "the fixture drops the SSN below the cutoff")
+        #expect(try await drops(seedingFast: true) == accurateOnly)
+    }
+
+    @Test("Regex search: a page's timeout is reported once, not again for the fast read")
+    func regexTimeoutReportedOnce() async throws {
+        func timeouts(seedingFast: Bool) async throws -> Int {
+            let doc = try #require(PDFDocument(data: TestFixtures.imageOnlyPDF()))
+            let rect = CGRect(x: 0.1, y: 0.5, width: 0.8, height: 0.03)
+            let searcher = DocumentSearcher(regexTimeoutOverride: .zero)
+            await searcher._testSeedOCRLines([OCREngine.TextLine(text: "Invoice INV-00731", normalizedRect: rect, confidence: 0.6)], forPageIndex: 0)
+            if seedingFast {
+                await searcher._testSeedOCRFastLines([OCREngine.TextLine(text: "Invoice INV-00731", normalizedRect: rect, confidence: 0.5)], forPageIndex: 0)
+            }
+            let counter = Counter()
+            await searcher.setRegexTimeoutSink { _ in counter.add(1) }
+            for await _ in searcher.search(SendablePDFDocument(doc), mode: .regex(#"INV-\d{5}"#, options: SearchOptions()),
+                                           progress: { _, _ in }) {}
+            return counter.total
+        }
+        let accurateOnly = try await timeouts(seedingFast: false)
+        #expect(accurateOnly == 1, "the zero timeout stops the page's read once")
+        #expect(try await timeouts(seedingFast: true) == accurateOnly)
+    }
 }
