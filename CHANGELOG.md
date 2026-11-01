@@ -19,7 +19,7 @@ Fixes a crash on iOS 27 when touching or scrolling a document. On iOS 27, export
 - Search: on iOS 27, saving or renaming a saved search under a name already in use closed the prompt without saving and without saying why; the alert naming the duplicate appears again, as on iOS 26.
 - Editor: on iOS 27, a zoomed-in page returned to the fit zoom when you stepped through search results, changed page from the page bar, or opened or closed the Search sheet; the zoom now holds, and each result step enlarges and centres the match again, as on iOS 26.
 - Accessibility: on iOS 27, toolbar buttons stopped telling VoiceOver and other assistive technologies their state and hints, such as why Redact is unavailable and whether the Rectangle tool's drawing mode is on; each button's label now carries them.
-- Detection: on iOS 27, name detection could miss every name for the rest of a session in some cases; Resecta now checks that the name model is ready before its first name lookup.
+- Detection: on iOS 27, name detection now stays available when Resecta's detection data fails its integrity check.
 
 ## [1.3.0] — 2026-10-26
 

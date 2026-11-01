@@ -158,6 +158,15 @@ On a scanned page, a name that iOS reads as two separate pieces of one line may 
 
 ---
 
+### KI-22: On iOS 27, Name Detection Can Miss Names (Medium)
+**Affects:** Names in Scan and Search on iOS 27
+
+On iOS 27, the system's name model can be unavailable or unreliable. After the iPhone has been on for a long time Resecta may detect no names and says so; in some sessions it can miss names without a notice. Restarting the iPhone may bring name detection back.
+
+**Workaround:** Check each page in the preview before sharing, search for each name you need removed, and draw a box over anything Scan missed.
+
+---
+
 ## Fixed
 
 ### KI-8: Duplicate Regions from Multiple Scan Runs (Low) — FIXED (entry moved 2026-10-01)
