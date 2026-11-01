@@ -90,8 +90,29 @@ extension PageImageInkFitTests {
             #expect(painted.allSatisfy { $0.height <= Self.points(glyphs, size).height + 3 },
                     "\(word): a fitted box \(painted) is the glyphs' own height (\(Self.points(glyphs, size).height) pt), not a read word's box")
         }
-        #expect(painted.contains { $0.contains(held) },
-                "\(word): the painted box \(painted) does not hold its glyphs \(held) (degraded \(fit.degraded))")
+        if #available(iOS 27, *), word == "4100773265" {
+            // iOS 27 (KI-20): the digits' box is fitted to their ink, which
+            // stands on the baseline, while PDFKit's glyph box reaches down
+            // into the font's descent. The paint must hold every pixel of the
+            // word's ink, read at the grey the line is drawn in; coverage on
+            // iOS 27 is also pinned by everyMatchCoversItsInk and
+            // turnedPageMatchesCoverTheirInk.
+            let window = Self.points(glyphs, size).insetBy(dx: 0, dy: -1.5)
+            let bitmap = try #require(DocumentSearcher.renderGray(cgPage, rotation: page.rotation, visual: size, window: window))
+                .reading(threshold: 200)
+            var inked = 0, outside = 0
+            for y in 0..<bitmap.height { for x in 0..<bitmap.width where bitmap.isInk(x, y) {
+                inked += 1
+                let point = CGPoint(x: window.minX + (CGFloat(x) + 0.5) / DocumentSearcher.inkFitScale,
+                                    y: window.minY + (CGFloat(y) + 0.5) / DocumentSearcher.inkFitScale)
+                if !painted.contains(where: { $0.contains(point) }) { outside += 1 }
+            } }
+            #expect(inked > 0, "\(word): its ink is read")
+            #expect(outside == 0, "\(word): \(outside) of its \(inked) ink pixels lie outside the painted box \(painted)")
+        } else {
+            #expect(painted.contains { $0.contains(held) },
+                    "\(word): the painted box \(painted) does not hold its glyphs \(held) (degraded \(fit.degraded))")
+        }
     }
 
     @Test("With the render stalled, a word's ascenders and descenders stay inside its read box, alone or with a row just above",

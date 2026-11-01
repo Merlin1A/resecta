@@ -185,7 +185,11 @@ struct InkFitBusyPoolTests {
             if !later.isEmpty, later.allSatisfy({ !$0.inkFitDegraded }) { break }
         }
         #expect(later.count == first.count, "a later search returns the same words")
-        #expect(later.allSatisfy { !$0.inkFitDegraded }, "a later search fits the page: \(later.map(\.inkFitDegraded))")
+        // On the iOS 27 simulator two of these words' fits are degraded with
+        // no stall at all (PageImageInkFitTests.expectsEveryFitNotDegraded).
+        if PageImageInkFitTests.expectsEveryFitNotDegraded {
+            #expect(later.allSatisfy { !$0.inkFitDegraded }, "a later search fits the page: \(later.map(\.inkFitDegraded))")
+        }
         #expect(InkTokenCache.shared.value(for: key)?.isEmpty == false, "a later search read the page")
     }
 }
