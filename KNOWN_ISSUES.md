@@ -149,6 +149,15 @@ On iOS 27, text read from images (scans and photos) can differ from iOS 26: a wo
 
 ---
 
+### KI-21: A Multi-Word Search Can Miss Text Split Within One Scanned Line (Medium)
+**Affects:** Search in text read from a picture (a scan, photo or screenshot), on iOS 26 and iOS 27
+
+On a scanned page, a name that iOS reads as two separate pieces of one line may not be found by a multi-word search; search a single word of it as a fallback.
+
+**Workaround:** Search a single word of the name, check each such page in the preview before sharing, and draw a box over anything Search missed.
+
+---
+
 ## Fixed
 
 ### KI-8: Duplicate Regions from Multiple Scan Runs (Low) — FIXED (entry moved 2026-10-01)
