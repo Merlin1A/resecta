@@ -9,8 +9,8 @@ import UIKit
 // A hybrid page: a picture of the line "Pay Delia Hartwell and Delia
 // Hartwell" with a hidden text layer that holds only "Pay Delia Hartwell".
 // The second occurrence is in the picture only. Search reads the text layer
-// and the picture's recognised text; after Apply, a region covers each
-// occurrence. On iOS 27 the picture is read twice (accurate and fast): when
+// and the picture's recognised text; after Apply, each occurrence's whole
+// ink lies inside a region. On iOS 27 the picture is read twice (accurate and fast): when
 // the accurate read misses the second occurrence and the fast read holds
 // both, the fast read's box for the second one must survive the text-layer
 // dedup.
@@ -44,11 +44,33 @@ struct HybridImageOnlyOccurrenceTests {
                       width: r.width / pageSize.width, height: r.height / pageSize.height)
     }
 
-    static var occurrences: [CGRect] {
+    static var occurrenceRanges: [NSRange] {
         let ns = line as NSString
         let first = ns.range(of: "Delia Hartwell")
         let second = ns.range(of: "Delia Hartwell", range: NSRange(location: NSMaxRange(first), length: ns.length - NSMaxRange(first)))
-        return [box(first), box(second)]
+        return [first, second]
+    }
+
+    static var occurrences: [CGRect] { occurrenceRanges.map(box) }
+
+    /// The ink of `line`'s characters `range` (the glyphs' drawn bounds), in
+    /// normalized page coordinates (bottom-left origin).
+    static func inkBox(_ range: NSRange) -> CGRect {
+        let x0 = CTLineGetOffsetForStringIndex(ctLine(line), range.location, nil)
+        let ink = CTLineGetImageBounds(ctLine((line as NSString).substring(with: range)), nil)
+        let r = CGRect(x: origin.x + x0 + ink.minX, y: origin.y + ink.minY, width: ink.width, height: ink.height)
+        return CGRect(x: r.minX / pageSize.width, y: r.minY / pageSize.height,
+                      width: r.width / pageSize.width, height: r.height / pageSize.height)
+    }
+
+    /// Each occurrence's whole ink lies inside one applied region.
+    static func expectEveryOccurrenceCovered(_ regions: [CGRect], _ results: [SearchResult]) {
+        for (index, range) in occurrenceRanges.enumerated() {
+            let ink = inkBox(range)
+            #expect(!ink.isEmpty)
+            #expect(regions.contains { $0.insetBy(dx: -1e-6, dy: -1e-6).contains(ink) },
+                    "occurrence \(index + 1)'s ink \(ink) lies inside one region; regions \(regions); results \(describe(results))")
+        }
     }
 
     /// The page: the line drawn as a 300 dpi picture, and the text layer's
@@ -109,10 +131,7 @@ struct HybridImageOnlyOccurrenceTests {
         #expect((doc.page(at: 0)?.string ?? "").contains("Pay Delia Hartwell"))
         #expect(!(doc.page(at: 0)?.string ?? "").contains("and Delia"), "the second occurrence is in the picture only")
         let (results, regions) = try await Self.searchAndApply(doc, searcher: DocumentSearcher())
-        for (index, occurrence) in Self.occurrences.enumerated() {
-            #expect(regions.contains { $0.contains(CGPoint(x: occurrence.midX, y: occurrence.midY)) },
-                    "occurrence \(index + 1) \(occurrence) is under a region: \(Self.describe(results))")
-        }
+        Self.expectEveryOccurrenceCovered(regions, results)
     }
 
     @Test("iOS 27 reads: the accurate read misses the second occurrence, the fast read holds both; both are redacted",
@@ -133,10 +152,7 @@ struct HybridImageOnlyOccurrenceTests {
             await searcher._testSeedOCRFastLines(
                 fastOrder.map { OCREngine.TextLine(text: $0.0, normalizedRect: $0.1, confidence: 0.5) }, forPageIndex: 0)
             let (results, regions) = try await Self.searchAndApply(doc, searcher: searcher)
-            for (index, occurrence) in occurrences.enumerated() {
-                #expect(regions.contains { $0.contains(CGPoint(x: occurrence.midX, y: occurrence.midY)) },
-                        "occurrence \(index + 1) \(occurrence) is under a region: \(Self.describe(results))")
-            }
+            Self.expectEveryOccurrenceCovered(regions, results)
         }
     }
 }
