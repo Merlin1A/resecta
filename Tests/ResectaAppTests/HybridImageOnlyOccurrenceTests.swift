@@ -128,8 +128,10 @@ struct HybridImageOnlyOccurrenceTests {
     @Test("Text recognition as it runs: both occurrences are redacted")
     func bothOccurrencesRedacted() async throws {
         let doc = try Self.hybridPage()
-        #expect((doc.page(at: 0)?.string ?? "").contains("Pay Delia Hartwell"))
-        #expect(!(doc.page(at: 0)?.string ?? "").contains("and Delia"), "the second occurrence is in the picture only")
+        let pageText = doc.page(at: 0)?.string ?? ""
+        #expect(pageText.contains("Pay Delia Hartwell"), "the text layer: \(pageText.debugDescription)")
+        let pictureOnly = pageText.range(of: "and Delia") == nil
+        #expect(pictureOnly, "the second occurrence is in the picture only: \(pageText.debugDescription)")
         let (results, regions) = try await Self.searchAndApply(doc, searcher: DocumentSearcher())
         Self.expectEveryOccurrenceCovered(regions, results)
     }
