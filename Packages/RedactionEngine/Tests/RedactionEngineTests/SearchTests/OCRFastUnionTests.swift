@@ -141,8 +141,8 @@ struct OCRFastUnionTests {
 
     // MARK: - More fast matches than accurate ones on a line; the order
 
-    @Test("A line the fast read holds more matches on than the accurate read keeps the fast matches, in either order")
-    func moreFastMatchesOnALineKeepTheFastOnes() {
+    @Test("A line the fast read holds more matches on than the accurate read adds the fast matches beside the accurate one, in either order")
+    func moreFastMatchesOnALineAddTheFastOnes() {
         // Binary-exact boxes, so a union is compared without rounding.
         let line = CGRect(x: 0.125, y: 0.5, width: 0.625, height: 0.03125)
         let left = CGRect(x: 0.125, y: 0.5, width: 0.25, height: 0.03125)
@@ -151,7 +151,8 @@ struct OCRFastUnionTests {
         for fast in [[result("delia hartwell", left), result("delia hartwell", right)],
                      [result("delia hartwell", right), result("delia hartwell", left)]] {
             let merged = DocumentSearcher.unionFastOCRResults(accurate: [a], fast: fast)
-            #expect(Set(merged.map(\.normalizedRect)) == [left, right], "\(merged.map(\.normalizedRect))")
+            #expect(Set(merged.map(\.normalizedRect)) == [line, left, right], "\(merged.map(\.normalizedRect))")
+            #expect(merged.count == 3)
         }
         let twoAccurate = DocumentSearcher.unionFastOCRResults(
             accurate: [a, result("delia hartwell", line)],
@@ -184,8 +185,13 @@ struct OCRFastUnionTests {
             let ocr = results.filter { if case .ocr = $0.source { true } else { false } }
             #expect(textLayer.count == 1, "the text layer holds the first occurrence")
             if DocumentSearcher.readsFastOCRBeside {
-                #expect(ocr.map(\.normalizedRect) == [DocumentSearcher.paddedNormalizedRect(right, in: page)],
+                let paddedLeft = DocumentSearcher.paddedNormalizedRect(left, in: page)
+                let paddedRight = DocumentSearcher.paddedNormalizedRect(right, in: page)
+                #expect(ocr.map(\.normalizedRect).contains(paddedRight),
                         "the second occurrence, in the image only, is boxed by its fast line: \(ocr.map(\.normalizedRect))")
+                // The text layer accounts for one of the OCR boxes over the first
+                // occurrence; the fast line box left over it covers that word again.
+                #expect(Set(ocr.map(\.normalizedRect)) == [paddedLeft, paddedRight], "\(ocr.map(\.normalizedRect))")
             } else {
                 #expect(ocr.isEmpty, "iOS 26 reads one recognition, which misreads the second occurrence")
             }

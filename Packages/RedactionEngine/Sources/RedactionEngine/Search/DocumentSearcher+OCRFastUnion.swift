@@ -20,14 +20,16 @@ extension DocumentSearcher {
     /// on one recognised line) form a group; the fast matches of that term
     /// whose boxes overlap the group's by at least half the smaller box are
     /// its fast matches, each taken by one group only. When the fast read
-    /// holds MORE matches there than the accurate read, the fast matches
-    /// stand for the group, with their own boxes: the accurate read missed
-    /// an occurrence, and one accurate box would answer for both (a hybrid
-    /// page then drops it as a repeat of the text-layer occurrence, leaving
-    /// the other unboxed). Otherwise each fast match pairs with one accurate
-    /// match, which is kept, boxed by the union of the two (the larger
-    /// cover). Every fast match no group took is added. Added matches take
-    /// their place in page order; the accurate matches keep theirs.
+    /// holds MORE matches there than the accurate read, the accurate matches
+    /// stay as they are and the fast matches are added beside them, with
+    /// their own boxes: the accurate read missed an occurrence, and the fast
+    /// boxes may not cover the one it did read, so its box is never given up
+    /// (on a hybrid page each text-layer occurrence then accounts for one of
+    /// these, and the occurrence only the image holds keeps a box of its
+    /// own). Otherwise each fast match pairs with one accurate match, which
+    /// is kept, boxed by the union of the two (the larger cover). Every fast
+    /// match no group took is added. Added matches take their place in page
+    /// order; the accurate matches keep theirs.
     nonisolated static func unionFastOCRResults(
         accurate: [SearchResult], fast: [SearchResult]
     ) -> [SearchResult] {
@@ -44,7 +46,6 @@ extension DocumentSearcher {
             }
         }
         var merged = accurate
-        var standsInFor = Set<Int>()   // accurate matches the fast ones replace
         var taken = Set<Int>()         // fast matches a group took
         var added: [SearchResult] = []
         for group in groups {
@@ -55,7 +56,6 @@ extension DocumentSearcher {
             }
             taken.formUnion(hits)
             if hits.count > group.count {
-                standsInFor.formUnion(group)
                 added += hits.map { fast[$0] }
             } else {
                 for (a, f) in zip(group, hits) {
@@ -64,7 +64,7 @@ extension DocumentSearcher {
             }
         }
         added += fast.indices.filter { !taken.contains($0) }.map { fast[$0] }
-        var result = merged.indices.filter { !standsInFor.contains($0) }.map { merged[$0] }
+        var result = merged
         for match in added { insertInPageOrder(match, into: &result) }
         return result
     }
