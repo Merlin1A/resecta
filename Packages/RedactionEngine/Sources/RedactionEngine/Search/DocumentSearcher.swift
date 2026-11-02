@@ -313,13 +313,16 @@ public actor DocumentSearcher {
     /// then the composed scored survivors) is part of the contract.
     /// `pageText` is the text the detector ran on: the page string on the
     /// text leg, the normalized concatenation on the OCR leg.
+    /// `reportsToSinks` is false for the OCR leg's second pass over the fast
+    /// read on iOS 27, whose drops the accurate pass already counted.
     private func gateAndCompose(
         _ matches: [PIIDetector.PIIMatch],
-        pageText: String
+        pageText: String,
+        reportsToSinks: Bool = true
     ) -> [PIIDetector.PIIMatch] {
         let (scored, rest) = matches.partitionedByScoredFamily()
         let gated = rest.applyingCountingDrops(thresholdVector: thresholdVector)
-        if gated.droppedBelowThreshold > 0 {
+        if reportsToSinks, gated.droppedBelowThreshold > 0 {
             belowThresholdSink?(gated.droppedBelowThreshold)
         }
         return (gated.survivors + composedSurvivors(scored, pageText: pageText))
@@ -1315,22 +1318,58 @@ public actor DocumentSearcher {
         if let cached = ocrPageCache.normalizedPage(for: pageIndex) {
             normalizedPage = cached
         } else {
-            var concat = ""
-            var entries: [NormalizedLineEntry] = []
-            entries.reserveCapacity(textLines.count)
-            for line in textLines {
-                let normalized = ocrNormalizer.normalize(line.text)
-                entries.append(NormalizedLineEntry(
-                    start: concat.utf16.count,
-                    normalizedText: normalized,
-                    normalizedRect: line.normalizedRect,
-                    confidence: line.confidence
-                ))
-                concat += normalized + "\n"
-            }
-            normalizedPage = NormalizedOCRPage(concatenated: concat, entries: entries)
+            normalizedPage = normalizedOCRPage(textLines)
             ocrPageCache.setNormalizedPage(normalizedPage, for: pageIndex)
         }
+        let accurate = await piiOCRMatches(
+            normalizedPage: normalizedPage, page: page, pageIndex: pageIndex,
+            categories: categories, reportsToSinks: true)
+        // iOS 27: the same scan over the page's fast read, merged; its
+        // overlap counts and pattern timeouts are not reported twice.
+        guard Self.readsFastOCRBeside, let fast = ocrPageCache.fastLines(for: pageIndex), !fast.isEmpty else {
+            return accurate
+        }
+        let fastPage: NormalizedOCRPage
+        if let cached = ocrPageCache.fastNormalizedPage(for: pageIndex) {
+            fastPage = cached
+        } else {
+            fastPage = normalizedOCRPage(fast)
+            ocrPageCache.setFastNormalizedPage(fastPage, for: pageIndex)
+        }
+        return Self.unionFastOCRResults(
+            accurate: accurate,
+            fast: await piiOCRMatches(
+                normalizedPage: fastPage, page: page, pageIndex: pageIndex,
+                categories: categories, reportsToSinks: false))
+    }
+
+    /// One recognition's lines through OCRTextNormalizer, joined with "\n",
+    /// with each line's UTF-16 offset (the detector's NSRange unit).
+    private func normalizedOCRPage(_ textLines: [OCREngine.TextLine]) -> NormalizedOCRPage {
+        var concat = ""
+        var entries: [NormalizedLineEntry] = []
+        entries.reserveCapacity(textLines.count)
+        for line in textLines {
+            let normalized = ocrNormalizer.normalize(line.text)
+            entries.append(NormalizedLineEntry(
+                start: concat.utf16.count,
+                normalizedText: normalized,
+                normalizedRect: line.normalizedRect,
+                confidence: line.confidence
+            ))
+            concat += normalized + "\n"
+        }
+        return NormalizedOCRPage(concatenated: concat, entries: entries)
+    }
+
+    /// The PII Scan over one recognition of a scanned page.
+    private func piiOCRMatches(
+        normalizedPage: NormalizedOCRPage,
+        page: PDFPage,
+        pageIndex: Int,
+        categories: Set<PIICategory>,
+        reportsToSinks: Bool
+    ) async -> [SearchResult] {
         let concatenated = normalizedPage.concatenated
         let lineOffsets = normalizedPage.entries
 
@@ -1358,14 +1397,14 @@ public actor DocumentSearcher {
         // The overlap resolver runs on the OCR path too. Resolver is a
         // pure static function on DetectionOrchestrator.
         let resolution = DetectionOrchestrator.resolveOverlaps(rawMatches)
-        if !resolution.suppressedCountByCategory.isEmpty {
+        if reportsToSinks, !resolution.suppressedCountByCategory.isEmpty {
             overlapSink?(resolution.suppressedCountByCategory)
         }
         // Site-B parity on the OCR path too (an un-routed site would leak
         // raw-gated FP for the scored families): the OCR feature text is
         // `concatenated` (the normalized page text the detector ran on),
         // NOT a `pageText` variable.
-        let matches = gateAndCompose(resolution.surviving, pageText: concatenated)
+        let matches = gateAndCompose(resolution.surviving, pageText: concatenated, reportsToSinks: reportsToSinks)
         var results: [SearchResult] = []
 
         // Spatial mapping shared between detector matches and
@@ -1478,7 +1517,7 @@ public actor DocumentSearcher {
             // layer can enqueue the custom-terms-skip toast. Same
             // sink as the text-layer branch above so the toast fires
             // regardless of which path produced the page's text.
-            if let sink = userTermsTimeoutSink {
+            if reportsToSinks, let sink = userTermsTimeoutSink {
                 for pattern in alwaysFlagResult.timedOutPatterns {
                     sink(pageIndex, pattern)
                 }
@@ -1505,9 +1544,22 @@ public actor DocumentSearcher {
 
         // Search within OCR results
         var results: [SearchResult] = []
-        let normalizedQuery = SearchCore.normalizedText(query, options: options)
+        // iOS 27 folds a space beside a separator inside a digit run on each
+        // line below; the query is folded the same way, so a query typed with
+        // that space still matches a line read with it. iOS 26 keeps both.
+        var foldedQuery = query
+        if #available(iOS 27, *) {
+            foldedQuery = TextNormalizer.foldOCRSeparatorSpaces(query)
+        }
+        let normalizedQuery = SearchCore.normalizedText(foldedQuery, options: options)
 
-        for line in textLines {
+        // iOS 27: the page's fast read follows the accurate one through the
+        // same per-line matching; its results start at `firstFastResult`
+        // and are merged below.
+        let fastLines = Self.readsFastOCRBeside ? (ocrPageCache.fastLines(for: pageIndex) ?? []) : []
+        var firstFastResult: Int? = nil
+        for (lineIndex, line) in (textLines + fastLines).enumerated() {
+            if lineIndex == textLines.count { firstFastResult = results.count }
             // Apply OCR confusable normalization BEFORE
             // NFKC (TextNormalizer.normalizeForSearch) so corrected digit
             // sequences survive NFKC unchanged. The raw line object
@@ -1515,7 +1567,14 @@ public actor DocumentSearcher {
             // OCRTextNormalizer keeps character offsets valid.
             // Manual-search per-line normalization stays in-loop — no
             // ocrNormalizedConcat writes (the PII path owns that cache).
-            let ocrNormalizedText = self.ocrNormalizer.normalize(line.text)
+            var ocrNormalizedText = self.ocrNormalizer.normalize(line.text)
+            // Text recognition on iOS 27 can read a space beside a separator
+            // inside a digit run; fold it so a typed number still matches.
+            // The match is boxed by the whole line below, so the fold moves
+            // no rect. iOS 26 reads keep their text.
+            if #available(iOS 27, *) {
+                ocrNormalizedText = TextNormalizer.foldOCRSeparatorSpaces(ocrNormalizedText)
+            }
             let nfkcLineText = SearchCore.normalizedText(ocrNormalizedText, options: options)
 
             // Recall extensions on the OCR literal
@@ -1625,7 +1684,12 @@ public actor DocumentSearcher {
             }
         }
 
-        return results + crossLineOCRMatches(lines: textLines, query: query, options: options, page: page, pageIndex: pageIndex, term: term)
+        let crossLine = crossLineOCRMatches(lines: textLines, query: query, options: options, page: page, pageIndex: pageIndex, term: term)
+        // The fast read's matches merge with every accurate match, a phrase
+        // the accurate read splits across two lines included.
+        guard let firstFastResult else { return results + crossLine }
+        return Self.unionFastOCRResults(
+            accurate: Array(results[..<firstFastResult]) + crossLine, fast: Array(results[firstFastResult...]))
     }
 
     // MARK: - OCR page lines (the one render→cache→evict body for every OCR path)
@@ -1682,7 +1746,14 @@ public actor DocumentSearcher {
                 let lines = try await ocrEngine.recognizeText(
                     in: cgImage, recognitionLevel: .accurate
                 )
-                ocrPageCache.insert(lines, for: pageIndex)
+                // iOS 27: the fast read of the same image beside the accurate
+                // one (`DocumentSearcher+OCRFastUnion`); nil elsewhere, and
+                // when the fast read fails the accurate read stands alone.
+                var fast: [OCREngine.TextLine]? = nil
+                if Self.readsFastOCRBeside {
+                    fast = try? await ocrEngine.recognizeText(in: cgImage, recognitionLevel: .fast)
+                }
+                ocrPageCache.insert(lines, fast: fast, for: pageIndex)
                 textLines = lines
             } catch { // LegalPhrases:safe (Swift keyword)
                 pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrUnavailable))
@@ -1715,6 +1786,29 @@ public actor DocumentSearcher {
         options: SearchOptions
     ) async -> [SearchResult] {
         let lines = await ocrLines(for: page, pageIndex: pageIndex)
+        let accurate = regexOCRMatches(lines: lines, page: page, pageIndex: pageIndex, regex: regex, options: options,
+                                       reportsToSinks: true)
+        // iOS 27: the same pattern over the page's fast read, merged.
+        guard Self.readsFastOCRBeside, let fast = ocrPageCache.fastLines(for: pageIndex), !fast.isEmpty else {
+            return accurate
+        }
+        return Self.unionFastOCRResults(
+            accurate: accurate,
+            fast: regexOCRMatches(lines: fast, page: page, pageIndex: pageIndex, regex: regex, options: options,
+                                  reportsToSinks: false))
+    }
+
+    /// The regex fallback over one recognition of a scanned page. The page's
+    /// timeout is reported only when `reportsToSinks` (not again for the
+    /// fast read's pass on iOS 27).
+    private func regexOCRMatches(
+        lines: [OCREngine.TextLine],
+        page: PDFPage,
+        pageIndex: Int,
+        regex: NSRegularExpression,
+        options: SearchOptions,
+        reportsToSinks: Bool
+    ) -> [SearchResult] {
         guard !lines.isEmpty else { return [] }
 
         // Normalize each line through OCRTextNormalizer (confusable correction)
@@ -1756,7 +1850,7 @@ public actor DocumentSearcher {
         let startTime = ContinuousClock.now
         // Snapshot the timeout sink — invoked synchronously inside the
         // enumerateMatches closure where actor re-entry is not permitted.
-        let snapshotTimeoutSink = self.regexTimeoutSink
+        let snapshotTimeoutSink = reportsToSinks ? self.regexTimeoutSink : nil
 
         SearchCore.enumerateRegexMatches(
             in: searchText, regex: regex,

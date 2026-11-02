@@ -160,6 +160,33 @@ A value typed into a PDF form is kept with its field, not drawn into the page it
 
 ---
 
+### KI-20: On iOS 27, Text Read from Images Can Differ (Medium)
+**Affects:** Search in text read from a picture (a scan, photo or screenshot) on iOS 27
+
+On iOS 27, text read from images (scans and photos) can differ from iOS 26: a word may be read wrongly, or two words read as one, so Search may miss a term on such a page; check the page in the preview before sharing. On a scan or photo that carries its own hidden text, a Search box over a small word next to a border line can be drawn taller than the word on iOS 27, and Resecta then says the box was widened.
+
+**Workaround:** Check each such page in the preview before sharing, and draw a box over anything Search missed.
+
+---
+
+### KI-21: A Multi-Word Search Can Miss Text Split Within One Scanned Line (Medium)
+**Affects:** Search in text read from a picture (a scan, photo or screenshot), on iOS 26 and iOS 27
+
+On a scanned page, a name that iOS reads as two separate pieces of one line may not be found by a multi-word search; search a single word of it as a fallback.
+
+**Workaround:** Search a single word of the name, check each such page in the preview before sharing, and draw a box over anything Search missed.
+
+---
+
+### KI-22: On iOS 27, Name Detection Can Miss Names (Medium)
+**Affects:** Names in Scan and Search on iOS 27
+
+On iOS 27, the system's name model can be unavailable or unreliable. After the iPhone has been on for a long time Resecta may detect no names and says so; in some sessions it can miss names without a notice. Restarting the iPhone may bring name detection back.
+
+**Workaround:** Check each page in the preview before sharing, search for each name you need removed, and draw a box over anything Scan missed.
+
+---
+
 ## Fixed
 
 ### KI-8: Duplicate Regions from Multiple Scan Runs (Low) — FIXED (entry moved 2026-10-01)

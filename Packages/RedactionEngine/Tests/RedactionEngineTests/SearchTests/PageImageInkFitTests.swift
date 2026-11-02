@@ -98,6 +98,19 @@ struct PageImageInkFitTests {
         return last
     }
 
+    /// Whether a fit must not be degraded. On the iOS 27 simulator, text
+    /// recognition can read a word's box off its ink (KI-20), so a fit there
+    /// can be left on the read word's box; that box still holds the word,
+    /// which everyMatchCoversItsInk and turnedPageMatchesCoverTheirInk pin.
+    /// A device on iOS 27 fits these words (iPhone 17, iOS 27.2,
+    /// appprobe-device-20261031-2009), as iOS 26 does everywhere.
+    static var expectsEveryFitNotDegraded: Bool {
+        #if targetEnvironment(simulator)
+        if #available(iOS 27, *) { return false }
+        #endif
+        return true
+    }
+
     static func points(_ normalized: CGRect, _ size: CGSize) -> CGRect {
         CGRect(x: normalized.minX * size.width, y: normalized.minY * size.height,
                width: normalized.width * size.width, height: normalized.height * size.height)
@@ -148,6 +161,9 @@ struct PageImageInkFitTests {
         let (export, source) = try await Self.reimportedExport()
         let truth = await Self.hits(source, "delia", includeOCR: false)
         var paints: [Int: [CGRect]] = [:]
+        // A degraded fit's paint is the read word's box, taller than the ink
+        // by design; only fitted paints are held to the ink's height.
+        var degradedPaints: [Int: [CGRect]] = [:]
         for index in 0..<export.pageCount {
             let page = try #require(export.page(at: index))
             await DocumentSearcher.prepareInkFit(page)
@@ -159,8 +175,9 @@ struct PageImageInkFitTests {
                 guard range.location != NSNotFound else { break }
                 at = NSMaxRange(range)
                 let fit = try #require(Self.settled({ DocumentSearcher().textLayerAndInkRects(for: range, page: page) }, degraded: \.degraded))
-                #expect(!fit.degraded, "the fit on page \(index + 1) is not degraded")
+                if Self.expectsEveryFitNotDegraded { #expect(!fit.degraded, "the fit on page \(index + 1) is not degraded") }
                 paints[index, default: []] += fit.paint.map { Self.points($0, size) }
+                if fit.degraded { degradedPaints[index, default: []] += fit.paint.map { Self.points($0, size) } }
             }
         }
         for (index, word) in truth.enumerated() {
@@ -168,7 +185,7 @@ struct PageImageInkFitTests {
             let ink = try #require(try Self.inkExtent(page, word: Self.points(word.normalizedRect, page.bounds(for: .cropBox).size)))
             let mine = (paints[word.pageIndex] ?? []).filter { $0.intersects(ink) }
             #expect(!mine.isEmpty, "hit \(index + 1) has a paint over its ink")
-            for paint in mine {
+            for paint in mine where !(degradedPaints[word.pageIndex] ?? []).contains(paint) {
                 // The half-point caps, a pixel of the ink box, a pixel of rounding.
                 #expect(paint.minY >= ink.minY - 1.0 && paint.maxY <= ink.maxY + 1.0,
                         "hit \(index + 1): paint y \(paint.minY)…\(paint.maxY), ink y \(ink.minY)…\(ink.maxY)")
@@ -431,7 +448,7 @@ struct PageImageInkFitTests {
                 .flatMap { searcher.normalizedRect(for: $0, page: sourcePage) })
             let fit = try #require(Self.settled({ DocumentSearcher.inkFit(raw, page: page, text: "ID", range: range, paintOnly: true) },
                                                 degraded: \.degraded))
-            #expect(!fit.degraded, "\"ID\" at \(range.location) is fitted, not left to the envelope")
+            if Self.expectsEveryFitNotDegraded { #expect(!fit.degraded, "\"ID\" at \(range.location) is fitted, not left to the envelope") }
             let outside = try Self.inkOutside(page, word: Self.points(truth, size), boxes: [Self.points(fit.rect, size)])
             #expect(outside.share == 0, "\"ID\" at \(range.location): \(outside.share * 100)% of its ink outside")
             checked += 1
@@ -458,7 +475,7 @@ struct PageImageInkFitTests {
             let delia = NSRange(location: token.location + 5, length: 5)
             let rects = try #require(Self.settled({ searcher.textLayerAndInkRects(for: delia, page: page) }, degraded: \.degraded),
                                      "the page is gated")
-            #expect(!rects.degraded, "the fit read its page")
+            if Self.expectsEveryFitNotDegraded { #expect(!rects.degraded, "the fit read its page") }
             let paint = rects.paint.map { Self.points($0, size) }
             // "INDN:" on the source, where its text is its ink; its middle (a
             // quarter point in from each edge) must carry no paint.
@@ -483,7 +500,12 @@ struct PageImageInkFitTests {
     @Test("A document PDFKit cannot write (a malformed /Info) gives no private copy and no crash")
     func malformedInfoGivesNoCopy() throws {
         let document = try #require(PDFDocument(data: MalformedInfoDictionaryTests.malformedInfoPDF))
-        #expect(PrivatePDFCopies.shared.copy(of: document) == nil, "the guarded write returns nil; nothing raises")
+        if #available(iOS 27, macOS 27, *) {
+            // iOS 27 and macOS 27 write this file without raising: the private copy is the same document.
+            #expect(PrivatePDFCopies.shared.copy(of: document)?.numberOfPages == document.pageCount)
+        } else {
+            #expect(PrivatePDFCopies.shared.copy(of: document) == nil, "the guarded write returns nil; nothing raises")
+        }
     }
 
     @Test("Concurrent first asks for one document's private copy make exactly one")

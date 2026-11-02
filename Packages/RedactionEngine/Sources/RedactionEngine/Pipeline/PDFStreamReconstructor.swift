@@ -262,7 +262,7 @@ public actor PDFStreamReconstructor {
         let key: String
         let replacement: String
         let padsToLength: Bool
-        var marker: Data { Data("/\(key) (".utf8) }
+        var keyToken: Data { Data("/\(key)".utf8) }
     }
 
     private static let infoLiteralRewrites: [InfoLiteralRewrite] = [
@@ -285,9 +285,13 @@ public actor PDFStreamReconstructor {
     /// and image streams are never re-encoded. Running the rewrite again on
     /// its own output changes nothing.
     ///
+    /// A literal is the key followed by any PDF whitespace, or none, and an
+    /// opening paren: the iOS 26 writer puts a space there, the iOS 27
+    /// writer a newline after `/CreationDate`.
+    ///
     /// Guards (each leaves that one literal untouched, the other literals
-    /// are still processed, and the export never fails): no marker in the
-    /// tail window, more than one marker, an unterminated literal, an
+    /// are still processed, and the export never fails): no literal in the
+    /// tail window, more than one, an unterminated literal, an
     /// existing producer value shorter than the fixed one, or a date value
     /// whose length differs from the fixed one's.
     static func overwriteInfoLiterals(at url: URL) {
@@ -327,16 +331,16 @@ public actor PDFStreamReconstructor {
     private static func rewriteBytes(
         for rewrite: InfoLiteralRewrite, in window: Data
     ) -> (offset: Int, bytes: Data)? {
-        let marker = rewrite.marker
         let replacement = Data(rewrite.replacement.utf8)
         let key = rewrite.key
 
-        guard let markerRange = window.range(of: marker) else {
+        let valueStarts = literalValueStarts(of: rewrite.keyToken, in: window)
+        guard let valueStart = valueStarts.first else {
             infoRewriteLogger.info(
                 "\(key, privacy: .public) literal not present in tail; left unchanged")
             return nil
         }
-        guard window.range(of: marker, in: markerRange.upperBound..<window.endIndex) == nil else {
+        guard valueStarts.count == 1 else {
             infoRewriteLogger.warning(
                 "multiple \(key, privacy: .public) literals in tail; left unchanged")
             return nil
@@ -345,7 +349,7 @@ public actor PDFStreamReconstructor {
         // Escape-aware scan for the literal's closing paren: a backslash
         // escapes the next byte, and unescaped balanced paren pairs are
         // legal inside a PDF literal string.
-        var index = markerRange.upperBound
+        var index = valueStart
         var depth = 1
         var closeIndex: Data.Index?
         while index < window.endIndex {
@@ -368,7 +372,7 @@ public actor PDFStreamReconstructor {
             return nil
         }
 
-        let valueLength = window.distance(from: markerRange.upperBound, to: close)
+        let valueLength = window.distance(from: valueStart, to: close)
         if rewrite.padsToLength {
             guard valueLength >= replacement.count else {
                 infoRewriteLogger.warning(
@@ -388,8 +392,31 @@ public actor PDFStreamReconstructor {
         var bytes = replacement
         bytes.append(0x29)  // ")"
         bytes.append(Data(repeating: 0x20, count: valueLength - replacement.count))
-        let offset = window.distance(from: window.startIndex, to: markerRange.upperBound)
+        let offset = window.distance(from: window.startIndex, to: valueStart)
         return (offset, bytes)
+    }
+
+    /// The index just past the opening paren of every `keyToken` literal in
+    /// `window`: the key, then PDF whitespace or none, then `(`. A longer
+    /// name that starts with the key (`/CreationDateX`) continues with a
+    /// regular character and is not one.
+    private static func literalValueStarts(of keyToken: Data, in window: Data) -> [Data.Index] {
+        var starts: [Data.Index] = []
+        var searchFrom = window.startIndex
+        while searchFrom < window.endIndex,
+              let hit = window.range(of: keyToken, in: searchFrom..<window.endIndex) {
+            searchFrom = hit.upperBound
+            var index = hit.upperBound
+            while index < window.endIndex, isPDFWhitespace(window[index]) { index += 1 }
+            if index < window.endIndex, window[index] == 0x28 { starts.append(index + 1) }  // "("
+        }
+        return starts
+    }
+
+    /// PDF whitespace (ISO 32000-1 §7.2.2): NUL, tab, line feed, form feed,
+    /// carriage return, space.
+    private static func isPDFWhitespace(_ byte: UInt8) -> Bool {
+        byte == 0x20 || byte == 0x0A || byte == 0x0D || byte == 0x09 || byte == 0x0C || byte == 0x00
     }
 
     // MARK: - File identifier rewrite

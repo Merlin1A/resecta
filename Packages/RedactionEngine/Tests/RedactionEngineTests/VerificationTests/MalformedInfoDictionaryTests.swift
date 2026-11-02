@@ -31,7 +31,12 @@ struct MalformedInfoDictionaryTests {
     @Test("The guarded write returns nil instead of raising")
     func guardedWriteReturnsNil() throws {
         let doc = try #require(PDFDocument(data: Self.malformedInfoPDF))
-        #expect(RSGuardedDataRepresentation(doc) == nil)
+        if #available(iOS 27, macOS 27, *) {
+            // iOS 27 and macOS 27 write this file without raising: the bytes reopen as the same document.
+            #expect(RSGuardedDataRepresentation(doc).flatMap { PDFDocument(data: $0) }?.pageCount == doc.pageCount)
+        } else {
+            #expect(RSGuardedDataRepresentation(doc) == nil)
+        }
     }
 
     @Test("The guarded write still returns the bytes of a well-formed document")
@@ -47,6 +52,11 @@ struct MalformedInfoDictionaryTests {
     @Test("The verification data loader reads the document as could-not-load")
     func loaderReturnsNil() throws {
         let doc = try #require(PDFDocument(data: Self.malformedInfoPDF))
-        #expect(VerificationEngine().loadPDFData(doc) == nil)
+        if #available(iOS 27, macOS 27, *) {
+            // iOS 27 and macOS 27 write this file without raising: the loader reads the same document.
+            #expect(VerificationEngine().loadPDFData(doc)?.1.numberOfPages == doc.pageCount)
+        } else {
+            #expect(VerificationEngine().loadPDFData(doc) == nil)
+        }
     }
 }

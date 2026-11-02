@@ -87,14 +87,47 @@ struct NameDetector: FamilyDetector {
         return kept
     }
 
+    /// iOS 27: the name model tags in a process only when the process has
+    /// asked which tag schemes are available before its first name tag pass;
+    /// a tag pass first leaves the model silent for the rest of the process.
+    /// Asked once per process, before the first name tagger. Before iOS 27,
+    /// nothing is asked.
+    static let nameModelQueried: Bool = {
+        guard #available(iOS 27, *) else { return false }
+        #if DEBUG
+        _nameModelQueryCount.add()
+        #endif
+        _ = NLTagger.availableTagSchemes(for: .word, language: .english)
+        return true
+    }()
+
+    #if DEBUG
+    /// Test seam: how many times this process asked (once on iOS 27, never before).
+    static let _nameModelQueryCount = QueryCount()
+    final class QueryCount: @unchecked Sendable {
+        private let lock = NSLock()
+        private var count = 0
+        func add() { lock.lock(); count += 1; lock.unlock() }
+        var value: Int { lock.lock(); defer { lock.unlock() }; return count }
+    }
+    #endif
+
+    /// The tagger detection reads person names with. On iOS 27 the process
+    /// has asked for the available schemes first (`nameModelQueried`).
+    static func makeNameTagger(for text: String) -> NLTagger {
+        _ = nameModelQueried
+        let tagger = NLTagger(tagSchemes: [.nameType])
+        tagger.string = text
+        return tagger
+    }
+
     private func runNLTagger(
         on text: String,
         original: String,
         strict: Bool,
         cache: inout [String: NameGazetteer.NameGazetteerVerdict]
     ) -> [PIIMatch] {
-        let tagger = NLTagger(tagSchemes: [.nameType])
-        tagger.string = text
+        let tagger = Self.makeNameTagger(for: text)
         var results: [PIIMatch] = []
 
         let originalNS = original as NSString

@@ -41,6 +41,17 @@ extension DocumentSearcher {
         ocrPageCache.seedLines(lines, forPageIndex: pageIndex)
     }
 
+    /// Seeds a page's fast-recognition lines (read on iOS 27 beside the
+    /// accurate read; `DocumentSearcher+OCRFastUnion`).
+    internal func _testSeedOCRFastLines(_ lines: [OCREngine.TextLine], forPageIndex pageIndex: Int) {
+        ocrPageCache.seedFastLines(lines, forPageIndex: pageIndex)
+    }
+
+    /// A page's cached fast-recognition lines: nil when no fast read was made.
+    internal func _testFastOCRLines(forPageIndex pageIndex: Int) -> [OCREngine.TextLine]? {
+        ocrPageCache.fastLines(for: pageIndex)
+    }
+
     /// Test seam: base address of the copy-on-write-shared surname
     /// Bloom buffer behind this searcher's PIIDetector. Two searchers backed by
     /// the process-shared static detector report the SAME address (shared COW

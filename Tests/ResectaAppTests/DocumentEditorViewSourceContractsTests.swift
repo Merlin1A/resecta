@@ -40,12 +40,12 @@ struct DocumentEditorViewSourceContractsTests {
                 "the glyph tint must gate on model.isWarning and reference the warningTint token")
     }
 
-    @Test("The toolbar groups and the iPhone Undo control render neutral")
+    @Test("The toolbar groups, the iPhone … menu and the iPhone Undo control render neutral")
     func toolbarGroupsCarryNeutralTint() throws {
         let source = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorToolbar.swift")
         let occurrences = source.components(separatedBy: ".tint(.primary)").count - 1
-        #expect(occurrences == 4,
-                "expected 4 neutral tints (the leading, trailing and … groups, and the iPhone Undo item); found \(occurrences)")
+        #expect(occurrences == 5,
+                "expected 5 neutral tints (the leading, trailing and … groups, the iPhone … menu's own label, and the iPhone Undo item); found \(occurrences)")
     }
 
     @Test("The Redact button is the one designated emphasis action")
