@@ -29,19 +29,59 @@ enum ConcealingAnnotations {
 
     /// Whether `annotation`'s own drawing hides what is under it: a widget
     /// with a dark opaque background colour (`/MK /BG`, luminance under
-    /// one half), or a drawing that decides at least 60 % of its rect
-    /// (`hiddenFraction`). A white or light field background is left to
-    /// the drawing; whether it hides anything is the content test's call
-    /// (`areaOverContent`), as an ordinary form's fields sit on blank
-    /// boxes. A field that draws only its value or a border does not count
-    /// (its value is the import notice's filled-field sentence), nor does a
-    /// light highlight multiplied over the text.
-    nonisolated static func drawsOpaqueCover(_ annotation: PDFAnnotation) -> Bool {
+    /// one half), or a drawing that decides at least 60 % of what it lies
+    /// over (`hiddenFraction`). On a page whose text layer reads, that is
+    /// any one word of the text in `area` (`wordRects`), so a wide cover
+    /// painted over one word at its edge counts however much blank page
+    /// the rest of its rect shows; elsewhere, where the content is in the
+    /// page image, it is the whole of `area`. `area` is the annotation's
+    /// part on the crop box (`areaOverContent`). A white or light field
+    /// background is left to the drawing; whether it hides anything is the
+    /// content test's call (`areaOverContent`), as an ordinary form's
+    /// fields sit on blank boxes. A field that draws only its value or a
+    /// border does not count (its value is the import notice's
+    /// filled-field sentence), nor does a light highlight multiplied over
+    /// the text.
+    nonisolated static func drawsOpaqueCover(
+        _ annotation: PDFAnnotation, over area: CGRect, on page: PDFPage, readsText: Bool
+    ) -> Bool {
         if annotation.type == "Widget", let background = annotation.backgroundColor,
            isDarkAndOpaque(background.cgColor) {
             return true
         }
-        return hiddenFraction(of: annotation) >= 0.6
+        let words = readsText ? wordRects(in: area, on: page) : []
+        let targets = words.isEmpty ? [area] : words
+        return targets.contains { hiddenFraction(of: annotation, over: $0) >= 0.6 }
+    }
+
+    /// Each word of `page`'s text in `area` (page space): the union of its
+    /// characters' boxes, cut to `area`. Empty when the selection reads no
+    /// characters with a box.
+    nonisolated private static func wordRects(in area: CGRect, on page: PDFPage) -> [CGRect] {
+        guard let selection = page.selection(for: area), let string = page.string else { return [] }
+        let text = string as NSString
+        var rects: [CGRect] = []
+        var word = CGRect.null
+        func endWord() {
+            let cut = word.intersection(area)
+            if !cut.isNull, cut.width > 0, cut.height > 0 { rects.append(cut) }
+            word = .null
+        }
+        for index in 0..<selection.numberOfTextRanges(on: page) {
+            let range = selection.range(at: index, on: page)
+            for position in range.location..<min(NSMaxRange(range), text.length) {
+                if let scalar = UnicodeScalar(text.character(at: position)),
+                   CharacterSet.whitespacesAndNewlines.contains(scalar) {
+                    endWord()
+                    continue
+                }
+                let box = page.characterBounds(at: position)
+                guard box.width > 0, box.height > 0 else { continue }
+                word = word.union(box)
+            }
+            endWord()
+        }
+        return rects
     }
 
     /// Whether `color` is at least half opaque with a relative luminance
@@ -78,16 +118,16 @@ enum ConcealingAnnotations {
         status.map { $0 == .rich } ?? !(page.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    /// The share of `annotation`'s rect where its drawing decides the pixel
-    /// whatever lies beneath: drawn once over white and once over black
-    /// (48 × 16 samples), the two results differ there by less than a
+    /// The share of `rect` (page space) where `annotation`'s drawing decides
+    /// the pixel whatever lies beneath: drawn once over white and once over
+    /// black (48 × 16 samples), the two results differ there by less than a
     /// quarter of full scale. An opaque fill decides its pixels, whatever
     /// the colour; a multiplied highlight leaves black text black, unless
     /// the highlight is itself dark. Zero for an empty rect.
-    nonisolated private static func hiddenFraction(of annotation: PDFAnnotation) -> Double {
+    nonisolated private static func hiddenFraction(of annotation: PDFAnnotation, over rect: CGRect) -> Double {
         let width = 48, height = 16
-        guard let overWhite = rendered(annotation, over: 1, width: width, height: height),
-              let overBlack = rendered(annotation, over: 0, width: width, height: height) else { return 0 }
+        guard let overWhite = rendered(annotation, in: rect, over: 1, width: width, height: height),
+              let overBlack = rendered(annotation, in: rect, over: 0, width: width, height: height) else { return 0 }
         var hidden = 0
         for pixel in 0..<(width * height) {
             var difference = 0
@@ -100,12 +140,11 @@ enum ConcealingAnnotations {
     }
 
     /// `annotation` drawn over a grey fill of `gray` (0 black, 1 white),
-    /// its rect scaled to `width` × `height` RGBA pixels. Nil for an empty
-    /// rect.
+    /// `bounds` (page space) scaled to `width` × `height` RGBA pixels. Nil
+    /// for an empty rect.
     nonisolated private static func rendered(
-        _ annotation: PDFAnnotation, over gray: CGFloat, width: Int, height: Int
+        _ annotation: PDFAnnotation, in bounds: CGRect, over gray: CGFloat, width: Int, height: Int
     ) -> [UInt8]? {
-        let bounds = annotation.bounds
         guard bounds.width > 0, bounds.height > 0,
               let context = CGContext(
                 data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
@@ -137,23 +176,28 @@ enum ConcealingAnnotations {
             guard crop.width > 0, crop.height > 0 else { continue }
             let reads = readsText(page, status: textLayerStatus[index])
             count += page.annotations.count {
-                $0.type == "Widget"
-                    && areaOverContent($0, on: page, crop: crop, readsText: reads) != nil
-                    && drawsOpaqueCover($0)
+                guard $0.type == "Widget",
+                      let area = areaOverContent($0, on: page, crop: crop, readsText: reads) else { return false }
+                return drawsOpaqueCover($0, over: area, on: page, readsText: reads)
             }
         }
         return count
     }
 
-    /// `drawsOpaqueCover`, kept per annotation for the share tap: the
-    /// annotations of the open document do not change, and the keys are
-    /// held weakly, so the entries go with the document.
-    private static let opaqueCoverCache = NSMapTable<PDFAnnotation, NSNumber>.weakToStrongObjects()
+    /// `drawsOpaqueCover`, kept per annotation for the share tap, one table
+    /// for a page whose text layer reads and one for a page read from its
+    /// image: the annotations of the open document do not change, and the
+    /// keys are held weakly, so the entries go with the document.
+    private static let opaqueCoverOverText = NSMapTable<PDFAnnotation, NSNumber>.weakToStrongObjects()
+    private static let opaqueCoverOverImage = NSMapTable<PDFAnnotation, NSNumber>.weakToStrongObjects()
 
-    private static func cachedDrawsOpaqueCover(_ annotation: PDFAnnotation) -> Bool {
-        if let known = opaqueCoverCache.object(forKey: annotation) { return known.boolValue }
-        let draws = drawsOpaqueCover(annotation)
-        opaqueCoverCache.setObject(NSNumber(value: draws), forKey: annotation)
+    private static func cachedDrawsOpaqueCover(
+        _ annotation: PDFAnnotation, over area: CGRect, on page: PDFPage, readsText: Bool
+    ) -> Bool {
+        let cache = readsText ? opaqueCoverOverText : opaqueCoverOverImage
+        if let known = cache.object(forKey: annotation) { return known.boolValue }
+        let draws = drawsOpaqueCover(annotation, over: area, on: page, readsText: readsText)
+        cache.setObject(NSNumber(value: draws), forKey: annotation)
         return draws
     }
 
@@ -187,7 +231,9 @@ enum ConcealingAnnotations {
                       let normalized = displayNormalized(area, crop: crop, rotation: page.rotation),
                       !covered(normalized, by: boxes) else { continue }
                 // The drawing test last: it draws the annotation twice.
-                if whenOpaque && !cachedDrawsOpaqueCover(annotation) { continue }
+                if whenOpaque && !cachedDrawsOpaqueCover(annotation, over: area, on: page, readsText: reads) {
+                    continue
+                }
                 out.append(index)
                 break
             }
