@@ -139,6 +139,51 @@ struct BackgroundVerifyResumeTests {
         #expect(FileManager.default.fileExists(atPath: output.path), "the built copy's file survives the cut")
     }
 
+    @Test("A standalone Verify cut by leaving the app returns to the editor with the paused notice, not a skipped report",
+          .timeLimit(.minutes(2)))
+    func standaloneVerifyBackgroundedIsResumable() async throws {
+        // Run Verification on the skipped results: verify-only against the
+        // existing copy, cut by leaving the app as its checks start.
+        let coord = makeLoadedCoordinator()
+        coord.redactionState.addRegion(drawnRegion(), page: 0, undoManager: nil)
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("background_verify_only_\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let output = root.appendingPathComponent("redacted_\(UUID().uuidString).pdf")
+        try makeTestPDFData().write(to: output)
+        coord.redactionState.outputURL = output
+        coord.redactionState.recordLastRunInputs(
+            .fixture(burnedRegionVersion: coord.redactionState.regionVersion))
+        let doc = coord.documentState
+        doc.lastUsedPipelineMode = .secureRasterization
+        doc.transition(to: .redacting(progress: .init(currentPage: 0, totalPages: 1, currentStep: "s")))
+        doc.transition(to: .verified(report: .skipped(reason: .cancelled)))
+
+        var seamFired = false
+        coord.beforeVerificationLoadsSeam = { [weak coord] in
+            guard let coord else { return }
+            seamFired = true
+            ContentView.cancelForBackground(
+                documentState: coord.documentState, redactionState: coord.redactionState)
+        }
+        coord.runVerifyOnly()
+        let task = try #require(doc.activePipelineTask, "the verify-only run started")
+        await task.value
+
+        #expect(seamFired, "the verify-only run reached its checks")
+        if case .verified(let report) = doc.phase {
+            Issue.record("landed on the results as \(report.overallStatus), reason \(String(describing: report.skipReason))")
+        }
+        #expect(doc.phaseKind == .editing)
+        #expect(doc.wasPausedByBackground)
+        #expect(doc.pausedFromPhase == .verifying)
+        #expect(TopBannerSlot.winner(documentState: doc, detectionBannerPresent: false) == .paused)
+        #expect(doc.redactRefusal(with: coord.redactionState) == nil, "the notice's Restart is not refused")
+        #expect(coord.redactionState.outputURL == output, "the copy is kept")
+        #expect(FileManager.default.fileExists(atPath: output.path), "the copy's file survives the cut")
+    }
+
     // MARK: - The recovery row that discards the copy
 
     private static var fullRun: PipelineRunKind {
