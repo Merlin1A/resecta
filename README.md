@@ -4,13 +4,13 @@
 
 [![Download on the App Store](https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/black/en-us?releaseDate=1786492800)](https://apps.apple.com/us/app/resecta/id6786922787)
 
-Resecta is a free, open-source iPhone app that redacts PDFs on-device and then checks the output. It runs on iOS 26, collects no data, and makes no network requests of its own.
+Resecta is a free, open-source iPhone app that redacts PDFs on-device and then checks the output. It runs on iOS 26 or later, collects no data, and makes no network requests of its own.
 
 **App Store:** [apps.apple.com/us/app/resecta/id6786922787](https://apps.apple.com/us/app/resecta/id6786922787) · **Website:** [resecta.app](https://resecta.app)
 
 **License:** [Apache License 2.0](./LICENSE)
 
-**Latest release:** 1.3.0 — see the [CHANGELOG](./CHANGELOG.md).
+**Latest release:** 1.3.1 — see the [CHANGELOG](./CHANGELOG.md).
 
 ---
 
