@@ -2,7 +2,7 @@
 
 All notable changes to Resecta are recorded in this file.
 
-The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html). Subsection ordering within a release: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`, then a project-specific `Internal`.
+The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html). Subsection ordering within a release: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`, then a project-specific `Internal`. A release is dated by the day it became available on the App Store.
 
 ## [Unreleased]
 
@@ -16,8 +16,18 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Share: the shared copy is named with a short code made from the redacted file itself (for example redacted-3f9a1c07.pdf), so saving several documents in one folder no longer asks to replace the last one; the name still carries nothing from the original document and no export time.
 - Documentation: the threat model names the import caps (500 pages, 5,000 points on a side, and an image that declares more than 100 million pixels refused before it is decoded); its network notes name the name-recognition model iOS fetches on its own and the iCloud download of a photo or a file stored only there; and its persistence note says the redacted output is moved into place in a single step and that a change to your regions deletes the previous output file at once.
 - Documentation: the threat model, the engineering notes and the README's claims map narrow the detection-data signature claim to what the key holder signed — the bytes the detector reads are the bytes the maintainer's signing run listed — and leave the installed app's integrity to the app-bundle code signature.
+- Documentation: the README says the app runs on iOS 26 or later.
+- Documentation: the README names 1.3.1 as the latest release.
+- Documentation: SECURITY.md's tag-verification example checks `v1.3.1`.
+- Documentation: the threat model's posture table names the 1.3.1 identity record (`RELEASES/1.3.1-identity.md`), `git tag -v v1.3.1` and `gh release verify v1.3.1`; v1.3.0 stays named as the first release published after immutable releases were turned on, and the section keeps its 2026-10-27 date.
 - Documentation: the engineering notes describe the fake-redaction suite's control, which asserts that the text survives when nothing is marked.
 - Documentation: accepted risk 9 now names the scanned-bar case; KNOWN_ISSUES KI-18.
+- Documentation: KNOWN_ISSUES describes the App Store release's results screen (KI-17, KI-19), the alignment guides as they are (KI-10), the Stop Processing control (KI-9), the third case in which Search reads a typed page's images (KI-13), and names Search before Scan (KI-22).
+- Documentation: the engineering notes name the two reference tables that stay live when the detection-data signature fails, the `PDFKitGuard` target and the fill's growth over ink that crosses a region's edge; the device-harness README names the scripts' options and prerequisites as they are.
+- Documentation: the privacy policy names the shared copy's file name by version (redacted.pdf through 1.3.1, then redacted- followed by a short code); its effective date moves to 2026-11-01.
+- Documentation: the README and the threat model say what verification checks and when sharing asks first.
+- Documentation: the README and CONTRIBUTING say that the hosted unit suite is a required check, which test schemes the pre-push hook runs, that eleven suites are left out on the hosted runner (three of them ink-fit timing pins) and how they are reported, which performance suites gate, and what the detection-data check verifies; the workflow and runner comments say the same.
+- Documentation: the threat model's import list puts the size check first and names the page-geometry stage; its detection-data paragraph names the verification pass among the check's triggers, the Scan interface as where the degraded banner shows, and the two reference tables that stay live; its persistence note says where a file a failed delete leaves goes; the image limits and the ink test's render resolution read as the code has them; and its share-confirmation sentences describe the App Store release.
 - Share confirm: a second share of the same results asks again, so each send of a file with reported issues, unrun checks or covered text gets its own confirmation.
 - Results: an annotation in the original that hides text no box covers is listed under the results with its pages, and the text-layer check is titled for the redacted PDF it reads.
 - Share: when the Detection Sweep reports possible items or the original's filled form values were not carried over, Share asks first and lists them; the sweep's row also names what it does not read.
@@ -29,15 +39,8 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - VoiceOver's end-of-run line says the same title as the results screen, such as Some Checks Incomplete.
 - With Verify Before Export off, the results advice names that setting instead of suggesting a Redact that would skip the checks again.
 - A match you left unapplied on purpose is described as left unapplied, not as one to redact.
-- The ink-fit stall test no longer counts other tests' work as its stall's hold, and it runs alone.
 - Search: a match that runs onto a second line is now one row in the results, with a box on each line; ticking the row applies every box, and the counts, the walk and the Marked notice count it once. Before, each line was its own row, so one line could be applied without the other.
-
-### Fixed
-
 - Verification: when a search match runs onto a second line and only one line's box is applied, or one of its boxes is removed, the Search Re-check now reports the match as only partly covered. Before, the line left without a box was read as a match the user chose not to redact, and the checks passed. The OCR check also reads the words of a redacted search match that open the next line after a box, or end the line before one, as part of the match.
-
-### Fixed
-
 - Search: a name or number broken at its own hyphen across two lines, such as a surname a word processor wraps after the hyphen, is now found as typed, with a box on each line. A soft hyphen inside a word is now ignored, so the word matches without it. Before, the line break after a hyphen read as a space and the phrase was not found.
 - Search: a phrase that starts at the end of one page and continues at the top of the next, past a repeated page header or footer, is now found, with a box on each page. Before, each page was searched on its own.
 - Stop, or leaving the app, in the moment after the redacted copy is built keeps the copy and shows the results as Verification Skipped, instead of discarding the copy.
@@ -45,7 +48,9 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - An undo or redo that arrives while a run is in progress, such as the system's three-finger gesture, no longer changes the regions under the run or discards its redacted copy; an undo stays available for when the run ends.
 - Verification checks the regions the run actually redacted, as burned into the page, not the editor's regions as they stand when verification starts.
 - Stop keeps its place when processing turns into verification, so a tap at that moment is not lost.
-- Search: on a scanned page, a typed number or code made of digits that look like letters, such as a suite, room or case number, an amount or a member ID, is now found, and an accented name matches with or without its accents. Each match is boxed on the words it covers rather than the whole recognised line. Before, the recognised line was corrected toward letters while the typed text was not, so such numbers never matched.
+- Search: on a scanned page, a typed number or code made of digits that look like letters, such as a suite, room or case number, an amount or a member ID, is now found, and an accented name matches with or without its accents. Before, the recognised line was corrected toward letters while the typed text was not, so such numbers never matched.
+- Search: on a scanned page or photo, a match is boxed on the words it covers rather than the whole recognised line (KNOWN_ISSUES KI-17).
+- A highlight or form field in the original that hides one word of a line at its edge is now named as covering text: on a page whose text layer reads, it counts as a cover when it hides at least 60% of any one word under it, not 60% of its whole area.
 
 ### Security
 
@@ -53,11 +58,14 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - `SECURITY.md` says why `v1.0.0` and `v1.2.0` verify from a clone of `main`, names the public API path that lists published advisories, and states that the project has had no third-party security audit, runs no bug bounty, and makes no compliance claims.
 - `THREAT-MODEL.md` §7 re-dated at `05b7ae0a` (2026-10-27), each row re-checked: the identity-record row names the 1.3.0 record beside the 1.2.0 one, and the immutable-releases row names `gh release verify v1.3.0`, the first release published after the setting was turned on.
 - When saving or loading your saved searches, settings or other stored data failed, the error the app wrote to the device's system log could include part of the stored text (for example a custom search term). The log now names only the kind of error; the details are kept private.
+
+- `THREAT-MODEL.md` §7 re-dated at `c91008ae` (2026-11-03): the app's unit-test suite has been a required check on `main` since 2026-10-27, and the branch-rules and unit-suite rows say so; the other rows re-checked.
 ### Internal
 
 - A target specification for the verification pass, VERIFICATION-SPEC.md, with a status line per rule; claims-lint covers it.
+- The ink-fit stall test no longer counts other tests' work as its stall's hold, and it runs alone.
 
-## [1.3.1] — 2026-11-01
+## [1.3.1] — 2026-11-03
 
 Fixes a crash on iOS 27 when touching or scrolling a document. On iOS 27, exported files now carry the fixed creation date again. Search on scanned pages and photos on iOS 27 now matches text it could miss, such as phone numbers. Also fixes zoom, toolbar and VoiceOver issues on iOS 27.
 
@@ -66,6 +74,7 @@ Fixes a crash on iOS 27 when touching or scrolling a document. On iOS 27, export
 - Editor: on iOS 27 the app quit at the first touch on an open document's page. The page view passed PDFKit's own gestures to a PDFKit method that iOS 27 no longer has; the double tap that returns to the fit zoom now has its own gesture delegate, so the page view no longer answers for PDFKit's gestures.
 - Export: on iOS 27 the redacted file kept the time it was written in its creation date, and verification reported the metadata as not rewritten; the creation date is now the fixed value, as on iOS 26.
 - Search: on iOS 27, a search on a scanned page or photo could miss text that iOS 26 read, such as a phone number read with a space after a hyphen or a line read as noise; Search now also reads the page a second way and adds what that read matched.
+- Scan: on iOS 27, a phone number that text recognition read with a space beside a hyphen or other separator, such as 1-800- 555-0199, is now found by Scan and by the Detection Sweep, as on iOS 26.
 - Editor: on iOS 27, before the first region the disabled Redact button and the … menu shared one button shape, and the trailing buttons shifted when the first region arrived; Undo, Redact and More are now three separate buttons in every state, as on iOS 26.
 - Search: on iOS 27, saving or renaming a saved search under a name already in use closed the prompt without saving and without saying why; the alert naming the duplicate appears again, as on iOS 26.
 - Editor: on iOS 27, a zoomed-in page returned to the fit zoom when you stepped through search results, changed page from the page bar, or opened or closed the Search sheet; the zoom now holds, and each result step enlarges and centres the match again, as on iOS 26.
@@ -154,20 +163,6 @@ A password-protected PDF opens with its password, a photo or an image becomes on
 - The unused snap-to-text setting and the text-row snapping code only it reached.
 - The freeform and polygon drawing tools, which the editor no longer offered, and the code behind them.
 - The engine's polygon regions: the polygon fill and its readback, the polygon character filter and spatial check, and the polygon word capture. A region every path now fills, filters and verifies is a rectangle; a region saved by an earlier version with polygon vertices is read as its bounding rectangle, which covers at least the polygon.
-
-### Security
-
-- The app opts into Apple's hardened-process protections in their reporting mode.
-- The pre-commit hook and the pull-request gate scan the whole shipping source, on every run, for the call-shaped networking and hand-off symbols (a bare `Link(`, the Network framework's listener and browser, the socket and stream constructors, `openURL`, `UIApplication.shared.open(`, an `import Network` line) against the sites pinned in `Scripts/audit-lint.sh` with their reasons, one pin per site (the file, the symbol and an identifier of the call), so a second use in a file that already has a pinned site fails too; two sites are pinned, the Settings view's `mailto:` feedback link and its App Store rating link.
-- The shipped-asset fence (`Scripts/verify-shipped-asset-hashes.sh`) verifies the gazetteer manifest's Ed25519 signature with a verifier outside the engine (OpenSSL 3, else CryptoKit through `swift`; no verifier fails the fence), beside the blob and digest pins it already held.
-- `SECURITY.md` says how a security fix is announced: the changelog's `Security` heading of the release that carries it, the App Store availability date, a GitHub security advisory with a CVE through GitHub's CNA where a report warrants one, and that a fix reaches users only as an update. `THREAT-MODEL.md`'s build-and-distribution boundary says that the app repository holds no Actions secret, so no workflow can sign or upload a build, and that the detection-data signing key never enters a repository.
-- `THREAT-MODEL.md` §7 re-dated at `28b9a777` (2026-10-20), with rows for the release-tag ruleset (`v*` tags cannot be updated, deleted or force-pushed once pushed), immutable releases in the app repository, and the mail policy on the reporting domain (DMARC `p=reject`, SPF `-all`); the branch-rules row states that the admin role may bypass the required check on a pull request, and names the rulesets API as the check a reader can run without a login.
-- The Searchable-mode ink test treats a glyph box whose pixels all lie within a fixed tolerance of one color (twelve of 255 levels) as showing no ink, so near-white, faint and nearly transparent text, and text under an opaque box, exports as an image only; light but inked text, such as a pale footer or a watermark, keeps its text layer, and so can text that shows faintly through a box that is not fully opaque.
-- The Searchable-mode ink test also reads the middle of each letter and digit without the glyph box's one-pixel margin, so text under an opaque box drawn into a received page that stops at the text's edges, at its selection or at its ink, exports as an image only; where the content just above and below a glyph is textured, as on a scanned page, the test allows 24 levels instead of twelve, so a word under a dark bar that is part of a scanned picture, whose noise spans more than that, can keep its text layer.
-- A redaction box made from a search or Scan match grows, before it is filled, over ink that crosses its edge and touches the text inside it, such as an accent above a capital or an italic overhang, by at most a quarter of the box's height; a box you draw is filled as drawn.
-- Import refuses a PDF whose catalog, non-widget annotation or form field additional actions, or a rendition action, carry JavaScript or a launch action; a PDF with XFA form data or embedded files imports with a notice that form data and attachments are not carried into the redacted copy.
-- Searchable redaction treats optional content as hidden when the default configuration turns layers off through its base state (a group its `/ON` list does not name counts, not the list's length), when the configuration carries a usage-application entry, when a page or form names a membership dictionary (content that can be hidden while every group is on), when a page inherits the resources that name it, or when a form object, a Type 3 font, a tiling pattern or a soft mask reachable from the page carries or names it; an optional-content entry that is not of its declared shape (a `/Properties` that is no dictionary, a form with no `/Subtype`, an `/OFF` that is no array) is read as hidden, and a glyph outside the visible page counts as showing no ink. The walk reads a resource dictionary shared by many forms once and stops on cancel.
-- Document canvas: with a hardware keyboard, Select All then Copy (⌘A, ⌘C) no longer places the document's text on the system pasteboard. The canvas view refuses the copy, cut, paste, select and select-all actions and builds its menu without the edit, look-up, learn and share groups; in 1.2.0 that keyboard path copied the whole document's text with no selection shown.
 
 ### Fixed
 
@@ -322,6 +317,20 @@ A password-protected PDF opens with its password, a photo or an image becomes on
 - Search: the live highlight drawn while typing sits on the box Apply will place, on pages whose text the search normalizes and on a match that wraps onto a second line.
 - At the Search sheet's medium height, an upward drag on the empty part of the Scan chip row raises the sheet again.
 
+### Security
+
+- The app opts into Apple's hardened-process protections in their reporting mode.
+- The pre-commit hook and the pull-request gate scan the whole shipping source, on every run, for the call-shaped networking and hand-off symbols (a bare `Link(`, the Network framework's listener and browser, the socket and stream constructors, `openURL`, `UIApplication.shared.open(`, an `import Network` line) against the sites pinned in `Scripts/audit-lint.sh` with their reasons, one pin per site (the file, the symbol and an identifier of the call), so a second use in a file that already has a pinned site fails too; two sites are pinned, the Settings view's `mailto:` feedback link and its App Store rating link.
+- The shipped-asset fence (`Scripts/verify-shipped-asset-hashes.sh`) verifies the gazetteer manifest's Ed25519 signature with a verifier outside the engine (OpenSSL 3, else CryptoKit through `swift`; no verifier fails the fence), beside the blob and digest pins it already held.
+- `SECURITY.md` says how a security fix is announced: the changelog's `Security` heading of the release that carries it, the App Store availability date, a GitHub security advisory with a CVE through GitHub's CNA where a report warrants one, and that a fix reaches users only as an update. `THREAT-MODEL.md`'s build-and-distribution boundary says that the app repository holds no Actions secret, so no workflow can sign or upload a build, and that the detection-data signing key never enters a repository.
+- `THREAT-MODEL.md` §7 re-dated at `28b9a777` (2026-10-20), with rows for the release-tag ruleset (`v*` tags cannot be updated, deleted or force-pushed once pushed), immutable releases in the app repository, and the mail policy on the reporting domain (DMARC `p=reject`, SPF `-all`); the branch-rules row states that the admin role may bypass the required check on a pull request, and names the rulesets API as the check a reader can run without a login.
+- The Searchable-mode ink test treats a glyph box whose pixels all lie within a fixed tolerance of one color (twelve of 255 levels) as showing no ink, so near-white, faint and nearly transparent text, and text under an opaque box, exports as an image only; light but inked text, such as a pale footer or a watermark, keeps its text layer, and so can text that shows faintly through a box that is not fully opaque.
+- The Searchable-mode ink test also reads the middle of each letter and digit without the glyph box's one-pixel margin, so text under an opaque box drawn into a received page that stops at the text's edges, at its selection or at its ink, exports as an image only; where the content just above and below a glyph is textured, as on a scanned page, the test allows 24 levels instead of twelve, so a word under a dark bar that is part of a scanned picture, whose noise spans more than that, can keep its text layer.
+- A redaction box made from a search or Scan match grows, before it is filled, over ink that crosses its edge and touches the text inside it, such as an accent above a capital or an italic overhang, by at most a quarter of the box's height; a box you draw is filled as drawn.
+- Import refuses a PDF whose catalog, non-widget annotation or form field additional actions, or a rendition action, carry JavaScript or a launch action; a PDF with XFA form data or embedded files imports with a notice that form data and attachments are not carried into the redacted copy.
+- Searchable redaction treats optional content as hidden when the default configuration turns layers off through its base state (a group its `/ON` list does not name counts, not the list's length), when the configuration carries a usage-application entry, when a page or form names a membership dictionary (content that can be hidden while every group is on), when a page inherits the resources that name it, or when a form object, a Type 3 font, a tiling pattern or a soft mask reachable from the page carries or names it; an optional-content entry that is not of its declared shape (a `/Properties` that is no dictionary, a form with no `/Subtype`, an `/OFF` that is no array) is read as hidden, and a glyph outside the visible page counts as showing no ink. The walk reads a resource dictionary shared by many forms once and stops on cancel.
+- Document canvas: with a hardware keyboard, Select All then Copy (⌘A, ⌘C) no longer places the document's text on the system pasteboard. The canvas view refuses the copy, cut, paste, select and select-all actions and builds its menu without the edit, look-up, learn and share groups; in 1.2.0 that keyboard path copied the whole document's text with no selection shown.
+
 ### Internal
 
 - Stubs the deleted detection run left behind: an always-zero apply count, a recognition level nothing read, a cached region count only tests read, and comments that named the run.
@@ -374,7 +383,7 @@ A password-protected PDF opens with its password, a photo or an image becomes on
 - Engine: unused detection model members, the learned-prior surface-form dictionary and the unused exact-match search option are removed.
 - Engine: the search preview also reports its visible-page matches as ranges in the raw page text, through the map the full search places its boxes from.
 
-## [1.2.0] — 2026-09-29
+## [1.2.0] — 2026-10-06
 
 ### Added
 
@@ -448,7 +457,7 @@ A password-protected PDF opens with its password, a photo or an image becomes on
 - CI: the engine host suite runs on demand only; the pull-request gate's base-branch lint set includes the silent-guard scanner, and a missing or failing scanner fails the gate; `Scripts/release-flag-check.sh --archive` checks an archived app for debug-only launch arguments and bundled test fixtures as a recorded release step; the app's unit suite runs on pull requests to `main` as a non-required check and both batched suites run weekly.
 - Engine: the public surface is narrowed toward the document-runner API, whose symbols are pinned at compile time (`EnginePublicSurfaceTests`); many detection, search and model internals become `internal`.
 
-## [1.1.0] — 2026-08-28
+## [1.1.0] — 2026-08-29
 
 ### Added
 

@@ -34,11 +34,11 @@
 #                          pipeline run never returns there, and the test's
 #                          own time limit cannot end a hang inside a system
 #                          framework) is named here by the workflow, left
-#                          out of the batches, listed in the summary and
+#                          out of the batches, named in the log and
 #                          counted in the VERDICT line as `excluded=N`, so a
 #                          verdict that skipped a body is never read as one
 #                          that proved it. Empty locally: the pre-push hook
-#                          runs every suite.
+#                          runs them on a push that needs their scheme.
 #   TEST_BATCHED_RECOVERY  what the recovery after a wedge does to the
 #                          simulator: `reboot` (default) shuts it down and
 #                          boots it again; `erase` also erases it first. An
@@ -839,7 +839,7 @@ fi
 echo ""
 TOTALS_LINE="totals: tests=$TOT_TESTS suites=$TOT_SUITES failed=$TOT_FAILED known-issues=$TOT_KNOWN wedged=$WEDGED excluded=${#EXCLUDED[@]}"
 echo "$TOTALS_LINE"
-[ "${#EXCLUDED[@]}" -gt 0 ] && echo "excluded on this runtime (not verified here; the pre-push hook runs them): ${EXCLUDED[*]}"
+[ "${#EXCLUDED[@]}" -gt 0 ] && echo "excluded on this runtime (not verified here; the pre-push hook runs them on a push that needs their scheme): ${EXCLUDED[*]}"
 [ -n "$EXCUSED" ] && echo "non-gating reds (perf-alone or on the exclusion list — never gate locally):$EXCUSED"
 [ -s "$FAILURES_FILE" ] && { echo "failure detail:"; sed 's/^/  /' "$FAILURES_FILE"; }
 [ -n "$WEDGED_LABELS" ] && echo "incomplete invocations (suites NOT verified — re-run or salvage):$WEDGED_LABELS"

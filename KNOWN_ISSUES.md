@@ -1,7 +1,7 @@
 # Known Issues
 
 > Tracked bugs, spec gaps, and implementation constraints.
-> Severity: Critical / High / Medium / Low.
+> Severity: Critical / High / Medium / Low–Medium / Low.
 > When fixed, move to the **Fixed** section with the resolution and date.
 
 ---
@@ -61,8 +61,8 @@ Page rendering goes through a synchronous C call with no cancellation points, so
 per-page timeout cannot interrupt a draw in progress — it reports `renderTimeout` for
 the affected page only once the draw completes, however long that takes. A page whose
 content stream expands through deeply nested Form XObjects (many drawing operators
-from a small file) can hold the render well past the timeout, and the in-app Cancel
-affordance is likewise ineffective for the duration of that one page's draw. The
+from a small file) can hold the render well past the timeout, and the Stop Processing
+button is likewise ineffective for the duration of that one page's draw. The
 documented input caps (payload size, page count, page dimensions) bound input size,
 not per-page drawing work.
 
@@ -75,7 +75,7 @@ page when the draw completes; no output is produced from a failed run.
 ### KI-10: Rectangle Edges Do Not Align to Text Rows (Low)
 **Affects:** Rectangle draw tool
 
-While drawing, rectangle edges align to other boxes and page guides; alignment to recognized text rows is not available.
+While drawing, moving or resizing, a rectangle's edges align to the edges of the boxes beside it; alignment to recognized text rows is not available.
 
 ---
 
@@ -98,7 +98,7 @@ A password that contains accented Latin letters, such as ä or é, does not open
 ### KI-13: Some Images on Typed Pages Are Not Read by Search (Low–Medium)
 **Affects:** Search (typed pages that also carry images)
 
-On a page with a text layer, Search also reads the page's images for text when one image holds at least 250,000 pixels or covers about half the page. It does not read text in a smaller image (a thumbnail-sized photo), in an image written inline in the page's drawing instructions, or in text drawn as outlines rather than as characters. The check after export still reads every page of the redacted copy for the terms you searched for, so a typed search term left in such an image is reported there. Names found by Scan are not checked that way.
+On a page with a text layer, Search also reads the page's images for text when one image holds at least 250,000 pixels or covers about half the page, or when the page's text layer is very short for its size (a stamp or a Bates line over a scan). Otherwise it does not read text in a smaller image (a thumbnail-sized photo), in an image written inline in the page's drawing instructions, or in text drawn as outlines rather than as characters. The check after export still reads every page of the redacted copy for the terms you searched for, so a typed search term left in such an image is reported there. Names found by Scan are not checked that way.
 
 **Workaround:** Draw a region over the image.
 
@@ -136,9 +136,9 @@ A photo whose full-size copy is kept only in iCloud, as with Optimize iPhone Sto
 
 On a page that is a picture, such as a photo, a screenshot or a scan without its own text, Search reads the text with on-device text recognition, which reports where each line is rather than each word. A box placed from a Search match on such a page covers the whole line that holds the match, so the other words on that line are covered too.
 
-A region you draw by hand on a page with no text layer (a photo, a screenshot or a scan without its own text) is not read by any check: no words are captured under it, so the checks cannot tell what it covers. The results list each such region that covers less than the whole page under "Hand-drawn regions not checked", with its page.
+A region you draw by hand on a page with no text layer (a photo, a screenshot or a scan without its own text) is not read by any check: no words are captured under it, so the checks cannot tell what it covers. The Binary String Search check notes how many hand-drawn regions added no term (a region that covers its whole page, or one on a page with no text layer) but does not say which pages hold them.
 
-**Workaround:** Before you tap Redact, select the box and drag its handles in to the word, leaving a margin around its letters: a box drawn to the edges of the letters can leave part of them readable. Check the page in the preview before you share. For a region you drew by hand on a page with no text layer, open its page from that results row and check in the preview that the region covers what you meant.
+**Workaround:** Before you tap Redact, select the box and drag its handles in to the word, leaving a margin around its letters: a box drawn to the edges of the letters can leave part of them readable. Check the page in the preview before you share. For a region you drew by hand on a page with no text layer, check in the preview that the region covers what you meant.
 
 ---
 
@@ -154,7 +154,7 @@ Searchable Redaction exports a page as an image only when it reads unmarked text
 ### KI-19: A Filled PDF Form Exports with Its Field Values Removed (Low–Medium)
 **Affects:** Export (PDF forms whose fields were filled in before you opened them)
 
-A value typed into a PDF form is kept with its field, not drawn into the page itself. Resecta rebuilds the redacted copy from the page's own content in both export modes, so the copy carries no field values: a filled form exports with its fields blank. Resecta does not yet draw field values into the page it exports. The import notice, the results screen ("Form values not carried over") and the share confirm say how many filled fields were not carried into the copy.
+A value typed into a PDF form is kept with its field, not drawn into the page itself. Resecta rebuilds the redacted copy from the page's own content in both export modes, so the copy carries no field values: a filled form exports with its fields blank. Resecta does not yet draw field values into the page it exports. The notice shown at import says how many filled fields are not carried into the copy.
 
 **Workaround:** Flatten the form in another app before you import it, so its values become part of the page, then mark any values you need to redact and check the preview before you share.
 
@@ -179,7 +179,7 @@ On a scanned page, a name that iOS reads as two separate pieces of one line may 
 ---
 
 ### KI-22: On iOS 27, Name Detection Can Miss Names (Medium)
-**Affects:** Names in Scan and Search on iOS 27
+**Affects:** Names in Search and Scan on iOS 27
 
 On iOS 27, the system's name model can be unavailable or unreliable. After the iPhone has been on for a long time Resecta may detect no names and says so; in some sessions it can miss names without a notice. Restarting the iPhone may bring name detection back.
 

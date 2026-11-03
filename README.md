@@ -4,13 +4,13 @@
 
 [![Download on the App Store](https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/black/en-us?releaseDate=1786492800)](https://apps.apple.com/us/app/resecta/id6786922787)
 
-Resecta is a free, open-source iPhone app that redacts PDFs on-device and then checks the output. It runs on iOS 26, collects no data, and makes no network requests of its own.
+Resecta is a free, open-source iPhone app that redacts PDFs on-device and then checks the output. It runs on iOS 26 or later, collects no data, and makes no network requests of its own.
 
 **App Store:** [apps.apple.com/us/app/resecta/id6786922787](https://apps.apple.com/us/app/resecta/id6786922787) · **Website:** [resecta.app](https://resecta.app)
 
 **License:** [Apache License 2.0](./LICENSE)
 
-**Latest release:** 1.3.0 — see the [CHANGELOG](./CHANGELOG.md).
+**Latest release:** 1.3.1 — see the [CHANGELOG](./CHANGELOG.md).
 
 ---
 
@@ -96,7 +96,7 @@ Each claim in the map below is paired with a mechanical check in this repo. The 
 | Placement survives rotated pages | A rotation × crop-box-origin test matrix positions its regions with a transform written independently of the production code (`SecurityTests/RotatedPageCoordinateTests.swift`) |
 | No network requests of its own | A source grep for networking symbols returns no code references (the sole hit is a comment); the pre-commit hook rejects those symbols on added Swift source lines (`Scripts/audit-lint.sh`) |
 | The app's own copy is linted for overclaiming vocabulary | A banned-vocabulary lint walks the legal string catalog, the view layer's string literals and the shipping docs (`Tests/ResectaAppTests/LegalPhraseLintTests.swift`, `Scripts/claims-lint.sh`) |
-| Bundled detection data is what the key holder signed | An Ed25519 signature over the gazetteer manifest is verified at load; failure degrades detection with a visible banner (`Detection/GazetteerLoader.swift`) |
+| Bundled detection data is what the key holder signed | An Ed25519 signature over the gazetteer manifest is verified the first time the detectors are needed, then each listed file's size and SHA-256 digest against its manifest entry; a failure withholds the gated loaders and degrades detection, with a banner in the Scan interface (`Detection/GazetteerLoader.swift`, `Detection/Gazetteer/AssetIntegrity.swift`) |
 
 ## Project layout
 
@@ -112,7 +112,7 @@ App source lives in `Sources/ResectaApp/`. The redaction engine is an SPM packag
    ./Scripts/install-hooks.sh
    ```
 
-   The pre-commit hook is a symlink to `Scripts/audit-lint.sh`, which runs the mechanical checks described in [`CONTRIBUTING.md`](./CONTRIBUTING.md); the pre-push hook runs both test schemes. Never bypass them with `--no-verify`.
+   The pre-commit hook is a symlink to `Scripts/audit-lint.sh`, which runs the mechanical checks described in [`CONTRIBUTING.md`](./CONTRIBUTING.md); the pre-push hook runs the test schemes the change touches. Never bypass them with `--no-verify`.
 
 2. **Generate the Xcode project.**
 
@@ -128,7 +128,7 @@ App source lives in `Sources/ResectaApp/`. The redaction engine is an SPM packag
    open ResectaApp.xcodeproj
    ```
 
-   Select the **ResectaApp** scheme and an iPhone 17 simulator. Build with `⌘B`. The app target uses iOS 26 and Swift 6.2; the `RedactionEngine` SPM package builds with the Swift 6.2 toolchain under strict concurrency checking.
+   Select the **ResectaApp** scheme and an iPhone 17 simulator. Build with `⌘B`. The app target uses iOS 26 and the Swift 6 language mode (tools version 6.2); the `RedactionEngine` SPM package builds in the same mode under strict concurrency checking.
 
 Tests and gates: [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
@@ -144,7 +144,7 @@ Together the suites carry about 12,000 `#expect`/`#require` assertions. Beyond o
 
 The commands that run both suites locally, and what the batched runner reports, are in [`CONTRIBUTING.md`](./CONTRIBUTING.md#running-the-tests).
 
-**On GitHub Actions.** Every pull request runs the required `pr-gate` check (`ci.yml`), which builds the app and its unit- and UI-test bundles without running them and runs the lint, count and hash checks. The app's unit suite also runs on a hosted simulator for every pull request to `main`, as a non-required check, and both schemes (app and engine) run weekly and on release tags; the engine suite runs locally on a simulator before every push, through the pre-push hook or an explicit batched run recorded with the pull request. The full gate list is in [`CONTRIBUTING.md`](./CONTRIBUTING.md#what-every-change-passes).
+**On GitHub Actions.** Every pull request runs two required checks: `pr-gate` (`ci.yml`), which builds the app, its unit- and UI-test bundles and the engine's test bundle without running them and runs the lint, count and hash checks, and `sim-suite (ResectaApp)`, which runs the app's unit suite on a hosted simulator. Both schemes (app and engine) run weekly and on release tags; the engine suite runs locally on a simulator before any push that touches the engine package, through the pre-push hook or an explicit batched run (the `local-suites` status on each pushed commit names the schemes it ran). The full gate list is in [`CONTRIBUTING.md`](./CONTRIBUTING.md#what-every-change-passes).
 
 ## Contributing
 
