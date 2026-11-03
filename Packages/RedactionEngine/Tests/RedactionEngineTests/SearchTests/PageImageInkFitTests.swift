@@ -49,15 +49,17 @@ struct PageImageInkFitTests {
     /// to 2 pt), so a neighbouring glyph past a gap is not the word's ink.
     /// The share of that ink no box covers, and the farthest such pixel
     /// from the boxes in points. Measured in the page's reading frame, so a
-    /// word on a turned page is followed along its line.
-    static func inkOutside(_ page: PDFPage, word visualWord: CGRect, boxes visualBoxes: [CGRect]) throws -> (share: Double, reach: Double) {
+    /// word on a turned page is followed along its line. `threshold` reads
+    /// lighter ink (grey text and its anti-aliased fringe) as ink.
+    static func inkOutside(_ page: PDFPage, word visualWord: CGRect, boxes visualBoxes: [CGRect],
+                           threshold: UInt8 = DocumentSearcher.inkFitThreshold) throws -> (share: Double, reach: Double) {
         let bounds = page.bounds(for: .cropBox)
         let frame = DocumentSearcher.readingFrame(of: page, visual: bounds.size)
         let word = frame.toReading(visualWord), boxes = visualBoxes.map(frame.toReading)
         let window = word.insetBy(dx: -4, dy: -9).intersection(CGRect(origin: .zero, size: frame.size))
         let cgPage = try #require(page.pageRef)
         let bitmap = try #require(DocumentSearcher.renderGray(
-            cgPage, rotation: page.rotation, visual: bounds.size, window: window, frame: frame))
+            cgPage, rotation: page.rotation, visual: bounds.size, window: window, frame: frame)).reading(threshold: threshold)
         let s = DocumentSearcher.inkFitScale
         func px(_ v: CGFloat, _ origin: CGFloat) -> Int { Int(((v - origin) * s).rounded(.down)) }
         let cx0 = max(0, px(word.minX + 1, window.minX)), cx1 = min(bitmap.width - 1, px(word.maxX - 1, window.minX))
@@ -134,6 +136,98 @@ struct PageImageInkFitTests {
             let outside = try Self.inkOutside(page, word: Self.points(word.normalizedRect, size), boxes: boxes)
             #expect(outside.share == 0,
                     "hit \(index + 1) on page \(word.pageIndex + 1): \(String(format: "%.1f", outside.share * 100))% of its ink lies outside the box, up to \(String(format: "%.2f", outside.reach)) pt")
+        }
+    }
+
+    /// Grey text the ink threshold does not read: the shaded page's grey
+    /// (150), and a lighter one (200, a grey in which a read at 200 sees no ink).
+    static let greyInks: [CGFloat] = [150.0 / 255, 200.0 / 255]
+
+    /// The statement's lines that name Delia, and two of the shaded page's
+    /// words, as vector text (Helvetica 12 pt), once in each of `greyInks`.
+    static let greyLines = ["Delia Hartwell", "INDN:DELIA HARTWELL CO ID:PR4471",
+                            "Account number 4100773265 on file", "Statement period ending Sunday"]
+
+    static func greyStatementPDF() throws -> Data {
+        var media = CGRect(x: 0, y: 0, width: 612, height: 792)
+        let font = CTFontCreateWithName("Helvetica" as CFString, 12, nil)
+        let data = NSMutableData()
+        let consumer = try #require(CGDataConsumer(data: data as CFMutableData))
+        let ctx = try #require(CGContext(consumer: consumer, mediaBox: &media, nil))
+        ctx.beginPDFPage(nil)
+        for (block, grey) in greyInks.enumerated() {
+            for (index, line) in greyLines.enumerated() {
+                let attributed = NSAttributedString(string: line, attributes: [
+                    NSAttributedString.Key(kCTFontAttributeName as String): font,
+                    NSAttributedString.Key(kCTForegroundColorAttributeName as String): CGColor(gray: grey, alpha: 1)])
+                ctx.textPosition = CGPoint(x: 72, y: 700 - CGFloat(block * greyLines.count + index) * 30)
+                CTLineDraw(CTLineCreateWithAttributedString(attributed), ctx)
+            }
+        }
+        ctx.endPDFPage(); ctx.closePDF()
+        return data as Data
+    }
+
+    /// The rows of `glyphs` (visual points) that carry ink read at
+    /// `threshold`, from the columns inside it (0.3 pt in from each side):
+    /// the lowest such row's foot to the highest one's top, nil when none.
+    static func inkRows(_ page: PDFPage, glyphs: CGRect, threshold: UInt8) throws -> ClosedRange<CGFloat>? {
+        let window = glyphs.insetBy(dx: 0.3, dy: 0)
+        let cgPage = try #require(page.pageRef)
+        let bitmap = try #require(DocumentSearcher.renderGray(
+            cgPage, rotation: page.rotation, visual: page.bounds(for: .cropBox).size, window: window)).reading(threshold: threshold)
+        let inked = (0..<bitmap.height).filter { y in (0..<bitmap.width).contains { bitmap.isInk($0, y) } }
+        guard let low = inked.first, let high = inked.last else { return nil }
+        let s = DocumentSearcher.inkFitScale
+        return (window.minY + CGFloat(low) / s)...(window.minY + CGFloat(high + 1) / s)
+    }
+
+    @Test("Grey text on a re-imported Searchable export (grey 150, grey 200): every match covers its ink read at 230, on both legs",
+          arguments: [false, true])
+    func greyTextMatchesCoverTheirInk(includeOCR: Bool) async throws {
+        let data = try Self.greyStatementPDF()
+        let source = try #require(PDFDocument(data: data))
+        let url = try await TestPipeline.processAndExport(data, mode: .searchableRedaction, regions: [:], dpi: 300)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let export = try #require(PDFDocument(data: try Data(contentsOf: url)))
+        let page = try #require(export.page(at: 0))
+        let cgPage = try #require(page.pageRef)
+        let size = page.bounds(for: .cropBox).size
+        #expect(DocumentSearcher.carriesHiddenTextOverImage(page, cgPage: cgPage), "the export's page is a picture under a hidden text layer")
+        await DocumentSearcher.prepareInkFit(page)
+        // Lighter than the fit's first read (128) and than a read at 200: the
+        // grey's anti-aliased fringe is ink too, and must lie under the paint.
+        let threshold: UInt8 = 230
+        for query in ["delia", "4100773265", "period"] {
+            // The words' own boxes on the source, where the text is the ink.
+            let truth = await Self.hits(source, query, includeOCR: false)
+            // A busy host can leave a fit degraded (its read or render waited
+            // out its bound): search again, as the reference in
+            // concurrentFitsAndPreviewAsks does. A match still degraded is
+            // checked all the same: its envelope must hold the ink.
+            var found = await Self.hits(export, query, includeOCR: includeOCR)
+            for _ in 0..<3 where found.contains(where: \.inkFitDegraded) {
+                found = await Self.hits(export, query, includeOCR: includeOCR)
+            }
+            let expected = Self.greyInks.count * (query == "delia" ? 2 : 1)
+            #expect(truth.count == expected, "\(query): the page names it \(expected) times; got \(truth.count)")
+            #expect(found.count == truth.count, "\(query): every word is found on the export; got \(found.count)")
+            let paints = found.filter { $0.pageIndex == 0 }.map { Self.points($0.normalizedRect, size) }
+            let degraded = found.filter(\.inkFitDegraded).count
+            for (index, word) in truth.enumerated() {
+                let glyphs = Self.points(word.normalizedRect, size)
+                let near = paints.filter { $0.intersects(glyphs.insetBy(dx: -2, dy: -2)) }
+                let outside = try Self.inkOutside(page, word: glyphs, boxes: paints, threshold: threshold)
+                #expect(outside.share == 0,
+                        "\(query) \(index + 1): \(String(format: "%.1f", outside.share * 100))% of its ink (read at \(threshold)) lies outside the paint, up to \(String(format: "%.2f", outside.reach)) pt; glyphs \(glyphs) paints \(near) (\(degraded) degraded)")
+                // The paint spans every row of the glyph box that bears ink,
+                // across the glyph box.
+                let rows = try #require(try Self.inkRows(page, glyphs: glyphs, threshold: threshold),
+                                        "\(query) \(index + 1): its ink is read at \(threshold)")
+                let held = CGRect(x: glyphs.minX + 0.3, y: rows.lowerBound, width: glyphs.width - 0.6, height: rows.upperBound - rows.lowerBound)
+                #expect(paints.contains { $0.contains(held) },
+                        "\(query) \(index + 1): no paint holds its glyph box's ink rows \(held); paints \(near) (\(degraded) degraded)")
+            }
         }
     }
 
