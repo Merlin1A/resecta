@@ -44,6 +44,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - An undo or redo that arrives while a run is in progress, such as the system's three-finger gesture, no longer changes the regions under the run or discards its redacted copy; an undo stays available for when the run ends.
 - Verification checks the regions the run actually redacted, as burned into the page, not the editor's regions as they stand when verification starts.
 - Stop keeps its place when processing turns into verification, so a tap at that moment is not lost.
+- Search: on a scanned page, a typed number or code made of digits that look like letters, such as a suite, room or case number, an amount or a member ID, is now found, and an accented name matches with or without its accents. Each match is boxed on the words it covers rather than the whole recognised line. Before, the recognised line was corrected toward letters while the typed text was not, so such numbers never matched.
 
 ### Security
 
