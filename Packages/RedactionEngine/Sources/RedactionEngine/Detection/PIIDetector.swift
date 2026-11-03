@@ -516,6 +516,14 @@ public struct PIIDetector: Sendable {
     /// pollute a concurrent test's `loadWithDiagnostics`. DEBUG-only; never
     /// consulted in release builds.
     @TaskLocal static var _nerAvailabilityOverride: Bool?
+
+    /// Test seam: bind via `$_nameCanaryOverride.withValue(_) { … }` to force
+    /// the answer of the Scan-kickoff name canary (true: the tagger found the
+    /// canary name; false: it found none) without a tag pass, so a test can
+    /// stand for a name scheme that is listed while its tagger is silent.
+    /// Task-local for the same reason as `_nerAvailabilityOverride`.
+    /// DEBUG-only; never consulted in release builds.
+    @TaskLocal static var _nameCanaryOverride: Bool?
     #endif
 
     /// Probe whether the OS-provisioned
@@ -527,8 +535,8 @@ public struct PIIDetector: Sendable {
     ///
     /// Side-effect-free: no `requestAssets` download is triggered (that would add a
     /// network-shaped operation the app forbids); read-only against the local asset
-    /// catalog. The canary fallback uses a fixed literal name — never document
-    /// content.
+    /// catalog. The canary fallback tags a fixed literal sentence
+    /// (`nameCanarySentence`) — never document content.
     static func isNameNERAvailable() -> Bool {
         #if DEBUG
         if let override = _nerAvailabilityOverride { return override }
@@ -537,12 +545,26 @@ public struct PIIDetector: Sendable {
         if NLTagger.availableTagSchemes(for: .word, language: .english).contains(.nameType) {
             return true
         }
-        // FALLBACK: a synchronous tag pass over a fixed canonical English name. If
+        // FALLBACK: a synchronous tag pass over the fixed canary sentence. If
         // the primary query is conservative on some build but the model in fact
         // tags, this confirms availability without a network fetch.
-        let canary = "Michael Johnson"            // fixed literal — not document content
         let tagger = NLTagger(tagSchemes: [.nameType])
-        tagger.string = canary
+        tagger.string = nameCanarySentence
+        return canaryTagsAName(tagger)
+    }
+
+    /// The fixed literal both name canaries tag (the load-time fallback above
+    /// and the Scan kickoff's `nameCanaryTags()`): an ordinary English
+    /// sentence naming two people, never document content. A bare two-word
+    /// name could come back untagged while the model tagged names in a
+    /// sentence in the same process; a sentence of this form tagged there.
+    static let nameCanarySentence =
+        "The account holder Michael Johnson paid Delia Hartwell on Monday, and the bank sent the statement to both of them by mail."
+
+    /// Whether `tagger`, holding `nameCanarySentence`, tags at least one
+    /// person name in it, with the text set to English.
+    private static func canaryTagsAName(_ tagger: NLTagger) -> Bool {
+        let canary = nameCanarySentence
         tagger.setLanguage(.english, range: canary.startIndex..<canary.endIndex)
         var sawName = false
         tagger.enumerateTags(in: canary.startIndex..<canary.endIndex,
@@ -551,6 +573,22 @@ public struct PIIDetector: Sendable {
             return true
         }
         return sawName
+    }
+
+    /// The Scan kickoff's name check: whether the detector's own name tagger
+    /// tags a person name in the fixed canary sentence. Unlike the load-time
+    /// probe above it never trusts the scheme list, so a listed scheme whose
+    /// tagger tags nothing, or a tagger that went silent after the load,
+    /// answers false. The tagger comes from `NameDetector.makeNameTagger(for:)`,
+    /// never a bare `NLTagger`: on iOS 27 a name tag pass made before the
+    /// process has asked for the available schemes leaves the model silent
+    /// for the rest of the process, and the factory asks first. No asset is
+    /// requested; the canary is a fixed literal, never document content.
+    static func nameCanaryTags() -> Bool {
+        #if DEBUG
+        if let override = _nameCanaryOverride { return override }
+        #endif
+        return canaryTagsAName(NameDetector.makeNameTagger(for: nameCanarySentence))
     }
 
     // MARK: - Reverse Rationale
