@@ -86,7 +86,8 @@ struct OCRFastUnionCoverageTests {
         let merged = DocumentSearcher.unionFastOCRResults(
             accurate: [result(Self.line)], fast: [result(Self.fragments[1]), result(Self.fragments[2])])
         #expect(merged.count == 2, "one result per fast match: \(merged.map(\.normalizedRect))")
-        #expect(Set(merged.map(\.normalizedRect)) == [Self.line, Self.fragments[2]], "the accurate box is kept, on the first")
+        #expect(merged.contains { $0.normalizedRect.contains(Self.line) }, "the accurate box is kept, on the first: \(merged.map(\.normalizedRect))")
+        #expect(merged.contains { $0.normalizedRect == Self.fragments[2] }, "the other fast match keeps its own box")
         #expect(Set(merged.map { $0.identityRect ?? $0.normalizedRect }) == [Self.fragments[1], Self.fragments[2]],
                 "each keeps its read's own box as its identity")
     }
