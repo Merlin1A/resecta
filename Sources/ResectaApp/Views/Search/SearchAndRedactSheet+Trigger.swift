@@ -309,7 +309,8 @@ extension SearchAndRedactSheet {
         // Scan interface runs through `DocumentSearcher`, whose shared
         // detector degraded silently (an NER-absent OS build dropped
         // every name match with zero signal). Surface the shared
-        // detector's load diagnostics at scan kickoff: first qualifying
+        // detector's load diagnostics at scan kickoff (on iOS 27 with the
+        // live name canary's answer, `scanKickoffDiagnostics`): first qualifying
         // failure posts the one-time toast and raises the persistent
         // Scan-interface banner (same flag, same gate semantics as the
         // legacy path).

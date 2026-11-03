@@ -561,6 +561,31 @@ public struct PIIDetector: Sendable {
         return sawName
     }
 
+    /// The Scan kickoff's name check: whether the detector's own name tagger
+    /// tags the fixed literal canary as a person name. Unlike the load-time
+    /// probe above it never trusts the scheme list, so a listed scheme whose
+    /// tagger tags nothing, or a tagger that went silent after the load,
+    /// answers false. The tagger comes from `NameDetector.makeNameTagger(for:)`,
+    /// never a bare `NLTagger`: on iOS 27 a name tag pass made before the
+    /// process has asked for the available schemes leaves the model silent
+    /// for the rest of the process, and the factory asks first. No asset is
+    /// requested; the canary is a fixed literal, never document content.
+    static func nameCanaryTags() -> Bool {
+        #if DEBUG
+        if let override = _nameCanaryOverride { return override }
+        #endif
+        let canary = "Michael Johnson"            // fixed literal — not document content
+        let tagger = NameDetector.makeNameTagger(for: canary)
+        tagger.setLanguage(.english, range: canary.startIndex..<canary.endIndex)
+        var sawName = false
+        tagger.enumerateTags(in: canary.startIndex..<canary.endIndex,
+                             unit: .word, scheme: .nameType) { tag, _ in
+            if tag == .personalName { sawName = true; return false }
+            return true
+        }
+        return sawName
+    }
+
     // MARK: - Reverse Rationale
     //
     // Snippet-as-page contract: the caller supplies a `fullContext` buffer
