@@ -94,6 +94,25 @@ struct ScanKickoffDegradeTests {
             == (reportsName ? ["NameGazetteer", Self.ner] : ["NameGazetteer"]))
     }
 
+    @Test("Where the name model tags a sentence in this process, the live kickoff adds nothing to the load")
+    func liveKickoffOnATaggingModel() async {
+        let text = "The account holder Michael Johnson paid Delia Hartwell on Monday, and the bank sent the statement to both of them by mail."
+        let tagger = NameDetector.makeNameTagger(for: text)
+        var names: [String] = []
+        tagger.enumerateTags(in: text.startIndex..<text.endIndex, unit: .word, scheme: .nameType) { tag, range in
+            if tag == .personalName { names.append(String(text[range])) }
+            return true
+        }
+        let shared = DocumentSearcher.sharedLoadDiagnostics
+        let kickoff = await DocumentSearcher.scanKickoffDiagnostics()
+        print("ScanKickoffDegrade: names=\(names) load=\(shared.failedGazetteers) kickoff=\(kickoff.failedGazetteers)")
+        guard !names.isEmpty else {
+            TestGate.skip("[NER asset] the name model tags nothing in this process; the healthy-tagger check needs it.")
+            return
+        }
+        #expect(kickoff == shared, "a tagging name model must not raise the degrade at kickoff")
+    }
+
     @Test("A tagging canary changes nothing: no flag, no toast, on a clean load")
     func taggingCanaryChangesNothing() async {
         let shared = DocumentSearcher.sharedLoadDiagnostics

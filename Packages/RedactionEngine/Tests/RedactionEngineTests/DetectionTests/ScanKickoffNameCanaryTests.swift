@@ -75,13 +75,39 @@ struct ScanKickoffNameCanaryTests {
             return true
         }
         #expect(NameDetector._nameModelQueryCount.value == (Self.onIOS27 ? 1 : 0))
-        if shared.failedGazetteers.contains(Self.ner) {
-            TestGate.skip("[NER asset] the name model is absent on this runtime; the tag-after-canary check needs it.")
+        print("ScanKickoffNameCanary: names after the canary \(names); load reports the name model: \(shared.failedGazetteers.contains(Self.ner))")
+        guard !names.isEmpty else {
+            // A load that found the model must still tag after the canary.
+            #expect(shared.failedGazetteers.contains(Self.ner),
+                    "a name tag pass after the kickoff canary found no names")
+            TestGate.skip("[NER asset] the name model tags nothing in this process; the agreement check needs it.")
             return
         }
-        print("ScanKickoffNameCanary: names after the canary \(names)")
-        #expect(!names.isEmpty, "a name tag pass after the kickoff canary found no names")
-        // A healthy tagger: the live canary passes and every kickoff reads as the load did.
+        // The model tags: every kickoff reads as the load did (no banner on a healthy tagger).
         for kickoff in kickoffs { #expect(kickoff == shared) }
+    }
+
+    @Test("Where a sentence tags names through the factory, the canary tags too")
+    func canaryAgreesWithATagPass() {
+        let text = "The account holder Michael Johnson paid Delia Hartwell on Monday, and the bank sent the statement to both of them by mail."
+        func names(_ s: String, english: Bool) -> [String] {
+            let tagger = NameDetector.makeNameTagger(for: s)
+            if english { tagger.setLanguage(.english, range: s.startIndex..<s.endIndex) }
+            var out: [String] = []
+            tagger.enumerateTags(in: s.startIndex..<s.endIndex, unit: .word, scheme: .nameType) { tag, range in
+                if tag == .personalName { out.append(String(s[range])) }
+                return true
+            }
+            return out
+        }
+        let canary = (0..<3).map { _ in PIIDetector.nameCanaryTags() }
+        let listed = NLTagger.availableTagSchemes(for: .word, language: .english).contains(.nameType)
+        let sentence = names(text, english: false)
+        print("ScanKickoffNameCanary: listed(en)=\(listed) canary=\(canary) canaryNoLanguage=\(names("Michael Johnson", english: false)) sentence=\(sentence) sentenceEnglish=\(names(text, english: true)) loadNERAvailable=\(PIIDetector.isNameNERAvailable())")
+        guard !sentence.isEmpty else {
+            TestGate.skip("[NER asset] the name model tags nothing in this process; the agreement check needs it.")
+            return
+        }
+        #expect(canary.allSatisfy { $0 }, "the name model tags \(sentence) but the canary reads it as silent")
     }
 }
