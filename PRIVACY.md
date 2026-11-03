@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Effective date:** 2026-11-01
+**Effective date:** 2026-11-03
 
 Resecta is an on-device document-redaction app for iOS. This Privacy Policy
 describes how Resecta handles information. It is written to satisfy Apple's
@@ -11,10 +11,11 @@ applies even to an app that collects no data.
 
 Resecta collects no personal data, makes no network requests of its own, and
 uses no third-party services, analytics, or advertising. Everything the app
-does happens on your device; the two system services that can reach the
-network on their own, Apple's rating prompt and the name-recognition model iOS
-provides, are described under "On-device detection" and "Information Apple may
-receive as the platform".
+does happens on your device; the system services that can reach the network on
+their own — Apple's rating prompt, the name-recognition model iOS provides, and
+iOS downloading a photo or file stored only in iCloud before handing it to the
+app — are described under "No network connections", "On-device detection" and
+"Information Apple may receive as the platform".
 
 ## Information Resecta collects
 
@@ -113,8 +114,9 @@ nothing about the device, the build or the moment of export, and two exports
 of identical content carry the same identifier. These replacements patch the
 finished file in place; if the writer's output is not in the shape a patch
 expects, that value stays as the writer wrote it, the export still completes,
-and the metadata check in the verification pass, when it runs, reports the value
-that was not replaced. The export therefore carries much less metadata than
+and the metadata check in the verification pass, when it runs, reports that a
+field was not replaced (the producer or timestamps, or the file identifier),
+without showing its value. The export therefore carries much less metadata than
 a typical PDF, but it is not metadata-free. The file name of a shared copy is
 redacted.pdf in version 1.3.1 and earlier, and in later versions redacted-
 followed by a short code made from the redacted file itself (for example
@@ -135,8 +137,9 @@ in the same way; version 1.2.0 opened PDF files only.
 
 Resecta detects candidate sensitive information entirely on your device. A scan
 runs the app's search engine over the text of each page — the page's text layer
-where it has one, and otherwise text recognized by the system Vision framework
-(optical character recognition) — for seventeen categories of text: Social
+where it has one, and text recognized by the system Vision framework (optical
+character recognition) on a page without one or from images a page carries —
+for seventeen categories of text: Social
 Security, EIN and ITIN numbers; card, account and routing numbers; driver's
 license, passport, license plate, medical record, NPI and DEA numbers; names,
 dates of birth, phone numbers, email addresses and postal addresses. The engine
@@ -172,7 +175,7 @@ itself collect:
   when you download or update any app.
 - Crash diagnostics, but only if you choose to share them with developers
   through your device's Analytics & Improvements settings, which Apple mediates
-  and anonymizes.
+  under its own privacy policy.
 - A rating, if you respond to Apple's standard App Store rating prompt, which
   Resecta may present once per app version, after the first share of a document
   whose checks passed. Any rating you submit goes to Apple's App Store, not to
