@@ -27,6 +27,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Documentation: the privacy policy names the shared copy's file name by version (redacted.pdf through 1.3.1, then redacted- followed by a short code); its effective date moves to 2026-11-01.
 - Documentation: the README and the threat model say what verification checks and when sharing asks first.
 - Documentation: the README and CONTRIBUTING say that the hosted unit suite is a required check, which test schemes the pre-push hook runs, that eleven suites are left out on the hosted runner (three of them ink-fit timing pins) and how they are reported, which performance suites gate, and what the detection-data check verifies; the workflow and runner comments say the same.
+- Documentation: the threat model's import list puts the size check first and names the page-geometry stage; its detection-data paragraph names the verification pass among the check's triggers, the Scan interface as where the degraded banner shows, and the two reference tables that stay live; its persistence note says where a file a failed delete leaves goes; the image limits and the ink test's render resolution read as the code has them; and its share-confirmation sentences describe the App Store release.
 - Share confirm: a second share of the same results asks again, so each send of a file with reported issues, unrun checks or covered text gets its own confirmation.
 - Results: an annotation in the original that hides text no box covers is listed under the results with its pages, and the text-layer check is titled for the redacted PDF it reads.
 - Share: when the Detection Sweep reports possible items or the original's filled form values were not carried over, Share asks first and lists them; the sweep's row also names what it does not read.
@@ -56,6 +57,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - `SECURITY.md` says why `v1.0.0` and `v1.2.0` verify from a clone of `main`, names the public API path that lists published advisories, and states that the project has had no third-party security audit, runs no bug bounty, and makes no compliance claims.
 - `THREAT-MODEL.md` §7 re-dated at `05b7ae0a` (2026-10-27), each row re-checked: the identity-record row names the 1.3.0 record beside the 1.2.0 one, and the immutable-releases row names `gh release verify v1.3.0`, the first release published after the setting was turned on.
 
+- `THREAT-MODEL.md` §7 re-dated at `c91008ae` (2026-11-03): the app's unit-test suite has been a required check on `main` since 2026-10-27, and the branch-rules and unit-suite rows say so; the other rows re-checked.
 ### Internal
 
 - A target specification for the verification pass, VERIFICATION-SPEC.md, with a status line per rule; claims-lint covers it.
