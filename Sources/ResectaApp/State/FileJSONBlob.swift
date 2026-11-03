@@ -54,7 +54,7 @@ nonisolated struct FileJSONBlob<T: Codable & Sendable>: Sendable {
             return envelope.payload
         } catch { // LegalPhrases:safe (Swift keyword)
             logger.warning(
-                "FileJSONBlob[\(self.fileURL.lastPathComponent, privacy: .public)] decode failed: \(String(describing: error), privacy: .public)")
+                "FileJSONBlob[\(self.fileURL.lastPathComponent, privacy: .public)] decode failed: \(LogSafeError.publicSummary(error), privacy: .public); \(String(describing: error), privacy: .private)")
             return fallback
         }
     }
@@ -99,7 +99,7 @@ nonisolated struct FileJSONBlob<T: Codable & Sendable>: Sendable {
         } catch { // LegalPhrases:safe (Swift keyword)
             try? FileManager.default.removeItem(at: tmpURL)
             logger.warning(
-                "FileJSONBlob[\(self.fileURL.lastPathComponent, privacy: .public)] write failed: \(String(describing: error), privacy: .public)")
+                "FileJSONBlob[\(self.fileURL.lastPathComponent, privacy: .public)] write failed: \(LogSafeError.publicSummary(error), privacy: .public); \(String(describing: error), privacy: .private)")
         }
     }
 

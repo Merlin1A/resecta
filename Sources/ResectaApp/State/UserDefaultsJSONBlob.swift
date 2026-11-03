@@ -46,7 +46,7 @@ nonisolated struct UserDefaultsJSONBlob<T: Codable & Sendable>: @unchecked Senda
             return envelope.payload
         } catch {
             logger.warning(
-                "UserDefaultsJSONBlob[\(self.key, privacy: .public)] decode failed: \(String(describing: error), privacy: .public)")
+                "UserDefaultsJSONBlob[\(self.key, privacy: .public)] decode failed: \(LogSafeError.publicSummary(error), privacy: .public); \(String(describing: error), privacy: .private)")
             return fallback
         }
     }
@@ -63,7 +63,7 @@ nonisolated struct UserDefaultsJSONBlob<T: Codable & Sendable>: @unchecked Senda
             defaults.set(data, forKey: key)
         } catch {
             logger.warning(
-                "UserDefaultsJSONBlob[\(self.key, privacy: .public)] encode failed: \(String(describing: error), privacy: .public)")
+                "UserDefaultsJSONBlob[\(self.key, privacy: .public)] encode failed: \(LogSafeError.publicSummary(error), privacy: .public); \(String(describing: error), privacy: .private)")
         }
     }
 
