@@ -4,7 +4,7 @@ import CoreGraphics
 @testable import ResectaApp
 import RedactionEngine
 
-// A verification interrupted by leaving the app, after a run that burned
+// A verification stopped part-way, after a run that burned
 // the live regions. The output carries every region on screen, so the
 // results screen must not say the regions changed after the PDF was made,
 // and Run Verification re-checks the existing output instead of redacting
@@ -69,7 +69,8 @@ struct CancelledVerifyCurrencyTests {
         return Fixture(coord: coord, output: output, root: root)
     }
 
-    /// Leaving the app during `.verifying` — the scene handler's cancel.
+    /// A Stop during `.verifying` (leaving the app now returns to the
+    /// editor instead: `BackgroundVerifyResumeTests`).
     private func backgroundMidVerify(_ f: Fixture) -> Bool {
         f.coord.documentState.cancelActivePipeline(redactionState: f.coord.redactionState)
         guard case .verified(let report) = f.coord.documentState.phase, report.skipReason == .cancelled else {
@@ -80,7 +81,7 @@ struct CancelledVerifyCurrencyTests {
         return true
     }
 
-    @Test("Backgrounded mid-verify: the Share caption does not say the regions changed")
+    @Test("Stopped mid-verify: the Share caption does not say the regions changed")
     func shareCaptionAfterACancelledVerify() throws {
         let f = try verifyingAfterABurn()
         defer { try? FileManager.default.removeItem(at: f.root) }
@@ -93,7 +94,7 @@ struct CancelledVerifyCurrencyTests {
                 "today the stale flag the run burned past survives the cancel")
     }
 
-    @Test("Backgrounded mid-verify: Run Verification re-checks the existing output")
+    @Test("Stopped mid-verify: Run Verification re-checks the existing output")
     func runVerificationRoutesVerifyOnly() throws {
         let f = try verifyingAfterABurn()
         defer { try? FileManager.default.removeItem(at: f.root) }
