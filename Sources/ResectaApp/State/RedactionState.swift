@@ -873,3 +873,16 @@ enum DetectionDegradeCopy {
             : "Detection is degraded for this session because the detection corpus failed to load. Manual redaction tools remain available."
     }
 }
+
+extension RedactionState {
+    /// Records a PII Scan kickoff's detector diagnostics on the session.
+    /// The first kickoff that reports a failure raises the degrade (the
+    /// flag and the failure list) and returns the one-time warning toast to
+    /// post; otherwise returns nil.
+    func noteScanKickoffDiagnostics(_ diagnostics: GazetteerLoadDiagnostics) -> String? {
+        guard diagnostics.didDegrade, !autoDetectionDegraded else { return nil }
+        autoDetectionDegraded = true
+        autoDetectionDegradeFailures = diagnostics.failedGazetteers
+        return DetectionDegradeCopy.toast(failedGazetteers: diagnostics.failedGazetteers)
+    }
+}

@@ -516,6 +516,14 @@ public struct PIIDetector: Sendable {
     /// pollute a concurrent test's `loadWithDiagnostics`. DEBUG-only; never
     /// consulted in release builds.
     @TaskLocal static var _nerAvailabilityOverride: Bool?
+
+    /// Test seam: bind via `$_nameCanaryOverride.withValue(_) { … }` to force
+    /// the answer of the Scan-kickoff name canary (true: the tagger found the
+    /// canary name; false: it found none) without a tag pass, so a test can
+    /// stand for a name scheme that is listed while its tagger is silent.
+    /// Task-local for the same reason as `_nerAvailabilityOverride`.
+    /// DEBUG-only; never consulted in release builds.
+    @TaskLocal static var _nameCanaryOverride: Bool?
     #endif
 
     /// Probe whether the OS-provisioned

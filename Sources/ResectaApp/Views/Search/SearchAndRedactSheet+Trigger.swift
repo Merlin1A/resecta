@@ -314,17 +314,9 @@ extension SearchAndRedactSheet {
         // Scan-interface banner (same flag, same gate semantics as the
         // legacy path).
         if isPIIScan {
-            let diagnostics = DocumentSearcher.sharedLoadDiagnostics
-            if diagnostics.didDegrade,
-               !redactionState.autoDetectionDegraded {
-                redactionState.autoDetectionDegraded = true
-                redactionState.autoDetectionDegradeFailures =
-                    diagnostics.failedGazetteers
-                toastManager.enqueue(
-                    DetectionDegradeCopy.toast(
-                        failedGazetteers: diagnostics.failedGazetteers),
-                    severity: .warning
-                )
+            let diagnostics = await DocumentSearcher.scanKickoffDiagnostics()
+            if let toast = redactionState.noteScanKickoffDiagnostics(diagnostics) {
+                toastManager.enqueue(toast, severity: .warning)
             }
         }
 
