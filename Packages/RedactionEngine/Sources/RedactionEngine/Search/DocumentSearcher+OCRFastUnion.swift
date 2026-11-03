@@ -209,7 +209,7 @@ extension DocumentSearcher {
                 let matchedText = nsString.substring(with: matchRange)
                 let window = contextSnippet(text: searchText, matchNSRange: matchRange)
 
-                results.append(SearchResult(
+                let match = SearchResult(
                     pageIndex: pageIndex,
                     normalizedRect: normalizedRect,
                     matchedText: matchedText,
@@ -217,7 +217,14 @@ extension DocumentSearcher {
                     source: .ocr(confidence: avgConfidence),
                     term: regex.pattern,
                     matchRangeInSnippet: window.matchRange
-                ))
+                )
+                // A match only the corrected reading holds takes its place in
+                // page order among the raw reading's, as a fast-only match does.
+                if index == 0 {
+                    results.append(match)
+                } else {
+                    Self.insertInPageOrder(match, into: &results)
+                }
                 return true
             }
         }
