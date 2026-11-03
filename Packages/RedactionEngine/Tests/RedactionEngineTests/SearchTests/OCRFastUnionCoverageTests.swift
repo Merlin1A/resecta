@@ -5,9 +5,10 @@ import PDFKit
 
 // On iOS 27 a scanned page's recognized text is read twice, accurate and fast.
 // When the fast read splits a line and holds more matches of a term over it than
-// the accurate read does, the fast boxes are added and the accurate line box
-// stays: the fast read can miss the very occurrence the accurate read matched,
-// and its boxes then do not cover it. One scanned line printed with three
+// the accurate read does, each fast match is an occurrence, and the accurate line
+// box is folded into one of them, not dropped: the fast read can miss the very
+// occurrence the accurate read matched, and its boxes alone then do not cover it.
+// One result per occurrence the fast read holds. One scanned line printed with three
 // occurrences, left to right: the accurate read matches the first only; the
 // fast read, in three fragments, matches the second and third only.
 
@@ -46,7 +47,7 @@ struct OCRFastUnionCoverageTests {
     private func expectFirstOccurrenceBoxed(_ results: [SearchResult], fastMatches: Int) {
         #expect(firstOccurrenceCovered(results) == 1, "boxes: \(results.map(\.normalizedRect))")
         if DocumentSearcher.readsFastOCRBeside {
-            #expect(results.count == 1 + fastMatches, "the accurate match and each fast match: \(results.map(\.matchedText))")
+            #expect(results.count == fastMatches, "one result per fast match, the accurate box folded into one: \(results.map(\.normalizedRect))")
         } else {
             #expect(results.count == 1, "iOS 26 reads one recognition")
         }
@@ -76,16 +77,24 @@ struct OCRFastUnionCoverageTests {
         expectFirstOccurrenceBoxed(results.filter { $0.piiCategory == .phone }, fastMatches: 2)
     }
 
-    @Test("A line the fast read holds more matches on keeps the accurate box beside the fast ones")
-    func unionKeepsTheAccurateBox() {
+    @Test("A line the fast read holds more matches on folds the accurate box into the first fast one")
+    func unionFoldsTheAccurateBoxIntoAFastOne() {
         func result(_ rect: CGRect) -> SearchResult {
             SearchResult(pageIndex: 0, normalizedRect: rect, matchedText: "x", contextSnippet: "x",
                          source: .ocr(confidence: 0.5), term: "delia hartwell")
         }
         let merged = DocumentSearcher.unionFastOCRResults(
             accurate: [result(Self.line)], fast: [result(Self.fragments[1]), result(Self.fragments[2])])
-        #expect(merged.map(\.normalizedRect).contains(Self.line), "the accurate box is kept")
-        #expect(Set(merged.map(\.normalizedRect)) == [Self.line, Self.fragments[1], Self.fragments[2]])
-        #expect(merged.count == 3, "each box once: no fast match is added twice")
+        #expect(merged.count == 2, "one result per fast match: \(merged.map(\.normalizedRect))")
+        // The fold's union is computed in floating point: equal to within 1e-9 on each edge.
+        func same(_ a: CGRect, _ b: CGRect) -> Bool {
+            abs(a.minX - b.minX) < 1e-9 && abs(a.minY - b.minY) < 1e-9
+                && abs(a.maxX - b.maxX) < 1e-9 && abs(a.maxY - b.maxY) < 1e-9
+        }
+        let boxes = merged.map(\.normalizedRect)
+        #expect(boxes.contains { same($0, Self.line) }, "the accurate box is kept, on the first: \(boxes)")
+        #expect(boxes.contains { same($0, Self.fragments[2]) }, "the other fast match keeps its own box: \(boxes)")
+        #expect(Set(merged.map { $0.identityRect ?? $0.normalizedRect }) == [Self.fragments[1], Self.fragments[2]],
+                "each keeps its read's own box as its identity")
     }
 }

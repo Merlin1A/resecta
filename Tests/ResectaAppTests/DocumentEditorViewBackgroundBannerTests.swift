@@ -198,12 +198,12 @@ struct DocumentEditorViewBackgroundBannerTests {
         #expect(TopBannerSlot.winner(documentState: documentState, detectionBannerPresent: true) == .detection)
     }
 
-    /// Leaving the app during Verify lands on the results screen, where
-    /// nothing reads the pause pair. Left set, Keep Editing (a bare
-    /// transition to `.editing`) mounted the paused banner over a finished
-    /// redaction. A background during Verify raises no pause.
-    @Test("Keep Editing after a background during Verify shows no paused banner")
-    func testBackgroundDuringVerifyRaisesNoPause() {
+    /// Leaving the app during Verify returns to the editor with the paused
+    /// banner, as a cut Scan or Redact does, instead of landing on the
+    /// results as skipped. The pause pair is read only in the editor, so it
+    /// never shows over the results (`BackgroundVerifyResumeTests`).
+    @Test("A background during Verify returns to the editor with the paused banner")
+    func testBackgroundDuringVerifyRaisesThePause() {
         let doc = DocumentState()
         let redaction = RedactionState()
         doc.sourceDocument = makeTestPDFDocument()
@@ -214,16 +214,13 @@ struct DocumentEditorViewBackgroundBannerTests {
 
         ContentView.cancelForBackground(documentState: doc, redactionState: redaction)
 
-        guard case .verified(let report) = doc.phase else {
-            Issue.record("Expected .verified after a background during Verify, got \(doc.phaseKind)")
-            return
+        if case .verified = doc.phase {
+            Issue.record("A background during Verify landed on the results as skipped")
         }
-        #expect(report.overallStatus == .skipped)
-        #expect(doc.wasPausedByBackground == false)
-        #expect(doc.pausedFromPhase == nil)
-
-        doc.transition(to: .editing)
-        #expect(!(doc.wasPausedByBackground && doc.phaseKind == .editing),
-                "the banner's mount predicate reads false after Keep Editing")
+        #expect(doc.phaseKind == .editing)
+        #expect(doc.wasPausedByBackground == true)
+        #expect(doc.pausedFromPhase == .verifying)
+        #expect(doc.wasPausedByBackground && doc.phaseKind == .editing,
+                "the banner's mount predicate reads true")
     }
 }

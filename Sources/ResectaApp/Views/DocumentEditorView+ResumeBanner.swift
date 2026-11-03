@@ -13,7 +13,8 @@ extension DocumentEditorView {
     // MARK: - Background-resume banner
 
     /// The banner the editor shows after a run was paused by a
-    /// backgrounding (cancel-from-redacting): offers the pipeline again.
+    /// backgrounding (cancel-from-redacting or -verifying): offers the
+    /// pipeline again.
     /// It is a record of a run that did not finish, so no timer ends it —
     /// it stays until it is dismissed, Restart is tapped, or another run
     /// starts (the banner leaves the screen with the editing phase, and

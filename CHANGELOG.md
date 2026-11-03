@@ -34,6 +34,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ### Fixed
 
+- A redaction and its checks now keep the screen awake while they run, so the screen locking on its own no longer cuts a long check short; checks cut short by leaving the app return to the editor's paused notice, where Restart runs them again, instead of ending as skipped.
 - Share confirm: only the slide, or the accessibility action that VoiceOver and Switch Control offer, completes it; a tap on the card's blank corner no longer opens the share sheet.
 - VoiceOver's end-of-run line says the same title as the results screen, such as Some Checks Incomplete.
 - With Verify Before Export off, the results advice names that setting instead of suggesting a Redact that would skip the checks again.
@@ -56,6 +57,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - `THREAT-MODEL.md` §7 is headed "Security posture", with its date and commit in its first sentence, so a link to it holds across re-dates. The branch-rules row names each repository's required check, the up-to-date-branch rule and the `rulesets/<id>` path, and says the admin role may bypass the ruleset on a pull request; the reporting and secrets rows give their public API paths and the contributors graph; the flag-check row names one launch argument. The rows the site's posture sheet also shows read as the site's do, and a note beneath the table names the checks that need a role on the repository. No state changed, and the section keeps its 2026-10-27 date.
 - `SECURITY.md` says why `v1.0.0` and `v1.2.0` verify from a clone of `main`, names the public API path that lists published advisories, and states that the project has had no third-party security audit, runs no bug bounty, and makes no compliance claims.
 - `THREAT-MODEL.md` §7 re-dated at `05b7ae0a` (2026-10-27), each row re-checked: the identity-record row names the 1.3.0 record beside the 1.2.0 one, and the immutable-releases row names `gh release verify v1.3.0`, the first release published after the setting was turned on.
+- When saving or loading your saved searches, settings or other stored data failed, the error the app wrote to the device's system log could include part of the stored text (for example a custom search term). The log now names only the kind of error; the details are kept private.
 
 - `THREAT-MODEL.md` §7 re-dated at `c91008ae` (2026-11-03): the app's unit-test suite has been a required check on `main` since 2026-10-27, and the branch-rules and unit-suite rows say so; the other rows re-checked.
 ### Internal

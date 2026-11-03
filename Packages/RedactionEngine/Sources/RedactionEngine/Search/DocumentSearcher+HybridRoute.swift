@@ -36,7 +36,10 @@ extension DocumentSearcher {
     /// slowly gets (taller than the line, centred where the word should be), both
     /// have their centre on the recognised line. Each text-layer rect accounts
     /// for at most one OCR result, so a second occurrence on the same line, which
-    /// the text layer does not hold, keeps its OCR result.
+    /// the text layer does not hold, keeps its OCR result. An OCR result whose
+    /// box a merge of two readings grew is told by the box its read gave it
+    /// (`identityRect`), not the grown one, which can reach over a text-layer
+    /// word it does not name.
     static func mergeHybridResults(textLayerRects: [CGRect], ocr: [SearchResult]) -> [SearchResult] {
         func area(_ rect: CGRect) -> CGFloat { rect.isNull ? 0 : rect.width * rect.height }
         func repeats(_ rect: CGRect, _ ocrRect: CGRect) -> Bool {
@@ -46,7 +49,8 @@ extension DocumentSearcher {
         }
         var unmatched = textLayerRects
         return ocr.filter { result in
-            guard let index = unmatched.firstIndex(where: { repeats($0, result.normalizedRect) }) else { return true }
+            let identity = result.identityRect ?? result.normalizedRect
+            guard let index = unmatched.firstIndex(where: { repeats($0, identity) }) else { return true }
             unmatched.remove(at: index)
             return false
         }

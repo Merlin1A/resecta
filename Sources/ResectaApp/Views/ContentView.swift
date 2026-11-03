@@ -133,14 +133,15 @@ struct ContentView: View {
     }
 
     /// The background rule: every cancellable phase is cancelled; only a
-    /// run the editor can restart raises the paused banner. The phase is
-    /// captured BEFORE the cancel transitions away, so the banner can offer
-    /// the matching pipeline (detect-only vs. full redact).
+    /// run the editor can restart raises the paused banner, a cut Verify
+    /// included (it returns to the editor rather than the skipped results).
+    /// The phase is captured BEFORE the cancel transitions away, so the
+    /// banner can offer the matching pipeline (detect-only vs. full redact).
     static func cancelForBackground(documentState: DocumentState, redactionState: RedactionState) {
         let kind = documentState.runChromePhaseKind
         guard kind.isCancellable else { return }
         if kind.raisesResumeBanner { documentState.pausedFromPhase = kind }
-        documentState.cancelActivePipeline(redactionState: redactionState)
+        documentState.cancelActivePipeline(redactionState: redactionState, cause: .background)
         if kind.raisesResumeBanner { documentState.wasPausedByBackground = true }
     }
 }

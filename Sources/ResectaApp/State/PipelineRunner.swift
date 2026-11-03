@@ -417,8 +417,9 @@ struct PipelineRunner {
     ) async throws -> PipelineRunOutcome {
         // The first verifying step goes out before the loads below suspend.
         // The redacted copy is built and its inputs recorded, so from here a
-        // Stop or a background pause keeps the copy and lands on the skipped
-        // report, never the redacting cancel that discards it; a load
+        // Stop or a background pause keeps the copy, never the redacting
+        // cancel that discards it: a Stop lands on the skipped report, a
+        // background pause on the editor's paused banner; a load
         // failure is the legal `.verifying → .failed` pair. The full run's
         // `(.redacting, .verifying)` and verify-only's `(.verifying,
         // .verifying)` are both legal.

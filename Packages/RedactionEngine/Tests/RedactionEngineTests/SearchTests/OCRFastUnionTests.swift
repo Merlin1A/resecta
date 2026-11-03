@@ -158,8 +158,8 @@ struct OCRFastUnionTests {
 
     // MARK: - More fast matches than accurate ones on a line; the order
 
-    @Test("A line the fast read holds more matches on than the accurate read adds the fast matches beside the accurate one, in either order")
-    func moreFastMatchesOnALineAddTheFastOnes() {
+    @Test("A line the fast read holds more matches on than the accurate read is one result per fast match, the first boxed by the accurate box too, in either order")
+    func moreFastMatchesOnALineStandForTheAccurateOne() {
         // Binary-exact boxes, so a union is compared without rounding.
         let line = CGRect(x: 0.125, y: 0.5, width: 0.625, height: 0.03125)
         let left = CGRect(x: 0.125, y: 0.5, width: 0.25, height: 0.03125)
@@ -168,8 +168,9 @@ struct OCRFastUnionTests {
         for fast in [[result("delia hartwell", left), result("delia hartwell", right)],
                      [result("delia hartwell", right), result("delia hartwell", left)]] {
             let merged = DocumentSearcher.unionFastOCRResults(accurate: [a], fast: fast)
-            #expect(Set(merged.map(\.normalizedRect)) == [line, left, right], "\(merged.map(\.normalizedRect))")
-            #expect(merged.count == 3)
+            #expect(merged.count == 2, "\(merged.map(\.normalizedRect))")
+            #expect(Set(merged.map(\.normalizedRect)) == [line, fast[1].normalizedRect], "\(merged.map(\.normalizedRect))")
+            #expect(Set(merged.map { $0.identityRect ?? $0.normalizedRect }) == [left, right])
         }
         let twoAccurate = DocumentSearcher.unionFastOCRResults(
             accurate: [a, result("delia hartwell", line)],
@@ -204,15 +205,61 @@ struct OCRFastUnionTests {
             if DocumentSearcher.readsFastOCRBeside {
                 let paddedLeft = DocumentSearcher.paddedNormalizedRect(left, in: page)
                 let paddedRight = DocumentSearcher.paddedNormalizedRect(right, in: page)
-                #expect(ocr.map(\.normalizedRect).contains(paddedRight),
-                        "the second occurrence, in the image only, is boxed by its fast line: \(ocr.map(\.normalizedRect))")
-                // The text layer accounts for one of the OCR boxes over the first
-                // occurrence; the fast line box left over it covers that word again.
-                #expect(Set(ocr.map(\.normalizedRect)) == [paddedLeft, paddedRight], "\(ocr.map(\.normalizedRect))")
+                #expect(ocr.contains { $0.normalizedRect.contains(paddedRight) },
+                        "the second occurrence, in the image only, is boxed: \(ocr.map(\.normalizedRect))")
+                // The text layer accounts for the one OCR result over the first
+                // occurrence; no second OCR box repeats that word.
+                #expect(ocr.count == 1, "\(ocr.map(\.normalizedRect))")
+                #expect(!ocr.contains { $0.normalizedRect == paddedLeft }, "\(ocr.map(\.normalizedRect))")
             } else {
                 #expect(ocr.isEmpty, "iOS 26 reads one recognition, which misreads the second occurrence")
             }
         }
+    }
+
+    @Test("Hybrid page: an image-only occurrence whose box the fast read widened over a text-layer word is not taken for that word")
+    func hybridWidenedBoxIsNotATextLayerRepeat() async throws {
+        let doc = try #require(PDFDocument(data: TestFixtures.lineOverScanPDF("Pay Delia Hartwell")))
+        let page = try #require(doc.page(at: 0))
+        let line = CGRect(x: 0.11, y: 0.925, width: 0.60, height: 0.025)
+        let left = CGRect(x: 0.11, y: 0.925, width: 0.28, height: 0.025)
+        let right = CGRect(x: 0.42, y: 0.925, width: 0.29, height: 0.025)
+        let searcher = DocumentSearcher()
+        // The accurate read matches the second occurrence (image only) and
+        // misreads the first; the fast read holds the whole line, matching the
+        // first, so the pair's box grows over the text-layer word.
+        await searcher._testSeedOCRLines([
+            OCREngine.TextLine(text: "Pay Dclia Hartwcll", normalizedRect: left, confidence: 0.6),
+            OCREngine.TextLine(text: "and Delia Hartwell", normalizedRect: right, confidence: 0.6),
+        ], forPageIndex: 0)
+        await searcher._testSeedOCRFastLines(
+            [OCREngine.TextLine(text: "Pay Delia Hartwell and Dclia Hartwcll", normalizedRect: line, confidence: 0.5)],
+            forPageIndex: 0)
+        var options = SearchOptions()
+        options.includeOCR = true
+        var results: [SearchResult] = []
+        for await r in searcher.search(SendablePDFDocument(doc), mode: .text("Delia Hartwell", options: options),
+                                       progress: { _, _ in }) { results.append(r) }
+        let textLayer = results.filter { $0.source == .textLayer }
+        let ocr = results.filter { if case .ocr = $0.source { true } else { false } }
+        let paddedRight = DocumentSearcher.paddedNormalizedRect(right, in: page)
+        #expect(textLayer.count == 1, "the text layer holds the first occurrence")
+        #expect(ocr.count == 1, "\(ocr.map(\.normalizedRect))")
+        #expect(ocr.contains { $0.normalizedRect.contains(paddedRight) },
+                "the second occurrence, in the image only, keeps its box: \(ocr.map(\.normalizedRect))")
+    }
+
+    @Test("Hybrid merge: a grown OCR box is told by its read's own box; without one, by its box, as before")
+    func hybridMergeTellsRepeatsByTheReadsOwnBox() {
+        let word = CGRect(x: 0.15, y: 0.93, width: 0.10, height: 0.015)
+        let line = CGRect(x: 0.11, y: 0.925, width: 0.60, height: 0.025)
+        let right = CGRect(x: 0.42, y: 0.925, width: 0.29, height: 0.025)
+        var grown = result("delia hartwell", line)
+        grown.identityRect = right
+        #expect(DocumentSearcher.mergeHybridResults(textLayerRects: [word], ocr: [grown]).count == 1,
+                "its read's box does not hold the word: not a repeat")
+        #expect(DocumentSearcher.mergeHybridResults(textLayerRects: [word], ocr: [result("delia hartwell", line)]).isEmpty,
+                "a box with no identity holds the word's centre: a repeat")
     }
 
     @Test("A phrase the accurate read splits across two lines and the fast read holds on one is one occurrence")
