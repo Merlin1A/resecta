@@ -36,7 +36,7 @@ nonisolated final class CanvasGeometryUITests: XCTestCase {
         // The selected box's handles cover its one-line strip, so the
         // selection is read by deleting it: the box that goes is the one
         // the tap selected.
-        let overflow = app.buttons["OverflowBarButtonItem"]
+        let overflow = app.editorOverflowButton
         XCTAssertTrue(overflow.waitForExistence(timeout: 10))
         overflow.tap()
         let delete = app.buttons["Delete Region"]
@@ -245,7 +245,7 @@ private extension CanvasGeometryUITests {
             tool.tap()
             let deadline = Date().addingTimeInterval(6)
             while Date() < deadline {
-                if (tool.value as? String) == value { return }
+                if tool.drawToolReads(value) { return }
                 usleep(250_000)
             }
         }
@@ -277,7 +277,7 @@ private extension CanvasGeometryUITests {
     }
 
     nonisolated func openOverflow() {
-        let overflow = app.buttons["OverflowBarButtonItem"]
+        let overflow = app.editorOverflowButton
         XCTAssertTrue(overflow.waitForExistence(timeout: 10))
         overflow.tap()
         _ = app.buttons["Add to Selection"].waitForExistence(timeout: 5)

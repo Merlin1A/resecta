@@ -103,6 +103,16 @@ extension TestFixtures {
             extra: [imageXObject(id: 6, width: 1275, height: 1650)])
     }
 
+    /// A 150-dpi scan over the whole letter page with one invisible 10-pt
+    /// text line (`line`) at the top-left: a hybrid page whose text layer
+    /// holds only that line.
+    static func lineOverScanPDF(_ line: String) -> Data {
+        onePage(
+            stream: "q 612 0 0 792 0 0 cm /Im1 Do Q\nBT 3 Tr /F1 10 Tf 72 740 Td (\(line)) Tj ET",
+            resources: "/Font << /F1 5 0 R >> /XObject << /Im1 6 0 R >>",
+            extra: [imageXObject(id: 6, width: 1275, height: 1650)])
+    }
+
     /// A born-digital letter of about 1,200 visible characters with a 120 × 60
     /// px logo in the corner: not image content in the census's sense.
     /// The same typed letter with one image of `width` × `height` pixels

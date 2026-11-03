@@ -35,6 +35,11 @@ struct OCRPageCache {
     private var counter: Int = 0
     /// The normalized PII-scan inputs, keyed identically to `lines`.
     private var normalized: [Int: NormalizedPage] = [:]
+    /// The fast recognition's lines per page index (iOS 27, beside the
+    /// accurate read), and their normalized PII-scan inputs; keyed and
+    /// evicted with `lines`.
+    private var fastLines: [Int: [OCREngine.TextLine]] = [:]
+    private var fastNormalized: [Int: NormalizedPage] = [:]
 
     /// A cache hit: records the access for eviction ordering and returns
     /// the page's lines; nil on a miss.
@@ -47,11 +52,27 @@ struct OCRPageCache {
 
     /// Inserts a page's lines through the eviction path (evict BEFORE
     /// insert) and records the access.
-    mutating func insert(_ newLines: [OCREngine.TextLine], for pageIndex: Int) {
+    mutating func insert(_ newLines: [OCREngine.TextLine], fast: [OCREngine.TextLine]? = nil, for pageIndex: Int) {
         evictIfNeeded()
         counter += 1
         access[pageIndex] = counter
         lines[pageIndex] = newLines
+        fastLines[pageIndex] = fast
+    }
+
+    /// The page's fast-recognition lines, when read; does not touch the
+    /// access order (the accurate read's `touch` does).
+    func fastLines(for pageIndex: Int) -> [OCREngine.TextLine]? {
+        fastLines[pageIndex]
+    }
+
+    /// The page's normalized PII-scan input built from its fast read.
+    func fastNormalizedPage(for pageIndex: Int) -> NormalizedPage? {
+        fastNormalized[pageIndex]
+    }
+
+    mutating func setFastNormalizedPage(_ page: NormalizedPage, for pageIndex: Int) {
+        fastNormalized[pageIndex] = page
     }
 
     /// Evicts the least-recently-used entry when the capacity ceiling is
@@ -64,6 +85,8 @@ struct OCRPageCache {
                 lines.removeValue(forKey: lruPage)
                 access.removeValue(forKey: lruPage)
                 normalized.removeValue(forKey: lruPage)
+                fastLines.removeValue(forKey: lruPage)
+                fastNormalized.removeValue(forKey: lruPage)
             }
         }
     }
@@ -98,6 +121,8 @@ struct OCRPageCache {
         lines.removeAll()
         access.removeAll()
         normalized.removeAll()
+        fastLines.removeAll()
+        fastNormalized.removeAll()
         counter = 0
         var added = 0
         var idx = 0
@@ -122,6 +147,11 @@ struct OCRPageCache {
         access[pageIndex] = counter
         lines[pageIndex] = newLines
         normalized.removeValue(forKey: pageIndex)
+    }
+
+    mutating func seedFastLines(_ newLines: [OCREngine.TextLine], forPageIndex pageIndex: Int) {
+        fastLines[pageIndex] = newLines
+        fastNormalized.removeValue(forKey: pageIndex)
     }
     #endif
 }

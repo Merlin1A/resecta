@@ -75,7 +75,7 @@ nonisolated final class HomeCancelKeepsSearchSelectionsUITests: XCTestCase {
     }
 
     private func openOverflowAndTapHome() {
-        let overflow = app.buttons["OverflowBarButtonItem"]
+        let overflow = app.editorOverflowButton
         XCTAssertTrue(overflow.waitForExistence(timeout: 10), "Toolbar overflow button never appeared.")
         overflow.tap()
         let byLabel = app.buttons["Home"].firstMatch

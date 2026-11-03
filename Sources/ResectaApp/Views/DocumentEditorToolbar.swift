@@ -39,6 +39,35 @@ struct DocumentEditorToolbar {
     /// The Rectangle tool's hint while VoiceOver is running.
     static let rectangleVoiceOverHint = "Drawing needs direct touch. Use Search or Scan."
 
+    /// The iPhone editor's own … menu, on iOS 27.
+    static let moreMenuIdentifier = "editorMoreMenu"
+
+    /// The Rectangle tool's accessibility label. iOS 27 drops a toolbar
+    /// button's accessibility value, so there the label also carries
+    /// drawing mode; earlier iOS keeps the plain label and the value says it.
+    static func drawToolAccessibilityLabel(active: Bool) -> String {
+        if #available(iOS 27, *), active { return "Rectangle, Drawing mode active" }
+        return "Rectangle"
+    }
+
+    /// The Rectangle tool's full accessibility label: its state, then its
+    /// hint, which only VoiceOver gets.
+    static func drawToolAccessibilityLabel(active: Bool, voiceOverRunning: Bool) -> String {
+        labelWithHint(drawToolAccessibilityLabel(active: active),
+                      hint: voiceOverRunning ? rectangleVoiceOverHint : "")
+    }
+
+    /// A toolbar control's accessibility label. iOS 27 drops a toolbar
+    /// button's accessibility hint, so there a non-empty hint follows the
+    /// label after ", "; earlier iOS keeps the label and speaks the hint.
+    static func labelWithHint(_ label: String, hint: String) -> String {
+        if #available(iOS 27, *), !hint.isEmpty { return "\(label), \(hint)" }
+        return label
+    }
+
+    /// The Stop control's hint while a run or a verification is in flight.
+    static let stopHint = "Stops processing. Your document is preserved."
+
     func resetCanvasTools() {
         activeTool = nil
         isMultiSelectActive = false
@@ -77,6 +106,8 @@ struct DocumentEditorToolbar {
             .accessibilityIdentifier("drawTool")
             .accessibilityValue(activeTool == .rectangle
                                 ? "Drawing mode active" : "Tap to enter drawing mode")
+            .accessibilityLabel(Self.drawToolAccessibilityLabel(
+                active: activeTool == .rectangle, voiceOverRunning: UIAccessibility.isVoiceOverRunning))
             // A drag cannot draw under VoiceOver: the tool is off, and says why.
             .disabled(UIAccessibility.isVoiceOverRunning)
             .accessibilityHint(UIAccessibility.isVoiceOverRunning ? Self.rectangleVoiceOverHint : "")
@@ -165,11 +196,13 @@ struct DocumentEditorToolbar {
             // ONE Stop for the whole run: its title follows the phase, the
             // button keeps its place at the processing to verifying hand-off,
             // so a tap in flight lands on it.
-            Button(Self.stopLabel(for: documentState.runChromePhaseKind) ?? "", systemImage: "stop.circle") {
+            let stopTitle = Self.stopLabel(for: documentState.runChromePhaseKind) ?? ""
+            Button(stopTitle, systemImage: "stop.circle") {
                 documentState.cancelActivePipeline(redactionState: redactionState)
             }
             .accessibilityIdentifier("stopProcessing")
-            .accessibilityHint("Stops processing. Your document is preserved.")
+            .accessibilityLabel(Self.labelWithHint(stopTitle, hint: Self.stopHint))
+            .accessibilityHint(Self.stopHint)
 
         default:
             // .verified, .failed — settings gear only.
@@ -204,6 +237,7 @@ struct DocumentEditorToolbar {
         .disabled(redactButtonDisabled)
         .keyboardShortcut("r", modifiers: [.command, .shift])
         .accessibilityIdentifier("redactButton")
+        .accessibilityLabel(Self.labelWithHint("Redact", hint: redactButtonHint))
         .accessibilityHint(redactButtonHint)
     }
 
@@ -311,6 +345,7 @@ struct DocumentEditorToolbar {
         }
         .menuOrder(.fixed)
         .disabled(mode == .unavailable)
+        .accessibilityLabel(Self.labelWithHint("Undo", hint: EditorToolbarLayout.undoHint(for: mode)))
         .accessibilityHint(EditorToolbarLayout.undoHint(for: mode))
         .accessibilityIdentifier("undoButton")
     }
@@ -435,7 +470,7 @@ struct DocumentEditorToolbar {
 }
 
 /// The editor's toolbar content. On iPhone in the editing phase the trailing
-/// side is the layout's pieces — the Undo control, Redact, the system … —
+/// side is the layout's pieces — the Undo control, Redact, the … menu —
 /// each its own item with a fixed spacer between, and the inline title is
 /// hidden (the bar leaves it no room); every other case keeps the trailing
 /// group. The neutral tint is applied inside each item's view, never
@@ -465,8 +500,23 @@ struct EditorToolbarContent: ToolbarContent {
                 }
             }
             ToolbarSpacer(.fixed, placement: .topBarTrailing)
-            ToolbarItemGroup(placement: .secondaryAction) {
-                toolbar.secondaryActionToolbarItems(layout: layout)
+            if #available(iOS 27, *) {
+                // Our own … menu on iOS 27, where the system's
+                // (`.secondaryAction`) shares one capsule with a disabled
+                // Redact. Earlier iOS keeps the system's.
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        toolbar.secondaryActionToolbarItems(layout: layout)
+                    } label: {
+                        Label("More", systemImage: "ellipsis")
+                    }
+                    .tint(.primary)
+                    .accessibilityIdentifier(DocumentEditorToolbar.moreMenuIdentifier)
+                }
+            } else {
+                ToolbarItemGroup(placement: .secondaryAction) {
+                    toolbar.secondaryActionToolbarItems(layout: layout)
+                }
             }
         } else {
             ToolbarItemGroup(placement: .topBarTrailing) {

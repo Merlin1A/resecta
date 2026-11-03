@@ -569,7 +569,7 @@ nonisolated final class SearchDetentLayoutUITests: XCTestCase {
 
         // The editor toolbar's Undo takes the region back and the
         // button re-enables — the undo-integration proof.
-        let undo = app.buttons["Undo"].firstMatch
+        let undo = app.buttons["undoButton"].firstMatch
         XCTAssertTrue(undo.waitForExistence(timeout: 5), "The editor toolbar's Undo button is missing.")
         XCTAssertTrue(undo.isHittable, "The editor toolbar's Undo is not hittable beneath the parked sheet.")
         undo.tap()

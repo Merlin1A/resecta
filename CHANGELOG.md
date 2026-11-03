@@ -49,6 +49,20 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - `THREAT-MODEL.md` §7 is headed "Security posture", with its date and commit in its first sentence, so a link to it holds across re-dates. The branch-rules row names each repository's required check, the up-to-date-branch rule and the `rulesets/<id>` path, and says the admin role may bypass the ruleset on a pull request; the reporting and secrets rows give their public API paths and the contributors graph; the flag-check row names one launch argument. The rows the site's posture sheet also shows read as the site's do, and a note beneath the table names the checks that need a role on the repository. No state changed, and the section keeps its 2026-10-27 date.
 - `SECURITY.md` says why `v1.0.0` and `v1.2.0` verify from a clone of `main`, names the public API path that lists published advisories, and states that the project has had no third-party security audit, runs no bug bounty, and makes no compliance claims.
 - `THREAT-MODEL.md` §7 re-dated at `05b7ae0a` (2026-10-27), each row re-checked: the identity-record row names the 1.3.0 record beside the 1.2.0 one, and the immutable-releases row names `gh release verify v1.3.0`, the first release published after the setting was turned on.
+## [1.3.1] — 2026-11-01
+
+Fixes a crash on iOS 27 when touching or scrolling a document. On iOS 27, exported files now carry the fixed creation date again. Search on scanned pages and photos on iOS 27 now matches text it could miss, such as phone numbers. Also fixes zoom, toolbar and VoiceOver issues on iOS 27.
+
+### Fixed
+
+- Editor: on iOS 27 the app quit at the first touch on an open document's page. The page view passed PDFKit's own gestures to a PDFKit method that iOS 27 no longer has; the double tap that returns to the fit zoom now has its own gesture delegate, so the page view no longer answers for PDFKit's gestures.
+- Export: on iOS 27 the redacted file kept the time it was written in its creation date, and verification reported the metadata as not rewritten; the creation date is now the fixed value, as on iOS 26.
+- Search: on iOS 27, a search on a scanned page or photo could miss text that iOS 26 read, such as a phone number read with a space after a hyphen or a line read as noise; Search now also reads the page a second way and adds what that read matched.
+- Editor: on iOS 27, before the first region the disabled Redact button and the … menu shared one button shape, and the trailing buttons shifted when the first region arrived; Undo, Redact and More are now three separate buttons in every state, as on iOS 26.
+- Search: on iOS 27, saving or renaming a saved search under a name already in use closed the prompt without saving and without saying why; the alert naming the duplicate appears again, as on iOS 26.
+- Editor: on iOS 27, a zoomed-in page returned to the fit zoom when you stepped through search results, changed page from the page bar, or opened or closed the Search sheet; the zoom now holds, and each result step enlarges and centres the match again, as on iOS 26.
+- Accessibility: on iOS 27, toolbar buttons stopped telling VoiceOver and other assistive technologies their state and hints, such as why Redact is unavailable and whether the Rectangle tool's drawing mode is on; each button's label now carries them.
+- Detection: on iOS 27, name detection now stays available when Resecta's detection data fails its integrity check.
 
 ## [1.3.0] — 2026-10-26
 
@@ -507,7 +521,8 @@ Initial public release.
 - **Pixel-destruction core shared by both modes.** Every page is rasterized, marked or not; vector text and images are converted into flat bitmap data, and the redaction process is designed to remove the original text layer from marked regions.
 - **Searchable Redaction text-layer design.** The reconstructed text layer uses a fresh monospace font with uniform spacing, designed to remove the glyph-positioning side channels identified in academic research on sandwich PDFs.
 
-[Unreleased]: https://github.com/Merlin1A/resecta/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/Merlin1A/resecta/compare/v1.3.1...HEAD
+[1.3.1]: https://github.com/Merlin1A/resecta/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/Merlin1A/resecta/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/Merlin1A/resecta/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Merlin1A/resecta/compare/v1.0.0...v1.1.0

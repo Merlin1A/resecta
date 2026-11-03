@@ -85,7 +85,7 @@ struct PDFDocumentView: UIViewRepresentable {
         if let doc = pdfView.document,
            let targetPage = doc.page(at: documentState.currentPageIndex),
            pdfView.currentPage != targetPage {
-            pdfView.go(to: targetPage)
+            pdfView.goKeepingZoom(to: targetPage)
         }
 
         // Rect-level scroll-to-match. Consume the pending target
@@ -206,6 +206,7 @@ final class FitFlooredPDFView: PDFView {
         applyFitFloor()
         reassertReadabilityFramingIfNeeded()
     }
+
 
     // MARK: - Edit menu
 
@@ -342,6 +343,10 @@ final class FitFlooredPDFView: PDFView {
     /// re-assert store above rides the parked inset's animation.
     private func centre(_ rectInPage: CGRect, on page: PDFPage) {
         guard scaleFactor > 0, bounds.width > 0, bounds.height > 0 else { return }
+        if #available(iOS 27, *), let scrollView {
+            centreByScrolling(rectInPage, on: page, in: scrollView)
+            return
+        }
         let point = PDFDocumentView.centeringDestinationPoint(
             rectInPage: rectInPage,
             visibleSizeInPage: CGSize(
@@ -350,6 +355,54 @@ final class FitFlooredPDFView: PDFView {
             pageBounds: page.bounds(for: displayBox)
         )
         go(to: PDFDestination(page: page, at: point))
+    }
+
+    /// iOS 27's `go(to:)` refits the page, undoing the scale just written,
+    /// so there the page change keeps the scale and the rect is centred by
+    /// moving PDFKit's scroll view, clamped to its content.
+    /// Without that scroll view (a PDFKit change), the destination path
+    /// above stands.
+    private func centreByScrolling(_ rectInPage: CGRect, on page: PDFPage, in scrollView: UIScrollView) {
+        if currentPage != page { goKeepingZoom(to: page) }
+        layoutIfNeeded()
+        let rect = convert(rectInPage, from: page)
+        var offset = scrollView.contentOffset
+        offset.x += rect.midX - bounds.midX
+        offset.y += rect.midY - bounds.midY
+        scrollView.setContentOffset(Self.clampedOffset(offset, in: scrollView), animated: false)
+    }
+
+    /// PDFKit's scroll view: a direct child on iOS 26 and 27.
+    private var scrollView: UIScrollView? {
+        subviews.first { $0 is UIScrollView } as? UIScrollView
+    }
+
+    /// `offset` kept inside the scroll view's content and insets.
+    static func clampedOffset(_ offset: CGPoint, in scrollView: UIScrollView) -> CGPoint {
+        let inset = scrollView.adjustedContentInset
+        let maxX = max(-inset.left, scrollView.contentSize.width - scrollView.bounds.width + inset.right)
+        let maxY = max(-inset.top, scrollView.contentSize.height - scrollView.bounds.height + inset.bottom)
+        return CGPoint(x: min(max(offset.x, -inset.left), maxX),
+                       y: min(max(offset.y, -inset.top), maxY))
+    }
+
+    /// Go to `page` at the current zoom. iOS 27's `go(to:)` refits a
+    /// zoomed-in page, so there a zoomed move puts the scale and the scroll
+    /// position back after it, as earlier iOS keeps them. At fit, and on
+    /// earlier iOS, it is `go(to:)` alone.
+    func goKeepingZoom(to page: PDFPage) {
+        let fit = scaleFactorForSizeToFit
+        let scale = scaleFactor
+        let offset = scrollView?.contentOffset
+        go(to: page)
+        guard #available(iOS 27, *), fit > 0, scale > fit * (1 + Self.floorTolerance),
+              abs(scaleFactor - scale) > ReadabilityZoom.scaleEpsilon * fit
+        else { return }
+        scaleFactor = scale
+        layoutIfNeeded()
+        if let scrollView, let offset {
+            scrollView.setContentOffset(Self.clampedOffset(offset, in: scrollView), animated: false)
+        }
     }
 
     static let returnToFitGestureName = "returnToFit"
@@ -367,8 +420,12 @@ final class FitFlooredPDFView: PDFView {
         UIView.animate(withDuration: 0.25) { self.scaleFactor = fit }
     }
 
-    /// The double tap returns to fit, only on empty page (this view is its
-    /// one delegate); the single tap waits for it to fail. Neither cancels
+    /// The double tap's delegate. A recognizer holds its delegate weakly,
+    /// so the view keeps it.
+    private let returnToFitDelegate = ReturnToFitTapDelegate()
+
+    /// The double tap returns to fit, only on empty page (its own delegate
+    /// decides); the single tap waits for it to fail. Neither cancels
     /// nor delays the touches beneath it, so a tap on a region still
     /// reaches the overlay.
     private func addTapGestures() {
@@ -377,7 +434,7 @@ final class FitFlooredPDFView: PDFView {
         doubleTap.cancelsTouchesInView = false
         doubleTap.delaysTouchesEnded = false
         doubleTap.name = Self.returnToFitGestureName
-        doubleTap.delegate = self
+        doubleTap.delegate = returnToFitDelegate
         addGestureRecognizer(doubleTap)
 
         let singleTap = UITapGestureRecognizer(target: self, action: #selector(handleSingleTap(_:)))
@@ -404,12 +461,33 @@ final class FitFlooredPDFView: PDFView {
             && scaleFactor <= previousFloor * (1 + Self.floorTolerance)
         minScaleFactor = fit
         // The setter above turns `autoScales` off (PDFView.h); keep
-        // PDFKit's own resize re-fit alongside the floor.
-        autoScales = true
+        // PDFKit's own resize re-fit alongside the floor. iOS 27 refits a
+        // zoomed-in page the moment `autoScales` turns on, even when only
+        // the canvas height moved (the search sheet), which earlier iOS
+        // does not; so there such a page keeps its zoom and `autoScales`
+        // stays off. A width change still re-fits, as on earlier iOS.
+        let widthChanged = abs(bounds.width - floorWidth) > 0.5
+        if !Self.keepsZoomOnFloorMove(floorApplied: floorApplied, satAtFloor: satAtFloor,
+                                      widthChanged: widthChanged, scale: scaleFactor, fit: fit) {
+            autoScales = true
+        }
         if !floorApplied || satAtFloor || scaleFactor < fit {
             scaleFactor = fit
         }
         floorApplied = true
+        floorWidth = bounds.width
+    }
+
+    /// The canvas width at the last floor move.
+    private var floorWidth: CGFloat = 0
+
+    /// Whether a floor move leaves a zoomed-in page alone: on iOS 27 only,
+    /// when only the height moved and the page sits above the new fit, not
+    /// at the old floor.
+    static func keepsZoomOnFloorMove(floorApplied: Bool, satAtFloor: Bool, widthChanged: Bool,
+                                     scale: CGFloat, fit: CGFloat) -> Bool {
+        guard #available(iOS 27, *) else { return false }
+        return floorApplied && !satAtFloor && !widthChanged && scale > fit * (1 + floorTolerance)
     }
 
     /// `.singlePage` fits each page on its own, so a differently sized
@@ -441,15 +519,16 @@ extension FitFlooredPDFView {
     private static func regionOverlays(in view: UIView) -> [RedactionOverlayView] {
         view.subviews.flatMap { ($0 as? RedactionOverlayView).map { [$0] } ?? regionOverlays(in: $0) }
     }
+}
 
-    /// The double tap's one delegate: a touch the canvas overlay claims (a
-    /// region, a handle, every draw and Add to Selection touch) is never a
-    /// double tap; a touch on the page is. PDFKit's own recognizers keep
-    /// PDFView's answer.
-    override func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
-        guard gestureRecognizer.name == Self.returnToFitGestureName else {
-            return super.gestureRecognizer(gestureRecognizer, shouldReceive: touch)
-        }
-        return !(touch.view is RedactionOverlayView)
+/// The return-to-fit double tap's delegate: a touch the canvas overlay
+/// claims (a region, a handle, every draw and Add to Selection touch) is
+/// never a double tap; a touch on the page is. It is its own object so the
+/// PDF view implements no gesture delegate method: PDFKit's recognizers
+/// keep PDFKit's own delegate handling, whichever methods PDFView
+/// implements on the running iOS.
+final class ReturnToFitTapDelegate: NSObject, UIGestureRecognizerDelegate {
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        !(touch.view is RedactionOverlayView)
     }
 }

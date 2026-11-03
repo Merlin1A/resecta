@@ -59,7 +59,7 @@ private extension CanvasRegionAccessibilityUITests {
     nonisolated func waitForValue(_ element: XCUIElement, _ value: String, timeout: TimeInterval = 6) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
-            if (element.value as? String) == value { return true }
+            if element.drawToolReads(value) { return true }
             usleep(250_000)
         }
         return false

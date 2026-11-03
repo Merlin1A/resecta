@@ -22,6 +22,11 @@ struct MalformedInfoDictionaryCopyTests {
     @Test("The search copy of a document with an unreadable /Info key is nil, not a crash")
     func searchCopyIsNil() throws {
         let doc = try #require(PDFDocument(data: Self.malformedInfoPDF))
-        #expect(DocumentState.makeSearchCopy(of: SendablePDFDocument(doc)) == nil)
+        if #available(iOS 27, *) {
+            // iOS 27 writes this file without raising: the search copy is the same document, held in memory.
+            #expect(DocumentState.makeSearchCopy(of: SendablePDFDocument(doc))?.document.pageCount == doc.pageCount)
+        } else {
+            #expect(DocumentState.makeSearchCopy(of: SendablePDFDocument(doc)) == nil)
+        }
     }
 }
