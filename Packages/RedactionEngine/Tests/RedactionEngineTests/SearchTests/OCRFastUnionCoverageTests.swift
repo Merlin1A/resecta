@@ -86,8 +86,14 @@ struct OCRFastUnionCoverageTests {
         let merged = DocumentSearcher.unionFastOCRResults(
             accurate: [result(Self.line)], fast: [result(Self.fragments[1]), result(Self.fragments[2])])
         #expect(merged.count == 2, "one result per fast match: \(merged.map(\.normalizedRect))")
-        #expect(merged.contains { $0.normalizedRect.contains(Self.line) }, "the accurate box is kept, on the first: \(merged.map(\.normalizedRect))")
-        #expect(merged.contains { $0.normalizedRect == Self.fragments[2] }, "the other fast match keeps its own box")
+        // The fold's union is computed in floating point: equal to within 1e-9 on each edge.
+        func same(_ a: CGRect, _ b: CGRect) -> Bool {
+            abs(a.minX - b.minX) < 1e-9 && abs(a.minY - b.minY) < 1e-9
+                && abs(a.maxX - b.maxX) < 1e-9 && abs(a.maxY - b.maxY) < 1e-9
+        }
+        let boxes = merged.map(\.normalizedRect)
+        #expect(boxes.contains { same($0, Self.line) }, "the accurate box is kept, on the first: \(boxes)")
+        #expect(boxes.contains { same($0, Self.fragments[2]) }, "the other fast match keeps its own box: \(boxes)")
         #expect(Set(merged.map { $0.identityRect ?? $0.normalizedRect }) == [Self.fragments[1], Self.fragments[2]],
                 "each keeps its read's own box as its identity")
     }
