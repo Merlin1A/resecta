@@ -139,6 +139,44 @@ struct BackgroundVerifyResumeTests {
         #expect(FileManager.default.fileExists(atPath: output.path), "the built copy's file survives the cut")
     }
 
+    // MARK: - The recovery row that discards the copy
+
+    private static var fullRun: PipelineRunKind {
+        .full(effectiveMode: .secureRasterization, runSettings: PipelineCoordinator.RunSettings(
+            pipelineMode: .secureRasterization, autoVerify: true,
+            paranoidMode: false, fillColor: .black, exportDPI: 300))
+    }
+    private static var verifyOnlyRun: PipelineRunKind {
+        .verifyOnly(outputURL: URL(fileURLWithPath: "/tmp/background-verify-resume.pdf"),
+                    effectiveMode: .secureRasterization)
+    }
+
+    /// The full run's cancel row discards the output from any running phase
+    /// (`PipelineRunRecoveryTests`). A background cut never reaches it: the
+    /// cut supersedes the run (its id is cleared) before the run's own handler
+    /// reads the table, and from the phase the cut lands on the cancel rows
+    /// drive nothing.
+    @Test("A background cut mid-verify never reaches the recovery row that discards the copy")
+    func backgroundCutNeverReachesTheDiscardRow() async throws {
+        let f = try verifyingRun()
+        defer { try? FileManager.default.removeItem(at: f.root) }
+        let doc = f.coord.documentState
+
+        ContentView.cancelForBackground(documentState: doc, redactionState: f.coord.redactionState)
+
+        #expect(doc.activeRunId == nil, "the run's own handler acts only while its run is the active one")
+        for kind in [Self.fullRun, Self.verifyOnlyRun] {
+            guard case .none = PipelineCoordinator.recovery(
+                for: kind, after: .cancelled, phaseKind: doc.phaseKind) else {
+                Issue.record("a cancel row drives a recovery from \(doc.phaseKind)")
+                continue
+            }
+        }
+        _ = await f.task.value
+        await Task.yield()
+        #expect(FileManager.default.fileExists(atPath: f.output.path), "the built copy's file survives the cut")
+    }
+
     // MARK: - Unchanged paths
 
     @Test("A Stop mid-verify still lands on the results as skipped, with no paused notice",
