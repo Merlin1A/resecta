@@ -165,13 +165,57 @@ public struct TextNormalizer: Sendable {
     /// such a separator after a digit and the next digit. Text recognition
     /// on iOS 27 can read "1-800-555-0199" as "1-800- 555-0199". A run of
     /// spaces, or a space with no digit across the separator, stays.
-    /// Length-changing and map-free: only callers whose rect does not come
-    /// from offsets into the folded text may use it (the OCR literal path
-    /// boxes a match by its whole line).
+    /// Length-changing, and this is its text only: a caller that places a
+    /// box from offsets into the text reads the fold through
+    /// `foldOCRSeparatorSpacesMapped` (the OCR literal path boxes a match
+    /// by the words it covers).
     static func foldOCRSeparatorSpaces(_ text: String) -> String {
+        foldOCRSeparatorSpacesMapped(text).text
+    }
+
+    /// The fold of `foldOCRSeparatorSpaces` with its route back:
+    /// `offsetMap[i]` is the UTF-16 offset in `text` of the folded text's
+    /// unit i, with one entry more for the end; nil when nothing folded.
+    /// Each folded space is one ASCII unit between ASCII characters, so no
+    /// surrogate pair is split.
+    static func foldOCRSeparatorSpacesMapped(_ text: String) -> (text: String, offsetMap: [Int]?) {
         let ns = text as NSString
-        return ocrSeparatorSpace.stringByReplacingMatches(
-            in: text, range: NSRange(location: 0, length: ns.length), withTemplate: "")
+        let folded = ocrSeparatorSpace.matches(in: text, range: NSRange(location: 0, length: ns.length)).map(\.range)
+        guard !folded.isEmpty else { return (text, nil) }
+        let result = NSMutableString(capacity: ns.length)
+        var map: [Int] = []
+        map.reserveCapacity(ns.length + 1)
+        var cursor = 0
+        for range in folded + [NSRange(location: ns.length, length: 0)] {
+            result.append(ns.substring(with: NSRange(location: cursor, length: range.location - cursor)))
+            map.append(contentsOf: cursor..<range.location)
+            cursor = NSMaxRange(range)
+        }
+        map.append(ns.length)
+        return (result as String, map)
+    }
+
+    /// The range in the unfolded text of `range` in the folded one.
+    static func unfoldedRange(_ range: NSRange, offsetMap: [Int]?) -> NSRange {
+        guard let offsetMap, range.length > 0 else { return range }
+        let start = offsetMap[range.location]
+        return NSRange(location: start, length: offsetMap[NSMaxRange(range) - 1] + 1 - start)
+    }
+
+    /// The range in the folded text of `range` in the unfolded one, whose
+    /// first unit was not folded away.
+    static func foldedRange(_ range: NSRange, offsetMap: [Int]?) -> NSRange {
+        guard let offsetMap else { return range }
+        func firstAtOrAfter(_ offset: Int) -> Int {
+            var low = 0, high = offsetMap.count - 1
+            while low < high {
+                let mid = (low + high) / 2
+                if offsetMap[mid] < offset { low = mid + 1 } else { high = mid }
+            }
+            return low
+        }
+        let start = firstAtOrAfter(range.location)
+        return NSRange(location: start, length: firstAtOrAfter(NSMaxRange(range)) - start)
     }
 
     // Constant pattern — try! safe (pinned in OCRSeparatorSpaceFoldTests).

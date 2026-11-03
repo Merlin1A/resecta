@@ -23,7 +23,9 @@ import PDFKit
 // its part of the match covers (Vision's word boxes,
 // `OCREngine.TextLine.wordBoxes`), padded as every OCR box is, never the whole
 // line; a line whose words have no box falls back to the line's box, and the
-// count of such lines is logged. The displayed text is sliced from the
+// count of such lines is logged. On iOS 27 a space beside a separator inside
+// a digit run folds on both sides, and each range comes back to the read
+// line's offsets through the fold's map before a word is boxed. The displayed text is sliced from the
 // recognised text itself, what the OCR Check reads. The Search Re-check
 // re-runs this searcher on the output, so an instance left printed reads as
 // found there too.
@@ -83,15 +85,28 @@ extension DocumentSearcher {
             zip(texts, separators + [""]).map { $0 + $1 }.joined()
         }
         let joined = joinedText(rawTexts)
+        // iOS 27 can read a space beside a separator inside a digit run
+        // ("555- 0147"). There both readings and the query fold it
+        // (`TextNormalizer.foldOCRSeparatorSpacesMapped`), and every range
+        // comes back to the read text's offsets through the fold's map, so a
+        // line's part of a match and its word boxes stay where Vision read
+        // them. iOS 26 reads keep their text.
+        let foldsSeparatorSpaces: Bool = { if #available(iOS 27, *) { return true }; return false }()
+        func reading(_ text: String) -> (text: String, offsetMap: [Int]?) {
+            foldsSeparatorSpaces ? TextNormalizer.foldOCRSeparatorSpacesMapped(text) : (text, nil)
+        }
+        let rawReading = reading(joined)
         let effective = SearchCore.effectiveOptions(OCRMatchSkeleton.options(options), pageText: joined, detectCJK: true)
-        let normalizedQuery = SearchCore.normalizedText(OCRMatchSkeleton.trimmedQuery(query), options: effective)
+        let typedQuery = OCRMatchSkeleton.trimmedQuery(query)
+        let normalizedQuery = SearchCore.normalizedText(
+            foldsSeparatorSpaces ? TextNormalizer.foldOCRSeparatorSpaces(typedQuery) : typedQuery, options: effective)
         guard !normalizedQuery.isEmpty else { return [] }
         // The raw reading matches on the skeleton (the typed digits against
         // the digits Vision read); the corrected reading matches as typed
         // (letters Vision read as digits, "1D" for "ID"). A range both
         // readings hold is kept once.
-        func ranges(in text: String, skeleton: Bool) -> [NSRange] {
-            let page = SearchCore.preparePage(text, options: effective)
+        func ranges(in reading: (text: String, offsetMap: [Int]?), skeleton: Bool) -> [NSRange] {
+            let page = SearchCore.preparePage(reading.text, options: effective)
             let prepared = skeleton ? OCRMatchSkeleton.skeleton(page) : page
             let typed = skeleton ? OCRMatchSkeleton.skeleton(normalizedQuery) : normalizedQuery
             let searchQuery = SearchCore.preparedQuery(normalized: typed, options: effective)
@@ -99,20 +114,23 @@ extension DocumentSearcher {
             return SearchCore.literalSpans(
                 in: prepared, query: searchQuery, comparison: [], wholeWord: effective.wholeWord, cap: nil
             ).spans.compactMap { prepared.rawNSRange(of: $0) }
+                .map { TextNormalizer.unfoldedRange($0, offsetMap: reading.offsetMap) }
         }
         var seen = Set<NSRange>()
-        let matches = (ranges(in: joined, skeleton: true) + ranges(in: joinedText(correctedTexts), skeleton: false))
+        let matches = (ranges(in: rawReading, skeleton: true) + ranges(in: reading(joinedText(correctedTexts)), skeleton: false))
             .filter { seen.insert($0).inserted }
             .sorted { $0.location < $1.location }
-        let text = joined as NSString
+        // The shown text is the raw reading as matched, folded where it was.
+        let text = rawReading.text as NSString
         // The context reads the separator of two unjoined lines as a space.
-        let shown = joined.replacingOccurrences(of: "\u{FFFC}", with: " ")
+        let shown = rawReading.text.replacingOccurrences(of: "\u{FFFC}", with: " ")
         var results: [SearchResult] = []
         var lineFallbacks = 0
         for raw in matches {
             let touched = spans.indices.filter { spans[$0].lowerBound < NSMaxRange(raw) && spans[$0].upperBound > raw.location }
-            let matchedText = TextNormalizer.foldWhitespaceRuns(text.substring(with: raw))
-            let window = contextSnippet(text: shown, matchNSRange: raw)
+            let display = TextNormalizer.foldedRange(raw, offsetMap: rawReading.offsetMap)
+            let matchedText = TextNormalizer.foldWhitespaceRuns(text.substring(with: display))
+            let window = contextSnippet(text: shown, matchNSRange: display)
             let occurrence = touched.count > 1 ? UUID() : nil
             for index in touched {
                 let lower = max(raw.location, spans[index].lowerBound), upper = min(NSMaxRange(raw), spans[index].upperBound)
