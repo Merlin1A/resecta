@@ -96,7 +96,7 @@ struct ScanKickoffDegradeTests {
 
     @Test("Where the name model tags a sentence in this process, the live kickoff adds nothing to the load")
     func liveKickoffOnATaggingModel() async {
-        let text = "The account holder Michael Johnson paid Delia Hartwell on Monday, and the bank sent the statement to both of them by mail."
+        let text = "Last Friday Robert Miller met Sarah Thompson at the branch, and the clerk gave each of them a copy of the signed loan papers."
         let tagger = NameDetector.makeNameTagger(for: text)
         var names: [String] = []
         tagger.enumerateTags(in: text.startIndex..<text.endIndex, unit: .word, scheme: .nameType) { tag, range in

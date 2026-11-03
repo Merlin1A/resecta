@@ -67,7 +67,7 @@ struct ScanKickoffNameCanaryTests {
                 "the kickoff's canary must ask through makeNameTagger(for:)")
         #expect(NameDetector.nameModelQueried == Self.onIOS27)
 
-        let text = "The account holder Michael Johnson paid Delia Hartwell on Monday, and the bank sent the statement to both of them by mail."
+        let text = "Last Friday Robert Miller met Sarah Thompson at the branch, and the clerk gave each of them a copy of the signed loan papers."
         let tagger = NameDetector.makeNameTagger(for: text)
         var names: [String] = []
         tagger.enumerateTags(in: text.startIndex..<text.endIndex, unit: .word, scheme: .nameType) { tag, range in
@@ -89,7 +89,7 @@ struct ScanKickoffNameCanaryTests {
 
     @Test("Where a sentence tags names through the factory, the canary tags too")
     func canaryAgreesWithATagPass() {
-        let text = "The account holder Michael Johnson paid Delia Hartwell on Monday, and the bank sent the statement to both of them by mail."
+        let text = "Last Friday Robert Miller met Sarah Thompson at the branch, and the clerk gave each of them a copy of the signed loan papers."
         func names(_ s: String, english: Bool) -> [String] {
             let tagger = NameDetector.makeNameTagger(for: s)
             if english { tagger.setLanguage(.english, range: s.startIndex..<s.endIndex) }
@@ -103,7 +103,7 @@ struct ScanKickoffNameCanaryTests {
         let canary = (0..<3).map { _ in PIIDetector.nameCanaryTags() }
         let listed = NLTagger.availableTagSchemes(for: .word, language: .english).contains(.nameType)
         let sentence = names(text, english: false)
-        print("ScanKickoffNameCanary: listed(en)=\(listed) canary=\(canary) canaryNoLanguage=\(names("Michael Johnson", english: false)) sentence=\(sentence) sentenceEnglish=\(names(text, english: true)) loadNERAvailable=\(PIIDetector.isNameNERAvailable())")
+        print("ScanKickoffNameCanary: listed(en)=\(listed) canary=\(canary) twoWordName=\(names("Michael Johnson", english: true)) sentence=\(sentence) sentenceEnglish=\(names(text, english: true)) loadNERAvailable=\(PIIDetector.isNameNERAvailable())")
         guard !sentence.isEmpty else {
             TestGate.skip("[NER asset] the name model tags nothing in this process; the agreement check needs it.")
             return
