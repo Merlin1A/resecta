@@ -51,6 +51,10 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - `THREAT-MODEL.md` §7 is headed "Security posture", with its date and commit in its first sentence, so a link to it holds across re-dates. The branch-rules row names each repository's required check, the up-to-date-branch rule and the `rulesets/<id>` path, and says the admin role may bypass the ruleset on a pull request; the reporting and secrets rows give their public API paths and the contributors graph; the flag-check row names one launch argument. The rows the site's posture sheet also shows read as the site's do, and a note beneath the table names the checks that need a role on the repository. No state changed, and the section keeps its 2026-10-27 date.
 - `SECURITY.md` says why `v1.0.0` and `v1.2.0` verify from a clone of `main`, names the public API path that lists published advisories, and states that the project has had no third-party security audit, runs no bug bounty, and makes no compliance claims.
 - `THREAT-MODEL.md` §7 re-dated at `05b7ae0a` (2026-10-27), each row re-checked: the identity-record row names the 1.3.0 record beside the 1.2.0 one, and the immutable-releases row names `gh release verify v1.3.0`, the first release published after the setting was turned on.
+### Internal
+
+- A target specification for the verification pass, VERIFICATION-SPEC.md, with a status line per rule; claims-lint covers it.
+
 ## [1.3.1] — 2026-11-01
 
 Fixes a crash on iOS 27 when touching or scrolling a document. On iOS 27, exported files now carry the fixed creation date again. Search on scanned pages and photos on iOS 27 now matches text it could miss, such as phone numbers. Also fixes zoom, toolbar and VoiceOver issues on iOS 27.
