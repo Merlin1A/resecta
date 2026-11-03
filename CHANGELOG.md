@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Documentation: the threat model names the import caps (500 pages, 5,000 points on a side, and an image that declares more than 100 million pixels refused before it is decoded); its network notes name the name-recognition model iOS fetches on its own and the iCloud download of a photo or a file stored only there; and its persistence note says the redacted output is moved into place in a single step and that a change to your regions deletes the previous output file at once.
 - Documentation: the threat model, the engineering notes and the README's claims map narrow the detection-data signature claim to what the key holder signed — the bytes the detector reads are the bytes the maintainer's signing run listed — and leave the installed app's integrity to the app-bundle code signature.
 - Documentation: the README says the app runs on iOS 26 or later.
+- Documentation: SECURITY.md's tag-verification example checks `v1.3.1`.
 - Documentation: the threat model's posture table names the 1.3.1 identity record (`RELEASES/1.3.1-identity.md`), `git tag -v v1.3.1` and `gh release verify v1.3.1`; v1.3.0 stays named as the first release published after immutable releases were turned on, and the section keeps its 2026-10-27 date.
 - Documentation: the engineering notes describe the fake-redaction suite's control, which asserts that the text survives when nothing is marked.
 - Documentation: accepted risk 9 now names the scanned-bar case; KNOWN_ISSUES KI-18.
