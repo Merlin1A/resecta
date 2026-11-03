@@ -10,7 +10,7 @@ Resecta is a free, open-source iPhone app that redacts PDFs on-device and then c
 
 **License:** [Apache License 2.0](./LICENSE)
 
-**Latest release:** 1.3.0 — see the [CHANGELOG](./CHANGELOG.md).
+**Latest release:** 1.3.1 — see the [CHANGELOG](./CHANGELOG.md).
 
 ---
 
