@@ -100,7 +100,16 @@ class DocumentState {
 
     // MARK: - State
 
-    var phase: Phase = .empty
+    /// Every phase change goes through `keepAwake`, the one owner of the
+    /// screen's auto-lock: held in a run phase, released on any other.
+    var phase: Phase = .empty {
+        didSet { keepAwake.update(for: phaseKind) }
+    }
+
+    /// Keeps the screen awake while a run works (`RunKeepAwake`). Tests
+    /// replace it with a recorder before the document enters a run.
+    @ObservationIgnored var keepAwake = RunKeepAwake()
+
     var sourceDocument: PDFDocument? {
         didSet { if oldValue !== sourceDocument { sourceDocumentToken = UUID() } }
     }
@@ -625,6 +634,13 @@ class DocumentState {
 
     // MARK: - Cancellation
 
+    /// Why a run is being cancelled: a Stop (the toolbar, the import
+    /// card's Cancel, closing the document) or leaving the app.
+    enum CancelCause {
+        case stop
+        case background
+    }
+
     /// Cancel the active pipeline or import task and return to a safe phase.
     /// `.importing` is cancellable too. The import
     /// task is tracked separately on `activeImportTask` because the
@@ -643,7 +659,7 @@ class DocumentState {
     /// so that `defer` observably completes before the next pipeline kicks
     /// off from the same workspace. The sync signature is preserved; callers
     /// from button-tap and `RedactWorkspace.tearDown()` need no change.
-    func cancelActivePipeline(redactionState: RedactionState) {
+    func cancelActivePipeline(redactionState: RedactionState, cause: CancelCause = .stop) {
         // Capture references before nilling so the awaiter
         // below can observe each cancelled Task's `defer` complete.
         let pipelineCaptured = activePipelineTask
@@ -670,15 +686,22 @@ class DocumentState {
             transition(to: .editing)
         case .verifying:
             // The redacted output is valid even if verification was
-            // interrupted: keep `outputURL` and land on the skipped report,
-            // carrying `.cancelled` so the results copy names the cause
-            // (user Stop and backgrounding mid-verify alike). The stale
-            // flag clears only through the burned-version guard, for the
-            // run recorded with the output; `clearVerification()` is not
-            // called, since it would clear the flag for any output. The
-            // resume banner reads the flag to choose Re-verify or Restart.
+            // interrupted: keep `outputURL`. The stale flag clears only
+            // through the burned-version guard, for the run recorded with
+            // the output; `clearVerification()` is not called, since it
+            // would clear the flag for any output.
             redactionState.markVerificationCurrentForRecordedRun()
-            transition(to: .verified(report: .skipped(reason: .cancelled)))
+            switch cause {
+            case .stop:
+                // A Stop lands on the skipped report, carrying
+                // `.cancelled` so the results copy names the cause.
+                transition(to: .verified(report: .skipped(reason: .cancelled)))
+            case .background:
+                // Leaving the app returns to the editor, where the paused
+                // banner (`ContentView.cancelForBackground`) offers the run
+                // again, as it does after a cut detection or redaction.
+                transition(to: .editing)
+            }
         default:
             break
         }
@@ -725,10 +748,12 @@ extension DocumentState.PhaseKind {
 
     /// The cancellable phases whose background pause raises the editor's
     /// paused banner: a run the editor can restart. A cancelled import has
-    /// nothing to restart; a cancelled Verify lands on the results screen.
+    /// nothing to restart. A Verify cut by leaving the app returns to the
+    /// editor (`cancelActivePipeline(redactionState:cause:)`), so it raises
+    /// the banner too instead of landing on the results as skipped.
     var raisesResumeBanner: Bool {
         switch self {
-        case .detecting, .redacting: true
+        case .detecting, .redacting, .verifying: true
         default: false
         }
     }
