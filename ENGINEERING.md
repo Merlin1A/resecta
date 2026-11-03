@@ -35,7 +35,9 @@ The fill itself is written to be verifiable: copy blend mode (destination
 pixels are replaced, not blended), anti-aliasing disabled, and every region
 rect expanded to integer pixel boundaries before painting — partial-pixel
 edges are exactly where anti-aliased blending would let original content bleed
-through (`Pipeline/PixelOperations.swift`).
+through (`Pipeline/PixelOperations.swift`). A text-derived fill also grows over
+the rendered ink that crosses its edge (an accent, an italic overhang), by at
+most 64 px, and the grown rectangle is read back the same way.
 
 Then the app checks its own work, unconditionally. After the fills are
 painted, and before the page can enter the output file, the raw bitmap buffer
@@ -144,10 +146,11 @@ asserts the pipeline destroys them
   extractable from the fixture. A fixture that doesn't demonstrate the failure
   can't demonstrate the fix.
 - The document is run through the production render, fill, readback and
-  writer code (not a mock), and the output must satisfy three separate
-  properties: the text layer no longer contains
-  the string; the raw output bytes do not contain the string in UTF-8,
-  UTF-16BE, or UTF-16LE; and zero annotations survive into the output.
+  writer code (not a mock), and the outputs are held to three separate
+  properties, each in its own test: in Searchable output with a covering
+  region the text layer no longer contains the string and the raw bytes do
+  not contain it in UTF-8, UTF-16BE or UTF-16LE; and no annotation survives
+  into the output.
 - As a control, the same fixture runs through the same path with nothing
   marked, and the test asserts that the text does survive into the
   Searchable Redaction output's text layer, so the assertions above depend
@@ -249,13 +252,15 @@ The expected result is a single match — a code comment noting the fact. The
 pre-commit hook rejects `URLSession`, `URLRequest`, `NWConnection`,
 `NWPathMonitor`, and `WKWebView` on every added Swift source line (the hook
 defines one override marker, for a Safari-view wrapper; no line in the tree
-uses it), and on every run it scans the whole shipping source — `Sources/`
+uses it), and on every run that adds or changes a file it scans the whole
+shipping source — `Sources/`
 and the engine package, the test trees excluded — for the call-shaped
 networking and hand-off symbols: a bare `Link(`, `NWListener(`,
 `NWBrowser(`, `NSURLConnection(`, the CFNetwork socket and stream
 constructors, the BSD `socket(` / `connect(` / `getaddrinfo(` calls,
-`openURL`, `UIApplication.shared.open(` and an `import Network` line, with
-comments and string literals skipped. Every hit must match a site pinned in
+`openURL`, `UIApplication.shared.open(`, an `import Network` line and the
+five symbols above in any code position, with comments and string literals
+skipped. Every hit must match a site pinned in
 the script with its reason, one pin per site: the file, the symbol and an
 identifier of the call, such as its destination. Today two sites are pinned,
 both in the Settings view: the Send Feedback link, a `mailto:` hand-off to
@@ -264,7 +269,9 @@ Store app. A new use of one of those symbols fails the hook and the gate,
 including a second use in a file that already has a pinned site. The lint names those symbols and no others: a
 `Data(contentsOf:)` on a remote URL, SwiftUI's `AsyncImage`, an `import
 WebKit` or a configuration type such as `URLSessionConfiguration` is outside
-it and is held by review, so the property holds for what the lint names, not
+it and is held by review, as is the App Store review prompt (`requestReview`),
+which the system presents and which makes its own requests, so the property
+holds for what the lint names, not
 for every way the platform can reach the network. The in-app
 legal/support links open in a Safari view or Mail, each in its own process —
 the binary embeds no web engine of its own. The privacy manifest ships at `Resources/PrivacyInfo.xcprivacy`
@@ -278,7 +285,9 @@ which shows that it needs no network, not what the app does while online.
 
 ## 7. Concurrency and reliability discipline
 
-Both targets build under Swift 6.2 strict concurrency: the app target is
+Both targets build in the Swift 6 language mode with complete
+strict-concurrency checking (tools version 6.2):
+the app target is
 MainActor-by-default, the engine package is non-MainActor with explicitly
 concurrent entry points. The working rules, checkable by grep:
 
@@ -369,12 +378,15 @@ assets. The contract between the two repos is enforced, not eyeballed:
   name Bloom filters (with their sidecars), the driver's-license and passport
   pattern gazetteers, the context-keywords loader, and the negative-context
   gazetteer.
-- Three reference tables load outside that verdict by design and stay live —
-  the institution gazetteer, the address-components gazetteer, and the
-  ZIP-to-state table — as do the Classifier assets and the audit rule catalog;
+- Two reference tables load outside that verdict by design and stay live —
+  the address-components gazetteer and the ZIP-to-state table — as do the
+  Classifier assets and the audit rule catalog;
   a digest failure on one of them is recorded in the load diagnostics and
   raises the banner, and the asset stays in use unless its own loader
-  rejects it, when its built-in fallback applies. Every loader that decodes a
+  rejects it, when its built-in fallback applies. The institution gazetteer is
+  also outside the verdict, but its only reader is the negative-context
+  gazetteer, so it is not loaded while that loader is withheld. Every loader
+  that decodes a
   versioned table fences its wire version, so a table from a future or stale
   schema is refused by name rather than read. The degraded-detection banner
   tells an OS-name-model-only degrade from a corpus-load failure; the withheld
@@ -433,7 +445,9 @@ common words. Lines never join across. A region covering the whole page adds no
 term, and a region on a page without a usable text layer is counted, not
 captured.
 
-These are public because a runner or the app consumes them, along with the
+These are public because the app consumes them, or, for `ExportMetadata` and
+`MatchAuditExporter`, because a client outside the app needs them to write an
+audit record (the app itself does not call those two today), along with the
 types their signatures carry and whatever else the app names; everything else
 in the package is `internal` or on its way there, and the test suites reach it
 through `@testable import`, so narrowing the surface costs no coverage.
