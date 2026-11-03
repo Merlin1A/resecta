@@ -19,8 +19,8 @@ struct CoverWidgetsTests {
     private static let coverRect = "[66 692 260 722]"
 
     /// A Form XObject the size of the cover, as an appearance stream.
-    private static func appearance(_ ops: String, resources: String = "") -> String {
-        "<< /Type /XObject /Subtype /Form /BBox [0 0 194 30] \(resources) /Length \(ops.utf8.count) >>\nstream\n\(ops)\nendstream"
+    private static func appearance(_ ops: String, resources: String = "", bbox: String = "[0 0 194 30]") -> String {
+        "<< /Type /XObject /Subtype /Form /BBox \(bbox) \(resources) /Length \(ops.utf8.count) >>\nstream\n\(ops)\nendstream"
     }
     private static let blackAppearance = appearance("0 g 0 0 194 30 re f")
 
@@ -101,6 +101,44 @@ struct CoverWidgetsTests {
         }
         #expect(ConcealingAnnotations.pages(in: try document(Self.transparentField), regions: [:]).isEmpty,
                 "an empty field draws nothing over the text")
+    }
+
+    /// A wide cover's rect: the printed line sits in its top-left corner,
+    /// the rest of it is blank page.
+    private static let wideRect = "[66 560 560 722]"
+    private static let wideBox = "[0 0 494 162]"
+    private static let wideQuad = "/QuadPoints [66 722 560 722 66 560 560 560]"
+
+    /// A wide highlight painted opaque over the SSN line only, at its edge:
+    /// most of its rect shows the blank page through it.
+    static let wideHighlightOverLine = coveredPDF(
+        "<< /Type /Annot /Subtype /Highlight /Rect \(wideRect) \(wideQuad) /C [1 1 0] /F 4 /AP << /N 6 0 R >> /P 3 0 R >>",
+        acroForm: false, sixth: appearance("1 1 0 rg 0 132 194 30 re f", bbox: wideBox))
+
+    /// The form-field twin: a wide text field whose appearance paints black
+    /// over the SSN line only, with no `/MK` colours.
+    static let wideFieldOverLine = coveredPDF(
+        "<< /Type /Annot /Subtype /Widget /FT /Tx /T (cover) /Rect \(wideRect) /F 4 "
+        + "/AP << /N 6 0 R >> /DA (/Helv 12 Tf 0 g) /P 3 0 R >>",
+        sixth: appearance("0 g 0 132 194 30 re f", bbox: wideBox))
+
+    /// The same wide highlight painted opaque over blank page only: the
+    /// printed line under it stays readable.
+    static let wideHighlightOverBlank = coveredPDF(
+        "<< /Type /Annot /Subtype /Highlight /Rect \(wideRect) \(wideQuad) /C [1 1 0] /F 4 /AP << /N 6 0 R >> /P 3 0 R >>",
+        acroForm: false, sixth: appearance("1 1 0 rg 300 0 194 30 re f", bbox: wideBox))
+
+    @Test("A wide highlight or field that paints over one line of text at its edge names the page at share and in the import count; one that paints only blank page does not")
+    func wideCoverOverOneLineConceals() throws {
+        let highlight = try document(Self.wideHighlightOverLine)
+        #expect(ConcealingAnnotations.pages(in: highlight, regions: [:]) == [0], "highlight")
+
+        let field = try document(Self.wideFieldOverLine)
+        #expect(ConcealingAnnotations.pages(in: field, regions: [:]) == [0], "field")
+        #expect(ConcealingAnnotations.coverWidgetCount(in: field) == 1, "field: the import notice counts it")
+
+        #expect(ConcealingAnnotations.pages(in: try document(Self.wideHighlightOverBlank), regions: [:]).isEmpty,
+                "paint over blank page hides no text")
     }
 
     @Test("A highlight that hides the text (black, or painted over it opaque) names the page at share; a multiplied yellow one does not")
