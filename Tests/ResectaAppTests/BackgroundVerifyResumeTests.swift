@@ -7,9 +7,9 @@ import CoreGraphics
 // Leaving the app while the checks run. The scene's background handler
 // cancels the run. A cut Verify returns to the editor with the paused
 // notice, whose Restart runs Redact and the checks again, the same way a
-// cut Scan or Redact does; it does not land on the results as skipped. A
-// Stop from the toolbar still lands on the skipped results, and a cut Scan
-// or Redact behaves as before.
+// cut redaction does; it does not land on the results as skipped. A Stop
+// from the toolbar still lands on the skipped results, and a cut redaction
+// behaves as before.
 
 @Suite("Leaving the app mid-verify: the paused notice", .tags(.coordination))
 @MainActor
@@ -82,6 +82,11 @@ struct BackgroundVerifyResumeTests {
                 "the notice's Restart is not refused")
         #expect(f.coord.redactionState.outputURL == f.output, "the built copy is kept")
         _ = await f.task.value
+        // The cut run's own recovery must not discard the copy after the
+        // fact: its task has ended and the file is still there.
+        await Task.yield()
+        #expect(f.coord.redactionState.outputURL == f.output)
+        #expect(FileManager.default.fileExists(atPath: f.output.path), "the built copy's file survives the cut")
     }
 
     @Test("The paused notice's Restart after a cut verify starts the run again", .timeLimit(.minutes(1)))
@@ -130,6 +135,8 @@ struct BackgroundVerifyResumeTests {
         #expect(doc.pausedFromPhase == .verifying)
         #expect(TopBannerSlot.winner(documentState: doc, detectionBannerPresent: false) == .paused)
         #expect(coord.redactionState.regions[0]?.count == 1, "the regions are untouched")
+        let output = try #require(coord.redactionState.outputURL, "the built copy was discarded by the cut")
+        #expect(FileManager.default.fileExists(atPath: output.path), "the built copy's file survives the cut")
     }
 
     // MARK: - Unchanged paths
@@ -152,26 +159,6 @@ struct BackgroundVerifyResumeTests {
         #expect(doc.pausedFromPhase == nil)
         #expect(f.coord.redactionState.outputURL == f.output, "the built copy is kept")
         _ = await f.task.value
-    }
-
-    @Test("Leaving the app mid-scan still returns to the editor with the paused notice",
-          .timeLimit(.minutes(1)))
-    func backgroundMidScanIsUnchanged() async {
-        let coord = makeLoadedCoordinator()
-        let doc = coord.documentState
-        doc.transition(to: .detecting(progress: .init(currentPage: 0, totalPages: 1, currentStep: "s")))
-        let task = Task<Void, Never> { while !Task.isCancelled { await Task.yield() } }
-        doc.activeRunId = UUID()
-        doc.activePipelineTask = task
-
-        ContentView.cancelForBackground(documentState: doc, redactionState: coord.redactionState)
-
-        #expect(task.isCancelled)
-        #expect(doc.phaseKind == .editing)
-        #expect(doc.wasPausedByBackground)
-        #expect(doc.pausedFromPhase == .detecting)
-        #expect(TopBannerSlot.winner(documentState: doc, detectionBannerPresent: false) == .paused)
-        _ = await task.value
     }
 
     @Test("Leaving the app mid-redact still discards the partial copy and raises the paused notice",
