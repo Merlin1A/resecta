@@ -8,11 +8,12 @@
 # engine package's public and open declaration lines exceed their cap
 # (the engine public-surface check) and reports the silent-guard census
 # over the three test trees. The scripts run
-# from the base branch's copies, so a change cannot edit the lint it is
-# gated by; the change's own copies run once more, report-only. About five
+# from the base branch's copies, so a change cannot edit a lint script it is
+# gated by (an edit to this workflow is itself reviewed in the pull
+# request); the change's own copies run once more, report-only. About five
 # minutes on a hosted macos-26 runner. The batched simulator suites
 # (sim-suite.yml) run weekly, on demand and on release tags, and the app
-# suite on every pull request to main as a non-required check; none of
+# suite on every pull request to main as a required check; none of
 # them runs here.
 name: ci
 

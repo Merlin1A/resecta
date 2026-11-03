@@ -2,8 +2,9 @@
 
 A recorder for attended runs on a physical iPhone. The operator does the
 taps on the phone; the Mac records each step with Instruments over the
-cable, reads the app's data container and the crash-log folder before and
-after, checks the PDFs the operator exports, and fills the run's record.
+cable, lists the app's data container and the crash-log folder before and
+after (names, sizes, dates and attributes; only new crash reports are
+copied), checks the PDFs the operator exports, and fills the run's record.
 Apple's command-line tools only (`xcrun devicectl`, `xcrun xctrace`); no
 root, no jailbreak tooling, no simulator.
 
@@ -12,7 +13,8 @@ root, no jailbreak tooling, no simulator.
 - Xcode 26.6 with its command-line tools selected.
 - An iPhone paired with this Mac, connected by cable, unlocked, with
   Developer Mode on, and the app under test installed.
-- For the PDF checks: `pdftotext` (poppler), `qpdf`, `exiftool`.
+- For the PDF checks: `pdftotext` (poppler), `qpdf`, `exiftool`, and
+  `strings` (from the command-line tools).
 - `python3` (standard library only) and `bash`.
 
 ## Verbs
@@ -40,7 +42,8 @@ All output goes to one run directory (`--out DIR`, default
   and one xctrace helper.
 - `xctrace_facts.py` — exported Instruments tables to facts: `Phase:`
   transitions, signpost intervals, memory footprint series and peaks,
-  thermal states, process ids, hardened-runtime diagnostics as counts.
+  thermal states, process ids, hardened-runtime and allocator diagnostics
+  as counts and their format strings.
 - `crash_facts.py` — `.ips` reports to facts: jetsam victims and the app's
   own entry, crashes that name the app.
 - `container_facts.py` — devicectl listings to facts: store attributes
@@ -49,7 +52,8 @@ All output goes to one run directory (`--out DIR`, default
   layer, a clean `qpdf --check`, no encryption, no EXIF/GPS/XMP traces.
 - `fill_record.py` — the record from a template and a run directory.
 
-Each takes `--help` and `--self-test`.
+Each Python script takes `--help` and `--self-test`; `sitting.sh` takes
+`--help` and the `self-test` verb.
 
 ## The rows file
 
@@ -62,7 +66,7 @@ Tab-separated, one header line, then one step per line:
 | `cap_min` | the recording's cap in minutes; `0` = no recording (an `A` step then runs without a prompt) |
 | `how` | what the operator does |
 | `pass` | the pass line shown before the step |
-| `checks` | comma-separated machine checks attached to the record (`fill_record.py --help` lists them) |
+| `checks` | comma-separated machine checks attached to the record (the docstring at the top of `fill_record.py` lists them) |
 
 `example-rows.tsv` is a three-step example.
 
@@ -76,8 +80,9 @@ own slot) and `{{judge}}` (the judged PDFs).
 
 Exported PDFs reach the Mac by AirDrop and land in `~/Downloads`. A
 process without access to `~/Downloads` reads them from
-`~/Documents/resecta-sitting-inbox/` (the default inbox) after a move by
-hand; run from your own terminal, `judge --inbox ~/Downloads` works too.
+`~/Documents/resecta-sitting-inbox/` (`judge_pdf.py`'s default; pass it to
+`judge --inbox`) after a move by hand; run from your own terminal,
+`judge --inbox ~/Downloads` works too.
 
 ## What it never does
 
@@ -88,12 +93,16 @@ hand; run from your own terminal, `judge --inbox ~/Downloads` works too.
 - Boot or touch a simulator.
 - Open a PDF in an app or copy one anywhere; put page text, metadata
   values or log message text into `facts.json` or the record beyond the
-  allow-listed phase names and numeric or key-only signpost messages.
+  allow-listed phase names, numeric or key-only signpost messages, and the
+  diagnostics' format strings (templates, never their values).
 
 The run directory itself is raw: each `row.trace`, its exported
 `tables/*.xml` (the log text of every process on the device) and any
 copied `.ips` report stay there, on this Mac. Share `facts.json`,
 `rows.jsonl`, `judge.json` and the record, not the run directory.
+`facts.json` carries file names from the app's container (PDFs outside
+`tmp/`, the pipeline outputs) and the names of other processes in a jetsam
+report; check them before sharing.
 
 ## Not yet
 

@@ -3,7 +3,7 @@
 # an iPhone 17 simulator under a watchdog, perf suites alone and
 # report-only. Both schemes run every Monday and on release tags, one job
 # each; a dispatch runs the scheme it names; ResectaApp alone runs on every
-# pull request to main as a non-required check (twenty to forty minutes),
+# pull request to main as a required check (twenty to forty minutes),
 # documentation-only pull requests included: its honesty tests read the
 # README, ENGINEERING, THREAT-MODEL, PRIVACY and EULA text.
 # RedactionEngine here runs the engine package's suites on the simulator
@@ -24,9 +24,10 @@
 # never returns on it, and neither does the engine's OCR sweep or re-check
 # over rasterized pages: 900 seconds of silence with no output, and the
 # test's own time limit cannot end a hang inside a system framework. The
-# five suites that run such a pass, and two ink-fit timing pins, are left
-# out on this runtime (TEST_BATCHED_EXCLUDE below; named in every verdict;
-# the pre-push hook runs them on every push), the runner's stall watchdog
+# eight suites that run such a pass, and three ink-fit timing pins, are left
+# out on this runtime (TEST_BATCHED_EXCLUDE below; counted on every totals
+# line and named in the log; the pre-push hook runs them on a push that
+# needs their scheme), the runner's stall watchdog
 # is widened (TEST_BATCHED_STALL_SECS) for the OCR-heavy tests that merely
 # run slowly here, and a recovery reboots the simulator instead of erasing
 # it.
@@ -84,8 +85,9 @@ jobs:
       # pass, and the engine's OCR sweep and re-check over rasterized pages,
       # hang on the hosted virtual machine (see the header), and a test's
       # own time limit cannot end a hang inside a system framework. The
-      # runner leaves them out, names them in the summary and counts them in
-      # the VERDICT line; the pre-push hook runs every suite on every push.
+      # runner leaves them out, counts them on the totals line and names them
+      # in the log; the pre-push hook runs them on a push that needs their
+      # scheme.
       # Added 2026-10-21: the engine job's batch 6 stalled on 2026-10-12,
       # 2026-10-19 and a dispatched run on 2026-10-21 (no output for 900 s,
       # every test in the batch left open). The same suites were open each
