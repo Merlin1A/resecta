@@ -60,7 +60,8 @@ extension DocumentSearcher {
                 added += hits.map { fast[$0] }
             } else {
                 for (a, f) in zip(group, hits) {
-                    merged[a] = merged[a].boxed(merged[a].normalizedRect.union(fast[f].normalizedRect))
+                    merged[a] = merged[a].boxed(merged[a].normalizedRect.union(fast[f].normalizedRect),
+                                                identity: merged[a].normalizedRect)
                 }
             }
         }
@@ -221,13 +222,16 @@ extension DocumentSearcher {
 }
 
 extension SearchResult {
-    /// This result with another box; every other field kept.
-    func boxed(_ rect: CGRect) -> SearchResult {
-        SearchResult(
+    /// This result with another box, and `identity` as the box its read gave
+    /// it; every other field kept.
+    func boxed(_ rect: CGRect, identity: CGRect) -> SearchResult {
+        var result = SearchResult(
             id: id, pageIndex: pageIndex, normalizedRect: rect, matchedText: matchedText,
             contextSnippet: contextSnippet, source: source, term: term, isSelected: isSelected,
             piiCategory: piiCategory, piiConfidence: piiConfidence, rationale: rationale,
             matchRangeInSnippet: matchRangeInSnippet, occurrenceID: occurrenceID,
             textLayerRect: textLayerRect, inkFitDegraded: inkFitDegraded)
+        result.identityRect = rect == identity ? nil : identity
+        return result
     }
 }

@@ -295,6 +295,11 @@ public struct SearchResult: Sendable, Identifiable, Equatable {
     /// the drift envelope around the hidden glyphs (a larger box, never a
     /// smaller one). false on every other result.
     public let inkFitDegraded: Bool
+    /// The box the read itself gave this match, when merging two readings of
+    /// a scanned page grew `normalizedRect` past it: what a hybrid page
+    /// compares with its text-layer matches to tell a repeat. nil when
+    /// `normalizedRect` is that box (every result but a merged one).
+    var identityRect: CGRect? = nil
 
     public init(
         id: UUID = UUID(),
