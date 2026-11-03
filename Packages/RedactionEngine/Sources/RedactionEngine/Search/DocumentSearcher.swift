@@ -158,7 +158,7 @@ public actor DocumentSearcher {
     // `perPageRegexTimeout` ceiling, in both the live-preview path
     // (`previewRegex`) and the full-scan path (`searchRegex`). The app
     // layer accumulates page indices to render the regex-timeout banner.
-    private var regexTimeoutSink: (@Sendable (Int) -> Void)?
+    private(set) var regexTimeoutSink: (@Sendable (Int) -> Void)?
     /// Fired once, with the gate's reason, when a regex search starts on a
     /// pattern the safety gate refuses; the stream then finishes empty.
     /// Without it an empty stream reads as "0 results" to every consumer.
@@ -221,7 +221,7 @@ public actor DocumentSearcher {
     /// actor. See `OCRPageCache`.
     var ocrPageCache = OCRPageCache()
     private typealias NormalizedOCRPage = OCRPageCache.NormalizedPage
-    private typealias NormalizedLineEntry = OCRPageCache.NormalizedLineEntry
+    typealias NormalizedLineEntry = OCRPageCache.NormalizedLineEntry
     let ocrNormalizer = OCRTextNormalizer()
 
     public init(
@@ -1711,7 +1711,7 @@ public actor DocumentSearcher {
     /// Coverage: the `.ocr` route is reported once per call, after the
     /// get-or-compute block, on both the hit and the miss path; a skipped
     /// or unreadable page reports its own route and returns no lines.
-    private func ocrLines(for page: PDFPage, pageIndex: Int) async -> [OCREngine.TextLine] {
+    func ocrLines(for page: PDFPage, pageIndex: Int) async -> [OCREngine.TextLine] {
         let textLines: [OCREngine.TextLine]
         if let cached = ocrPageCache.touch(pageIndex) {
             textLines = cached
@@ -1764,123 +1764,4 @@ public actor DocumentSearcher {
         pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocr))
         return textLines
     }
-
-    /// Search a scanned (no-text-layer) page via OCR + regex.
-    /// Called by `searchRegex` when `options.includeOCR` is true and the
-    /// page's text layer is empty.
-    ///
-    /// Normalization ordering:
-    ///   1. OCRTextNormalizer corrects confusable glyphs per-line.
-    ///   2. Lines are joined with "\n" preserving line offsets.
-    ///   3. NFKC (normalizeUnicode option) is NOT applied here — the regex
-    ///      pattern was authored by the user for literal match; applying NFKC
-    ///      to the body only (not the pattern) would silently break ASCII
-    ///      patterns. This is consistent with the text-layer path in searchRegex.
-    /// Takes the caller's already-compiled (and safety-validated)
-    /// `NSRegularExpression` — re-validating/re-compiling the pattern
-    /// string here repeated the full precheck once per scanned page.
-    private func searchPageViaOCRFallback_regex(
-        page: PDFPage,
-        pageIndex: Int,
-        regex: NSRegularExpression,
-        options: SearchOptions
-    ) async -> [SearchResult] {
-        let lines = await ocrLines(for: page, pageIndex: pageIndex)
-        let accurate = regexOCRMatches(lines: lines, page: page, pageIndex: pageIndex, regex: regex, options: options,
-                                       reportsToSinks: true)
-        // iOS 27: the same pattern over the page's fast read, merged.
-        guard Self.readsFastOCRBeside, let fast = ocrPageCache.fastLines(for: pageIndex), !fast.isEmpty else {
-            return accurate
-        }
-        return Self.unionFastOCRResults(
-            accurate: accurate,
-            fast: regexOCRMatches(lines: fast, page: page, pageIndex: pageIndex, regex: regex, options: options,
-                                  reportsToSinks: false))
-    }
-
-    /// The regex fallback over one recognition of a scanned page. The page's
-    /// timeout is reported only when `reportsToSinks` (not again for the
-    /// fast read's pass on iOS 27).
-    private func regexOCRMatches(
-        lines: [OCREngine.TextLine],
-        page: PDFPage,
-        pageIndex: Int,
-        regex: NSRegularExpression,
-        options: SearchOptions,
-        reportsToSinks: Bool
-    ) -> [SearchResult] {
-        guard !lines.isEmpty else { return [] }
-
-        // Normalize each line through OCRTextNormalizer (confusable correction)
-        // then join with "\n" to build the searchable text. The per-line
-        // normalize step preserves line offsets for rect mapping below.
-        let normalizedLines = lines.map { self.ocrNormalizer.normalize($0.text) }
-        var searchText = normalizedLines.joined(separator: "\n")
-        guard !searchText.isEmpty else { return [] }
-        // Page-side smart punctuation, same contract as the
-        // text-layer regex path. 1:1 substitution keeps the UTF-16
-        // NSRanges aligned with the per-line offsets below.
-        if options.normalizeSmartPunctuation {
-            searchText = TextNormalizer.normalizeSmartPunctuation(searchText)
-        }
-        // Each line's start in the joined text, in UTF-16 units (one line
-        // feed after each line), for the line union behind every rect.
-        var lineOffsets: [NormalizedLineEntry] = []
-        var cursor = 0
-        for (line, normalizedText) in zip(lines, normalizedLines) {
-            lineOffsets.append(NormalizedLineEntry(
-                start: cursor, normalizedText: normalizedText,
-                normalizedRect: line.normalizedRect, confidence: line.confidence))
-            cursor += normalizedText.utf16.count + 1
-        }
-
-        let nsString = searchText as NSString
-        let fullRange = NSRange(location: 0, length: nsString.length)
-
-        var results: [SearchResult] = []
-        let avgConfidence = averageOCRConfidence(lines)
-
-        // Wrap page in SendablePDFPage so the enumerateMatches closure
-        // (which is @Sendable in Swift 6.2 strict mode) can capture it
-        // without a Sendable violation — same pattern as searchRegex.
-        let sendablePage = SendablePDFPage(page)
-
-        // Per-page timeout matching the text-layer regex path.
-        let effectiveTimeout: Duration = regexTimeoutOverride ?? Self.perPageRegexTimeout
-        let startTime = ContinuousClock.now
-        // Snapshot the timeout sink — invoked synchronously inside the
-        // enumerateMatches closure where actor re-entry is not permitted.
-        let snapshotTimeoutSink = reportsToSinks ? self.regexTimeoutSink : nil
-
-        SearchCore.enumerateRegexMatches(
-            in: searchText, regex: regex,
-            wholeWord: options.wholeWord, unconvertibleRangePasses: false,
-            cap: nil,
-            timeout: effectiveTimeout, startTime: startTime,
-            onTimeout: { snapshotTimeoutSink?(pageIndex) }
-        ) { matchRange in
-            // The union of every recognised line the match overlaps.
-            guard let mapped = ocrUnionRect(
-                forUTF16Range: matchRange, lineOffsets: lineOffsets, page: sendablePage.page
-            ) else { return false }
-            let normalizedRect = mapped.rect
-
-            let matchedText = nsString.substring(with: matchRange)
-            let window = contextSnippet(text: searchText, matchNSRange: matchRange)
-
-            results.append(SearchResult(
-                pageIndex: pageIndex,
-                normalizedRect: normalizedRect,
-                matchedText: matchedText,
-                contextSnippet: window.snippet,
-                source: .ocr(confidence: avgConfidence),
-                term: regex.pattern,
-                matchRangeInSnippet: window.matchRange
-            ))
-            return true
-        }
-
-        return results
-    }
-
 }

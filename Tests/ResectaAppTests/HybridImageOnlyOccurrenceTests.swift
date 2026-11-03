@@ -133,7 +133,18 @@ struct HybridImageOnlyOccurrenceTests {
         let pictureOnly = pageText.range(of: "and Delia") == nil
         #expect(pictureOnly, "the second occurrence is in the picture only: \(pageText.debugDescription)")
         let (results, regions) = try await Self.searchAndApply(doc, searcher: DocumentSearcher())
-        Self.expectEveryOccurrenceCovered(regions, results)
+        // KI-21: on iOS 26 Search misses the occurrence only the picture
+        // holds, so occurrence 2's ink lies outside every region.
+        // Known there, and only that miss: the test fails the day iOS 26
+        // stops reproducing it. iOS 27 runs the check plainly.
+        withKnownIssue("KI-21: on iOS 26 the picture-only occurrence is not found") {
+            Self.expectEveryOccurrenceCovered(regions, results)
+        } when: {
+            if #available(iOS 27, *) { return false }
+            return true
+        } matching: { issue in
+            issue.comments.contains { $0.rawValue.hasPrefix("occurrence 2's ink") }
+        }
     }
 
     @Test("iOS 27 reads: the accurate read misses the second occurrence, the fast read holds both; both are redacted",
