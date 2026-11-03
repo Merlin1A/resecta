@@ -139,6 +139,23 @@ struct OCRFastUnionTests {
         #expect(try await timeouts(seedingFast: true) == accurateOnly)
     }
 
+    @Test("Regex search: a page whose two readings differ reports its timeout once, with the fast read beside it")
+    func regexTimeoutReportedOnceAcrossReadings() async throws {
+        let doc = try #require(PDFDocument(data: TestFixtures.imageOnlyPDF()))
+        let line = OCREngine.TextLine(text: "Room 101 key 67B9", normalizedRect: CGRect(x: 0.1, y: 0.5, width: 0.8, height: 0.03),
+                                      confidence: 0.6)
+        let searcher = DocumentSearcher(regexTimeoutOverride: .zero)
+        let readings = await searcher.ocrReadings([line])
+        #expect(readings.raw != readings.corrected, "the page reads two ways: \(readings)")
+        await searcher._testSeedOCRLines([line], forPageIndex: 0)
+        await searcher._testSeedOCRFastLines([line], forPageIndex: 0)
+        let counter = Counter()
+        await searcher.setRegexTimeoutSink { _ in counter.add(1) }
+        for await _ in searcher.search(SendablePDFDocument(doc), mode: .regex(#"Room \d+"#, options: SearchOptions()),
+                                       progress: { _, _ in }) {}
+        #expect(counter.total == 1, "one report for the page, across both readings and both reads")
+    }
+
     // MARK: - More fast matches than accurate ones on a line; the order
 
     @Test("A line the fast read holds more matches on than the accurate read adds the fast matches beside the accurate one, in either order")
