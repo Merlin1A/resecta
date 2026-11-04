@@ -5,8 +5,11 @@ import Foundation
 // language, not outcome-promise. `LegalPhraseLintTests` walks the xcstrings
 // catalog and fails if any localized value contains a banned term.
 //
-// The list below is maintained directly. Additions here are
-// additive — a new banned term immediately tightens the lint.
+// The list below is maintained directly and is the one home of the banned
+// vocabulary: `Scripts/claims-lint.sh` reads these literals for its sweep of
+// the shipping documents and the Swift string literals. A term is a
+// case-insensitive substring, so a stem bans each of its inflections.
+// Additions here are additive — a new banned term immediately tightens both.
 
 public enum LegalPhrases {
 
@@ -22,7 +25,7 @@ public enum LegalPhrases {
         "security invariant",
         "provably reliable",
         // Outcome-promise vocabulary.
-        "guaranteed",
+        "guarantee", // LegalPhrases:safe — the stem: guarantee, guarantees, guaranteed
         "ensures",
         "securely removes",
         "100%",

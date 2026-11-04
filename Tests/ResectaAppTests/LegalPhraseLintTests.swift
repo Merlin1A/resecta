@@ -33,7 +33,7 @@ struct LegalPhraseLintTests {
     @Test("Banned-term list is non-empty")
     func bannedTermsGuard() {
         // Guard against accidental emptying of LegalPhrases during refactors.
-        #expect(LegalPhrases.bannedTerms.contains("guaranteed"))
+        #expect(LegalPhrases.bannedTerms.contains("guarantee")) // LegalPhrases:safe — the list under test
         #expect(LegalPhrases.bannedTerms.count >= 10)
     }
 
