@@ -64,6 +64,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 ### Internal
 
 - A target specification for the verification pass, VERIFICATION-SPEC.md, with a status line per rule; claims-lint covers it.
+- New release identity records check the app's imported symbols against the privacy manifest's declared reasons: a required-reason API whose category the manifest does not declare is marked in the record and the script exits 3. The record also lists the Xcode version and the platform SDK version it was built with, and names its record format, so the published 1.2.0, 1.3.0 and 1.3.1 records still match byte for byte; `Scripts/release-identity.sh --self-test` runs the checks on planted inputs.
 - The ink-fit stall test no longer counts other tests' work as its stall's hold, and it runs alone.
 
 ## [1.3.1] — 2026-11-03
