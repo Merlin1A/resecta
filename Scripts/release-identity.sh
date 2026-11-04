@@ -56,10 +56,11 @@ NET_SUBSTRINGS='URLSession NSURLSession NSURLConnection URLRequest NWConnection 
 # this name.
 NET_FUNCTIONS='_socket _connect _getaddrinfo _gethostbyname _bind _listen _accept _send _sendto _sendmsg _recv _recvfrom _recvmsg'
 
-usage() { sed -n '3,42p' "$0" >&2; exit 64; }
+usage_text() { sed -n '3,/^set -eu$/{ /^set -eu$/!p; }' "$0"; }
+usage() { usage_text >&2; exit 64; }
 die() { echo "release-identity: $1" >&2; exit 2; }
 
-ARCHIVE=""; CHECK=""; TAG=""; GATE=""; MAC=""
+ARCHIVE=""; CHECK=""; TAG=""; GATE=""; MAC=""; SELF_TEST=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --archive) [ $# -ge 2 ] || usage; ARCHIVE="$2"; shift 2 ;;
@@ -68,19 +69,11 @@ while [ $# -gt 0 ]; do
         --gate) [ $# -ge 2 ] || usage; GATE="$2"; shift 2 ;;
         --mac) [ $# -ge 2 ] || usage
                case "$2" in yes|no) MAC="$2" ;; *) usage ;; esac; shift 2 ;;
-        -h|--help) sed -n '3,42p' "$0"; exit 0 ;;
+        --self-test) SELF_TEST=1; shift ;;
+        -h|--help) usage_text; exit 0 ;;
         *) echo "release-identity: unknown option: $1" >&2; usage ;;
     esac
 done
-[ -n "$ARCHIVE" ] || usage
-ARCHIVE="${ARCHIVE%/}"
-[ -f "$ARCHIVE/Info.plist" ] || die "not an Xcode archive (no Info.plist): $ARCHIVE"
-ARCHIVE_ABS="$(cd "$ARCHIVE" && pwd)"
-ARCHIVE_NAME="$(basename "$ARCHIVE_ABS")"
-
-SCRATCH="$(mktemp -d "${TMPDIR:-/tmp}/release-identity.XXXXXX")"
-trap 'rm -rf "$SCRATCH"' EXIT
-
 # The property-list reader. Modes:
 #   get FILE KEY.PATH      a scalar value, or nothing when absent
 #   entitlements FILE      table rows: key | value
@@ -219,6 +212,89 @@ else:
     sys.exit("unknown mode " + mode)
 '
 plist() { python3 -I -c "$PLIST_PY" "$@"; }
+
+# The self-test: the required-reason table, its exit code, the record-format
+# reader and the Info.plist rows each format carries, on planted inputs (no
+# archive and no fixture file); then --check of a record that names an
+# unknown format, on a planted archive.
+self_test() {
+    T="$(mktemp -d "${TMPDIR:-/tmp}/release-identity-test.XXXXXX")"
+    trap 'rm -rf "$T"' EXIT
+    fails=0
+    ok() { if [ "$2" = "$3" ]; then echo "  ok   $1"; else echo "  FAIL $1: got '$2', want '$3'"; fails=$((fails + 1)); fi; }
+    manifest() { # file, then pairs of category and reason
+        f="$1"; shift
+        { echo '<?xml version="1.0" encoding="UTF-8"?>'
+          echo '<plist version="1.0"><dict><key>NSPrivacyTracking</key><false/><key>NSPrivacyAccessedAPITypes</key><array>'
+          while [ $# -ge 2 ]; do
+              echo "<dict><key>NSPrivacyAccessedAPIType</key><string>NSPrivacyAccessedAPICategory$1</string><key>NSPrivacyAccessedAPITypeReasons</key><array><string>$2</string></array></dict>"
+              shift 2
+          done
+          echo '</array></dict></plist>'; } > "$f"
+    }
+    FORMAT=2
+
+    # (a) a boot-time function imported, its category not declared.
+    printf '%s\n' '_mach_absolute_time' '_memcpy' > "$T/imports-a.txt"
+    manifest "$T/m-a.plist" UserDefaults CA92.1
+    plist rr-declared "$T/m-a.plist" > "$T/d-a.txt"
+    rr_rows "$T/imports-a.txt" "$T/d-a.txt" "$T/rows-a.txt" "$T/hits-a.txt"
+    ok "(a) one imported pattern whose category is not declared" "$RR_UNDECLARED" 1
+    ok "(a) its row says UNDECLARED" "$($GREP -c -F '| `_mach_absolute_time` | exactly | 1 | `NSPrivacyAccessedAPICategorySystemBootTime` | **UNDECLARED** |' "$T/rows-a.txt" || true)" 1
+    ok "(a) exit code 3" "$(rr_status)" 3
+
+    # (b) the same import with its category declared.
+    manifest "$T/m-b.plist" UserDefaults CA92.1 SystemBootTime 35F9.1
+    plist rr-declared "$T/m-b.plist" > "$T/d-b.txt"
+    rr_rows "$T/imports-a.txt" "$T/d-b.txt" "$T/rows-b.txt" "$T/hits-b.txt"
+    ok "(b) declared: none undeclared" "$RR_UNDECLARED" 0
+    ok "(b) its row names the declared reason" "$($GREP -c -F '| `_mach_absolute_time` | exactly | 1 | `NSPrivacyAccessedAPICategorySystemBootTime` | yes, `35F9.1` |' "$T/rows-b.txt" || true)" 1
+    ok "(b) exit code 0" "$(rr_status)" 0
+
+    # (c) the shape of build 7 of 1.3.1: a file-timestamp key and two user-defaults symbols, both categories declared.
+    printf '%s\n' '_NSURLCreationDateKey' '_OBJC_CLASS_$_NSUserDefaults' \
+        '_$s7SwiftUI10AppStorageV12wrappedValue_5storeACySbGSb_SSSo14NSUserDefaultsCSgtcSbRszlufC' '_memcpy' '_objc_msgSend' > "$T/imports-c.txt"
+    manifest "$T/m-c.plist" UserDefaults CA92.1 FileTimestamp C617.1
+    plist rr-declared "$T/m-c.plist" > "$T/d-c.txt"
+    rr_rows "$T/imports-c.txt" "$T/d-c.txt" "$T/rows-c.txt" "$T/hits-c.txt"
+    ok "(c) NSURLCreationDateKey counted once" "$($GREP -c -F '| `NSURLCreationDateKey` | contains | 1 | `NSPrivacyAccessedAPICategoryFileTimestamp` | yes, `C617.1` |' "$T/rows-c.txt" || true)" 1
+    ok "(c) NSUserDefaults counted twice" "$($GREP -c -F '| `NSUserDefaults` | contains | 2 | `NSPrivacyAccessedAPICategoryUserDefaults` | yes, `CA92.1` |' "$T/rows-c.txt" || true)" 1
+    ok "(c) every other pattern counts 0" "$(awk -F ' [|] ' '$3 != "0"' "$T/rows-c.txt" | $GREP -c . || true)" 2
+    ok "(c) three imported symbols match" "$RR_HITS" 3
+    ok "(c) exit code 0" "$(rr_status)" 0
+
+    # (d) the record format: none named is format 1; the Info.plist rows of each format.
+    printf '%s\n' '# Resecta 1.0 (1): identity record of the archived build' '' 'This record describes the app bundle.' > "$T/rec1.md"
+    printf '%s\n' '# Resecta 1.0 (1): identity record of the archived build' '' 'Record format: 2' '' 'This record describes the app bundle.' > "$T/rec2.md"
+    ok "(d) a record naming no format is format 1" "$(record_format "$T/rec1.md")" 1
+    ok "(d) a record naming format 2 is format 2" "$(record_format "$T/rec2.md")" 2
+    printf '%s\n' '<?xml version="1.0" encoding="UTF-8"?>' '<plist version="1.0"><dict><key>DTXcode</key><string>2720</string><key>DTPlatformVersion</key><string>27.2</string><key>DTXcodeBuild</key><string>27B52</string></dict></plist>' > "$T/info.plist"
+    ok "(d) format 1 carries no DTXcode or DTPlatformVersion row" "$(plist info "$T/info.plist" 1 | $GREP -c -e '`DTXcode`' -e '`DTPlatformVersion`' || true)" 0
+    ok "(d) format 2 carries both" "$(plist info "$T/info.plist" 2 | $GREP -c -e '| `DTXcode` (built with) | `2720` |' -e '| `DTPlatformVersion` (built with) | `27.2` |' || true)" 2
+
+    # (e) --check of a record that names a format this script does not know: exit 2.
+    A="$T/fake.xcarchive"; mkdir -p "$A/Products/Applications/F.app"
+    printf '%s\n' '<?xml version="1.0" encoding="UTF-8"?>' '<plist version="1.0"><dict><key>ApplicationProperties</key><dict><key>ApplicationPath</key><string>Applications/F.app</string></dict></dict></plist>' > "$A/Info.plist"
+    printf '%s\n' '<?xml version="1.0" encoding="UTF-8"?>' '<plist version="1.0"><dict><key>CFBundleExecutable</key><string>F</string><key>CFBundleShortVersionString</key><string>9.9</string></dict></plist>' > "$A/Products/Applications/F.app/Info.plist"
+    printf 'x' > "$A/Products/Applications/F.app/F"
+    printf '%s\n' '# Resecta 9.9 (1): identity record of the archived build' '' 'Record format: 9' > "$T/rec9.md"
+    rc=0; sh "$0" --archive "$A" --check "$T/rec9.md" > "$T/out9.txt" 2>&1 || rc=$?
+    ok "(e) a record naming format 9: exit 2" "$rc" 2
+    ok "(e) the message names the format" "$($GREP -c 'format 9' "$T/out9.txt" || true)" 1
+
+    if [ "$fails" -eq 0 ]; then echo "SELF-TEST PASS (release-identity.sh)"; return 0; fi
+    echo "SELF-TEST FAIL ($fails)"; return 1
+}
+if [ "$SELF_TEST" = 1 ]; then self_test; exit $?; fi
+
+[ -n "$ARCHIVE" ] || usage
+ARCHIVE="${ARCHIVE%/}"
+[ -f "$ARCHIVE/Info.plist" ] || die "not an Xcode archive (no Info.plist): $ARCHIVE"
+ARCHIVE_ABS="$(cd "$ARCHIVE" && pwd)"
+ARCHIVE_NAME="$(basename "$ARCHIVE_ABS")"
+
+SCRATCH="$(mktemp -d "${TMPDIR:-/tmp}/release-identity.XXXXXX")"
+trap 'rm -rf "$SCRATCH"' EXIT
 
 # The app inside the archive.
 APP_REL="$(plist get "$ARCHIVE/Info.plist" ApplicationProperties.ApplicationPath)"
