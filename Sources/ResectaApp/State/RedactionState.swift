@@ -84,12 +84,12 @@ class RedactionState {
     /// `SearchState.deselectionSnapshotForRun()` (the same derivation the
     /// scan coverage panel renders); captured at the apply commit
     /// (`pendingRunDeselection`) and read at run entry
-    /// (`runEntryDeselectionSnapshot()`). `deselectedCount` is the item
-    /// count. In-memory only.
+    /// (`runEntryDeselectionSnapshot()`). `deselectedCount` counts matches
+    /// by occurrence; `items` keep one per line. In-memory only.
     struct DeselectionSnapshot: Equatable, Sendable {
         let items: [SearchResult]
         let totalCount: Int
-        var deselectedCount: Int { items.count }
+        var deselectedCount: Int { SearchState.occurrenceCount(items) }
     }
 
     /// The deselection facts of the search sessions the user *applied*
