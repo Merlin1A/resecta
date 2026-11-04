@@ -1,6 +1,6 @@
 # End-User License Agreement
 
-**Effective date:** 2026-10-15
+**Effective date:** 2026-11-03
 
 This End-User License Agreement ("Agreement") is between you and Jesse Brookins
 ("Developer") and governs your use of the Resecta application ("the App"). By
@@ -48,8 +48,8 @@ before sharing any document.
 
 **How redaction works.** Resecta offers two redaction modes that share the same
 pixel-destruction process for the regions you mark. Secure Rasterization, the
-default, flattens each affected page to an image, which is designed to remove
-the underlying text layer for that page. Searchable Redaction is designed to
+default, flattens every page of the document to an image, which is designed to
+remove the text layer from the whole output. Searchable Redaction is designed to
 drop the text you mark while keeping a selectable text layer for the content you
 did not redact; for a page whose text cannot be extracted reliably, or whose
 unmarked text does not show on the rendered page, it falls back to image-only
