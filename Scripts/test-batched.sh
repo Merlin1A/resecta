@@ -98,7 +98,7 @@ GREP=/usr/bin/grep
 # hand, never gated). "Completely alone" is load-bearing: StressCorpusTests
 # has been red when paired with even one other suite.
 PERF_ALONE_RedactionEngine="CancellationLatencyTests PixelBufferZeroizeTimingTests ReverseRationalePerformanceTests StressCorpusTests ApplyPhaseMemoryStressTests ParallelLayerExecutionTests DetectionRasterizeOverlapTests Layer2OCRParallelismTests SearchRecheckParallelismTests PageImageInkFitStallTests"
-PERF_ALONE_ResectaApp="PageParallelRasterizationTests"
+PERF_ALONE_ResectaApp="PageParallelRasterizationTests PageParallelRasterizationScheduleTests PageParallelRasterizationTimingTests"
 
 # ALONE-GATING: perf-alone suites (above) whose reds still gate. Each runs
 # completely alone after the batches like the rest of the list, and a red in
@@ -110,14 +110,27 @@ PERF_ALONE_ResectaApp="PageParallelRasterizationTests"
 #   released read's caller past the pin's slack. Owner: Merlin1A. Ends when
 #   the lane reports the stalled read's release itself (the pin reads that,
 #   not a clock), or at the review on 2027-01-31, whichever comes first.
+# - PageParallelRasterizationTests: page order through a 50-page full
+#   pipeline run, about a minute alone against its three-minute limit; batch
+#   load would race the limit. Owner: Merlin1A. Ends when the run is measured
+#   inside a batch within half its limit, or at the review on 2027-01-31,
+#   whichever comes first.
+# - PageParallelRasterizationScheduleTests: two of its tests post the
+#   process-wide memory warning, which lowers the DPI cap and clamps
+#   parallelism on every live coordinator in the test host, and three assert
+#   the cap or bound from before a warning; other suites post the warning
+#   too. Owner: Merlin1A. Ends when a test's warning reaches only its own
+#   coordinator, or at the review on 2027-01-31, whichever comes first.
+# Their timing sibling, PageParallelRasterizationTimingTests, stays
+# report-only (perf-alone and on the exclusion list below).
 ALONE_GATING_RedactionEngine="PageImageInkFitStallTests"
-ALONE_GATING_ResectaApp=""
+ALONE_GATING_ResectaApp="PageParallelRasterizationTests PageParallelRasterizationScheduleTests"
 
 # Exclusion list (suite granularity): reds here do not gate the exit
 # status even inside normal batches.
 # The last four assert wall-clock bounds that move with a neighbouring
 # build or run on the same machine (two runs share one host): report-only.
-NON_GATING="ScreenCaptureShieldTests PageParallelRasterizationTests StressCorpusTests ImportServiceCancelTests ReDoSFuzzTests RegexSearchHardeningTests CoverageHistogramTests SearchDebounceCancelTests"
+NON_GATING="ScreenCaptureShieldTests PageParallelRasterizationTimingTests StressCorpusTests ImportServiceCancelTests ReDoSFuzzTests RegexSearchHardeningTests CoverageHistogramTests SearchDebounceCancelTests"
 # ──────────────────────────────────────────────────────────────────────────
 
 BATCH_SIZE=28          # ~25-32 suites per batch
@@ -454,6 +467,21 @@ STUB
     $GREP -A2 'if in_list "\$s" "\$ALONE_GATING"; then' "$me" | $GREP -q 'run_invocation "alone-\$s" "gating" "\$s"' \
         || { echo "self-test: the alone loop does not run an alone-gating suite gating" >&2; n=1; }
     if [ "$n" -eq 0 ]; then echo "self-test: alone-gating suites are perf-alone, off the exclusion list, and run gating OK"; else fails=1; fi
+    # 11. The page-parallel rasterization correctness tests gate: the
+    #     page-order suite and the schedule suite are alone-gating, and only
+    #     the timing suite is report-only. Each name is a suite the
+    #     enumerator finds, so a rename cannot drop a suite out of the gate.
+    n=0
+    local app_suites
+    app_suites="$(enumerate_suites "$(cd "$(dirname "$me")/.." && pwd)/Tests/ResectaAppTests")"
+    for pat in PageParallelRasterizationTests PageParallelRasterizationScheduleTests PageParallelRasterizationTimingTests; do
+        printf '%s\n' "$app_suites" | $GREP -qx -- "$pat" || { echo "self-test: $pat is not an enumerated app suite" >&2; n=1; }
+    done
+    for pat in PageParallelRasterizationTests PageParallelRasterizationScheduleTests; do
+        case " $ALONE_GATING_ResectaApp " in *" $pat "*) ;; *) echo "self-test: $pat is not alone-gating" >&2; n=1 ;; esac
+    done
+    case " $NON_GATING " in *" PageParallelRasterizationTimingTests "*) ;; *) echo "self-test: PageParallelRasterizationTimingTests is not report-only" >&2; n=1 ;; esac
+    if [ "$n" -eq 0 ]; then echo "self-test: the rasterization correctness suites gate and only its timing suite is report-only OK"; else fails=1; fi
     [ "$fails" -eq 0 ] && { echo "self-test: PASS"; exit 0; }
     echo "self-test: FAIL" >&2; exit 1
 }

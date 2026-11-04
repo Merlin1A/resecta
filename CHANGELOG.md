@@ -65,6 +65,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 - A target specification for the verification pass, VERIFICATION-SPEC.md, with a status line per rule; claims-lint covers it.
 - The ink-fit stall test no longer counts other tests' work as its stall's hold, and it runs alone.
+- The page-parallel rasterization tests that check page order, the parallelism bound, the memory-warning fallback and the DPI cap now gate: they run alone and a failure fails the run, and all but the full-pipeline page-order test now also run on the hosted runner. Only the parallel-versus-serial timing test stays report-only, in a suite of its own.
 
 ## [1.3.1] — 2026-11-03
 
