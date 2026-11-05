@@ -23,6 +23,20 @@ import os
 // the memory-warning observer) is owned by `PipelineCoordinator` in the
 // app target, not the engine package, so the test file is placed where
 // the coordinator's `@testable import` works.
+//
+// Three suites, because Scripts/test-batched.sh classifies suites, not
+// tests, and only the wall-clock ratio is report-only:
+//
+//   * PageParallelRasterizationTests: page order through a full pipeline
+//     run. Runs alone and gates. Left out on the hosted runner, where a
+//     full run's verification pass hangs (sim-suite.yml).
+//   * PageParallelRasterizationScheduleTests: streamed delivery order, the
+//     parallelism bound, the memory-warning collapse and the per-submission
+//     DPI cap. Runs alone and gates, and is serialized: two of its tests
+//     post the process-wide memory warning, which lowers the DPI cap and
+//     clamps parallelism on every live coordinator in the test host.
+//   * PageParallelRasterizationTimingTests: parallel vs. serial wall-clock.
+//     Runs alone, report-only.
 
 @Suite("Page-Parallel Rasterization", .tags(.critical, .coordination))
 @MainActor
@@ -82,6 +96,11 @@ struct PageParallelRasterizationTests {
         #expect(coord.lastReconstructorAppendOrder == Array(0..<pageCount),
                 "Reconstructor must receive pages in 0..<\(pageCount) order regardless of task completion order (got \(coord.lastReconstructorAppendOrder.count) appends)")
     }
+}
+
+@Suite("Page-Parallel Rasterization: schedule", .serialized, .tags(.critical, .coordination))
+@MainActor
+struct PageParallelRasterizationScheduleTests {
 
     @Test(
         "rasterizePagesInParallel streams every input index to onPageReady in 0..<n order",
@@ -117,108 +136,6 @@ struct PageParallelRasterizationTests {
 
         #expect(deliveredIndices == Array(0..<pageCount),
                 "onPageReady must fire for every index in strict 0..<\(pageCount) order regardless of task completion order (got \(deliveredIndices))")
-    }
-
-    // MARK: - 2. Wall-clock comparison (parallel vs. sequential override)
-
-    @Test(
-        "Parallel wall-clock measurably faster than forced-sequential baseline on multi-core hardware",
-        .timeLimit(.minutes(5))
-    )
-    func testParallelBeatSerialByMeasurableMargin() async throws {
-        // Renamed from testWallClockHalvesOnTwoCores — the old
-        // name promised a <= 0.50 ratio the test never required. This
-        // test guards the "parallelism broken / measurably slower"
-        // regression only; the stress-baseline.json corpus (500-page
-        // corpus, make stress-baseline) owns the strict speedup gate.
-        // Only run on multi-core hosts; single-core simulators can't
-        // exhibit any speedup and the test would be a coin flip.
-        let cores = ProcessInfo.processInfo.activeProcessorCount
-        guard cores >= 2 else {
-            // Recorded as a visible skip, not a failure.
-            TestGate.skip("single-core host — the parallel-vs-serial comparison needs at least two cores")
-            return
-        }
-
-        // Use enough pages that scheduling overhead is small relative
-        // to per-page rasterize work. The committed stress-baseline
-        // (500-page run, see stress-baseline.json) is the strict 60%
-        // acceptance gate; this unit test
-        // only verifies the mechanism wins clearly on a tractable
-        // fixture (target: parallel < sequential by a substantive
-        // margin, but with margin enough to absorb simulator noise).
-        let pageCount = 32
-        let url = try makeStampedMultiPagePDF(pages: pageCount)
-        defer { try? FileManager.default.removeItem(at: url) }
-        guard let doc = PDFDocument(url: url) else {
-            Issue.record("Failed to load fixture"); return
-        }
-
-        // --- Sequential baseline: force parallelism to 1.
-        let seqCoord = makeLoadedCoordinator(document: doc)
-        addRegionToAllPages(seqCoord, pageCount: pageCount)
-        seqCoord.parallelismOverride = 1
-        let seqPages = seqCoord.buildPDFPageData(effectiveMode: .secureRasterization)
-        let seqClock = ContinuousClock.now
-        // No-op callback: this test measures rasterize wall-clock only; the
-        // append work parity is the same ignored result as the old dict call.
-        try await seqCoord.rasterizePagesInParallel(
-            pages: seqPages, rasterizer: PageRasterizer()
-        ) { _, _ in }
-        let seqElapsed = seqClock.duration(to: ContinuousClock.now)
-        let seqSeconds = secondsOf(seqElapsed)
-
-        // --- Parallel run: default bound (cores - 1, memory permitting).
-        let parCoord = makeLoadedCoordinator(document: doc)
-        addRegionToAllPages(parCoord, pageCount: pageCount)
-        let parPages = parCoord.buildPDFPageData(effectiveMode: .secureRasterization)
-        let parClock = ContinuousClock.now
-        try await parCoord.rasterizePagesInParallel(
-            pages: parPages, rasterizer: PageRasterizer()
-        ) { _, _ in }
-        let parElapsed = parClock.duration(to: ContinuousClock.now)
-        let parSeconds = secondsOf(parElapsed)
-
-        // Acceptance budget for the unit test: parallel must beat
-        // sequential by a measurable margin on a multi-core host. The
-        // strict 60% acceptance bar lives in
-        // `stress-baseline.json` where the per-run
-        // wall-clock is large enough to absorb scheduling jitter.
-        // Skip-on-near-zero: if both runs landed under 50 ms, the
-        // simulator is so fast on this fixture that ratio noise
-        // dominates; signal as recorded rather than fail.
-        //
-        // The unit-test ratio bar was widened from 0.80 (20% speedup)
-        // to 0.90 (10% speedup) after the iPhone 17 simulator on
-        // Apple silicon hosts began landing the 32-page rasterize in
-        // the ~0.9s sequential / ~0.85s parallel band, where the
-        // scheduler-jitter floor swallows most of the parallel win.
-        // The 10% bar still flags the "no parallelism at all"
-        // regression (which would land at or above 1.0); the stress-baseline
-        // corpus is the venue for tighter speedup bars on larger fixtures.
-        let ratio = parSeconds / max(seqSeconds, 0.0001)
-        if seqSeconds < 0.05 {
-            // Previously a bare return — the skip was invisible
-            // and the test passed with zero assertions. Surface it as a
-            // known issue so result bundles show WHY no ratio was asserted.
-            withKnownIssue(
-                "Sequential run completed in \(seqSeconds)s — too fast to measure speedup on this host; ratio noise dominates below 50 ms"
-            ) {
-                Issue.record("near-zero sequential baseline; speedup ratio not asserted")
-            }
-            return
-        }
-        // Floor assert: parallel slower than serial means the
-        // parallel machinery is broken outright, regardless of how much
-        // jitter the 0.90 margin absorbs.
-        #expect(
-            ratio < 1.0,
-            "Parallel run must not be slower than serial — parallelism is broken (ratio \(ratio); seq=\(seqSeconds)s par=\(parSeconds)s cores=\(cores))"
-        )
-        #expect(
-            ratio <= 0.90,
-            "Parallel run was \(Int(ratio * 100))% of sequential (unit-test threshold 90%; the stress-baseline corpus owns the strict speedup gate); seq=\(seqSeconds)s par=\(parSeconds)s cores=\(cores)"
-        )
     }
 
     // MARK: - 3. Memory warning caps parallelism to 1 mid-run
@@ -451,47 +368,156 @@ struct PageParallelRasterizationTests {
         #expect(history.last?.dpiCap == 150,
                 "Final page must rasterize at the post-warning cap of 150 (got \(String(describing: history.last?.dpiCap)))")
     }
+}
 
-    // MARK: - Helpers (private)
+@Suite("Page-Parallel Rasterization: timing", .tags(.coordination))
+@MainActor
+struct PageParallelRasterizationTimingTests {
 
-    private func addRegionToAllPages(_ coord: PipelineCoordinator, pageCount: Int) {
-        let region = RedactionRegion(
-            id: UUID(),
-            normalizedRect: CGRect(x: 0.1, y: 0.1, width: 0.4, height: 0.04),
-            source: .manual
-        )
-        for i in 0..<pageCount {
-            coord.redactionState.regions[i] = [region]
+    // MARK: - 2. Wall-clock comparison (parallel vs. sequential override)
+
+    @Test(
+        "Parallel wall-clock measurably faster than forced-sequential baseline on multi-core hardware",
+        .timeLimit(.minutes(5))
+    )
+    func testParallelBeatSerialByMeasurableMargin() async throws {
+        // Renamed from testWallClockHalvesOnTwoCores — the old
+        // name promised a <= 0.50 ratio the test never required. This
+        // test guards the "parallelism broken / measurably slower"
+        // regression only; the stress-baseline.json corpus (500-page
+        // corpus, make stress-baseline) owns the strict speedup gate.
+        // Only run on multi-core hosts; single-core simulators can't
+        // exhibit any speedup and the test would be a coin flip.
+        let cores = ProcessInfo.processInfo.activeProcessorCount
+        guard cores >= 2 else {
+            // Recorded as a visible skip, not a failure.
+            TestGate.skip("single-core host — the parallel-vs-serial comparison needs at least two cores")
+            return
         }
-    }
 
-    /// Build a multi-page PDF whose pages have distinct visible text so
-    /// out-of-order completion would be observable downstream. The text
-    /// is in the page corner and intentionally NOT under the redaction
-    /// region drawn in `addRegionToAllPages` so the post-redaction PDF
-    /// still has page-identifying text.
-    private func makeStampedMultiPagePDF(pages: Int) throws -> URL {
-        let pageRect = CGRect(x: 0, y: 0, width: 612, height: 792)
-        let renderer = UIGraphicsPDFRenderer(bounds: pageRect)
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent(
-            "perf2-stamped-\(UUID().uuidString).pdf"
-        )
-        try renderer.writePDF(to: url) { ctx in
-            for i in 0..<pages {
-                ctx.beginPage()
-                let attrs: [NSAttributedString.Key: Any] = [
-                    .font: UIFont.systemFont(ofSize: 16)
-                ]
-                ("Stamp \(i + 1)" as NSString).draw(
-                    at: CGPoint(x: 400, y: 700), withAttributes: attrs
-                )
+        // Use enough pages that scheduling overhead is small relative
+        // to per-page rasterize work. The committed stress-baseline
+        // (500-page run, see stress-baseline.json) is the strict 60%
+        // acceptance gate; this unit test
+        // only verifies the mechanism wins clearly on a tractable
+        // fixture (target: parallel < sequential by a substantive
+        // margin, but with margin enough to absorb simulator noise).
+        let pageCount = 32
+        let url = try makeStampedMultiPagePDF(pages: pageCount)
+        defer { try? FileManager.default.removeItem(at: url) }
+        guard let doc = PDFDocument(url: url) else {
+            Issue.record("Failed to load fixture"); return
+        }
+
+        // --- Sequential baseline: force parallelism to 1.
+        let seqCoord = makeLoadedCoordinator(document: doc)
+        addRegionToAllPages(seqCoord, pageCount: pageCount)
+        seqCoord.parallelismOverride = 1
+        let seqPages = seqCoord.buildPDFPageData(effectiveMode: .secureRasterization)
+        let seqClock = ContinuousClock.now
+        // No-op callback: this test measures rasterize wall-clock only; the
+        // append work parity is the same ignored result as the old dict call.
+        try await seqCoord.rasterizePagesInParallel(
+            pages: seqPages, rasterizer: PageRasterizer()
+        ) { _, _ in }
+        let seqElapsed = seqClock.duration(to: ContinuousClock.now)
+        let seqSeconds = secondsOf(seqElapsed)
+
+        // --- Parallel run: default bound (cores - 1, memory permitting).
+        let parCoord = makeLoadedCoordinator(document: doc)
+        addRegionToAllPages(parCoord, pageCount: pageCount)
+        let parPages = parCoord.buildPDFPageData(effectiveMode: .secureRasterization)
+        let parClock = ContinuousClock.now
+        try await parCoord.rasterizePagesInParallel(
+            pages: parPages, rasterizer: PageRasterizer()
+        ) { _, _ in }
+        let parElapsed = parClock.duration(to: ContinuousClock.now)
+        let parSeconds = secondsOf(parElapsed)
+
+        // Acceptance budget for the unit test: parallel must beat
+        // sequential by a measurable margin on a multi-core host. The
+        // strict 60% acceptance bar lives in
+        // `stress-baseline.json` where the per-run
+        // wall-clock is large enough to absorb scheduling jitter.
+        // Skip-on-near-zero: if both runs landed under 50 ms, the
+        // simulator is so fast on this fixture that ratio noise
+        // dominates; signal as recorded rather than fail.
+        //
+        // The unit-test ratio bar was widened from 0.80 (20% speedup)
+        // to 0.90 (10% speedup) after the iPhone 17 simulator on
+        // Apple silicon hosts began landing the 32-page rasterize in
+        // the ~0.9s sequential / ~0.85s parallel band, where the
+        // scheduler-jitter floor swallows most of the parallel win.
+        // The 10% bar still flags the "no parallelism at all"
+        // regression (which would land at or above 1.0); the stress-baseline
+        // corpus is the venue for tighter speedup bars on larger fixtures.
+        let ratio = parSeconds / max(seqSeconds, 0.0001)
+        if seqSeconds < 0.05 {
+            // Previously a bare return — the skip was invisible
+            // and the test passed with zero assertions. Surface it as a
+            // known issue so result bundles show WHY no ratio was asserted.
+            withKnownIssue(
+                "Sequential run completed in \(seqSeconds)s — too fast to measure speedup on this host; ratio noise dominates below 50 ms"
+            ) {
+                Issue.record("near-zero sequential baseline; speedup ratio not asserted")
             }
+            return
         }
-        return url
+        // Floor assert: parallel slower than serial means the
+        // parallel machinery is broken outright, regardless of how much
+        // jitter the 0.90 margin absorbs.
+        #expect(
+            ratio < 1.0,
+            "Parallel run must not be slower than serial — parallelism is broken (ratio \(ratio); seq=\(seqSeconds)s par=\(parSeconds)s cores=\(cores))"
+        )
+        #expect(
+            ratio <= 0.90,
+            "Parallel run was \(Int(ratio * 100))% of sequential (unit-test threshold 90%; the stress-baseline corpus owns the strict speedup gate); seq=\(seqSeconds)s par=\(parSeconds)s cores=\(cores)"
+        )
     }
 
     private func secondsOf(_ d: Duration) -> Double {
         let comps = d.components
         return Double(comps.seconds) + Double(comps.attoseconds) / 1e18
     }
+}
+
+// MARK: - Fixtures (shared by the three suites)
+
+@MainActor
+private func addRegionToAllPages(_ coord: PipelineCoordinator, pageCount: Int) {
+    let region = RedactionRegion(
+        id: UUID(),
+        normalizedRect: CGRect(x: 0.1, y: 0.1, width: 0.4, height: 0.04),
+        source: .manual
+    )
+    for i in 0..<pageCount {
+        coord.redactionState.regions[i] = [region]
+    }
+}
+
+/// Build a multi-page PDF whose pages have distinct visible text so
+/// out-of-order completion would be observable downstream. The text
+/// is in the page corner and intentionally NOT under the redaction
+/// region drawn in `addRegionToAllPages` so the post-redaction PDF
+/// still has page-identifying text.
+@MainActor
+private func makeStampedMultiPagePDF(pages: Int) throws -> URL {
+    let pageRect = CGRect(x: 0, y: 0, width: 612, height: 792)
+    let renderer = UIGraphicsPDFRenderer(bounds: pageRect)
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(
+        "perf2-stamped-\(UUID().uuidString).pdf"
+    )
+    try renderer.writePDF(to: url) { ctx in
+        for i in 0..<pages {
+            ctx.beginPage()
+            let attrs: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 16)
+            ]
+            ("Stamp \(i + 1)" as NSString).draw(
+                at: CGPoint(x: 400, y: 700), withAttributes: attrs
+            )
+        }
+    }
+    return url
 }
