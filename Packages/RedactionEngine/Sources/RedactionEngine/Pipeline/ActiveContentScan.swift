@@ -211,44 +211,115 @@ public enum ActiveContentScan {
         return false
     }
 
-    /// True when the action dictionary's `/S` is JavaScript or Launch, when
-    /// it is a Rendition action carrying a `/JS` entry, or when any action in
-    /// its `/Next` chain (a dictionary or an array of them) is; nil when the
-    /// chain runs past `maxActionChainDepth`, so the walk could not read it
-    /// to the end. A non-dictionary object — an `/OpenAction` destination
-    /// array, say — is not an action.
-    static func actionChainIsActive(_ object: CGPDFObjectRef, depth: Int = 0) -> Bool? {
-        guard depth < maxActionChainDepth else { return nil }
-        var dictionary: CGPDFDictionaryRef?
-        guard CGPDFObjectGetValue(object, .dictionary, &dictionary),
-              let dictionary else { return false }
+    /// True when the action, or any action its `/Next` chain reaches (a
+    /// dictionary or an array of them), is active (`isActiveAction`); nil
+    /// when the chain runs past `maxActionChainDepth` or loops back on
+    /// itself, so the walk could not read it to the end. A non-dictionary
+    /// object (an `/OpenAction` destination array, say) is not an action.
+    /// The chain is read once per action (`readActionGraph`) and then
+    /// walked (`actionGraphIsActive`).
+    static func actionChainIsActive(_ object: CGPDFObjectRef) -> Bool? {
+        actionGraphIsActive(readActionGraph(from: object))
+    }
 
+    /// Whether the action dictionary's `/S` is JavaScript or Launch, or it is
+    /// a Rendition action carrying a `/JS` entry.
+    static func isActiveAction(_ dictionary: CGPDFDictionaryRef) -> Bool {
         var subtype: UnsafePointer<CChar>?
-        if CGPDFDictionaryGetName(dictionary, "S", &subtype), let subtype {
-            let name = String(cString: subtype)
-            if activeActionSubtypes.contains(name) { return true }
-            var script: CGPDFObjectRef?
-            if name == "Rendition", CGPDFDictionaryGetObject(dictionary, "JS", &script) {
-                return true
+        guard CGPDFDictionaryGetName(dictionary, "S", &subtype), let subtype else { return false }
+        let name = String(cString: subtype)
+        if activeActionSubtypes.contains(name) { return true }
+        var script: CGPDFObjectRef?
+        return name == "Rendition" && CGPDFDictionaryGetObject(dictionary, "JS", &script)
+    }
+
+    /// An action chain as values: node 0 is the starting object, and each
+    /// node lists the nodes its `/Next` names, in order. An action
+    /// dictionary named more than once is one node.
+    struct ActionGraph: Equatable, Sendable {
+        struct Node: Equatable, Sendable {
+            var isActive: Bool
+            var next: [Int]
+        }
+        var nodes: [Node]
+    }
+
+    /// Reads the actions reachable from `object` through `/Next`, nearest
+    /// first, each action dictionary once. An action reached only at
+    /// `maxDepth` hops or more is not opened (the walk answers nil there
+    /// before reading it), and an active action's own `/Next` is not read
+    /// (the walk stops at it). A non-dictionary object is a node with no
+    /// `/Next` that is not active.
+    static func readActionGraph(from object: CGPDFObjectRef, maxDepth: Int = maxActionChainDepth) -> ActionGraph {
+        var nodes: [ActionGraph.Node] = []
+        var index: [CGPDFDictionaryRef: Int] = [:]
+        var toRead: [(dictionary: CGPDFDictionaryRef, node: Int, depth: Int)] = []
+        func node(for object: CGPDFObjectRef, depth: Int) -> Int {
+            var dictionary: CGPDFDictionaryRef?
+            guard CGPDFObjectGetValue(object, .dictionary, &dictionary), let dictionary else {
+                nodes.append(.init(isActive: false, next: []))
+                return nodes.count - 1
+            }
+            if let known = index[dictionary] { return known }
+            let active = isActiveAction(dictionary)
+            nodes.append(.init(isActive: active, next: []))
+            index[dictionary] = nodes.count - 1
+            if !active, depth < maxDepth { toRead.append((dictionary, nodes.count - 1, depth)) }
+            return nodes.count - 1
+        }
+        _ = node(for: object, depth: 0)
+        var head = 0
+        while head < toRead.count {
+            let (dictionary, current, depth) = toRead[head]
+            head += 1
+            var next: CGPDFObjectRef?
+            guard CGPDFDictionaryGetObject(dictionary, "Next", &next), let next else { continue }
+            var chain: CGPDFArrayRef?
+            if CGPDFObjectGetValue(next, .array, &chain), let chain {
+                for slot in 0..<CGPDFArrayGetCount(chain) {
+                    var item: CGPDFObjectRef?
+                    guard CGPDFArrayGetObject(chain, slot, &item), let item else { continue }
+                    let child = node(for: item, depth: depth + 1)
+                    nodes[current].next.append(child)
+                }
+            } else {
+                let child = node(for: next, depth: depth + 1)
+                nodes[current].next.append(child)
             }
         }
+        return ActionGraph(nodes: nodes)
+    }
 
-        var next: CGPDFObjectRef?
-        guard CGPDFDictionaryGetObject(dictionary, "Next", &next), let next else { return false }
-        var chain: CGPDFArrayRef?
-        if CGPDFObjectGetValue(next, .array, &chain), let chain {
-            for slot in 0..<CGPDFArrayGetCount(chain) {
-                var item: CGPDFObjectRef?
-                guard CGPDFArrayGetObject(chain, slot, &item), let item else { continue }
-                switch actionChainIsActive(item, depth: depth + 1) {
+    /// The walk over an action graph from node 0, depth first in `/Next`
+    /// order: true at the first active node, nil at the first node met at
+    /// `maxDepth` hops or more or met again while still on the current path
+    /// (a loop), false when neither happens. Each node keeps the deepest
+    /// depth at which its own chain was read clean; meeting it again at
+    /// that depth or shallower answers false without reading it again, and
+    /// only a deeper meeting reads it again, so each node is read at most
+    /// `maxDepth` times. The answer is the same as reading every path in
+    /// full to the depth bound.
+    static func actionGraphIsActive(_ graph: ActionGraph, maxDepth: Int = maxActionChainDepth) -> Bool? {
+        guard !graph.nodes.isEmpty else { return false }
+        var onPath = [Bool](repeating: false, count: graph.nodes.count)
+        var cleanAtDepth = [Int](repeating: -1, count: graph.nodes.count)
+        func walk(_ node: Int, depth: Int) -> Bool? {
+            guard depth < maxDepth, !onPath[node] else { return nil }
+            if depth <= cleanAtDepth[node] { return false }
+            if graph.nodes[node].isActive { return true }
+            onPath[node] = true
+            defer { onPath[node] = false }
+            for next in graph.nodes[node].next {
+                switch walk(next, depth: depth + 1) {
                 case true: return true
                 case nil: return nil
                 case false: continue
                 }
             }
+            cleanAtDepth[node] = depth
             return false
         }
-        return actionChainIsActive(next, depth: depth + 1)
+        return walk(0, depth: 0)
     }
 
     /// Every value in an additional-actions dictionary is an action keyed by
