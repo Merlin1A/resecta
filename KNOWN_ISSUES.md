@@ -187,6 +187,15 @@ On iOS 27, the system's name model can be unavailable or unreliable. After the i
 
 ---
 
+### KI-24: On a Scanned Page, a Box Can Leave the Word in a Searchable Export (High)
+**Affects:** Searchable Redaction (scanned pages that carry their own text, such as a scan made searchable by OCR)
+
+Some scanned PDFs carry an invisible layer of text over the picture of each page, which is what makes them searchable. That layer does not always line up with the printed words: a word's hidden copy can sit a little to one side of where it is printed. A box placed from a Search or Scan match of that text, and left where it was placed, removes the hidden copy where it is. Any other box removes only the hidden text under the box itself: one you draw by hand, one made with Duplicate Region, one you resize or move after placing it, or one placed where Resecta read the word from the page's picture because the hidden text spells it differently. On such a page the hidden copy of the word you covered can stay in a Searchable export, where it can be selected, copied and searched. Verification reports it only if it is one of the structured categories its final sweep reads; a name or an address is not.
+
+**Workaround:** Export scanned documents with Secure Rasterization, which keeps no text layer.
+
+---
+
 ## Fixed
 
 ### KI-8: Duplicate Regions from Multiple Scan Runs (Low) — FIXED (entry moved 2026-10-01)
