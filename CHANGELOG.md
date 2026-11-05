@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+## [1.3.2]
+
+Search matches a name that wraps onto a second line, or breaks at its own hyphen, as one match, with a box on each line. On photos and scans, a typed search now boxes the words it matched instead of the whole line. Share now also asks you to confirm first when the Detection Sweep lists possible items outside your boxes, or when form values were not carried over; slide to share. Copies of different documents get their own names, so saving several in one folder no longer replaces one with another. A redaction and its checks keep the screen awake while they run.
+
 ### Added
 
 - Results: filled form values the export does not carry, and hand-drawn regions on pages with no text layer, which no check can read, are listed with the results.
@@ -52,6 +56,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Search: on a scanned page, a typed number or code made of digits that look like letters, such as a suite, room or case number, an amount or a member ID, is now found, and an accented name matches with or without its accents. Before, the recognised line was corrected toward letters while the typed text was not, so such numbers never matched.
 - Search: on a scanned page or photo, a match is boxed on the words it covers rather than the whole recognised line (KNOWN_ISSUES KI-17).
 - A highlight or form field in the original that hides one word of a line at its edge is now named as covering text: on a page whose text layer reads, it counts as a cover when it hides at least 60% of any one word under it, not 60% of its whole area.
+- Search: a match that wraps onto two lines now counts once in the number of results left unselected, as it already did in the match count.
 
 ### Security
 
@@ -542,7 +547,8 @@ Initial public release.
 - **Pixel-destruction core shared by both modes.** Every page is rasterized, marked or not; vector text and images are converted into flat bitmap data, and the redaction process is designed to remove the original text layer from marked regions.
 - **Searchable Redaction text-layer design.** The reconstructed text layer uses a fresh monospace font with uniform spacing, designed to remove the glyph-positioning side channels identified in academic research on sandwich PDFs.
 
-[Unreleased]: https://github.com/Merlin1A/resecta/compare/v1.3.1...HEAD
+[Unreleased]: https://github.com/Merlin1A/resecta/compare/v1.3.2...HEAD
+[1.3.2]: https://github.com/Merlin1A/resecta/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/Merlin1A/resecta/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/Merlin1A/resecta/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/Merlin1A/resecta/compare/v1.1.0...v1.2.0
