@@ -31,6 +31,15 @@
 #       Re-derives the record into a temporary file and compares the two byte
 #       for byte: prints MATCH and exits 0, or prints the diff and exits 1.
 #       --tag, --gate and --mac default to the values the record states.
+#       The record's format is the one it names (`Record format: N` under the
+#       title; a record without the line is format 1), and that format is
+#       re-rendered, so a record keeps matching the layout it was made in.
+#   Scripts/release-identity.sh --self-test
+#       Runs the checks below on planted inputs and prints PASS or FAIL.
+#
+# Record format 2, written from this version on, adds the `Record format`
+# line, the required-reason table and the DTXcode and DTPlatformVersion rows
+# to format 1's layout (the records of 1.2.0, 1.3.0 and 1.3.1).
 #
 # The networking check reads the imported (undefined) symbols, `nm -u`, and
 # counts those that contain a name in NET_SUBSTRINGS or are exactly a name in
@@ -38,8 +47,17 @@
 # binds to when it loads; a function looked up by name at run time is not in
 # it, so the count is read alongside the source-level check in ENGINEERING.md.
 #
+# The required-reason check (format 2) counts the same imports against the
+# APIs Apple requires a declared reason for (RR_EXACT and RR_SUBSTRINGS below),
+# maps each to its category and reads whether the app's own privacy manifest
+# declares that category. An imported pattern whose category is not declared
+# is marked UNDECLARED and the script exits 3, after writing the record (or
+# after printing MATCH under --check).
+#
 # Exit: 0 written or MATCH; 1 the record differs (--check); 2 an unreadable
-# archive or a record the privacy guard refused; 64 usage.
+# archive, a record naming an unknown format or a record the privacy guard
+# refused; 3 an imported required-reason API whose category the privacy
+# manifest does not declare (format 2); 64 usage.
 set -eu
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 GREP=/usr/bin/grep
@@ -56,10 +74,20 @@ NET_SUBSTRINGS='URLSession NSURLSession NSURLConnection URLRequest NWConnection 
 # this name.
 NET_FUNCTIONS='_socket _connect _getaddrinfo _gethostbyname _bind _listen _accept _send _sendto _sendmsg _recv _recvfrom _recvmsg'
 
-usage() { sed -n '3,42p' "$0" >&2; exit 64; }
+# Required-reason APIs (Apple's list of APIs a privacy manifest must give a
+# reason for). Functions, counted when imported under exactly this name or
+# with the `$INODE64` suffix; then names counted when an imported symbol
+# contains them. rr_category maps each to its manifest category.
+RR_EXACT='_stat _fstat _fstatat _lstat _getattrlist _getattrlistbulk _fgetattrlist _getattrlistat _statfs _statvfs _fstatfs _fstatvfs _mach_absolute_time'
+RR_SUBSTRINGS='NSURLCreationDateKey NSURLContentModificationDateKey NSFileCreationDate NSFileModificationDate VolumeAvailableCapacity VolumeTotalCapacity NSFileSystemFreeSize NSFileSystemSize systemUptime activeInputModes NSUserDefaults'
+# The format a fresh record is written in.
+FORMAT_CURRENT=2
+
+usage_text() { sed -n '3,/^set -eu$/{ /^set -eu$/!p; }' "$0"; }
+usage() { usage_text >&2; exit 64; }
 die() { echo "release-identity: $1" >&2; exit 2; }
 
-ARCHIVE=""; CHECK=""; TAG=""; GATE=""; MAC=""
+ARCHIVE=""; CHECK=""; TAG=""; GATE=""; MAC=""; SELF_TEST=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --archive) [ $# -ge 2 ] || usage; ARCHIVE="$2"; shift 2 ;;
@@ -68,24 +96,17 @@ while [ $# -gt 0 ]; do
         --gate) [ $# -ge 2 ] || usage; GATE="$2"; shift 2 ;;
         --mac) [ $# -ge 2 ] || usage
                case "$2" in yes|no) MAC="$2" ;; *) usage ;; esac; shift 2 ;;
-        -h|--help) sed -n '3,42p' "$0"; exit 0 ;;
+        --self-test) SELF_TEST=1; shift ;;
+        -h|--help) usage_text; exit 0 ;;
         *) echo "release-identity: unknown option: $1" >&2; usage ;;
     esac
 done
-[ -n "$ARCHIVE" ] || usage
-ARCHIVE="${ARCHIVE%/}"
-[ -f "$ARCHIVE/Info.plist" ] || die "not an Xcode archive (no Info.plist): $ARCHIVE"
-ARCHIVE_ABS="$(cd "$ARCHIVE" && pwd)"
-ARCHIVE_NAME="$(basename "$ARCHIVE_ABS")"
-
-SCRATCH="$(mktemp -d "${TMPDIR:-/tmp}/release-identity.XXXXXX")"
-trap 'rm -rf "$SCRATCH"' EXIT
-
 # The property-list reader. Modes:
 #   get FILE KEY.PATH      a scalar value, or nothing when absent
 #   entitlements FILE      table rows: key | value
-#   info FILE              table rows for the security-relevant Info.plist keys
+#   info FILE [FORMAT]     table rows for the security-relevant Info.plist keys
 #   privacy FILE           the privacy manifest as tables
+#   rr-declared FILE       the manifest's declared API categories: category reasons
 #   archive FILE           table rows from the archive's own Info.plist
 PLIST_PY='
 import datetime, json, plistlib, re, sys
@@ -135,10 +156,12 @@ elif mode == "entitlements":
         print("| `%s` | %s |" % (cell(k), fmt(p[k])))
 
 elif mode == "info":
+    record_format = int(sys.argv[3]) if len(sys.argv) > 3 else 1
     rows = [
         ("CFBundleIdentifier", None), ("CFBundleShortVersionString", None),
         ("CFBundleVersion", None), ("MinimumOSVersion", None),
         ("DTSDKName", "built with"), ("DTXcodeBuild", "built with"),
+    ] + ([("DTXcode", "built with"), ("DTPlatformVersion", "built with")] if record_format >= 2 else []) + [
         ("UIDeviceFamily", None), ("UIRequiredDeviceCapabilities", None),
         ("NSAppTransportSecurity", None), ("UIFileSharingEnabled", None),
         ("LSSupportsOpeningDocumentsInPlace", None), ("UIBackgroundModes", None),
@@ -198,6 +221,14 @@ elif mode == "privacy":
     else:
         print("Accessed API types: none declared.")
 
+elif mode == "rr-declared":
+    rows = []
+    for a in p.get("NSPrivacyAccessedAPITypes") or []:
+        if isinstance(a, dict) and a.get("NSPrivacyAccessedAPIType"):
+            rows.append("%s %s" % (a["NSPrivacyAccessedAPIType"], fmt(sorted(a.get("NSPrivacyAccessedAPITypeReasons", [])))))
+    for r in sorted(rows):
+        print(r)
+
 elif mode == "archive":
     ap = p.get("ApplicationProperties", {})
     ident = str(ap.get("SigningIdentity", ""))
@@ -220,6 +251,135 @@ else:
 '
 plist() { python3 -I -c "$PLIST_PY" "$@"; }
 
+# The manifest category of a required-reason pattern.
+rr_category() {
+    case "$1" in
+        _stat|_fstat|_fstatat|_lstat|_getattrlist|_getattrlistbulk|_fgetattrlist|_getattrlistat|NSURLCreationDateKey|NSURLContentModificationDateKey|NSFileCreationDate|NSFileModificationDate) echo FileTimestamp ;;
+        _statfs|_statvfs|_fstatfs|_fstatvfs|VolumeAvailableCapacity|VolumeTotalCapacity|NSFileSystemFreeSize|NSFileSystemSize) echo DiskSpace ;;
+        _mach_absolute_time|systemUptime) echo SystemBootTime ;;
+        activeInputModes) echo ActiveKeyboards ;;
+        NSUserDefaults) echo UserDefaults ;;
+    esac
+}
+
+# The required-reason table: imports file, declared-categories file (plist
+# rr-declared), rows out, matching symbols out. Sets RR_HITS (matching
+# symbols) and RR_UNDECLARED (imported patterns whose category is undeclared).
+rr_rows() {
+    : > "$3"; : > "$4"; RR_UNDECLARED=0
+    for p in $RR_EXACT $RR_SUBSTRINGS; do
+        case " $RR_EXACT " in
+            *" $p "*) m=exactly
+                      $GREP -x -F -e "$p" -e "$p\$INODE64" "$1" >> "$4" || true
+                      n="$($GREP -c -x -F -e "$p" -e "$p\$INODE64" "$1" || true)" ;;
+            *) m=contains
+               $GREP -F -- "$p" "$1" >> "$4" || true
+               n="$($GREP -c -F -- "$p" "$1" || true)" ;;
+        esac
+        c="NSPrivacyAccessedAPICategory$(rr_category "$p")"
+        r="$($GREP "^$c " "$2" | sed "s/^$c //" | head -1 || true)"
+        if [ -n "$r" ]; then d="yes, $r"
+        elif [ "$n" -gt 0 ]; then d="**UNDECLARED**"; RR_UNDECLARED=$((RR_UNDECLARED + 1))
+        else d="no"; fi
+        printf '| `%s` | %s | %s | `%s` | %s |\n' "$p" "$m" "$n" "$c" "$d" >> "$3"
+    done
+    sort -u "$4" -o "$4"
+    RR_HITS="$($GREP -c . "$4" || true)"
+}
+
+# The exit code the required-reason check asks for (format 2 only).
+rr_status() { if [ "$FORMAT" -ge 2 ] && [ "$RR_UNDECLARED" -gt 0 ]; then echo 3; else echo 0; fi; }
+
+# A record's format: the number on its `Record format:` line, 1 when it has
+# none; a format this script does not render fails.
+record_format() {
+    f="$(sed -n '1,5s/^Record format: \([0-9][0-9]*\)$/\1/p' "$1" | head -1)"
+    case "${f:-1}" in 1|2) echo "${f:-1}" ;; *) echo "$f"; return 1 ;; esac
+}
+
+# The self-test: the required-reason table, its exit code, the record-format
+# reader and the Info.plist rows each format carries, on planted inputs (no
+# archive and no fixture file); then --check of a record that names an
+# unknown format, on a planted archive.
+self_test() {
+    T="$(mktemp -d "${TMPDIR:-/tmp}/release-identity-test.XXXXXX")"
+    trap 'rm -rf "$T"' EXIT
+    fails=0
+    ok() { if [ "$2" = "$3" ]; then echo "  ok   $1"; else echo "  FAIL $1: got '$2', want '$3'"; fails=$((fails + 1)); fi; }
+    manifest() { # file, then pairs of category and reason
+        f="$1"; shift
+        { echo '<?xml version="1.0" encoding="UTF-8"?>'
+          echo '<plist version="1.0"><dict><key>NSPrivacyTracking</key><false/><key>NSPrivacyAccessedAPITypes</key><array>'
+          while [ $# -ge 2 ]; do
+              echo "<dict><key>NSPrivacyAccessedAPIType</key><string>NSPrivacyAccessedAPICategory$1</string><key>NSPrivacyAccessedAPITypeReasons</key><array><string>$2</string></array></dict>"
+              shift 2
+          done
+          echo '</array></dict></plist>'; } > "$f"
+    }
+    FORMAT=2
+
+    # (a) a boot-time function imported, its category not declared.
+    printf '%s\n' '_mach_absolute_time' '_memcpy' > "$T/imports-a.txt"
+    manifest "$T/m-a.plist" UserDefaults CA92.1
+    plist rr-declared "$T/m-a.plist" > "$T/d-a.txt"
+    rr_rows "$T/imports-a.txt" "$T/d-a.txt" "$T/rows-a.txt" "$T/hits-a.txt"
+    ok "(a) one imported pattern whose category is not declared" "$RR_UNDECLARED" 1
+    ok "(a) its row says UNDECLARED" "$($GREP -c -F '| `_mach_absolute_time` | exactly | 1 | `NSPrivacyAccessedAPICategorySystemBootTime` | **UNDECLARED** |' "$T/rows-a.txt" || true)" 1
+    ok "(a) exit code 3" "$(rr_status)" 3
+
+    # (b) the same import with its category declared.
+    manifest "$T/m-b.plist" UserDefaults CA92.1 SystemBootTime 35F9.1
+    plist rr-declared "$T/m-b.plist" > "$T/d-b.txt"
+    rr_rows "$T/imports-a.txt" "$T/d-b.txt" "$T/rows-b.txt" "$T/hits-b.txt"
+    ok "(b) declared: none undeclared" "$RR_UNDECLARED" 0
+    ok "(b) its row names the declared reason" "$($GREP -c -F '| `_mach_absolute_time` | exactly | 1 | `NSPrivacyAccessedAPICategorySystemBootTime` | yes, `35F9.1` |' "$T/rows-b.txt" || true)" 1
+    ok "(b) exit code 0" "$(rr_status)" 0
+
+    # (c) the shape of build 7 of 1.3.1: a file-timestamp key and two user-defaults symbols, both categories declared.
+    printf '%s\n' '_NSURLCreationDateKey' '_OBJC_CLASS_$_NSUserDefaults' \
+        '_$s7SwiftUI10AppStorageV12wrappedValue_5storeACySbGSb_SSSo14NSUserDefaultsCSgtcSbRszlufC' '_memcpy' '_objc_msgSend' > "$T/imports-c.txt"
+    manifest "$T/m-c.plist" UserDefaults CA92.1 FileTimestamp C617.1
+    plist rr-declared "$T/m-c.plist" > "$T/d-c.txt"
+    rr_rows "$T/imports-c.txt" "$T/d-c.txt" "$T/rows-c.txt" "$T/hits-c.txt"
+    ok "(c) NSURLCreationDateKey counted once" "$($GREP -c -F '| `NSURLCreationDateKey` | contains | 1 | `NSPrivacyAccessedAPICategoryFileTimestamp` | yes, `C617.1` |' "$T/rows-c.txt" || true)" 1
+    ok "(c) NSUserDefaults counted twice" "$($GREP -c -F '| `NSUserDefaults` | contains | 2 | `NSPrivacyAccessedAPICategoryUserDefaults` | yes, `CA92.1` |' "$T/rows-c.txt" || true)" 1
+    ok "(c) every other pattern counts 0" "$(awk -F ' [|] ' '$3 != "0"' "$T/rows-c.txt" | $GREP -c . || true)" 2
+    ok "(c) three imported symbols match" "$RR_HITS" 3
+    ok "(c) exit code 0" "$(rr_status)" 0
+
+    # (d) the record format: none named is format 1; the Info.plist rows of each format.
+    printf '%s\n' '# Resecta 1.0 (1): identity record of the archived build' '' 'This record describes the app bundle.' > "$T/rec1.md"
+    printf '%s\n' '# Resecta 1.0 (1): identity record of the archived build' '' 'Record format: 2' '' 'This record describes the app bundle.' > "$T/rec2.md"
+    ok "(d) a record naming no format is format 1" "$(record_format "$T/rec1.md")" 1
+    ok "(d) a record naming format 2 is format 2" "$(record_format "$T/rec2.md")" 2
+    printf '%s\n' '<?xml version="1.0" encoding="UTF-8"?>' '<plist version="1.0"><dict><key>DTXcode</key><string>2720</string><key>DTPlatformVersion</key><string>27.2</string><key>DTXcodeBuild</key><string>27B52</string></dict></plist>' > "$T/info.plist"
+    ok "(d) format 1 carries no DTXcode or DTPlatformVersion row" "$(plist info "$T/info.plist" 1 | $GREP -c -e '`DTXcode`' -e '`DTPlatformVersion`' || true)" 0
+    ok "(d) format 2 carries both" "$(plist info "$T/info.plist" 2 | $GREP -c -e '| `DTXcode` (built with) | `2720` |' -e '| `DTPlatformVersion` (built with) | `27.2` |' || true)" 2
+
+    # (e) --check of a record that names a format this script does not know: exit 2.
+    A="$T/fake.xcarchive"; mkdir -p "$A/Products/Applications/F.app"
+    printf '%s\n' '<?xml version="1.0" encoding="UTF-8"?>' '<plist version="1.0"><dict><key>ApplicationProperties</key><dict><key>ApplicationPath</key><string>Applications/F.app</string></dict></dict></plist>' > "$A/Info.plist"
+    printf '%s\n' '<?xml version="1.0" encoding="UTF-8"?>' '<plist version="1.0"><dict><key>CFBundleExecutable</key><string>F</string><key>CFBundleShortVersionString</key><string>9.9</string></dict></plist>' > "$A/Products/Applications/F.app/Info.plist"
+    printf 'x' > "$A/Products/Applications/F.app/F"
+    printf '%s\n' '# Resecta 9.9 (1): identity record of the archived build' '' 'Record format: 9' > "$T/rec9.md"
+    rc=0; sh "$0" --archive "$A" --check "$T/rec9.md" > "$T/out9.txt" 2>&1 || rc=$?
+    ok "(e) a record naming format 9: exit 2" "$rc" 2
+    ok "(e) the message names the format" "$($GREP -c 'format 9' "$T/out9.txt" || true)" 1
+
+    if [ "$fails" -eq 0 ]; then echo "SELF-TEST PASS (release-identity.sh)"; return 0; fi
+    echo "SELF-TEST FAIL ($fails)"; return 1
+}
+if [ "$SELF_TEST" = 1 ]; then self_test; exit $?; fi
+
+[ -n "$ARCHIVE" ] || usage
+ARCHIVE="${ARCHIVE%/}"
+[ -f "$ARCHIVE/Info.plist" ] || die "not an Xcode archive (no Info.plist): $ARCHIVE"
+ARCHIVE_ABS="$(cd "$ARCHIVE" && pwd)"
+ARCHIVE_NAME="$(basename "$ARCHIVE_ABS")"
+
+SCRATCH="$(mktemp -d "${TMPDIR:-/tmp}/release-identity.XXXXXX")"
+trap 'rm -rf "$SCRATCH"' EXIT
+
 # The app inside the archive.
 APP_REL="$(plist get "$ARCHIVE/Info.plist" ApplicationProperties.ApplicationPath)"
 [ -n "$APP_REL" ] || die "the archive's Info.plist names no ApplicationPath"
@@ -237,8 +397,10 @@ SIGNING_IDENTITY="$(plist get "$ARCHIVE/Info.plist" ApplicationProperties.Signin
 
 # --check: the release facts default to the values the record states.
 record_value() { sed -n "s/^| $1 | \`\\([^\`]*\\)\` |\$/\\1/p" "$CHECK" | head -1; }
+FORMAT="$FORMAT_CURRENT"
 if [ -n "$CHECK" ]; then
     [ -f "$CHECK" ] || die "no record to check at $CHECK"
+    FORMAT="$(record_format "$CHECK")" || die "the record names format $FORMAT, which this script does not render: $CHECK"
     [ -n "$TAG" ] || TAG="$(record_value 'Release tag')"
     [ -n "$GATE" ] || GATE="$(record_value 'Gated commit')"
     [ -n "$MAC" ] || MAC="$(record_value 'Offered on Apple-silicon Macs (App Store listing)')"
@@ -302,6 +464,11 @@ N_FILES="$($GREP -c . "$SCRATCH/files.txt" || true)"
 (cd "$APP" && $FIND . -mindepth 1 -type d \( -name '*.bundle' -o -name '*.framework' -o -name '*.appex' -o -name '*.app' -o -name '*.xpc' \) | sed 's|^\./||' | sort) > "$SCRATCH/nested.txt"
 (cd "$APP" && $FIND . -name PrivacyInfo.xcprivacy -type f | sed 's|^\./||' | sort) > "$SCRATCH/privacy.txt"
 
+# The required-reason check, against the app's own manifest (the bundle root).
+: > "$SCRATCH/rr-declared.txt"
+[ ! -f "$APP/PrivacyInfo.xcprivacy" ] || plist rr-declared "$APP/PrivacyInfo.xcprivacy" > "$SCRATCH/rr-declared.txt"
+rr_rows "$SCRATCH/imports.txt" "$SCRATCH/rr-declared.txt" "$SCRATCH/rr-rows.txt" "$SCRATCH/rr-hits.txt"
+
 # For one bundled file: the tracked files at the tag's commit with the same
 # bytes. Candidates end with the file's path inside its innermost bundle.
 same_at_tag() { # bundle-relative path, digest
@@ -320,6 +487,10 @@ same_at_tag() { # bundle-relative path, digest
 render() {
     echo "# Resecta $VERSION ($BUILD): identity record of the archived build"
     echo
+    if [ "$FORMAT" -ge 2 ]; then
+        echo "Record format: $FORMAT"
+        echo
+    fi
     echo "This record describes the app bundle in the Xcode archive \`$ARCHIVE_NAME\`, as \`$SCRIPT_NAME\` reads it. Running the script again on the same archive in this repository gives this file byte for byte (the command is at the end)."
     echo
     echo "## Source"
@@ -399,6 +570,24 @@ render() {
     if [ "$HAS_DLSYM" -eq 1 ]; then printf '%s' " (this executable imports \`dlsym\`, through which such a lookup can be made)"; fi
     echo ", so this count is read alongside the source-level check in \`ENGINEERING.md\`. A system view the app presents, such as a browser sheet, loads its content in a separate process and does not appear here."
     echo
+    if [ "$FORMAT" -ge 2 ]; then
+        echo "## Imported symbols checked for required-reason APIs"
+        echo
+        echo "Apple requires an app that uses certain APIs to state a reason for each of their categories in its privacy manifest. Each pattern below is counted against the same imported symbols (\"exactly\" also counts the name with the \`\$INODE64\` suffix), with the category it belongs to and whether the app's own manifest, \`PrivacyInfo.xcprivacy\` at the root of the bundle, declares that category and with which reasons."
+        echo
+        echo "| Pattern | Match | Imported symbols | Category | Declared in the manifest |"
+        echo "|---|---|---|---|---|"
+        cat "$SCRATCH/rr-rows.txt"
+        echo
+        echo "Imported symbols matching any pattern: $RR_HITS of $N_IMPORTS. Imported patterns whose category the manifest does not declare: $RR_UNDECLARED."
+        if [ "$RR_HITS" -gt 0 ]; then
+            echo
+            sed 's/^\(.*\)$/- `\1`/' "$SCRATCH/rr-hits.txt"
+        fi
+        echo
+        echo "As with the networking check, an API reached through a function looked up by name at run time, or called by a system framework on the app's behalf, is not an import, so this table is read alongside the source and the manifest itself."
+        echo
+    fi
     echo "## Entitlements"
     echo
     if $GREP -q '<plist' "$SCRATCH/ent.plist"; then
@@ -415,7 +604,7 @@ render() {
     echo
     echo "| Key | Value |"
     echo "|---|---|"
-    plist info "$APP/Info.plist"
+    plist info "$APP/Info.plist" "$FORMAT"
     echo
     echo "## Privacy manifest"
     echo
@@ -518,6 +707,10 @@ render() {
             echo "The maintainer publishes this record from the archive that produced the submitted build; the upload entry above is the archive's own record of that upload. The executable's UUID also appears in crash reports from the shipped build, in the list of binary images. A reader who obtains the App Store IPA by other means can compare the same fields: the UUID (\`dwarfdump --uuid\`), the linked libraries (\`otool -L\`), the imported-symbol check (\`nm -u\` with the patterns above) and the digests of the bundled files, with the signature-dependent fields described above set aside. The encryption covers the executable's code, not the load commands and symbol tables these tools read." ;;
     esac
     echo
+    if [ "$FORMAT" -ge 2 ]; then
+        echo "The line \`Record format: $FORMAT\` under the title names the layout of this record. \`--check\` re-renders the layout the checked record names, and a record without the line is checked in format 1, the layout of the records made before format 2, so each published record keeps matching the script that made it. The script exits 3 when an imported symbol matches a required-reason pattern whose category the manifest does not declare."
+        echo
+    fi
     printf '%s' "To re-make this record and compare it with this file: \`$SCRIPT_NAME --archive <path>/$ARCHIVE_NAME"
     [ -z "$TAG" ] || printf ' --tag %s' "$TAG"
     [ -z "$GATE" ] || printf ' --gate %s' "$(printf '%s' "$GATE_COMMIT" | cut -c1-8)"
@@ -535,10 +728,12 @@ for s in "$HOME" "$ARCHIVE_ABS" "/Users/" "$SIGNING_IDENTITY" "${SIGNING_IDENTIT
     fi
 done
 
+RR_EXIT="$(rr_status)"
 if [ -n "$CHECK" ]; then
     if cmp -s "$CHECK" "$SCRATCH/record.md"; then
         echo "MATCH"
-        exit 0
+        [ "$RR_EXIT" -eq 0 ] || echo "release-identity: an imported required-reason API's category is not declared in the privacy manifest" >&2
+        exit "$RR_EXIT"
     fi
     diff -u "$CHECK" "$SCRATCH/record.md" | sed "s|$SCRATCH/record.md|(re-derived)|" || true
     echo "release-identity: the record differs from the archive's re-derivation" >&2
@@ -548,4 +743,8 @@ fi
 mkdir -p "$ROOT/RELEASES"
 OUT="RELEASES/$VERSION-identity.md"
 cp "$SCRATCH/record.md" "$ROOT/$OUT"
-echo "release-identity: wrote $OUT — $VERSION ($BUILD), UUID $(cut -d' ' -f1 "$SCRATCH/uuid.txt" | head -1), $N_IMPORTS imported symbols, $N_NET matching the networking patterns, $N_FILES bundled files digested"
+echo "release-identity: wrote $OUT — $VERSION ($BUILD), record format $FORMAT, UUID $(cut -d' ' -f1 "$SCRATCH/uuid.txt" | head -1), $N_IMPORTS imported symbols, $N_NET matching the networking patterns, $RR_HITS matching the required-reason patterns ($RR_UNDECLARED undeclared), $N_FILES bundled files digested"
+if [ "$RR_EXIT" -ne 0 ]; then
+    echo "release-identity: an imported required-reason API's category is not declared in the privacy manifest (see the record)" >&2
+fi
+exit "$RR_EXIT"
