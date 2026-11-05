@@ -33,8 +33,19 @@ struct LegalPhraseLintTests {
     @Test("Banned-term list is non-empty")
     func bannedTermsGuard() {
         // Guard against accidental emptying of LegalPhrases during refactors.
-        #expect(LegalPhrases.bannedTerms.contains("guaranteed"))
+        #expect(LegalPhrases.bannedTerms.contains("guarantee")) // LegalPhrases:safe — the list under test
         #expect(LegalPhrases.bannedTerms.count >= 10)
+    }
+
+    @Test("A banned stem matches each of its inflections")
+    func bannedStemsCatchTheirInflections() {
+        // A banned word listed in one inflection misses the others: the list
+        // holds the stem, so every form below is caught by a substring match.
+        for word in ["guarantee", "guarantees", "guaranteed", "guaranteeing"] { // LegalPhrases:safe — the words under test
+            #expect(
+                LegalPhrases.bannedTerms.contains { word.contains($0.lowercased()) },
+                "\"\(word)\" is not caught by any banned term")
+        }
     }
 
     @Test("The first-launch agreement body describes PDF documents and images")

@@ -214,9 +214,10 @@ Overclaiming is a defect class here, tested like any other:
   description into a warranty. The list itself lives in
   `Sources/ResectaApp/Legal/LegalPhrases.swift`; I won't reproduce it here,
   since these docs are scanned by the same rules.
-- `Scripts/claims-lint.sh` sweeps the shipping markdown set and the SwiftUI
-  view-layer string literals for the same vocabulary, so the docs are held to
-  the same bar as the UI.
+- `Scripts/claims-lint.sh` reads that list and sweeps the shipping markdown
+  set, the app's Swift string literals and the verification checks' copy
+  literals for the same vocabulary, so the docs are held to the same bar as
+  the UI.
 - The pre-commit hook (`Scripts/audit-lint.sh`) blocks banned phrasing on the
   Swift, string-catalog and Markdown lines a commit adds, banned networking
   symbols on the Swift source lines it adds, and any call-shaped networking
