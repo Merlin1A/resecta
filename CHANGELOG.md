@@ -66,6 +66,7 @@ Search matches a name that wraps onto a second line, or breaks at its own hyphen
 - When saving or loading your saved searches, settings or other stored data failed, the error the app wrote to the device's system log could include part of the stored text (for example a custom search term). The log now names only the kind of error; the details are kept private.
 
 - `THREAT-MODEL.md` §7 re-dated at `c91008ae` (2026-11-03): the app's unit-test suite has been a required check on `main` since 2026-10-27, and the branch-rules and unit-suite rows say so; the other rows re-checked.
+- Import: the active-content check no longer stalls on some documents.
 ### Internal
 
 - A target specification for the verification pass, VERIFICATION-SPEC.md, with a status line per rule; claims-lint covers it.
