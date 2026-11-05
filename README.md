@@ -2,11 +2,20 @@
 
 [![ci](https://github.com/Merlin1A/resecta/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Merlin1A/resecta/actions/workflows/ci.yml)
 
-[![Download on the App Store](https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/black/en-us?releaseDate=1786492800)](https://apps.apple.com/us/app/resecta/id6786922787)
+[![Download on the App Store](https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/black/en-us?releaseDate=1786492800)](https://apps.apple.com/app/apple-store/id6786922787?pt=128267797&ct=github&mt=8)
 
 Resecta is a free, open-source iPhone app that redacts PDFs on-device and then checks the output. It runs on iOS 26 or later, collects no data, and makes no network requests of its own.
 
-**App Store:** [apps.apple.com/us/app/resecta/id6786922787](https://apps.apple.com/us/app/resecta/id6786922787) · **Website:** [resecta.app](https://resecta.app)
+A black box drawn over text can leave the text underneath readable. Resecta is designed to remove the text in the regions you mark, not just cover it, and then checks the redacted PDF before you share it. How redaction has failed in practice, with sources: [the redaction failure record](https://resecta.app/research/).
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./.github/assets/readme-home-dark.png">
+    <img src="./.github/assets/readme-home.png" width="300" alt="Resecta's home screen on an iPhone: Open a Document, Import Photos, and Try the Sample, above the line On-device, No tracking, Open source">
+  </picture>
+</p>
+
+**App Store:** [Resecta on the App Store](https://apps.apple.com/app/apple-store/id6786922787?pt=128267797&ct=github&mt=8) · **Website:** [resecta.app](https://resecta.app)
 
 **License:** [Apache License 2.0](./LICENSE)
 
@@ -148,6 +157,7 @@ The commands that run both suites locally, and what the batched runner reports, 
 
 ## Contributing
 
+- If Resecta is useful to you, starring the repo helps others discover it.
 - Read [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the gates every change passes and the changes that need an agreed plan before they land.
 - Open bugs and implementation constraints are tracked in [`KNOWN_ISSUES.md`](./KNOWN_ISSUES.md).
 - Security issues: please use [`SECURITY.md`](./SECURITY.md) — do not file public issues for vulnerabilities.
