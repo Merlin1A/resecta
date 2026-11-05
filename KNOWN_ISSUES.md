@@ -187,6 +187,15 @@ On iOS 27, the system's name model can be unavailable or unreliable. After the i
 
 ---
 
+### KI-24: On a Scanned Page, a Box Drawn by Hand Can Leave the Word in a Searchable Export (High)
+**Affects:** Searchable Redaction (scanned pages that carry their own text, such as a scan made searchable by OCR); regions drawn by hand or made with Duplicate Region
+
+Some scanned PDFs carry an invisible layer of text over the picture of each page, which is what makes them searchable. That layer does not always line up with the printed words: a word's hidden copy can sit a little to one side of where it is printed. A box placed from a Search or Scan match removes the hidden copy where it is. A box you draw by hand, or one made with Duplicate Region, removes only the hidden text under the box itself, so on such a page the hidden copy of the word you covered can stay in a Searchable export, where it can be selected, copied and searched. Verification reports it only if it is one of the structured categories its final sweep reads; a name or an address is not.
+
+**Workaround:** Export scanned documents with Secure Rasterization, which keeps no text layer. In Searchable Redaction, place boxes on a scanned page from a Search match rather than drawing them.
+
+---
+
 ## Fixed
 
 ### KI-8: Duplicate Regions from Multiple Scan Runs (Low) — FIXED (entry moved 2026-10-01)
