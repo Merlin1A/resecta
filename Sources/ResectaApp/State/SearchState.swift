@@ -752,13 +752,13 @@ final class SearchState: Identifiable {
         appliedResultIDs.contains(id) || coveredResultIDs.contains(id)
     }
 
-    /// Count of results the user left un-checked in triage
+    /// Count of matches the user left un-checked in triage, by occurrence
     /// (the complement of `selectedCount`). Folded into
     /// `CoverageReport.deselectedCount` at the panel + audit-export boundary
     /// by `coverageReportForDisplay()`. Derived from live `isSelected` state,
     /// so it returns to 0 with `results` on `clear()` / `clearResults()`.
     var deselectedCount: Int {
-        results.count { !$0.isSelected }
+        Self.occurrenceCount(results.filter { !$0.isSelected })
     }
 
     /// Total match count (a match wrapped onto two lines counts once).
