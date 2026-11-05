@@ -43,8 +43,17 @@ env:
 jobs:
   analyze-swift:
     name: Analyze (swift)
-    runs-on: macos-26
-    timeout-minutes: 60
+    runs-on: xcode-27
+    # The traced build takes 21 to 25 minutes on a hosted runner and the
+    # analysis about 2 (pull requests of 2026-11-04 and 2026-11-05); the
+    # 60-minute limit cancelled #385's run on 2026-11-05 with its build
+    # unfinished. The job limit leaves room for a slow build; the build
+    # step's own limit ends a build that has stopped making progress, and
+    # the build prints its log so such a stall shows where it stopped.
+    timeout-minutes: 120
+    env:
+      # The release's Xcode by path; see ci.yml.
+      DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
     permissions:
       contents: read
       security-events: write
@@ -76,6 +85,7 @@ jobs:
       # A fresh DerivedData directory, so every Swift file is compiled under
       # the tracer in this run.
       - name: Build the app
+        timeout-minutes: 90
         run: |
           xcodebuild build \
             -project ResectaApp.xcodeproj -scheme ResectaApp \
@@ -84,7 +94,7 @@ jobs:
             ARCHS=arm64 \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
             COMPILATION_CACHE_ENABLE_CACHING=NO SWIFT_ENABLE_COMPILE_CACHE=NO \
-            SWIFT_USE_INTEGRATED_DRIVER=NO -quiet
+            SWIFT_USE_INTEGRATED_DRIVER=NO
 
       - uses: github/codeql-action/analyze@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         with:
