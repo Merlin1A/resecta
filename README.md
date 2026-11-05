@@ -2,11 +2,20 @@
 
 [![ci](https://github.com/Merlin1A/resecta/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Merlin1A/resecta/actions/workflows/ci.yml)
 
-[![Download on the App Store](https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/black/en-us?releaseDate=1786492800)](https://apps.apple.com/us/app/resecta/id6786922787)
+[![Download on the App Store](https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/black/en-us?releaseDate=1786492800)](https://apps.apple.com/app/apple-store/id6786922787?pt=128267797&ct=github&mt=8)
 
 Resecta is a free, open-source iPhone app that redacts PDFs on-device and then checks the output. It runs on iOS 26 or later, collects no data, and makes no network requests of its own.
 
-**App Store:** [apps.apple.com/us/app/resecta/id6786922787](https://apps.apple.com/us/app/resecta/id6786922787) · **Website:** [resecta.app](https://resecta.app)
+A black box drawn over text can leave the text underneath readable. Resecta is designed to remove the text in the regions you mark, not just cover it, and then checks the redacted PDF before you share it. How redaction has failed in practice, with sources: [the redaction failure record](https://resecta.app/research/).
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./.github/assets/readme-home-dark.png">
+    <img src="./.github/assets/readme-home.png" width="300" alt="Resecta's home screen on an iPhone: Open a Document, Import Photos, and Try the Sample, above the line On-device, No tracking, Open source">
+  </picture>
+</p>
+
+**App Store:** [Resecta on the App Store](https://apps.apple.com/app/apple-store/id6786922787?pt=128267797&ct=github&mt=8) · **Website:** [resecta.app](https://resecta.app)
 
 **License:** [Apache License 2.0](./LICENSE)
 
@@ -95,7 +104,7 @@ Each claim in the map below is paired with a mechanical check in this repo. The 
 | The exported file is re-opened and re-checked | The 7/12-layer verification pass re-opens the output and scans its text, OCR of its rendered pages, the raw bytes across seven encodings (outside stream data) plus each page's decoded text, its structure and its metadata, re-runs each applied search on the output, and runs the app's structured detectors on the output to report what remains — names and addresses are not swept (`Verification/VerificationEngine.swift`) |
 | Placement survives rotated pages | A rotation × crop-box-origin test matrix positions its regions with a transform written independently of the production code (`SecurityTests/RotatedPageCoordinateTests.swift`) |
 | No network requests of its own | A source grep for networking symbols returns no code references (the sole hit is a comment); the pre-commit hook rejects those symbols on added Swift source lines (`Scripts/audit-lint.sh`) |
-| The app's own copy is linted for overclaiming vocabulary | A banned-vocabulary lint walks the legal string catalog, the view layer's string literals and the shipping docs (`Tests/ResectaAppTests/LegalPhraseLintTests.swift`, `Scripts/claims-lint.sh`) |
+| The app's own copy is linted for overclaiming vocabulary | A banned-vocabulary lint walks the legal string catalog, the app's string literals, the verification checks' result copy and the shipping docs (`Tests/ResectaAppTests/LegalPhraseLintTests.swift`, `Scripts/claims-lint.sh`) |
 | Bundled detection data is what the key holder signed | An Ed25519 signature over the gazetteer manifest is verified the first time the detectors are needed, then each listed file's size and SHA-256 digest against its manifest entry; a failure withholds the gated loaders and degrades detection, with a banner in the Scan interface (`Detection/GazetteerLoader.swift`, `Detection/Gazetteer/AssetIntegrity.swift`) |
 
 ## Project layout
@@ -137,7 +146,7 @@ Tests and gates: [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 The test tree is larger than the source tree: roughly 69,000 lines of Swift source to roughly 118,000 lines of test code, about 1.7×. Counted from the current tree:
 
 - **Engine package** (`Packages/RedactionEngine/Tests`) — 2,202 Swift Testing `@Test` functions across 309 suites: the pipeline and rasterization, the verification layers, the security suites (fake redaction, pixel destruction, rotated-page coordinates, adversarial verification), search, detection, and the corpus measurement harnesses.
-- **App target** (`Tests/ResectaAppTests`) — 2,121 `@Test` functions across 335 suites: the pipeline state machine, cancellation and restart races, view-level predicates, and the honesty guards that keep the docs and UI copy accurate.
+- **App target** (`Tests/ResectaAppTests`) — 2,127 `@Test` functions across 336 suites: the pipeline state machine, cancellation and restart races, view-level predicates, and the honesty guards that keep the docs and UI copy accurate.
 - **UI / end-to-end** (`Tests/ResectaAppUITests`) — 96 XCUITest methods that drive the built app on a simulator (run from Xcode; the batched runner and CI build them without running them): the first-launch legal gate, search-to-redaction flows, the search re-check on the results screen, and the editor's handling of links inside a document.
 
 Together the suites carry about 12,000 `#expect`/`#require` assertions. Beyond ordinary coverage, they pin the things this project cannot afford to regress: the named fake-redaction attacks (text under an opaque annotation must be destroyed at the text-layer, byte, and annotation level), the rotation × geometry placement matrix, fill-readback edge cases, cancellation and restart races, and the app's own copy — overclaiming is treated as a defect class with its own red tests. The reasoning behind that structure is in [`ENGINEERING.md`](./ENGINEERING.md).
@@ -148,6 +157,7 @@ The commands that run both suites locally, and what the batched runner reports, 
 
 ## Contributing
 
+- If Resecta is useful to you, starring the repo helps others discover it.
 - Read [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the gates every change passes and the changes that need an agreed plan before they land.
 - Open bugs and implementation constraints are tracked in [`KNOWN_ISSUES.md`](./KNOWN_ISSUES.md).
 - Security issues: please use [`SECURITY.md`](./SECURITY.md) — do not file public issues for vulnerabilities.
