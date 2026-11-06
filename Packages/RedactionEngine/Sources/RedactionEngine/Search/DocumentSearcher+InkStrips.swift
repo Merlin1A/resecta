@@ -86,6 +86,16 @@ extension DocumentSearcher {
         return hidden.minX < paint.maxX + dx && paint.minX - dx < hidden.maxX
     }
 
+    /// Whether a page's lines run across it: unless most of its words of
+    /// three characters or more are taller than wide. A short word's box
+    /// ("in", "by") is often taller than wide on a line that runs across, so
+    /// it says nothing either way.
+    nonisolated static func linesRunAcross(_ words: [(length: Int, box: CGRect)], pageSize: CGSize) -> Bool {
+        let longer = words.filter { $0.length >= 3 }
+        let across = longer.filter { $0.box.width * pageSize.width >= $0.box.height * pageSize.height }.count
+        return longer.isEmpty || 2 * across >= longer.count
+    }
+
     /// The plan for `regions` from the page's candidate hidden words (pure).
     /// A region strips every word whose ink meets its paint with positive
     /// area, and names it; a word placed without confidence is stripped (not
@@ -141,7 +151,8 @@ extension DocumentSearcher {
             return InkStripPlan(unsure: true)
         }
         await prepareInkFit(page)
-        let horizontal = true
+        let horizontal = linesRunAcross(source.wordBounds.map { (length: $0.range.length, box: $0.normalizedRect) },
+                                        pageSize: size)
         let searcher = DocumentSearcher()
         var words: [HiddenWordInk] = []
         for word in source.wordBounds where boxes.contains(where: {

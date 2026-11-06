@@ -133,4 +133,33 @@ struct InkStripPlanTests {
         #expect(p.covers([b, Self.box(CGRect(x: 0, y: 0, width: 1, height: 1))]), "a whole-page box needs no plan")
     }
 
+    // MARK: - Line direction
+
+    static func tile(_ length: Int, w: CGFloat, h: CGFloat) -> (length: Int, box: CGRect) {
+        (length, Self.n(100, 100, w, h))
+    }
+
+    @Test("a page's lines run across it when most longer words are wider than tall; a short tall word says nothing")
+    func linesRunAcrossWithShortWords() {
+        let words = [Self.tile(7, w: 50, h: 16), Self.tile(6, w: 44, h: 16), Self.tile(2, w: 11, h: 16),
+                     Self.tile(2, w: 11, h: 16), Self.tile(2, w: 11, h: 16), Self.tile(5, w: 40, h: 16)]
+        #expect(DocumentSearcher.linesRunAcross(words, pageSize: Self.size))
+    }
+
+    @Test("a page set down the page reads as vertical lines; one tall longer word on a horizontal page does not")
+    func verticalPageAndStrayTallWord() {
+        let down = [Self.tile(6, w: 16, h: 44), Self.tile(5, w: 16, h: 40), Self.tile(7, w: 16, h: 52)]
+        #expect(!DocumentSearcher.linesRunAcross(down, pageSize: Self.size))
+        let mostlyAcross = [Self.tile(6, w: 44, h: 16), Self.tile(5, w: 40, h: 16), Self.tile(4, w: 14, h: 30)]
+        #expect(DocumentSearcher.linesRunAcross(mostlyAcross, pageSize: Self.size))
+    }
+
+    @Test("on a page whose lines run down it, a word in the box's column is a candidate")
+    func verticalLine() {
+        let tall = HiddenWordInk(range: NSRange(location: 0, length: 4), strip: [Self.n(300, 430, 14, 60)],
+                                 ink: [Self.n(300, 400, 14, 60)])
+        let b = Self.box(Self.n(300, 400, 14, 60))
+        #expect(DocumentSearcher.inkStripPlan(regions: [b], words: [tall], pageSize: Self.size, horizontalLines: false)
+            .strips[b.id] == tall.strip)
+    }
 }
