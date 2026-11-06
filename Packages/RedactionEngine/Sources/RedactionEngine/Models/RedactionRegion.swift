@@ -42,6 +42,11 @@ public struct RedactionRegion: Sendable, Identifiable, Equatable, Codable {
     /// image-only (`PageContentFacts.keepsTextLayer`). An encoded region
     /// without it decodes as false.
     public var textAnchored: Bool
+    /// For one run only: the hidden glyphs' boxes of the words whose printed
+    /// ink this region covers on a page whose text is a hidden layer over a
+    /// picture of the page (`InkStripPlan`), wherever they sit. A Searchable
+    /// export strips under them too. Never encoded; empty outside a run.
+    public var inkStripRects: [CGRect] = []
 
     public init(
         id: UUID,
@@ -71,9 +76,10 @@ public struct RedactionRegion: Sendable, Identifiable, Equatable, Codable {
     }
 
     /// The rects a Searchable export strips the text layer under: the box,
-    /// then the hidden glyphs' box when there is one (a second rect, not a
-    /// union, so the space between them keeps its text).
-    public var textRemovalRects: [CGRect] { [normalizedRect] + (textLayerRect.map { [$0] } ?? []) }
+    /// then the hidden glyphs' box when there is one, then the run's ink
+    /// strips (separate rects, not a union, so the space between them keeps
+    /// its text).
+    public var textRemovalRects: [CGRect] { [normalizedRect] + (textLayerRect.map { [$0] } ?? []) + inkStripRects }
 
     public enum Source: Sendable, Equatable, Codable {
         case manual

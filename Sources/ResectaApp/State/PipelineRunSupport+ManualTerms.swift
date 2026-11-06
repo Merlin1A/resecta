@@ -27,11 +27,17 @@ nonisolated struct SensitiveTermSet: Sendable, Equatable {
     /// 0-based page of each manual region, short of a whole page, on a page
     /// whose text layer is not rich; one entry per region.
     let manualRegionPagesWithoutText: [Int]
+    /// Per page whose text is a hidden layer over a picture of the page: the
+    /// hidden words whose ink each region covers, read with the capture (the
+    /// capture names those words; the run's pages strip them).
+    let inkPlans: [Int: InkStripPlan]
 
-    init(terms: [SensitiveTerm], manualRegionsWithoutText: Int = 0, manualRegionPagesWithoutText: [Int] = []) {
+    init(terms: [SensitiveTerm], manualRegionsWithoutText: Int = 0, manualRegionPagesWithoutText: [Int] = [],
+         inkPlans: [Int: InkStripPlan] = [:]) {
         self.terms = terms
         self.manualRegionsWithoutText = manualRegionsWithoutText
         self.manualRegionPagesWithoutText = manualRegionPagesWithoutText
+        self.inkPlans = inkPlans
     }
 
     static let empty = SensitiveTermSet(terms: [])
@@ -68,6 +74,7 @@ extension PipelineCoordinator {
         manualRegions regions: [Int: [RedactionRegion]],
         in document: PDFDocument,
         textLayerStatus: [Int: TextLayerStatus],
+        inkPlans: [Int: InkStripPlan] = [:],
         pageWords: (PDFPage) -> ManualCapturePageWords? = ManualCapturePageWords.init(page:)
     ) -> SensitiveTermSet {
         var requiresBoundaryByText: [String: Bool] = [:]
@@ -82,6 +89,10 @@ extension PipelineCoordinator {
         var pagesWithoutText: [Int] = []
         for (pageIndex, pageRegions) in regions.sorted(by: { $0.key < $1.key }) {
             let page = document.page(at: pageIndex)
+            // On a page with an ink plan that covers its regions, a region's
+            // words are those whose printed ink it covers, not those whose
+            // hidden glyphs happen to lie under it.
+            let inkPlan = inkPlans[pageIndex].flatMap { $0.covers(pageRegions) ? $0 : nil }
             // The page's words are read once, on its first capturable region.
             var words: ManualCapturePageWords??
             // A `.manual` region carries no hidden glyphs' box (`textLayerRect`:
@@ -99,7 +110,8 @@ extension PipelineCoordinator {
                     continue
                 }
                 if words == nil { words = .some(pageWords(page)) }
-                let lines = words??.lines(touching: rect) ?? []
+                let lines = inkPlan.map { words??.lines(ofRanges: $0.words[region.id] ?? []) ?? [] }
+                    ?? words??.lines(touching: rect) ?? []
                 let captured = lines.flatMap(\.words)
                 if captured.count == 1 {
                     insert(captured[0], requiresTokenBoundary: true)
@@ -119,7 +131,8 @@ extension PipelineCoordinator {
             SensitiveTerm(text: $0.key, requiresTokenBoundary: $0.value)
         }.sorted { $0.text < $1.text }
         return SensitiveTermSet(
-            terms: terms, manualRegionsWithoutText: withoutText, manualRegionPagesWithoutText: pagesWithoutText)
+            terms: terms, manualRegionsWithoutText: withoutText, manualRegionPagesWithoutText: pagesWithoutText,
+            inkPlans: inkPlans)
     }
 
     /// The term set for a run starting now: the applied terms
@@ -128,8 +141,12 @@ extension PipelineCoordinator {
     /// text-layer status are read on the MainActor; the capture — PDFKit's
     /// per-word selection over every manual region's page — runs detached.
     /// Without a document the applied terms
-    /// are the whole set.
-    func collectSensitiveTermSet() async -> SensitiveTermSet {
+    /// are the whole set. With `planInk` (a Searchable run; a Secure run
+    /// passes false, its pages keep no text layer), the ink plan of
+    /// every page whose text is a hidden layer over a picture of the page is
+    /// read first (`DocumentSearcher.inkStripPlan`), and the capture and the
+    /// run's pages read it.
+    func collectSensitiveTermSet(planInk: Bool = true) async -> SensitiveTermSet {
         let applied = collectSensitiveTerms()
         guard let document = documentState.sourceDocument else {
             return SensitiveTermSet(terms: applied)
@@ -143,9 +160,19 @@ extension PipelineCoordinator {
         // which the pending run refuses (`DocumentState.canStartImport`).
         nonisolated(unsafe) let source = document
         return await Task.detached {
-            Self.sensitiveTermSet(
+            var inkPlans: [Int: InkStripPlan] = [:]
+            if planInk {
+                for (index, pageRegions) in regions.sorted(by: { $0.key < $1.key })
+                where !pageRegions.isEmpty && status[index] == .rich {
+                    guard let page = source.page(at: index) else { continue }
+                    if let plan = await DocumentSearcher.inkStripPlan(regions: pageRegions, page: page) {
+                        inkPlans[index] = plan
+                    }
+                }
+            }
+            return Self.sensitiveTermSet(
                 applied: applied, manualRegions: regions,
-                in: source, textLayerStatus: status)
+                in: source, textLayerStatus: status, inkPlans: inkPlans)
         }.value
     }
 }
@@ -204,11 +231,24 @@ nonisolated struct ManualCapturePageWords {
         guard rect.width > 0, rect.height > 0 else { return [] }
         let halo = rect.insetBy(dx: -Self.removalHaloPoints / displayedSize.width,
                                 dy: -Self.removalHaloPoints / displayedSize.height)
+        return lines { word in
+            let onBand = rect.minY < word.box.maxY && word.box.minY < rect.maxY
+            return word.box.intersects(rect) || (onBand && word.box.intersects(halo))
+        }
+    }
+
+    /// The lines of the words at `ranges` (an ink plan's words for one
+    /// region), grouped as `lines(touching:)` groups them.
+    func lines(ofRanges ranges: [NSRange]) -> [CapturedLine] {
+        let wanted = Set(ranges.map { NSMaxRange($0) * 0x1_0000_0000 + $0.location })
+        return lines { wanted.contains(NSMaxRange($0.range) * 0x1_0000_0000 + $0.range.location) }
+    }
+
+    private func lines(where taken: ((text: String, box: CGRect, range: NSRange)) -> Bool) -> [CapturedLine] {
         var lines: [[(text: String, box: CGRect, range: NSRange)]] = []
         var previousIndex = -1
         for (index, word) in entries.enumerated() {
-            let onBand = rect.minY < word.box.maxY && word.box.minY < rect.maxY
-            guard word.box.intersects(rect) || (onBand && word.box.intersects(halo)) else { continue }
+            guard taken(word) else { continue }
             if index == previousIndex + 1, let last = lines.last?.last,
                last.box.minY < word.box.maxY && word.box.minY < last.box.maxY {
                 lines[lines.count - 1].append(word)
