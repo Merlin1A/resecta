@@ -1,0 +1,19 @@
+Property: The along axis is the page rotation's; a line's own spread only cross-checks it.
+Area: hidden-word check (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/HiddenWordInkAlignCases
+Must go red: RedactionEngineTests/HiddenWordInkAlignCases V22 (axis)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkCheck.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkCheck.swift
+index 998a7178..cfd1b3b9 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkCheck.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkCheck.swift
+@@ -159,7 +159,7 @@ enum HiddenWordInkCheck {
+             // runs its lines up or down the normalized frame. The rule is
+             // the same on either, so a vertical page is read transposed and
+             // its marks transposed back.
+-            let vertical = axis.isVertical
++            let vertical = words.count >= 2 ? (words.map(\.box.centre2Y).max()! - words.map(\.box.centre2Y).min()!) > (words.map(\.box.centre2X).max()! - words.map(\.box.centre2X).min()!) : axis.isVertical
+             let t: (GridBox) -> GridBox = { vertical ? $0.transposed : $0 }
+             words = words.map { GridWord(key: $0.key, raw: $0.raw, box: t($0.box)) }
+                 .sorted { ($0.box.minX, $0.box.maxX) < ($1.box.minX, $1.box.maxX) }

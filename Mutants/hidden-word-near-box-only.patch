@@ -1,0 +1,19 @@
+Property: An unplaceable word changes the page only when it could lie under a box.
+Area: hidden-word check (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/HiddenWordInkPredicateCases
+Must go red: RedactionEngineTests/HiddenWordInkPredicateCases V17
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkCheck.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkCheck.swift
+index 998a7178..4b24bc92 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkCheck.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkCheck.swift
+@@ -324,7 +324,7 @@ enum HiddenWordInkCheck {
+         let perPoint = Int128((driftAlongPerPoint * 100).rounded())
+         let perWide = Int128((driftAlongPerWide * 100).rounded())
+         let reach100 = base + perPoint * distance + perWide * Int128(line.height) * wide
+-        return boxes.contains { _, paint in
++        return !boxes.isEmpty || boxes.contains { _, paint in
+             let gapX = Int128(max(0, paint.minX - word.box.maxX, word.box.minX - paint.maxX))
+             let gapY = max(0, paint.minY - word.box.maxY, word.box.minY - paint.maxY)
+             return gapX * 100 <= reach100 && 2 * gapY <= line.across2

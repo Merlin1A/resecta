@@ -1,0 +1,19 @@
+Property: A word's window is also centred on its nearest aligned neighbours' offsets, so a group's growing offset aligns.
+Area: hidden-word check (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/HiddenWordInkAlignCases
+Must go red: RedactionEngineTests/HiddenWordInkAlignCases (f); RedactionEngineTests/HiddenWordInkAlignCases (f′)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkAlign.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkAlign.swift
+index e0202e75..a2b1e013 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkAlign.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkAlign.swift
+@@ -194,7 +194,7 @@ enum HiddenWordInkAlign {
+                 if let right = ((k + 1)..<entries.count).first(where: { alignment[$0] != nil }) {
+                     centres.append(alignment[right]!.offset)
+                 }
+-                return spellings[k].filter { c in centres.contains { 2 * n * abs(c.offset - $0) <= w2n } }
++                return spellings[k].filter { c in [0].contains { 2 * n * abs(c.offset - $0) <= w2n } }
+             }
+             var aligned: [Int: Candidate] = [:]
+             var ambiguous = Set<Int>()

@@ -1,0 +1,19 @@
+Property: Whether a placed word has print is decided by position; text keys only choose anchors.
+Area: hidden-word check (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/HiddenWordInkPredicateCases
+Must go red: RedactionEngineTests/HiddenWordInkPredicateCases V1 (predicate); RedactionEngineTests/HiddenWordInkPredicateCases V18c
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkCheck.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkCheck.swift
+index 998a7178..2fc5218b 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkCheck.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkCheck.swift
+@@ -176,7 +176,7 @@ enum HiddenWordInkCheck {
+             for word in words {
+                 let mapped = fit.map(word.box)
+                 var flagged = false
+-                for (id, paint) in lineBoxes where mapped.centreInside(paint) {
++                for (id, paint) in lineBoxes where mapped.centreInside(paint) && lineSource.contains(where: { $0.key == word.key }) {
+                     verdict.findings.append(HiddenWordInkMark(pageIndex: pageIndex, regionID: id, inkRect: ink(mapped)))
+                     flagged = true
+                 }
