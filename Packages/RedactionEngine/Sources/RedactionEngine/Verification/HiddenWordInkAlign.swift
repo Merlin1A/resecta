@@ -16,12 +16,20 @@ import Foundation
 //   ordered subsequence of one source line's glyphs. A word's characters
 //   match consecutive glyphs of that line (a fragment matches its own
 //   glyphs), and the line's words keep their order.
-// - The window: a candidate's first glyph must sit within `windowCells` of
-//   the export word's own cell (its length along the line ÷ its character
-//   count) plus `HiddenWordInkCheck.residualSlack` of the word's leading
-//   edge, along the axis; across, on a source line whose band overlaps the
-//   word's band. The window only narrows; a unique match outside it is
-//   unaligned.
+// - The window: a candidate's offset (the export word's leading edge minus
+//   its first glyph's, along the axis) must lie within `windowCells` of the
+//   word's own cell (its length along the line ÷ its character count) plus
+//   `HiddenWordInkCheck.residualSlack` of zero, or of the offset of the
+//   nearest aligned word on either side on the same export line (the
+//   writer's offsets build up along a group it draws in fixed cells). An
+//   offset past `capCells` cells is never accepted. Across, the candidate
+//   must lie on a source line whose band overlaps the word's band. The
+//   window only narrows; a unique match outside it is unaligned.
+// - Rounds: each round judges the words still unaligned against the
+//   alignments as they stood at its start; a word that is ever ambiguous
+//   stays unaligned; an aligned word stays aligned; the rounds end when one
+//   aligns nothing new. Ambiguity is judged over the whole window. The result
+//   does not depend on the order the words are listed in.
 // - A word with no candidate, or with more than one that the order leaves
 //   standing, is unaligned. Position never chooses between candidates.
 // - An unaligned word makes the page not inspected when its export box,
@@ -62,6 +70,40 @@ enum HiddenWordInkAlign {
     /// residual slack): the writer snaps each word left onto its line's grid
     /// and rounds the gaps to whole cells.
     static let windowCells = (numerator: 3, denominator: 2)
+
+    /// The most a chain may carry a word from its own glyphs, in the word's
+    /// cells: past it a match is never accepted (a chain cannot walk along a
+    /// line onto another copy).
+    static let capCells = 6
+
+    /// One spelling of a word on a source line: its glyphs `start ..< end`
+    /// and its offset (the word's leading edge minus its first glyph's, along
+    /// the line, in grid units).
+    struct Candidate: Hashable { var line: Int; var start: Int; var end: Int; var offset: Int }
+
+    /// The order: on each source line, a candidate stands only if the words
+    /// before and after it (in position order) can keep their order on that
+    /// source line; words with no candidate there do not constrain it.
+    static func inOrder(_ candidates: [[Candidate]]) -> [Set<Candidate>] {
+        var standing = candidates.map { _ in Set<Candidate>() }
+        for li in Set(candidates.flatMap { $0.map(\.line) }) {
+            let order = candidates.indices.filter { candidates[$0].contains { $0.line == li } }
+            var forward: [Int: [Candidate]] = [:]
+            var lastEnd: Int?
+            for k in order {
+                let here = candidates[k].filter { c in c.line == li && (lastEnd.map { c.start >= $0 } ?? true) }
+                forward[k] = here
+                lastEnd = here.map(\.end).min() ?? lastEnd
+            }
+            var nextStart: Int?
+            for k in order.reversed() {
+                let here = (forward[k] ?? []).filter { c in nextStart.map { c.end <= $0 } ?? true }
+                standing[k].formUnion(here)
+                nextStart = here.map(\.start).max() ?? nextStart
+            }
+        }
+        return standing
+    }
 
     /// A box in the axis's reading frame: x runs the way the text advances
     /// (so `minX` is the leading edge), y runs across the line.
@@ -105,8 +147,8 @@ enum HiddenWordInkAlign {
             if !line.chars.isEmpty { lines.append(line) }
         }
 
-        // The export lines, each word in the reading frame.
-        struct Candidate: Hashable { var line: Int; var start: Int; var end: Int }
+        // The export lines, each word in the reading frame, in order along
+        // the line by position (never by the order the words are listed).
         for (_, indices) in Dictionary(grouping: words.indices, by: { words[$0].line }).sorted(by: { $0.key < $1.key }) {
             var entries: [(index: Int, chars: [Character], box: HiddenWordInkCheck.GridBox)] = []
             for i in indices {
@@ -114,50 +156,63 @@ enum HiddenWordInkAlign {
                 guard !chars.isEmpty, let box = grid.box(words[i].rect) else { continue }
                 entries.append((i, chars, reading(box, axis)))
             }
-            entries.sort { ($0.box.minX, $0.box.maxX) < ($1.box.minX, $1.box.maxX) }
+            entries.sort { ($0.box.minX, $0.box.maxX, String($0.chars)) < ($1.box.minX, $1.box.maxX, String($1.chars)) }
 
-            // Candidates: consecutive glyphs spelling the word, on a line whose
-            // band overlaps the word's, first glyph within the window.
-            var candidates: [[Candidate]] = entries.map { entry in
-                let n = entry.chars.count
-                let w2n = window2n(length: entry.box.maxX - entry.box.minX, n: n)
+            // Every spelling of each word on a line whose band overlaps the
+            // word's, its first glyph at most `capCells` of its cells away.
+            let spellings: [[Candidate]] = entries.map { entry in
+                let n = entry.chars.count, length = entry.box.maxX - entry.box.minX
                 var found: [Candidate] = []
                 for (li, line) in lines.enumerated()
                 where line.minY < entry.box.maxY && entry.box.minY < line.maxY && line.chars.count >= n {
                     for s in 0...(line.chars.count - n) where Array(line.chars[s..<(s + n)]) == entry.chars {
-                        if 2 * n * abs(line.boxes[s].minX - entry.box.minX) <= w2n {
-                            found.append(Candidate(line: li, start: s, end: s + n))
+                        let offset = entry.box.minX - line.boxes[s].minX
+                        if n * abs(offset) <= capCells * length {
+                            found.append(Candidate(line: li, start: s, end: s + n, offset: offset))
                         }
                     }
                 }
                 return found
             }
 
-            // The order: on each source line, a candidate stands only if the
-            // words before and after it on the export line can keep their
-            // order on that source line (words with no candidate there do not
-            // constrain it).
-            var standing = candidates.map { _ in Set<Candidate>() }
-            for li in Set(candidates.flatMap { $0.map(\.line) }) {
-                let order = candidates.indices.filter { candidates[$0].contains { $0.line == li } }
-                var forward: [Int: [Candidate]] = [:]
-                var lastEnd: Int?
-                for k in order {
-                    let here = candidates[k].filter { c in c.line == li && (lastEnd.map { c.start >= $0 } ?? true) }
-                    forward[k] = here
-                    lastEnd = here.map(\.end).min() ?? lastEnd
+            // Rounds. Each judges every word still unaligned against the
+            // alignments as they stood when the round began: its window is
+            // centred on zero and on the offset of the nearest aligned word on
+            // either side; the order then keeps the candidates that can stand.
+            // One left standing aligns the word; more than one leaves it
+            // unaligned for good. An aligned word stays aligned. The rounds end
+            // when one aligns nothing new.
+            // A word's window under `alignment`: its spellings whose offset lies
+            // within its window of zero or of the nearest aligned word's offset
+            // on either side; an aligned word's window is its alignment.
+            func window(_ k: Int, _ alignment: [Int: Candidate]) -> [Candidate] {
+                if let fixed = alignment[k] { return [fixed] }
+                let n = entries[k].chars.count
+                let w2n = window2n(length: entries[k].box.maxX - entries[k].box.minX, n: n)
+                var centres = [0]
+                if let left = (0..<k).reversed().first(where: { alignment[$0] != nil }) { centres.append(alignment[left]!.offset) }
+                if let right = ((k + 1)..<entries.count).first(where: { alignment[$0] != nil }) {
+                    centres.append(alignment[right]!.offset)
                 }
-                var nextStart: Int?
-                for k in order.reversed() {
-                    let here = (forward[k] ?? []).filter { c in nextStart.map { c.end <= $0 } ?? true }
-                    standing[k].formUnion(here)
-                    nextStart = here.map(\.start).max() ?? nextStart
-                }
+                return spellings[k].filter { c in centres.contains { 2 * n * abs(c.offset - $0) <= w2n } }
             }
-            candidates = standing.map(Array.init)
+            var aligned: [Int: Candidate] = [:]
+            var ambiguous = Set<Int>()
+            while true {
+                let settled = aligned
+                let windows = entries.indices.map { window($0, settled) }
+                let standing = inOrder(windows)
+                var added: [Int: Candidate] = [:]
+                for k in entries.indices where settled[k] == nil && !ambiguous.contains(k) {
+                    if standing[k].count == 1, let only = standing[k].first { added[k] = only }
+                    else if standing[k].count > 1 { ambiguous.insert(k) }
+                }
+                if added.isEmpty { break }
+                aligned.merge(added) { old, _ in old }
+            }
 
             for (k, entry) in entries.enumerated() {
-                guard candidates[k].count == 1, let c = candidates[k].first else { continue }
+                guard let c = aligned[k] else { continue }
                 result[entry.index] = lines[c.line].rects[c.start..<c.end].reduce(CGRect.null) { $0.union($1) }
             }
         }
