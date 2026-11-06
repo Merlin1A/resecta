@@ -22,10 +22,12 @@ import CoreGraphics
 //   unaligned, not accepted;
 // - a word with two candidates that the order cannot decide between, or with
 //   none, is unaligned (nil); text missing from the source is unaligned;
-// - an unaligned word gives the page `unplaceableNearBox` if its export box,
-//   widened by its window plus the drift reach (36 pt along the line, growing
-//   along the line as the fit's scale allows; 10 pt across), meets any box's
-//   paint. Otherwise it changes nothing;
+// - an unaligned word gives the page `unplaceableNearBox` if either reach
+//   meets any box's paint: its window mapped through its line's accepted fit,
+//   or the generic reach (its export box widened by its window, then 36 pt +
+//   0.45 pt per pt from the farther line end along the line, and max(10 pt,
+//   1.5 line heights) across). The union only adds "not inspected".
+//   Otherwise it changes nothing;
 // - the axis is the page's rotation's; each line's spread only cross-checks
 //   it. A line whose spread disagrees with the axis, or has no clear axis, is
 //   unplaceable;
@@ -40,6 +42,7 @@ import CoreGraphics
 // - align by nearest position instead of by order: (c), (d);
 // - an unaligned word read as absent: (d′), (e′); (e″) guards the other way;
 // - no window, any ordered match accepted: (a′);
+// - the generic reach alone, no fit-mapped window: (e‴);
 // - the axis taken from the line's spread alone: V22's `.right` half.
 
 @Suite("Hidden word check: the alignment step (frozen cases)")
@@ -219,6 +222,46 @@ struct HiddenWordInkAlignCases {
             + [Self.ew("zzz", 346, cell: 6, y: 500)]
         let v = try Self.pageVerdict(export: export, lines: placed + [line], regions: [Self.box(198, 28, y: 600)])
         #expect(v == InkCaseVerdict(), "an unaligned word far from every box leaves the page clean")
+    }
+
+    static let wide = CGSize(width: 792, height: 612)
+
+    @Test("(e‴): export text missing from the source, near a box only through its line's fit, leaves the page not inspected")
+    func missingNearABoxByTheFit() throws {
+        // A landscape page (792 × 612), so the line is long enough for the fit to carry a word past the generic reach.
+        // The hidden layer is set at 1/1.6 of its print from x 20: the line's fit is print = 20 + 1.6 × (hidden − 20),
+        // scale 1.6, residual 0 on nine anchors.
+        let line = "alpha bravo charlie delta echo foxtrot golf hotel india".enumerated().map { i, c in
+            InkCaseGlyph(char: c, rect: Self.normalized(CGRect(x: 20 + 7 * CGFloat(i), y: 400, width: 7, height: 14), Self.wide),
+                         line: 0)
+        }
+        func points(_ r: CGRect) -> CGRect {
+            CGRect(x: r.minX * Self.wide.width, y: r.minY * Self.wide.height,
+                   width: r.width * Self.wide.width, height: r.height * Self.wide.height)
+        }
+        let hidden = Self.printWords(line, Self.wide)
+        let print = hidden.map { w -> InkCaseWord in
+            let p = points(w.rect)
+            return InkCaseWord(key: w.key, rect: Self.normalized(CGRect(x: 20 + 1.6 * (p.minX - 20), y: p.minY,
+                                                                        width: 1.6 * p.width, height: p.height), Self.wide),
+                               line: 0)
+        }
+        let kept = hidden.map { w -> InkCaseWord in
+            let p = points(w.rect)
+            return InkCaseWord(key: w.key, rect: Self.normalized(CGRect(x: p.minX + 2, y: 400, width: CGFloat(w.key.count) * 6,
+                                                                        height: 14), Self.wide), line: 0)
+        }
+        // "zzz" at x 450–468 (cell 6, window 12.5), after "india" (hidden 370–405, print 580–636).
+        let zzz = InkCaseWord(key: "zzz", rect: Self.normalized(CGRect(x: 450, y: 400, width: 18, height: 14), Self.wide), line: 0)
+        // (i) Through the fit, its box maps to 708–736.8 and its window (437.5–480.5) to 688–756.8: either meets the
+        //     paint at 728–746.
+        // (ii) The generic reach ends at 468 + 12.5 + 36 + 0.45 × 448 = 718.1 along (d = 448, from its far edge to the
+        //      line's start at x 20, the largest reading of d), short of 728. Across, the box is on the word's band.
+        let box = RedactionRegion(id: UUID(), normalizedRect: Self.normalized(CGRect(x: 728, y: 400, width: 18, height: 14),
+                                                                              Self.wide), source: .manual)
+        let v = try Self.pageVerdict(export: kept + [zzz], lines: [line], regions: [box], size: Self.wide, sourceInk: print)
+        #expect(v.unplaceableNearBox, "an unaligned word whose fitted window meets a box is not inspected, past the generic reach")
+        #expect(v.findings.isEmpty)
     }
 
     // MARK: - The axis
