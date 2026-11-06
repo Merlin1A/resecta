@@ -31,8 +31,9 @@ import CoreGraphics
 //   unplaceable;
 // - `HiddenWordInkSeam.verdict` keeps its meaning, with the axis `.right`.
 //
-// Geometry is in points on a 612 × 792 page (V22: its visual frame, 792 ×
-// 612), converted to the normalized frame. A source line is one glyph per
+// Geometry is in points on a 612 × 792 page (V22: the turned page's visual
+// frame, 792 × 612 for /Rotate 90 and 270, 612 × 792 for 180), converted to
+// the normalized frame. A source line is one glyph per
 // character, spaces included, `advance` apart.
 //
 // Mutants these cases are written to kill (run against the built step):
@@ -222,47 +223,89 @@ struct HiddenWordInkAlignCases {
 
     // MARK: - The axis
 
-    static let turned = CGSize(width: 792, height: 612)
+    /// A page turned so its lines advance along `axis` (/Rotate 90: down, 180: left, 270: up), in its visual frame.
+    /// One line of 7 pt glyphs in a 14 pt band at 400–414 across; five spaces before "the" keep the glyphs under its
+    /// print box blank.
+    struct Turned {
+        let axis: InkCaseAxis
+        static let text = "alpha bravo     the delta echo foxtrot golf hotel"
 
-    /// A line of a /Rotate 90 page in its visual frame: glyphs stepping down from y 560, 7 pt each, in a band at
-    /// x 400–414. Five spaces before "the" keep the glyphs under its print box blank.
-    static func downLine() -> [InkCaseGlyph] {
-        "alpha bravo     the delta echo foxtrot golf hotel".enumerated().map { i, c in
-            InkCaseGlyph(char: c, rect: normalized(CGRect(x: 400, y: 560 - 7 * CGFloat(i + 1), width: 14, height: 7), turned),
-                         line: 0)
+        var size: CGSize { axis == .left ? CGSize(width: 612, height: 792) : CGSize(width: 792, height: 612) }
+
+        /// Glyph `i`'s box (points): down from y 560, left from x 560, up from y 50.
+        func slot(_ i: Int) -> CGRect {
+            let k = CGFloat(i)
+            switch axis {
+            case .left: return CGRect(x: 560 - 7 * (k + 1), y: 400, width: 7, height: 14)
+            case .up: return CGRect(x: 400, y: 50 + 7 * k, width: 14, height: 7)
+            default: return CGRect(x: 400, y: 560 - 7 * (k + 1), width: 14, height: 7)
+            }
+        }
+
+        /// One step along the axis, as a vector in points.
+        var along: CGVector {
+            switch axis {
+            case .left: return CGVector(dx: -1, dy: 0)
+            case .up: return CGVector(dx: 0, dy: 1)
+            case .right: return CGVector(dx: 1, dy: 0)
+            case .down: return CGVector(dx: 0, dy: -1)
+            }
+        }
+
+        var glyphs: [InkCaseGlyph] {
+            Self.text.enumerated().map { i, c in
+                InkCaseGlyph(char: c, rect: HiddenWordInkAlignCases.normalized(slot(i), size), line: 0)
+            }
+        }
+
+        /// An export word 2 pt along from its glyphs' leading edge, 6 pt a character, in a 12 pt band at 401–413.
+        func exportWord(_ w: InkCaseWord) -> InkCaseWord {
+            let r = CGRect(x: w.rect.minX * size.width, y: w.rect.minY * size.height,
+                           width: w.rect.width * size.width, height: w.rect.height * size.height)
+            let length = CGFloat(w.key.count) * 6
+            let e: CGRect
+            switch axis {
+            case .left: e = CGRect(x: r.maxX - 2 - length, y: 401, width: length, height: 12)
+            case .up: e = CGRect(x: 401, y: r.minY + 2, width: 12, height: length)
+            default: e = CGRect(x: 401, y: r.maxY - 2 - length, width: 12, height: length)
+            }
+            return InkCaseWord(key: w.key, rect: HiddenWordInkAlignCases.normalized(e, size), line: 0)
         }
     }
 
-    static func v22(axis: InkCaseAxis) throws -> (InkCaseVerdict, RedactionRegion) {
-        let line = Self.downLine()
-        // The layer drifted 30 pt along the axis: the print is 30 pt up from the hidden glyphs.
-        let print = Self.printWords(line, turned, shift: CGVector(dx: 0, dy: 30))
-        // The export keeps every word, "the" included: each 2 pt along from its glyphs, 6 pt a character.
-        let export = Self.printWords(line, turned).map { w -> InkCaseWord in
-            let top = w.rect.maxY * turned.height - 2, length = CGFloat(w.key.count) * 6
-            return InkCaseWord(key: w.key, rect: normalized(CGRect(x: 401, y: top - length, width: 12, height: length), turned),
-                               line: 0)
-        }
-        // The box is over the print of "the": x 400–414, y 457–478 (its hidden glyphs are 427–448).
+    /// The turned page with its layer drifted 30 pt along its lines, every word kept by the export ("the" included),
+    /// and a box over the print of "the"; verified with `axis`.
+    static func v22(_ page: Turned, axis: InkCaseAxis) throws -> (InkCaseVerdict, RedactionRegion, CGRect) {
+        let line = page.glyphs
+        // The print is 30 pt back along the axis from the hidden glyphs.
+        let print = Self.printWords(line, page.size, shift: CGVector(dx: -30 * page.along.dx, dy: -30 * page.along.dy))
+        let export = Self.printWords(line, page.size).map(page.exportWord)
+        // On /Rotate 90 the box is x 400–414, y 457–478 (the hidden glyphs of "the" are 427–448).
         let the = try #require(print.first { $0.key == "the" })
         let box = RedactionRegion(id: UUID(), normalizedRect: the.rect, source: .manual)
-        let v = try Self.pageVerdict(export: export, lines: [line], regions: [box], size: turned, axis: axis,
+        let v = try Self.pageVerdict(export: export, lines: [line], regions: [box], size: page.size, axis: axis,
                                      sourceInk: print)
-        return (v, box)
+        let ink = CGRect(x: the.rect.minX * page.size.width, y: the.rect.minY * page.size.height,
+                         width: the.rect.width * page.size.width, height: the.rect.height * page.size.height)
+        return (v, box, ink)
     }
 
-    @Test("V22: on a /Rotate 90 page, a word drifted 30 pt down past a box over its print is flagged on that box")
-    func axisFromTheRotation() throws {
-        let (v, box) = try Self.v22(axis: .down)
-        #expect(v.findings.map(\.regionID) == [box.id])
+    @Test("V22: on a page turned so its lines run down, left or up, a word drifted 30 pt along past a box over its print is flagged on that box",
+          arguments: [InkCaseAxis.down, .left, .up])
+    func axisFromTheRotation(axis: InkCaseAxis) throws {
+        let page = Turned(axis: axis)
+        let (v, box, ink) = try Self.v22(page, axis: axis)
+        #expect(v.findings.map(\.regionID) == [box.id], "\(axis)")
         if let mark = v.findings.first {
-            #expect(abs(mark.inkRect.midY * Self.turned.height - 467.5) < 6, "the flagged box is the word's ink")
+            let midX = mark.inkRect.midX * page.size.width, midY = mark.inkRect.midY * page.size.height
+            #expect(abs(midX - ink.midX) < 6 && abs(midY - ink.midY) < 6,
+                    "\(axis): the flagged box is the word's ink (\(ink.midX), \(ink.midY)), not (\(midX), \(midY))")
         }
     }
 
-    @Test("V22 (axis): the same page given the axis .right, its lines running down, is not inspected: never flagged, never clean")
+    @Test("V22 (axis): the /Rotate 90 page given the axis .right, its lines running down, is not inspected: never flagged, never clean")
     func axisDisagreesWithTheSpread() throws {
-        let (v, _) = try Self.v22(axis: .right)
+        let (v, _, _) = try Self.v22(Turned(axis: .down), axis: .right)
         #expect(v.unplaceableNearBox, "a line whose spread disagrees with the axis is unplaceable")
         #expect(v.findings.isEmpty)
         #expect(v != InkCaseVerdict())
