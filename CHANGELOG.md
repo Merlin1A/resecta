@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [1.3.2]
 
-Search matches a name that wraps onto a second line, or breaks at its own hyphen, as one match, with a box on each line. On photos and scans, a typed search now boxes the words it matched instead of the whole line. Share now also asks you to confirm first when the Detection Sweep lists possible items outside your boxes, or when form values were not carried over; slide to share. Copies of different documents get their own names, so saving several in one folder no longer replaces one with another. A redaction and its checks keep the screen awake while they run.
+Search matches a name that wraps onto a second line, or breaks at its own hyphen, as one match, with a box on each line. On photos and scans, a typed search now boxes the words it matched instead of the whole line. On searchable scans, a word's invisible copy can sit slightly off the printed word; a box now removes that copy for each word it covers, even where it falls outside the box. Share now also asks you to confirm first when the Detection Sweep lists possible items outside your boxes, or when form values were not carried over; slide to share. Copies of different documents get their own names, so saving several in one folder no longer replaces one with another. A redaction and its checks keep the screen awake while they run.
 
 ### Added
 
@@ -68,6 +68,7 @@ Search matches a name that wraps onto a second line, or breaks at its own hyphen
 
 - `THREAT-MODEL.md` §7 re-dated at `c91008ae` (2026-11-03): the app's unit-test suite has been a required check on `main` since 2026-10-27, and the branch-rules and unit-suite rows say so; the other rows re-checked.
 - Import: the active-content check no longer stalls on some documents.
+- Searchable Redaction: on a scanned page that carries its own hidden text, a box now removes the hidden copy of each word whose printed text it covers, even when that copy lies outside the box, including boxes drawn by hand, duplicated, resized or moved.
 ### Internal
 
 - A target specification for the verification pass, VERIFICATION-SPEC.md, with a status line per rule; claims-lint covers it.
