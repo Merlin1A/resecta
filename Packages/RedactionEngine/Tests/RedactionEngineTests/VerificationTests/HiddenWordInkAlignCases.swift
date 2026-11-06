@@ -15,11 +15,19 @@ import CoreGraphics
 //   ordered subsequence of one source line's glyphs; a word's characters
 //   match consecutive glyphs of that line (a fragment matches its own
 //   glyphs), and the line's words keep their order;
-// - the window: a candidate's first glyph must sit within 1.5 × the export
-//   word's own cell (its width ÷ its character count) + 3.5 pt of the word's
-//   leading edge, along the axis; across, it must lie on a source line whose
-//   band overlaps the word's band. A unique match outside the window is
-//   unaligned, not accepted;
+// - the window: a candidate's offset (the export word's leading edge minus
+//   its first glyph's, along the axis) must lie within 1.5 × the word's own
+//   cell (its width ÷ its character count) + 3.5 pt of zero, or within that
+//   of the offset of the nearest aligned neighbour on either side on the same
+//   export line (the chain: the writer's offsets build up along a group). An
+//   absolute offset over 6 cells is unaligned (the cap). Across, it must lie
+//   on a source line whose band overlaps the word's band. A unique match
+//   outside the window is unaligned, not accepted;
+// - rounds: each round judges the still-unaligned words against the
+//   alignments as they stood at the round's start; a word ambiguous in any
+//   round stays unaligned, an aligned word stays aligned; stop when a round
+//   aligns nothing new. Ambiguity is judged over the whole window (zero and
+//   chain). The result does not depend on the order the words are listed in;
 // - a word with two candidates that the order cannot decide between, or with
 //   none, is unaligned (nil); text missing from the source is unaligned;
 // - an unaligned word gives the page `unplaceableNearBox` if either reach
@@ -43,6 +51,10 @@ import CoreGraphics
 // - an unaligned word read as absent: (d′), (e′); (e″) guards the other way;
 // - no window, any ordered match accepted: (a′);
 // - the generic reach alone, no fit-mapped window: (e‴);
+// - no chain (the zero window only): (f), (f′);
+// - no cap: (f⁗);
+// - the words judged in list order, each seeing the alignments made before
+//   it, instead of rounds: (f″), and (f-shuffle) for a single pass.
 // - the axis taken from the line's spread alone: V22's `.right` half.
 
 @Suite("Hidden word check: the alignment step (frozen cases)")
@@ -168,6 +180,102 @@ struct HiddenWordInkAlignCases {
     func missingFromTheSource() throws {
         let r = try Self.align([Self.ew("zzz", 142, cell: 6)], Self.glyphs("alpha bravo charlie", 100, 7))
         #expect(r == [nil])
+    }
+
+    // MARK: - The chained window
+
+    /// A source line drawn from x 72, 7 pt a glyph, and its export: each word at `offsets[i]` from its own glyphs'
+    /// start, 6 pt a character (cell 6: window 12.5, cap 36).
+    static func chain(_ text: String, _ offsets: [CGFloat]) -> (glyphs: [InkCaseGlyph], export: [InkCaseWord], own: [CGRect]) {
+        let line = Self.glyphs(text, 72, 7)
+        let own = printWords(line).map { w in
+            CGRect(x: w.rect.minX * size.width, y: w.rect.minY * size.height, width: w.rect.width * size.width,
+                   height: w.rect.height * size.height)
+        }
+        let export = zip(printWords(line), zip(own, offsets)).map { w, p in Self.ew(w.key, p.0.minX + p.1, cell: 6) }
+        return (line, export, own)
+    }
+
+    /// The writer's shape: one group in fixed cells, its offset growing 4.8 pt (0.8 cell) a word to −24 (4 cells).
+    static let chainText = "amber birch cedar dune elm fern"
+    static let chainOffsets: [CGFloat] = [0, -4.8, -9.6, -14.4, -19.2, -24]
+
+    @Test("(f): a group whose offset grows 0.8 cell a word, to 4 cells, aligns every word to its own glyphs through the chain")
+    func chainedGroup() throws {
+        // Offsets 0, −4.8, −9.6 are inside the zero window (12.5): round 1. "dune" (−14.4) and "elm" (−19.2) are
+        // within 12.5 of "cedar" (−9.6): round 2. "fern" (−24) is 14.4 from "cedar", 4.8 from "elm": round 3.
+        let (line, export, own) = Self.chain(Self.chainText, Self.chainOffsets)
+        let r = try Self.align(export, line)
+        guard r.count == own.count else { return }
+        for (i, box) in own.enumerated() { Self.expectBox(r[i], box.minX, box.maxX, "\(export[i].key)") }
+    }
+
+    @Test("(f-shuffle): the same group listed in another order aligns the same way")
+    func chainedGroupShuffled() throws {
+        let (line, export, own) = Self.chain(Self.chainText, Self.chainOffsets)
+        // fern, cedar, amber, elm, birch, dune: a single pass in this order meets "fern" before any neighbour is aligned.
+        let order = [5, 2, 0, 4, 1, 3]
+        let r = try Self.align(order.map { export[$0] }, line)
+        guard r.count == order.count else { return }
+        for (k, i) in order.enumerated() { Self.expectBox(r[k], own[i].minX, own[i].maxX, "\(export[i].key)") }
+    }
+
+    @Test("(f″): a second run of a chained word's text, inside its chained window and outside the zero window, leaves it unaligned")
+    func chainedAmbiguous() throws {
+        // The group's last word is "000"; the export kept "00", which matches its glyphs at x 261 and at x 268.
+        // Offsets: −23.2 and −30.2. Round 2 ("cedar", −9.6, window to −22.1) reaches neither; round 3 ("elm",
+        // −19.2, window −31.7 … −6.7) reaches both: ambiguous. Words listed with "00" before "elm", so a pass that
+        // reads alignments as it makes them takes "00" from "dune" (−14.4, window to −26.9) and only the run at 261.
+        let base = Self.chain("amber birch cedar dune elm 000", [0, -4.8, -9.6, -14.4, -19.2, 0])
+        let zeros = Self.ew("00", 261 - 23.2, cell: 6)
+        let words = [base.export[0], base.export[1], base.export[2], base.export[3], zeros, base.export[4]]
+        let r = try Self.align(words, base.glyphs)
+        guard r.count == 6 else { return }
+        for i in 0..<4 { Self.expectBox(r[i], base.own[i].minX, base.own[i].maxX, "\(words[i].key)") }
+        #expect(r[4] == nil, "two runs in the window: unaligned")
+        Self.expectBox(r[5], base.own[4].minX, base.own[4].maxX, "elm")
+    }
+
+    @Test("(f‴): a word 2.6 cells from its aligned neighbour and outside the zero window is unaligned")
+    func chainStepTooFar() throws {
+        // "dune" at −25.2: 15.6 from "cedar" (−9.6), past 12.5; |−25.2| is past the zero window.
+        let (line, export, own) = Self.chain("amber birch cedar  dune", [0, -4.8, -9.6, -25.2])
+        let r = try Self.align(export, line)
+        guard r.count == 4 else { return }
+        for i in 0..<3 { Self.expectBox(r[i], own[i].minX, own[i].maxX, "\(export[i].key)") }
+        #expect(r[3] == nil)
+    }
+
+    @Test("(f⁗): a chain that would reach a candidate at 7 cells leaves it unaligned (the cap)")
+    func chainCap() throws {
+        // Offsets 0 … −33.6 in steps of 4.8 (5.6 cells); "ivy" at −42 (7 cells) is 8.4 from "heath": inside the chain,
+        // past the cap of 36.
+        let (line, export, own) = Self.chain("amber birch cedar dune elm fern grove heath ivy",
+                                              [0, -4.8, -9.6, -14.4, -19.2, -24, -28.8, -33.6, -42])
+        let r = try Self.align(export, line)
+        guard r.count == 9 else { return }
+        for i in 0..<8 { Self.expectBox(r[i], own[i].minX, own[i].maxX, "\(export[i].key)") }
+        #expect(r[8] == nil, "an absolute offset over 6 cells is unaligned")
+    }
+
+    @Test("(f′): the chain's last word a surviving fragment of a boxed word at 4 cells, its ink under the box, is flagged on that box")
+    func chainedFragmentFlagged() throws {
+        // The layer drifted 30 pt: print = hidden − 30. A box over the print of "fernwood" (x 259–315) stripped the
+        // hidden glyphs under it; "wood" (hidden 317–345) survives at offset −24, 4.8 from "elm" (−19.2): round 3.
+        // Placed by the line's fit (−30), its ink is 287–315: centre 301, inside the box.
+        let line = Self.glyphs("amber birch cedar dune elm     fernwood", 72, 7)
+        let hidden = Self.printWords(line)
+        let own = hidden.map { $0.rect.minX * Self.size.width }
+        let export = (0..<5).map { Self.ew(hidden[$0].key, own[$0] + Self.chainOffsets[$0], cell: 6) }
+            + [Self.ew("wood", 317 - 24, cell: 6)]
+        let print = Self.printWords(line, shift: CGVector(dx: -30, dy: 0))
+        let name = try #require(print.first { $0.key == "fernwood" })
+        let box = RedactionRegion(id: UUID(), normalizedRect: name.rect, source: .manual)
+        let v = try Self.pageVerdict(export: export, lines: [line], regions: [box], sourceInk: print)
+        #expect(v.findings.map(\.regionID) == [box.id])
+        if let mark = v.findings.first {
+            #expect(abs(mark.inkRect.midX * Self.size.width - 301) < 6, "the flagged box is the fragment's ink")
+        }
     }
 
     // MARK: - Through the page's verdict
