@@ -126,10 +126,11 @@ struct PipelineRunner {
             // the snapshot to the `.redacting` transition below this
             // scaffold does not suspend, so no region can change between
             // what is burned and what is verified.
+            let capture: @MainActor () async -> SensitiveTermSet = {
+                await coordinator.collectSensitiveTermSet(planInk: effectiveMode == .searchableRedaction)
+            }
             let entry = try await Self.captureRunEntry(
-                coordinator: coordinator, effectiveMode: effectiveMode,
-                runSettings: runSettings,
-                capture: { await coordinator.collectSensitiveTermSet(planInk: effectiveMode == .searchableRedaction) })
+                coordinator: coordinator, effectiveMode: effectiveMode, runSettings: runSettings, capture: capture)
             let pages = entry.pages
             let sensitiveTerms = entry.sensitiveTerms
             let deselectionSnapshot = entry.deselectionSnapshot
