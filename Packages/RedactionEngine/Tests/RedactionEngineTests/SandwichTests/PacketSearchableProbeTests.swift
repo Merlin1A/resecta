@@ -90,7 +90,7 @@ struct PacketSearchableProbeTests {
             let run = try await RealDocProbe.run(fixture, regions: regions)
             defer { try? FileManager.default.removeItem(at: run.outputURL) }
 
-            #expect(run.layers.count == 12, "Searchable mode must run all 12 layers.")
+            #expect(run.layers.count == 13, "Searchable mode must run all 13 layers.")
             #expect(run.outputDocument.pageCount == 12, "Output must keep 12 pages.")
 
             // Transcribe the per-layer verdict matrix and derive OVERALL.
@@ -151,7 +151,7 @@ struct PacketSearchableProbeTests {
             // The dense URLA/T1040 long-line reconstruction keeps every glyph
             // on the page (Layer 6 count + Layer 8 lineage non-FAIL = no loss),
             // and the embedded STMT pages 3-5 verify within the packet.
-            for idx in [0, 1, 2, 3, 4, 6, 7, 8, 9, 10] {
+            for idx in [0, 1, 2, 3, 4, 6, 7, 8, 9, 11] {
                 #expect(run.layers[idx]?.status.isFail == false,
                         "config=\(label): layer idx\(idx) must not FAIL on the packet.")
             }

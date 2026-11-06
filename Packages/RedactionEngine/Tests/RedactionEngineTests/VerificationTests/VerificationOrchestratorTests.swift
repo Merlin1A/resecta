@@ -119,20 +119,21 @@ struct VerificationOrchestratorTests {
         )
 
         let layers = VerificationEngine().layers(for: .searchableRedaction)
-        #expect(layers.count == 12)
+        #expect(layers.count == 13)
         #expect(report.layers.map(\.name) == layers.map(\.name),
                 "the report lists every layer in canonical order")
         #expect(events.map(shape) == [
-            "S1/12 textExtraction after:0",
+            "S1/13 textExtraction after:0",
             "F1 textExtraction", "F2 ocrCheck", "F3 binaryStringSearch", "F10 operatorReExtraction",
-            "S4/12 structureCheck after:4", "F4 structureCheck",
-            "S5/12 metadataCheck after:5", "F5 metadataCheck",
-            "S6/12 spatialVerification after:6", "F6 spatialVerification",
-            "S7/12 characterCount after:7", "F7 characterCount",
-            "S8/12 fontVerification after:8", "F8 fontVerification",
-            "S9/12 characterLineage after:9", "F9 characterLineage",
-            "S11/12 searchRecheck after:10", "F11 searchRecheck",
-            "S12/12 detectionSweep after:11", "F12 detectionSweep",
+            "S4/13 structureCheck after:4", "F4 structureCheck",
+            "S5/13 metadataCheck after:5", "F5 metadataCheck",
+            "S6/13 spatialVerification after:6", "F6 spatialVerification",
+            "S7/13 characterCount after:7", "F7 characterCount",
+            "S8/13 fontVerification after:8", "F8 fontVerification",
+            "S9/13 characterLineage after:9", "F9 characterLineage",
+            "S11/13 hiddenWordInk after:10", "F11 hiddenWordInk",
+            "S12/13 searchRecheck after:11", "F12 searchRecheck",
+            "S13/13 detectionSweep after:12", "F13 detectionSweep",
         ], "the batch publishes in canonical order, then the catalog readers, the sandwich checks and the post batch each start and finish in order")
         // The results a `.layerStarted` carries are exactly the ones
         // published before it, in publication order.

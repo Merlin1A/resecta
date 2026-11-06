@@ -14,12 +14,12 @@ struct VerificationLayerIdentityTests {
 
     private let engine = VerificationEngine()
 
-    @Test("Secure Rasterization runs 7 layers, Searchable 12; the search re-check then the detection sweep are last in both")
+    @Test("Secure Rasterization runs 7 layers, Searchable 13; the search re-check then the detection sweep are last in both")
     func countsAndLastLayers() {
         let raster = engine.layers(for: .secureRasterization)
         let searchable = engine.layers(for: .searchableRedaction)
         #expect(raster.count == 7)
-        #expect(searchable.count == 12)
+        #expect(searchable.count == 13)
         #expect(raster.suffix(2) == [.searchRecheck, .detectionSweep])
         #expect(searchable.suffix(2) == [.searchRecheck, .detectionSweep])
         #expect(raster.last == .detectionSweep)
@@ -60,7 +60,7 @@ struct VerificationLayerIdentityTests {
         #expect(VerificationLayer.allCases.filter { $0.phase == .catalogSequential }
                 == [.structureCheck, .metadataCheck])
         #expect(VerificationLayer.allCases.filter { $0.phase == .sandwichSequential }
-                == [.spatialVerification, .characterCount, .fontVerification, .characterLineage])
+                == [.spatialVerification, .characterCount, .fontVerification, .characterLineage, .hiddenWordInk])
         #expect(VerificationLayer.allCases.filter { $0.phase == .postSequential }
                 == [.searchRecheck, .detectionSweep])
         // Raster mode carries no sandwich layer and no operator re-extraction.
@@ -75,8 +75,8 @@ struct VerificationLayerIdentityTests {
         #expect(engine.layers(for: .secureRasterization)[5].name == "Search Re-check")
         #expect(engine.layers(for: .secureRasterization)[6].name == "Detection Sweep")
         #expect(engine.layers(for: .searchableRedaction)[5].name == "Spatial Verification")
-        #expect(engine.layers(for: .searchableRedaction)[10].name == "Search Re-check")
-        #expect(engine.layers(for: .searchableRedaction)[11].name == "Detection Sweep")
+        #expect(engine.layers(for: .searchableRedaction)[11].name == "Search Re-check")
+        #expect(engine.layers(for: .searchableRedaction)[12].name == "Detection Sweep")
         #expect(engine.layers(for: .secureRasterization)[5].symbolName == "text.page.badge.magnifyingglass")
         for (index, layer) in VerificationLayer.allCases.enumerated() {
             #expect(engine.layers(for: .searchableRedaction)[index].name == layer.name)
@@ -122,6 +122,6 @@ struct VerificationLayerIdentityTests {
                 regions: [:], sensitiveTerms: [], pipelineMode: .searchableRedaction,
                 filterDigests: [nil], perPageModes: [.searchableRedaction])
         }
-        #expect(box.seen == [5, 10, 6, 11])
+        #expect(box.seen == [5, 11, 6, 12])
     }
 }

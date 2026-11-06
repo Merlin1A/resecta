@@ -105,14 +105,16 @@ final class InkCaseReader: @unchecked Sendable {
 
 enum HiddenWordInkSeam {
     /// The check's `VerificationLayer` case. Not built: nil.
-    static var layer: VerificationLayer? { nil }
+    static var layer: VerificationLayer? { .hiddenWordInk }
 
     /// The check's pure predicate for page `pageIndex`. Not built: nil.
     static func verdict(
         pageIndex: Int, output: [InkCaseWord], sourceInk: [InkCaseWord],
         regions: [RedactionRegion], pageSize: CGSize, kind: InkCasePageKind
     ) -> InkCaseVerdict? {
-        nil
+        caseVerdict(HiddenWordInkCheck.verdict(
+            pageIndex: pageIndex, output: output.map(word), sourceInk: sourceInk.map(word), regions: regions,
+            pageSize: pageSize, kind: kind == .plain ? .plain : .textOverImage))
     }
 
     /// The check's layer over an output document and its source, as the
@@ -123,7 +125,18 @@ enum HiddenWordInkSeam {
         output: PDFDocument, source: PDFDocument?, regions: [Int: [RedactionRegion]],
         mode: PipelineMode, reader: InkCaseReader?
     ) async -> LayerResult? {
-        nil
+        let run = {
+            await VerificationEngine().runLayer(
+                .hiddenWordInk, outputDocument: SendablePDFDocument(output), sourcePageCount: output.pageCount,
+                regions: regions, sensitiveTerms: [], pipelineMode: mode, filterDigests: [],
+                perPageModes: Array(repeating: mode, count: output.pageCount),
+                sourceDocument: source.map(SendablePDFDocument.init))
+        }
+        guard let reader else { return await run() }
+        let read: @Sendable (Int) throws -> [HiddenWordInkWord] = { index in
+            try reader.read(pageIndex: index).map(word)
+        }
+        return await VerificationEngine.$hiddenWordInkSourceRead.withValue(read) { await run() }
     }
 
     /// The alignment step: each export word's aligned source-glyph box (the
@@ -132,7 +145,8 @@ enum HiddenWordInkSeam {
     static func align(
         words: [InkCaseWord], glyphs: [InkCaseGlyph], pageSize: CGSize, axis: InkCaseAxis
     ) -> [CGRect?]? {
-        nil
+        HiddenWordInkAlign.align(words: words.map(word), glyphs: glyphs.map(glyph), pageSize: pageSize,
+                                 axis: engineAxis(axis))
     }
 
     /// `align`, then the predicate on the aligned words, plus the handling of
@@ -142,6 +156,27 @@ enum HiddenWordInkSeam {
         pageIndex: Int, exportWords: [InkCaseWord], glyphs: [InkCaseGlyph], sourceInk: [InkCaseWord],
         regions: [RedactionRegion], pageSize: CGSize, kind: InkCasePageKind, axis: InkCaseAxis
     ) -> InkCaseVerdict? {
-        nil
+        caseVerdict(HiddenWordInkCheck.pageVerdict(
+            pageIndex: pageIndex, exportWords: exportWords.map(word), glyphs: glyphs.map(glyph),
+            sourceInk: sourceInk.map(word), regions: regions, pageSize: pageSize,
+            kind: kind == .plain ? .plain : .textOverImage, axis: engineAxis(axis)))
+    }
+
+    // Conversions between the cases' shapes and the check's.
+    private static func word(_ w: InkCaseWord) -> HiddenWordInkWord { HiddenWordInkWord(key: w.key, rect: w.rect, line: w.line) }
+    private static func glyph(_ g: InkCaseGlyph) -> HiddenWordInkGlyph { HiddenWordInkGlyph(char: g.char, rect: g.rect, line: g.line) }
+    private static func engineAxis(_ a: InkCaseAxis) -> HiddenWordInkAxis {
+        switch a { case .right: .right; case .down: .down; case .left: .left; case .up: .up }
+    }
+    private static func caseVerdict(_ v: HiddenWordInkVerdict) -> InkCaseVerdict {
+        let mark = { (m: HiddenWordInkMark) in InkCaseMark(pageIndex: m.pageIndex, regionID: m.regionID, inkRect: m.inkRect) }
+        let reason: InkCaseNotApplicable? = switch v.notApplicable {
+        case .noText: .noText
+        case .plainSource: .plainSource
+        case .noRegions: .noRegions
+        case nil: nil
+        }
+        return InkCaseVerdict(findings: v.findings.map(mark), edgeNotes: v.edgeNotes.map(mark),
+                              unplaceableNearBox: v.unplaceableNearBox, notApplicable: reason)
     }
 }

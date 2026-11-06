@@ -30,7 +30,7 @@ import PDFKit
 /// The check's `VerificationLayer` case. Not built: nil. The engine lane
 /// returns the check's case here and changes nothing else in this file.
 enum HiddenWordInkAppSeam {
-    static var layer: VerificationLayer? { nil }
+    static var layer: VerificationLayer? { .hiddenWordInk }
 }
 
 @Suite("Hidden word check: the app's run (frozen cases)", .serialized, .tags(.coordination))

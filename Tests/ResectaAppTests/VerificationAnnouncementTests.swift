@@ -27,7 +27,7 @@ struct VerificationAnnouncementTests {
     func passWithNothingToCheckSpeaksTheCounts() {
         let rasterized = VerificationDebugFixtures.searchableAllRasterized
         let line = VerificationResultsView.completionAnnouncement(report: rasterized)
-        #expect(line == "Verification complete. Checks Passed. 9 of 12 checks passed. 3\u{00A0}had nothing to check.")
+        #expect(line == "Verification complete. Checks Passed. 10 of 13 checks passed. 3\u{00A0}had nothing to check.")
         #expect(!line.contains("without issues"))
         #expect(!VerificationResultsView.completionAnnouncement(report: VerificationDebugFixtures.searchableAllPass)
                 .contains("without issues"))

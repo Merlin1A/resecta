@@ -439,10 +439,12 @@ struct SandwichVerificationTests {
     /// The layers that report INFO on a run with no applied search and no
     /// applied scan: the Search Re-check and the Detection Sweep re-run what
     /// was applied, so with nothing applied each is a note, not a verdict.
+    /// Hidden Words Under Boxes reads the export's text layer, which the
+    /// full-page box empties, so it has nothing to check either.
     /// Every other layer must PASS outright — the fixture's own text is
     /// handed in as the run's sensitive term, so the string, OCR and
     /// re-extraction checks read the output for it and must read none.
-    static let layersWithNothingToCheckOnAFullPage: Set<VerificationLayer> = [.searchRecheck, .detectionSweep]
+    static let layersWithNothingToCheckOnAFullPage: Set<VerificationLayer> = [.hiddenWordInk, .searchRecheck, .detectionSweep]
 
     @Test("A fully-redacted page verifies on every layer in both modes: overall PASS, no FAIL or WARN, nothing left unverified",
           .timeLimit(.minutes(2)))
