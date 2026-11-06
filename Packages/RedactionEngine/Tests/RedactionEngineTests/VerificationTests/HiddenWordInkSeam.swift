@@ -11,10 +11,12 @@ import PDFKit
 //
 // Until the check is built, every entry point here returns nil and every case
 // that needs the check fails with "the check is not built". To build it, the
-// engine lane replaces the bodies of the three entry points below (and only
-// them) with calls into the check. The case files, and the shapes in this
-// file, stay as they are: a case that cannot pass against them is a design
-// question for the verification leader, not an edit.
+// engine lane replaces the bodies of the five entry points below (and only
+// them) with calls into the check: `layer`, `verdict`, `runLayer`, and the
+// alignment step's `align` and `pageVerdict` (`HiddenWordInkAlignCases`).
+// The case files, and the shapes in this file, stay as they are: a case that
+// cannot pass against them is a design question for the verification leader,
+// not an edit.
 
 /// One word as the check reads it: a text key, a box in the page's
 /// normalized frame (bottom-left origin, the post-rotation crop-box frame
@@ -63,6 +65,20 @@ struct InkCaseVerdict: Equatable, Sendable {
     var notApplicable: InkCaseNotApplicable?
 }
 
+/// One hidden character of the source's text layer, in `page.string` order,
+/// in the normalized frame. Spaces are glyphs too.
+struct InkCaseGlyph: Equatable, Sendable {
+    var char: Character
+    var rect: CGRect
+    var line: Int
+}
+
+/// The direction text advances in the visual (post-rotation) frame.
+enum InkCaseAxis: Equatable, Sendable {
+    /// /Rotate 0, 90, 180, 270.
+    case right, down, left, up
+}
+
 /// The source read the layer's dispatcher uses, made injectable. It counts
 /// its calls and can be told to fail.
 final class InkCaseReader: @unchecked Sendable {
@@ -107,6 +123,25 @@ enum HiddenWordInkSeam {
         output: PDFDocument, source: PDFDocument?, regions: [Int: [RedactionRegion]],
         mode: PipelineMode, reader: InkCaseReader?
     ) async -> LayerResult? {
+        nil
+    }
+
+    /// The alignment step: each export word's aligned source-glyph box (the
+    /// union of its matched glyphs), or nil when it is unaligned or
+    /// ambiguous; one entry per word, in order. Not built: nil.
+    static func align(
+        words: [InkCaseWord], glyphs: [InkCaseGlyph], pageSize: CGSize, axis: InkCaseAxis
+    ) -> [CGRect?]? {
+        nil
+    }
+
+    /// `align`, then the predicate on the aligned words, plus the handling of
+    /// unaligned words. `verdict` keeps its meaning, with the axis taken as
+    /// `.right`. Not built: nil.
+    static func pageVerdict(
+        pageIndex: Int, exportWords: [InkCaseWord], glyphs: [InkCaseGlyph], sourceInk: [InkCaseWord],
+        regions: [RedactionRegion], pageSize: CGSize, kind: InkCasePageKind, axis: InkCaseAxis
+    ) -> InkCaseVerdict? {
         nil
     }
 }

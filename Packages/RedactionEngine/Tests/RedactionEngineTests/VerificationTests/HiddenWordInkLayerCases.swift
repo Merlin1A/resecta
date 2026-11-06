@@ -222,4 +222,20 @@ struct HiddenWordInkLayerCases {
         #expect(try Self.row(run.report).status == .pass, "the output's words and the source render share one frame")
         #expect(!run.report.overallStatus.isFail)
     }
+
+    @Test("V21b: a hand box over the name on a page with /Rotate 90, an offset crop box and its layer drifted 30 pt, reads Checks Failed",
+          .timeLimit(.minutes(3)))
+    func v21b() async throws {
+        let crop = CGRect(x: 18, y: 24, width: 576, height: 744)
+        let data = F.seededPage(drift: 30, rotate: 90, cropBox: crop)
+        // The name's print, in the region's frame: its hidden box on the drift-0 twin of the same rotated page.
+        let twin = try #require(PDFDocument(data: F.seededPage(drift: 0, rotate: 90, cropBox: crop))?.page(at: 0))
+        let paint = try #require(F.hiddenRect(twin, "Marisol Vance-Oduya"))
+        let run = try await F.mirrorRun(data, paint: paint)
+        let source = try #require(run.source.page(at: 0))
+        let marisol = try #require(F.hiddenRect(source, "Marisol"))
+        #expect(F.textInside(run.source, marisol).contains("Marisol"),
+                "precondition: the helper reads the rotated page's frame")
+        try Self.expectLeakFails(run, leaked: "Vance-Oduya", "a hand box on the name of the rotated page")
+    }
 }

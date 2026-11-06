@@ -215,13 +215,34 @@ enum HiddenWordInkFixtures {
         return Run(source: doc, output: output, region: region, report: report)
     }
 
-    /// The text the export's page 1 still holds inside `rect` (normalized,
-    /// unrotated page): the leak a case's precondition looks for.
+    /// The text the export's page 1 still holds inside `rect` (normalized, in
+    /// the page's visual frame, as `RedactionRegion` holds it): the leak a
+    /// case's precondition looks for. On an unrotated page with its crop box
+    /// at the origin, the rect is scaled by the page's size.
     static func textInside(_ output: PDFDocument, _ rect: CGRect) -> String {
         guard let page = output.page(at: 0) else { return "" }
-        let size = page.bounds(for: .cropBox).size
-        let points = CGRect(x: rect.minX * size.width, y: rect.minY * size.height,
-                            width: rect.width * size.width, height: rect.height * size.height)
+        let points = pageSpaceRect(rect, page: page)
         return (page.selection(for: points)?.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// A normalized visual-frame rect in the page's own (unrotated, absolute)
+    /// space: the inverse of the crop-box translate and the /Rotate turn
+    /// (clockwise, ISO 32000 §8.3.2), written out here rather than taken from
+    /// the engine.
+    static func pageSpaceRect(_ rect: CGRect, page: PDFPage) -> CGRect {
+        let crop = page.bounds(for: .cropBox)
+        let w = crop.width, h = crop.height
+        let rotation = ((page.rotation % 360) + 360) % 360
+        let turned = rotation == 90 || rotation == 270
+        let vw = turned ? h : w, vh = turned ? w : h
+        let v = CGRect(x: rect.minX * vw, y: rect.minY * vh, width: rect.width * vw, height: rect.height * vh)
+        let local: CGRect
+        switch rotation {
+        case 90: local = CGRect(x: w - v.maxY, y: v.minX, width: v.height, height: v.width)
+        case 180: local = CGRect(x: w - v.maxX, y: h - v.maxY, width: v.width, height: v.height)
+        case 270: local = CGRect(x: v.minY, y: h - v.maxX, width: v.height, height: v.width)
+        default: local = v
+        }
+        return local.offsetBy(dx: crop.minX, dy: crop.minY)
     }
 }
