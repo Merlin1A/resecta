@@ -8,11 +8,9 @@ import PDFKit
 // box on such a page is matched to the hidden words whose printed ink it
 // covers (the ink fit, `DocumentSearcher+InkFit.swift`), and the hidden
 // glyphs' boxes of those words are stripped with it, wherever they sit. A word
-// near a box whose print could not be placed with confidence is stripped when
-// the fit's own drift envelope for it meets the box (it may lose its
-// searchable text; nothing covered survives within the bound). A word that
-// could not be fitted at all leaves the page unplanned: it is written as an
-// image only.
+// that could lie under a box and whose print could not be placed with
+// confidence, or at all, leaves the page unplanned: it is written as an image
+// only.
 
 /// The hidden words found for the boxes on one page.
 public struct InkStripPlan: Sendable, Equatable {
@@ -47,20 +45,16 @@ public struct InkStripPlan: Sendable, Equatable {
 
 /// One hidden word as the planner reads it: its range, its hidden glyphs'
 /// boxes (one per line it spans), and its printed ink's boxes, or nil when the
-/// ink fit could not place it with confidence; then `envelope` is where the
-/// fit says its ink can lie (its drift envelope), or nil when there was no fit
-/// at all. Page-normalized boxes.
+/// ink fit could not place it with confidence or at all. Page-normalized boxes.
 public struct HiddenWordInk: Sendable, Equatable {
     public var range: NSRange
     public var strip: [CGRect]
     public var ink: [CGRect]?
-    public var envelope: [CGRect]?
 
-    public init(range: NSRange, strip: [CGRect], ink: [CGRect]?, envelope: [CGRect]? = nil) {
+    public init(range: NSRange, strip: [CGRect], ink: [CGRect]?) {
         self.range = range
         self.strip = strip
         self.ink = ink
-        self.envelope = envelope
     }
 }
 
@@ -98,10 +92,9 @@ extension DocumentSearcher {
 
     /// The plan for `regions` from the page's candidate hidden words (pure).
     /// A region strips every word whose ink meets its paint with positive
-    /// area, and names it; a word placed without confidence is stripped (not
-    /// named) when its envelope meets the paint; a candidate word with no fit
-    /// at all makes the page unsure. `regions`' paint is the pre-growth box
-    /// the user placed.
+    /// area, and names it; a candidate word whose print was not placed with
+    /// confidence makes the page unsure. `regions`' paint is the pre-growth
+    /// box the user placed.
     public nonisolated static func inkStripPlan(
         regions: [RedactionRegion], words: [HiddenWordInk], pageSize: CGSize, horizontalLines: Bool = true
     ) -> InkStripPlan {
@@ -122,8 +115,6 @@ extension DocumentSearcher {
                         strips += word.strip
                         ranges.append(word.range)
                     }
-                } else if let envelope = word.envelope {
-                    if meets(envelope, paint) { strips += word.strip }
                 } else {
                     plan.unsure = true
                 }
@@ -162,9 +153,7 @@ extension DocumentSearcher {
                 words.append(HiddenWordInk(range: word.range, strip: [word.normalizedRect], ink: nil))
                 continue
             }
-            words.append(fit.degraded
-                ? HiddenWordInk(range: word.range, strip: fit.strip, ink: nil, envelope: fit.paint)
-                : HiddenWordInk(range: word.range, strip: fit.strip, ink: fit.paint))
+            words.append(HiddenWordInk(range: word.range, strip: fit.strip, ink: fit.degraded ? nil : fit.paint))
         }
         return inkStripPlan(regions: boxes, words: words, pageSize: size, horizontalLines: horizontal)
     }

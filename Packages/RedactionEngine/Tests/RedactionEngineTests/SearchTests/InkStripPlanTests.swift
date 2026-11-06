@@ -5,10 +5,9 @@ import CoreGraphics
 
 // The ink strip plan, as a pure function of the boxes and the candidate hidden
 // words: a box strips every hidden word whose printed ink it covers, wherever
-// the word's hidden glyphs sit; a word whose print could not be placed with
-// confidence is stripped when its drift envelope meets the box, and not named;
-// a word with no fit at all leaves the page unsure (it is written as an image
-// only); the plan covers a page only for the boxes it was made for.
+// the word's hidden glyphs sit; a word on the box's line whose print could not
+// be placed with confidence, or at all, leaves the page unsure (it is written
+// as an image only); the plan covers a page only for the boxes it was made for.
 
 @Suite("Ink strip plan")
 struct InkStripPlanTests {
@@ -22,14 +21,13 @@ struct InkStripPlanTests {
         RedactionRegion(id: UUID(), normalizedRect: rect, source: source)
     }
     /// A word printed at `x`, its hidden glyphs drifted `drift` points along the line.
-    /// `sure: false` gives the fit's envelope instead of the ink: 36 pt along the
-    /// line and 21 pt across around the hidden glyphs; `fitted: false` gives no fit.
+    /// `sure: false` is a fit placed without confidence and `fitted: false` no
+    /// fit: either way the planner has no ink for the word.
     static func word(_ location: Int, x: CGFloat, width: CGFloat, y: CGFloat = 400, drift: CGFloat = 30,
                      sure: Bool = true, fitted: Bool = true) -> HiddenWordInk {
         let hidden = n(x + drift, y, width, 14)
         return HiddenWordInk(range: NSRange(location: location, length: 4), strip: [hidden],
-                             ink: sure && fitted ? [n(x, y, width, 14)] : nil,
-                             envelope: !sure && fitted ? [n(x + drift - 36, y - 21, width + 72, 56)] : nil)
+                             ink: sure && fitted ? [n(x, y, width, 14)] : nil)
     }
     static func plan(_ regions: [RedactionRegion], _ words: [HiddenWordInk]) -> InkStripPlan {
         DocumentSearcher.inkStripPlan(regions: regions, words: words, pageSize: size)
@@ -70,24 +68,29 @@ struct InkStripPlanTests {
         }
     }
 
-    @Test("a word whose print could not be placed is stripped when its envelope meets the box, and not named")
-    func uncertainWordStrippedByEnvelope() {
+    @Test("a word on the box's line whose print could not be placed with confidence leaves the page unsure")
+    func uncertainWordUnderTheBox() {
         let b = Self.box(Self.n(124, 400, 135, 14))
-        let unsure = Self.word(10, x: 124, width: 135, sure: false)
-        let p = Self.plan([b], [unsure])
-        #expect(p.strips[b.id] == unsure.strip)
+        let p = Self.plan([b], [Self.word(0, x: 72, width: 48), Self.word(10, x: 124, width: 135, sure: false)])
+        #expect(p.unsure)
+        #expect(!p.covers([b]))
         #expect((p.words[b.id] ?? []).isEmpty, "a word not placed with confidence is not captured")
-        #expect(!p.unsure)
-        #expect(p.covers([b]))
     }
 
-    @Test("a word whose print could not be placed and whose envelope misses the box is left")
-    func uncertainWordAwayFromTheBox() {
+    @Test("an uncertain word far along the box's line leaves the page unsure too: drift along a line has no bound")
+    func uncertainWordAlongTheLine() {
         let b = Self.box(Self.n(124, 400, 40, 14))
-        let along = Self.word(10, x: 400, width: 40, sure: false)
-        let p = Self.plan([b], [along])
-        #expect(p.strips[b.id] == nil)
+        let p = Self.plan([b], [Self.word(10, x: 400, width: 40, sure: false)])
+        #expect(p.unsure)
+        #expect(!p.covers([b]))
+    }
+
+    @Test("an uncertain word on another line, beyond the band across the line, changes nothing")
+    func uncertainWordFarAway() {
+        let b = Self.box(Self.n(124, 400, 135, 14))
+        let p = Self.plan([b], [Self.word(50, x: 124, width: 135, y: 300, sure: false)])
         #expect(!p.unsure)
+        #expect(p.covers([b]))
     }
 
     @Test("a candidate word with no fit at all leaves the page unsure")
