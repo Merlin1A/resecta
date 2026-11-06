@@ -43,7 +43,14 @@ env:
 jobs:
   analyze-swift:
     name: Analyze (swift)
-    runs-on: xcode-27
+    # CodeQL traces the build to extract Swift, and traced analyses are
+    # unsupported on macOS 27 and Xcode 27; CodeQL does not analyze Swift
+    # 6.4 on any platform (GitHub changelog, 2026-10-19). Under Xcode 27 the
+    # traced build stops at package resolution ("Bad CPU type in
+    # executable"). This job therefore stays on the macOS 26 image with
+    # Xcode 26.6 (Swift 6.3), on which the sources build without error,
+    # while the other workflows build and test with the release's Xcode.
+    runs-on: macos-26
     # The traced build takes 21 to 25 minutes on a hosted runner and the
     # analysis about 2 (pull requests of 2026-11-04 and 2026-11-05); the
     # 60-minute limit cancelled #385's run on 2026-11-05 with its build
@@ -52,8 +59,9 @@ jobs:
     # the build prints its log so such a stall shows where it stopped.
     timeout-minutes: 120
     env:
-      # The release's Xcode by path; see ci.yml.
-      DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
+      # The newest Xcode CodeQL can trace, by path, so an image update
+      # that changes the default Xcode does not change the analysis.
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
     permissions:
       contents: read
       security-events: write
