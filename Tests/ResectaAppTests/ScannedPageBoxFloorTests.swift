@@ -135,7 +135,7 @@ struct ScannedPageBoxFloorTests {
 
     static func expectImageOnly(_ page: PDFPageData, _ comment: Comment) {
         #expect(page.pipelineMode == .secureRasterization, comment)
-        #expect(page.fallbackReason != nil, "an image-only page states why")
+        #expect(page.fallbackReason == .unanchoredRegion, "an image-only page states why: \(String(describing: page.fallbackReason))")
     }
 
     static func expectKept(_ page: PDFPageData, _ comment: Comment) {
@@ -251,6 +251,58 @@ struct ScannedPageBoxFloorTests {
         undo.undo()
         #expect(state.regions[0]?.first?.normalizedRect == Self.ink)
         Self.expectKept(Self.outcome(Self.scanPage(), state.regions[0] ?? []), "scan page, resize undone")
+    }
+
+    // MARK: - Anchoring
+
+    @Test("an Apply anchors a text-layer match and never a picture-read one")
+    func applyAnchorsTextLayerOnly() {
+        let prepared = prepareApply(selected: [Self.match(.textLayer)], existingRectsByPage: [:],
+                                    existingStripRectsByPage: [:], appliedAt: Date(), searchRecord: nil)
+        #expect(prepared.createdRegions[0]?.count == 1)
+        #expect(prepared.createdRegions[0]?.allSatisfy(\.textAnchored) == true, "the text-layer match is anchored")
+        let ocrOnly = prepareApply(selected: [Self.match(.ocr(confidence: 0.9))], existingRectsByPage: [:],
+                                   existingStripRectsByPage: [:], appliedAt: Date(), searchRecord: nil)
+        #expect(ocrOnly.createdRegions[0]?.allSatisfy { !$0.textAnchored } == true, "a picture-read match is not anchored")
+    }
+
+    @Test("a duplicate of an anchored match is not anchored")
+    func duplicateIsNotAnchored() throws {
+        let state = Self.applied([Self.match(.textLayer)])
+        let source = try #require(state.regions[0]?.first)
+        #expect(source.textAnchored)
+        state.duplicateRegion(source.id, page: 0, undoManager: nil)
+        let copy = try #require(state.regions[0]?.first { $0.id != source.id })
+        #expect(!copy.textAnchored)
+    }
+
+    @Test("resize, move and group move clear anchoring; Undo restores it and Redo clears it again")
+    func editsClearAndUndoRestores() throws {
+        let state = Self.applied([Self.match(.textLayer, strip: Self.strip)])
+        let id = try #require(state.regions[0]?.first?.id)
+        let undo = makeUndoManager()
+        func anchored() -> Bool { state.regions[0]?.first { $0.id == id }?.textAnchored ?? false }
+
+        withUndoGroup(undo) { _ = state.resizeRegion(id, page: 0, newRect: Self.ink.insetBy(dx: -0.02, dy: 0), undoManager: undo) }
+        #expect(!anchored(), "resize clears")
+        undo.undo()
+        #expect(anchored(), "Undo of a resize restores")
+        undo.redo()
+        #expect(!anchored(), "Redo of the resize clears again")
+        undo.undo()
+
+        withUndoGroup(undo) { _ = state.moveRegion(id, page: 0, newRect: Self.ink.offsetBy(dx: 0.01, dy: 0), undoManager: undo) }
+        #expect(!anchored(), "move clears")
+        undo.undo()
+        #expect(anchored(), "Undo of a move restores")
+
+        withUndoGroup(undo) {
+            _ = state.moveRegions([(id: id, newRect: Self.ink.offsetBy(dx: 0, dy: 0.01))], page: 0, undoManager: undo)
+        }
+        #expect(!anchored(), "group move clears")
+        undo.undo()
+        #expect(anchored(), "Undo of a group move restores")
+        #expect(state.regions[0]?.first { $0.id == id }?.normalizedRect == Self.ink)
     }
 
     @Test("a Secure run writes every page as an image and states no reason, whatever its boxes")

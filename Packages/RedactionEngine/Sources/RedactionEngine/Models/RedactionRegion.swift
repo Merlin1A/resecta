@@ -35,17 +35,39 @@ public struct RedactionRegion: Sendable, Identifiable, Equatable, Codable {
     /// resized, because the hidden glyphs do not move. nil for every other
     /// region; an encoded region without it decodes as nil.
     public let textLayerRect: CGRect?
+    /// Placed from a match in the page's own text layer and not moved or
+    /// resized since: its box is that text's box. False for every other
+    /// region (drawn, duplicated, read from the page's picture, or edited);
+    /// on a page that is not plain such a region sends a Searchable page
+    /// image-only (`PageContentFacts.keepsTextLayer`). An encoded region
+    /// without it decodes as false.
+    public var textAnchored: Bool
 
     public init(
         id: UUID,
         normalizedRect: CGRect,
         source: Source,
-        textLayerRect: CGRect? = nil
+        textLayerRect: CGRect? = nil,
+        textAnchored: Bool = false
     ) {
         self.id = id
         self.normalizedRect = normalizedRect
         self.source = source
         self.textLayerRect = textLayerRect
+        self.textAnchored = textAnchored
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, normalizedRect, source, textLayerRect, textAnchored
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        normalizedRect = try container.decode(CGRect.self, forKey: .normalizedRect)
+        source = try container.decode(Source.self, forKey: .source)
+        textLayerRect = try container.decodeIfPresent(CGRect.self, forKey: .textLayerRect)
+        textAnchored = try container.decodeIfPresent(Bool.self, forKey: .textAnchored) ?? false
     }
 
     /// The rects a Searchable export strips the text layer under: the box,

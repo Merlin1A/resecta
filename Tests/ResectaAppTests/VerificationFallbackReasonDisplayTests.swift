@@ -15,6 +15,7 @@ struct VerificationFallbackReasonDisplayTests {
     private nonisolated static let allReasons: [TextLayerDetector.FallbackReason] = [
         .noExtractableText, .cjkEncodingFailure, .rtlText, .verticalText,
         .zeroSizeBounds, .unresolvedEncoding, .extractionFailed, .hiddenText,
+        .unanchoredRegion,
     ]
 
     @Test("Every reason has non-empty short copy",
@@ -40,6 +41,8 @@ struct VerificationFallbackReasonDisplayTests {
                 == "extraction failed")
         #expect(TextLayerDetector.FallbackReason.hiddenText.shortReasonText
                 == "hidden text on the page")
+        #expect(TextLayerDetector.FallbackReason.unanchoredRegion.shortReasonText
+                == "hand-drawn box on scanned text")
     }
 
     @Test("Chip reason row copy: page number + mode + reason")

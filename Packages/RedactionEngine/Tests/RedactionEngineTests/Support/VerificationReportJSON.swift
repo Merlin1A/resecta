@@ -120,6 +120,7 @@ private struct ReportJSON: Encodable {
         case .unresolvedEncoding: "unresolvedEncoding"
         case .extractionFailed:   "extractionFailed"
         case .hiddenText:         "hiddenText"
+        case .unanchoredRegion:   "unanchoredRegion"
         }
     }
 

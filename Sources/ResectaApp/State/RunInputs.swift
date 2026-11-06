@@ -70,6 +70,16 @@ enum RunInputs {
                 if let trigger = TextLayerDetector.checkFallbackTriggers(page) {
                     pageMode = .secureRasterization
                     fallbackReason = trigger
+                } else if !PageContentFacts.keepsTextLayer(
+                    regions: pageRegions, facts: { PageContentFacts.read(cgPage) }
+                ) {
+                    // A box not placed from this page's own text (drawn,
+                    // duplicated, read from the picture, moved or resized)
+                    // on a page whose text layer need not sit on its print:
+                    // the covered words' text may lie outside the box, so the
+                    // page is written as an image only.
+                    pageMode = .secureRasterization
+                    fallbackReason = .unanchoredRegion
                 } else {
                     pageMode = .searchableRedaction
                 }
