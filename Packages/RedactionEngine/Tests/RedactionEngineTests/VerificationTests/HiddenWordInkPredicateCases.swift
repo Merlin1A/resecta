@@ -11,11 +11,14 @@ import CoreGraphics
 // the normalized frame.
 //
 // The rules the cases pin:
-// - each output line's drift from its print is an offset plus a scale along
-//   the line, fitted from at least two anchors (surviving words away from
-//   every box, matched to a source word of the same key); the fit is used
-//   only when its scale is within 0.5–2 and every anchor's residual is within
-//   a few points;
+// - each output line's drift from its print is fitted from its anchors
+//   (surviving words away from every box, matched to a source word of the
+//   same key; a repeated word matched by its order on the line): with no
+//   anchor or one, the line cannot be placed; with exactly two, an offset
+//   alone, used only when both anchors lie within a few points of it; with
+//   three or more, an offset plus a scale along the line, used only when the
+//   scale is within 0.5–2 and every anchor lies within a few points of the
+//   fit. No anchor is dropped to make a fit;
 // - a surviving word whose placed ink has its centre inside a box's paint is
 //   flagged on that box, whatever its key (a fragment counts); one whose
 //   placed ink only crosses a box's edge is an edge note;
@@ -146,6 +149,25 @@ struct HiddenWordInkPredicateCases {
         #expect(v.unplaceableNearBox, "agreement is judged by the residual slack, never by the 36 pt drift bound")
     }
 
+    @Test("V18b: exactly two anchors whose offsets are 30 and 42 pt, a kept word beside a box, leave the page not inspected")
+    func twoAnchorsDisagree() throws {
+        let source = [Self.w("alpha", 72, 40), Self.w("bravo", 240, 40), Self.w("delta", 330, 40)]
+        let output = [Self.w("alpha", 102, 40), Self.w("bravo", 282, 40)]
+        let v = try Self.verdict(output: output, source: source, regions: [Self.box(330, 40)])
+        #expect(v.unplaceableNearBox, "two anchors are fitted by an offset alone; a free scale would fit any pair exactly")
+        #expect(v.findings.isEmpty)
+    }
+
+    @Test("V18c: exactly two anchors that agree (30 and 31 pt) place the line: a fragment mapped inside a box is flagged")
+    func twoAnchorsAgree() throws {
+        let source = [Self.w("alpha", 72, 40), Self.w("bravo", 160, 40), Self.w("charlie", 250, 40)]
+        let output = [Self.w("alpha", 102, 40), Self.w("bravo", 191, 40), Self.w("rlie", 300, 20)]
+        let b = Self.box(250, 40)
+        let v = try Self.verdict(output: output, source: source, regions: [b])
+        #expect(v.findings.map(\.regionID) == [b.id], "two agreeing anchors are enough to place a line")
+        #expect(!v.unplaceableNearBox)
+    }
+
     // MARK: - Accepted (nothing flagged)
 
     @Test("V16: a kept neighbour whose ink crosses a box's edge, its centre outside, is an edge note, not flagged")
@@ -179,6 +201,17 @@ struct HiddenWordInkPredicateCases {
         let v = try Self.verdict(output: output, source: source, regions: [review])
         #expect(v.findings.isEmpty, "one offset for the line would put the kept last word inside the box")
         #expect(!v.unplaceableNearBox)
+    }
+
+    @Test("V20b: a word repeated 24 pt apart on a line drifted 25 pt, both copies kept, is placed: nothing flagged, nothing unplaceable")
+    func closeRepeatedWord() throws {
+        let source = [Self.w("one", 72, 28), Self.w("the", 110, 20), Self.w("the", 134, 20), Self.w("two", 170, 28),
+                      Self.w("three", 230, 32), Self.w("four", 300, 30), Self.w("five", 360, 30)]
+        let output = [Self.w("one", 97, 28), Self.w("the", 135, 20), Self.w("the", 159, 20), Self.w("two", 195, 28),
+                      Self.w("three", 255, 32), Self.w("four", 325, 30)]
+        let v = try Self.verdict(output: output, source: source, regions: [Self.box(360, 30)])
+        #expect(!v.unplaceableNearBox, "repeats are matched by their order on the line, never by the nearest copy")
+        #expect(v.findings.isEmpty)
     }
 
     // MARK: - Not applicable

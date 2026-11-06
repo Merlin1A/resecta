@@ -38,12 +38,17 @@ struct HiddenWordInkLayerCases {
     /// The leak is in the export, and the run reads Checks Failed with the
     /// check's row failing on page 1.
     static func expectLeakFails(_ run: F.Run, leaked word: String, _ comment: Comment) throws {
-        let hidden = try #require(F.hiddenRect(run.source.page(at: 0)!, word))
-        #expect(!F.textInside(run.output, hidden).isEmpty, "precondition: \(comment) leaves \(word)'s hidden copy in the export")
+        try expectLeak(run, leaked: word, comment)
         #expect(run.report.overallStatus.isFail, "\(comment): the run reads Checks Failed, not \(run.report.overallStatus)")
         let row = try row(run.report)
         #expect(row.status.isFail, "\(comment): the check's row fails")
         #expect(row.pageReferences == [0], "\(comment): on page 1")
+    }
+
+    /// The precondition: the export holds `word`'s hidden copy.
+    static func expectLeak(_ run: F.Run, leaked word: String, _ comment: Comment) throws {
+        let hidden = try #require(F.hiddenRect(run.source.page(at: 0)!, word))
+        #expect(!F.textInside(run.output, hidden).isEmpty, "precondition: \(comment) leaves \(word)'s hidden copy in the export")
     }
 
     // MARK: - The leaking exports
@@ -74,8 +79,10 @@ struct HiddenWordInkLayerCases {
     @Test("V4: a hand box on a line's first word, and on a first word narrower than the drift, read Checks Failed",
           .timeLimit(.minutes(3)))
     func v4() async throws {
-        try Self.expectLeakFails(try await Self.p8(), leaked: "Signed", "a hand box on Signed")
-        try Self.expectLeakFails(try await Self.p9(), leaked: "The", "a hand box on The")
+        let p8 = try await Self.p8(), p9 = try await Self.p9()
+        try Self.expectLeak(p9, leaked: "The", "a hand box on The")
+        try Self.expectLeakFails(p8, leaked: "Signed", "a hand box on Signed")
+        try Self.expectLeakFails(p9, leaked: "The", "a hand box on The")
     }
 
     // MARK: - Clean, Secure
@@ -148,13 +155,13 @@ struct HiddenWordInkLayerCases {
     @Test("V12: with no source, or a locked one, the check could not verify, and reads nothing", .timeLimit(.minutes(3)))
     func v12() async throws {
         let leak = try await Self.p7()
+        let locked = try #require(PDFDocument(data: try F.lockedCopy(Self.seeded)))
+        #expect(locked.isLocked, "precondition: the copy opens locked")
         let r1 = InkCaseReader()
         let noSource = try await Self.runLayer(leak.output, source: nil, regions: [0: [leak.region]], reader: r1)
         #expect(noSource.status.isWarn && noSource.couldNotVerify, "no source: \(noSource.status)")
         #expect(r1.calls == 0)
 
-        let locked = try #require(PDFDocument(data: try F.lockedCopy(Self.seeded)))
-        #expect(locked.isLocked, "precondition: the copy opens locked")
         let r2 = InkCaseReader()
         let lockedRow = try await Self.runLayer(leak.output, source: locked, regions: [0: [leak.region]], reader: r2)
         #expect(lockedRow.status.isWarn && lockedRow.couldNotVerify, "a locked source: \(lockedRow.status)")

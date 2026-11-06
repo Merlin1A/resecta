@@ -256,13 +256,16 @@ struct HiddenWordInkRunCases {
     func crossCheck() async throws {
         let lines = Self.seededLines
         let data = Self.page(lines, drift: 30)
-        let layer = try #require(HiddenWordInkAppSeam.layer, "the check is not built")
         func check(_ id: String, kept: Bool, setUp: (PipelineCoordinator) throws -> Void) async throws {
             let coord = try Self.coordinator(data)
             try setUp(coord)
             let report = try await Self.run(coord)
             #expect(report.perPageModes == [kept ? .searchableRedaction : .secureRasterization],
                     "\(id): precondition, the run \(kept ? "keeps the layer" : "goes to the floor")")
+            guard let layer = HiddenWordInkAppSeam.layer else {
+                Issue.record("\(id): the check is not built")
+                return
+            }
             let row = try #require(report.layers.first { $0.layer == layer }, "\(id): the report carries the check's row")
             if kept {
                 #expect(row.status == .pass || row.status.isInfo, "\(id): \(row.status)")
