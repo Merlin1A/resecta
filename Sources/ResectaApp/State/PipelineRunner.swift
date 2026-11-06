@@ -128,7 +128,8 @@ struct PipelineRunner {
             // what is burned and what is verified.
             let entry = try await Self.captureRunEntry(
                 coordinator: coordinator, effectiveMode: effectiveMode,
-                runSettings: runSettings, capture: coordinator.collectSensitiveTermSet)
+                runSettings: runSettings,
+                capture: { await coordinator.collectSensitiveTermSet(planInk: effectiveMode == .searchableRedaction) })
             let pages = entry.pages
             let sensitiveTerms = entry.sensitiveTerms
             let deselectionSnapshot = entry.deselectionSnapshot
@@ -274,7 +275,7 @@ struct PipelineRunner {
 
         // Synchronous from here: one region state.
         let pages = coordinator.buildPDFPageData(
-            effectiveMode: effectiveMode, runSettings: runSettings)
+            effectiveMode: effectiveMode, runSettings: runSettings, inkPlans: sensitiveTerms.inkPlans)
         let burnedRegionVersion = redactionState.regionVersion
         // The run's deselection facts. The value is recorded onto
         // RedactionState only after `processDocument` returns (inside the
@@ -341,7 +342,7 @@ struct PipelineRunner {
         if let retainedTerms = retained?.sensitiveTerms {
             sensitiveTerms = retainedTerms
         } else {
-            sensitiveTerms = await coordinator.collectSensitiveTermSet()
+            sensitiveTerms = await coordinator.collectSensitiveTermSet(planInk: effectiveMode == .searchableRedaction)
         }
         // Same retention contract for the output re-check requests:
         // the retained set when the run recorded one, else the same

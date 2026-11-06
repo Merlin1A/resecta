@@ -14,14 +14,18 @@ enum RunInputs {
     /// `textLayerStatus` is the import's per-page status and
     /// `sourceHasHiddenOCG` its hidden-layer fact; `settings` is the
     /// run-entry snapshot; `effectiveMode` is the mode the run was entered
-    /// with.
+    /// with. `inkPlans` holds, for a page whose text is a hidden layer over a
+    /// picture of the page, the hidden words each region's ink covers
+    /// (`DocumentSearcher.inkStripPlan`, read at run entry); each region
+    /// strips them too.
     static func pageData(
         document doc: PDFDocument,
         regions: [Int: [RedactionRegion]],
         textLayerStatus: [Int: TextLayerStatus],
         sourceHasHiddenOCG: Bool,
         settings snapshot: PipelineCoordinator.RunSettings,
-        effectiveMode: PipelineMode
+        effectiveMode: PipelineMode,
+        inkPlans: [Int: InkStripPlan] = [:]
     ) -> [PDFPageData] {
         (0..<doc.pageCount).compactMap { i -> PDFPageData? in
             guard let page = doc.page(at: i) else { return nil }
@@ -30,9 +34,13 @@ enum RunInputs {
             // `page.bounds(for:)` / `page.pageRef` off the shared source document.
             let cropBoxBounds = page.bounds(for: .cropBox)
             let cgPage = page.pageRef
+            // The ink plan applies only when it covers every region as it now
+            // stands; otherwise the page is decided without it.
+            let inkPlan = inkPlans[i].flatMap { $0.covers(regions[i] ?? []) ? $0 : nil }
             let pageRegions = regions[i]?.compactMap { region -> RedactionRegion? in
                 var clamped = region
                 clamped.normalizedRect = region.normalizedRect.clampedToNormalized()
+                clamped.inkStripRects = inkPlan?.strips[region.id] ?? []
                 // Minimum dimension threshold, read on the clamped box: a
                 // box reaching past the page edge keeps only its on-page
                 // part, and one wholly past the edge clamps to nothing. Read
@@ -70,14 +78,15 @@ enum RunInputs {
                 if let trigger = TextLayerDetector.checkFallbackTriggers(page) {
                     pageMode = .secureRasterization
                     fallbackReason = trigger
-                } else if !PageContentFacts.keepsTextLayer(
+                } else if inkPlan == nil, !PageContentFacts.keepsTextLayer(
                     regions: pageRegions, facts: { PageContentFacts.read(cgPage) }
                 ) {
                     // A box not placed from this page's own text (drawn,
                     // duplicated, read from the picture, moved or resized)
-                    // on a page whose text layer need not sit on its print:
-                    // the covered words' text may lie outside the box, so the
-                    // page is written as an image only.
+                    // on a page whose text layer need not sit on its print,
+                    // with no ink plan that covers it: the covered words'
+                    // text may lie outside the box, so the page is written as
+                    // an image only.
                     pageMode = .secureRasterization
                     fallbackReason = .unanchoredRegion
                 } else {
