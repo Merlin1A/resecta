@@ -336,7 +336,8 @@ nonisolated func prepareApply(
             id: UUID(),
             normalizedRect: result.normalizedRect,
             source: .searchMatch(term: result.term, rationale: result.rationale),
-            textLayerRect: result.textLayerRect
+            textLayerRect: result.textLayerRect,
+            textAnchored: result.source == .textLayer
         )
         createdRegions[result.pageIndex, default: []].append(region)
         coveringRectsByPage[result.pageIndex, default: []].append(result.normalizedRect)

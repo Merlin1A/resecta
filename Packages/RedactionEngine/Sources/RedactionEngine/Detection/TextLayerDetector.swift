@@ -108,6 +108,12 @@ public enum TextLayerDetector {
         /// painted over the text) — recorded by PageRasterizer after the
         /// render, never returned by the pre-flight trigger check.
         case hiddenText
+        /// A region on a page that is not plain (`PageContentFacts`) was not
+        /// placed from a match in the page's own text layer, or was moved or
+        /// resized after it was: the covered words' text-layer copies may sit
+        /// outside it. Recorded by the run's page bridge, never by the
+        /// pre-flight trigger check.
+        case unanchoredRegion
     }
 
     // MARK: - Private Helpers

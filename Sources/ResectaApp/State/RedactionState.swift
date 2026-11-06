@@ -765,9 +765,9 @@ class RedactionState {
     ) -> RedactionRegion? {
         if let documentState, !documentState.canMutateRegions { return nil }
         let region = RedactionRegion(
-            id: UUID(),
-            normalizedRect: nudge.normalizedRect,
-            source: .searchMatch(term: nudge.term, rationale: nudge.rationale), textLayerRect: nudge.textLayerRect
+            id: UUID(), normalizedRect: nudge.normalizedRect,
+            source: .searchMatch(term: nudge.term, rationale: nudge.rationale), textLayerRect: nudge.textLayerRect,
+            textAnchored: nudge.source == .textLayer
         )
         // Category stamp — mirrors `prepareApply` so a nudge-accepted
         // region stays indistinguishable from a sheet-applied region.
