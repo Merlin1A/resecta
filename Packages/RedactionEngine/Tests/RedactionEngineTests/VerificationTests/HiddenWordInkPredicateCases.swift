@@ -158,6 +158,27 @@ struct HiddenWordInkPredicateCases {
         #expect(v.findings.isEmpty)
     }
 
+    @Test("V23: on an upright page (axis .right), a line whose words run down, across the axis, beside a box is not inspected: never flagged, never clean")
+    func lineAcrossTheAxis() throws {
+        // V22's /Rotate 90 line on an upright 612 × 792 page: 7 pt glyphs stepping down from y 560 in a band at
+        // x 400–414, one line id, each word given as its hidden glyphs' box. "alpha bravo the delta echo" puts
+        // alpha at y 525–560, bravo 483–518, the 455–476, delta 413–448, echo 378–406. The print is 30 pt up.
+        let words: [(String, CGFloat, CGFloat)] = [("alpha", 525, 35), ("bravo", 483, 35), ("the", 455, 21),
+                                                    ("delta", 413, 35), ("echo", 378, 28)]
+        let output = words.map { Self.w($0.0, 400, 14, y: $0.1, h: $0.2) }
+        let source = words.map { Self.w($0.0, 400, 14, y: $0.1 + 30, h: $0.2) }
+        // The box over the print of "the": x 400–414, y 485–506.
+        let the = Self.box(400, 14, y: 485, h: 21)
+        // The axis is the rotation's (.right), and the words' centres spread 0 pt along it and 150.5 pt across it,
+        // so the line is not placed. The hidden "the" lies 9 pt from the box, within the across reach of 1.5
+        // median word heights (52.5 pt). Read along the line's own spread instead, alpha, delta and echo fit +30
+        // at scale 1 and "the" maps onto the box.
+        let v = try Self.verdict(output: output, source: source, regions: [the])
+        #expect(v.unplaceableNearBox, "a line that runs across the page's axis is not placed")
+        #expect(v.findings.isEmpty, "the axis comes from the rotation, never from the line's spread")
+        #expect(v != InkCaseVerdict())
+    }
+
     @Test("V18c: exactly two anchors that agree (30 and 31 pt) place the line: a fragment mapped inside a box is flagged")
     func twoAnchorsAgree() throws {
         let source = [Self.w("alpha", 72, 40), Self.w("bravo", 160, 40), Self.w("charlie", 250, 40)]
