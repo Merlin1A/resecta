@@ -1,0 +1,19 @@
+Property: An export word that cannot be aligned is never read as absent: near a box it leaves the page not inspected.
+Area: hidden-word check (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/HiddenWordInkAlignCases
+Must go red: RedactionEngineTests/HiddenWordInkAlignCases (d′); RedactionEngineTests/HiddenWordInkAlignCases (e′)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkAlign.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkAlign.swift
+index e0202e75..cb5dd506 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkAlign.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkAlign.swift
+@@ -244,7 +244,7 @@ extension HiddenWordInkCheck {
+         var verdict = placed.isEmpty ? HiddenWordInkVerdict()
+             : verdict(pageIndex: pageIndex, output: placed, sourceInk: sourceInk, regions: regions,
+                       pageSize: pageSize, kind: kind, axis: axis)
+-        if !unaligned.isEmpty, unalignedNearABox(unaligned, exportWords: exportWords, placed: placed,
++        if false, !unaligned.isEmpty, unalignedNearABox(unaligned, exportWords: exportWords, placed: placed,
+                                                  sourceInk: sourceInk, regions: regions, pageSize: pageSize, axis: axis) {
+             verdict.unplaceableNearBox = true
+         }

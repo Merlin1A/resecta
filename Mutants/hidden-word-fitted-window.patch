@@ -1,0 +1,19 @@
+Property: An unaligned word on a fitted line is near a box when its window mapped through the fit meets the paint, as well as by the drift reach.
+Area: hidden-word check (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/HiddenWordInkAlignCases
+Must go red: RedactionEngineTests/HiddenWordInkAlignCases (e‴)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkAlign.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkAlign.swift
+index e0202e75..cd897167 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkAlign.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkAlign.swift
+@@ -290,7 +290,7 @@ extension HiddenWordInkCheck {
+                 fits[word.line] = aligned.isEmpty ? Fit?.none
+                     : placedFit(aligned, line: LineFacts(aligned), source: source, boxes: boxes.map { $0.1 })
+             }
+-            if let fit = fits[word.line] ?? nil {
++            if false, let fit = fits[word.line] ?? nil {
+                 let mapped = fit.map(box)
+                 if boxes.contains(where: { mapped.overlaps($0.1) }) { return true }
+             }

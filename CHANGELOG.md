@@ -58,6 +58,7 @@ Search matches a name that wraps onto a second line, or breaks at its own hyphen
 - A highlight or form field in the original that hides one word of a line at its edge is now named as covering text: on a page whose text layer reads, it counts as a cover when it hides at least 60% of any one word under it, not 60% of its whole area.
 - Search: a match that wraps onto two lines now counts once in the number of results left unselected, as it already did in the match count.
 - Searchable Redaction: when Resecta cannot match a scanned page's hidden text to the printed words under a box, the page is exported as an image only, and the results show why.
+- Verification: a hidden copy of a covered word left in a Searchable export is now reported, on the page and box it belongs to.
 
 ### Security
 

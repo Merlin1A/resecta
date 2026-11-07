@@ -22,6 +22,7 @@ import os
 //   - Base layers 3, 4  = Structure, Metadata                → sequential
 //   - Sandwich 5/6/7/8  = Spatial, CharCount, FontVerify,
 //                         Character Lineage                  → sequential
+//   - Sandwich 10       = Hidden Words Under Boxes           → sequential
 //
 // Mechanism-description language only — no outcome promises.
 //
@@ -239,7 +240,7 @@ struct ParallelLayerExecutionTests {
 
     // MARK: - Test 3 — Sandwich layers run sequentially
 
-    @Test("Sandwich layers 5/6/7/8 run one after the other (no overlap)")
+    @Test("Sandwich layers 5/6/7/8/10 run one after the other (no overlap)")
     func testSandwichLayersSequential() async throws {
         // Sandwich layers expect a Searchable-Redaction page with a
         // filter digest. Use the textLayerPDF fixture so the page has
@@ -261,7 +262,7 @@ struct ParallelLayerExecutionTests {
             )
         }
         let sandwich = Self.ordinals(of: .sandwichSequential, mode: .searchableRedaction)
-        #expect(sandwich == [5, 6, 7, 8])
+        #expect(sandwich == [5, 6, 7, 8, 10])
 
         let run = try await Self.runOrchestrated(
             url: url, doc: doc, pipelineMode: .searchableRedaction,

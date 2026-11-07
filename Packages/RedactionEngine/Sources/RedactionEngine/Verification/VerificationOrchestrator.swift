@@ -101,7 +101,9 @@ public struct VerificationOrchestrator: Sendable {
     /// requests from that pass; the two results publish in canonical order.
     /// With `sourceDocument` (the original, the caller's own copy) the
     /// Search Re-check also re-runs each applied request on the original
-    /// pages and fails a box that leaves part of its match uncovered.
+    /// pages and fails a box that leaves part of its match uncovered, and
+    /// the hidden-word check reads the original's print; without it, that
+    /// check could not verify.
     ///
     /// The report lists every layer in canonical order: the results UI
     /// labels rows by ordinal position. A cancellation checkpoint precedes
@@ -204,7 +206,9 @@ public struct VerificationOrchestrator: Sendable {
                     pipelineMode: pipelineMode,
                     filterDigests: filterDigests,
                     perPageModes: perPageModes,
-                    manualRegionsWithoutText: manualRegionsWithoutText
+                    manualRegionsWithoutText: manualRegionsWithoutText,
+                    // The hidden-word check reads the original's print.
+                    sourceDocument: sourceDocument
                 )
                 resultsByLayer[layer] = result
                 completedLayers.append(result)

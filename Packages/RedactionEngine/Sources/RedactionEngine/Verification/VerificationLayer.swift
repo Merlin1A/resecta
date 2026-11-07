@@ -11,7 +11,7 @@ import Foundation
 ///
 /// The Searchable order is the declaration order. Secure Rasterization runs
 /// the five base checks and the two post-sequential checks (seven);
-/// Searchable Redaction runs all twelve. The two post-sequential checks —
+/// Searchable Redaction runs all thirteen. The two post-sequential checks —
 /// the search re-check, then the detection sweep — are last in both modes.
 public enum VerificationLayer: String, CaseIterable, Sendable, Hashable {
     case textExtraction
@@ -24,6 +24,7 @@ public enum VerificationLayer: String, CaseIterable, Sendable, Hashable {
     case fontVerification
     case characterLineage
     case operatorReExtraction
+    case hiddenWordInk
     case searchRecheck
     case detectionSweep
 
@@ -52,6 +53,7 @@ public enum VerificationLayer: String, CaseIterable, Sendable, Hashable {
         case .fontVerification: "Font Verification"
         case .characterLineage: "Character Lineage"
         case .operatorReExtraction: "Operator Re-Extraction"
+        case .hiddenWordInk: "Hidden Words Under Boxes"
         case .searchRecheck: "Search Re-check"
         case .detectionSweep: "Detection Sweep"
         }
@@ -71,6 +73,7 @@ public enum VerificationLayer: String, CaseIterable, Sendable, Hashable {
         case .fontVerification: "textformat"
         case .characterLineage: "checkmark.seal"
         case .operatorReExtraction: "doc.text.below.ecg"
+        case .hiddenWordInk: "eye.slash"
         case .searchRecheck: "text.page.badge.magnifyingglass"
         case .detectionSweep: "rectangle.and.text.magnifyingglass"
         }
@@ -83,7 +86,7 @@ public enum VerificationLayer: String, CaseIterable, Sendable, Hashable {
             .parallelBase
         case .structureCheck, .metadataCheck:
             .catalogSequential
-        case .spatialVerification, .characterCount, .fontVerification, .characterLineage:
+        case .spatialVerification, .characterCount, .fontVerification, .characterLineage, .hiddenWordInk:
             .sandwichSequential
         case .searchRecheck, .detectionSweep:
             .postSequential
@@ -101,7 +104,7 @@ public enum VerificationLayer: String, CaseIterable, Sendable, Hashable {
                  .structureCheck, .metadataCheck, .searchRecheck, .detectionSweep:
                 return true
             case .spatialVerification, .characterCount, .fontVerification,
-                 .characterLineage, .operatorReExtraction:
+                 .characterLineage, .operatorReExtraction, .hiddenWordInk:
                 return false
             }
         }

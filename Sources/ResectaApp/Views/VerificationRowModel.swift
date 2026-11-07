@@ -229,6 +229,7 @@ nonisolated struct VerificationRowModel: Equatable {
         case .fontVerification:     return "Monospace Fonts"
         case .characterLineage:     return "Character Sequence"
         case .operatorReExtraction: return "Terms in Content Streams"
+        case .hiddenWordInk:        return "Hidden Words Under Boxes"
         case .searchRecheck:        return "Search Re-check"
         case .detectionSweep:       return "Detection Sweep"
         }
@@ -252,6 +253,8 @@ nonisolated struct VerificationRowModel: Equatable {
         case .fontVerification:     "Checks fonts against Courier and Menlo."
         case .characterLineage:     "Compares kept characters with the record."
         case .operatorReExtraction: "Searches text commands for your terms."
+        case .hiddenWordInk:
+            "Looks for hidden copies of boxed words."
         case .searchRecheck:        "Re-runs your searches on the redacted PDF."
         case .detectionSweep:       "Runs the detectors on the redacted PDF."
         }
@@ -282,6 +285,8 @@ nonisolated struct VerificationRowModel: Equatable {
             "Each page's kept characters must match the fingerprint recorded at redaction. Zero-width marks are not seen."
         case .operatorReExtraction:
             "No term may appear in the commands that draw text. Scanning stops at the first page with a match."
+        case .hiddenWordInk:
+            "Fails if a boxed word's hidden copy survives; not checked where the hidden text cannot be matched to print."
         case .searchRecheck:
             "Each text, regex, or multi-term search is re-run with OCR on and must match nothing. Misread text is not seen."
         case .detectionSweep:
@@ -310,6 +315,8 @@ nonisolated struct VerificationRowModel: Equatable {
             "No captured text to search for."
         case .characterCount, .fontVerification, .characterLineage:
             "No Searchable pages to check."
+        case .hiddenWordInk:
+            "No page keeps hidden text over a picture of the page."
         case .textExtraction, .ocrCheck, .structureCheck, .metadataCheck, .spatialVerification:
             nil
         }

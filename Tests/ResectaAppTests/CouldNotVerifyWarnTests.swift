@@ -51,6 +51,8 @@ struct CouldNotVerifyWarnTests {
         "Per-page mode data covered 1 of 2 pages; 1 page not checked",
         // Character Count / Character Lineage
         "Cross-checked 1 of 2 pages — remaining pages lacked rasterization data",
+        // Hidden Words Under Boxes
+        "Page 1: the hidden text could not be matched to the printed words, so its boxes were not checked.",
         // Search Re-check
         "1 search re-run; 1 page could not be checked: 2",
     ]

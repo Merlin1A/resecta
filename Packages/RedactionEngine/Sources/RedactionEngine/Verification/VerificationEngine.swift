@@ -11,7 +11,7 @@ import AppKit  // macOS tooling destination: thumbnail returns NSImage
 
 // Verification engine. Each check is a `VerificationLayer` case; the
 // per-mode order and count come from `layers(for:)` (Secure Rasterization
-// runs seven checks, Searchable Redaction twelve; the two post-sequential
+// runs seven checks, Searchable Redaction thirteen; the two post-sequential
 // checks are last in both), never from an index table.
 
 /// Stateless verification engine. Runs individual layers on output PDFs.
@@ -261,6 +261,16 @@ public struct VerificationEngine: Sendable {
                 layerPageReferences = l10.pageReferences
                 layerReviewTerms = l10.reviewTermTexts
                 couldNotVerify = l10.couldNotVerify
+            case .hiddenWordInk:
+                // Hidden words under boxes — each word left in the text
+                // layer placed on the source page's print by its own read,
+                // failing when that print lies under a box.
+                let (s11, pages11, cnv11, copy11) = try await runHiddenWordInk(
+                    doc, regions: regions, sourceDocument: sourceDocument)
+                status = s11
+                layerPageReferences = pages11
+                couldNotVerify = cnv11
+                copyOverride = copy11
             case .searchRecheck:
                 // Search Re-check — re-runs every applied typed search on
                 // the output through the search engine itself (text layer

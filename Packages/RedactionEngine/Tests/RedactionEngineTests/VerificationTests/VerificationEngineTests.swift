@@ -12,15 +12,15 @@ struct VerificationEngineTests {
 
     // MARK: - Layer Count (never hardcoded)
 
-    @Test("Secure Rasterization has 7 layers, Searchable has 12")
+    @Test("Secure Rasterization has 7 layers, Searchable has 13")
     func layerCounts() {
         let engine = VerificationEngine()
         #expect(engine.layers(for: .secureRasterization).count == 7)
-        #expect(engine.layers(for: .searchableRedaction).count == 12)
+        #expect(engine.layers(for: .searchableRedaction).count == 13)
         // The two post-sequential checks close both orders.
         #expect(engine.layers(for: .searchableRedaction).suffix(2) == [.searchRecheck, .detectionSweep])
-        #expect(engine.layers(for: .searchableRedaction)[10].name == "Search Re-check")
-        #expect(engine.layers(for: .searchableRedaction)[11].name == "Detection Sweep")
+        #expect(engine.layers(for: .searchableRedaction)[11].name == "Search Re-check")
+        #expect(engine.layers(for: .searchableRedaction)[12].name == "Detection Sweep")
         #expect(engine.layers(for: .secureRasterization)[5].name == "Search Re-check")
         #expect(engine.layers(for: .secureRasterization)[6].name == "Detection Sweep")
     }

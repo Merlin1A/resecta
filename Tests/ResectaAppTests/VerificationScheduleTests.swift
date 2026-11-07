@@ -33,9 +33,9 @@ struct VerificationScheduleTests {
             #expect(parallel == [.textExtraction, .ocrCheck, .binaryStringSearch])
             #expect(sandwich.isEmpty)
         case .searchableRedaction:
-            #expect(layers.count == 12)
+            #expect(layers.count == 13)
             #expect(parallel == [.textExtraction, .ocrCheck, .binaryStringSearch, .operatorReExtraction])
-            #expect(sandwich == [.spatialVerification, .characterCount, .fontVerification, .characterLineage])
+            #expect(sandwich == [.spatialVerification, .characterCount, .fontVerification, .characterLineage, .hiddenWordInk])
         }
     }
 
@@ -89,19 +89,19 @@ struct VerificationScheduleTests {
                 "an idle re-check has nothing to check, never a skipped layer")
     }
 
-    @Test("Searchable verify-only reports twelve layers in canonical order; the parallel-batch layer keeps its ordinal")
+    @Test("Searchable verify-only reports thirteen layers in canonical order; the parallel-batch layer keeps its ordinal")
     func searchableReportIsCanonical() async throws {
         let report = try await verifyOnlyReport(mode: .searchableRedaction)
         let expected = VerificationEngine().layers(for: .searchableRedaction)
-        #expect(report.layers.count == 12)
+        #expect(report.layers.count == 13)
         #expect(report.layers.map(\.name) == expected.map(\.name))
         // Operator Re-Extraction completes in the parallel base batch but
         // the report places it at its canonical ordinal (index 9).
         #expect(report.layers[9].layer == .operatorReExtraction)
-        #expect(report.layers[10].layer == .searchRecheck)
-        #expect(report.layers[10].status == .notApplicable(""))
-        #expect(report.layers[11].layer == .detectionSweep)
-        #expect(report.layers[11].status == .pass, "the sweep ran on the output — never the idle note")
+        #expect(report.layers[11].layer == .searchRecheck)
+        #expect(report.layers[11].status == .notApplicable(""))
+        #expect(report.layers[12].layer == .detectionSweep)
+        #expect(report.layers[12].status == .pass, "the sweep ran on the output — never the idle note")
     }
 
     @Test("The idle re-check row reads NOT APPLICABLE, never a pass, a note, a warn or an attention row")

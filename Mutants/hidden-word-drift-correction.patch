@@ -1,0 +1,20 @@
+Property: Each surviving word is placed by its line's fitted drift, not by its raw position.
+Area: hidden-word check (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/HiddenWordInkPredicateCases -only-testing:RedactionEngineTests/HiddenWordInkLayerCases
+Must go red: RedactionEngineTests/HiddenWordInkPredicateCases V1 (predicate); RedactionEngineTests/HiddenWordInkPredicateCases V18c; RedactionEngineTests/HiddenWordInkPredicateCases V19 (b); RedactionEngineTests/HiddenWordInkPredicateCases V20; RedactionEngineTests/HiddenWordInkLayerCases V1; RedactionEngineTests/HiddenWordInkLayerCases V2; RedactionEngineTests/HiddenWordInkLayerCases V3 (the RED); RedactionEngineTests/HiddenWordInkLayerCases V4
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkCheck.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkCheck.swift
+index 998a7178..87ddc5be 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkCheck.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkCheck.swift
+@@ -174,7 +174,8 @@ enum HiddenWordInkCheck {
+                 continue
+             }
+             for word in words {
+-                let mapped = fit.map(word.box)
++                let mapped = MappedBox(minX: Int128(word.box.minX), maxX: Int128(word.box.maxX), xDen: 1,
++                                       minY: Int128(word.box.minY), maxY: Int128(word.box.maxY), yDen: 1)
+                 var flagged = false
+                 for (id, paint) in lineBoxes where mapped.centreInside(paint) {
+                     verdict.findings.append(HiddenWordInkMark(pageIndex: pageIndex, regionID: id, inkRect: ink(mapped)))

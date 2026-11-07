@@ -133,6 +133,7 @@ enum VerificationDebugFixtures {
     private static let coreSearchable: [VerificationLayer] = [
         .textExtraction, .ocrCheck, .binaryStringSearch, .structureCheck, .metadataCheck,
         .spatialVerification, .characterCount, .fontVerification, .characterLineage, .operatorReExtraction,
+        .hiddenWordInk,
     ]
 
     /// The run's rows in engine order, each passing unless `overrides` names it.

@@ -1,0 +1,22 @@
+Property: Alignment is judged in rounds against the alignments at each round's start, so the result does not depend on list order.
+Area: hidden-word check (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/HiddenWordInkAlignCases
+Must go red: RedactionEngineTests/HiddenWordInkAlignCases (f-shuffle); RedactionEngineTests/HiddenWordInkAlignCases (f″)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkAlign.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkAlign.swift
+index e0202e75..4ead1874 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkAlign.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkAlign.swift
+@@ -199,6 +199,11 @@ enum HiddenWordInkAlign {
+             var aligned: [Int: Candidate] = [:]
+             var ambiguous = Set<Int>()
+             while true {
++                for k in entries.indices.sorted(by: { entries[$0].index < entries[$1].index }) where aligned[k] == nil && !ambiguous.contains(k) {
++                    let live = inOrder(entries.indices.map { window($0, aligned) })
++                    if live[k].count == 1, let only = live[k].first { aligned[k] = only } else if live[k].count > 1 { ambiguous.insert(k) }
++                }
++                if true { break }
+                 let settled = aligned
+                 let windows = entries.indices.map { window($0, settled) }
+                 let standing = inOrder(windows)

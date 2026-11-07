@@ -1,0 +1,19 @@
+Property: Anchors must agree within the residual slack, never merely within the drift bound.
+Area: hidden-word check (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/HiddenWordInkPredicateCases
+Must go red: RedactionEngineTests/HiddenWordInkPredicateCases V18; RedactionEngineTests/HiddenWordInkPredicateCases V18b
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkCheck.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkCheck.swift
+index 998a7178..c3667ac0 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkCheck.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkCheck.swift
+@@ -273,7 +273,7 @@ enum HiddenWordInkCheck {
+         }
+         let n = anchors.count
+         guard n >= 2, n <= maxAnchorsPerLine else { return nil }
+-        let slack2 = Int128(slackGrid2)
++        let slack2 = Int128(Int((driftAlong * Double(gridPerPoint) * 2).rounded()))
+ 
+         // Across: an offset alone, every anchor within the slack of the mean.
+         let dys = anchors.map { Int128($0.print.centre2Y - $0.layer.centre2Y) }

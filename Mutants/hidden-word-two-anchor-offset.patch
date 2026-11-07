@@ -1,0 +1,19 @@
+Property: Exactly two anchors fit an offset alone (scale 1), never an exact line through both.
+Area: hidden-word check (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/HiddenWordInkPredicateCases
+Must go red: RedactionEngineTests/HiddenWordInkPredicateCases V18b
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkCheck.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkCheck.swift
+index 998a7178..b61b0eb6 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkCheck.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkCheck.swift
+@@ -283,7 +283,7 @@ enum HiddenWordInkCheck {
+ 
+         let xs = anchors.map { Int128($0.layer.centre2X) }
+         let ys = anchors.map { Int128($0.print.centre2X) }
+-        if n == 2 {
++        if n == 2 && false {
+             // An offset alone: both anchors within the slack of the pair's mean.
+             let d0 = ys[0] - xs[0], d1 = ys[1] - xs[1]
+             guard abs(d0 - d1) <= 2 * slack2 else { return nil }
