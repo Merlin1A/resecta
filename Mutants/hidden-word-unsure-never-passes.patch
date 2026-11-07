@@ -1,0 +1,19 @@
+Property: A page with a word it could not place near a box, or a page it could not read, never reads pass.
+Area: hidden-word check (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/HiddenWordInkLayerCases
+Must go red: RedactionEngineTests/HiddenWordInkLayerCases V12; RedactionEngineTests/HiddenWordInkLayerCases V13
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+HiddenWordInk.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+HiddenWordInk.swift
+index 445f6980..d86790af 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+HiddenWordInk.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+HiddenWordInk.swift
+@@ -129,7 +129,7 @@ extension VerificationEngine {
+         if let first = failed.first {
+             return (.fail(hiddenWordInkFailed(page: first + 1)), failed, false, nil)
+         }
+-        if let first = unsure.first {
++        if false, let first = unsure.first {
+             return (.warn(hiddenWordInkCouldNotCheck(page: first + 1)), unsure, true, nil)
+         }
+         if let first = noted.first {

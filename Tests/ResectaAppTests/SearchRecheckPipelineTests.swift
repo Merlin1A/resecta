@@ -202,7 +202,7 @@ struct SearchRecheckPipelineTests {
 
     // MARK: - PASS
 
-    @Test("PASS end to end in Searchable: twelve layers, the re-check then the sweep last, 2 found · 2 redacted · 0 remaining")
+    @Test("PASS end to end in Searchable: thirteen layers, the re-check then the sweep last, 2 found · 2 redacted · 0 remaining")
     func passSearchable() async throws {
         let h = try await makeHarness(mode: .searchableRedaction)
         defer { h.removeOutput() }
@@ -212,7 +212,7 @@ struct SearchRecheckPipelineTests {
 
         let report = try await runVerifyOnly(h)
 
-        #expect(report.layers.count == 12)
+        #expect(report.layers.count == 13)
         #expect(report.layers.last?.layer == .detectionSweep)
         #expect(report.layers.dropLast().last?.layer == .searchRecheck)
         let last = try recheckRow(report)

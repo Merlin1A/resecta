@@ -1,0 +1,19 @@
+Property: A repeated key is paired by its order on the line, never by the nearest copy.
+Area: hidden-word check (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/HiddenWordInkPredicateCases
+Must go red: RedactionEngineTests/HiddenWordInkPredicateCases V20b
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkCheck.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkCheck.swift
+index 998a7178..17c5fbae 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkCheck.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkCheck.swift
+@@ -266,7 +266,7 @@ enum HiddenWordInkCheck {
+         let printByKey = Dictionary(grouping: band.filter { !$0.key.isEmpty }, by: \.key)
+         for (key, layerCopies) in layerByKey {
+             guard let printCopies = printByKey[key], printCopies.count == layerCopies.count else { continue }
+-            for (layer, print) in zip(layerCopies, printCopies)
++            for (layer, print) in layerCopies.map({ l in (l, printCopies.min(by: { abs($0.box.centre2X - l.box.centre2X) < abs($1.box.centre2X - l.box.centre2X) })!) })
+             where !boxes.contains(where: { layer.box.overlaps($0) || print.box.overlaps($0) }) {
+                 anchors.append((layer.box, print.box))
+             }

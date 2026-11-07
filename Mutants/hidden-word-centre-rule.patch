@@ -1,0 +1,19 @@
+Property: A word is flagged only when the centre of its placed print is inside the paint; one that only crosses the edge is a note.
+Area: hidden-word check (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/HiddenWordInkPredicateCases
+Must go red: RedactionEngineTests/HiddenWordInkPredicateCases V16
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkCheck.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkCheck.swift
+index 998a7178..b13de704 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkCheck.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkCheck.swift
+@@ -176,7 +176,7 @@ enum HiddenWordInkCheck {
+             for word in words {
+                 let mapped = fit.map(word.box)
+                 var flagged = false
+-                for (id, paint) in lineBoxes where mapped.centreInside(paint) {
++                for (id, paint) in lineBoxes where mapped.overlaps(paint) {
+                     verdict.findings.append(HiddenWordInkMark(pageIndex: pageIndex, regionID: id, inkRect: ink(mapped)))
+                     flagged = true
+                 }

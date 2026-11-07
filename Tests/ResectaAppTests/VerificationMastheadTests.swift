@@ -188,7 +188,7 @@ struct VerificationMastheadTests {
                 == "Checks Failed. 6 of 7 checks passed. 1\u{00A0}failed. \(Self.keepEditing) to fix what failed, "
                 + "or share after review.")
         #expect(Results.mastheadAccessibilityLabel(report: Fixtures.searchableAllRasterized)
-                == "Checks Passed. 9 of 12 checks passed. 3\u{00A0}had nothing to check. "
+                == "Checks Passed. 10 of 13 checks passed. 3\u{00A0}had nothing to check. "
                 + "Look over the redacted PDF in Preview before you share it.")
         #expect(Results.mastheadAccessibilityLabel(report: Fixtures.pageCountGate)
                 == "Checks Failed. 0 of 1 check passed. 1\u{00A0}failed. \(Self.keepEditing) and run Redact again; "

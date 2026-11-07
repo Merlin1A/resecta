@@ -1,0 +1,19 @@
+Property: Between candidates inside a word's window, the order of the line's words decides, never the nearest position.
+Area: hidden-word check (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/HiddenWordInkAlignCases
+Must go red: RedactionEngineTests/HiddenWordInkAlignCases (c); RedactionEngineTests/HiddenWordInkAlignCases (d)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkAlign.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkAlign.swift
+index e0202e75..c1c733ea 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkAlign.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkAlign.swift
+@@ -201,7 +201,7 @@ enum HiddenWordInkAlign {
+             while true {
+                 let settled = aligned
+                 let windows = entries.indices.map { window($0, settled) }
+-                let standing = inOrder(windows)
++                let standing = windows.map { cs in Set(cs.min(by: { abs($0.offset) < abs($1.offset) }).map { [$0] } ?? []) }
+                 var added: [Int: Candidate] = [:]
+                 for k in entries.indices where settled[k] == nil && !ambiguous.contains(k) {
+                     if standing[k].count == 1, let only = standing[k].first { added[k] = only }

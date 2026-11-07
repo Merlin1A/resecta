@@ -449,7 +449,7 @@ struct CouldNotVerifyFlagTests {
     /// classified here — the could-not-verify family (23 sites) and the
     /// routine-note WARNs — so a new site cannot land silently: an
     /// unclassified construction, a moved message or a changed count fails.
-    @Test("source census: the could-not-verify family is exactly 24 sites and every WARN construction is classified")
+    @Test("source census: the could-not-verify family is exactly 25 sites and every WARN construction is classified")
     func warnSiteCensus() throws {
         struct Marker { let text: String; let family: Bool; let sites: Int; let lines: Int }
         let markers: [String: [Marker]] = [
@@ -524,6 +524,11 @@ struct CouldNotVerifyFlagTests {
             "DetectionSweep.swift": [
                 Marker(text: "status: .warn(message)", family: true, sites: 1, lines: 1),
             ],
+            // The hidden-word check's one WARN, could-not-verify: pages whose
+            // hidden text could not be matched to the print.
+            "VerificationEngine+HiddenWordInk.swift": [
+                Marker(text: "return (.warn(hiddenWordInkCouldNotCheck(page: first + 1)), unsure, true, nil)", family: true, sites: 1, lines: 1),
+            ],
         ]
         // Pinned `.warn(` construction counts (pattern matches excluded).
         let constructionCounts = [
@@ -534,6 +539,7 @@ struct CouldNotVerifyFlagTests {
             "Layer2OCRCheck+Sweep.swift": 3, "SandwichVerification.swift": 5,
             "SandwichVerification+Layer10.swift": 5,
             "SearchRecheck.swift": 2, "DetectionSweep.swift": 1,
+            "VerificationEngine+HiddenWordInk.swift": 1,
         ]
 
         let sources = URL(fileURLWithPath: #filePath)
@@ -555,6 +561,6 @@ struct CouldNotVerifyFlagTests {
                 familySites += m.sites
             }
         }
-        #expect(familySites == 24, "the could-not-verify family is \(familySites) sites; the contract says 24")
+        #expect(familySites == 25, "the could-not-verify family is \(familySites) sites; the contract says 25")
     }
 }

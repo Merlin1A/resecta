@@ -1,0 +1,30 @@
+Property: The layer folds its own pages (could-not-verify kept, notes and nothing-to-check kept), not through PerPageOutcomes.record.
+Area: hidden-word check (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/HiddenWordInkLayerCases
+Must go red: RedactionEngineTests/HiddenWordInkLayerCases V10; RedactionEngineTests/HiddenWordInkLayerCases V11; RedactionEngineTests/HiddenWordInkLayerCases V12; RedactionEngineTests/HiddenWordInkLayerCases V13
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+HiddenWordInk.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+HiddenWordInk.swift
+index 445f6980..7d7fe9f3 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+HiddenWordInk.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+HiddenWordInk.swift
+@@ -113,6 +113,19 @@ extension VerificationEngine {
+     static func foldHiddenWordInk(
+         _ outcomes: [(page: Int, outcome: HiddenWordInkPage)]
+     ) -> (VerificationStatus, [Int]?, Bool, LayerCopy?) {
++        var shared = PerPageOutcomes()
++        for (page, outcome) in outcomes {
++            switch outcome {
++            case .couldNotCheck: shared.record(.warn(hiddenWordInkCouldNotCheck(page: page + 1)), page: page)
++            case .verdict(let v):
++                if !v.findings.isEmpty { shared.record(.fail(hiddenWordInkFailed(page: page + 1)), page: page) }
++                else if v.unplaceableNearBox { shared.record(.warn(hiddenWordInkCouldNotCheck(page: page + 1)), page: page) }
++                else if !v.edgeNotes.isEmpty { shared.record(.info(hiddenWordInkEdgeNote(page: page + 1)), page: page) }
++            }
++        }
++        if let f = shared.failure { return (f.0, f.1, f.2, nil) }
++        if let w = shared.warning(couldNotVerify: false) { return (w.0, w.1, w.2, nil) }
++        return (.pass, nil, false, LayerCopy(short: hiddenWordInkPassed, detail: ""))
+         var failed: [Int] = [], unsure: [Int] = [], noted: [Int] = [], checked = false
+         for (page, outcome) in outcomes {
+             switch outcome {

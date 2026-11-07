@@ -114,9 +114,9 @@ struct VerificationResultsActionsTests {
     @Test("The ring: P of T with T every check, the verdict's tone; SKIPPED draws the slot")
     func ringContent() {
         #expect(VerificationMasthead.ringContent(report: Fixtures.searchableAllRasterized)
-                == .count(passed: 9, total: 12, tone: .pass))
+                == .count(passed: 10, total: 13, tone: .pass))
         #expect(VerificationMasthead.ringContent(report: Fixtures.searchableAttentionMixed)
-                == .count(passed: 7, total: 12, tone: .attention))
+                == .count(passed: 8, total: 13, tone: .attention))
         #expect(VerificationMasthead.ringContent(report: Fixtures.secureWarningOnly)
                 == .count(passed: 6, total: 7, tone: .warn))
         #expect(VerificationMasthead.ringContent(report: Fixtures.pageCountGate)
@@ -209,7 +209,7 @@ struct VerificationResultsActionsTests {
         let sweep = Fixtures.secureScreenshot.layers.last!
         #expect(VerificationRowModel(layer: sweep, perPageModes: [], pagesOnChips: true).caption
                 == "5 possible items remain.")
-        let recheck = Fixtures.searchableRecheckReview.layers[10]
+        let recheck = Fixtures.searchableRecheckReview.layers[11]
         #expect(VerificationRowModel(layer: recheck, perPageModes: [], pagesOnChips: true).caption
                 == "Your searches \u{201C}Delia\u{201D} and \u{201C}\\d{4}\u{201D} still have 3 matches.")
     }

@@ -1,0 +1,19 @@
+Property: However the chain runs, a match more than six of the word's cells from its glyphs is never accepted.
+Area: hidden-word check (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/HiddenWordInkAlignCases
+Must go red: RedactionEngineTests/HiddenWordInkAlignCases (f⁗)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkAlign.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkAlign.swift
+index e0202e75..279ee9c5 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkAlign.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkAlign.swift
+@@ -167,7 +167,7 @@ enum HiddenWordInkAlign {
+                 where line.minY < entry.box.maxY && entry.box.minY < line.maxY && line.chars.count >= n {
+                     for s in 0...(line.chars.count - n) where Array(line.chars[s..<(s + n)]) == entry.chars {
+                         let offset = entry.box.minX - line.boxes[s].minX
+-                        if n * abs(offset) <= capCells * length {
++                        if true {
+                             found.append(Candidate(line: li, start: s, end: s + n, offset: offset))
+                         }
+                     }
