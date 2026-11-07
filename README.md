@@ -6,7 +6,7 @@
 
 Resecta is a free, open-source iPhone app that redacts PDFs on-device and then checks the output. It runs on iOS 26 or later, collects no data, and makes no network requests of its own.
 
-A black box drawn over text can leave the text underneath readable. Resecta is designed to remove the text in the regions you mark, not just cover it, and then checks the redacted PDF before you share it. How redaction has failed in practice, with sources: [the redaction failure record](https://resecta.app/research/).
+A black box drawn over text can leave the text underneath readable. Resecta is designed to remove the text in the regions you mark, not just cover it, and then checks the redacted PDF before you share it. How redaction has failed in practice, with sources: [Redaction by architecture](https://resecta.app/features/#redaction-by-architecture).
 
 <p align="center">
   <picture>
