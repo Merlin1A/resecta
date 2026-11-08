@@ -1,0 +1,19 @@
+Property: A page's ink-fit box is placed from that page's own read, never from another page's that shares its text, box and picture; the page's index in its document is part of the content key.
+Area: ink fit (Search)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/InkFitPageIdentityTests
+Must go red: RedactionEngineTests/InkFitPageIdentityTests (two pages with one hidden text and different print: each box covers its own page's word)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/InkFitCaches.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/InkFitCaches.swift
+index b217c3ba..77e28fb9 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/InkFitCaches.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/InkFitCaches.swift
+@@ -139,7 +139,7 @@ final class InkTokenCache: @unchecked Sendable {
+         if let known = PageKeyCache.shared.value(for: page) { return known }
+         var hasher = Hasher()
+         hasher.combine(InkFitSession.shared.salt)
+-        hasher.combine(page.document?.index(for: page) ?? -1)
++        // mutant: page index term removed
+         hasher.combine(page.string ?? "")
+         hasher.combine(largestImageBytes(cgPage))
+         hasher.combine(visual.width)
