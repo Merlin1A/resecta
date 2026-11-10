@@ -58,7 +58,7 @@ finished file with no knowledge of how it was produced (§2). And no automated
 check replaces looking at the output — the verification results screen, where
 you share from, says so in its closing note.
 
-## 2. Verification is a second, independent pass over the finished file
+## 2. Verification is a second pass over the finished file
 
 Once the output file is written, a verification engine re-opens it *as a file*
 and hunts for residue (`Verification/VerificationEngine.swift`). Secure
@@ -82,8 +82,8 @@ Rasterization output gets seven layers, numbered here in the engine's order:
    uncovered;
 7. a detection sweep that runs the app's structured detectors on the output
    through the search engine (by OCR in this mode; names and addresses are
-   not swept) and reports what remains in those categories, minus what you
-   chose to leave unredacted.
+   not swept) and reports what the detectors flag in those categories, minus
+   what you chose to leave unredacted.
 
 Searchable Redaction adds five more over the preserved text layer (twelve in
 total), numbered 6–10 ahead of the re-check and the sweep: spatial
