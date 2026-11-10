@@ -618,6 +618,7 @@ class DocumentState {
         documentPassword.wipe()
         sourceDocument = nil
         ThumbnailCache.clear()   // the closed document's page images leave memory with it
+        DocumentSearcher.startNewInkFitSession()   // and its read words place no box in the next document
         sourceFacts = ImportFacts.Summary()
         textLayerStatus = [:]
         searchUnreadablePages = []

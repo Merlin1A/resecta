@@ -196,6 +196,13 @@ Some scanned PDFs carry an invisible layer of text over the picture of each page
 
 ---
 
+### KI-26: Some Searchable Exports Keep the Real Export Time and iOS Version (Low)
+**Affects:** Searchable Redaction
+
+On Searchable exports that need a large fallback font, such as Chinese or Japanese text, the file keeps the real export time and iOS version instead of the fixed values. No document content is affected. Checks report this as a metadata warning.
+
+---
+
 ## Fixed
 
 ### KI-8: Duplicate Regions from Multiple Scan Runs (Low) — FIXED (entry moved 2026-10-01)

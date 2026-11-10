@@ -368,6 +368,7 @@ enum ImportService {
     ) {
         redactionState.clearForNewDocument()
         ThumbnailCache.clear()   // the previous document's page images never outlive it
+        DocumentSearcher.startNewInkFitSession()   // nor do its read words place a box in this one
         documentState.sourceDocument = loaded.document.document
         documentState.sourceFacts = loaded.facts.summary
         // The password that unlocked the source stays with the session: the

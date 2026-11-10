@@ -127,11 +127,19 @@ final class InkTokenCache: @unchecked Sendable {
     private var tokens: [Int: [DocumentSearcher.InkToken]] = [:]
     private var order: [Int] = []
 
-    /// The page's content key: its text, the bytes of its largest image, its
-    /// displayed box and rotation. Read once per page object.
+    /// The page's content key: the document session, the page's index in its
+    /// document, its text, the bytes of its largest image, its displayed box
+    /// and rotation. Read once per page object. The session and the index
+    /// keep one page's read from standing in for another page's, in this
+    /// document or a later one, when the two share a text and a box and no
+    /// direct image tells them apart (a scan whose picture sits inside a form
+    /// object); a search on a fresh copy of the same document still reads the
+    /// cache, since the copy's pages keep their indices.
     static func key(page: PDFPage, cgPage: CGPDFPage, visual: CGSize) -> Int {
         if let known = PageKeyCache.shared.value(for: page) { return known }
         var hasher = Hasher()
+        hasher.combine(InkFitSession.shared.salt)
+        hasher.combine(page.document?.index(for: page) ?? -1)
         hasher.combine(page.string ?? "")
         hasher.combine(largestImageBytes(cgPage))
         hasher.combine(visual.width)
@@ -387,5 +395,24 @@ final class HiddenTextOverImageCache: @unchecked Sendable {
     func set(_ value: Bool, for page: PDFPage) {
         lock.lock(); defer { lock.unlock() }
         table.setObject(NSNumber(value: value), forKey: page)
+    }
+}
+
+/// The document session the ink-fit caches' keys belong to. Its salt enters
+/// every page content key, so a page of a closed document never answers for a
+/// page of the next one, however alike their text, box and picture.
+final class InkFitSession: @unchecked Sendable {
+    static let shared = InkFitSession()
+    private let lock = NSLock()
+    private var current: Int = 0
+    var salt: Int { lock.lock(); defer { lock.unlock() }; return current }
+    func advance() { lock.lock(); current &+= 1; lock.unlock() }
+}
+
+extension DocumentSearcher {
+    /// A document boundary: the next document's pages key apart from the
+    /// closed one's, so nothing read or fitted for it places a box in the next.
+    public static func startNewInkFitSession() {
+        InkFitSession.shared.advance()
     }
 }

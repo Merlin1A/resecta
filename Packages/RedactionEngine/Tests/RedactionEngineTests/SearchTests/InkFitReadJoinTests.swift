@@ -191,7 +191,10 @@ struct InkFitReadJoinTests {
     @Test("Searches of one page at once take one read of it, and each fits from it")
     func concurrentSearchesOfOnePageShareOneRead() async throws {
         let data = try await InkFitBusyPoolTests.export(mark: CGRect(x: 0.024, y: 0.012, width: 0.011, height: 0.008))
-        let first = try #require(PDFDocument(data: data)?.page(at: 0))
+        // The page's document stays alive: the content key names the page's
+        // place in its document, so a page whose document is gone keys apart.
+        let firstDocument = try #require(PDFDocument(data: data))
+        let first = try #require(firstDocument.page(at: 0))
         let key = InkTokenCache.key(page: first, cgPage: try #require(first.pageRef), visual: first.bounds(for: .cropBox).size)
         try #require(InkTokenCache.shared.value(for: key) == nil, "the page is this test's own")
         let count = 6
