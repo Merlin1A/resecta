@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [1.3.2]
 
-Search matches a name that wraps onto a second line, or breaks at its own hyphen, as one match, with a box on each line. On photos and scans, a typed search now boxes the words it matched instead of the whole line. On searchable scans, a word's invisible copy can sit slightly off the printed word; a box now removes that copy for each word it covers, even where it falls outside the box. Share now also asks you to confirm first when the Detection Sweep lists possible items outside your boxes, or when form values were not carried over; slide to share. Copies of different documents get their own names, so saving several in one folder no longer replaces one with another. A redaction and its checks keep the screen awake while they run.
+Search matches a name that wraps between its words onto a second line, or breaks at its own hyphen, as one match, with a box on each line (on a scan, only where the print reads upright). On photos and scans, a typed search now boxes the words it matched instead of the whole line. On searchable scans, a word's invisible copy can sit slightly off the printed word; a box now removes that copy for each word it covers, even where it falls outside the box. Share now also asks you to confirm first when the Detection Sweep lists possible items outside your boxes, or when form values were not carried over; slide to share. Copies of different documents get their own names, so saving several in one folder no longer replaces one with another. A redaction and its checks keep the screen awake while they run.
 
 ### Added
 
@@ -54,7 +54,7 @@ Search matches a name that wraps onto a second line, or breaks at its own hyphen
 - Verification checks the regions the run actually redacted, as burned into the page, not the editor's regions as they stand when verification starts.
 - Stop keeps its place when processing turns into verification, so a tap at that moment is not lost.
 - Search: on a scanned page, a typed number or code made of digits that look like letters, such as a suite, room or case number, an amount or a member ID, is now found, and an accented name matches with or without its accents. Before, the recognised line was corrected toward letters while the typed text was not, so such numbers never matched.
-- Search: on a scanned page or photo, a match is boxed on the words it covers rather than the whole recognised line (KNOWN_ISSUES KI-17).
+- Search: on a scanned page or photo, a Text or Multi-term match is boxed on the words it covers rather than the whole recognised line (KNOWN_ISSUES KI-17).
 - A highlight or form field in the original that hides one word of a line at its edge is now named as covering text: on a page whose text layer reads, it counts as a cover when it hides at least 60% of any one word under it, not 60% of its whole area.
 - Search: a match that wraps onto two lines now counts once in the number of results left unselected, as it already did in the match count.
 - Searchable Redaction: when Resecta cannot match a scanned page's hidden text to the printed words under a box, the page is exported as an image only, and the results show why.

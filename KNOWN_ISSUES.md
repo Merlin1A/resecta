@@ -98,7 +98,7 @@ A password that contains accented Latin letters, such as ä or é, does not open
 ### KI-13: Some Images on Typed Pages Are Not Read by Search (Low–Medium)
 **Affects:** Search (typed pages that also carry images)
 
-On a page with a text layer, Search also reads the page's images for text when one image holds at least 250,000 pixels or covers about half the page, or when the page's text layer is very short for its size (a stamp or a Bates line over a scan). Otherwise it does not read text in a smaller image (a thumbnail-sized photo), in an image written inline in the page's drawing instructions, or in text drawn as outlines rather than as characters. The check after export still reads every page of the redacted copy for the terms you searched for, so a typed search term left in such an image is reported there. Names found by Scan are not checked that way.
+On a page with a text layer, Search also reads the page's images for text when one image holds at least 250,000 pixels or covers about half the page, or when the page's text layer is very short for its size (a stamp or a Bates line over a scan). Otherwise it does not read text in a smaller image (a thumbnail-sized photo), in an image written inline in the page's drawing instructions, or in text drawn as outlines rather than as characters. When you have applied at least one result of a typed search, the check after export reads every page of the redacted copy for that term and can report it if it is left in such an image. A search that found nothing is not run again after export, so a term that appears only in such an image is not reported. Names found by Scan are not checked that way.
 
 **Workaround:** Draw a region over the image.
 
@@ -142,10 +142,10 @@ A region you draw by hand on a page with no text layer (a photo, a screenshot or
 
 ---
 
-### KI-18: A Bar Already in a Received Page Can Leave Text in a Searchable Export (Medium)
+### KI-18: A Bar or Cover Already in a Received Page Can Leave Text in a Searchable Export (Medium)
 **Affects:** Searchable Redaction (documents that were blacked out before you opened them)
 
-Searchable Redaction exports a page as an image only when it reads unmarked text there as showing no ink. Two kinds of bar already in a received page can defeat that reading: a dark bar that is part of a scanned picture, whose scanning noise reads as ink, over a word the page's own OCR text layer still holds; and a bar drawn over live text that is not fully opaque, so the text shows through faintly. The page then keeps its text layer, the word under the bar can be selected, copied and searched in the export, and verification reports it only if it is one of the structured categories its final sweep reads; a name or an address is not.
+Searchable Redaction exports a page as an image only when it reads unmarked text there as showing no ink. Bars and covers of these kinds already in a received page can defeat that reading: a dark bar that is part of a scanned picture, whose scanning noise reads as ink, over a word the page's own OCR text layer still holds; a bar drawn over live text that is not fully opaque, so the text shows through faintly; and a cover drawn over live text that is filled with a pattern, such as hatching or dots, or is a picture. The page then keeps its text layer, the word under the bar or cover can be selected, copied and searched in the export, and verification reports it only if a detector in its final sweep flags it. The sweep reads the structured categories, and a detector can weigh the words around a number before it flags it; a name or an address is not swept.
 
 **Workaround:** For a document that was already blacked out, export with Secure Rasterization, which keeps no text layer.
 
@@ -172,9 +172,9 @@ On iOS 27, text read from images (scans and photos) can differ from iOS 26: a wo
 ### KI-21: A Multi-Word Search Can Miss Text Split Within One Scanned Line (Medium)
 **Affects:** Search in text read from a picture (a scan, photo or screenshot), on iOS 26 and iOS 27
 
-On a scanned page, a name that iOS reads as two separate pieces of one line may not be found by a multi-word search; search a single word of it as a fallback.
+On a scanned page, a name that iOS reads as two separate pieces of one line may not be found by a multi-word search; search each word of it on its own as a fallback.
 
-**Workaround:** Search a single word of the name, check each such page in the preview before sharing, and draw a box over anything Search missed.
+**Workaround:** Search each word of the name on its own, check each such page in the preview before sharing, and draw a box over anything Search missed.
 
 ---
 
@@ -190,7 +190,7 @@ On iOS 27, the system's name model can be unavailable or unreliable. After the i
 ### KI-24: On a Scanned Page, a Box Can Leave the Word in a Searchable Export (High)
 **Affects:** Searchable Redaction (scanned pages that carry their own text, such as a scan made searchable by OCR)
 
-Some scanned PDFs carry an invisible layer of text over the picture of each page, which is what makes them searchable. That layer does not always line up with the printed words: a word's hidden copy can sit a little to one side of where it is printed. A box placed from a Search or Scan match of that text, and left where it was placed, removes the hidden copy where it is. Any other box removes only the hidden text under the box itself: one you draw by hand, one made with Duplicate Region, one you resize or move after placing it, or one placed where Resecta read the word from the page's picture because the hidden text spells it differently. On such a page the hidden copy of the word you covered can stay in a Searchable export, where it can be selected, copied and searched. Verification reports it only if it is one of the structured categories its final sweep reads; a name or an address is not.
+Some scanned PDFs carry an invisible layer of text over the picture of each page, which is what makes them searchable. That layer does not always line up with the printed words: a word's hidden copy can sit a little to one side of where it is printed. A box placed from a Search or Scan match of that text, and left where it was placed, removes the hidden copy where it is. Any other box removes only the hidden text under the box itself: one you draw by hand, one made with Duplicate Region, one you resize or move after placing it, or one placed where Resecta read the word from the page's picture because the hidden text spells it differently. On such a page the hidden copy of the word you covered can stay in a Searchable export, where it can be selected, copied and searched. Verification reports it only if a detector in its final sweep flags it. The sweep reads the structured categories, and a detector can weigh the words around a number before it flags it; a name or an address is not swept.
 
 **Workaround:** Export scanned documents with Secure Rasterization, which keeps no text layer.
 
@@ -200,6 +200,29 @@ Some scanned PDFs carry an invisible layer of text over the picture of each page
 **Affects:** Searchable Redaction
 
 On Searchable exports that need a large fallback font, such as Chinese or Japanese text, the file keeps the real export time and iOS version instead of the fixed values. No document content is affected. Checks report this as a metadata warning.
+
+---
+
+### KI-27: A Searchable Export Can Write Some Letters Twice in Its Hidden Text (Low–Medium)
+**Affects:** Searchable Redaction
+
+A Searchable export carries a hidden copy of the page's text, which is what makes the file searchable. Where the original file draws two letters as one joined shape, as some typeset documents do for "fi", "fl" and "ff", the hidden copy can carry both letters twice: "Benefit" is written "Benefifit". The same can happen to a Thai syllable written with the vowel sign ำ and to an emoji made of several joined emoji. In the exported file a search for such a word can find nothing even though the word is printed on the page, and text copied from the file carries the doubles. The Character Count check can then warn on a file that is otherwise correct. Some Devanagari and Tamil marks can be missing from the hidden copy. The picture of the page is not affected. In the cases tested, a box that touched any part of such a joined shape removed all of its letters from the hidden copy. <!-- LegalPhrases:safe -->
+
+---
+
+### KI-28: On a Scanned Page That Reads Sideways or Upside Down, a Multi-Word Search Can Miss Text That Runs onto the Next Line (Medium)
+**Affects:** Search in text read from a picture (a scan, photo or screenshot)
+
+On a scanned page whose print reads sideways or upside down as the page is shown, a name, address or other phrase that ends one line and continues on the next is not found by a search for the whole phrase. No box is placed on it, so it stays readable in the export. Verification does not report it: its Search Re-check looks for the phrase the same way, and a search that found nothing is not run again after export.
+
+**Workaround:** Search each word of the phrase on its own, check each such page in the preview before sharing, and draw a box over anything Search missed.
+
+---
+
+### KI-29: In a Searchable Export, a Number Next to a Box Can Lose Digits in the Hidden Text (Low–Medium)
+**Affects:** Searchable Redaction
+
+The hidden copy of the page's text leaves out the characters closest to a box, on purpose: any character within three points (about a millimeter) of it. A number that stands beside a box, or on the line just above or below one, can lose the digits nearest the box that way, so "1290" can read "12" when it is copied or searched, while the page you see still shows the number, whole or in part. No boxed text comes back, and no digit is added. In some files the hidden copy also loses the space between two words.
 
 ---
 
