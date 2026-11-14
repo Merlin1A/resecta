@@ -109,8 +109,14 @@ struct CouldNotReadRowTests {
     static func hiddenWordsWithoutResults() async throws {
         let data = HiddenWordInkFixtures.seededPage(drift: 30)
         let output = try #require(PDFDocument(data: data)), source = try #require(PDFDocument(data: data))
-        let region = RedactionRegion(id: UUID(), normalizedRect: HiddenWordInkFixtures.inkRect(line: 5, phrase: "Marisol"),
+        // A box over a blank stretch below the last line: no hidden word lies
+        // near it, so a page read that returns no words is a page checked.
+        let region = RedactionRegion(id: UUID(), normalizedRect: CGRect(x: 0.1, y: 0.05, width: 0.3, height: 0.05),
                                      source: .manual)
+        let emptyRead = await VerificationEngine.$hiddenWordInkSourceRead.withValue({ _ in [] }) {
+            await run(.hiddenWordInk, output, regions: [0: [region]], source: source)
+        }
+        #expect(emptyRead.status == .pass, "a read that returns no words is a read: the page is checked")
         let r = await VerificationEngine.$onRecognitionSimulateNoResults.withValue({ _ in true }) {
             await run(.hiddenWordInk, output, regions: [0: [region]], source: source)
         }

@@ -174,7 +174,11 @@ struct VerificationRowPartTests {
 
     @Test("a part that ends in a full stop: the stop stays at the end, and there is none before \"; \"")
     func partKeepsItsFinalStop() {
-        let layer = Self.row(.fail("Page 1: a box covers a word whose hidden copy is still in the text layer"), .hiddenWordInk,
+        // The engine's own sentence, which ends in a full stop: the stop is
+        // dropped at the join, and the part keeps its own.
+        let issue = VerificationEngine.hiddenWordInkFailed(page: 1)
+        #expect(issue.hasSuffix("."))
+        let layer = Self.row(.fail(issue), .hiddenWordInk,
                              pages: [0], part: "Page 2: the hidden text could not be matched to the printed words, so its boxes were not checked.",
                              partPages: [1])
         let caption = Self.caption(layer)
