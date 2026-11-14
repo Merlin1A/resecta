@@ -112,6 +112,66 @@ public final class PageRasterizer: @unchecked Sendable {
     /// coordinator (lowered on memory-warning notifications per KI-5).
     @concurrent
     public func rasterize(_ page: PDFPageData, dpiCap: Int = defaultDPICap) async throws -> RasterizeResult {
+        let raster = try preflight(page, dpiCap: dpiCap)
+        var textLayer = await prepareTextLayer(page, effectiveSize: raster.effectiveSize)
+        let renderedImage = try await render(page, raster: raster)
+
+        // autoreleasepool wraps the synchronous bitmap work
+        // (context creation, fill, verify, image extraction) to release ObjC
+        // objects between pages. The async portions above cannot be wrapped.
+        //
+        // Bitmap context comes from the per-rasterizer pool. After
+        // `makeImage()` returns, the buffer is zeroized AND the
+        // context is checked back into the pool (which zeroizes again
+        // unconditionally). Both calls are inside this autoreleasepool so
+        // the pool entry is wiped before its CGImage retains anything.
+        return try autoreleasepool {
+            // 4. Check out a mutable context from the pool, draw rendered image
+            let width = renderedImage.width
+            let height = renderedImage.height
+            guard let ctx = self.bitmapPool.checkOut(width: width, height: height) else {
+                throw PipelineError.redactionError(.bitmapCreationFailed(pageIndex: page.pageIndex))
+            }
+
+            // After `makeImage()` returns, the buffer holds the redacted
+            // pixels — zeroize before the context returns to the pool.
+            // `defer` covers every exit path including thrown
+            // errors so the pool invariant holds even on verify failure.
+            defer {
+                PixelOperations.zeroizeBitmapBuffer(ctx)
+                self.bitmapPool.checkIn(ctx)
+            }
+
+            ctx.draw(renderedImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+
+            try self.inkTest(&textLayer, context: ctx, page: page, pageSize: raster.effectiveSize)
+
+            try self.paint(context: ctx, page: page)
+
+            try self.readBack(context: ctx, page: page, width: width, height: height)
+
+            // 7. Extract final image
+            guard let redactedImage = ctx.makeImage() else {
+                throw PipelineError.redactionError(.bitmapCreationFailed(pageIndex: page.pageIndex))
+            }
+            return self.buildOutput(textLayer, image: redactedImage, page: page,
+                                    pageSize: raster.effectiveSize)
+        }
+    }
+
+    struct Raster {
+        let effectiveSize: CGSize
+        let dpi: Int
+    }
+
+    struct TextLayerState {
+        var entries: [CharacterInfo]?
+        var digest: PageFilterDigest?
+        var removalRects: [CGRect]
+        var fallbackReason: TextLayerDetector.FallbackReason?
+    }
+
+    private func preflight(_ page: PDFPageData, dpiCap: Int) throws -> Raster {
         try Task.checkCancellation()
 
         // Pre-flight page validation is the front gate, in two halves so
@@ -176,7 +236,10 @@ public final class PageRasterizer: @unchecked Sendable {
             // is the honest class here.
             throw PipelineError.redactionError(.insufficientMemory(pageIndex: page.pageIndex))
         }
+        return Raster(effectiveSize: effectiveSize, dpi: dpi)
+    }
 
+    func prepareTextLayer(_ page: PDFPageData, effectiveSize: CGSize) async -> TextLayerState {
         // 2. Text extraction for Searchable Redaction
         // Extract character positions BEFORE rasterization to capture from source PDF.
         // For Secure Rasterization pages, skip entirely.
@@ -310,6 +373,13 @@ public final class PageRasterizer: @unchecked Sendable {
             }
         }
 
+        return TextLayerState(
+            entries: textLayerEntries, digest: pageDigest,
+            removalRects: redactionRectsForTextLayer, fallbackReason: fallbackReason
+        )
+    }
+
+    private func render(_ page: PDFPageData, raster: Raster) async throws -> CGImage {
         // 3. Render page with timeout
         // CG-only concurrent render path — draw the pre-extracted
         // `cgPage` with the pre-extracted `cropBoxBounds`/`rotation`; the shared
@@ -317,131 +387,111 @@ public final class PageRasterizer: @unchecked Sendable {
         guard let cgPage = page.cgPage else {
             throw PipelineError.redactionError(.bitmapCreationFailed(pageIndex: page.pageIndex))
         }
-        let renderedImage = try await renderCGPageWithTimeout(
+        return try await renderCGPageWithTimeout(
             cgPage, bounds: page.cropBoxBounds, rotation: page.rotation,
-            pageIndex: page.pageIndex, dpi: CGFloat(dpi)
+            pageIndex: page.pageIndex, dpi: CGFloat(raster.dpi)
         )
+    }
 
-        // autoreleasepool wraps the synchronous bitmap work
-        // (context creation, fill, verify, image extraction) to release ObjC
-        // objects between pages. The async portions above cannot be wrapped.
-        //
-        // Bitmap context comes from the per-rasterizer pool. After
-        // `makeImage()` returns, the buffer is zeroized AND the
-        // context is checked back into the pool (which zeroizes again
-        // unconditionally). Both calls are inside this autoreleasepool so
-        // the pool entry is wiped before its CGImage retains anything.
-        return try autoreleasepool {
-            // 4. Check out a mutable context from the pool, draw rendered image
-            let width = renderedImage.width
-            let height = renderedImage.height
-            guard let ctx = self.bitmapPool.checkOut(width: width, height: height) else {
-                throw PipelineError.redactionError(.bitmapCreationFailed(pageIndex: page.pageIndex))
-            }
-
-            // After `makeImage()` returns, the buffer holds the redacted
-            // pixels — zeroize before the context returns to the pool.
-            // `defer` covers every exit path including thrown
-            // errors so the pool invariant holds even on verify failure.
-            defer {
-                PixelOperations.zeroizeBitmapBuffer(ctx)
-                self.bitmapPool.checkIn(ctx)
-            }
-
-            ctx.draw(renderedImage, in: CGRect(x: 0, y: 0, width: width, height: height))
-
-            // 4b. The hidden-text ink test. A Searchable page's
-            // surviving glyphs are read back from the RENDERED pixels — what
-            // the reader will see. A glyph whose pixel box is uniform carries
-            // no visible ink (white-on-white text, an invisible render mode,
-            // a box painted over it); its text layer would re-expose what
-            // the page hides, so the page falls back to Secure HERE — after
-            // the render, before any fill — through the same path as the
-            // pre-render fallbacks: entries and digest dropped, the reason
-            // recorded. The box goes through the fills' own mapping and the
-            // fills' own reader (`hasInklessGlyph`).
-            if let entries = textLayerEntries,
-               try Self.hasInklessGlyph(
-                   context: ctx, entries: entries, pageSize: effectiveSize,
-                   rotation: page.rotation
-               ) {
-                textLayerEntries = nil
-                redactionRectsForTextLayer = []
-                pageDigest = nil
-                if Self.inkTestCanRun(context: ctx, pageSize: effectiveSize) {
-                    fallbackReason = .hiddenText
-                    pageRasterizerLogger.log(
-                        "page \(page.pageIndex) fell back to secure rasterization at runtime (hidden text)"
-                    )
-                } else {
-                    // The test could not run: not known clean, so the secure
-                    // path, with the reason that reads true for it.
-                    fallbackReason = .extractionFailed
-                    pageRasterizerLogger.log(
-                        "page \(page.pageIndex) fell back to secure rasterization at runtime (the ink test could not run)"
-                    )
-                }
-            }
-
-            // 4c. Ink growth, read on the rendered page before any fill: a
-            // text-derived fill grows over the ink that crosses its edge.
-            let growth = try inkGrowthRects(context: ctx, regions: page.regions)
-
-            // 5. Apply fills — bitmap dimensions only, no PDF geometry.
-            // 256-row band cancellation checks happen inside.
-            try applyRedactionFills(
-                context: ctx, regions: page.regions, fillColor: page.fillColor
-            )
-            for rect in growth {
-                ctx.setBlendMode(.copy); ctx.setShouldAntialias(false)
-                ctx.setFillColor(page.fillColor.cgColor); ctx.fill(rect)
-                guard try verifyFill(context: ctx, rect: rect, expectedColor: page.fillColor.expectedPixel) else {
-                    throw PipelineError.redactionError(.fillVerificationFailed(pageIndex: page.pageIndex))
-                }
-            }
-
-            // 6. Verify fills. 256-row band cancellation
-            // checks happen inside; a thrown CancellationError propagates here.
-            for region in page.regions {
-                let pixelRect = normalizedToFillPixels(
-                    region.normalizedRect, bitmapWidth: width, bitmapHeight: height
+    private func inkTest(
+        _ textLayer: inout TextLayerState, context ctx: CGContext,
+        page: PDFPageData, pageSize effectiveSize: CGSize
+    ) throws {
+        // 4b. The hidden-text ink test. A Searchable page's
+        // surviving glyphs are read back from the RENDERED pixels — what
+        // the reader will see. A glyph whose pixel box is uniform carries
+        // no visible ink (white-on-white text, an invisible render mode,
+        // a box painted over it); its text layer would re-expose what
+        // the page hides, so the page falls back to Secure HERE — after
+        // the render, before any fill — through the same path as the
+        // pre-render fallbacks: entries and digest dropped, the reason
+        // recorded. The box goes through the fills' own mapping and the
+        // fills' own reader (`hasInklessGlyph`).
+        if let entries = textLayer.entries,
+           try Self.hasInklessGlyph(
+               context: ctx, entries: entries, pageSize: effectiveSize,
+               rotation: page.rotation
+           ) {
+            textLayer.entries = nil
+            textLayer.removalRects = []
+            textLayer.digest = nil
+            if Self.inkTestCanRun(context: ctx, pageSize: effectiveSize) {
+                textLayer.fallbackReason = .hiddenText
+                pageRasterizerLogger.log(
+                    "page \(page.pageIndex) fell back to secure rasterization at runtime (hidden text)"
                 )
-                // Clamp to bitmap bounds
-                let clamped = pixelRect.intersection(
-                    CGRect(x: 0, y: 0, width: width, height: height)
+            } else {
+                // The test could not run: not known clean, so the secure
+                // path, with the reason that reads true for it.
+                textLayer.fallbackReason = .extractionFailed
+                pageRasterizerLogger.log(
+                    "page \(page.pageIndex) fell back to secure rasterization at runtime (the ink test could not run)"
                 )
-                guard !clamped.isEmpty else { continue }
-                let verifyPassed = try verifyFill(
-                    context: ctx, rect: clamped,
-                    expectedColor: page.fillColor.expectedPixel
-                )
-                guard verifyPassed else {
-                    // Fill verification failed — the redaction fill did
-                    // not produce the expected pixel values across the entire region.
-                    throw PipelineError.redactionError(
-                        .fillVerificationFailed(pageIndex: page.pageIndex)
-                    )
-                }
             }
-
-            // 7. Extract final image
-            guard let redactedImage = ctx.makeImage() else {
-                throw PipelineError.redactionError(.bitmapCreationFailed(pageIndex: page.pageIndex))
-            }
-
-            // Use point dimensions (not pixel) for the PDF media box.
-            // The CGImage carries the full pixel resolution; CGPDFContext embeds it
-            // at native DPI when drawn into the smaller point-sized rect.
-            let output = PageOutput(
-                image: redactedImage,
-                size: effectiveSize,
-                textLayerEntries: textLayerEntries,
-                redactionRectsInPoints: redactionRectsForTextLayer,
-                rotation: page.rotation
-            )
-            return RasterizeResult(pageOutput: output, filterDigest: pageDigest,
-                                   fallbackReason: fallbackReason)
         }
+    }
+
+    private func paint(context ctx: CGContext, page: PDFPageData) throws {
+        // 4c. Ink growth, read on the rendered page before any fill: a
+        // text-derived fill grows over the ink that crosses its edge.
+        let growth = try inkGrowthRects(context: ctx, regions: page.regions)
+
+        // 5. Apply fills — bitmap dimensions only, no PDF geometry.
+        // 256-row band cancellation checks happen inside.
+        try applyRedactionFills(
+            context: ctx, regions: page.regions, fillColor: page.fillColor
+        )
+        for rect in growth {
+            ctx.setBlendMode(.copy); ctx.setShouldAntialias(false)
+            ctx.setFillColor(page.fillColor.cgColor); ctx.fill(rect)
+            guard try verifyFill(context: ctx, rect: rect, expectedColor: page.fillColor.expectedPixel) else {
+                throw PipelineError.redactionError(.fillVerificationFailed(pageIndex: page.pageIndex))
+            }
+        }
+    }
+
+    private func readBack(context ctx: CGContext, page: PDFPageData, width: Int, height: Int) throws {
+        // 6. Verify fills. 256-row band cancellation
+        // checks happen inside; a thrown CancellationError propagates here.
+        for region in page.regions {
+            let pixelRect = normalizedToFillPixels(
+                region.normalizedRect, bitmapWidth: width, bitmapHeight: height
+            )
+            // Clamp to bitmap bounds
+            let clamped = pixelRect.intersection(
+                CGRect(x: 0, y: 0, width: width, height: height)
+            )
+            guard !clamped.isEmpty else { continue }
+            let verifyPassed = try verifyFill(
+                context: ctx, rect: clamped,
+                expectedColor: page.fillColor.expectedPixel
+            )
+            guard verifyPassed else {
+                // Fill verification failed — the redaction fill did
+                // not produce the expected pixel values across the entire region.
+                throw PipelineError.redactionError(
+                    .fillVerificationFailed(pageIndex: page.pageIndex)
+                )
+            }
+        }
+    }
+
+    private func buildOutput(
+        _ textLayer: TextLayerState, image redactedImage: CGImage,
+        page: PDFPageData, pageSize effectiveSize: CGSize
+    ) -> RasterizeResult {
+        // Use point dimensions (not pixel) for the PDF media box.
+        // The CGImage carries the full pixel resolution; CGPDFContext embeds it
+        // at native DPI when drawn into the smaller point-sized rect.
+        let output = PageOutput(
+            image: redactedImage,
+            size: effectiveSize,
+            textLayerEntries: textLayer.entries,
+            redactionRectsInPoints: textLayer.removalRects,
+            rotation: page.rotation
+        )
+        return RasterizeResult(pageOutput: output, filterDigest: textLayer.digest,
+                               fallbackReason: textLayer.fallbackReason)
     }
 
     // MARK: - Hidden-text ink test
