@@ -584,10 +584,10 @@ struct SearchAndRedactSheet: View {
                         )
                         switch outcome {
                         case .rejectedEmpty:
-                            // Return on an empty field with terms staged
-                            // re-runs the current set — the affordance
-                            // the not-run empty state names.
-                            if !searchState.searchTerms.isEmpty {
+                            // Return on an empty field runs the staged
+                            // terms, unless their results are listed or
+                            // arriving (`SearchState.returnStartsRun`).
+                            if searchState.returnStartsRun {
                                 triggerSearch()
                             }
                             return
@@ -625,11 +625,11 @@ struct SearchAndRedactSheet: View {
                     // deliberately does not auto-run, and for short
                     // queries below the debounce floor.
                     .onSubmit {
-                        // Trimmed gate (mirrors multi-term's
-                        // validator): a whitespace-only Return must not
-                        // run an invisible query.
-                        if !searchState.queryText
-                            .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        // A whitespace-only Return runs nothing, and a
+                        // Return on the search whose results are listed
+                        // or arriving only puts the keyboard away
+                        // (`SearchState.returnStartsRun`).
+                        if searchState.returnStartsRun {
                             triggerSearch()
                         }
                     }
