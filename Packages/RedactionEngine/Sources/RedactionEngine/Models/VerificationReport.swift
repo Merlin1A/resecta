@@ -172,6 +172,17 @@ public struct LayerResult: Sendable {
     /// and remedy by it (the box is short of its text; the remedy is the
     /// box, not a search). False on every other result.
     public let reviewIsFragment: Bool
+    /// Display-only: on a row with an issue whose check also could not read
+    /// part of its input, the could-not-verify part — its conditions'
+    /// sentences, then its warnings, joined by "; ". Like `reviewTermTexts`,
+    /// it exists solely for in-app display composition and is never logged
+    /// or persisted. Nil on every other row; the issue's own status, message
+    /// and pages are not changed by it.
+    public let couldNotVerifyPart: String?
+    /// Display-only: the 0-based pages of `couldNotVerifyPart`'s conditions
+    /// (empty when none names a page), never a page the check read. Nil
+    /// exactly when `couldNotVerifyPart` is nil.
+    public let couldNotVerifyPartPages: [Int]?
 
     /// Whether the expanded row has a detail line to show — false when
     /// the check's short line already says everything it has to say.
@@ -184,7 +195,9 @@ public struct LayerResult: Sendable {
                 layer: VerificationLayer? = nil,
                 queryLines: [SearchRecheckQueryLine]? = nil,
                 couldNotVerify: Bool = false,
-                reviewIsFragment: Bool = false) {
+                reviewIsFragment: Bool = false,
+                couldNotVerifyPart: String? = nil,
+                couldNotVerifyPartPages: [Int]? = nil) {
         self.name = name
         self.symbolName = symbolName
         self.status = status
@@ -197,6 +210,8 @@ public struct LayerResult: Sendable {
         self.queryLines = queryLines
         self.couldNotVerify = couldNotVerify
         self.reviewIsFragment = reviewIsFragment
+        self.couldNotVerifyPart = couldNotVerifyPart
+        self.couldNotVerifyPartPages = couldNotVerifyPart == nil ? nil : (couldNotVerifyPartPages ?? [])
     }
 }
 

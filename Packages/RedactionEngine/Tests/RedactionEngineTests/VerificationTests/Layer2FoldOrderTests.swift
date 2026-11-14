@@ -81,32 +81,34 @@ struct Layer2FoldOrderTests {
         #expect(r.terms == ["CONFIDENTIAL"])
         #expect(!r.couldNotVerify, "a leak result never carries the could-not-verify flag")
 
+        // The could-not-verify WARNs lead every note; the in-region text
+        // warning is joined after them, and their pages are the row's.
         outcomes.removeAll { $0.bucket == .sensitiveTermOutsideRegions }
+        r = fold(outcomes, terms: terms)
+        #expect(r.status.isWarn, "unmappable WARN returns ahead of the notes — got \(r.status)")
+        #expect(message(r.status).hasPrefix("OCR coordinates could not be mapped to page space"))
+        #expect(message(r.status).hasSuffix("; OCR could not be run on 1 page; OCR detected text within a redacted region on page 3"))
+        #expect(r.couldNotVerify, "unmappable coordinates: the check did not fully run")
+        #expect(r.pages == [4, 7])
+        #expect(r.terms == nil)
+
+        outcomes.removeAll { $0.bucket == .unmappable }
+        r = fold(outcomes, terms: terms)
+        #expect(r.status.isWarn, "unchecked pages WARN ahead of the notes — got \(r.status)")
+        #expect(message(r.status) == "OCR could not be run on 1 page; OCR detected text within a redacted region on page 3")
+        #expect(r.couldNotVerify, "unchecked pages: the check did not fully run")
+        #expect(r.pages == [7])
+
+        outcomes.removeAll { $0.bucket == .unchecked }
         r = fold(outcomes, terms: terms)
         #expect(r.status.isWarn, "in-region text on a Searchable page WARNs next — got \(r.status)")
         #expect(message(r.status).contains("OCR detected text within a redacted region"))
         #expect(r.pages == [2])
         #expect(!r.couldNotVerify)
 
-        // The could-not-verify WARNs return ahead of every note.
-        outcomes.removeAll { $0.bucket == .textInRegionSearchable }
-        r = fold(outcomes, terms: terms)
-        #expect(r.status.isWarn, "unmappable WARN returns ahead of the notes — got \(r.status)")
-        #expect(message(r.status).contains("could not be mapped to page space"))
-        #expect(r.couldNotVerify, "unmappable coordinates: the check did not fully run")
-        #expect(r.pages == [4])
-        #expect(r.terms == nil)
-
-        outcomes.removeAll { $0.bucket == .unmappable }
-        r = fold(outcomes, terms: terms)
-        #expect(r.status.isWarn, "unchecked pages WARN ahead of the notes — got \(r.status)")
-        #expect(message(r.status).contains("OCR could not be run"))
-        #expect(r.couldNotVerify, "unchecked pages: the check did not fully run")
-        #expect(r.pages == [7])
-
         // Note tier, most specific first: fill artifact ahead of generic
         // outside text.
-        outcomes.removeAll { $0.bucket == .unchecked }
+        outcomes.removeAll { $0.bucket == .textInRegionSearchable }
         r = fold(outcomes, terms: terms)
         #expect(r.status.isInfo, "fill note wins the note tier — got \(r.status)")
         #expect(message(r.status).contains("no readable text recovered"))

@@ -39,17 +39,19 @@ extension SandwichVerification {
     /// itself stays content-free). Both nil for every other status.
     /// `couldNotVerify` is true for the WARNs that say the scan did not
     /// fully run (terms it could not search, pages it could not traverse).
+    /// `partSentence` and `partPages` carry, beside an issue, what the scan
+    /// could not read (`CheckRowComposition`).
     func verifyTextOperatorSemantics(
         outputDocument: SendablePDFDocument,
         sensitiveTerms: [SensitiveTerm]
     ) async -> (status: VerificationStatus, pageReferences: [Int]?, reviewTermTexts: [String]?,
-                couldNotVerify: Bool) {
+                couldNotVerify: Bool, partSentence: String?, partPages: [Int]?) {
         // No terms provided — expected for manual-only redaction.
         // INFO, not PASS — the operator-semantic search did not run, and
         // "No issues found" would overstate what this layer observed
         // (mirrors Layer 3's guard).
         guard !sensitiveTerms.isEmpty else {
-            return (.notApplicable("No sensitive terms were provided — string search did not run."), nil, nil, false)
+            return (.notApplicable("No sensitive terms were provided — string search did not run."), nil, nil, false, nil, nil)
         }
         // Filter terms too short to search (matches Layer 3, shared
         // `AhoCorasick.isSearchableTerm`): ≥3 scalars (supports 3-letter PII
@@ -58,7 +60,7 @@ extension SandwichVerification {
         // while Layer 3 WARNed — align on Layer 3's tier and copy.
         let validTerms = sensitiveTerms.filter { AhoCorasick.isSearchableTerm($0.text) }
         guard !validTerms.isEmpty else {
-            return (.warn("All sensitive terms shorter than 3 characters"), nil, nil, true)
+            return (.warn("All sensitive terms shorter than 3 characters"), nil, nil, true, nil, nil)
         }
         // Surfaced on the otherwise-clean path below (mirrors Layer 3).
         let droppedTermCount = sensitiveTerms.count - validTerms.count
@@ -66,11 +68,28 @@ extension SandwichVerification {
         // Boundary-required terms drop matches embedded in an
         // alphanumeric run; plain terms keep substring semantics.
         let termAutomaton = SensitiveTermAutomaton(validTerms: validTerms)
-        guard termAutomaton.hasPatterns else { return (.pass, nil, nil, false) }
+        guard termAutomaton.hasPatterns else { return (.pass, nil, nil, false, nil, nil) }
         if termAutomaton.isDegraded {
             return (.warn(
                 "Operator-semantic term search exceeded size limit — results may be incomplete"
-            ), nil, nil, true)
+            ), nil, nil, true, nil, nil)
+        }
+
+        // Pages with a text-showing operand the scan could not read (not
+        // popped, or not decoded): could-not-verify, naming the first such
+        // page; then the short terms. Every issue carries them, up to the
+        // page where it stopped.
+        var unreadOperandPages: [Int] = []
+        func conditions() -> [UnverifiedCondition] {
+            var out: [UnverifiedCondition] = []
+            if let first = unreadOperandPages.first {
+                out.append(UnverifiedCondition(
+                    sentence: "Operator scanner could not traverse page \(first + 1)", pages: unreadOperandPages))
+            }
+            if droppedTermCount > 0 {
+                out.append(UnverifiedCondition(sentence: shortTermTail(droppedTermCount), pages: []))
+            }
+            return out
         }
 
         let doc = outputDocument.document
@@ -79,7 +98,7 @@ extension SandwichVerification {
                   let pageRef = page.pageRef else {
                 return (.warn(
                     "Operator scanner unavailable for page \(pageIdx + 1)"
-                ), nil, nil, true)
+                ), nil, nil, true, nil, nil)
             }
 
             // Accumulate per-page semantic text bytes. The C callbacks below
@@ -87,7 +106,7 @@ extension SandwichVerification {
             // via the scanner's `info` pointer; @convention(c) callbacks
             // cannot capture Swift context, so the accumulator is the only
             // channel for state across operator hits.
-            var accumulator = Data()
+            var accumulator = Layer10Accumulator()
             let scanned: Bool = withUnsafeMutablePointer(to: &accumulator) { accPtr in
                 guard let table = CGPDFOperatorTableCreate() else { return false }
                 defer { CGPDFOperatorTableRelease(table) }
@@ -110,9 +129,9 @@ extension SandwichVerification {
                 // (the writer's Courier subset is MacRoman-encoded) reads
                 // back as PDFDocEncoding's character for that byte. The
                 // corpus cell `factory-compat-residue` measures that gap.
-                // nil decodes are tolerated — false negatives are
-                // acceptable on a defense-in-depth layer; false positives
-                // are not.
+                // An operand that cannot be popped or decoded is counted
+                // for its page: the page was not fully read, and is never
+                // reported as clean.
                 CGPDFOperatorTableSetCallback(table, "Tj") { scanner, info in
                     sandwichLayer10AppendPoppedOperand(scanner: scanner, info: info)
                 }
@@ -123,11 +142,14 @@ extension SandwichVerification {
                     sandwichLayer10AppendPoppedOperand(scanner: scanner, info: info)
                 }
                 CGPDFOperatorTableSetCallback(table, "TJ") { scanner, info in
+                    guard let info else { return }
+                    let ptr = info.assumingMemoryBound(to: Layer10Accumulator.self)
                     var pdfArray: CGPDFArrayRef?
                     guard CGPDFScannerPopArray(scanner, &pdfArray),
-                          let arr = pdfArray,
-                          let info else { return }
-                    let ptr = info.assumingMemoryBound(to: Data.self)
+                          let arr = pdfArray else {
+                        ptr.pointee.unreadOperands += 1
+                        return
+                    }
                     let count = CGPDFArrayGetCount(arr)
                     for i in 0..<count {
                         var obj: CGPDFObjectRef?
@@ -153,8 +175,9 @@ extension SandwichVerification {
             if !scanned {
                 return (.warn(
                     "Operator scanner could not traverse page \(pageIdx + 1)"
-                ), nil, nil, true)
+                ), nil, nil, true, nil, nil)
             }
+            if accumulator.unreadOperands > 0 { unreadOperandPages.append(pageIdx) }
 
             // The status message reports page index + match count
             // only; the matched term content is never echoed in it. Mirrors
@@ -173,8 +196,8 @@ extension SandwichVerification {
             // occurrence never double-counts. The accumulator holds UTF-8
             // (decoded strings + the 0x1F separator), so the round trip
             // through String is lossless.
-            let matches = termAutomaton.tokenFilteredMatches(in: accumulator)
-            let decodedText = String(decoding: accumulator, as: UTF8.self)
+            let matches = termAutomaton.tokenFilteredMatches(in: accumulator.bytes)
+            let decodedText = String(decoding: accumulator.bytes, as: UTF8.self)
             let normalizedText = TextNormalizer.normalize(decodedText)
             let normalizedMatches = normalizedText == decodedText
                 ? []
@@ -185,17 +208,30 @@ extension SandwichVerification {
                 let count = max(
                     AhoCorasick.uniqueOccurrenceCount(matches),
                     AhoCorasick.uniqueOccurrenceCount(normalizedMatches))
-                return (.attention(
-                    "Text matching your redactions is readable in page \(pageIdx + 1) content "
-                    + "(\(count) instance\(count == 1 ? "" : "s"))"
-                ), [pageIdx], termAutomaton.matchedTermTexts(matches + normalizedMatches), false)
+                let row = CheckRowComposition.compose(
+                    issue: (.attention(
+                        "Text matching your redactions is readable in page \(pageIdx + 1) content "
+                        + "(\(count) instance\(count == 1 ? "" : "s"))"
+                    ), [pageIdx]),
+                    conditions: conditions(), warnings: [])
+                    ?? .passed
+                return (row.status, row.pages, termAutomaton.matchedTermTexts(matches + normalizedMatches), false,
+                        row.partSentence, row.partPages)
             }
         }
-        if droppedTermCount > 0 {
-            return (.warn(shortTermTail(droppedTermCount)), nil, nil, true)
+        if let row = CheckRowComposition.compose(issue: nil, conditions: conditions(), warnings: []) {
+            return (row.status, row.pages, nil, row.couldNotVerify, nil, nil)
         }
-        return (.pass, nil, nil, false)
+        return (.pass, nil, nil, false, nil, nil)
     }
+}
+
+/// The scan's per-page state, reached from the C callbacks through the
+/// scanner's `info` pointer: the decoded text bytes, and the count of
+/// text-showing operands that could not be popped or decoded.
+fileprivate struct Layer10Accumulator {
+    var bytes = Data()
+    var unreadOperands = 0
 }
 
 // MARK: - Layer 10 callback helpers
@@ -203,23 +239,25 @@ extension SandwichVerification {
 // `@convention(c)` callbacks installed via `CGPDFOperatorTableSetCallback`
 // cannot capture Swift context. These file-private helpers run inside the
 // callback body and operate purely on the scanner ref + the info pointer
-// (which the callback site populates with a `&Data` accumulator).
+// (which the callback site populates with a `&Layer10Accumulator`).
 
 fileprivate func sandwichLayer10AppendPoppedOperand(
     scanner: CGPDFScannerRef,
     info: UnsafeMutableRawPointer?
 ) {
+    guard let info else { return }
+    let ptr = info.assumingMemoryBound(to: Layer10Accumulator.self)
     var obj: CGPDFObjectRef?
-    guard CGPDFScannerPopObject(scanner, &obj),
-          let o = obj,
-          let info else { return }
-    let ptr = info.assumingMemoryBound(to: Data.self)
+    guard CGPDFScannerPopObject(scanner, &obj), let o = obj else {
+        ptr.pointee.unreadOperands += 1
+        return
+    }
     sandwichLayer10AppendObjectText(o, into: ptr)
 }
 
 fileprivate func sandwichLayer10AppendObjectText(
     _ obj: CGPDFObjectRef,
-    into ptr: UnsafeMutablePointer<Data>
+    into ptr: UnsafeMutablePointer<Layer10Accumulator>
 ) {
     switch CGPDFObjectGetType(obj) {
     case .string:
@@ -229,9 +267,12 @@ fileprivate func sandwichLayer10AppendObjectText(
         }
         guard popped,
               let str = s,
-              let decoded = CGPDFStringCopyTextString(str) else { return }
-        ptr.pointee.append(Data((decoded as String).utf8))
-        ptr.pointee.append(0x1F)
+              let decoded = PDFStringDecode.decode(str) else {
+            ptr.pointee.unreadOperands += 1
+            return
+        }
+        ptr.pointee.bytes.append(Data(decoded.utf8))
+        ptr.pointee.bytes.append(0x1F)
     case .name:
         // PDF 1.7 §7.3.5: Name objects are UTF-8 byte sequences. A spec-
         // valid `Tj` operand is always a string; observing a Name operand
@@ -241,9 +282,12 @@ fileprivate func sandwichLayer10AppendObjectText(
         let popped = withUnsafeMutablePointer(to: &cstr) { cPtr in
             CGPDFObjectGetValue(obj, .name, UnsafeMutableRawPointer(cPtr))
         }
-        guard popped, let p = cstr else { return }
-        ptr.pointee.append(Data(String(cString: p).utf8))
-        ptr.pointee.append(0x1F)
+        guard popped, let p = cstr else {
+            ptr.pointee.unreadOperands += 1
+            return
+        }
+        ptr.pointee.bytes.append(Data(String(cString: p).utf8))
+        ptr.pointee.bytes.append(0x1F)
     default:
         // Numeric kerning displacements and other non-text operands carry
         // no semantic text content for Layer 10 to surface.

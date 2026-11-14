@@ -279,7 +279,7 @@ struct SearchableMergeProbeTests {
                     "constructedMergeProbe: no merge even with split+overlapping runs (output composed ≥ surviving).")
             #expect(outCount?.isFail != true,
                     "constructedMergeProbe: Layer 7 count must not FAIL (no deficit).")
-            #expect(outLineage.isFail == false,
+            #expect(outLineage?.isFail != true,
                     "constructedMergeProbe: Layer 9 lineage must not FAIL on the constructed-merge path.")
         }
         print("===== END CONSTRUCTED MERGE PROBE =====")

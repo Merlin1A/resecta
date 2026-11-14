@@ -180,7 +180,9 @@ extension DocumentEditorView {
     }
 
     /// Item lines for the incomplete-WARN confirm family: every check that
-    /// could not verify part of the output (`CouldNotVerifyWarn.matches`)
+    /// could not verify part of the output (`CouldNotVerifyWarn.matches`),
+    /// every failed or needs-review check that also could not read part of
+    /// its input (its line built from that part's pages, never the issue's),
     /// and every skipped check, in engine order — "Character Count:
     /// skipped". Static so the derivation is unit-testable without a
     /// SwiftUI host.
@@ -189,6 +191,11 @@ extension DocumentEditorView {
             if layer.status.isSkipped { return "\(VerificationRowModel.title(for: layer)): skipped" }
             if CouldNotVerifyWarn.matches(layer) {
                 return confirmFactLine(layer: layer, outcome: "could not verify")
+            }
+            if layer.status.isFail || layer.status.isAttention, layer.couldNotVerifyPart != nil {
+                let title = VerificationRowModel.title(for: layer)
+                let location = VerificationRowModel.pageLocation(layer.couldNotVerifyPartPages).map { " \($0)" } ?? ""
+                return "\(title): could not verify\(location)"
             }
             return nil
         }
