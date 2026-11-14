@@ -5,11 +5,14 @@
 # Usage:
 #   Scripts/doc-metrics.sh            print the measured numbers
 #   Scripts/doc-metrics.sh --check    also compare them with README.md / ENGINEERING.md
-#   Scripts/doc-metrics.sh --self-test   prove the logging claims move: a scratch
-#                                     copy of the Swift trees and the two documents
-#                                     passes --check; one planted `.public`
-#                                     interpolation reads DRIFT; one planted
-#                                     `print(` reads DRIFT; exit 1 otherwise
+#   Scripts/doc-metrics.sh --self-test   prove the claims move: a scratch copy of
+#                                     the Swift trees and the two documents passes
+#                                     --check; one planted `.public` interpolation
+#                                     reads DRIFT; one planted `print(` reads DRIFT;
+#                                     the five test counts written "about N" within
+#                                     3 % pass and each one outside reads DRIFT; each
+#                                     written as a number one off reads DRIFT; the verdict
+#                                     line carries the exact counts; exit 1 otherwise
 #
 # Measured, from the checkout this script runs in:
 #   - Swift line counts per tree (engine source, engine tests, app source, app
@@ -25,9 +28,12 @@
 #
 # --check tolerances: line counts within 3 % of the claim (the documents round
 # to the nearest thousand), assertion totals within 3 % (the README says
-# "about"), every other count exact. Number words (seven, ...) are read as
-# numbers. Exit 0 = the documents match; 1 = drift (each drifted claim is
-# printed with the measured value); 64 = usage.
+# "about"). The five test counts (engine and app `@Test` functions and suites,
+# XCUITest methods) are exact when written as a number and within 3 % when
+# written "about N". Every other count is exact. Number words (seven, ...) are
+# read as numbers. The verdict line carries the five counts as measured, the
+# exact counts of record. Exit 0 = the documents match; 1 = drift (each drifted
+# claim is printed with the measured value); 64 = usage.
 #
 # Pure local: python3 from the system, no network, no third-party tools.
 set -euo pipefail
@@ -60,6 +66,55 @@ if [ "$MODE" = "--self-test" ]; then
     out="$("$0" --check-root "$scratch" 2>&1 || true)"
     if printf '%s' "$out" | /usr/bin/grep -q 'DRIFT ENGINEERING print calls'; then echo "self-test: one planted print( reads DRIFT OK"
     else echo "self-test: a planted print( did not read DRIFT" >&2; fails=1; fi
+    unlink "$planted"
+    # The five test counts: the README's own claims (equal to the tree when the
+    # first case passes) rewritten by a factor, as "about N" or as a number.
+    cp "$scratch/README.md" "$scratch/README.exact"
+    counts_as() { # factor about|exact [label] — rewrite the claims; one label alone when given
+        python3 - "$scratch/README.exact" "$scratch/README.md" "$1" "$2" "${3:-}" <<'REWRITE'
+import re, sys
+src, dst, factor, form, only = sys.argv[1], sys.argv[2], float(sys.argv[3]), sys.argv[4], sys.argv[5]
+text = open(src, encoding="utf-8").read()
+CLAIMS = {
+    "README engine @Test": r"([\d,]+)( Swift Testing `@Test` functions across [\d,]+ suites)",
+    "README engine suites": r"(?<=Swift Testing `@Test` functions across )([\d,]+)( suites)",
+    "README app @Test": r"([\d,]+)( `@Test` functions across [\d,]+ suites: the pipeline state machine)",
+    "README app suites": r"(?<=`@Test` functions across )([\d,]+)( suites: the pipeline state machine)",
+    "README XCUITest methods": r"([\d,]+)( XCUITest methods)",
+}
+for label, pattern in CLAIMS.items():
+    if only and label != only:
+        continue
+    def scaled(m):
+        v = int(m.group(1).replace(",", ""))
+        v = v + 1 if form == "one-more" else round(v * factor)
+        return ("about " if form == "about" else "") + f"{v:,}" + m.group(2)
+    text, n = re.subn(pattern, scaled, text, count=1)
+    assert n == 1, label
+open(dst, "w", encoding="utf-8").write(text)
+REWRITE
+    }
+    labels="README engine @Test|README engine suites|README app @Test|README app suites|README XCUITest methods"
+    counts_as 1.02 about
+    out="$("$0" --check-root "$scratch" 2>&1)" && n=$(printf '%s\n' "$out" | /usr/bin/grep -cE "ok    ($labels): claimed about ") \
+        && [ "$n" -eq 5 ] && echo "self-test: the five test counts written about N within 3 % pass OK" \
+        || { echo "self-test: the five counts written about N within 3 % did not all pass" >&2; fails=1; }
+    for label in "README engine @Test" "README engine suites" "README app @Test" "README app suites" "README XCUITest methods"; do
+        counts_as 1.05 about "$label"
+        out="$("$0" --check-root "$scratch" 2>&1 || true)"
+        if printf '%s' "$out" | /usr/bin/grep -q "DRIFT $label: claimed about "; then echo "self-test: $label written about N outside 3 % reads DRIFT OK"
+        else echo "self-test: $label written about N outside 3 % did not read DRIFT" >&2; fails=1; fi
+    done
+    for label in "README engine @Test" "README engine suites" "README app @Test" "README app suites" "README XCUITest methods"; do
+        counts_as 1 one-more "$label"
+        out="$("$0" --check-root "$scratch" 2>&1 || true)"
+        if printf '%s' "$out" | /usr/bin/grep -qE "DRIFT $label: claimed [0-9,]+ measured"; then echo "self-test: $label written as a number one off reads DRIFT OK"
+        else echo "self-test: $label written as a number one off did not read DRIFT" >&2; fails=1; fi
+    done
+    cp "$scratch/README.exact" "$scratch/README.md"
+    out="$("$0" --check-root "$scratch" 2>&1 || true)"
+    if printf '%s' "$out" | /usr/bin/grep -qE '^DOC-METRICS OK · counts of record: engine @Test [0-9]+, engine suites [0-9]+, app @Test [0-9]+, app suites [0-9]+, XCUITest methods [0-9]+$'; then echo "self-test: the verdict line carries the exact counts OK"
+    else echo "self-test: the verdict line does not carry the exact counts" >&2; fails=1; fi
     rm -rf "$scratch"
     [ "$fails" -eq 0 ] && { echo "self-test: PASS"; exit 0; }
     echo "self-test: FAIL" >&2; exit 1
@@ -199,6 +254,25 @@ def claim(doc, label, pattern, measured, tolerance=0.0, words=False):
     if not ok:
         drift.append(label)
 
+def count_claim(doc, label, pattern, measured):
+    # A test count: exact when written as a number, within 3 % when written
+    # "about N". The pattern's first group is the optional "about ", its second
+    # the number.
+    m = re.search(pattern, doc)
+    if not m:
+        drift.append(f"{label}: claim not found (pattern {pattern!r})")
+        return
+    about = m.group(1) is not None
+    value = int(m.group(2).replace(",", ""))
+    ok = abs(value - measured) <= 0.03 * measured if about else value == measured
+    shown = f"about {value:,}" if about else f"{value:,}"
+    print(f"  {'ok   ' if ok else 'DRIFT'} {label}: claimed {shown} measured {measured:,}")
+    if not ok:
+        drift.append(label)
+
+record = (f"counts of record: engine @Test {counts['engine tests']['tests']}, engine suites {counts['engine tests']['suites']}, "
+          f"app @Test {counts['app tests']['tests']}, app suites {counts['app tests']['suites']}, XCUITest methods {counts['UI tests']['xcui']}")
+
 print("Checking README.md")
 claim(readme, "README source lines", r"roughly ([\d,]+) lines of Swift source", source_lines, 0.03)
 claim(readme, "README test lines", r"roughly ([\d,]+) lines of test code", test_lines, 0.03)
@@ -210,11 +284,11 @@ if m:
         drift.append("README ratio")
 else:
     drift.append("README ratio: claim not found")
-claim(readme, "README engine @Test", r"([\d,]+) Swift Testing `@Test` functions across [\d,]+ suites", counts["engine tests"]["tests"])
-claim(readme, "README engine suites", r"[\d,]+ Swift Testing `@Test` functions across ([\d,]+) suites", counts["engine tests"]["suites"])
-claim(readme, "README app @Test", r"([\d,]+) `@Test` functions across [\d,]+ suites: the pipeline state machine", counts["app tests"]["tests"])
-claim(readme, "README app suites", r"[\d,]+ `@Test` functions across ([\d,]+) suites: the pipeline state machine", counts["app tests"]["suites"])
-claim(readme, "README XCUITest methods", r"([\d,]+) XCUITest methods", counts["UI tests"]["xcui"])
+count_claim(readme, "README engine @Test", r"(about )?([\d,]+) Swift Testing `@Test` functions across (?:about )?[\d,]+ suites", counts["engine tests"]["tests"])
+count_claim(readme, "README engine suites", r"[\d,]+ Swift Testing `@Test` functions across (about )?([\d,]+) suites", counts["engine tests"]["suites"])
+count_claim(readme, "README app @Test", r"(about )?([\d,]+) `@Test` functions across (?:about )?[\d,]+ suites: the pipeline state machine", counts["app tests"]["tests"])
+count_claim(readme, "README app suites", r"[\d,]+ `@Test` functions across (about )?([\d,]+) suites: the pipeline state machine", counts["app tests"]["suites"])
+count_claim(readme, "README XCUITest methods", r"(about )?([\d,]+) XCUITest methods", counts["UI tests"]["xcui"])
 claim(readme, "README assertions", r"about ([\d,]+) `#expect`/`#require` assertions", expect_total, 0.03)
 claim(readme, "README encodings", r"raw bytes across (\w+) encodings", encodings, words=True)
 
@@ -228,7 +302,7 @@ claim(eng, "ENGINEERING source lines (reading section)", r"about ([\d,]+) lines 
 claim(eng, "ENGINEERING test lines (reading section)", r"lines of source to about ([\d,]+) lines of tests", test_lines, 0.03)
 
 if drift:
-    print("DOC-METRICS FAIL: " + "; ".join(drift))
+    print("DOC-METRICS FAIL: " + "; ".join(drift) + " · " + record)
     sys.exit(1)
-print("DOC-METRICS OK")
+print("DOC-METRICS OK · " + record)
 PY
