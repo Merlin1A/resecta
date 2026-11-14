@@ -116,16 +116,14 @@ struct ImportDispatchCancellationTests {
     }
 }
 
-// MARK: - Detached-task hydration on UserDefaults read
+// MARK: - Stores read their file at init
 
-@Suite("Store hydrate runs off-MainActor", .tags(.search))
+@Suite("Stores load their file synchronously", .tags(.search))
 @MainActor
 struct StoreHydrateOffMainActorTests {
 
-    @Test("UserTermsStore async hydrate eventually publishes loaded blob")
-    func testUserTermsStoreAsyncHydratePublishes() async {
-        // Seed the store file with a non-empty blob so the async hydrate
-        // has visible work to do.
+    @Test("UserTermsStore loads synchronously: the stored list is visible from init")
+    func testUserTermsStoreSyncLoadPublishes() {
         let suiteName = "pkg-n-conc-1-userterms-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         let fileURL = FileManager.default.temporaryDirectory
@@ -135,22 +133,11 @@ struct StoreHydrateOffMainActorTests {
             defaults.removePersistentDomain(forName: suiteName)
             try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent())
         }
-        // Round-trip a seeded value through the sync path so we know
-        // the storage format matches what async hydrate would load.
         let seed = UserTermsStore(fileURL: fileURL, legacyDefaults: defaults)
         _ = seed.addAlwaysFlag(UserTerm(pattern: "alpha", isRegex: false))
-        // Spin up the async-hydrate store. Initial blob is `.empty`,
-        // then the detached-task hop publishes the loaded value.
-        let store = UserTermsStore(fileURL: fileURL, legacyDefaults: defaults, asyncHydrate: true)
-        #expect(store.blob.alwaysFlag.isEmpty, "Initial blob is empty before detached hydrate completes")
-        // Yield repeatedly to let the detached task run and the
-        // MainActor awaiter publish. A bounded retry loop covers
-        // simulator-load jitter without flaking on slow hosts.
-        for _ in 0..<200 {
-            await Task.yield()
-            if !store.blob.alwaysFlag.isEmpty { break }
-            try? await Task.sleep(for: .milliseconds(5))
-        }
+        // The store reads its file inside its initialiser: the stored
+        // list is there with no wait.
+        let store = UserTermsStore(fileURL: fileURL, legacyDefaults: defaults)
         #expect(store.blob.alwaysFlag.contains(where: { $0.pattern == "alpha" }))
     }
 

@@ -128,8 +128,8 @@ struct StoreFileHardeningTests {
         #expect(defaults.data(forKey: UserTermsStore.storageKey) == nil)
     }
 
-    @Test("UserTermsStore async-hydrate path publishes the migrated blob")
-    func userTermsLegacyMigrationAsyncHydrate() async {
+    @Test("UserTermsStore publishes the migrated blob from its first moment")
+    func userTermsLegacyMigrationVisibleFromInit() {
         let defaults = Self.makeSuite()
         let fileURL = Self.makeScratchFileURL("user-terms.v1.json")
         defer { Self.removeScratch(fileURL) }
@@ -145,14 +145,12 @@ struct StoreFileHardeningTests {
             neverFlag: []
         ))
 
-        // The migration itself is synchronous inside init; only the file
-        // read rides the detached hydrate.
-        let store = UserTermsStore(fileURL: fileURL, legacyDefaults: defaults, asyncHydrate: true)
+        // The migration runs inside init, before the file is read.
+        let store = UserTermsStore(fileURL: fileURL, legacyDefaults: defaults)
         #expect(defaults.data(forKey: UserTermsStore.storageKey) == nil,
                 "migration completes before init returns")
-        await store.hydrationTask?.value
         #expect(store.blob.alwaysFlag.map(\.pattern) == ["async-carried"],
-                "the migrated blob must publish through the async hydrate")
+                "the migrated blob is in the store from its first moment")
     }
 
     @Test("SavedRegexStore migrates the legacy UserDefaults envelope into the file once")
