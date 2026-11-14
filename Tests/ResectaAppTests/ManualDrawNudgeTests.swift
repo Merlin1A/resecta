@@ -496,13 +496,13 @@ struct ManualDrawNudgeTests {
         coord.redactionState.addRegion(
             Self.manualRegion(at: CGRect(x: 0.10, y: 0.10, width: 0.05, height: 0.02)),
             page: 0, undoManager: nil)
-        toasts.enqueue("1 match nearby. Add to selection?", actionLabel: "Add", editsRegions: true) {}
+        toasts.enqueue("1 match nearby. Add to selection?", actionLabel: "Add") {}
         #expect(toasts.activeToasts.count == 1)
 
         coord.runFullPipeline(documentOverride: nil)
         defer { coord.documentState.cancelActivePipeline(redactionState: coord.redactionState) }
 
         #expect(coord.documentState.activePipelineTask != nil, "the run started")
-        #expect(!toasts.activeToasts.contains { $0.editsRegions })
+        #expect(!toasts.activeToasts.contains { $0.actionHandler != nil })
     }
 }
