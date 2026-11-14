@@ -397,10 +397,15 @@ struct LayerResultRow: View {
     static let reviewInScanLabel = "Review in Scan"
 
     /// Review in Scan shows on a Detection Sweep row that reports possible
-    /// items remaining — the row whose page links open a Preview with
-    /// nothing marked (the sweep keeps pages, not locations).
+    /// items remaining, in both of its forms: the note, and the needs-review
+    /// row the sweep reports when an item is in a category the person's own
+    /// Scan applied. Either row's page links open a Preview with nothing
+    /// marked (the sweep keeps pages, not locations). The row that could not
+    /// read a page does not offer it.
     static func offersReviewInScan(layer: LayerResult) -> Bool {
-        VerificationRowModel.hasItemsRemaining(layer)
+        layer.layer == .detectionSweep
+            && (layer.status.isInfo || layer.status.isAttention)
+            && layer.queryLines != nil
     }
 
     static func rowCaptionText(layer: LayerResult) -> String? {
