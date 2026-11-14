@@ -1,0 +1,18 @@
+Property: The measure along the print direction is used only when that direction is more than 3 degrees from horizontal.
+Area: OCR literal search, lines joined across a line break
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/OCRLineJoinDirectionTests (or on the host: cd Packages/RedactionEngine && swift test --filter OCRLineJoinDirectionTests)
+Must go red: RedactionEngineTests/OCRLineJoinDirectionTests join (6 pt print 7 pt apart, under 3 degrees: only the upright measure applies, the value is not joined (a stated limit), skew -2.0, turned 0)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+OCRCrossLine.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+OCRCrossLine.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+OCRCrossLine.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+OCRCrossLine.swift
+@@ -90,7 +90,7 @@
+         printDirection: CGVector?, pageSize: CGSize
+     ) -> Bool {
+         if linesJoin(line, next) { return true }
+-        guard let along = printDirection, along.dx < printTurnedCosine else { return false }
++        guard let along = printDirection else { return false }  // mutant: used at any angle
+         for own in [lineDirection, nextDirection] { if let own, dot(own, along) < printAgreementCosine { return false } }
+         let scale = CGAffineTransform(scaleX: pageSize.width, y: pageSize.height)
+         let a = line.applying(scale), b = next.applying(scale)

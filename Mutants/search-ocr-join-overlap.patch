@@ -1,0 +1,18 @@
+Property: Along the print direction, two lines join only when their spans along that direction overlap.
+Area: OCR literal search, lines joined across a line break
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/OCRLineJoinDirectionTests (or on the host: cd Packages/RedactionEngine && swift test --filter OCRLineJoinDirectionTests)
+Must go red: RedactionEngineTests/OCRLineJoinDirectionTests join (two staggered blocks that do not overlap across the page do not join, turned 90); RedactionEngineTests/OCRLineJoinDirectionTests join (two staggered blocks that do not overlap across the page do not join, turned 180); RedactionEngineTests/OCRLineJoinDirectionTests join (two staggered blocks that do not overlap across the page do not join, turned 270)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+OCRCrossLine.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+OCRCrossLine.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+OCRCrossLine.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+OCRCrossLine.swift
+@@ -104,7 +104,7 @@
+         }
+         let (aSpan, bSpan) = (span(a), span(b))
+         let overlap = aSpan.lower < bSpan.upper && bSpan.lower < aSpan.upper
+-        return below && overlap
++        return below  // mutant: no overlap test along the print direction
+     }
+ 
+     private nonisolated static func dot(_ a: CGVector, _ b: CGVector) -> CGFloat { a.dx * b.dx + a.dy * b.dy }

@@ -1,0 +1,18 @@
+Property: Along the print direction, the next line joins only when it lies below the previous one, not above it.
+Area: OCR literal search, lines joined across a line break
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/OCRLineJoinDirectionTests (or on the host: cd Packages/RedactionEngine && swift test --filter OCRLineJoinDirectionTests)
+Must go red: RedactionEngineTests/OCRLineJoinDirectionTests join (one column: the wrapped value on two boxes, the one-line value on one, turned 90); RedactionEngineTests/OCRLineJoinDirectionTests join (one column: the wrapped value on two boxes, the one-line value on one, turned 180); RedactionEngineTests/OCRLineJoinDirectionTests join (one column: the wrapped value on two boxes, the one-line value on one, turned 270)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+OCRCrossLine.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+OCRCrossLine.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+OCRCrossLine.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+OCRCrossLine.swift
+@@ -95,7 +95,7 @@
+         let scale = CGAffineTransform(scaleX: pageSize.width, y: pageSize.height)
+         let a = line.applying(scale), b = next.applying(scale)
+         let down = CGVector(dx: along.dy, dy: -along.dx)
+-        let below = dot(CGVector(dx: b.midX - a.midX, dy: b.midY - a.midY), down) > 0
++        let below = dot(CGVector(dx: b.midX - a.midX, dy: b.midY - a.midY), down) < 0  // mutant: sign flipped
+         func span(_ rect: CGRect) -> (lower: CGFloat, upper: CGFloat) {
+             let ends = [CGPoint(x: rect.minX, y: rect.minY), CGPoint(x: rect.maxX, y: rect.minY),
+                         CGPoint(x: rect.minX, y: rect.maxY), CGPoint(x: rect.maxX, y: rect.maxY)]

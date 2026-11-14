@@ -1,0 +1,20 @@
+Property: The print direction is the mean of the lines within 20 degrees of the mean of all of them, set only when at least three lines lie within those 20 degrees; never a blend of two directions.
+Area: OCR literal search, lines joined across a line break
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/OCRLineJoinDirectionTests (or on the host: cd Packages/RedactionEngine && swift test --filter OCRLineJoinDirectionTests)
+Must go red: RedactionEngineTests/OCRLineJoinDirectionTests direction (twenty sideways lines and one upright: the sideways direction, not a blend); RedactionEngineTests/OCRLineJoinDirectionTests direction (six upright lines and three sideways: not set); RedactionEngineTests/OCRLineJoinDirectionTests direction (twelve sideways lines and two upright: the sideways direction); RedactionEngineTests/OCRLineJoinDirectionTests direction (eight sideways lines and three upright: not set)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+OCRCrossLine.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+OCRCrossLine.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+OCRCrossLine.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+OCRCrossLine.swift
+@@ -74,9 +74,7 @@
+     nonisolated static func printDirection(of lineDirections: [CGVector?]) -> CGVector? {
+         let directions = lineDirections.compactMap { $0 }
+         guard directions.count >= 3, let mean = unitSum(directions) else { return nil }
+-        let agreeing = directions.filter { dot($0, mean) >= printAgreementCosine }
+-        guard agreeing.count >= 3 else { return nil }
+-        return unitSum(agreeing)
++        return mean  // mutant: the plain mean of every line, with no agreement test
+     }
+ 
+     /// Whether a phrase may run from the end of `line` into the start of
