@@ -456,6 +456,10 @@ if grep -qx 'counts: crash' "$f"; then
     exit 1
 fi
 grep -qx 'counts: usage' "$f" && exit 64
+grep -qx 'counts: of record' "$f" && {
+    echo 'DOC-METRICS OK · counts of record: engine @Test 2291, engine suites 317, app @Test 2156, app suites 339, XCUITest methods 96'
+    exit 0
+}
 grep -qx 'counts: ok' "$f" && { echo 'DOC-METRICS OK'; exit 0; }
 exit 3
 EOF
@@ -675,6 +679,10 @@ PYEOF
     hook "$(line "$h")"
     check "documented counts that match pass, naming the base" 0 "" \
         "documented counts match the pushed tree of ${h:0:8}" "origin/main $b8, "
+    local hrec; hrec="$(commit README.md 'counts: of record' record)"
+    hook "$(line "$hrec")"
+    check "a verdict line that carries the counts of record passes" 0 "" \
+        "documented counts match the pushed tree of ${hrec:0:8}" "!could not run"
     h="$(commit README.md 'counts: stale' stale)"
     hook "$(line "$h")"
     check "a stale documented count refuses the push" 1 "" "the documented counts do not match" \
@@ -736,6 +744,10 @@ PYEOF
     hook_script="$mut"; hook "$(line "$cc6b")"; hook_script=""
     if cmp -s "$me" "$mut"; then rc=unchanged; fi
     check "planted failure: reading DRIFT lines, not the last line, calls a reworded sentence could not run" 1 "" "could not run"
+    sed 's/ || \[ "${last#DOC-METRICS OK · }" != "$last" \]//' "$me" > "$mut"
+    hook_script="$mut"; hook "$(line "$hrec")"; hook_script=""
+    if cmp -s "$me" "$mut"; then rc=unchanged; fi
+    check "planted failure: reading only the bare verdict line calls the counts of record could not run" 1 "" "could not run"
     sed "s/grep -E '^  DRIFT ' >\&2/grep -E '^  DRIFT  ' >\&2/" "$me" > "$mut"
     h="$(commit README.md 'counts: stale' stale)"
     hook_script="$mut"; hook "$(line "$h")"; hook_script=""
