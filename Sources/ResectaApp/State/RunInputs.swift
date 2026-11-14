@@ -51,64 +51,22 @@ enum RunInputs {
                 return clamped
             } ?? []
 
-            let pageMode: PipelineMode
             // The pre-flight reason is recorded (not just nil-checked)
             // and threaded through the run so the verification report can say
             // why a page rasterized. Reasons exist only for Searchable-mode
             // runs — a secure-raster-mode run rasterizes every page by
             // choice, so its pages carry nil.
-            var fallbackReason: TextLayerDetector.FallbackReason?
-            // Rotated pages now take
-            // searchable mode. The canonical coordinate contract is complete —
-            // `extractCharacters` applies T_rot so `CharacterInfo.bounds` are
-            // zero-origin, rotation-applied (displayed) coordinates, matching the
-            // rasterizer's `effectiveSize` region basis; the filter and the
-            // verifier compare in one frame. Proven end-to-end by the
-            // `RotatedPageCoordinateTests` matrix (4 rotations × {zero,offset}
-            // CropBox origin, Layers 6–10 + tamper). The former `page.rotation == 0`
-            // stopgap is removed.
-            if effectiveMode == .searchableRedaction,
-               textLayerStatus[i] == .rich {
-                // Check per-page triggers BEFORE committing to
-                // searchable mode (RTL/vertical/encoding-broken pages have
-                // unreliable PDFKit bounds; fall back per-page). Rotated pages
-                // now reach this gate for the first time — a real RTL/vertical
-                // misclassification surfaces here as a per-page SR fallback (the
-                // checkFallbackTriggers heuristics are geometry-agnostic).
-                if let trigger = TextLayerDetector.checkFallbackTriggers(page) {
-                    pageMode = .secureRasterization
-                    fallbackReason = trigger
-                } else if inkPlan == nil, !PageContentFacts.keepsTextLayer(
-                    regions: pageRegions, facts: { PageContentFacts.read(cgPage) }
-                ) {
-                    // A box not placed from this page's own text (drawn,
-                    // duplicated, read from the picture, moved or resized)
-                    // on a page whose text layer need not sit on its print,
-                    // with no ink plan that covers it: the covered words'
-                    // text may lie outside the box, so the page is written as
-                    // an image only.
-                    pageMode = .secureRasterization
-                    fallbackReason = .unanchoredRegion
-                } else {
-                    pageMode = .searchableRedaction
-                }
-            } else {
-                pageMode = .secureRasterization
-                // A sparse/no-text page in a Searchable-mode run is also a
-                // per-page fallback the report should explain; the trigger
-                // check never ran, but the reason is the same fact the
-                // sparse/none classification records.
-                if effectiveMode == .searchableRedaction {
-                    fallbackReason = .noExtractableText
-                }
-            }
+            let (pageMode, fallbackReason) = PageModeDecision.decide(
+                effectiveMode: effectiveMode, textLayerStatus: textLayerStatus[i], page: page,
+                pageRegions: pageRegions, inkPlanCovers: inkPlan != nil
+            )
 
             // Compute hasText serially, searchable pages only. Secure-
             // rasterization pages short-circuit the searchable-mode assert's left
             // disjunct, so `false` is correct for them — and this avoids a
             // Release-only `page.string` scan that would otherwise feed only a
             // Debug-build assert. Searchable pages already paid for text scans
-            // via textLayerStatus / checkFallbackTriggers above.
+            // via textLayerStatus and the trigger check (`PageModeDecision.decide`).
             let hasText = pageMode == .searchableRedaction
                 ? (page.string?.isEmpty == false) : false
 
