@@ -13,16 +13,30 @@ public enum PageModeDecision {
     /// was entered with; `textLayerStatus` is the import's status for the
     /// page; `pageRegions` are the page's regions after the size floor;
     /// `inkPlanCovers` says whether an ink plan covers every one of them.
-    /// `readFacts` reads the page's content facts (`PageContentFacts.read`);
-    /// it is called only when some region was not placed from the page's own
-    /// text and does not cover the whole page.
+    /// The page's content facts are read (`PageContentFacts.read`) only when
+    /// some region was not placed from the page's own text and does not
+    /// cover the whole page.
     public static func decide(
         effectiveMode: PipelineMode,
         textLayerStatus: TextLayerStatus?,
         page: PDFPage,
         pageRegions: [RedactionRegion],
+        inkPlanCovers: Bool
+    ) -> (mode: PipelineMode, fallbackReason: TextLayerDetector.FallbackReason?) {
+        decide(effectiveMode: effectiveMode, textLayerStatus: textLayerStatus, page: page,
+               pageRegions: pageRegions, inkPlanCovers: inkPlanCovers, readFacts: PageContentFacts.read)
+    }
+
+    /// The decision with the reader of the page's facts given, so a test can
+    /// count its reads. Internal: outside the package the facts are always
+    /// read from the page.
+    static func decide(
+        effectiveMode: PipelineMode,
+        textLayerStatus: TextLayerStatus?,
+        page: PDFPage,
+        pageRegions: [RedactionRegion],
         inkPlanCovers: Bool,
-        readFacts: (CGPDFPage?) -> PageContentFacts = PageContentFacts.read
+        readFacts: (CGPDFPage?) -> PageContentFacts
     ) -> (mode: PipelineMode, fallbackReason: TextLayerDetector.FallbackReason?) {
         let pageMode: PipelineMode
         var fallbackReason: TextLayerDetector.FallbackReason?
