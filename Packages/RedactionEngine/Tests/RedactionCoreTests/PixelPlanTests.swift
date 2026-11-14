@@ -226,8 +226,16 @@ private let paintRuleCases: [PaintRuleCase] = [
             failures += check(contains(p.painted, hull), "blocks not covered in \(w)×\(h)")
             failures += check(p.marginEdge.maxY <= floorPixel(above, dpi: 300), "margin past the limit above in \(w)×\(h)")
             failures += check(p.marginEdge.minY >= ceilPixel(below, dpi: 300), "margin past the limit below in \(w)×\(h)")
-            failures += check(p.painted.maxY == max(p.marginEdge.maxY, hull.maxY), "top is not the further edge in \(w)×\(h)")
-            failures += check(p.painted.minY == min(p.marginEdge.minY, hull.minY), "bottom is not the further edge in \(w)×\(h)")
+            // Each side is the further out of the margin's edge (outward, one
+            // pixel more, then held where a limit is) and the block edge.
+            let marginLeft = floorPixel(paint.minX, dpi: 300) - 1
+            let marginRight = ceilPixel(paint.maxX, dpi: 300) + 1
+            let marginTop = min(ceilPixel(paint.maxY, dpi: 300) + 1, floorPixel(above, dpi: 300))
+            let marginBottom = max(floorPixel(paint.minY, dpi: 300) - 1, ceilPixel(below, dpi: 300))
+            failures += check(p.painted.minX == min(marginLeft, hull.minX), "left is not the further edge in \(w)×\(h)")
+            failures += check(p.painted.maxX == max(marginRight, hull.maxX), "right is not the further edge in \(w)×\(h)")
+            failures += check(p.painted.maxY == max(marginTop, hull.maxY), "top is not the further edge in \(w)×\(h)")
+            failures += check(p.painted.minY == min(marginBottom, hull.minY), "bottom is not the further edge in \(w)×\(h)")
         }
         return failures
     },
@@ -291,7 +299,7 @@ private let paintRuleCases: [PaintRuleCase] = [
 
     /// Rows count 8 from the top, so the last block is cut by the bottom edge:
     /// at 300 dpi it holds rows 0…3 (3,300 = 8 × 412 + 4), at 150 dpi rows 0…1
-    /// (1,650 = 8 × 205 + 2). The box holds rows 1…3. At 300 dpi its block ends
+    /// (1,650 = 8 × 206 + 2). The box holds rows 1…3. At 300 dpi its block ends
     /// at 4 and the margin's edge one row higher, 5, is the further out; at
     /// 150 dpi it also touches the block of rows 2…9, which ends at 10.
     @Test(arguments: [(300, 3_300, 5), (150, 1_650, 10)])
