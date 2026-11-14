@@ -13,7 +13,7 @@ import Foundation
 //
 // The "dob.label" string in withPerPageTimeout("dob.label") is a TIMING
 // label only, never emitted as a ruleID. The match picks up the default
-// ruleID "dob.regex" (already aliased in RuleCatalog.engineToCatalog).
+// ruleID "dob.regex" (in PIIDetector.emittedRuleIDs).
 
 @Suite("DOB label-anchored financial path")
 struct DOBLabelAnchoredFinancialTests {
