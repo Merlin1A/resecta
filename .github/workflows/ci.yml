@@ -11,7 +11,7 @@
 # from the base branch's copies, so a change cannot edit a lint script it is
 # gated by (an edit to this workflow is itself reviewed in the pull
 # request); the change's own copies run once more, report-only. About five
-# minutes on a hosted macos-26 runner. The batched simulator suites
+# minutes on a hosted runner of the xcode-27 image. The batched simulator suites
 # (sim-suite.yml) run weekly, on demand and on release tags, and the app
 # suite on every pull request to main as a required check; none of
 # them runs here.
@@ -36,14 +36,18 @@ defaults:
 env:
   XCODEGEN_VERSION: 2.45.3
   XCODEGEN_SHA256: 0c90f4d28ca57335f9fa78cf5bf6dabfe20a232036dabe36de2eef79cb7c0878
-  # The toolchain is selected by name (the 1.2.0 archive's), not left to the
-  # image's default, so an image update does not move the compiler under
-  # the gate; the summary prints the version that ran.
-  DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+  # The toolchain is selected by path (the release's Xcode 27.2), not left
+  # to the image's default (27.1), so an image update does not move the
+  # compiler under the gate. The image's Xcode_27.2.app has been the 27.2
+  # release candidate (27B48) while the release is archived with the final
+  # build (27B52); the Toolchain step compares the build that ran with the
+  # pin in Scripts/toolchain-pin-check.sh and prints a warning when they
+  # differ, and the summary prints the version that ran.
+  DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
 
 jobs:
   pr-gate:
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -63,7 +67,18 @@ jobs:
       - name: Toolchain
         run: |
           xcodebuild -version
-          { echo "## toolchain"; echo; echo '```'; xcodebuild -version; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          Scripts/toolchain-pin-check.sh --self-test
+          pin=0
+          Scripts/toolchain-pin-check.sh --xcode > "${RUNNER_TEMP}/pin.txt" || pin=$?
+          cat "${RUNNER_TEMP}/pin.txt"
+          if [ "$pin" -ne 0 ]; then
+            echo "::warning::the Xcode that ran is not the release's pinned build (Scripts/toolchain-pin-check.sh --print-pin)"
+          fi
+          {
+            echo "## toolchain"; echo; echo '```'; xcodebuild -version; echo '```'
+            echo; echo "pinned build: $(Scripts/toolchain-pin-check.sh --print-pin | tr '\n' ' ')"
+            echo; echo '```'; cat "${RUNNER_TEMP}/pin.txt"; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Generate the project
         run: ./regenerate.sh
