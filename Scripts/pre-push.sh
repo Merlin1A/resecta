@@ -22,7 +22,15 @@
 #      re-rooting them (the signing-team lines a regenerate drops carry no
 #      path). A difference refuses the push and prints the regenerate
 #      commands; no xcodegen on PATH is a printed warning, not a refusal.
-#   2. Scheme by diff. The pushed commit is diffed against its merge base with
+#   2. The documented counts. The local origin/main's copy of
+#      Scripts/doc-metrics.sh --check runs against the pushed commit's tree
+#      (git archive, --check-root); a drifted count refuses the push and
+#      prints what the script measured. The hosted gate runs the same check;
+#      this shows a miss before the push. A commit whose tree cannot be
+#      checked (no README.md, the tree cannot be written out, the script
+#      ends without its verdict line) is refused as "could not run"; a local
+#      origin/main without the script is a printed warning, not a refusal.
+#   3. Scheme by diff. The pushed commit is diffed against its merge base with
 #      the LOCAL origin/main (never fetched) and each path is classed:
 #        engine       Packages/RedactionEngine/**, xcschemes/RedactionEngine.xcscheme
 #                     → both schemes (the app links the engine)
@@ -34,7 +42,7 @@
 #                     Scripts/** path runs the two scripts' --self-test
 #        unclassified anything else → both schemes (each path printed)
 #      PREPUSH_SCHEME_BY_DIFF=0 needs both schemes for every push.
-#   3. Verdict acceptance. A needed scheme is not re-run when a verdict.json
+#   4. Verdict acceptance. A needed scheme is not re-run when a verdict.json
 #      under /tmp/test-batched-<scheme>-*/ or $TEST_BATCHED_VERDICT_DIR
 #      (depth ≤ 3) was written by test-batched.sh for that scheme with
 #      VERDICT PASS on the pushed commit's tree (a rebase that keeps the tree
@@ -44,10 +52,10 @@
 #      `summary.txt` still match it (the re-read a hand-written verdict
 #      without its run dir fails). Each acceptance and each rejection of a
 #      verdict for the same tree is printed.
-#   4. The runs. The runner tests the working tree, so a needed scheme with no
+#   5. The runs. The runner tests the working tree, so a needed scheme with no
 #      accepted verdict runs only when the pushed commit is this checkout's
 #      HEAD and no tracked file is modified; otherwise the push is refused.
-#   5. The record. An allowed push posts a `local-suites` commit status for
+#   6. The record. An allowed push posts a `local-suites` commit status for
 #      each pushed commit ("PASS @ tree <tree8>: <schemes>") once GitHub has
 #      the commit; a SKIP_TESTS=1 push posts none, so on a pull request a
 #      skipped push shows no such check.
@@ -177,6 +185,71 @@ stale_check() { # → 0 fresh or warned, 1 stale (printed)
     echo "    ./regenerate.sh" >&2
     echo "    perl -0pi -e 's/^(\\t*)(MARKETING_VERSION = [^;]+;)/\$1\$2\\n\$1DEVELOPMENT_TEAM = ${team:-<team id>};/mg' $live" >&2
     return 1
+}
+
+# The documented counts, for every pushed commit: the local origin/main's copy
+# of Scripts/doc-metrics.sh (so a change cannot edit the check it is gated by,
+# as in the hosted step) runs with --check-root on the commit's own files,
+# written out with git archive into a temporary folder, so the pushed tree is
+# checked whatever the working tree holds. The outcome is read from the
+# script's exit code and its last line: 0 with "DOC-METRICS OK" passes; 1 with
+# "DOC-METRICS FAIL: …" is a stale or unreadable count, refused with the
+# script's DRIFT lines; anything else means the check could not run, refused.
+count_check() { # → 0 match or warned, 1 refused (printed)
+    local base_id j sha tmp p out last rc a_rc t_rc
+    local -a paths st
+    base_id="$(git log -1 --format='%h, %cs' "$BASE_REF" 2>/dev/null || echo unknown)"
+    if ! git cat-file -e "$BASE_REF:Scripts/doc-metrics.sh" 2>/dev/null; then
+        echo "⚠  pre-push: WARN origin/main ($base_id) has no Scripts/doc-metrics.sh — the documented counts are not checked" >&2
+        return 0
+    fi
+    cannot() { # sha words [lines]
+        echo "✗ pre-push: the documented-count check could not run on the pushed tree of ${1:0:8} (origin/main $base_id's copy of Scripts/doc-metrics.sh): $2. Push refused. Mend the cause; if the check itself is broken, SKIP_TESTS=1 skips every gate and is logged." >&2
+        [ -n "${3:-}" ] && printf '%s\n' "$3" | sed 's/^/    | /' >&2
+        return 0
+    }
+    j=0
+    while [ "$j" -lt "${#P_SHA[@]}" ]; do
+        sha="${P_SHA[$j]}"; j=$((j + 1))
+        if ! tmp="$(mktemp -d "${TMPDIR:-/tmp}/pre-push-counts.XXXXXX" 2>/dev/null)" || [ -z "$tmp" ]; then
+            cannot "$sha" "cannot make a temporary folder"; return 1
+        fi
+        trap 'rm -rf "$tmp"' EXIT
+        if ! git cat-file -e "$sha:README.md" 2>/dev/null; then
+            cannot "$sha" "the pushed tree has no README.md"; rm -rf "$tmp"; trap - EXIT; return 1
+        fi
+        paths=()
+        for p in Packages/RedactionEngine/Sources Packages/RedactionEngine/Tests Sources Tests README.md ENGINEERING.md; do
+            git cat-file -e "$sha:$p" 2>/dev/null && paths+=("$p")
+        done
+        mkdir -p "$tmp/tree"
+        git archive "$sha" -- "${paths[@]}" | tar -x -C "$tmp/tree"
+        st=("${PIPESTATUS[@]}"); a_rc="${st[0]}"; t_rc="${st[1]:-}"
+        if [ "$a_rc" != 0 ] || [ "$t_rc" != 0 ]; then
+            cannot "$sha" "cannot write the pushed tree out: git archive rc $a_rc, tar rc $t_rc"; rm -rf "$tmp"; trap - EXIT; return 1
+        fi
+        if ! git show "$BASE_REF:Scripts/doc-metrics.sh" > "$tmp/doc-metrics.sh" || ! chmod +x "$tmp/doc-metrics.sh"; then
+            cannot "$sha" "cannot write out origin/main's copy of the script"; rm -rf "$tmp"; trap - EXIT; return 1
+        fi
+        rc=0
+        out="$("$tmp/doc-metrics.sh" --check-root "$tmp/tree" 2>&1)" || rc=$?
+        rm -rf "$tmp"; trap - EXIT
+        last="$(printf '%s\n' "$out" | tail -n 1)"
+        if [ "$rc" = 0 ] && { [ "$last" = "DOC-METRICS OK" ] || [ "${last#DOC-METRICS OK · }" != "$last" ]; }; then
+            echo "→ pre-push: documented counts match the pushed tree of ${sha:0:8} (origin/main $base_id's copy of Scripts/doc-metrics.sh)." >&2
+        elif [ "$rc" = 1 ] && [ "${last#DOC-METRICS FAIL:}" != "$last" ]; then
+            echo "✗ pre-push: the documented counts do not match the pushed tree of ${sha:0:8} (Scripts/doc-metrics.sh --check, origin/main $base_id's copy):" >&2
+            printf '%s\n' "$out" | /usr/bin/grep -E '^  DRIFT ' >&2 || true
+            printf '%s\n' "$last" >&2
+            echo "  Run Scripts/doc-metrics.sh in this tree and set README.md / ENGINEERING.md to the numbers it prints; where it says 'claim not found' or 'unreadable claim', the counted sentence was reworded: put its wording back. Change no other word. Push refused." >&2
+            return 1
+        else
+            cannot "$sha" "Scripts/doc-metrics.sh exited $rc and its last line is not its verdict line" \
+                "$(printf '%s\n' "$out" | tail -n 3)"
+            return 1
+        fi
+    done
+    return 0
 }
 
 # Prints "ACCEPT <path> <VERDICT line>" for the newest acceptable verdict,
@@ -360,11 +433,38 @@ echo "test-batched.sh $*" >> "$PREPUSH_SELFTEST_LOG"
 exit "${STUB_RUN_RC:-0}"
 EOF
     sed 's/test-batched\.sh \$\*/pre-push.sh $*/' "$repo/Scripts/test-batched.sh" > "$repo/Scripts/pre-push.sh"
-    chmod +x "$t/bin/xcrun" "$t/bin/xcodebuild" "$repo/Scripts/test-batched.sh" "$repo/Scripts/pre-push.sh"
+    # A stub count check: its outcome is the line in DIR/README.md; each line it
+    # prints is the real script's, copied from its output.
+    cat > "$repo/Scripts/doc-metrics.sh" <<'EOF'
+#!/bin/sh
+[ "$1" = "--check-root" ] || exit 64
+f="$2/README.md"
+if grep -qx 'counts: stale' "$f"; then
+    echo '  DRIFT README app @Test: claimed 1 measured 2'
+    echo 'DOC-METRICS FAIL: README app @Test'
+    exit 1
+fi
+if grep -qx 'counts: notfound' "$f"; then
+    cat <<'X'
+DOC-METRICS FAIL: README XCUITest methods: claim not found (pattern '([\\d,]+) XCUITest methods')
+X
+    exit 1
+fi
+if grep -qx 'counts: crash' "$f"; then
+    echo 'Traceback (most recent call last):'
+    echo "NameError: name 'x' is not defined"
+    exit 1
+fi
+grep -qx 'counts: usage' "$f" && exit 64
+grep -qx 'counts: ok' "$f" && { echo 'DOC-METRICS OK'; exit 0; }
+exit 3
+EOF
+    chmod +x "$t/bin/xcrun" "$t/bin/xcodebuild" "$repo/Scripts/test-batched.sh" "$repo/Scripts/pre-push.sh" \
+        "$repo/Scripts/doc-metrics.sh"
     printf 'name: SelfTest\ntargets:\n  SelfTest:\n    type: application\n    platform: iOS\n    sources: [Sources]\n' > "$repo/project.yml"
     echo 'let a = 1' > "$repo/Sources/A.swift"
     echo 'let e = 1' > "$repo/Packages/RedactionEngine/E.swift"
-    echo '# Self-test' > "$repo/README.md"
+    printf '# Self-test\ncounts: ok\n' > "$repo/README.md"
     printf '*.xcodeproj/\n' > "$repo/.gitignore"
 
     g() { git -C "$repo" -c user.name=self-test -c user.email=self-test@example.invalid \
@@ -385,22 +485,29 @@ EOF
         (cd "$repo" && xcodegen generate --quiet)
     fi
 
-    # hook <stdin line or ""> [VAR=value...] — this script in the scratch repo.
+    # hook <stdin line or ""> [VAR=value...] — this script in the scratch repo
+    # (or the copy named by $hook_script, for a planted failure).
+    hook_script=""
     hook() {
         local input="$1"; shift
         : > "$t/runs"
         rc=0
         out="$(cd "$repo" && printf '%s\n' "$input" | env -u SKIP_TESTS -u PREPUSH_SCHEME_BY_DIFF \
             TEST_BATCHED_SIM_UDID=SELF-TEST-UDID TEST_BATCHED_VERDICT_DIR="$t/verdicts" \
-            PREPUSH_SELFTEST_LOG="$t/runs" PATH="$t/bin:$PATH" "$@" bash "$me" origin self-test 2>&1)" || rc=$?
+            PREPUSH_SELFTEST_LOG="$t/runs" PATH="$t/bin:$PATH" "$@" bash "${hook_script:-$me}" origin self-test 2>&1)" || rc=$?
     }
     line() { echo "refs/heads/topic $1 refs/heads/topic 0000000000000000000000000000000000000000"; }
-    check() { # label expected-rc expected-runs fixed-string...
+    check() { # label expected-rc expected-runs fixed-string... ("!text": text must be absent)
         local label="$1" want="$2" runs="$3" s ok=1 got
         shift 3
         got="$(tr '\n' ';' < "$t/runs")"
         [ "$rc" = "$want" ] && [ "$got" = "$runs" ] || ok=0
-        for s in "$@"; do printf '%s\n' "$out" | /usr/bin/grep -qF -- "$s" || ok=0; done
+        for s in "$@"; do
+            case "$s" in
+                !*) ! printf '%s\n' "$out" | /usr/bin/grep -qF -- "${s#!}" || ok=0 ;;
+                *)  printf '%s\n' "$out" | /usr/bin/grep -qF -- "$s" || ok=0 ;;
+            esac
+        done
         if [ "$ok" = 1 ]; then echo "self-test: $label OK"; return 0; fi
         echo "self-test: $label FAILED (rc $rc, wanted $want; runs '$got', wanted '$runs'; expected text: $*)" >&2
         printf '%s\n' "$out" | sed 's/^/    | /' >&2
@@ -558,6 +665,84 @@ PYEOF
         echo "self-test: SKIP stale-project rules — xcodegen is not on PATH"
     fi
 
+    # The documented counts: the base's copy of the script runs on the pushed
+    # commit's tree; the stub's outcome is the line in that tree's README.md.
+    local b8 cc6b mut
+    b8="$(g log -1 --format='%h' "$base")"
+    g reset -q --hard "$base"
+    [ "$have_xg" = 1 ] && (cd "$repo" && xcodegen generate --quiet)
+    h="$(commit README.md 'more docs' docs)"
+    hook "$(line "$h")"
+    check "documented counts that match pass, naming the base" 0 "" \
+        "documented counts match the pushed tree of ${h:0:8}" "origin/main $b8, "
+    h="$(commit README.md 'counts: stale' stale)"
+    hook "$(line "$h")"
+    check "a stale documented count refuses the push" 1 "" "the documented counts do not match" \
+        "  DRIFT README app @Test" "DOC-METRICS FAIL: README app @Test" "!could not run"
+    g reset -q --hard "$base"
+    hook "$(line "$h")"
+    check "the pushed tree is checked, not the working tree" 1 "" "the documented counts do not match"
+    g reset -q --hard "$base"
+    echo 'let s = 9' >> "$repo/Sources/A.swift"; echo 'counts: stale' >> "$repo/README.md"
+    g add -A && g commit -qm 'app change with a stale count'
+    local h3; h3="$(g rev-parse HEAD)"
+    hook "$(line "$h3")"
+    check "a stale count refuses before a scheme runs" 1 "" "the documented counts do not match"
+    h="$(commit Sources/A.swift 'let s = 9' app)"
+    hook "$(line "$h")"
+    check "control: the same app change with matching counts runs the app scheme" 0 "test-batched.sh ResectaApp;" \
+        "documented counts match the pushed tree"
+    g reset -q --hard "$base"
+    g rm -q README.md && g commit -qm 'no readme'
+    h="$(g rev-parse HEAD)"
+    hook "$(line "$h")"
+    check "could not run: the pushed tree has no README.md" 1 "" "could not run" "has no README.md"
+    h="$(commit README.md 'counts: crash' crash)"
+    hook "$(line "$h")"
+    check "could not run: the script ends without its verdict line" 1 "" "could not run" "exited 1" \
+        "Traceback (most recent call last):" "!do not match"
+    cc6b="$(commit README.md 'counts: notfound' notfound)"
+    hook "$(line "$cc6b")"
+    check "a reworded counted sentence refuses the push" 1 "" "the documented counts do not match" \
+        "claim not found" "!could not run"
+    h="$(commit README.md 'counts: usage' usage)"
+    hook "$(line "$h")"
+    check "could not run: the script exits 64" 1 "" "could not run" "exited 64"
+    h="$(commit README.md 'more docs' docs)"
+    mkdir -p "$t/bin-mktemp" "$t/bin-tar"
+    printf '#!/bin/sh\nfor a in "$@"; do case "$a" in *pre-push-counts.*) exit 1 ;; esac; done\nexec /usr/bin/mktemp "$@"\n' \
+        > "$t/bin-mktemp/mktemp"
+    printf '#!/bin/sh\nexit 2\n' > "$t/bin-tar/tar"
+    chmod +x "$t/bin-mktemp/mktemp" "$t/bin-tar/tar"
+    hook "$(line "$h")" PATH="$t/bin-mktemp:$t/bin:$PATH"
+    check "could not run: no temporary folder for the count check" 1 "" "could not run" "cannot make a temporary folder"
+    hook "$(line "$h")" PATH="$t/bin-tar:$t/bin:$PATH"
+    check "could not run: the pushed tree cannot be written out" 1 "" "could not run" "tar rc 2"
+    g reset -q --hard "$base"
+    g rm -q Scripts/doc-metrics.sh && g commit -qm 'no count script'
+    g update-ref refs/remotes/origin/main "$(g rev-parse HEAD)"
+    hook "$(line "$h")"
+    check "a base without the script is a printed warning, not a refusal" 0 "" \
+        "has no Scripts/doc-metrics.sh — the documented counts are not checked"
+    g update-ref refs/remotes/origin/main "$base"
+
+    # Planted failures: each copy of this script must fail a case above.
+    mut="$t/pre-push-mutant.sh"
+    /usr/bin/grep -vx 'count_check || exit 1' "$me" > "$mut"
+    g reset -q --hard "$h3"
+    hook_script="$mut"; hook "$(line "$h3")"; hook_script=""
+    check "planted failure: without the count check the stale app change runs its scheme" 0 "test-batched.sh ResectaApp;"
+    sed 's/elif \[ "$rc" = 1 \] && \[ "${last#DOC-METRICS FAIL:}" != "$last" \]; then/elif [ "$rc" = 1 ] \&\& printf "%s\\n" "$out" | \/usr\/bin\/grep -q "^  DRIFT "; then/' "$me" > "$mut"
+    hook_script="$mut"; hook "$(line "$cc6b")"; hook_script=""
+    if cmp -s "$me" "$mut"; then rc=unchanged; fi
+    check "planted failure: reading DRIFT lines, not the last line, calls a reworded sentence could not run" 1 "" "could not run"
+    sed "s/grep -E '^  DRIFT ' >\&2/grep -E '^  DRIFT  ' >\&2/" "$me" > "$mut"
+    h="$(commit README.md 'counts: stale' stale)"
+    hook_script="$mut"; hook "$(line "$h")"; hook_script=""
+    if cmp -s "$me" "$mut"; then rc=unchanged; fi
+    check "planted failure: a pass-through for the old DRIFT shape loses the DRIFT line" 1 "" \
+        "the documented counts do not match" "!  DRIFT README app @Test"
+
     [ "$fails" -eq 0 ] && { echo "self-test: PASS"; exit 0; }
     echo "self-test: FAIL" >&2; exit 1
 }
@@ -620,6 +805,7 @@ if [ "${#P_SHA[@]}" -eq 0 ]; then
 fi
 
 stale_check || exit 1
+count_check || exit 1
 
 HEAD_SHA="$(git rev-parse -q --verify HEAD 2>/dev/null || true)"
 CLEAN=1
