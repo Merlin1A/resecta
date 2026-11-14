@@ -40,3 +40,4 @@ with its reason and the mutant that is caught in its place.
 | `hidden-word-align-chain.patch` | A word's window is also centred on its nearest aligned neighbours' offsets, so a group's growing offset aligns. | RedactionEngineTests/HiddenWordInkAlignCases (f); RedactionEngineTests/HiddenWordInkAlignCases (f′) |
 | `hidden-word-align-cap.patch` | However the chain runs, a match more than six of the word's cells from its glyphs is never accepted. | RedactionEngineTests/HiddenWordInkAlignCases (f⁗) |
 | `hidden-word-align-rounds.patch` | Alignment is judged in rounds against the alignments at each round's start, so the result does not depend on list order. | RedactionEngineTests/HiddenWordInkAlignCases (f-shuffle); RedactionEngineTests/HiddenWordInkAlignCases (f″) |
+| `paused-notice-ends-in-state.patch` | The paused notice's leaving the screen does not end the pause it reports. | ResectaAppTests/DocumentEditorViewBackgroundBannerTests testPausedNoticeHasNoLeavingHook |
