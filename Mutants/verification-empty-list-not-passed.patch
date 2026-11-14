@@ -1,0 +1,19 @@
+Property: An empty list of checks reads skipped: nothing was verified, so it never folds to Passed.
+Area: verification schedule (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/UnfinishedRunTests
+Must go red: RedactionEngineTests/UnfinishedRunTests eachCase
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine.swift
+index 36b95ba2..313f142c 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine.swift
+@@ -411,7 +411,7 @@ public struct VerificationEngine: Sendable {
+     /// each layer, so a new status case is a compile error here, not a
+     /// silent PASS. An empty list is `.skipped`: nothing was verified.
+     public func aggregateStatus(_ layers: [LayerResult]) -> VerificationStatus {
+-        guard !layers.isEmpty else { return .skipped }
++        // mutant: an empty list folds to Passed again
+         var firstFail: String?
+         var firstAttention: String?
+         var firstWarn: String?

@@ -1,0 +1,22 @@
+Property: A report lists one result per scheduled check; a check that stored no result ends the run instead of being dropped.
+Area: verification schedule (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/UnfinishedRunTests
+Must go red: RedactionEngineTests/UnfinishedRunTests eachCase
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationOrchestrator.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationOrchestrator.swift
+index a85710da..e2ad8f31 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationOrchestrator.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationOrchestrator.swift
+@@ -284,9 +284,8 @@ public struct VerificationOrchestrator: Sendable {
+         var orderedResults: [LayerResult] = []
+         orderedResults.reserveCapacity(layers.count)
+         for (position, layer) in layers.enumerated() {
+-            guard let result = resultsByLayer[layer] else {
+-                throw PipelineError.verificationError(.engineCrash(layerIndex: position))
+-            }
++            // mutant: a missing result is dropped without comparing the count
++            guard let result = resultsByLayer[layer] else { continue }
+             orderedResults.append(result)
+         }
+         return VerificationReport(

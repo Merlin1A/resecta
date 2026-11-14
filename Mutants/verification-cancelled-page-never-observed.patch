@@ -1,0 +1,19 @@
+Property: A cancelled page throws; it is never returned as an observation with some of its requests' counts missing.
+Area: verification schedule (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/UnfinishedRunTests
+Must go red: RedactionEngineTests/UnfinishedRunTests eachCase
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/OutputRecheck.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/OutputRecheck.swift
+index 9dc2dddf..f7e60026 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/OutputRecheck.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/OutputRecheck.swift
+@@ -242,7 +242,7 @@ struct OutputRecheck: Sendable {
+         let wrapped = SendablePDFDocument(pageDocument)
+ 
+         for requestIndex in work.requestIndices {
+-            try Task.checkCancellation()
++            if Task.isCancelled { break } // mutant: break in place of the throw
+             let request = requests[requestIndex]
+             let query = request.record.query
+             // The output may have no text layer at all; the searcher's own
