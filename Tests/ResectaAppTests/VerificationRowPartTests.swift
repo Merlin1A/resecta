@@ -1,12 +1,14 @@
 import Testing
 import Foundation
+import PDFKit
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// A row whose check found something and also could not read part of its
-// input: the caption under the title, and the Share sheet's lines. Each
-// report holds the row as the engine returns it (the engine's case table
-// pins the row); these cases pin what the app makes of it.
+// A row whose check reported an issue and also could not read part of its
+// input, and a row that could not verify: the caption under the title, and
+// the Share sheet's lines. The two Share-line cases of a could-not-verify
+// row run the engine on a hand-built file and read its own row; the others
+// hold a row built as the engine's case table pins it.
 
 @Suite("A row's could-not-read part on the results screen and the Share sheet")
 struct VerificationRowPartTests {
@@ -35,19 +37,106 @@ struct VerificationRowPartTests {
         VerificationRowModel.caption(for: layer, outcome: VerificationRowModel.outcome(for: layer, perPageModes: []))
     }
 
-    // MARK: - The two cases beside the engine table
+    // MARK: - The two cases beside the engine table: real engine rows
 
-    @Test("a row whose page did not open, an edge graze on another page: the Share line names the unopened page and no other")
-    func shareLineNamesTheUnopenedPage() {
-        let layer = Self.row(.warn(Self.unread2), .spatialVerification, pages: [1], couldNotVerify: true)
+    /// A document whose listed pages cannot be opened (`page(at:)` is nil).
+    nonisolated final class UnopenablePagesDocument: PDFDocument {
+        nonisolated(unsafe) var unopenable: Set<Int> = []
+        override func page(at index: Int) -> PDFPage? {
+            unopenable.contains(index) ? nil : super.page(at: index)
+        }
+    }
+
+    /// A hand-built file: one page per content stream, in Helvetica as
+    /// `/F1`, and an /Info body.
+    static func rawPDF(_ contents: [String], info: String? = nil) -> Data {
+        var objects: [Int: String] = [1: "<< /Type /Catalog /Pages 2 0 R >>",
+                                      3: "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"]
+        var kids: [String] = []
+        for (i, content) in contents.enumerated() {
+            let id = 10 + 2 * i
+            kids.append("\(id) 0 R")
+            objects[id] = "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents \(id + 1) 0 R /Resources << /Font << /F1 3 0 R >> >> >>"
+            objects[id + 1] = "<< /Length \(content.utf8.count) >>\nstream\n\(content)\nendstream"
+        }
+        objects[2] = "<< /Type /Pages /Kids [\(kids.joined(separator: " "))] /Count \(kids.count) >>"
+        if let info { objects[4] = "<< \(info) >>" }
+        let size = (objects.keys.max() ?? 0) + 1
+        var out = "%PDF-1.4\n"
+        var offsets = [Int](repeating: -1, count: size)
+        for n in objects.keys.sorted() {
+            offsets[n] = out.utf8.count
+            out += "\(n) 0 obj\n\(objects[n] ?? "")\nendobj\n"
+        }
+        let xref = out.utf8.count
+        out += "xref\n0 \(size)\n0000000000 65535 f \n"
+        for n in 1..<size { out += offsets[n] < 0 ? "0000000000 65535 f \n" : String(format: "%010d 00000 n \n", offsets[n]) }
+        out += "trailer\n<< /Size \(size) /Root 1 0 R\(info == nil ? "" : " /Info 4 0 R") >>\nstartxref\n\(xref)\n%%EOF\n"
+        return Data(out.utf8)
+    }
+
+    /// The file written to a temporary URL and opened from it, as the app
+    /// opens the verified document.
+    static func open(_ data: Data, unopenable: Set<Int> = []) throws -> UnopenablePagesDocument {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("vrp_\(UUID().uuidString).pdf")
+        try data.write(to: url)
+        let doc = try #require(UnopenablePagesDocument(url: url))
+        doc.unopenable = unopenable
+        return doc
+    }
+
+    static func remove(_ doc: PDFDocument) {
+        if let url = doc.documentURL { try? FileManager.default.removeItem(at: url) }
+    }
+
+    /// The engine's own row for `layer` on `doc`, every page in `mode`.
+    static func engineRow(_ layer: VerificationLayer, _ doc: PDFDocument, mode: PipelineMode,
+                          terms: [String] = [], regions: [Int: [RedactionRegion]] = [:]) async -> LayerResult {
+        let n = doc.pageCount
+        return await VerificationEngine().runLayer(
+            layer, outputDocument: SendablePDFDocument(doc), sourcePageCount: n, regions: regions,
+            sensitiveTerms: terms.map { SensitiveTerm(text: $0) }, pipelineMode: mode,
+            filterDigests: Array(repeating: nil, count: n), perPageModes: Array(repeating: mode, count: n),
+            appliedSearches: [], sourceDocument: SendablePDFDocument(doc))
+    }
+
+    /// A box over the left edge of the page's first character: an edge graze.
+    static func grazeRegion(on page: PDFPage) throws -> RedactionRegion {
+        let bounds = try #require(page.selection(for: NSRange(location: 0, length: 1))).bounds(for: page)
+        try #require(bounds.width > 0 && bounds.height > 0)
+        let p = page.bounds(for: .cropBox)
+        let r = CGRect(x: bounds.minX - 10, y: bounds.minY, width: 10 + bounds.width * 0.2, height: bounds.height)
+        return RedactionRegion(id: UUID(), normalizedRect: CGRect(x: r.minX / p.width, y: r.minY / p.height,
+                                                                  width: r.width / p.width, height: r.height / p.height),
+                               source: .manual)
+    }
+
+    @Test("Character Positions' own row for a page that did not open beside an edge graze: the Share line names the unopened page and no other")
+    func shareLineNamesTheUnopenedPage() async throws {
+        let data = Self.rawPDF(["BT /F1 24 Tf 72 700 Td (SECRET CONTENT) Tj ET", ""])
+        let doc = try Self.open(data, unopenable: [1]), whole = try Self.open(data)
+        defer { Self.remove(doc); Self.remove(whole) }
+        let region = try Self.grazeRegion(on: try #require(whole.page(at: 0)))
+        // The fixture really grazes: with every page open, the row is the
+        // graze note and the sheet lists nothing.
+        let grazed = await Self.engineRow(.spatialVerification, whole, mode: .searchableRedaction, regions: [0: [region]])
+        try #require(grazed.status.isWarn && !grazed.couldNotVerify, "the fixture grazes; got \(grazed.status)")
+        #expect(DocumentEditorView.couldNotVerifyItemLines(report: Self.report([grazed])).isEmpty)
+        let layer = await Self.engineRow(.spatialVerification, doc, mode: .searchableRedaction, regions: [0: [region]])
+        #expect(layer.status == .warn("") && layer.shortDescription == Self.unread2, "got \(layer.status)")
         #expect(DocumentEditorView.couldNotVerifyItemLines(report: Self.report([layer]))
                 == ["Character Positions: could not verify on\(Self.nbsp)page\(Self.nbsp)2"])
     }
 
-    @Test("a joined row with no page list: the Share line reads could not verify, with no page")
-    func shareLineJoinedRowNoPage() {
-        let layer = Self.row(.warn("1 term too short to check; Possible sensitive term fragment in output PDF structural data (1 match(es))"),
-                             .binaryStringSearch, pages: nil, couldNotVerify: true)
+    @Test("Terms in Text & Bytes' own joined row with no page list: the Share line reads could not verify, with no page")
+    func shareLineJoinedRowNoPage() async throws {
+        let doc = try Self.open(Self.rawPDF([""], info: "/X (CLASSIFIEDZ)"))
+        defer { Self.remove(doc) }
+        let layer = await Self.engineRow(.binaryStringSearch, doc, mode: .secureRasterization, terms: ["CLASSIFIED", "ab"])
+        #expect(layer.shortDescription
+                == "1 term too short to check; Possible sensitive term fragment in output PDF structural data (1 match(es))",
+                "got \(layer.status)")
+        #expect(layer.pageReferences == nil)
         #expect(DocumentEditorView.couldNotVerifyItemLines(report: Self.report([layer]))
                 == ["Terms in Text & Bytes: could not verify"])
     }
