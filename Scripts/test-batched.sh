@@ -560,7 +560,15 @@ STUB
     ui_suites="$(enumerate_suites "$(cd "$(dirname "$me")/.." && pwd)/Tests/ResectaAppUITests")"
     printf '%s\n' "$ui_suites" | $GREP -qx DocumentLinkUITests \
         || { echo "self-test: the enumerator does not find DocumentLinkUITests in the UI-test tree" >&2; n=1; }
-    if [ "$n" -eq 0 ]; then echo "self-test: ResectaAppUI runs the UI-test target serially (one suite per invocation, $(printf '%s\n' "$ui_suites" | $GREP -c .) suites) through the app scheme OK"; else fails=1; fi
+    # Counted: the enumerator's UI suites are exactly the XCTestCase classes
+    # the tree declares, counted here by a pattern of their own.
+    local ui_declared ui_found
+    ui_declared="$($GREP -rhE '^[[:space:]]*(nonisolated[[:space:]]+)?(final[[:space:]]+)?class[[:space:]]+[A-Za-z0-9_]+[[:space:]]*:[^{]*XCTestCase' \
+        "$(cd "$(dirname "$me")/.." && pwd)/Tests/ResectaAppUITests" | $GREP -c .)"
+    ui_found="$(printf '%s\n' "$ui_suites" | $GREP -c .)"
+    [ "$ui_found" -gt 0 ] && [ "$ui_found" -eq "$ui_declared" ] \
+        || { echo "self-test: the enumerator lists $ui_found UI suites; the tree declares $ui_declared XCTestCase classes" >&2; n=1; }
+    if [ "$n" -eq 0 ]; then echo "self-test: ResectaAppUI runs the UI-test target serially (one suite per invocation, $ui_found suites, as many as the tree declares) through the app scheme OK"; else fails=1; fi
     [ "$fails" -eq 0 ] && { echo "self-test: PASS"; exit 0; }
     echo "self-test: FAIL" >&2; exit 1
 }
