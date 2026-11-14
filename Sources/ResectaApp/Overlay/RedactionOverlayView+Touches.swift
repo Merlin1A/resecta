@@ -2,6 +2,13 @@ import UIKit
 import PDFKit
 import RedactionEngine
 
+// The overlay's touch handling, moved out of `RedactionOverlayView.swift`
+// (the hub) from its `// MARK: - Touch Handling` and `// MARK: - Zoom`
+// seams: touches began, moved, ended and cancelled, the zoom scale they
+// read, the reset of the drag state, and the rejection of a box drawn
+// smaller than the drag threshold. The drag state they read and write is
+// stored on the hub (an extension adds no storage).
+
 extension RedactionOverlayView {
     // MARK: - Touch Handling
 

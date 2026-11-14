@@ -1,5 +1,10 @@
 import UIKit
 
+// The two transforms between the overlay's points and the page's normalized
+// space, and the snap page, moved out of `RedactionOverlayView.swift` (the
+// hub) from its `// MARK: - Coordinate Transforms` and `// MARK: - Snap Page`
+// seams.
+
 extension RedactionOverlayView {
     // MARK: - Coordinate Transforms
 

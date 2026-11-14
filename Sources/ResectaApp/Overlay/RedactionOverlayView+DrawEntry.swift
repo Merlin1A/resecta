@@ -1,5 +1,9 @@
 import UIKit
 
+// The overlay's `draw(_:)` override, moved out of `RedactionOverlayView.swift`
+// (the hub) from its `// MARK: - Drawing` seam. The segments it draws are in
+// `RedactionOverlayView+Draw.swift`.
+
 extension RedactionOverlayView {
     // MARK: - Drawing
 

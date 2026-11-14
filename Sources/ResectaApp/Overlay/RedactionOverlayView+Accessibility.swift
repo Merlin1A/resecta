@@ -1,6 +1,12 @@
 import UIKit
 import RedactionEngine
 
+// The overlay's accessibility, moved out of `RedactionOverlayView.swift` (the
+// hub) from its `// MARK: - Accessibility` seam: the overlay as a container,
+// the layout pass that drops its cached elements, one element a region and
+// one a search highlight, and each region's spoken value. The element cache
+// is stored on the hub (an extension adds no storage).
+
 extension RedactionOverlayView {
     // MARK: - Accessibility
 
@@ -88,10 +94,6 @@ extension RedactionOverlayView {
         if let metadata = coordinator?.redactionState?.regionMetadata[region.id] {
             // Qualitative descriptor replaces the raw
             // percent; same one threshold source as every other site.
-            // This canvas leg is currently unreachable by VoiceOver in
-            // the served tree (accessibilityElements above never
-            // surfaces it in production use) — swapped for consistency;
-            // unverifiable visually.
             let descriptor = SearchResultRow.absoluteConfidenceTier(metadata.confidence).descriptor
             return "\(base), \(descriptor)"
         }

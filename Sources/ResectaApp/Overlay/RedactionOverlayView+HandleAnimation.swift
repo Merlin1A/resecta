@@ -1,5 +1,11 @@
 import UIKit
 
+// The selection handles' scale animation, moved out of
+// `RedactionOverlayView.swift` (the hub) from its `// MARK: - Handle
+// Animation` seam: animating the handles in and out, the display link's
+// tick, and the `removeFromSuperview` override that stops it. The animation
+// state is stored on the hub (an extension adds no storage).
+
 extension RedactionOverlayView {
     // MARK: - Handle Animation
 

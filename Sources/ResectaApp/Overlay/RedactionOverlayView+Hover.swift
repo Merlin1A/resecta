@@ -1,5 +1,9 @@
 import UIKit
 
+// The pointer hover handler, moved out of `RedactionOverlayView.swift` (the
+// hub) from its `// MARK: - Hover` seam. The hub's initialiser installs the
+// hover recognizer that calls it.
+
 extension RedactionOverlayView {
     // MARK: - Hover
 

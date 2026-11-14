@@ -1,6 +1,12 @@
 import UIKit
 import RedactionEngine
 
+// The overlay's configure call, moved out of `RedactionOverlayView.swift`
+// (the hub) from its `// MARK: - Configuration` seam: it takes the regions,
+// the selection, the search highlights and the live preview from the
+// editor's state, and does nothing while a drag is active. The state it writes is stored on the hub
+// (an extension adds no storage).
+
 extension RedactionOverlayView {
     // MARK: - Configuration
 
