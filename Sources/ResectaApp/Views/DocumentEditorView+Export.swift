@@ -88,6 +88,31 @@ extension DocumentEditorView {
         return true
     }
 
+    /// Write the share copy through `write` and return it. On a failed
+    /// write the editor shows the failure and returns to the results with
+    /// every share confirm armed again: an acknowledgement covers one send,
+    /// and a send that never started used none. The confirms' flags are
+    /// cleared here, and so are the two the returned report carries, since
+    /// the phase is not `.verified` while the copy is written. Nil when the
+    /// write failed.
+    static func writeShareCopy(
+        report: VerificationReport, documentState: DocumentState, write: () throws -> URL
+    ) -> URL? {
+        do {
+            return try write()
+        } catch {
+            documentState.rearmShareRiskConfirms()
+            var returned = report
+            returned.userOverrodeFailure = false
+            returned.userAcknowledgedSkippedShare = false
+            documentState.transition(to: .failed(
+                error: .exportError(.writeFailed),
+                returnPhase: .verified(report: returned)
+            ))
+            return nil
+        }
+    }
+
     /// Check once, `delay` after `present`, that the share sheet is up;
     /// when it is not, `recover` takes the editor back to the results.
     @discardableResult
@@ -217,17 +242,10 @@ struct DocumentEditorExportFlow {
         // The share copy sits in the per-session backup-excluded
         // subdirectory, so the name the share sheet shows comes from the
         // same protected location as the pipeline output.
-        let exportURL: URL
-        do {
-            exportURL = try DocumentEditorView.makeShareCopy(
-                of: outputURL, in: coordinator.tempExportDirectory)
-        } catch {
-            documentState.transition(to: .failed(
-                error: .exportError(.writeFailed),
-                returnPhase: .verified(report: report)
-            ))
-            return
-        }
+        guard let exportURL = DocumentEditorView.writeShareCopy(
+            report: report, documentState: documentState,
+            write: { try DocumentEditorView.makeShareCopy(of: outputURL, in: coordinator.tempExportDirectory) })
+        else { return }
 
         // Apply `.complete` protection to the export copy. The
         // session is still live (user is sharing now). Best-effort —

@@ -176,12 +176,13 @@ struct RegionCoverage: Sendable {
     /// request's `appliedPages` (when it names any) are not read. A page the
     /// searcher could not read is reported in `unreadPages`, never passed
     /// by silence: the searcher's own coverage and timeout sinks say which
-    /// pages it read and why it could not read one.
+    /// pages it read and why it could not read one. A cancellation throws:
+    /// a re-run cut short is never an outcome.
     static func check(
         source: SendablePDFDocument,
         requests: [SearchRecheckRequest],
         regions: [Int: [RedactionRegion]]
-    ) async -> Outcome {
+    ) async throws -> Outcome {
         var unread = Set<Int>()
         // The pages' text-layer status as the import and the search read
         // it, so a scanned or header-only page is re-run through OCR the
@@ -201,7 +202,7 @@ struct RegionCoverage: Sendable {
         // occurrence is compared, so the occurrence is judged whole.
         var pieces: [PlacedPiece] = []
         for (index, request) in requests.enumerated() where request.origin == .applied {
-            if Task.isCancelled { break }
+            try Task.checkCancellation()
             let configuration = request.record.scanConfiguration
             await searcher.setThresholdVector(configuration?.thresholdVector)
             await searcher.setUserTerms(configuration?.userTermsIndex)
@@ -221,7 +222,7 @@ struct RegionCoverage: Sendable {
             var strays: [PlacedPiece] = []
             var comparedOccurrences = Set<UUID>()
             for await result in stream {
-                if Task.isCancelled { break }
+                try Task.checkCancellation()
                 let match = PageMatch(
                     requestIndex: index, rect: result.normalizedRect.clampedToNormalized(),
                     term: result.term, occurrence: result.occurrenceID)

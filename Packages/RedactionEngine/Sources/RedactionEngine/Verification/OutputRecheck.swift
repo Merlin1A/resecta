@@ -77,6 +77,31 @@ struct RecheckObservation: Sendable, Equatable {
             regexTimedOut: subset.values.contains(where: \.timedOut), counts: subset,
             textLayerRead: textLayerRead)
     }
+
+    /// The observations a fold reads, made whole before it reads them: a
+    /// page of the output with no observation gets one that says it was not
+    /// read, and a page that was read but holds no count for one of the
+    /// `requestCount` requests is marked not read, keeping the counts it
+    /// does hold (a match that remains there still leads). A page already
+    /// recorded as unopenable, too large or with recognition unavailable
+    /// keeps its own route, so its reason stays. Page order is kept.
+    static func completed(
+        _ observations: [RecheckObservation], pageCount: Int, requestCount: Int
+    ) -> [RecheckObservation] {
+        var byPage: [Int: RecheckObservation] = [:]
+        for observation in observations { byPage[observation.pageIndex] = observation }
+        var out = observations.map { observation -> RecheckObservation in
+            var observation = observation
+            let wasRead = observation.route == .textLayer || observation.route == .ocr
+            let missingCount = (0..<requestCount).contains { observation.counts[$0] == nil }
+            if wasRead && missingCount { observation.route = nil }
+            return observation
+        }
+        for page in 0..<pageCount where byPage[page] == nil {
+            out.append(RecheckObservation(pageIndex: page, route: nil, regexTimedOut: false, counts: [:]))
+        }
+        return out.sorted { $0.pageIndex < $1.pageIndex }
+    }
 }
 
 struct OutputRecheck: Sendable {
@@ -123,7 +148,7 @@ struct OutputRecheck: Sendable {
                 for item in work {
                     group.addTask {
                         try Task.checkCancellation()
-                        return await Self.observePage(
+                        return try await Self.observePage(
                             item, requests: requests, regexTimeoutOverride: regexTimeoutOverride)
                     }
                 }
@@ -141,7 +166,7 @@ struct OutputRecheck: Sendable {
         return observations.sorted { $0.pageIndex < $1.pageIndex }
     }
 
-    private struct PageWork: Sendable {
+    struct PageWork: Sendable {
         let index: Int
         let data: Data?
         let requestIndices: [Int]
@@ -192,10 +217,12 @@ struct OutputRecheck: Sendable {
         var value: Bool { lock.lock(); defer { lock.unlock() }; return fired }
     }
 
-    /// Run every request on one page through its own searcher.
-    private static func observePage(
+    /// Run every request on one page through its own searcher. A
+    /// cancellation throws: a page whose requests were not all run is never
+    /// returned as an observation.
+    static func observePage(
         _ work: PageWork, requests: [SearchRecheckRequest], regexTimeoutOverride: Duration?
-    ) async -> RecheckObservation {
+    ) async throws -> RecheckObservation {
         var observation = RecheckObservation(
             pageIndex: work.index, route: nil, regexTimedOut: false, counts: [:])
         guard let data = work.data,
@@ -215,7 +242,7 @@ struct OutputRecheck: Sendable {
         let wrapped = SendablePDFDocument(pageDocument)
 
         for requestIndex in work.requestIndices {
-            if Task.isCancelled { break }
+            try Task.checkCancellation()
             let request = requests[requestIndex]
             let query = request.record.query
             // The output may have no text layer at all; the searcher's own
@@ -253,7 +280,7 @@ struct OutputRecheck: Sendable {
             await searcher.setUserTermsTimeoutSink { _, _ in timeout.set() }
             let stream = searcher.search(wrapped, mode: mode, progress: { _, _ in })
             for await result in stream {
-                if Task.isCancelled { break }
+                try Task.checkCancellation()
                 remaining += 1
                 perTerm[result.term, default: 0] += 1
                 if query.isScan {

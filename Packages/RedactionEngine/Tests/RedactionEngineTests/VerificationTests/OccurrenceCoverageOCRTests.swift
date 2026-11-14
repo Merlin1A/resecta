@@ -33,7 +33,7 @@ struct OccurrenceCoverageOCRTests {
         let top = try #require(hits.max { $0.normalizedRect.midY < $1.normalizedRect.midY })
         let box = Self.searchBox(over: top)
         let request = TestFixtures.textRequest("Jane Doe", options: options)
-        let coverage = await RegionCoverage.check(source: SendablePDFDocument(doc), requests: [request], regions: [0: [box]])
+        let coverage = try await RegionCoverage.check(source: SendablePDFDocument(doc), requests: [request], regions: [0: [box]])
         #expect(coverage.shortfalls.count == 1 && coverage.shortfalls.first?.pageIndex == 0, "\(coverage.shortfalls)")
 
         let outURL = try await TestPipeline.processAndExport(try Data(contentsOf: url), mode: .secureRasterization, regions: [0: [box]])

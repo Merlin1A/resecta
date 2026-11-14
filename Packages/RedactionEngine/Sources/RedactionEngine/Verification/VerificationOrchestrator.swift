@@ -133,6 +133,13 @@ public struct VerificationOrchestrator: Sendable {
         ) {
             return gate
         }
+        // Equal counts of zero pass the gate, and every per-page check then
+        // reads nothing: an output with no pages is not verified, so the
+        // run ends with the error raised for an output that cannot be
+        // loaded, never a report.
+        guard outputDocument.document.pageCount > 0 else {
+            throw PipelineError.verificationError(.engineCrash(layerIndex: 0))
+        }
 
         // `layers` is the canonical (report) order; the count is derived.
         let layers = verifier.layers(for: pipelineMode)
@@ -219,7 +226,7 @@ public struct VerificationOrchestrator: Sendable {
         // --- Post-sequential batch: one pass over the output, one fold per layer ---
         if !postLayers.isEmpty {
             try Task.checkCancellation()
-            let batch = await Self.observeOutput(outputDocument, requests: appliedSearches)
+            let batch = try await Self.observeOutput(outputDocument, requests: appliedSearches)
             for (position, layer) in postLayers.enumerated() {
                 try Task.checkCancellation()
                 events(.layerStarted(
@@ -252,12 +259,40 @@ public struct VerificationOrchestrator: Sendable {
         // Final cancellation checkpoint before the report is constructed.
         try Task.checkCancellation()
 
-        let orderedResults = layers.compactMap { resultsByLayer[$0] }
-        let elapsed = CFAbsoluteTimeGetCurrent() - startTime
+        return try assembleReport(
+            layers: layers,
+            resultsByLayer: resultsByLayer,
+            durationSeconds: CFAbsoluteTimeGetCurrent() - startTime,
+            perPageModes: perPageModes,
+            perPageFallbackReasons: perPageFallbackReasons
+        )
+    }
+
+    /// The report from the schedule and the results the phases stored: one
+    /// result per scheduled check, in the schedule's (canonical) order. A
+    /// scheduled check that stored no result ends the run with the error
+    /// raised for an output that cannot be verified, its position in the
+    /// schedule as the index, never a report that lists fewer checks than
+    /// were scheduled.
+    func assembleReport(
+        layers: [VerificationLayer],
+        resultsByLayer: [VerificationLayer: LayerResult],
+        durationSeconds: Double,
+        perPageModes: [PipelineMode],
+        perPageFallbackReasons: [TextLayerDetector.FallbackReason?]
+    ) throws -> VerificationReport {
+        var orderedResults: [LayerResult] = []
+        orderedResults.reserveCapacity(layers.count)
+        for (position, layer) in layers.enumerated() {
+            guard let result = resultsByLayer[layer] else {
+                throw PipelineError.verificationError(.engineCrash(layerIndex: position))
+            }
+            orderedResults.append(result)
+        }
         return VerificationReport(
             layers: orderedResults,
             overallStatus: verifier.aggregateStatus(orderedResults),
-            durationSeconds: elapsed,
+            durationSeconds: durationSeconds,
             perPageModes: perPageModes,
             perPageFallbackReasons: perPageFallbackReasons
         )
@@ -266,17 +301,17 @@ public struct VerificationOrchestrator: Sendable {
     /// The one output pass the post-sequential checks share: every request
     /// on every page through the shared runner, off the caller's actor (the
     /// page extraction reads the output document, which has one reader at
-    /// a time — this pass, between the sequential layers). Nil when nothing was
-    /// requested (each layer then reports NOT APPLICABLE without a pass) or
-    /// when the pass was cancelled (each layer's own pass then folds the
-    /// cancellation into its `.skipped` row, as before).
+    /// a time — this pass, between the sequential layers). Nil only when
+    /// nothing was requested (each layer then reports NOT APPLICABLE without
+    /// a pass). What the pass throws (a cancellation) is thrown to the
+    /// caller, never turned into a missing batch.
     @concurrent static func observeOutput(
         _ outputDocument: SendablePDFDocument, requests: [SearchRecheckRequest]
-    ) async -> PostSequentialBatch? {
+    ) async throws -> PostSequentialBatch? {
         guard !requests.isEmpty else { return nil }
         let start = CFAbsoluteTimeGetCurrent()
-        guard let observations = try? await OutputRecheck().observe(
-            outputDocument: outputDocument, requests: requests) else { return nil }
+        let observations = try await OutputRecheck().observe(
+            outputDocument: outputDocument, requests: requests)
         return PostSequentialBatch(
             observations: observations, seconds: CFAbsoluteTimeGetCurrent() - start)
     }
