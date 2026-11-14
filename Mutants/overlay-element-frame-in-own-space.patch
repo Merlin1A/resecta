@@ -1,0 +1,19 @@
+Property: A box's accessibility element has its frame in the overlay's own space, so it follows the box when the page moves on screen without the overlay being laid out again (a parked Search sheet raised or closed, a pinch).
+Area: canvas overlay (accessibility)
+Test command: xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppUITests/CanvasRegionAccessibilityUITests -only-testing:ResectaAppTests/OverlayCoordinateTests
+Must go red: ResectaAppUITests/CanvasRegionAccessibilityUITests testABoxsElementStaysOnTheBoxWhenTheSearchSheetCloses; ResectaAppUITests/CanvasRegionAccessibilityUITests testABoxsElementStaysOnTheBoxAfterAPinch; ResectaAppTests/OverlayCoordinateTests "Each element's frame is given in the overlay's own space" (the box's case)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView.swift
+index 5526bb2f..e0a34aa1 100644
+--- a/Sources/ResectaApp/Overlay/RedactionOverlayView.swift
++++ b/Sources/ResectaApp/Overlay/RedactionOverlayView.swift
+@@ -919,7 +919,7 @@ class RedactionOverlayView: UIView {
+     ) -> UIAccessibilityElement {
+         let element = UIAccessibilityElement(accessibilityContainer: self)
+         let viewRect = pdfNormalizedToOverlay(region.normalizedRect)
+-        element.accessibilityFrameInContainerSpace = viewRect
++        element.accessibilityFrame = UIAccessibility.convertToScreenCoordinates(viewRect, in: self)  // mutant: the box frame fixed in screen coordinates
+ 
+         // Numbered label — "Redaction region N"
+         element.accessibilityLabel = "Redaction region \(index + 1)"
