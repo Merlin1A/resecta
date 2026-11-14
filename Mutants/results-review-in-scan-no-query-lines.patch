@@ -1,0 +1,18 @@
+Property: Review in Scan is offered only on a sweep row that carries its query lines.
+Area: results screen, Review in Scan (App)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/ReviewInScanTests
+Must go red: ResectaAppTests/ReviewInScanTests offeredOnNeedsReviewSweep
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/LayerResultRow.swift b/Sources/ResectaApp/Views/LayerResultRow.swift
+index 37e5bbde..91c89cbc 100644
+--- a/Sources/ResectaApp/Views/LayerResultRow.swift
++++ b/Sources/ResectaApp/Views/LayerResultRow.swift
+@@ -405,7 +405,6 @@ struct LayerResultRow: View {
+     static func offersReviewInScan(layer: LayerResult) -> Bool {
+         layer.layer == .detectionSweep
+             && (layer.status.isInfo || layer.status.isAttention)
+-            && layer.queryLines != nil
+     }
+ 
+     static func rowCaptionText(layer: LayerResult) -> String? {
