@@ -110,9 +110,18 @@ public final class PageRasterizer: @unchecked Sendable {
     ///
     /// `dpiCap` is the MainActor-owned ceiling maintained by the pipeline
     /// coordinator (lowered on memory-warning notifications per KI-5).
+    ///
+    /// The work is in stages, in this order: `preflight` (the front gate
+    /// and the DPI), `prepareTextLayer` (a Searchable page's text layer,
+    /// built before the render), `render`, then the bitmap work in this
+    /// function's own autorelease block: the ink test, `paint`, `readBack`,
+    /// the image and `buildOutput`. The block and its one `defer` stay here,
+    /// so the pooled bitmap is zeroed and returned only after the image is
+    /// made.
     @concurrent
     public func rasterize(_ page: PDFPageData, dpiCap: Int = defaultDPICap) async throws -> RasterizeResult {
         let raster = try preflight(page, dpiCap: dpiCap)
+        // Written before the render; after it, only the ink test changes it.
         var textLayer = await prepareTextLayer(page, effectiveSize: raster.effectiveSize)
         let renderedImage = try await render(page, raster: raster)
 
@@ -144,10 +153,13 @@ public final class PageRasterizer: @unchecked Sendable {
 
             ctx.draw(renderedImage, in: CGRect(x: 0, y: 0, width: width, height: height))
 
+            // 4b. The hidden-text ink test (`inkTest`).
             try self.inkTest(&textLayer, context: ctx, page: page, pageSize: raster.effectiveSize)
 
+            // 4c-5. Ink growth, the fills, the growth fills and their readback (`paint`).
             try self.paint(context: ctx, page: page)
 
+            // 6. Verify fills (`readBack`).
             try self.readBack(context: ctx, page: page, width: width, height: height)
 
             // 7. Extract final image
@@ -159,11 +171,20 @@ public final class PageRasterizer: @unchecked Sendable {
         }
     }
 
+    // MARK: - The stages of `rasterize`
+
+    /// The page's output size and DPI as `preflight` settled them.
     struct Raster {
+        /// The output page in points: the crop box turned by the page's rotation.
         let effectiveSize: CGSize
         let dpi: Int
     }
 
+    /// A Searchable page's text layer as it crosses the render: the
+    /// surviving characters, their digest, the removal rectangles the line
+    /// assembly reads, and the page's fallback reason. `prepareTextLayer`
+    /// writes it; after the render, only the ink test changes it: it may
+    /// drop the text layer and record why.
     struct TextLayerState {
         var entries: [CharacterInfo]?
         var digest: PageFilterDigest?
@@ -171,6 +192,8 @@ public final class PageRasterizer: @unchecked Sendable {
         var fallbackReason: TextLayerDetector.FallbackReason?
     }
 
+    /// The front gate, the test seam, the mode check and the DPI. Throws
+    /// the page's refusal.
     private func preflight(_ page: PDFPageData, dpiCap: Int) throws -> Raster {
         try Task.checkCancellation()
 
@@ -239,6 +262,14 @@ public final class PageRasterizer: @unchecked Sendable {
         return Raster(effectiveSize: effectiveSize, dpi: dpi)
     }
 
+    /// The text layer, built before the render from the source page. It
+    /// never throws: every error from the extraction or the character filter,
+    /// cancellation included, is caught here and the page goes on as Secure
+    /// Rasterization with the reason recorded.
+    ///
+    /// Internal, not private, for one characterization pin alone: a
+    /// cancelled stage. `rasterize` cannot reach that case, because
+    /// `preflight` checks cancellation first.
     func prepareTextLayer(_ page: PDFPageData, effectiveSize: CGSize) async -> TextLayerState {
         // 2. Text extraction for Searchable Redaction
         // Extract character positions BEFORE rasterization to capture from source PDF.
@@ -279,7 +310,7 @@ public final class PageRasterizer: @unchecked Sendable {
                     // BOTH invariants: a zero-origin region basis AND zero live
                     // `page.page` reads in the concurrent path (this
                     // statement overwrites the earlier `cropBoxBounds` value, while
-                    // the :119 geometry read survives). For an un-rotated page
+                    // `preflight`'s geometry read survives). For an un-rotated page
                     // `effectiveSize` equals the cropBox size; the origin is zero.
                     // This one `pageBounds` feeds all FOUR synchronized consumers:
                     // the rect filter, the region shapes,
@@ -379,6 +410,7 @@ public final class PageRasterizer: @unchecked Sendable {
         )
     }
 
+    /// The page drawn at the settled DPI, under the render's timeout.
     private func render(_ page: PDFPageData, raster: Raster) async throws -> CGImage {
         // 3. Render page with timeout
         // CG-only concurrent render path — draw the pre-extracted
@@ -393,20 +425,20 @@ public final class PageRasterizer: @unchecked Sendable {
         )
     }
 
+    /// 4b. The hidden-text ink test. A Searchable page's
+    /// surviving glyphs are read back from the RENDERED pixels — what
+    /// the reader will see. A glyph whose pixel box is uniform carries
+    /// no visible ink (white-on-white text, an invisible render mode,
+    /// a box painted over it); its text layer would re-expose what
+    /// the page hides, so the page falls back to Secure HERE — after
+    /// the render, before any fill — through the same path as the
+    /// pre-render fallbacks: entries and digest dropped, the reason
+    /// recorded. The box goes through the fills' own mapping and the
+    /// fills' own reader (`hasInklessGlyph`).
     private func inkTest(
         _ textLayer: inout TextLayerState, context ctx: CGContext,
         page: PDFPageData, pageSize effectiveSize: CGSize
     ) throws {
-        // 4b. The hidden-text ink test. A Searchable page's
-        // surviving glyphs are read back from the RENDERED pixels — what
-        // the reader will see. A glyph whose pixel box is uniform carries
-        // no visible ink (white-on-white text, an invisible render mode,
-        // a box painted over it); its text layer would re-expose what
-        // the page hides, so the page falls back to Secure HERE — after
-        // the render, before any fill — through the same path as the
-        // pre-render fallbacks: entries and digest dropped, the reason
-        // recorded. The box goes through the fills' own mapping and the
-        // fills' own reader (`hasInklessGlyph`).
         if let entries = textLayer.entries,
            try Self.hasInklessGlyph(
                context: ctx, entries: entries, pageSize: effectiveSize,
@@ -431,6 +463,8 @@ public final class PageRasterizer: @unchecked Sendable {
         }
     }
 
+    /// The ink growth read, the fills, then each growth rectangle filled and
+    /// read back. Runs after the ink test and before `readBack`.
     private func paint(context ctx: CGContext, page: PDFPageData) throws {
         // 4c. Ink growth, read on the rendered page before any fill: a
         // text-derived fill grows over the ink that crosses its edge.
@@ -450,6 +484,7 @@ public final class PageRasterizer: @unchecked Sendable {
         }
     }
 
+    /// Every region's fill read back over its clamped pixel rectangle.
     private func readBack(context ctx: CGContext, page: PDFPageData, width: Int, height: Int) throws {
         // 6. Verify fills. 256-row band cancellation
         // checks happen inside; a thrown CancellationError propagates here.
@@ -476,6 +511,7 @@ public final class PageRasterizer: @unchecked Sendable {
         }
     }
 
+    /// The page's output and its result.
     private func buildOutput(
         _ textLayer: TextLayerState, image redactedImage: CGImage,
         page: PDFPageData, pageSize effectiveSize: CGSize
