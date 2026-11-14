@@ -1,7 +1,7 @@
 Property: A line's direction is measured in page points, not in the 0-to-1 frame whose two axes have different scales.
 Area: OCR literal search, lines joined across a line break
 Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/OCRLineJoinDirectionTests (or on the host: cd Packages/RedactionEngine && swift test --filter OCRLineJoinDirectionTests)
-Must go red: RedactionEngineTests/OCRLineJoinDirectionTests direction (one column, skew 5: 5 degrees, measured in page points); RedactionEngineTests/OCRLineJoinDirectionTests join (a long line over a short last line 12 pt apart: the value across them on two boxes, skew -3.5, turned 0)
+Must go red: RedactionEngineTests/OCRLineJoinDirectionTests join [a long line over a short last line 12 pt apart: the value across them on two boxes, skew -3.5, turned 0]; RedactionEngineTests/OCRLineJoinDirectionTests direction [one column, skew 5: 5 degrees, measured in page points]
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+OCRCrossLine.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+OCRCrossLine.swift
