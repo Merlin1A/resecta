@@ -69,11 +69,19 @@ struct ParkedChromeLayoutTests {
         pages: Int = 3,
         size: UserInterfaceSizeClass? = .compact,
         phase: DocumentState.PhaseKind = .editing,
-        hug: CGFloat = CompactFloatDetent.hugHeight
+        hug: CGFloat = CompactFloatDetent.hugHeight,
+        barHeight: CGFloat = 0
     ) -> ParkedChromeLayout {
         ParkedChromeLayout(
             sheetPresented: sheet, detent: detent, walkLive: walk,
-            pageCount: pages, sizeClass: size, phase: phase, hugHeight: hug)
+            pageCount: pages, sizeClass: size, phase: phase, hugHeight: hug,
+            pageBarHeight: barHeight)
+    }
+
+    private static func repoFile(_ relativePath: String) throws -> String {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        return try String(contentsOf: root.appendingPathComponent(relativePath), encoding: .utf8)
     }
 
     @Test("The page bar mounts only at compact width, with a page open, in the editing phase")
@@ -149,6 +157,47 @@ struct ParkedChromeLayoutTests {
     func pageBarClearanceIsTheBarsLayoutHeight() {
         #expect(ParkedChromeLayout.pageBarClearance
                 == ResectaTokens.TouchTarget.minimum + 2 * ResectaTokens.Spacing.sm)
+    }
+
+    @Test("A bottom message is lifted by the page bar's measured height")
+    func toastClearanceFollowsTheMeasuredBar() {
+        // No sheet: the bar's own height.
+        #expect(layout(sheet: false, walk: false, barHeight: 126).toastClearance == 126)
+        // Parked with no walk: the hug plus the bar.
+        #expect(layout(walk: false, hug: 120, barHeight: 126).toastClearance == 246)
+        // Parked with a live walk: the bar steps aside, whatever it measured.
+        #expect(layout(walk: true, hug: 120, barHeight: 126).toastClearance == 120)
+        // A taller sheet: nothing.
+        #expect(layout(detent: .medium, barHeight: 126).toastClearance == 0)
+        #expect(layout(detent: .large, barHeight: 126).toastClearance == 0)
+        // No page: no bar, so no bar's share.
+        #expect(layout(sheet: false, walk: false, pages: 0, barHeight: 126).toastClearance == 0)
+    }
+
+    @Test("A bar not yet measured, or no taller than one line, lifts by the one-line bar's height")
+    func toastClearanceFloorsAtTheOneLineBar() {
+        let bar = ParkedChromeLayout.pageBarClearance
+        #expect(layout(sheet: false, walk: false, barHeight: 0).toastClearance == bar)
+        #expect(layout(sheet: false, walk: false, barHeight: 40).toastClearance == bar)
+        #expect(layout(sheet: false, walk: false, barHeight: 62).toastClearance == bar)
+        #expect(layout(sheet: false, walk: false, barHeight: 62.5).toastClearance == 62.5)
+    }
+
+    @Test("The editor measures the bar where it mounts, and both builders read that height")
+    func barHeightSourcePins() throws {
+        let editor = try Self.repoFile("Sources/ResectaApp/Views/DocumentEditorView.swift")
+        let sheet = try Self.repoFile("Sources/ResectaApp/Views/Search/SearchAndRedactSheet+CompactApply.swift")
+        let start = try #require(editor.range(of: "private var pageNavigationBarInset"))
+        let end = try #require(editor.range(of: "var parkedChromeLayout", range: start.upperBound..<editor.endIndex))
+        let inset = editor[start.upperBound..<end.lowerBound]
+        let measure = try #require(inset.range(of: ".onGeometryChange(for: CGFloat.self)"),
+                                   "the bar is measured where it mounts")
+        let padding = try #require(inset.range(of: ".padding(.bottom, layout.canvasBottomInset)"))
+        #expect(measure.lowerBound < padding.lowerBound,
+                "the bar is measured before its bottom padding, so a parked sheet's height is not counted twice")
+        let read = "pageBarHeight: toastManager.pageBarHeight"
+        #expect(editor.components(separatedBy: read).count - 1 == 1)
+        #expect(sheet.components(separatedBy: read).count - 1 == 1)
     }
 
     @Test("The hint-capsule lift is zero in every state — the capsule rides the bottom inset")

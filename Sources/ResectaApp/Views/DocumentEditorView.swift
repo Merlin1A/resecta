@@ -569,6 +569,10 @@ struct DocumentEditorView: View {
         Group {
             if layout.showsPageBar {
                 PageNavigationBar()
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                        toastManager.pageBarHeight = height
+                        toastManager.bottomClearance = parkedChromeLayout.toastClearance
+                    }
                     .padding(.bottom, layout.canvasBottomInset)
                     .onAppear { toastManager.bottomClearance = layout.toastClearance }
             } else {
@@ -596,7 +600,8 @@ struct DocumentEditorView: View {
             pageCount: documentState.pageCount,
             sizeClass: horizontalSizeClass,
             phase: documentState.phaseKind,
-            hugHeight: CompactFloatDetent.hug(for: dynamicTypeSize)
+            hugHeight: CompactFloatDetent.hug(for: dynamicTypeSize),
+            pageBarHeight: toastManager.pageBarHeight
         )
     }
 

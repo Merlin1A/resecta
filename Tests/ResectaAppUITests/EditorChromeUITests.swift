@@ -375,6 +375,94 @@ nonisolated final class EditorChromeUITests: XCTestCase {
         attachScreenshot(named: "chrome-walk-ended-page-bar-back")
     }
 
+    // MARK: - A bottom message above the page bar, at every text size
+
+    /// The gap between a bottom message's foot and the page bar's glass at
+    /// the default text size: the 32 pt (`ResectaTokens.Spacing.xl`) the
+    /// bottom toast hosts add above their lift. Read on the unchanged tree:
+    /// the message's element reports its whole frame, padding included.
+    private static let defaultGapAbovePageBar: CGFloat = 32
+
+    /// The page bar's padding above its content, which the bar's element
+    /// does not report (its identifier sits on the content).
+    private static let pageBarTopPadding: CGFloat = 8
+
+    private func launchEditor(textSize: String?) {
+        var arguments = ["--uitesting", "--loadTestDocument", "--multipageDoc"]
+        if let textSize { arguments += ["-UIPreferredContentSizeCategoryName", textSize] }
+        app.launchArguments = arguments
+        app.launch()
+    }
+
+    /// The gap between the load message's foot and the top of the page
+    /// bar's glass, read once the message has stopped sliding in.
+    private func messageGapAbovePageBar(_ name: String) -> CGFloat {
+        let bar = element("pageNav")
+        XCTAssertTrue(bar.waitForExistence(timeout: 60), "The page bar never appeared.")
+        let message = app.staticTexts
+            .matching(NSPredicate(format: "label BEGINSWITH 'Text layer detected'")).firstMatch
+        XCTAssertTrue(message.waitForExistence(timeout: 10), "The load message never appeared.")
+        var frame = message.frame
+        let deadline = Date().addingTimeInterval(3)
+        while Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.3)
+            let next = message.frame
+            if next == frame { break }
+            frame = next
+        }
+        let gap = (bar.frame.minY - Self.pageBarTopPadding) - frame.maxY
+        let reading = XCTAttachment(string: "gap \(gap) pt; message \(frame); page bar \(bar.frame)")
+        reading.name = "\(name)-gap"
+        reading.lifetime = .keepAlways
+        add(reading)
+        attachScreenshot(named: name)
+        return gap
+    }
+
+    func testBottomMessage_atTheDefaultSize_keepsItsGapAboveThePageBar() {
+        launchEditor(textSize: nil)
+        let counter = element("pageNavCounter")
+        XCTAssertTrue(counter.waitForExistence(timeout: 60), "The page counter never appeared.")
+        XCTAssertLessThanOrEqual(counter.frame.height, 40, "The counter is on one line at the default size.")
+        let gap = messageGapAbovePageBar("bottom-message-default-size")
+        XCTAssertLessThanOrEqual(abs(gap - Self.defaultGapAbovePageBar), 2,
+                                 "The message's gap above the page bar is \(gap) pt.")
+    }
+
+    func testBottomMessage_atTheLargestOrdinarySize_keepsItsGapAboveThePageBar() {
+        launchEditor(textSize: "UICTContentSizeCategoryXXXL")
+        let counter = element("pageNavCounter")
+        XCTAssertTrue(counter.waitForExistence(timeout: 60), "The page counter never appeared.")
+        // The counter's line is taller here than at the default size, so a
+        // size name the system ignored (it says nothing) fails this test.
+        XCTAssertGreaterThanOrEqual(counter.frame.height, 25, "The text size did not take.")
+        XCTAssertLessThanOrEqual(counter.frame.height, 40, "The counter is on one line below the accessibility sizes.")
+        let gap = messageGapAbovePageBar("bottom-message-largest-ordinary-size")
+        XCTAssertLessThanOrEqual(abs(gap - Self.defaultGapAbovePageBar), 2,
+                                 "The message's gap above the page bar is \(gap) pt.")
+    }
+
+    func testBottomMessage_atAccessibilityOne_keepsItsGapAboveThePageBar() {
+        launchEditor(textSize: "UICTContentSizeCategoryAccessibilityM")
+        let counter = element("pageNavCounter")
+        XCTAssertTrue(counter.waitForExistence(timeout: 60), "The page counter never appeared.")
+        XCTAssertGreaterThan(counter.frame.height, 40, "The text size did not take: the counter stacks here.")
+        let gap = messageGapAbovePageBar("bottom-message-accessibility-one")
+        XCTAssertLessThanOrEqual(abs(gap - Self.defaultGapAbovePageBar), 2,
+                                 "The message's gap above the page bar is \(gap) pt.")
+    }
+
+    func testBottomMessage_atTheLargestTextSize_keepsItsGapAboveThePageBar() {
+        launchEditor(textSize: "UICTContentSizeCategoryAccessibilityXXXL")
+        let counter = element("pageNavCounter")
+        XCTAssertTrue(counter.waitForExistence(timeout: 60), "The page counter never appeared.")
+        XCTAssertGreaterThan(counter.frame.height, 40, "The text size did not take: the counter stacks here.")
+        let gap = messageGapAbovePageBar("bottom-message-largest-text-size")
+        XCTAssertGreaterThanOrEqual(gap, 0, "The message overlaps the page bar by \(-gap) pt.")
+        XCTAssertLessThanOrEqual(abs(gap - Self.defaultGapAbovePageBar), 2,
+                                 "The message's gap above the page bar is \(gap) pt.")
+    }
+
     /// Grabber drag from the parked strip up until the sheet's Dismiss
     /// shows (`ResultWalkUITests`' idiom); the Dismiss, or nil.
     private func raiseSheetToDismiss() -> XCUIElement? {

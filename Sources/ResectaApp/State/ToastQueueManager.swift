@@ -118,6 +118,14 @@ final class ToastQueueManager {
     /// and by the sheet on its detent changes and disappearance.
     var bottomClearance: CGFloat = 0
 
+    /// The page bar's measured layout height, written by the editor where
+    /// the bar mounts and read by both places that build the bottom-chrome
+    /// model (the editor and the Search sheet), so the lift follows the
+    /// bar when its counter stacks at the larger text sizes. 0 until the
+    /// bar is first measured; the model never lifts by less than the
+    /// one-line bar's height.
+    var pageBarHeight: CGFloat = 0
+
     /// Pre-filtered active toasts by position — avoids per-render .filter allocations.
     var activeTopToasts: [ToastItem] {
         activeToasts.filter { $0.severity.position == .top }
