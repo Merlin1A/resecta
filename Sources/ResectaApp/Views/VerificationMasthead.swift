@@ -272,22 +272,14 @@ struct VerificationMasthead: View {
         VStack(spacing: 0) {
             CountRing(content: VerificationMasthead.ringContent(report: report),
                       drawKey: VerificationMasthead.drawKey(for: report))
-            BalancedLines {
-                Text(VerificationResultsView.mastheadTitle(report: report))
-                    .font(.title.bold())
-                    .foregroundStyle(.primary)
-                    .multilineTextAlignment(.center)
-            }
-            .padding(.top, ResectaTokens.Results.ringToTitle)
+            BalancedText(string: VerificationResultsView.mastheadTitle(report: report), font: .title.bold())
+                .foregroundStyle(.primary)
+                .padding(.top, ResectaTokens.Results.ringToTitle)
             if let sentence {
-                BalancedLines {
-                    Text(sentence)
-                        .font(.subheadline)
-                        .foregroundStyle(ResectaTokens.SemanticColor.supportText)
-                        .multilineTextAlignment(.center)
-                }
-                .frame(maxWidth: ResectaTokens.Results.sentenceMaxWidth)
-                .padding(.top, ResectaTokens.Results.titleToSentence)
+                BalancedText(string: sentence, font: .subheadline)
+                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+                    .frame(maxWidth: ResectaTokens.Results.sentenceMaxWidth)
+                    .padding(.top, ResectaTokens.Results.titleToSentence)
                     // The ATTENTION sentence can quote the review terms —
                     // text the checks found still readable in the output.
                     .privacySensitive(quotesTerms)
@@ -433,6 +425,22 @@ struct CountRing: View {
         case .warn: ResectaTokens.Results.warnRing
         case .attention: ResectaTokens.SemanticColor.attentionText
         case .fail: ResectaTokens.SemanticColor.failText
+        }
+    }
+}
+
+/// The masthead's title or its sentence: the string in its font, centred,
+/// laid out by `BalancedLines`. The one place a balanced text is built; the
+/// callers give it their colour, padding and width limit from outside.
+struct BalancedText: View {
+    let string: String
+    let font: Font
+
+    var body: some View {
+        BalancedLines {
+            Text(string)
+                .font(font)
+                .multilineTextAlignment(.center)
         }
     }
 }
