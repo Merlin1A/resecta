@@ -492,6 +492,54 @@ struct VerificationRowModelTests {
         #expect(whole.caption == "\u{201C}Delia\u{201D} is still readable on\u{00A0}page\u{00A0}2.")
     }
 
+    @Test("An opened part-of-a-word result gives no search remedy; a whole-word result keeps its lead")
+    func fragmentResultHasNoSearchLead() throws {
+        typealias Item = LayerResultRow.ExpandedItem
+        func result(_ terms: [String], pages: [Int]?, fragment: Bool,
+                    check: VerificationLayer = .ocrCheck) -> LayerResult {
+            LayerResult(name: check.name, symbolName: "shield", status: .attention("x"),
+                        shortDescription: "Engine short line.", detailDescription: "", pageReferences: pages,
+                        durationSeconds: 0, reviewTermTexts: terms, layer: check, reviewIsFragment: fragment)
+        }
+        func opened(_ layer: LayerResult, _ modes: [PipelineMode] = []) -> [[Item]] {
+            let model = VerificationRowModel(layer: layer, perPageModes: modes)
+            return [LayerResultRow.expandedItems(model: model, layer: layer, opensPages: true),
+                    LayerResultRow.groupedExpandedItems(model: model, layer: layer, pagesOnChips: true)]
+        }
+        func leads(_ items: [Item]) -> [Item] {
+            items.filter { if case .lead = $0 { return true } else { return false } }
+        }
+
+        // The picture-reading check, part of a word: no lead, in either form of the opened block.
+        let fragments = [result(["Delia"], pages: [1], fragment: true),
+                         result(["Delia", "Hartwell"], pages: [0, 2], fragment: true)]
+        #expect(fragments.count == 2)
+        for layer in fragments {
+            let model = VerificationRowModel(layer: layer, perPageModes: [])
+            #expect(model.lead.isEmpty, "\(layer.reviewTermTexts ?? [])")
+            for items in opened(layer) { #expect(leads(items).isEmpty, "\(layer.reviewTermTexts ?? [])") }
+            // The caption is still the box's own sentence.
+            #expect(model.caption == VerificationRowModel.fragmentSentence(
+                termTexts: layer.reviewTermTexts ?? [], pages: layer.pageReferences))
+        }
+
+        // The same check, whole words: the search remedy leads, as shipped.
+        let wholes = [(result(["Delia"], pages: [1], fragment: false), 1),
+                      (result(["Delia", "Hartwell"], pages: [0, 2], fragment: false), 2)]
+        #expect(wholes.count == 2)
+        for (layer, count) in wholes {
+            let expected = VerificationRowModel.reviewLead(termCount: count)
+            #expect(VerificationRowModel(layer: layer, perPageModes: []).lead == [expected])
+            for items in opened(layer) { #expect(items.first == .lead(expected), "\(count) word(s)") }
+        }
+
+        // The drawing-commands check with the flag: only the whole-word line goes; its stop line stays.
+        let modes: [PipelineMode] = [.searchableRedaction, .searchableRedaction, .searchableRedaction]
+        let stream = result(["Delia"], pages: [0], fragment: true, check: .operatorReExtraction)
+        let stop = try #require(VerificationRowModel.contentStreamStopLine(pages: [0], pageCount: modes.count))
+        #expect(VerificationRowModel(layer: stream, perPageModes: modes).lead == [stop])
+    }
+
     @Test("A Search Re-check that re-ran no typed search (a scan-only run) captions its passed row with the check's own compare line; a typed re-run keeps the explainer")
     func scanOnlyRecheckPassedCaption() {
         let compareLine = "No typed searches to re-run; the applied scan's 1 match was compared with its box on the original pages — it is covered."
