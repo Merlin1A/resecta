@@ -28,7 +28,9 @@
 #       split that widens the name and is not compared by --compare-lists.
 #   F6  The page mode's fallback triggers are asked in one place. In the app
 #       and engine sources and the chain runner's page loop, outside the
-#       detector itself: no call of `checkFallbackTriggers(` beyond its list.
+#       detector itself and the page mode decision's own file
+#       (Detection/PageModeDecision.swift): no call of
+#       `checkFallbackTriggers(` beyond its list.
 #
 # Comments are never read. String literals are read by F3 alone. A listed
 # site that is no longer in the tree is reported as gone; it may be taken off
@@ -138,7 +140,9 @@ F6_LIST = {
         "if let trigger = TextLayerDetector.checkFallbackTriggers(page) {",
     ],
 }
-F6_EXEMPT = [E + "Detection/TextLayerDetector.swift"]
+# The detector itself, and the one place the page's mode is decided (the
+# app and the chain runner both call that decision).
+F6_EXEMPT = [E + "Detection/TextLayerDetector.swift", E + "Detection/PageModeDecision.swift"]
 
 LISTS = {"F1": F1_LIST, "F2": F2_LIST, "F3": F3_LIST, "F4": F4_LIST, "F6": F6_LIST}
 
@@ -555,6 +559,12 @@ def self_test():
         offences, _ = judge(tmp, empty, names, quiet=True)
         check("F4 a width or height compared with any other number reads as a floor", len(offences) == 2)
         os.remove(os.path.join(tmp, path))
+        # F6: a call in the page mode decision's own file is no offence.
+        write(tmp, E + "Detection/PageModeDecision.swift",
+              "func d() { _ = TextLayerDetector.checkFallbackTriggers(page) }\n")
+        offences, _ = judge(tmp, empty, names, quiet=True)
+        check("F6 a call in the page mode decision's own file reads as none", not offences)
+        os.remove(os.path.join(tmp, E + "Detection/PageModeDecision.swift"))
         # A widened name written from its own type's files is no offence.
         offences, _ = judge(tmp, empty, names, quiet=True)
         check("F5 a write from the type's own files reads as none", not offences)
@@ -564,7 +574,7 @@ def self_test():
     grown.setdefault("F1", {}).setdefault(A + "Views/Planted.swift", []).append("let s = DocumentSearcher()")
     check("a list entry the change adds reads as an offence", len(list_growth(base, grown)) == 1)
     check("the same lists read as none", not list_growth(base, base))
-    expected = 6 * 4 + 4 + 2 + 2
+    expected = 6 * 4 + 4 + 2 + 2 + 1
     check(f"the self-test ran its {expected} cases", len(results) == expected)
     failed = [n for n, ok in results if not ok]
     print(f"self-test: {len(results) - len(failed)} of {len(results)} cases passed")
