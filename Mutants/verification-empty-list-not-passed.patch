@@ -1,7 +1,7 @@
 Property: An empty list of checks reads skipped: nothing was verified, so it never folds to Passed.
 Area: verification schedule (Verification)
 Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/UnfinishedRunTests
-Must go red: RedactionEngineTests/UnfinishedRunTests eachCase
+Must go red: RedactionEngineTests/UnfinishedRunTests eachCase [an empty list of checks reads skipped, not passed]
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine.swift

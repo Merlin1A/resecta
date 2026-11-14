@@ -1,7 +1,7 @@
 Property: A report lists one result per scheduled check; a check that stored no result ends the run instead of being dropped.
 Area: verification schedule (Verification)
 Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/UnfinishedRunTests
-Must go red: RedactionEngineTests/UnfinishedRunTests eachCase
+Must go red: RedactionEngineTests/UnfinishedRunTests eachCase [a scheduled check that stored no result ends the run, and the report is built in two places only]
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationOrchestrator.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationOrchestrator.swift

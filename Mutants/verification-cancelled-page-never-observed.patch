@@ -1,7 +1,7 @@
 Property: A cancelled page throws; it is never returned as an observation with some of its requests' counts missing.
 Area: verification schedule (Verification)
 Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/UnfinishedRunTests
-Must go red: RedactionEngineTests/UnfinishedRunTests eachCase
+Must go red: RedactionEngineTests/UnfinishedRunTests eachCase [a cancelled page throws instead of returning a part observation]
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/OutputRecheck.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/OutputRecheck.swift
