@@ -1,0 +1,33 @@
+Property: The results area keeps one root view in every state, so the field keeps its focus.
+Area: the Search sheet's results area
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppUITests/SearchTypingFocusUITests/testTypingFirstResults_fieldKeepsFocusAndSheetHolds
+Must go red: ResectaAppUITests/SearchTypingFocusUITests testTypingFirstResults_fieldKeepsFocusAndSheetHolds
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/Search/SearchResultsSection.swift b/Sources/ResectaApp/Views/Search/SearchResultsSection.swift
+index 586ac352..6cdb4613 100644
+--- a/Sources/ResectaApp/Views/Search/SearchResultsSection.swift
++++ b/Sources/ResectaApp/Views/Search/SearchResultsSection.swift
+@@ -75,6 +75,13 @@ struct SearchResultsSection: View {
+         // found nothing) re-hosts that inset, the field leaves its
+         // window for an instant, loses first responder, and the
+         // keyboard closes under the user's fingers.
++        Group {
++            if searchState.results.isEmpty && !searchState.isSearching {
++                VStack(spacing: 0) {
++                    sectionTopChrome
++                    emptyState
++                }
++            } else {
+         resultsList
+             .overlay {
+                 if searchState.searchModeType == .piiScan
+@@ -96,6 +103,8 @@ struct SearchResultsSection: View {
+             .safeAreaInset(edge: .top, spacing: 0) {
+                 sectionTopChrome
+             }
++            }
++        }
+             .background { keyboardShortcutButtons }
+     }
+ 

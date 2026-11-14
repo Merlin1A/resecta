@@ -1,0 +1,18 @@
+Property: A search whose run is still going is not started again.
+Area: Return in the Search field
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/SearchReturnRuleTests
+Must go red: ResectaAppTests/SearchReturnRuleTests runningRunOfTheSameSearch
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/SearchState+ReturnRule.swift b/Sources/ResectaApp/State/SearchState+ReturnRule.swift
+index b613b806..1c80047f 100644
+--- a/Sources/ResectaApp/State/SearchState+ReturnRule.swift
++++ b/Sources/ResectaApp/State/SearchState+ReturnRule.swift
+@@ -70,6 +70,6 @@ extension SearchState {
+         // neither listed nor arriving (cancelled, stopped before it started,
+         // or cleared since). A run that stopped at the result cap is listed:
+         // it ends as a cancelled run, so the completed flag stays down.
+-        return !isSearching && !hasCompletedRun && !stoppedAtCap
++        return !hasCompletedRun && !stoppedAtCap
+     }
+ }
