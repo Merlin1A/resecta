@@ -116,13 +116,25 @@ public struct TextNormalizer: Sendable {
         _ run: Substring, previous: Character?, beforeThat: Character?, next: Character?
     ) -> String {
         if run.unicodeScalars.contains("\u{00AD}") { return "" }
-        if run.contains(where: \.isNewline),
-           let previous, hardHyphens.contains(previous),
-           let beforeThat, beforeThat.isLetter || beforeThat.isNumber,
-           let next, next.isLetter || next.isNumber {
+        if isBreakAfterHardHyphen(run, previous: previous, beforeThat: beforeThat, next: next) {
             return ""
         }
         return run.contains(where: isSpacingCharacter) ? " " : ""
+    }
+
+    /// Whether a run is a layout engine's line break right after a hard
+    /// hyphen: the run holds a line break, the Character before it is a hard
+    /// hyphen, and a letter or digit stands before the hyphen and after the
+    /// run ("Vance-" / "Oduya", "18-" / "115"). The one question `foldedRun`
+    /// and the page preparation (`SearchCore.normalizedPage`) both ask.
+    static func isBreakAfterHardHyphen(
+        _ run: Substring, previous: Character?, beforeThat: Character?, next: Character?
+    ) -> Bool {
+        guard run.contains(where: \.isNewline),
+              let previous, hardHyphens.contains(previous),
+              let beforeThat, beforeThat.isLetter || beforeThat.isNumber,
+              let next, next.isLetter || next.isNumber else { return false }
+        return true
     }
 
     /// Fold every run of whitespace, zero-width and control characters by

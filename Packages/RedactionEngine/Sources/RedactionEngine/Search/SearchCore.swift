@@ -152,6 +152,12 @@ enum SearchCore {
         let offsetMap: [Int]?
         let baseChars: [Character]?
         let rawMap: RawTextMap?
+        /// Character offsets in `searchText` of each hard hyphen that ends a
+        /// line between two letters of the same case: the hyphens the
+        /// closed-spelling reading drops (`SearchCore+AlternateReadings.swift`).
+        /// Empty on a page with none, and under the digit-separator strip,
+        /// which has already removed them.
+        var closedSpellingHyphens: [Int] = []
 
         /// The `NSRange` in the RAW page text (`page.string`) of a base span:
         /// through `rawMap` on every page that has one (every page that is
@@ -213,13 +219,13 @@ enum SearchCore {
     /// from unmapped offsets on a page that needs the map.
     static func normalizedPage(
         _ pageText: String, options: SearchOptions
-    ) -> (text: String, rawMap: RawTextMap?) {
+    ) -> (text: String, rawMap: RawTextMap?, closedSpellingHyphens: [Int]) {
         // The fast path holds only when no step changed the length: a run
         // folded to one space or to nothing would, so such a page takes the
         // map path.
         if isSingleUnitASCII(pageText) {
             let whole = normalizedText(pageText, options: options)
-            if whole.count == pageText.count, isSingleUnitASCII(whole) { return (whole, nil) }
+            if whole.count == pageText.count, isSingleUnitASCII(whole) { return (whole, nil, []) }
         }
         var text = ""
         text.reserveCapacity(pageText.utf8.count)
@@ -229,6 +235,8 @@ enum SearchCore {
         scalarRawLast.reserveCapacity(pageText.unicodeScalars.count)
         var utf16: [Int] = [0]
         utf16.reserveCapacity(pageText.count + 1)
+        // Per closed-spelling break: the scalar of `text` that is its hyphen.
+        var hyphenScalars: [Int] = []
         // A maximal run of whitespace, zero-width, soft-hyphen or control
         // Characters is one piece, read by the one run rule
         // (`TextNormalizer.foldedRun`, over the raw Characters around it):
@@ -246,6 +254,10 @@ enum SearchCore {
                 text.append(piece)
                 scalarRaw.append(open.offset)
                 scalarRawLast.append(i - 1)
+            } else if !scalarRaw.isEmpty,
+                      isClosedSpellingBreak(
+                        pageText[open.start..<end], previous: open.previous, beforeThat: open.beforeThat, next: next) {
+                hyphenScalars.append(scalarRaw.count - 1)
             }
             run = nil
         }
@@ -270,14 +282,20 @@ enum SearchCore {
         var last: [Int] = []
         first.reserveCapacity(text.count)
         last.reserveCapacity(text.count)
+        var hyphens: [Int] = []
+        var nextHyphen = 0
         var scalar = 0
-        for character in text {
+        for (offset, character) in text.enumerated() {
             let count = character.unicodeScalars.count
             first.append(scalarRaw[scalar])
             last.append(scalarRawLast[scalar + count - 1])
+            if nextHyphen < hyphenScalars.count, hyphenScalars[nextHyphen] < scalar + count {
+                hyphens.append(offset)
+                nextHyphen += 1
+            }
             scalar += count
         }
-        return (text, RawTextMap(rawFirst: first, rawLast: last, rawUTF16Offsets: utf16))
+        return (text, RawTextMap(rawFirst: first, rawLast: last, rawUTF16Offsets: utf16), hyphens)
     }
 
     /// The literal tier's page preparation: `normalizedPage` then the
@@ -301,7 +319,9 @@ enum SearchCore {
             baseText: ext.baseText,
             offsetMap: ext.offsetMap,
             baseChars: ext.offsetMap != nil ? Array(ext.baseText) : nil,
-            rawMap: normalized.rawMap
+            rawMap: normalized.rawMap,
+            closedSpellingHyphens: closedSpellingHyphens(
+                normalized.closedSpellingHyphens, searchText: ext.pageText, offsetMap: ext.offsetMap, options: options)
         )
     }
 
@@ -344,7 +364,8 @@ enum SearchCore {
 
     // MARK: - The literal matcher
 
-    /// The one literal cursor walk. Locates `query` in `page.searchText` with
+    /// The literal cursor walk over the page as read (`literalSpans` adds the
+    /// closed-spelling reading to it). Locates `query` in `page.searchText` with
     /// `comparison` (the preview passes `.literal`, the full tier the
     /// composed-character-sequence default — both are the same NSString
     /// search; the comparison is a parameter so neither tier's count moves),
@@ -355,7 +376,7 @@ enum SearchCore {
     /// and stops after `cap` accepted spans (nil = unbounded). Character
     /// offsets are measured incrementally along the page (distances along one
     /// string are additive), so a dense page costs one walk, not one per match.
-    static func literalSpans(
+    static func literalSpansAsRead(
         in page: PreparedPage,
         query: String,
         comparison: String.CompareOptions,
