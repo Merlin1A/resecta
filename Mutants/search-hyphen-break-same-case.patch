@@ -1,0 +1,19 @@
+Property: A line-end hyphen is dropped only between two letters of the same case, judged on the page's own letters; a capital after the break keeps it.
+Area: search (literal matching)
+Test command: xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/HyphenBreakClosedSpellingTests -only-testing:RedactionEngineTests/HyphenBreakClosedSpellingSearchTests
+Must go red: RedactionEngineTests/HyphenBreakClosedSpellingTests "Each row's search over its page" [a capital after the break keeps the hyphen: the closed spelling is not found]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift
+index 7458898a..6d56d420 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift
+@@ -31,7 +31,7 @@ extension SearchCore {
+     ) -> Bool {
+         guard TextNormalizer.isBreakAfterHardHyphen(run, previous: previous, beforeThat: beforeThat, next: next),
+               let beforeThat, let next else { return false }
+-        return isSameCase(beforeThat, next)
++        return true // mutant: no same-case test
+     }
+ 
+     /// Two letters that are both lower case or both upper case. A digit, or
