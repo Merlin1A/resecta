@@ -70,10 +70,12 @@ if [ "$MODE" = "--self-test" ]; then
     # The five test counts: the README's own claims (equal to the tree when the
     # first case passes) rewritten by a factor, as "about N" or as a number.
     cp "$scratch/README.md" "$scratch/README.exact"
-    counts_as() { # factor about|exact [label] — rewrite the claims; one label alone when given
-        python3 - "$scratch/README.exact" "$scratch/README.md" "$1" "$2" "${3:-}" <<'REWRITE'
+    counts_as() { # factor form [label [count]] — rewrite the claims; one label alone when given.
+        # form: about | exact | one-more | roundabout | edge-in-up | edge-out-up | edge-in-down | edge-out-down;
+        # an edge form writes "about" the last count within 3 % of the count (the claim's own, or the one given), or the first past it.
+        python3 - "$scratch/README.exact" "$scratch/README.md" "$1" "$2" "${3:-}" "${4:-}" <<'REWRITE'
 import re, sys
-src, dst, factor, form, only = sys.argv[1], sys.argv[2], float(sys.argv[3]), sys.argv[4], sys.argv[5]
+src, dst, factor, form, only, base = sys.argv[1], sys.argv[2], float(sys.argv[3]), sys.argv[4], sys.argv[5], sys.argv[6]
 text = open(src, encoding="utf-8").read()
 CLAIMS = {
     "README engine @Test": r"([\d,]+)( Swift Testing `@Test` functions across [\d,]+ suites)",
@@ -86,9 +88,14 @@ for label, pattern in CLAIMS.items():
     if only and label != only:
         continue
     def scaled(m):
-        v = int(m.group(1).replace(",", ""))
+        v = int(base) if base else int(m.group(1).replace(",", ""))
+        k = 3 * v // 100
+        edges = {"edge-in-up": v + k, "edge-out-up": v + k + 1, "edge-in-down": v - k, "edge-out-down": v - k - 1}
+        if form in edges:
+            return "about " + f"{edges[form]:,}" + m.group(2)
         v = v + 1 if form == "one-more" else round(v * factor)
-        return ("about " if form == "about" else "") + f"{v:,}" + m.group(2)
+        prefix = {"about": "about ", "roundabout": "roundabout "}.get(form, "")
+        return prefix + f"{v:,}" + m.group(2)
     text, n = re.subn(pattern, scaled, text, count=1)
     assert n == 1, label
 open(dst, "w", encoding="utf-8").write(text)
@@ -111,6 +118,39 @@ REWRITE
         if printf '%s' "$out" | /usr/bin/grep -qE "DRIFT $label: claimed [0-9,]+ measured"; then echo "self-test: $label written as a number one off reads DRIFT OK"
         else echo "self-test: $label written as a number one off did not read DRIFT" >&2; fails=1; fi
     done
+    # The 3 % edge, both ways, on the app suites count as it is: the last count
+    # within 3 % passes and the next one reads DRIFT.
+    edge_case() { # label form ok|DRIFT what [count]
+        counts_as 1 "$2" "$1" "${5:-}"
+        out="$("$0" --check-root "$scratch" 2>&1 || true)"
+        if [ "$3" = ok ]; then pat="ok    $1: claimed about "; else pat="DRIFT $1: claimed about "; fi
+        if printf '%s' "$out" | /usr/bin/grep -qF "$pat"; then echo "self-test: $1 $4 reads $3 OK"
+        else echo "self-test: $1 $4 did not read $3" >&2; fails=1; fi
+    }
+    edge_case "README app suites" edge-in-up ok "written about the last count within 3 % above"
+    edge_case "README app suites" edge-out-up DRIFT "written about the first count past 3 % above"
+    edge_case "README app suites" edge-in-down ok "written about the last count within 3 % below"
+    edge_case "README app suites" edge-out-down DRIFT "written about the first count past 3 % below"
+    # The same edge where 3 % is a whole count: test methods planted in the
+    # scratch copy bring the XCUITest count to a multiple of 100, so the last
+    # count within is exactly 3 % away.
+    cp "$scratch/README.exact" "$scratch/README.md"
+    xcui=$("$0" --check-root "$scratch" 2>&1 | /usr/bin/sed -nE 's/.*README XCUITest methods: claimed .* measured ([0-9,]+).*/\1/p' | tr -d ,)
+    case "$xcui" in ''|*[!0-9]*) echo "self-test: the XCUITest count could not be read for the edge cases" >&2; fails=1; xcui=0 ;; esac
+    plant=$(( (100 - xcui % 100) % 100 ))
+    uiplanted="$scratch/Tests/ResectaAppUITests/SelfTestPlantedMethods.swift"
+    { echo "final class SelfTestPlantedMethods {"; i=0; while [ $i -lt $plant ]; do echo "    func testPlanted$i() {}"; i=$((i+1)); done; echo "}"; } > "$uiplanted"
+    whole=$((xcui + plant))
+    edge_case "README XCUITest methods" edge-in-up ok "written about exactly 3 % above a count of $whole" "$whole"
+    edge_case "README XCUITest methods" edge-out-up DRIFT "written about one past exactly 3 % above a count of $whole" "$whole"
+    edge_case "README XCUITest methods" edge-in-down ok "written about exactly 3 % below a count of $whole" "$whole"
+    edge_case "README XCUITest methods" edge-out-down DRIFT "written about one past exactly 3 % below a count of $whole" "$whole"
+    unlink "$uiplanted"
+    # "about" is read as a word: "roundabout N" is a number, and exact.
+    counts_as 1.02 roundabout "README engine @Test"
+    out="$("$0" --check-root "$scratch" 2>&1 || true)"
+    if printf '%s' "$out" | /usr/bin/grep -qE "DRIFT README engine @Test: claimed [0-9,]+ measured"; then echo "self-test: README engine @Test written roundabout N is read as a number and reads DRIFT OK"
+    else echo "self-test: README engine @Test written roundabout N was not read as a number" >&2; fails=1; fi
     cp "$scratch/README.exact" "$scratch/README.md"
     out="$("$0" --check-root "$scratch" 2>&1 || true)"
     if printf '%s' "$out" | /usr/bin/grep -qE '^DOC-METRICS OK · counts of record: engine @Test [0-9]+, engine suites [0-9]+, app @Test [0-9]+, app suites [0-9]+, XCUITest methods [0-9]+$'; then echo "self-test: the verdict line carries the exact counts OK"
@@ -256,7 +296,8 @@ def claim(doc, label, pattern, measured, tolerance=0.0, words=False):
 
 def count_claim(doc, label, pattern, measured):
     # A test count: exact when written as a number, within 3 % when written
-    # "about N". The pattern's first group is the optional "about ", its second
+    # "about N" (as a word: "roundabout N" is a number), compared in whole
+    # numbers. The pattern's first group is the optional "about ", its second
     # the number.
     m = re.search(pattern, doc)
     if not m:
@@ -264,7 +305,7 @@ def count_claim(doc, label, pattern, measured):
         return
     about = m.group(1) is not None
     value = int(m.group(2).replace(",", ""))
-    ok = abs(value - measured) <= 0.03 * measured if about else value == measured
+    ok = 100 * abs(value - measured) <= 3 * measured if about else value == measured
     shown = f"about {value:,}" if about else f"{value:,}"
     print(f"  {'ok   ' if ok else 'DRIFT'} {label}: claimed {shown} measured {measured:,}")
     if not ok:
@@ -284,11 +325,11 @@ if m:
         drift.append("README ratio")
 else:
     drift.append("README ratio: claim not found")
-count_claim(readme, "README engine @Test", r"(about )?([\d,]+) Swift Testing `@Test` functions across (?:about )?[\d,]+ suites", counts["engine tests"]["tests"])
-count_claim(readme, "README engine suites", r"[\d,]+ Swift Testing `@Test` functions across (about )?([\d,]+) suites", counts["engine tests"]["suites"])
-count_claim(readme, "README app @Test", r"(about )?([\d,]+) `@Test` functions across (?:about )?[\d,]+ suites: the pipeline state machine", counts["app tests"]["tests"])
-count_claim(readme, "README app suites", r"[\d,]+ `@Test` functions across (about )?([\d,]+) suites: the pipeline state machine", counts["app tests"]["suites"])
-count_claim(readme, "README XCUITest methods", r"(about )?([\d,]+) XCUITest methods", counts["UI tests"]["xcui"])
+count_claim(readme, "README engine @Test", r"(\babout )?([\d,]+) Swift Testing `@Test` functions across (?:\babout )?[\d,]+ suites", counts["engine tests"]["tests"])
+count_claim(readme, "README engine suites", r"[\d,]+ Swift Testing `@Test` functions across (\babout )?([\d,]+) suites", counts["engine tests"]["suites"])
+count_claim(readme, "README app @Test", r"(\babout )?([\d,]+) `@Test` functions across (?:\babout )?[\d,]+ suites: the pipeline state machine", counts["app tests"]["tests"])
+count_claim(readme, "README app suites", r"[\d,]+ `@Test` functions across (\babout )?([\d,]+) suites: the pipeline state machine", counts["app tests"]["suites"])
+count_claim(readme, "README XCUITest methods", r"(\babout )?([\d,]+) XCUITest methods", counts["UI tests"]["xcui"])
 claim(readme, "README assertions", r"about ([\d,]+) `#expect`/`#require` assertions", expect_total, 0.03)
 claim(readme, "README encodings", r"raw bytes across (\w+) encodings", encodings, words=True)
 
