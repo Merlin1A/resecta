@@ -245,6 +245,7 @@ extension SearchAndRedactSheet {
         }
 
         let mode = buildSearchMode()
+        searchState.lastRunShape = searchState.currentRunShape  // read in the same stretch as the query above
         searchState.totalPages = liveDoc.pageCount
 
         // Snapshot the user-selected preset's
