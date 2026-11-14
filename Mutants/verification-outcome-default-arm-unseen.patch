@@ -1,0 +1,18 @@
+Property: The row mapping holds no default arm, even one that changes no name's row today.
+Area: the names a check reports in (Core)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/CheckOutcomeNamesTests
+Must go red: RedactionCoreTests/CheckOutcomeNamesTests rowMappingHasNoDefaultArm
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Verification/CheckOutcomeNames.swift b/Packages/RedactionEngine/Sources/RedactionCore/Verification/CheckOutcomeNames.swift
+index 3672a6a0..a1402ef8 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Verification/CheckOutcomeNames.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Verification/CheckOutcomeNames.swift
+@@ -71,6 +71,7 @@ extension OutcomeKind {
+         case .fault(.unreadableInput): .couldNotVerify
+         case .fault(.evidenceShort): .couldNotVerify
+         case .fault(.wrongSubject): .couldNotVerify
++        default: .passed
+         }
+     }
+ }
