@@ -1,0 +1,23 @@
+Property: Share's hint is spoken exactly when the Share tap's gate would ask.
+Area: the results screen, Share's spoken hint
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationResultsActionsTests
+Must go red: ResectaAppTests/VerificationResultsActionsTests hintForEachFamily; ResectaAppTests/VerificationResultsActionsTests hintAgreesWithTheGate
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationResultsActions.swift b/Sources/ResectaApp/Views/VerificationResultsActions.swift
+--- a/Sources/ResectaApp/Views/VerificationResultsActions.swift
++++ b/Sources/ResectaApp/Views/VerificationResultsActions.swift
+@@ -203,8 +203,11 @@
+         report: VerificationReport, canExport: Bool,
+         documentState: DocumentState, concealedPages: [Int]
+     ) -> Bool {
+-        canExport && DocumentEditorView.shareConfirmKind(
+-            report: report, documentState: documentState, concealedPages: concealedPages) != nil
++        canExport && (
++            DocumentEditorView.shareNeedsFailConfirm(report: report, acknowledged: documentState.failShareAcknowledged)
++            || DocumentEditorView.shareNeedsSkippedConfirm(report: report, acknowledged: documentState.skippedShareAcknowledged)
++            || DocumentEditorView.shareNeedsIncompleteWarnConfirm(
++                report: report, acknowledged: documentState.incompleteWarnShareAcknowledged))
+     }
+ 
+     /// The pages of the covered-text item among the results screen's
