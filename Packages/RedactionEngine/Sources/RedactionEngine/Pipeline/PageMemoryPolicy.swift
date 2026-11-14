@@ -40,15 +40,6 @@ public func selectDPI(
 
 // MARK: - Input Validation
 
-/// Validate a page before rendering: the geometry half
-/// (`validatePageGeometry`) and the memory half (`validatePageMemory`)
-/// together. Kept as the one-call form for callers and tests that only
-/// need the combined verdict; `PageRasterizer.rasterize` calls the two
-/// halves separately so each refusal carries its own error case.
-func validatePage(_ page: PDFPage, effectiveDPI: Int = 300) -> Bool {
-    validatePageGeometry(page) && validatePageMemory(page, effectiveDPI: effectiveDPI)
-}
-
 /// The geometry half of the pre-flight: every side of the cropBox between
 /// 10 and 5,000 pt, no non-default `/UserUnit` on the page dictionary, and a
 /// `/Rotate` that is a right angle read the same way by PDFKit and by
