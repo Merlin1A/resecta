@@ -592,8 +592,8 @@ public final class PageRasterizer: @unchecked Sendable {
 
     /// The one render body, over a pre-extracted `CGPDFPage` + PDFKit-sourced
     /// `bounds`/`rotation`, so the concurrent render path never reads the live
-    /// `PDFPage`. The box defaults to `.cropBox` (the production call site);
-    /// `renderPage(PDFPage,…)` passes its caller's. Handles the box origin,
+    /// `PDFPage`. The box defaults to `.cropBox`, the one the production call
+    /// site uses. Handles the box origin,
     /// /Rotate, DPI scaling and the anti-aliasing defense. Rendering is via
     /// CoreGraphics (`drawPDFPage`), never the PDFKit page-level draw API.
     @concurrent

@@ -40,6 +40,11 @@ public func selectDPI(
 
 // MARK: - Input Validation
 
+// A page is validated before rendering in two halves, the geometry half
+// (`validatePageGeometry`) and the memory half (`validatePageMemory`);
+// `PageRasterizer.rasterize` calls them separately so each refusal carries
+// its own error case.
+
 /// The geometry half of the pre-flight: every side of the cropBox between
 /// 10 and 5,000 pt, no non-default `/UserUnit` on the page dictionary, and a
 /// `/Rotate` that is a right angle read the same way by PDFKit and by
@@ -88,7 +93,7 @@ func validatePageMemory(_ page: PDFPage, effectiveDPI: Int = 300) -> Bool {
     // Measured 2026-06-13: `os_proc_available_memory()` is unusable
     // on the simulator — it reports well under 67 MB regardless of real
     // headroom, so a standard page's 300-DPI raster (~33.7 MB) fails the
-    // fraction-of-available test and the validatePage wire-up would then refuse every page.
+    // fraction-of-available test and the pre-flight would then refuse every page.
     // When the reading is at or below the 150 MB headroom — the same
     // floor at which `selectDPI` yields zero budget — treat it as unusable and
     // defer the memory decision to the runtime DPI cap + `selectDPI` (KI-5),
@@ -113,7 +118,7 @@ func validatePageMemory(_ page: PDFPage, effectiveDPI: Int = 300) -> Bool {
 /// per-page estimate the app layer budgets (render context + pooled fill
 /// context + encode buffer, `PipelineCoordinator`'s
 /// `pixelW * pixelH * 4 * 3`). Extracted so the constant is host-testable;
-/// `validatePage`'s deferral branches above are unchanged.
+/// `validatePageMemory`'s deferral branches above are unchanged.
 @inlinable
 internal func pageMemoryEstimateFits(oneBitmapBytes: Int, available: Int) -> Bool {
     oneBitmapBytes < available / 3

@@ -2,6 +2,13 @@ import CoreGraphics
 import PDFKit
 @testable import RedactionEngine
 
+// The one-call forms of a page's render and pre-flight, for tests. The
+// product has neither: `PageRasterizer.rasterize` validates a page through
+// `validatePageGeometry` and `validatePageMemory` (PageMemoryPolicy.swift)
+// separately, and renders it through `renderPageFromCGPage`
+// (PageRasterizer.swift) over the page's pre-extracted Core Graphics page.
+// Each body below is the product's former one-call form, unchanged.
+
 extension PageRasterizer {
     /// Render a PDF page to a CGImage using CGPDFPage, never PDFKit's page-level draw.
     /// Handles cropBox origin, /Rotate, DPI scaling, and anti-aliasing defense.
@@ -29,9 +36,7 @@ extension PageRasterizer {
 
 /// Validate a page before rendering: the geometry half
 /// (`validatePageGeometry`) and the memory half (`validatePageMemory`)
-/// together. Kept as the one-call form for callers and tests that only
-/// need the combined verdict; `PageRasterizer.rasterize` calls the two
-/// halves separately so each refusal carries its own error case.
+/// together, the combined verdict.
 func validatePage(_ page: PDFPage, effectiveDPI: Int = 300) -> Bool {
     validatePageGeometry(page) && validatePageMemory(page, effectiveDPI: effectiveDPI)
 }
