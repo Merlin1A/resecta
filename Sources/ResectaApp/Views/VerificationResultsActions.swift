@@ -7,7 +7,8 @@ import RedactionEngine
 // action rows (Run Verification on a skipped report, Keep Editing, Preview)
 // and the undo footnote. ONE Share `Button` in either style carries
 // `onExport`, ⌘E and the disabled gate; it speaks a hint exactly when
-// tapping it opens a confirm.
+// the Share tap's gate would ask, from the covered pages the results screen
+// has derived so far.
 
 struct VerificationResultsActions: View {
     let report: VerificationReport
@@ -17,6 +18,11 @@ struct VerificationResultsActions: View {
     let previewAvailable: Bool
     var onExport: () -> Void
     var onRunVerification: () -> Void
+    /// The pages of the results screen's covered-text item, as far as the
+    /// screen has derived them: the Share tap's gate reads the same pages at
+    /// the tap. Until the first derivation ends, covered text alone raises
+    /// no hint; the tap still asks.
+    let concealedPages: [Int]
 
     @Environment(DocumentState.self) private var documentState
 
@@ -146,9 +152,7 @@ struct VerificationResultsActions: View {
     private var shareWillConfirm: Bool {
         Self.shareWillConfirm(
             report: report, canExport: canExport,
-            failAcknowledged: documentState.failShareAcknowledged,
-            skippedAcknowledged: documentState.skippedShareAcknowledged,
-            incompleteWarnAcknowledged: documentState.incompleteWarnShareAcknowledged)
+            documentState: documentState, concealedPages: concealedPages)
     }
 
     // MARK: - The rules (static, so the tests read them without a host)
@@ -185,22 +189,31 @@ struct VerificationResultsActions: View {
     }
 
     /// The Share hint: spoken only, exactly when tapping Share opens a
-    /// confirm. It reads the live confirm predicates with their
+    /// confirm. It asks the Share tap's gate, with the document's own
     /// acknowledgements — never the rows — so after a completed share,
     /// whose acknowledgement stays spent, no hint promises a confirm.
     static let shareConfirmHint = "Asks you to confirm before sharing."
 
-    /// Whether Share will ask for confirmation: Share is enabled and one of
-    /// the three confirm families is armed.
+    /// Whether Share will ask for confirmation: Share is enabled and the
+    /// Share tap's gate returns a kind for these covered pages. The pages are
+    /// the ones the results screen has derived so far, so before its first
+    /// derivation ends, covered text in the original raises no hint by
+    /// itself; the tap reads the pages again and still asks.
     static func shareWillConfirm(
         report: VerificationReport, canExport: Bool,
-        failAcknowledged: Bool, skippedAcknowledged: Bool, incompleteWarnAcknowledged: Bool
+        documentState: DocumentState, concealedPages: [Int]
     ) -> Bool {
-        canExport && (
-            DocumentEditorView.shareNeedsFailConfirm(report: report, acknowledged: failAcknowledged)
-            || DocumentEditorView.shareNeedsSkippedConfirm(report: report, acknowledged: skippedAcknowledged)
-            || DocumentEditorView.shareNeedsIncompleteWarnConfirm(
-                report: report, acknowledged: incompleteWarnAcknowledged))
+        canExport && DocumentEditorView.shareConfirmKind(
+            report: report, documentState: documentState, concealedPages: concealedPages) != nil
+    }
+
+    /// The pages of the covered-text item among the results screen's
+    /// findings, or none.
+    static func concealedPages(in findings: [ResultsFinding]) -> [Int] {
+        for entry in findings {
+            if case .coveredTextInOriginal(let pages) = entry { return pages }
+        }
+        return []
     }
 }
 

@@ -6,7 +6,7 @@ import SwiftUI
 
 // The grouped results page's rules, read without a host: which capsule
 // leads, how Share is drawn, which action rows show and in what order, when
-// Share speaks its confirm hint (the live confirm predicates with their
+// Share speaks its confirm hint (the Share tap's gate with the document's
 // acknowledgements, never the rows), what the count ring shows, which group
 // opens, how page links and the run section read, and the completion line.
 
@@ -70,43 +70,131 @@ struct VerificationResultsActionsTests {
 
     // MARK: - The Share hint (moved here with Share)
 
-    static func willConfirm(_ report: VerificationReport, canExport: Bool = true,
-                            fail: Bool = false, skipped: Bool = false, incomplete: Bool = false) -> Bool {
-        Actions.shareWillConfirm(report: report, canExport: canExport, failAcknowledged: fail,
-                                 skippedAcknowledged: skipped, incompleteWarnAcknowledged: incomplete)
+    static func willConfirm(_ report: VerificationReport, _ doc: DocumentState = DocumentState(),
+                            canExport: Bool = true, concealed: [Int] = []) -> Bool {
+        Actions.shareWillConfirm(report: report, canExport: canExport, documentState: doc, concealedPages: concealed)
     }
+
+    /// One reason Share asks, with the document state that raises it and the
+    /// gate's kind for it.
+    struct HintRow {
+        let name: String
+        let report: VerificationReport
+        let formFields: Int
+        let concealed: [Int]
+        let kind: String
+
+        func document() -> DocumentState {
+            let doc = DocumentState()
+            doc.sourceFilledFormFieldCount = formFields
+            return doc
+        }
+
+        /// The row's own acknowledgement, set.
+        func acknowledged() -> DocumentState {
+            let doc = document()
+            switch kind {
+            case "failOrAttention": doc.failShareAcknowledged = true
+            case "skipped": doc.skippedShareAcknowledged = true
+            case "incompleteWarn": doc.incompleteWarnShareAcknowledged = true
+            case "possibleItems": doc.possibleItemsShareAcknowledged = true
+            case "concealedAnnotations": doc.concealedAnnotationsShareAcknowledged = true
+            default: Issue.record("no acknowledgement for \(kind)")
+            }
+            return doc
+        }
+    }
+
+    static let hintRows: [HintRow] = [
+        HintRow(name: "a failed check", report: Fixtures.secureFail, formFields: 0, concealed: [], kind: "failOrAttention"),
+        HintRow(name: "a skipped run", report: Fixtures.secureSkippedOff, formFields: 0, concealed: [], kind: "skipped"),
+        HintRow(name: "an incomplete warning", report: Fixtures.searchableSkipInduced, formFields: 0, concealed: [],
+                kind: "incompleteWarn"),
+        HintRow(name: "possible items left", report: Fixtures.secureScreenshot, formFields: 0, concealed: [],
+                kind: "possibleItems"),
+        HintRow(name: "form values not carried", report: Fixtures.secureAllPass, formFields: 4, concealed: [],
+                kind: "possibleItems"),
+        HintRow(name: "covered text in the original", report: Fixtures.secureAllPass, formFields: 0, concealed: [0],
+                kind: "concealedAnnotations"),
+    ]
 
     @Test("The hint text is spoken only — one sentence, no promise")
     func hintText() {
         #expect(Actions.shareConfirmHint == "Asks you to confirm before sharing.")
     }
 
-    @Test("The hint follows the confirm families: FAIL, ATTENTION, SKIPPED, the incomplete WARN")
-    func hintWhereAConfirmOpens() {
-        #expect(Self.willConfirm(Fixtures.secureFail))
-        #expect(Self.willConfirm(Fixtures.searchableAttentionMixed))
-        #expect(Self.willConfirm(Fixtures.secureSkippedOff))
-        #expect(Self.willConfirm(Fixtures.searchableSkipInduced))
-        #expect(!Self.willConfirm(Fixtures.secureAllPass))
-        #expect(!Self.willConfirm(Fixtures.secureWarningOnly))
-        #expect(!Self.willConfirm(Fixtures.securePassRidingNote))
+    @Test("The Share hint is spoken for each of the five confirm families")
+    func hintForEachFamily() {
+        #expect(Self.hintRows.count == 6)
+        for row in Self.hintRows {
+            let doc = row.document()
+            #expect(Self.willConfirm(row.report, doc, concealed: row.concealed), "\(row.name)")
+            #expect(DocumentEditorView.shareConfirmKind(
+                report: row.report, documentState: doc, concealedPages: row.concealed)?.id == row.kind, "\(row.name)")
+        }
     }
 
-    @Test("No hint once the family is acknowledged — after a completed share — or when Share is disabled")
+    @Test("No hint once the family is acknowledged, when Share is disabled, or when nothing asks")
     func noHintWhenNoConfirmOpens() {
-        #expect(!Self.willConfirm(Fixtures.secureFail, fail: true))
-        #expect(!Self.willConfirm(Fixtures.searchableAttentionMixed, fail: true))
-        #expect(!Self.willConfirm(Fixtures.secureSkippedOff, skipped: true))
-        #expect(!Self.willConfirm(Fixtures.searchableSkipInduced, incomplete: true))
-        for report in [Fixtures.secureFail, Fixtures.secureSkippedOff, Fixtures.searchableSkipInduced] {
-            #expect(!Self.willConfirm(report, canExport: false))
+        #expect(Self.hintRows.count == 6)
+        for row in Self.hintRows {
+            #expect(!Self.willConfirm(row.report, row.acknowledged(), concealed: row.concealed), "\(row.name), acknowledged")
+            #expect(!Self.willConfirm(row.report, row.document(), canExport: false, concealed: row.concealed),
+                    "\(row.name), Share disabled")
         }
-        for (_, report) in Fixtures.all {
-            let predicates = DocumentEditorView.shareNeedsFailConfirm(report: report, acknowledged: false)
+        let quiet = [Fixtures.secureAllPass, Fixtures.secureWarningOnly, Fixtures.securePassRidingNote]
+        #expect(quiet.count == 3)
+        for report in quiet {
+            #expect(!Self.willConfirm(report))
+        }
+    }
+
+    @Test("The hint and the Share tap's gate agree on every seeded report")
+    func hintAgreesWithTheGate() {
+        #expect(Fixtures.all.count == 18)
+        var differFromThreeFamilies: Set<String> = []
+        for (name, report) in Fixtures.all {
+            for concealed in [[], [0]] as [[Int]] {
+                let doc = DocumentState()
+                let gate = DocumentEditorView.shareConfirmKind(report: report, documentState: doc, concealedPages: concealed)
+                #expect(Self.willConfirm(report, doc, concealed: concealed) == (gate != nil), "\(name), pages \(concealed)")
+            }
+            let threeFamilies = DocumentEditorView.shareNeedsFailConfirm(report: report, acknowledged: false)
                 || DocumentEditorView.shareNeedsSkippedConfirm(report: report, acknowledged: false)
                 || DocumentEditorView.shareNeedsIncompleteWarnConfirm(report: report, acknowledged: false)
-            #expect(Self.willConfirm(report) == predicates)
+            if Self.willConfirm(report) != threeFamilies { differFromThreeFamilies.insert(name) }
         }
+        #expect(differFromThreeFamilies == ["secureScreenshot", "secureScanOnly"])
+    }
+
+    @Test("The hint reads the covered pages of the results screen's covered-text item")
+    func hintReadsTheCoveredTextPages() {
+        #expect(Actions.concealedPages(in: [.coveredTextInOriginal(pages: [2, 5]), .filledFormValuesNotCarried(count: 1)]) == [2, 5])
+        #expect(Actions.concealedPages(in: [.filledFormValuesNotCarried(count: 3)]) == [])
+        #expect(Actions.concealedPages(in: []) == [])
+    }
+
+    @Test("Before the results screen has derived its findings, covered text alone raises no hint")
+    func noCoveredTextHintBeforeTheFirstDerivation() {
+        #expect(!Self.willConfirm(Fixtures.secureAllPass, DocumentState(), concealed: Actions.concealedPages(in: [])))
+        #expect(Self.willConfirm(Fixtures.secureAllPass, DocumentState(),
+                                 concealed: Actions.concealedPages(in: [.coveredTextInOriginal(pages: [0])])))
+    }
+
+    @Test("The results screen hands Share's hint the covered pages of its findings")
+    func resultsScreenPassesTheCoveredPages() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let source = try String(contentsOf: root.appendingPathComponent("Sources/ResectaApp/Views/VerificationResultsView.swift"),
+                                encoding: .utf8)
+        let argument = "concealedPages: VerificationResultsActions.concealedPages(in: findings)"
+        #expect(source.components(separatedBy: argument).count == 2, "the argument appears exactly once")
+        let call = try #require(source.range(of: "VerificationResultsActions("))
+        let padding = try #require(source.range(of: ".padding(.top, ResectaTokens.Results.blockGap)",
+                                                range: call.upperBound..<source.endIndex))
+        let at = try #require(source.range(of: argument))
+        #expect(call.upperBound <= at.lowerBound && at.upperBound <= padding.lowerBound,
+                "the argument lies inside the call, before the padding that follows it")
     }
 
     // MARK: - The count ring
