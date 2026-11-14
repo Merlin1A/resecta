@@ -1,0 +1,17 @@
+Property: When a full run starts, every message that carries an action is withdrawn, shown or waiting.
+Area: the brief messages, at the start of a full run
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/ModeSwitchToastTests -only-testing:ResectaAppUITests/RunStartMessageActionsUITests
+Must go red: ResectaAppTests/ModeSwitchToastTests runStartRemovesTheModeSwitchUndo; ResectaAppUITests/RunStartMessageActionsUITests testModeSwitchUndo_isWithdrawnWhenARunStarts
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/PipelineCoordinator.swift b/Sources/ResectaApp/State/PipelineCoordinator.swift
+--- a/Sources/ResectaApp/State/PipelineCoordinator.swift
++++ b/Sources/ResectaApp/State/PipelineCoordinator.swift
+@@ -237,7 +237,6 @@
+         // (an Undo, a Mark, a Re-run) is withdrawn, shown or waiting: the
+         // run now owns the document, and the action no longer means what
+         // it offered.
+-        toastManager?.dropActionToasts()
+ 
+         // Snapshot pipeline-affecting settings once at run
+         // entry. Subsequent reads (verify-for-run, fillColor, exportDPI,
