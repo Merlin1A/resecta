@@ -12,6 +12,14 @@ import PDFKit
 // previous one and their spans across the page overlap: lines of different
 // columns never overlap and are kept apart by a character no query holds,
 // while an indented first line, a centred line or a short last line joins.
+// Below and across are read as the page is displayed, or, on a scan whose
+// print runs sideways, upside down or at a slant of more than 3 degrees,
+// along the direction the page's print runs: the mean of the lines' own
+// directions (each from the centre of its first word box to the centre of
+// its last, in page points) that lie within 20 degrees of the mean of all of
+// them, set only when at least three lines lie within those 20 degrees. A
+// line whose own direction is more than 20 degrees from the page's, such as
+// an upright stamp on a sideways scan, joins only as displayed.
 // Both sides of the match take the match skeleton (`OCRMatchSkeleton`): the
 // confusable classes of Scan's normalizer, so a typed "Suite 100" matches a
 // line read "Suite 1OO"; the lines through Scan's confusable correction are
@@ -30,6 +38,10 @@ import PDFKit
 // re-runs this searcher on the output, so an instance left printed reads as
 // found there too.
 private let ocrLiteralLogger = Logger(subsystem: "com.resecta.app", category: "search")
+/// A line agrees with a direction when the angle between them is at most 20 degrees.
+private let printAgreementCosine = cos(20 * Double.pi / 180)
+/// Print is turned when its direction is more than 3 degrees from horizontal.
+private let printTurnedCosine = cos(3 * Double.pi / 180)
 
 extension DocumentSearcher {
 
@@ -38,6 +50,72 @@ extension DocumentSearcher {
     /// overlap (one column).
     nonisolated static func linesJoin(_ line: CGRect, _ next: CGRect) -> Bool {
         next.midY < line.midY && next.minX < line.maxX && line.minX < next.maxX
+    }
+
+    /// The direction `line`'s print runs, in page points (`pageSize`, the
+    /// displayed page): a unit vector from the centre of its first word box to
+    /// the centre of its last, by their order in the line's text; nil for a
+    /// line with fewer than two word boxes or whose first and last share a centre.
+    nonisolated static func lineDirection(_ line: OCREngine.TextLine, pageSize: CGSize) -> CGVector? {
+        let boxes = line.wordBoxes.sorted { $0.range.location < $1.range.location }
+        guard boxes.count >= 2, let first = boxes.first?.normalizedRect, let last = boxes.last?.normalizedRect else { return nil }
+        return unitVector(CGVector(dx: (last.midX - first.midX) * pageSize.width, dy: (last.midY - first.midY) * pageSize.height))
+    }
+
+    /// The direction the page's print runs: the mean of the lines' own
+    /// directions that lie within 20 degrees of the mean of all of them, or
+    /// nil when fewer than three lines have a direction or fewer than three
+    /// lie within those 20 degrees.
+    nonisolated static func printDirection(_ lines: [OCREngine.TextLine], pageSize: CGSize) -> CGVector? {
+        printDirection(of: lines.map { lineDirection($0, pageSize: pageSize) })
+    }
+
+    /// `printDirection(_:pageSize:)` on the lines' own directions.
+    nonisolated static func printDirection(of lineDirections: [CGVector?]) -> CGVector? {
+        let directions = lineDirections.compactMap { $0 }
+        guard directions.count >= 3, let mean = unitSum(directions) else { return nil }
+        let agreeing = directions.filter { dot($0, mean) >= printAgreementCosine }
+        guard agreeing.count >= 3 else { return nil }
+        return unitSum(agreeing)
+    }
+
+    /// Whether a phrase may run from the end of `line` into the start of
+    /// `next`: today's test as displayed, or, where the page's print
+    /// direction is set and more than 3 degrees from horizontal and neither
+    /// line's own direction is more than 20 degrees from it, `next` lies
+    /// below `line` and their spans overlap, both measured along that
+    /// direction in page points.
+    nonisolated static func linesJoin(
+        _ line: CGRect, _ next: CGRect, lineDirection: CGVector?, nextDirection: CGVector?,
+        printDirection: CGVector?, pageSize: CGSize
+    ) -> Bool {
+        if linesJoin(line, next) { return true }
+        guard let along = printDirection, along.dx < printTurnedCosine else { return false }
+        for own in [lineDirection, nextDirection] { if let own, dot(own, along) < printAgreementCosine { return false } }
+        let scale = CGAffineTransform(scaleX: pageSize.width, y: pageSize.height)
+        let a = line.applying(scale), b = next.applying(scale)
+        let down = CGVector(dx: along.dy, dy: -along.dx)
+        let below = dot(CGVector(dx: b.midX - a.midX, dy: b.midY - a.midY), down) > 0
+        func span(_ rect: CGRect) -> (lower: CGFloat, upper: CGFloat) {
+            let ends = [CGPoint(x: rect.minX, y: rect.minY), CGPoint(x: rect.maxX, y: rect.minY),
+                        CGPoint(x: rect.minX, y: rect.maxY), CGPoint(x: rect.maxX, y: rect.maxY)]
+                .map { dot(CGVector(dx: $0.x, dy: $0.y), along) }
+            return (ends.min() ?? 0, ends.max() ?? 0)
+        }
+        let (aSpan, bSpan) = (span(a), span(b))
+        let overlap = aSpan.lower < bSpan.upper && bSpan.lower < aSpan.upper
+        return below && overlap
+    }
+
+    private nonisolated static func dot(_ a: CGVector, _ b: CGVector) -> CGFloat { a.dx * b.dx + a.dy * b.dy }
+
+    private nonisolated static func unitVector(_ v: CGVector) -> CGVector? {
+        let length = (v.dx * v.dx + v.dy * v.dy).squareRoot()
+        return length > 0 ? CGVector(dx: v.dx / length, dy: v.dy / length) : nil
+    }
+
+    private nonisolated static func unitSum(_ vectors: [CGVector]) -> CGVector? {
+        unitVector(vectors.reduce(CGVector(dx: 0, dy: 0)) { CGVector(dx: $0.dx + $1.dx, dy: $0.dy + $1.dy) })
     }
 
     /// The box of the part `local` (UTF-16, in the line's text) of a match on
@@ -70,6 +148,10 @@ extension DocumentSearcher {
         let (rawTexts, correctedTexts) = ocrReadings(lines)
         // Each line's span in the joined text, in UTF-16 units; a line that
         // does not join the next is followed by U+FFFC, which no query holds.
+        // The print direction is the page's, from every recognised line.
+        let pageSize = effectiveBounds(page.bounds(for: .cropBox), rotation: page.rotation).size
+        let ownDirections = lines.map { Self.lineDirection($0, pageSize: pageSize) }
+        let printDirection = Self.printDirection(of: ownDirections)
         var separators: [String] = []
         var spans: [Range<Int>] = []
         var cursor = 0
@@ -77,7 +159,11 @@ extension DocumentSearcher {
             let length = (text as NSString).length
             spans.append(cursor..<(cursor + length))
             guard index + 1 < rawTexts.count else { break }
-            let separator = Self.linesJoin(lines[index].normalizedRect, lines[index + 1].normalizedRect) ? "\n" : "\n\u{FFFC}\n"
+            let joins = Self.linesJoin(
+                lines[index].normalizedRect, lines[index + 1].normalizedRect,
+                lineDirection: ownDirections[index], nextDirection: ownDirections[index + 1],
+                printDirection: printDirection, pageSize: pageSize)
+            let separator = joins ? "\n" : "\n\u{FFFC}\n"
             separators.append(separator)
             cursor += length + (separator as NSString).length
         }
