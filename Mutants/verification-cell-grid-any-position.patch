@@ -1,0 +1,19 @@
+Property: A pair passes on its second condition only when its second character starts a whole number of cells from its line's start edge, within the tolerance; never at any position.
+Area: Character Positions spacing test (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/Layer6CellGridTests
+Must go red: RedactionEngineTests/Layer6CellGridTests a3; RedactionEngineTests/Layer6CellGridTests a4; RedactionEngineTests/Layer6CellGridTests a6
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification+SpatialExclusion.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification+SpatialExclusion.swift
+index 1c6e33e8..f49fddb7 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification+SpatialExclusion.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification+SpatialExclusion.swift
+@@ -342,6 +342,7 @@ extension SandwichVerification {
+                 : bounds.minY - scan.pageBox.minY
+         }
+         let cells = (fromEdge / cell).rounded()
+-        return abs(fromEdge - cells * cell) <= tolerance
++        _ = abs(fromEdge - cells * cell) <= tolerance
++        return true
+     }
+ }

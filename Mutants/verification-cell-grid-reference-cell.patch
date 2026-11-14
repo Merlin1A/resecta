@@ -1,0 +1,20 @@
+Property: The grid a piece starts on is measured in the cell of the pair's own size, not the 12 pt reference cell.
+Area: Character Positions spacing test (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/Layer6CellGridTests
+Must go red: RedactionEngineTests/Layer6CellGridTests a1; RedactionEngineTests/Layer6CellGridTests a5; RedactionEngineTests/Layer6CellGridTests a8
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification+SpatialExclusion.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification+SpatialExclusion.swift
+index 1c6e33e8..495a0b41 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification+SpatialExclusion.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification+SpatialExclusion.swift
+@@ -313,7 +313,8 @@ extension SandwichVerification {
+                 // not a whole number of cells past its neighbour.
+                 if abs(delta - (natural + j * cell)) > tolerance,
+                    !Self.startsOnCellGrid(
+-                    curr.bounds, cell: cell, tolerance: tolerance, scan: scan) {
++                    curr.bounds, cell: SandwichMetrics.courierAdvancePerPoint * 12,
++                    tolerance: tolerance, scan: scan) {
+                     return .fail(
+                         "Non-uniform glyph advance on page \(pageIndex + 1)"
+                     )
