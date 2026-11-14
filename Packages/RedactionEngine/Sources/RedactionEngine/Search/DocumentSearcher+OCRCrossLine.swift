@@ -30,8 +30,8 @@ import PDFKit
 // lines of one match sharing one occurrence. Each line's box is the words
 // its part of the match covers (Vision's word boxes,
 // `OCREngine.TextLine.wordBoxes`), padded as every OCR box is, never the whole
-// line; a line whose words have no box falls back to the line's box, and the
-// count of such lines is logged. On iOS 27 a space beside a separator inside
+// line; a line part that touches a word with no box of its own falls back to
+// the line's box, and the count of such parts is logged. On iOS 27 a space beside a separator inside
 // a digit run folds on both sides, and each range comes back to the read
 // line's offsets through the fold's map before a word is boxed. The displayed text is sliced from the
 // recognised text itself, what the OCR Check reads. The Search Re-check
@@ -119,9 +119,18 @@ extension DocumentSearcher {
     }
 
     /// The box of the part `local` (UTF-16, in the line's text) of a match on
-    /// `line`: the union of the words it overlaps, or nil when no word has a box.
+    /// `line`: the union of the boxes of the words it touches, or nil when any
+    /// word it touches has no box of its own, so that word is never left
+    /// outside the box (the caller then boxes the whole line).
     nonisolated static func matchedWordsRect(_ line: OCREngine.TextLine, local: NSRange) -> CGRect? {
-        let boxes = line.wordBoxes.filter { NSIntersectionRange($0.range, local).length > 0 }.map(\.normalizedRect)
+        let text = line.text
+        let touched = OCREngine.wordRanges(in: text).map { NSRange($0, in: text) }
+            .filter { NSIntersectionRange($0, local).length > 0 }
+        var boxes: [CGRect] = []
+        for word in touched {
+            guard let box = line.wordBoxes.first(where: { $0.range == word }) else { return nil }
+            boxes.append(box.normalizedRect)
+        }
         guard let first = boxes.first else { return nil }
         return boxes.dropFirst().reduce(first) { $0.union($1) }
     }
