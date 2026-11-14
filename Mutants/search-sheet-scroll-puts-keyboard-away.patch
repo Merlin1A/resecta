@@ -1,0 +1,19 @@
+Property: A scroll of the results puts the keyboard away.
+Area: the Search sheet's results list
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppUITests/SearchTypingFocusUITests/testScrollingResults_putsTheKeyboardAwayAndTheSheetStays
+Must go red: ResectaAppUITests/SearchTypingFocusUITests testScrollingResults_putsTheKeyboardAwayAndTheSheetStays
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/Search/SearchResultsSection.swift b/Sources/ResectaApp/Views/Search/SearchResultsSection.swift
+index 586ac352..e703dc13 100644
+--- a/Sources/ResectaApp/Views/Search/SearchResultsSection.swift
++++ b/Sources/ResectaApp/Views/Search/SearchResultsSection.swift
+@@ -306,7 +306,7 @@ struct SearchResultsSection: View {
+         // The field keeps its focus while results arrive, so the keyboard
+         // stays up; scrolling the results is how it is put away (Return
+         // is the other way). Stated here rather than left to the default.
+-        .scrollDismissesKeyboard(.immediately)
++        .scrollDismissesKeyboard(.never)
+         // Stable handle for the cooperative-arbitration XCUI
+         // pins' in-list drags — the results-list sibling of
+         // `scanReviewList`.

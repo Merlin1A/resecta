@@ -1,0 +1,18 @@
+Property: Arriving results do not take the field's focus.
+Area: the Search sheet's field focus
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppUITests/SearchTypingFocusUITests/testTypingFirstResults_fieldKeepsFocusAndSheetHolds
+Must go red: ResectaAppUITests/SearchTypingFocusUITests testTypingFirstResults_fieldKeepsFocusAndSheetHolds
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/SearchAndRedactSheet.swift b/Sources/ResectaApp/Views/SearchAndRedactSheet.swift
+index f5cb2cae..91eaa5af 100644
+--- a/Sources/ResectaApp/Views/SearchAndRedactSheet.swift
++++ b/Sources/ResectaApp/Views/SearchAndRedactSheet.swift
+@@ -469,6 +469,7 @@ struct SearchAndRedactSheet: View {
+         // change, only on the empty → non-empty transition. Predicate
+         // is static for unit-testability.
+         .onChange(of: searchState.results.isEmpty) { wasEmpty, isEmpty in
++            isSearchFieldFocused = false
+             if Self.shouldRaiseDetentForArrivedResults(
+                 wasEmpty: wasEmpty,
+                 isEmpty: isEmpty,
