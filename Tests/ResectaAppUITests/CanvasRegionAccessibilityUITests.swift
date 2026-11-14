@@ -125,7 +125,13 @@ nonisolated final class CanvasRegionAccessibilityUITests: XCTestCase {
         // The line is drawn with the page: 2 pt wide at fit, so 1 pt outside
         // the box there, and zoom times that once the page is zoomed. The
         // probe reads whole points, which adds up to 1 pt more. At fit this
-        // is the 2 pt of the other reads.
+        // is the 2 pt of the other reads. Measured on iOS 26.4.1 after a 2x
+        // pinch: a zoom of about 1.78 (drawn width 142 pt, then 253 pt); read
+        // from the pixels, the box's drawn edge lay 1.81 to 1.89 pt outside
+        // the element's frame on all four sides, so the element was centred
+        // on the box; the probe's whole-point read put the far sides at
+        // 2.2 and 2.55 pt, over a flat 2 pt. The unfixed frame stayed at its
+        // fit place, about 56 pt off.
         let zoom = after.width / before.width
         assertOnTheBox(regionElement.frame, after, "after the pinch", tolerance: zoom + 1)
     }
