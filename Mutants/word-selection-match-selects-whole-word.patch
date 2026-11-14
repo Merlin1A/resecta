@@ -5,14 +5,16 @@ Must go red: RedactionCoreTests/WordPartitionTests eachCase [Roe. matched by Roe
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/WordSelection.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/WordSelection.swift
-index ab8ab17a..26383a89 100644
+index ab8ab17a..263e6c88 100644
 --- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/WordSelection.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/WordSelection.swift
-@@ -12,6 +12,7 @@ package struct WordSelection: Hashable, Sendable {
-     /// The characters of `ranges` in `text`, white space left out. Offsets
-     /// outside the string are left out.
-     package static func characters(_ ranges: [Range<Int>], in text: String) -> WordSelection {
-+        if !ranges.isEmpty { return wholeWords(ranges, in: text) }
-         let units = Array(text.utf16)
-         var offsets: Set<Int> = []
-         for range in ranges {
+@@ -19,6 +19,9 @@ package struct WordSelection: Hashable, Sendable {
+                 offsets.insert(offset)
+             }
+         }
++        let indices = WordPartition.wordIndices(utf16: units)
++        let words = Set(offsets.map { indices[$0] })
++        offsets = Set(units.indices.filter { words.contains(indices[$0]) && !WordPartition.isWhiteSpace(units[$0]) })
+         return WordSelection(offsets: offsets)
+     }
+ 
