@@ -1,0 +1,19 @@
+Property: A digest with an empty lineage record is a page Character Sequence did not compare, never a page that passed.
+Area: could-not-verify rows (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/CouldNotReadRowTests
+Must go red: RedactionEngineTests/CouldNotReadRowTests eachCase [Character Sequence: a digest with no lineage record is a page not compared]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification.swift
+index 06204a70..a5e3c71a 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification.swift
+@@ -507,7 +507,7 @@ struct SandwichVerification: Sendable {
+         // page reproduces: 0 expected and 0 found compare equal; 0 expected
+         // with any measurable output unit compares unequal and FAILs (an
+         // injection).
+-        guard !digest.lineageHash.isEmpty else { return nil }
++        guard !digest.lineageHash.isEmpty else { return .pass }
+ 
+         let outputHash = try Self.computeOutputLineageHash(
+             outputPage, pageRotation: digest.pageRotation)

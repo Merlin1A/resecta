@@ -1,0 +1,42 @@
+Property: A row with an issue keeps, beside the issue, what the same check could not read, with those pages.
+Area: could-not-verify rows (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/CouldNotReadRowTests
+Must go red: RedactionEngineTests/CouldNotReadRowTests eachCase [Text & Annotations: an annotation, and a page that does not open]; RedactionEngineTests/CouldNotReadRowTests eachCase [OCR of Page Images: a term inside a region, and a page not run]; RedactionEngineTests/CouldNotReadRowTests eachCase [OCR of Page Images: a term inside a region, a page not run, and the in-region text]; RedactionEngineTests/CouldNotReadRowTests eachCase [Terms in Text & Bytes: a readable term, and a page that does not open]; RedactionEngineTests/CouldNotReadRowTests eachCase [Terms in Text & Bytes: a readable term, and a term too short]; RedactionEngineTests/CouldNotReadRowTests eachCase [Active Content & Structure: a page action, and a page whose dictionary cannot be read]; RedactionEngineTests/CouldNotReadRowTests eachCase [Character Positions: a character inside a region, and a page that does not open]; RedactionEngineTests/CouldNotReadRowTests eachCase [Character Count: a deficit, and a page with no record]; RedactionEngineTests/CouldNotReadRowTests eachCase [Monospace Fonts: another font, and a page that does not open]; RedactionEngineTests/CouldNotReadRowTests eachCase [Character Sequence: a mismatch, and a page with no record]; RedactionEngineTests/CouldNotReadRowTests eachCase [Terms in Content Streams: a term, and an earlier page with an operand not read]; RedactionEngineTests/CouldNotReadRowTests eachCase [Hidden Words Under Boxes: a flagged word, and a page not matched]; RedactionEngineTests/CouldNotReadRowTests eachCase [Search Re-check: a match remains, and a page that does not open]; RedactionEngineTests/CouldNotReadRowTests eachCase [Search Re-check: a match only partly covered, and a page that does not open]; RedactionEngineTests/CouldNotReadRowTests eachCase [Detection Sweep: an item in the scan's categories remains, and a page that does not open]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/CheckRowComposition.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/CheckRowComposition.swift
+index 303b2fa2..669f080f 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/CheckRowComposition.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/CheckRowComposition.swift
+@@ -76,8 +76,7 @@ enum CheckRowComposition {
+             guard !conditions.isEmpty else {
+                 return CheckRow(status: issue.status, pages: issue.pages, couldNotVerify: false)
+             }
+-            return CheckRow(status: issue.status, pages: issue.pages, couldNotVerify: false,
+-                            partSentence: joined, partPages: conditionPages)
++            return CheckRow(status: issue.status, pages: issue.pages, couldNotVerify: false)
+         }
+         if !conditions.isEmpty {
+             return CheckRow(status: .warn(joined), pages: conditionPages.isEmpty ? nil : conditionPages,
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SearchRecheck.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SearchRecheck.swift
+index 9b6a38a7..51d7493b 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SearchRecheck.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SearchRecheck.swift
+@@ -178,7 +178,7 @@ struct SearchRecheck: Sendable {
+             pageReferences: pages,
+             reviewTermTexts: terms,
+             queryLines: queryLines,
+-            partSentence: part.isEmpty ? nil : CheckRowComposition.join(part),
++            partSentence: nil,
+             partPages: part.isEmpty ? nil : Array(Set(partPages)).sorted())
+     }
+ 
+@@ -443,7 +443,7 @@ struct SearchRecheck: Sendable {
+                 pageReferences: remainingPages,
+                 reviewTermTexts: reviewTerms,
+                 queryLines: queryLines,
+-                partSentence: couldNotClauses.isEmpty ? nil : CheckRowComposition.join(couldNotClauses),
++                partSentence: nil,
+                 partPages: couldNotClauses.isEmpty ? nil : couldNotPages)
+         }
+ 

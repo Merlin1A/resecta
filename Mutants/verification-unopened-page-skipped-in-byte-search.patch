@@ -1,0 +1,18 @@
+Property: A page of the output that does not open is never skipped in silence by the decoded pass of Terms in Text & Bytes; it is a page not read.
+Area: could-not-verify rows (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/CouldNotReadRowTests
+Must go red: RedactionEngineTests/CouldNotReadRowTests eachCase [Terms in Text & Bytes: a page that does not open is a page not read]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Layer3.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Layer3.swift
+index b97e87fe..9f149546 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Layer3.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Layer3.swift
+@@ -181,7 +181,6 @@ extension VerificationEngine {
+         var unreadPages = Set<Int>()
+         for i in 0..<doc.pageCount {
+             guard let page = doc.page(at: i) else {
+-                unreadPages.insert(i)
+                 continue
+             }
+             guard let pageText = page.string, !pageText.isEmpty else { continue }

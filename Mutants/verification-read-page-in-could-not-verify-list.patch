@@ -1,0 +1,45 @@
+Property: A could-not-verify row's page list holds only the pages the check could not read: never a grazed page, a page with a count excess or a page with possible items.
+Area: could-not-verify rows (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/CouldNotReadRowTests
+Must go red: RedactionEngineTests/CouldNotReadRowTests eachCase [Character Positions: no measurable position, a page that does not open, and a graze left out]; RedactionEngineTests/CouldNotReadRowTests eachCase [Character Count: a page with no record, then the excess]; RedactionEngineTests/CouldNotReadRowTests eachCase [Detection Sweep: possible items only, and a page that does not open]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/CheckRowComposition.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/CheckRowComposition.swift
+index 303b2fa2..93f362a4 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/CheckRowComposition.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/CheckRowComposition.swift
+@@ -80,7 +80,7 @@ enum CheckRowComposition {
+                             partSentence: joined, partPages: conditionPages)
+         }
+         if !conditions.isEmpty {
+-            return CheckRow(status: .warn(joined), pages: conditionPages.isEmpty ? nil : conditionPages,
++            return CheckRow(status: .warn(joined), pages: conditionPages.isEmpty ? nil : Array(Set(conditionPages + warnings.flatMap { $0.pages ?? [] })).sorted(),
+                             couldNotVerify: true)
+         }
+         if let first = warnings.first {
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/DetectionSweep.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/DetectionSweep.swift
+index bec1446b..a87636b4 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/DetectionSweep.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/DetectionSweep.swift
+@@ -386,7 +386,7 @@ struct DetectionSweep: Sendable {
+             return Outcome(
+                 status: .warn(message),
+                 copyOverride: LayerCopy(short: message, detail: detail),
+-                pageReferences: uncheckedPages,
++                pageReferences: Array(Set(uncheckedPages + furtherPages)).sorted(),
+                 reviewTermTexts: nil,
+                 queryLines: queryLines)
+         }
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+SandwichDispatch.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+SandwichDispatch.swift
+index e319f6d0..fd165683 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+SandwichDispatch.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+SandwichDispatch.swift
+@@ -191,7 +191,7 @@ extension VerificationEngine {
+         // (never selected above; see perPageModeCoverageGap). The loop has
+         // finished, so every issue carries them all.
+         let conditions = [
+-            firstUnmeasuredMessage.map { UnverifiedCondition(sentence: $0, pages: unmeasuredPages) },
++            firstUnmeasuredMessage.map { UnverifiedCondition(sentence: $0, pages: Array(Set(unmeasuredPages + grazePages)).sorted()) },
+             unreadablePagesCondition(unreadablePages),
+             perPageModeCoverageCondition(perPageModes: perPageModes, pageCount: doc.pageCount),
+         ].compactMap { $0 }

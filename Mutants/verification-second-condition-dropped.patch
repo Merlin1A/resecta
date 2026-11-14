@@ -1,0 +1,21 @@
+Property: A row whose check could not verify two things says both, in the check's order, with the pages of both.
+Area: could-not-verify rows (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/CouldNotReadRowTests
+Must go red: RedactionEngineTests/CouldNotReadRowTests eachCase [OCR of Page Images: coordinates not mapped, a page not run, then the in-region text]; RedactionEngineTests/CouldNotReadRowTests eachCase [Text & Annotations: no file to read form fields from, and a page that does not open]; RedactionEngineTests/CouldNotReadRowTests eachCase [Character Positions: no measurable position, a page that does not open, and a graze left out]; RedactionEngineTests/CouldNotReadRowTests eachCase [Monospace Fonts: a page that does not open, then a page with no resources]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/CheckRowComposition.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/CheckRowComposition.swift
+index 303b2fa2..31d3a059 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/CheckRowComposition.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/CheckRowComposition.swift
+@@ -70,8 +70,8 @@ enum CheckRowComposition {
+         conditions: [UnverifiedCondition],
+         warnings: [CheckWarning]
+     ) -> CheckRow? {
+-        let conditionPages = Array(Set(conditions.flatMap(\.pages))).sorted()
+-        let joined = join(conditions.map(\.sentence) + warnings.map(\.sentence))
++        let conditionPages = Array(Set(conditions.prefix(1).flatMap(\.pages))).sorted()
++        let joined = join(conditions.prefix(1).map(\.sentence) + warnings.map(\.sentence))
+         if let issue {
+             guard !conditions.isEmpty else {
+                 return CheckRow(status: issue.status, pages: issue.pages, couldNotVerify: false)

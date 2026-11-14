@@ -1,0 +1,18 @@
+Property: Character Count compares a page whose text read returns nothing or nothing at all, and fails it; it is never taken as matching. (Not a put-back: it breaks the cover the two pins rely on.)
+Area: could-not-verify rows (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/CouldNotReadRowTests
+Must go red: RedactionEngineTests/CouldNotReadRowTests eachCase [pin: a page whose text read returns nothing fails the count, while the other checks pass]; RedactionEngineTests/CouldNotReadRowTests eachCase [pin: a page whose text read is empty fails the count, while the other checks pass]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification.swift
+index 06204a70..1d483ad8 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification.swift
+@@ -282,6 +282,7 @@ struct SandwichVerification: Sendable {
+     ) async throws -> VerificationStatus {
+         // Entry-level cooperative cancellation.
+         try Task.checkCancellation()
++        if (outputPage.string ?? "").isEmpty { return .pass }
+         let outputCount = try countComposedCharacters(outputPage)
+         let expectedCount = digest.survivingNonWhitespaceCount
+ 

@@ -1,0 +1,22 @@
+Property: A recognition pass that returns no result object is a page OCR could not run on, never a page with no text.
+Area: could-not-verify rows (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/CouldNotReadRowTests
+Must go red: RedactionEngineTests/CouldNotReadRowTests eachCase [OCR of Page Images: a recognition pass that returns no result object is a page not run]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/Layer2OCRCheck+Sweep.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/Layer2OCRCheck+Sweep.swift
+index 56a983f3..66351514 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/Layer2OCRCheck+Sweep.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/Layer2OCRCheck+Sweep.swift
+@@ -161,10 +161,7 @@ extension VerificationEngine {
+                     continuation.resume(returning: nil)
+                     return
+                 }
+-                guard !noResults, let observations = request.results else {
+-                    continuation.resume(returning: nil)
+-                    return
+-                }
++                let observations = noResults ? [] : (request.results ?? [])
+                 continuation.resume(returning: observations.compactMap { obs in
+                     guard obs.confidence >= Self.ocrConfidenceThreshold else { return nil }
+                     let candidate = obs.topCandidates(1).first

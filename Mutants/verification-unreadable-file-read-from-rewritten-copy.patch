@@ -1,0 +1,23 @@
+Property: A document opened from a file whose bytes cannot be read is never read from PDFKit's rewritten copy; the checks that read the file say they could not.
+Area: could-not-verify rows (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/CouldNotReadRowTests
+Must go red: RedactionEngineTests/CouldNotReadRowTests eachCase [Terms in Text & Bytes and Document Metadata: a file that cannot be read is never read from a rewritten copy]; RedactionEngineTests/CouldNotReadRowTests eachCase [Active Content & Structure: a file that cannot be read is never read from a rewritten copy]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine.swift
+index 605e3fcb..2fe52e72 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine.swift
+@@ -597,9 +597,9 @@ public struct VerificationEngine: Sendable {
+     /// "could not load" on the nil path below rather than aborting the
+     /// verification.
+     func loadPDFData(_ doc: PDFDocument) -> (Data, CGPDFDocument)? {
+-        if let url = doc.documentURL {
+-            guard let data = try? Data(contentsOf: url),
+-                  let cgDoc = CGPDFDocument(url as CFURL) else { return nil }
++        if let url = doc.documentURL,
++           let data = try? Data(contentsOf: url),
++           let cgDoc = CGPDFDocument(url as CFURL) {
+             return (data, cgDoc)
+         }
+         guard let data = RSGuardedDataRepresentation(doc),
