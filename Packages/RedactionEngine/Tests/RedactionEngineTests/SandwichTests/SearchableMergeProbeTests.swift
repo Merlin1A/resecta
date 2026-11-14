@@ -129,7 +129,7 @@ struct SearchableMergeProbeTests {
                 "No page has output composed < surviving (this is WHY Layer 7 count passes).")
     }
 
-    /// Sweep the inter-column gap and record where `groupIntoRuns` splits
+    /// Sweep the inter-column gap and record where `runMemberGroups` splits
     /// the row.
     ///
     /// The earlier premise — PDFKit bridges every born-digital same-line gap
@@ -218,7 +218,7 @@ struct SearchableMergeProbeTests {
             ("overlap-tiny", [("ABCDEFGHIJ", 72, 700), ("KLMNOPQRST", 73, 700)]),
             ("dotless-then-mark", [("\u{0131}\u{0301}\u{0131}\u{0303}\u{0131}\u{0308}", 72, 700)]),
             // Two runs on near-coincident baselines (Y-diff in the
-            // groupIntoRuns "different line" window) with overlapping X — the
+            // runMemberGroups "different line" window) with overlapping X — the
             // only remaining path to cross-run output co-location.
             ("two-lines-4pt", [("ABCDEFGHIJ", 72, 700), ("KLMNOPQRST", 72, 696)]),
             ("two-lines-6pt", [("ABCDEFGHIJ", 72, 700), ("KLMNOPQRST", 72, 694)]),
@@ -270,11 +270,11 @@ struct SearchableMergeProbeTests {
             func tag(_ s: VerificationStatus?) -> String { s?.isFail == true ? "FAIL" : (s == nil ? "?" : "pass") }
             print("rightX=\(rightX) surv=\(surviving.count) outComposed=\(prof.totalNonZeroBounds) deficit=\(surviving.count - prof.totalNonZeroBounds) runs=\(rs.runCount) | L7(count)=\(tag(outCount)) L9(lineage)=\(tag(outLineage))")
             // Even when the surviving set is constructed directly with born-digital
-            // column gaps (bypassing PDFKit source-side bridging) so groupIntoRuns
+            // column gaps (bypassing PDFKit source-side bridging) so runMemberGroups
             // DOES split and the 12pt redraw overlaps, PDFKit still re-extracts
             // output composed ≥ surviving — no merge, no deficit.
             #expect(rs.runCount > rows.count,
-                    "constructedMergeProbe: groupIntoRuns must split the column table (the break the source path can't produce).")
+                    "constructedMergeProbe: runMemberGroups must split the column table (the break the source path can't produce).")
             #expect(prof.totalNonZeroBounds >= surviving.count,
                     "constructedMergeProbe: no merge even with split+overlapping runs (output composed ≥ surviving).")
             #expect(outCount?.isFail != true,

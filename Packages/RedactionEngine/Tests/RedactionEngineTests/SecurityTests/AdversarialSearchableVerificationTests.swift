@@ -130,7 +130,7 @@ struct AdversarialSearchableVerificationTests {
     @Test("RT-5/H3: Layer 9 round-trip — multi-paragraph (N2 surface)",
           .tags(.critical))
     func rt5Layer9RoundTripMultiParagraph() async throws {
-        // groupIntoRuns produces multiple runs; PDFKit may synthesize
+        // runMemberGroups produces multiple runs; PDFKit may synthesize
         // inter-run whitespace on the output side. Pre-redesign this was
         // untested; the zero-bounds skip on the verifier is the only
         // safeguard. Post-redesign, the same zero-bounds skip applies and
@@ -686,51 +686,79 @@ struct AdversarialSearchableVerificationTests {
                 "Layer 6 must FAIL on a Courier sandwich with TJ kerning injection")
     }
 
-    @Test("RT-2: Width fingerprint collapses to cell-grid origins under the M2 grid",
+    @Test("RT-2: A removed run's width reaches the text layer only in whole cells of its band",
           .tags(.critical))
-    func rt2WidthFingerprintReducesToCellGrid() {
-        // The grid emits cell-quantized origins, so total
-        // run width = `cellCount × cellWidth` — a function of character
-        // count only. Synthesises 100 single-run inputs at the same start
-        // X but with varying per-character widths in the source
-        // `CharacterInfo`; the reconstructor's `groupIntoRuns` drops the
-        // per-char widths and produces identical output positions for all
-        // 100 runs, collapsing the width-fingerprint channel to the
-        // inherent character-count channel already in Secure Rasterization.
-        let charCount = 5
-        let cellWidth = TextLayerReconstructor.cellWidth
-        let baseStartX: CGFloat = 72.0
-        let expectedOriginX = floor(baseStartX / cellWidth) * cellWidth
-
-        let alphabet = Array("ABCDE")
-        let widthCatalog: [CGFloat] = [4, 6, 8, 10, 12, 14, 16]
-
-        for runIdx in 0..<100 {
-            let perCharWidth = widthCatalog[runIdx % widthCatalog.count]
-            var characters: [CharacterInfo] = []
-            var x: CGFloat = baseStartX
-            for c in 0..<charCount {
-                characters.append(CharacterInfo(
-                    character: String(alphabet[c]),
-                    bounds: CGRect(x: x, y: 700, width: perCharWidth, height: 12),
-                    stringIndex: c
-                ))
-                x += perCharWidth
-            }
-            let runs = TextLayerReconstructor.groupIntoRuns(characters)
-            #expect(runs.count == 1,
-                    "Run \(runIdx): \(charCount) adjacent characters group into one run")
-            #expect(runs[0].origin.x == expectedOriginX,
-                    "Run \(runIdx): origin X must snap to \(expectedOriginX) regardless of source per-character widths")
-            #expect(runs[0].text.count == charCount,
-                    "Run \(runIdx): text length equals input character count")
+    func rt2RemovedRunWidthReachesLayerOnlyInWholeCells() throws {
+        // The writer derives one quantized pitch per line band from source
+        // metrics: the content-dependent channel this re-opens is the band's
+        // quantized size class — bounded bits, redundant with the visible
+        // raster (`TextLayerReconstructor.swift`'s header).
+        //
+        // The same kept letters ("AB", a box, "CD") are laid out with boxes
+        // of many widths. The band's size and the first line never move; the
+        // run after the box starts on a whole cell of its band; moved by
+        // less than a cell without crossing a cell edge its line is the
+        // same, and across one edge its start moves by exactly one cell.
+        func letters(boxWidth: CGFloat) -> (entries: [CharacterInfo], box: CGRect) {
+            let box = CGRect(x: 90, y: 698, width: boxWidth, height: 16)
+            let after = box.maxX + 2
+            let entries = [
+                CharacterInfo(character: "A", bounds: CGRect(x: 72, y: 700, width: 7, height: 12), stringIndex: 0),
+                CharacterInfo(character: "B", bounds: CGRect(x: 79, y: 700, width: 7, height: 12), stringIndex: 1),
+                CharacterInfo(character: "C", bounds: CGRect(x: after, y: 700, width: 7, height: 12), stringIndex: 2),
+                CharacterInfo(character: "D", bounds: CGRect(x: after + 7, y: 700, width: 7, height: 12), stringIndex: 3),
+            ]
+            return (entries, box)
         }
+        func lines(boxWidth: CGFloat) -> [TextLayerLine] {
+            let (entries, box) = letters(boxWidth: boxWidth)
+            return TextLayerReconstructor.layoutLinesWithSources(
+                entries, pageWidth: 612, redactionRects: [box]).map(\.line)
+        }
+
+        let reference = lines(boxWidth: 20)
+        try #require(reference.map(\.text) == ["AB", "CD"],
+                     "a box between the runs splits the line")
+        let size = reference[0].fontSize
+        let cw = SandwichMetrics.courierAdvancePerPoint * size
+
+        // Every box width: same size, same first line, and the run after the
+        // box starts on the whole cell its first letter stands in.
+        for i in 0..<100 {
+            let width = 10 + CGFloat(i) * 0.37
+            let drawn = lines(boxWidth: width)
+            try #require(drawn.map(\.text) == ["AB", "CD"], "box \(width): two lines")
+            #expect(drawn.map(\.fontSize) == [size, size],
+                    "box \(width): the band's size does not move")
+            #expect(drawn[0].origin == reference[0].origin,
+                    "box \(width): the line before the box does not move")
+            let sourceX = 90 + width + 2
+            let start = drawn[1].origin.x
+            let cells = start / cw
+            #expect(abs(cells - cells.rounded()) < 1e-9,
+                    "box \(width): start \(start) is not a whole cell of \(cw)")
+            #expect(start <= sourceX + 1e-9 && sourceX < start + cw,
+                    "box \(width): start \(start) is not the cell \(sourceX) stands in")
+        }
+
+        // Within one cell, then across its edge.
+        let cell = ((90 + 20 + 2) / cw).rounded(.down)
+        let near = lines(boxWidth: cell * cw + 0.1 * cw - 92)
+        let far = lines(boxWidth: cell * cw + 0.9 * cw - 92)
+        let next = lines(boxWidth: (cell + 1) * cw + 0.1 * cw - 92)
+        try #require(near.count == 2 && far.count == 2 && next.count == 2)
+        #expect(near.map(\.origin) == far.map(\.origin),
+                "moved by less than a cell inside one cell: the drawn lines are the same")
+        #expect(near.map(\.text) == far.map(\.text))
+        #expect(abs((next[1].origin.x - near[1].origin.x) - cw) < 1e-9,
+                "across one cell edge the start moves by exactly one cell")
+        #expect(next[0].origin == near[0].origin)
     }
 
     // MARK: - Helpers
 
     /// Build a `CharacterInfo` array from a string. Origin and bounds are
-    /// indicative — `groupIntoRuns` consumes them for sorting/grouping but
+    /// indicative — `runMemberGroups` consumes them for sorting/grouping but
     /// the post-redesign lineage hash does not fold position fields. Each
     /// Swift Character maps to one `CharacterInfo` entry; for ASCII this
     /// matches the NSString composed-character-sequence iteration the
