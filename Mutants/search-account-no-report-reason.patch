@@ -1,0 +1,19 @@
+Property: A page with no report is named among the pages that stop Redact.
+Area: Search, the account of what was read
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/AccountOfWhatWasReadTests (or on the host: cd Packages/RedactionEngine && swift test --filter AccountOfWhatWasReadTests)
+Must go red: RedactionEngineTests/AccountOfWhatWasReadTests row [C-16 adding a page not read or partly read never gives fewer warnings]; RedactionEngineTests/AccountOfWhatWasReadTests row [C-18 a page with no report is not read, and named]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/AccountOfWhatWasRead.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/AccountOfWhatWasRead.swift
+index 7a7931a3..798c2945 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/AccountOfWhatWasRead.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/AccountOfWhatWasRead.swift
+@@ -274,7 +274,7 @@ struct AccountOfWhatWasRead: Sendable, Equatable {
+             states.indices.filter {
+                 switch states[$0].kind {
+                 case .read: false
+-                case .notRead: true
++                case .notRead: states[$0] != .noReport
+                 case .partlyRead: states[$0] != .partlyRead([.smallPictures])
+                 }
+             }

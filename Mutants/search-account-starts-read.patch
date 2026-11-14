@@ -1,0 +1,19 @@
+Property: Every page starts with no facts: "not read: no report".
+Area: Search, the account of what was read
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/AccountOfWhatWasReadTests (or on the host: cd Packages/RedactionEngine && swift test --filter AccountOfWhatWasReadTests)
+Must go red: RedactionEngineTests/AccountOfWhatWasReadTests row [C-02 a scanned page with recognition off is not read]; RedactionEngineTests/AccountOfWhatWasReadTests row [C-10 the pages after the result limit's page are not reached]; RedactionEngineTests/AccountOfWhatWasReadTests row [C-11 a run stopped on page 6 leaves it partly read and the rest not reached]; RedactionEngineTests/AccountOfWhatWasReadTests row [C-13 a page read by recognition is counted in the qualified no-match]; RedactionEngineTests/AccountOfWhatWasReadTests row [C-15 an empty read on a blank picture is read, and the plain no-match stays allowed]; RedactionEngineTests/AccountOfWhatWasReadTests row [C-17 a failure after a success leaves the page not read]; RedactionEngineTests/AccountOfWhatWasReadTests row [C-17b a success after a failure leaves the page not read]; RedactionEngineTests/AccountOfWhatWasReadTests row [C-18 a page with no report is not read, and named]; RedactionEngineTests/AccountOfWhatWasReadTests row [C-19 an empty read on a picture with one line of print is not read]; RedactionEngineTests/AccountOfWhatWasReadTests row [C-20 a cached empty read reports what the fresh read did]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/AccountOfWhatWasRead.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/AccountOfWhatWasRead.swift
+index 7a7931a3..dd42080f 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/AccountOfWhatWasRead.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/AccountOfWhatWasRead.swift
+@@ -198,7 +198,7 @@ struct AccountOfWhatWasRead: Sendable, Equatable {
+     /// Every page starts with no facts: "not read: no report".
+     init(pageCount: Int) {
+         self.pageCount = max(0, pageCount)
+-        facts = Array(repeating: [], count: self.pageCount)
++        facts = Array(repeating: .ownText, count: self.pageCount)
+     }
+ 
+     /// Adds a report's facts to one page. A page outside the document is ignored.

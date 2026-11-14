@@ -1,0 +1,20 @@
+Property: With no picture at hand, an empty read has ink.
+Area: Search, the account of what was read
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/AccountOfWhatWasReadTests (or on the host: cd Packages/RedactionEngine && swift test --filter AccountOfWhatWasReadTests)
+Must go red: RedactionEngineTests/AccountOfWhatWasReadTests row [C-21 an empty read with no picture at hand is ink]; RedactionEngineTests/AccountOfWhatWasReadTests row [While no floor is set, every empty read is ink]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/PageInk.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/PageInk.swift
+index f2528b8b..f6a9605f 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/PageInk.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/PageInk.swift
+@@ -42,7 +42,8 @@ enum PageInk {
+     /// True when `share` is at or above `floor`; true as well when either is
+     /// missing or the share counted no pixel.
+     static func hasInk(_ share: DarkShare?, floor: FloorShare?) -> Bool {
+-        guard let share, let floor, share.total > 0, let scale = power(floor.exponent) else { return true }
++        guard let share else { return false }
++        guard let floor, share.total > 0, let scale = power(floor.exponent) else { return true }
+         return Int128(share.dark) * scale >= Int128(floor.significand) * Int128(share.total)
+     }
+ 

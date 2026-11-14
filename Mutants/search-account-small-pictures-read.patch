@@ -1,0 +1,18 @@
+Property: Pictures below the picture rule's floors leave the page partly read (quietly), not read.
+Area: Search, the account of what was read
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/AccountOfWhatWasReadTests (or on the host: cd Packages/RedactionEngine && swift test --filter AccountOfWhatWasReadTests)
+Must go red: RedactionEngineTests/AccountOfWhatWasReadTests row [C-08 a typed page with a small picture is partly read and does not stop Redact]; RedactionEngineTests/AccountOfWhatWasReadTests row [C-23 small pictures alone stop nothing]; RedactionEngineTests/AccountOfWhatWasReadTests row [C-25 every set of facts at every place gives exactly one state, and a failure never a better one]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/AccountOfWhatWasRead.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/AccountOfWhatWasRead.swift
+index 7a7931a3..a230fcde 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/AccountOfWhatWasRead.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/AccountOfWhatWasRead.swift
+@@ -176,7 +176,6 @@ struct AccountOfWhatWasRead: Sendable, Equatable {
+         var reasons: Set<Reason> = []
+         if position == .onTheResultLimitPage || position == .onTheStopPage { reasons.insert(.runEndedOnThisPage) }
+         if facts.contains(.patternTimedOut) { reasons.insert(.patternTimedOut) }
+-        if facts.contains(.smallPictures) { reasons.insert(.smallPictures) }
+         if facts.contains(.ownText) {
+             if facts.contains(.recognitionFailed) { reasons.insert(.recognitionFailed) }
+             if facts.contains(.tooLarge) { reasons.insert(.tooLarge) }
