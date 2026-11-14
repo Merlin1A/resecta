@@ -39,6 +39,16 @@
                ReferencedContainer = "container:Packages/RedactionEngine">
             </BuildableReference>
          </TestableReference>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "RedactionCoreTests"
+               BuildableName = "RedactionCoreTests"
+               BlueprintName = "RedactionCoreTests"
+               ReferencedContainer = "container:Packages/RedactionEngine">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction
