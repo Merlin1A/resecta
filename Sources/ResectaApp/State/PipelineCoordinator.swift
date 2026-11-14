@@ -224,6 +224,9 @@ final class PipelineCoordinator: @unchecked Sendable {
             if !refusal.hint.isEmpty { enqueueToast(refusal.hint, severity: .warning) }
             return
         }
+        // A full run's start ends the pause it would otherwise report.
+        documentState.wasPausedByBackground = false
+        documentState.pausedFromPhase = nil
 
         // At the Apply seam, the Search & Redact sheet mutates
         // `redactionState.regions` and is incompatible with the phases this
