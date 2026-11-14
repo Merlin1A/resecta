@@ -193,6 +193,23 @@ for s in sorted(suites):
 PYEOF
 }
 
+# A scheme can test more than one target: the engine scheme tests the engine
+# and its Foundation-only core. Each pair is `Target=test-source-dir`; every
+# suite is printed as `Target/Suite`, the form `-only-testing:` takes, so a
+# suite is addressed by the target it is in. The first pair is the scheme's
+# own and its folder must exist (the caller checks); a later pair whose
+# folder is absent is left out, so a tree from before the core target runs.
+# The exclusion, perf-alone and gating lists and the OFFENDERS line name bare
+# suites, so a suite name is used in one target only.
+enumerate_targets() { # Target=dir... — one `Target/Suite` per line
+    local pair t d
+    for pair in "$@"; do
+        t="${pair%%=*}"; d="${pair#*=}"
+        [ -d "$d" ] || continue
+        enumerate_suites "$d" | sed "s|^|$t/|"
+    done
+}
+
 # ── Verdict file ──────────────────────────────────────────────────────────
 # write_verdict PASS|FAIL|INCOMPLETE|BUILD-FAILED <summary line>... writes,
 # beside the run's logs: `nonce` (uuidgen), `summary.txt` (the summary lines
@@ -464,7 +481,7 @@ STUB
         case " $PERF_ALONE_ResectaApp " in *" $pat "*) ;; *) echo "self-test: $pat is alone-gating but not perf-alone" >&2; n=1 ;; esac
         case " $NON_GATING " in *" $pat "*) echo "self-test: $pat is alone-gating and in NON_GATING" >&2; n=1 ;; esac
     done
-    $GREP -A2 'if in_list "\$s" "\$ALONE_GATING"; then' "$me" | $GREP -q 'run_invocation "alone-\$s" "gating" "\$s"' \
+    $GREP -A2 'if in_list "\$s" "\$ALONE_GATING"; then' "$me" | $GREP -q 'run_invocation "alone-\$s" "gating" "\$q"' \
         || { echo "self-test: the alone loop does not run an alone-gating suite gating" >&2; n=1; }
     if [ "$n" -eq 0 ]; then echo "self-test: alone-gating suites are perf-alone, off the exclusion list, and run gating OK"; else fails=1; fi
     # 11. The page-parallel rasterization correctness tests gate: the
@@ -482,6 +499,33 @@ STUB
     done
     case " $NON_GATING " in *" PageParallelRasterizationTimingTests "*) ;; *) echo "self-test: PageParallelRasterizationTimingTests is not report-only" >&2; n=1 ;; esac
     if [ "$n" -eq 0 ]; then echo "self-test: the rasterization correctness suites gate and only its timing suite is report-only OK"; else fails=1; fi
+    # 12. A scheme that tests two targets lists each suite under its own
+    #     target: a suite planted in the core's folder is listed with the core
+    #     target, one in the engine's folder with the engine target; with the
+    #     core's folder absent the engine's suites alone are listed; and a
+    #     `Target/Suite` reaches xcodebuild as `-only-testing:Target/Suite`.
+    n=0
+    tdir="$(mktemp -d "${TMPDIR:-/tmp}/test-batched-selftest.XXXXXX")"
+    mkdir -p "$tdir/eng" "$tdir/core"
+    printf 'import Testing\nstruct EngineSide {\n    @Test func a() {}\n}\n' > "$tdir/eng/E.swift"
+    printf 'import Testing\nstruct CoreSide {\n    @Test func b() {}\n}\n' > "$tdir/core/C.swift"
+    got="$(enumerate_targets "EngT=$tdir/eng" "CoreT=$tdir/core" | tr '\n' ' ')"
+    [ "$got" = "EngT/EngineSide CoreT/CoreSide " ] \
+        || { echo "self-test: two targets expected 'EngT/EngineSide CoreT/CoreSide', got '$got'" >&2; n=1; }
+    got="$(enumerate_targets "EngT=$tdir/eng" "CoreT=$tdir/absent" | tr '\n' ' ')"
+    [ "$got" = "EngT/EngineSide " ] \
+        || { echo "self-test: an absent core folder expected 'EngT/EngineSide', got '$got'" >&2; n=1; }
+    unlink "$tdir/eng/E.swift"; unlink "$tdir/core/C.swift"; rmdir "$tdir/eng" "$tdir/core" "$tdir"
+    body="$(sed -n '/^run_invocation()/,/^}/p' "$me")"
+    printf '%s\n' "$body" | $GREP -q 'args+=("-only-testing:\$s")' \
+        || { echo "self-test: run_invocation does not pass a Target/Suite through as it is" >&2; n=1; }
+    $GREP -q '^        TEST_TARGETS="\$TEST_TARGET=\$TEST_SRC RedactionCoreTests=Packages/RedactionEngine/Tests/RedactionCoreTests"$' "$me" \
+        || { echo "self-test: the engine scheme does not list the core's test target" >&2; n=1; }
+    $GREP -q '^TEST_TARGETS="\${TEST_TARGETS:-\$TEST_TARGET=\$TEST_SRC}"$' "$me" \
+        || { echo "self-test: a scheme with no pair of its own does not default to its one target" >&2; n=1; }
+    $GREP -A1 '^TEST_TARGETS=""   # set by the scheme below, never read from the environment$' "$me" | $GREP -qx 'case "\$SCHEME" in' \
+        || { echo "self-test: the scheme's targets are not cleared right before the scheme case (read from the environment)" >&2; n=1; }
+    if [ "$n" -eq 0 ]; then echo "self-test: each target's suites are listed under that target, an absent core folder is left out, and Target/Suite is addressed as it is OK"; else fails=1; fi
     [ "$fails" -eq 0 ] && { echo "self-test: PASS"; exit 0; }
     echo "self-test: FAIL" >&2; exit 1
 }
@@ -491,10 +535,12 @@ STUB
 case "$RECOVERY" in reboot|erase) ;; *) echo "TEST_BATCHED_RECOVERY must be reboot or erase (got $RECOVERY)" >&2; exit 64 ;; esac
 case "$STALL_SECS" in ''|*[!0-9]*) echo "TEST_BATCHED_STALL_SECS must be a whole number of seconds (got $STALL_SECS)" >&2; exit 64 ;; esac
 SCHEME="$1"; shift
+TEST_TARGETS=""   # set by the scheme below, never read from the environment
 case "$SCHEME" in
     RedactionEngine)
         TEST_TARGET="RedactionEngineTests"
         TEST_SRC="Packages/RedactionEngine/Tests/RedactionEngineTests"
+        TEST_TARGETS="$TEST_TARGET=$TEST_SRC RedactionCoreTests=Packages/RedactionEngine/Tests/RedactionCoreTests"
         PERF_ALONE="$PERF_ALONE_RedactionEngine"
         ALONE_GATING="$ALONE_GATING_RedactionEngine"
         SETTLE_SECS=0
@@ -508,6 +554,8 @@ case "$SCHEME" in
         ;;
     *) echo "unknown scheme: $SCHEME (expected RedactionEngine or ResectaApp)" >&2; usage ;;
 esac
+# A scheme that tests one target needs no pair of its own.
+TEST_TARGETS="${TEST_TARGETS:-$TEST_TARGET=$TEST_SRC}"
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -566,11 +614,16 @@ fi
 echo "simulator: $SIM_UDID (pinned via TEST_BATCHED_SIM_UDID)"
 
 SUITES_FILE="$RUN_DIR/suites.txt"
-enumerate_suites "$TEST_SRC" > "$SUITES_FILE"
+enumerate_targets $TEST_TARGETS > "$SUITES_FILE"   # the pairs hold no spaces: split on purpose
 
 TOTAL_SUITES="$(wc -l < "$SUITES_FILE" | tr -d ' ')"
 [ "$TOTAL_SUITES" -gt 0 ] || { echo "suite enumeration produced nothing — check $TEST_SRC" >&2; exit 1; }
-echo "enumerated $TOTAL_SUITES suites in $TEST_TARGET"
+for pair in $TEST_TARGETS; do
+    t="${pair%%=*}"
+    n="$($GREP -c "^$t/" "$SUITES_FILE" || true)"
+    echo "enumerated $n suites in $t"
+done
+echo "enumerated $TOTAL_SUITES suites in all"
 
 in_list() { # word, space-separated list
     local w="$1" l="$2" x
@@ -581,9 +634,10 @@ in_list() { # word, space-separated list
 BATCHABLE=()
 ALONE=()
 EXCLUDED=()
-while IFS= read -r s; do
+while IFS= read -r q; do   # q = Target/Suite; the lists below name bare suites
+    s="${q#*/}"
     if in_list "$s" "$EXCLUDE"; then EXCLUDED+=("$s")
-    elif in_list "$s" "$PERF_ALONE"; then ALONE+=("$s"); else BATCHABLE+=("$s"); fi
+    elif in_list "$s" "$PERF_ALONE"; then ALONE+=("$q"); else BATCHABLE+=("$q"); fi
 done < "$SUITES_FILE"
 echo "batchable: ${#BATCHABLE[@]}   perf-alone: ${#ALONE[@]}   excluded on this runtime: ${#EXCLUDED[@]}"
 [ "${#EXCLUDED[@]}" -gt 0 ] && echo "excluded (TEST_BATCHED_EXCLUDE; not run here, not verified here): ${EXCLUDED[*]}"
@@ -688,7 +742,9 @@ run_invocation() { # label mode suite...
     local label="$1" mode="$2"; shift 2
     local nsuites=$#
     local args=() s
-    for s in "$@"; do args+=("-only-testing:$TEST_TARGET/$s"); done
+    for s in "$@"; do   # `Target/Suite` as enumerated; a bare suite is the scheme's own target's
+        case "$s" in */*) args+=("-only-testing:$s") ;; *) args+=("-only-testing:$TEST_TARGET/$s") ;; esac
+    done
 
     local attempt=1 state log xc start now retried=""
     while :; do
@@ -814,14 +870,15 @@ while [ "$i" -lt "${#BATCHABLE[@]}" ]; do
 done
 
 if [ "${#ALONE[@]}" -gt 0 ]; then
-    for s in "${ALONE[@]}"; do
+    for q in "${ALONE[@]}"; do
+        s="${q#*/}"
         [ "$SETTLE_SECS" -gt 0 ] && sleep "$SETTLE_SECS"
         if in_list "$s" "$ALONE_GATING"; then
             echo "perf-alone $s (completely alone, gating):"
-            run_invocation "alone-$s" "gating" "$s"
+            run_invocation "alone-$s" "gating" "$q"
         else
             echo "perf-alone $s (completely alone, report-only):"
-            run_invocation "alone-$s" "report-only" "$s"
+            run_invocation "alone-$s" "report-only" "$q"
         fi
     done
 fi
