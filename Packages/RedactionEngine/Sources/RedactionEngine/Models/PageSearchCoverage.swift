@@ -5,8 +5,8 @@ import Foundation
 /// `DocumentSearcher.setPageCoverageSink(_:)` — the search-side seam for the
 /// verification search re-check. Reporting-only: installing the sink never
 /// changes which results a search yields.
-struct PageSearchCoverage: Sendable, Equatable {
-    enum Route: Sendable, Equatable {
+public struct PageSearchCoverage: Sendable, Equatable {
+    public enum Route: Sendable, Equatable {
         /// The page's text layer was searched.
         case textLayer
         /// The page was rendered and read by OCR (cached or fresh).
@@ -19,11 +19,36 @@ struct PageSearchCoverage: Sendable, Equatable {
         case unopenable
     }
 
-    let pageIndex: Int
-    let route: Route
+    /// Of an `ocr` report whose accurate read returned no line: whether the
+    /// picture recognition was given holds ink (`PageInk`).
+    public enum EmptyRead: Sendable, Equatable {
+        case blank
+        case ink
+    }
 
-    init(pageIndex: Int, route: Route) {
+    /// Of a `textLayer` report on a page with pictures: whether the picture
+    /// rule requires them read, or they are below its floors.
+    public enum Pictures: Sendable, Equatable {
+        case required
+        case belowFloors
+    }
+
+    public let pageIndex: Int
+    public let route: Route
+    /// Nil unless the route is `ocr` and the accurate read returned no line.
+    public let emptyRead: EmptyRead?
+    /// Nil when the report says nothing of the page's pictures.
+    public let pictures: Pictures?
+    /// The searched text is hidden text over a page-size picture: another
+    /// app's recognition.
+    public let throughAnotherAppsLayer: Bool
+
+    init(pageIndex: Int, route: Route, emptyRead: EmptyRead? = nil, pictures: Pictures? = nil,
+         throughAnotherAppsLayer: Bool = false) {
         self.pageIndex = pageIndex
         self.route = route
+        self.emptyRead = emptyRead
+        self.pictures = pictures
+        self.throughAnotherAppsLayer = throughAnotherAppsLayer
     }
 }
