@@ -1,4 +1,4 @@
-Property: While the page bar is up and uncovered, a bottom message is lifted by the bar's measured height (never less than the one-line bar's), so it clears the bar at every text size.
+Property: While the page bar is up and uncovered, a bottom message is lifted by the bar's measured height (never less than the one-line bar's).
 Area: editor bottom chrome (bottom message lift)
 Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/ParkedChromeLayoutTests
 Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppUITests/EditorChromeUITests/testBottomMessage_atAccessibilityOne_keepsItsGapAboveThePageBar -only-testing:ResectaAppUITests/EditorChromeUITests/testBottomMessage_atTheLargestTextSize_keepsItsGapAboveThePageBar
