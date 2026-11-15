@@ -519,6 +519,25 @@ struct ResectaApp: App {
                                         .first(where: { $0.hasPrefix("--seedVerifiedReport=") })?
                                         .split(separator: "=").last,
                                        let report = VerificationDebugFixtures.all[String(name)] {
+                                        // The debug seeds (`DebugSeedOptions`),
+                                        // each one fact of the results screen.
+                                        // The document's own facts and the
+                                        // changed box come first: the box goes
+                                        // in before the seeded PDF is
+                                        // registered, so it is one that PDF
+                                        // does not carry and the change deletes
+                                        // nothing.
+                                        let seeds = DebugSeedOptions.parse(arguments: launchArguments)
+                                        if let count = seeds.formValues {
+                                            ws.documentState.sourceFilledFormFieldCount = count
+                                        }
+                                        if seeds.coveredText {
+                                            DebugSeedOptions.coverFirstLine(of: ws.documentState.sourceDocument)
+                                        }
+                                        if seeds.boxesChanged {
+                                            ws.redactionState.addRegion(
+                                                DebugSeedOptions.changedBox(), page: 0, undoManager: nil)
+                                        }
                                         // `--seedOutput`: a copy of the loaded
                                         // sample stands in for the redacted PDF,
                                         // so Share, its confirm and Preview are
@@ -538,13 +557,28 @@ struct ResectaApp: App {
                                             // Seeded by hand: no run, so no record.
                                             ws.redactionState.recordLastRunInputs(.init(
                                                 perPageModes: run.modes, perPageFallbackReasons: run.reasons,
-                                                sensitiveTerms: SensitiveTermSet(terms: [], manualRegionsWithoutText: 0),
-                                                appliedSearches: [], deselection: nil,
+                                                sensitiveTerms: seeds.sensitiveTerms,
+                                                appliedSearches: seeds.appliedSearches, deselection: seeds.deselection,
                                                 ocrSkippedPages: run.ocrSkippedPages, degradeFailures: nil))
                                         }
                                         ws.documentState.transition(to: .redacting(progress: .init(
                                             currentPage: 1, totalPages: 1, currentStep: "Seeded")))
-                                        ws.documentState.transition(to: .verified(report: report))
+                                        // `--seedVerifying=<finished>`: the run
+                                        // stops at its checks, the report's
+                                        // first rows finished and the next one
+                                        // running. A count that leaves no row
+                                        // running is a wrong seed argument, and
+                                        // the launch stops on it.
+                                        if let finished = seeds.verifyingFinished {
+                                            guard let progress = VerificationDebugFixtures.progress(
+                                                for: String(name), finished: finished) else {
+                                                preconditionFailure(VerificationDebugFixtures.verifyingSeedFault(
+                                                    for: String(name), finished: finished))
+                                            }
+                                            ws.documentState.transition(to: .verifying(progress: progress))
+                                        } else {
+                                            ws.documentState.transition(to: .verified(report: report))
+                                        }
                                     }
                                     if failsOnDocument,
                                        case .seed(let error, let phase, let report) = seededFailure {
