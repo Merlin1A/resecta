@@ -38,7 +38,7 @@
 #      under /tmp/test-batched-<scheme>-*/ or $TEST_BATCHED_VERDICT_DIR
 #      (depth ≤ 3) was written by test-batched.sh for that scheme with
 #      VERDICT PASS on the pushed commit's tree (a rebase that keeps the tree
-#      keeps the verdict), started and ended with clean tracked files on one
+#      keeps the verdict), counted at least one test, started and ended with clean tracked files on one
 #      commit, ran on $TEST_BATCHED_SIM_UDID whose runtime build is still the
 #      same, under the same Xcode build, and names a run dir whose `nonce` and
 #      `summary.txt` still match it (the re-read a hand-written verdict
@@ -226,6 +226,9 @@ if vdir and os.path.isdir(vdir):
 def why_not(d):
     if d.get("verdict") != "PASS":
         return "verdict is %s, not PASS" % d.get("verdict")
+    tests = (d.get("counts") or {}).get("tests")
+    if not isinstance(tests, int) or isinstance(tests, bool) or tests <= 0:
+        return "verdict PASS counted no tests (tests=%s)" % tests
     if not (d.get("tracked_clean_start") is True and d.get("tracked_clean_end") is True):
         return "tracked files were modified at the run's start or end"
     if not d.get("head") or d.get("head") != d.get("head_end"):
@@ -416,7 +419,8 @@ lines = ["totals: tests=1 suites=1 failed=0 known-issues=0 wedged=0 excluded=0",
 v = {"source": "test-batched.sh", "scheme": "ResectaApp", "verdict": "PASS", "head": head,
      "head_end": head, "tree": tree, "tracked_clean_start": True, "tracked_clean_end": True,
      "sim": {"udid": "SELF-TEST-UDID", "runtime_version": "1.0", "runtime_build": "R1"},
-     "xcode_build": "X1", "run_dir": d, "nonce": "N-1", "summary_lines": lines}
+     "xcode_build": "X1", "run_dir": d, "nonce": "N-1", "summary_lines": lines,
+     "counts": {"tests": 1, "suites": 1}}
 files = {"nonce": "N-1\n", "summary.txt": "\n".join(lines) + "\n"}
 for m in mods:
     if m == "-nonce":
@@ -502,7 +506,9 @@ PYEOF
              "verdict=FAIL|verdict is FAIL" "tracked_clean_start=false|tracked files were modified" \
              "tracked_clean_end=false|tracked files were modified" "head_end=0000|different commits" \
              "sim.udid=OTHER|ran on simulator OTHER" "-nonce|holds no nonce" \
-             "nonce-file=N-2|does not match" "summary-file=VERDICT: PASS forged|summary.txt in"; do
+             "nonce-file=N-2|does not match" "summary-file=VERDICT: PASS forged|summary.txt in" \
+             "counts.tests=0|counted no tests (tests=0)" "counts.tests=-1|counted no tests (tests=-1)" \
+             "counts.tests=null|counted no tests (tests=None)"; do
         rm -rf "$t/verdicts"/*
         forge "$t/verdicts/v" "${x%%|*}"
         hook "$(line "$h")"
