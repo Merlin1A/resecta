@@ -1,0 +1,19 @@
+Property: A box for which no band was made gives no plan's rectangle: each region it names keeps its own rectangle as an ordinary one.
+Area: the text path's choice of boxes with a band
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/TextPathRectangleTests (or on the host: cd Packages/RedactionEngine && swift test --filter TextPathRectangleTests)
+Must go red: RedactionCoreTests/TextPathRectangleTests list [a box for which no band was made]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/TextPathRectangle.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/TextPathRectangle.swift
+index 89f7ef68..e59510ee 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/TextPathRectangle.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/TextPathRectangle.swift
+@@ -90,7 +90,7 @@ extension TextPathRectangle {
+     /// regions in the frame the plan's boxes are in. The inner rectangle is
+     /// whole sixty-fourths of a point, and dividing by 64 is exact.
+     package static func forPage(regions: [TextPathRegion], boxes: [PaintedBox]) -> [TextPathRectangle] {
+-        let banded = boxes.filter(\.bandMade)
++        let banded = boxes  // mutant: a box for which no band was made is treated as banded
+         var given = [Bool](repeating: false, count: banded.count)
+         var list: [TextPathRectangle] = []
+         for region in regions {

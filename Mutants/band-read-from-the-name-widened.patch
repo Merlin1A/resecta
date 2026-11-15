@@ -1,0 +1,19 @@
+Property: Whether a box has a band is read from the band record, not from its treatment: a box already as wide, or one that could not be widened for want of a column, gives the plan's rectangle when a band was made for it.
+Area: the text path's choice of boxes with a band
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/TextPathRectangleTests (or on the host: cd Packages/RedactionEngine && swift test --filter TextPathRectangleTests)
+Must go red: RedactionCoreTests/TextPathRectangleTests list [a box with a band over the region with hidden letters and strips]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/TextPathRectangle.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/TextPathRectangle.swift
+index 89f7ef68..e17bddfd 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/TextPathRectangle.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/TextPathRectangle.swift
+@@ -90,7 +90,7 @@ extension TextPathRectangle {
+     /// regions in the frame the plan's boxes are in. The inner rectangle is
+     /// whole sixty-fourths of a point, and dividing by 64 is exact.
+     package static func forPage(regions: [TextPathRegion], boxes: [PaintedBox]) -> [TextPathRectangle] {
+-        let banded = boxes.filter(\.bandMade)
++        let banded = boxes.filter { if case .widened = $0.treatment { true } else { false } }  // mutant: the name "widened" alone
+         var given = [Bool](repeating: false, count: banded.count)
+         var list: [TextPathRectangle] = []
+         for region in regions {
