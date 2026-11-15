@@ -1,0 +1,19 @@
+Property: The hand-drawn boxes seed names their page, which the results row reads; a count alone shows no row.
+Area: debug launch seeds, hand-drawn boxes (App)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppUITests/SeededStatesUITests
+Must go red: ResectaAppUITests/SeededStatesUITests testHandBoxesShowTheirRow
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/App/DebugSeedOptions.swift b/Sources/ResectaApp/App/DebugSeedOptions.swift
+index e68079ee..87a22c4f 100644
+--- a/Sources/ResectaApp/App/DebugSeedOptions.swift
++++ b/Sources/ResectaApp/App/DebugSeedOptions.swift
+@@ -105,7 +105,7 @@ extension DebugSeedOptions {
+     var sensitiveTerms: SensitiveTermSet {
+         guard let handBoxes else { return SensitiveTermSet(terms: [], manualRegionsWithoutText: 0) }
+         return SensitiveTermSet(terms: [], manualRegionsWithoutText: handBoxes,
+-                                manualRegionPagesWithoutText: Array(repeating: 0, count: handBoxes))
++                                manualRegionPagesWithoutText: [])
+     }
+ 
+     /// The run's applied searches: one of the seeded kind, on page 1, or none.

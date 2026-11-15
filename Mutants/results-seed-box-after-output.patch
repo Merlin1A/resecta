@@ -1,0 +1,32 @@
+Property: The changed box goes in before the seeded PDF is registered; added after it, it deletes the PDF and the reason under Share is the missing file's.
+Area: debug launch seeds, boxes changed (App)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppUITests/SeededStatesUITests
+Must go red: ResectaAppUITests/SeededStatesUITests testBoxesChangedWithTheOutputSaysRegionsChanged
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/App/ResectaApp.swift b/Sources/ResectaApp/App/ResectaApp.swift
+index 71ea36f6..0f2fb1e9 100644
+--- a/Sources/ResectaApp/App/ResectaApp.swift
++++ b/Sources/ResectaApp/App/ResectaApp.swift
+@@ -534,10 +534,6 @@ struct ResectaApp: App {
+                                         if seeds.coveredText {
+                                             DebugSeedOptions.coverFirstLine(of: ws.documentState.sourceDocument)
+                                         }
+-                                        if seeds.boxesChanged {
+-                                            ws.redactionState.addRegion(
+-                                                DebugSeedOptions.changedBox(), page: 0, undoManager: nil)
+-                                        }
+                                         // `--seedOutput`: a copy of the loaded
+                                         // sample stands in for the redacted PDF,
+                                         // so Share, its confirm and Preview are
+@@ -553,6 +549,10 @@ struct ResectaApp: App {
+                                                 ws.redactionState.outputURL = copy
+                                             }
+                                         }
++                                        if seeds.boxesChanged {
++                                            ws.redactionState.addRegion(
++                                                DebugSeedOptions.changedBox(), page: 0, undoManager: nil)
++                                        }
+                                         if let run = VerificationDebugFixtures.runInputs(for: String(name)) {
+                                             // Seeded by hand: no run, so no record.
+                                             ws.redactionState.recordLastRunInputs(.init(

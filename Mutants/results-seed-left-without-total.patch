@@ -1,0 +1,19 @@
+Property: An items-left seed without a total seeds nothing; it is not read as all of them left.
+Area: debug launch seeds, items left (App)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/DebugSeedOptionsTests
+Must go red: ResectaAppTests/DebugSeedOptionsTests parsesEachSeedAndIgnoresMalformedOnes [left without a total]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/App/DebugSeedOptions.swift b/Sources/ResectaApp/App/DebugSeedOptions.swift
+index e68079ee..6dadd05b 100644
+--- a/Sources/ResectaApp/App/DebugSeedOptions.swift
++++ b/Sources/ResectaApp/App/DebugSeedOptions.swift
+@@ -89,7 +89,7 @@ nonisolated struct DebugSeedOptions: Equatable, Sendable {
+     }
+ 
+     private static func left(_ raw: String) -> Left? {
+-        let parts = raw.split(separator: "/", omittingEmptySubsequences: false)
++        let parts = raw.contains("/") ? raw.split(separator: "/", omittingEmptySubsequences: false) : [Substring(raw), Substring(raw)]
+         guard parts.count == 2, let left = positive(String(parts[0])),
+               let total = positive(String(parts[1])), left <= total else { return nil }
+         return Left(left: left, total: total)
