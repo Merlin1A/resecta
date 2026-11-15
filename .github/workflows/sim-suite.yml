@@ -5,7 +5,9 @@
 # each; a dispatch runs the scheme it names; ResectaApp alone runs on every
 # pull request to main as a required check (twenty to forty minutes),
 # documentation-only pull requests included: its honesty tests read the
-# README, ENGINEERING, THREAT-MODEL, PRIVACY and EULA text.
+# README, ENGINEERING, THREAT-MODEL, PRIVACY and EULA text. A draft pull
+# request skips it (the job's `if:`); it runs when the pull request is
+# marked ready for review, and on every push after that.
 # RedactionEngine here runs the engine package's suites on the simulator
 # (the package's one hosted run: a host `swift test` of the whole package
 # never reached a verdict on a hosted runner) and stays off pull requests
@@ -51,6 +53,9 @@ on:
     tags: ['v*']
   pull_request:
     branches: [main]
+    # The default three, plus ready_for_review: a draft skips the suite,
+    # so marking it ready must start the run.
+    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
   contents: read
@@ -70,6 +75,7 @@ env:
 jobs:
   sim-suite:
     name: sim-suite (${{ matrix.scheme }})
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
     runs-on: macos-26
     timeout-minutes: 120
     strategy:
