@@ -1,0 +1,21 @@
+Property: Layer 9 fails a page whose text layer reads back other units than the filter's digest holds.
+Area: Layer 9, the character lineage check
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/SearchableMergeProbeTests (or on the host: cd Packages/RedactionEngine && swift test --filter SearchableMergeProbeTests)
+Must go red: RedactionEngineTests/SearchableMergeProbeTests layer9LineageFailOnRecomposedLetter
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification.swift
+index 39b5602d..8d57c848 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification.swift
+@@ -511,9 +511,7 @@ struct SandwichVerification: Sendable {
+         let outputHash = try Self.computeOutputLineageHash(
+             outputPage, pageRotation: digest.pageRotation)
+         if outputHash != digest.lineageHash {
+-            return .fail(
+-                "Character lineage mismatch on page \(digest.pageIndex + 1)"
+-            )
++            return .pass  // mutant: Layer 9 passes whatever the output reads back
+         }
+         return .pass
+     }
