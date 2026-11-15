@@ -53,6 +53,10 @@ package struct PageWord: Hashable, Sendable {
     package var letters: [Int]
     /// The bounding rectangle of its letters' boxes, or nil when none has one.
     package var box: PointRect?
+    /// Its letters' own boxes, in the order of its letters; a letter the
+    /// walk gave two boxes has both, in the walk's order, and a letter with
+    /// no box has none.
+    package var letterBoxes: [LetterBox]
     /// The most common height among its letters' boxes, in whole
     /// sixty-fourths of a point (each height rounded to the nearest); when
     /// two heights are equally common, the larger. Nil when no letter has a
@@ -60,10 +64,12 @@ package struct PageWord: Hashable, Sendable {
     package var letterSize: Int?
     package var source: WordSource
 
-    package init(index: Int, letters: [Int], box: PointRect?, letterSize: Int?, source: WordSource) {
+    package init(index: Int, letters: [Int], box: PointRect?, letterSize: Int?, source: WordSource,
+                 letterBoxes: [LetterBox] = []) {
         self.index = index
         self.letters = letters
         self.box = box
+        self.letterBoxes = letterBoxes
         self.letterSize = letterSize
         self.source = source
     }
@@ -91,10 +97,12 @@ package struct PageWords: Hashable, Sendable {
         }
         var words: [PageWord] = []
         for letters in WordPartition.words(of: text) {
-            let rects = letters.flatMap { boxesAt[$0] ?? [] }
+            let letterBoxes = letters.flatMap { offset in (boxesAt[offset] ?? []).map { LetterBox(offset: offset, rect: $0) } }
+            let rects = letterBoxes.map(\.rect)
             let box = rects.dropFirst().reduce(rects.first) { $0?.union($1) }
             words.append(PageWord(index: indices[letters[0]], letters: letters, box: box,
-                                  letterSize: Self.letterSize(of: rects), source: rects.isEmpty ? .none : source))
+                                  letterSize: Self.letterSize(of: rects), source: rects.isEmpty ? .none : source,
+                                  letterBoxes: letterBoxes))
         }
         self.words = words
     }
