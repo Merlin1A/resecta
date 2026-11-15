@@ -25,9 +25,7 @@ top-level subdirectories below. The entries describe what each
 subsystem produces or consumes; the subsystems call each other directly
 and pass the shared `Models/` types between them.
 
-- **Audit** — Loads and translates the rule catalog from bundled JSON,
-  mapping engine-generated rule IDs to catalog version-stable
-  identifiers for audit-export record binding.
+- **Audit** — Reads the gazetteer manifest's version from bundled JSON.
 - **Detection** — The PII detectors the search path runs (regex and
   NLTagger matching, spatial address assembly, calibrated scoring and
   cross-category overlap resolution) and the document-type classifier
@@ -41,9 +39,6 @@ and pass the shared `Models/` types between them.
 - **Import** — Analyzes PDF annotations using PDFKit to classify the
   document profile (unredacted, or redacted with a mark count) and
   extract annotation metadata from existing markup.
-- **Instrumentation** — Records cold-start timing metrics (engine-load
-  duration and first-detection timing) for performance analysis;
-  release-build implementation compiles to no-ops.
 - **Models** — Defines the data structures for the pipeline: detection
   results, page output, document profile (PDF annotation classification),
   pipeline modes, and verification metadata that cross subdirectory
