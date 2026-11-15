@@ -1,0 +1,21 @@
+Property: An unknown --seedFailure name stops the app; it never falls back to a failure the test did not name.
+Area: launch hooks (DEBUG)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/DebugLaunchHookTests
+Must go red: ResectaAppTests/DebugLaunchHookTests unknownNameStops
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/App/ResectaApp.swift b/Sources/ResectaApp/App/ResectaApp.swift
+index 70526438..e2df4fd8 100644
+--- a/Sources/ResectaApp/App/ResectaApp.swift
++++ b/Sources/ResectaApp/App/ResectaApp.swift
+@@ -313,9 +313,7 @@ struct ResectaApp: App {
+         let parts = argument.dropFirst(prefix.count)
+             .split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
+         let name = String(parts[0])
+-        guard let error = seedFailureErrors.first(where: { seedFailureName($0) == name }) else {
+-            return .stop("--seedFailure: unknown failure \"\(name)\"")
+-        }
++        let error = seedFailureErrors.first(where: { seedFailureName($0) == name }) ?? seedFailureErrors[0]
+         var phase = SeedFailurePhase.editing
+         if parts.count == 2 {
+             guard let named = SeedFailurePhase(rawValue: String(parts[1])) else {
