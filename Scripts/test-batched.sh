@@ -66,7 +66,10 @@
 #   1  at least one red outside the exclusion list (offenders printed)
 #   2  no gating reds, but >=1 invocation wedged, or hit a test-host launch
 #      refusal or a launch hang twice — those suites are unverified,
-#      coverage incomplete;
+#      coverage incomplete; or completed with no result bundle, or one that
+#      cannot be read (unread); or a gating invocation ran no test (empty);
+#      or the run counted no test at all — a run that verified nothing is
+#      never a pass;
 #      also when TEST_BATCHED_SIM_UDID is unset (nothing ran)
 #
 # A launch hang — the watchdog fires before the log shows any suite or
@@ -569,6 +572,55 @@ STUB
     [ "$ui_found" -gt 0 ] && [ "$ui_found" -eq "$ui_declared" ] \
         || { echo "self-test: the enumerator lists $ui_found UI suites; the tree declares $ui_declared XCTestCase classes" >&2; n=1; }
     if [ "$n" -eq 0 ]; then echo "self-test: ResectaAppUI runs the UI-test target serially (one suite per invocation, $ui_found suites, as many as the tree declares) through the app scheme OK"; else fails=1; fi
+    # 14. A run that verified nothing never reads PASS: an invocation that
+    #     completed with no result bundle (unread), a gating one that ran no
+    #     test (empty) and a run with no invocation at all each read
+    #     INCOMPLETE, exit 2; a good invocation beside an unread one is still
+    #     INCOMPLETE, with the good one's tests counted; two good ones PASS.
+    #     Driven through run_invocation and the summary with a stub xcodebuild
+    #     (the Nth call plays the Nth word: pass3, pass0 or nobundle) and the
+    #     result read stubbed to match; nothing real is launched.
+    n=0
+    tdir="$(mktemp -d "${TMPDIR:-/tmp}/test-batched-selftest.XXXXXX")"
+    mkdir -p "$tdir/bin"
+    cat > "$tdir/bin/xcodebuild" <<'STUB'
+#!/bin/bash
+n=$(( $(cat "$TB_STUB_DIR/calls" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$TB_STUB_DIR/calls"
+xc=""; while [ $# -gt 0 ]; do [ "$1" = "-resultBundlePath" ] && xc="$2"; shift; done
+set -- $TB_STUB_PLAN; shift $((n - 1))
+echo "Test Suite 'Selected tests' started at now."; echo "◇ Test run started."
+[ "${1:-pass3}" = "nobundle" ] || mkdir -p "$xc"
+exit 0
+STUB
+    printf '#!/bin/bash\nexit 0\n' > "$tdir/bin/xcrun"
+    chmod +x "$tdir/bin/xcodebuild" "$tdir/bin/xcrun"
+    tb_verdict() { # plan → "verdict rc unread=N empty=N tests=N" of a whole dry run
+        rm -rf "$tdir/run" "$tdir/calls"; mkdir -p "$tdir/run"
+        PATH="$tdir/bin:$PATH" TB_STUB_DIR="$tdir" TB_STUB_PLAN="$1" bash -c '
+            eval "$(sed -n -e "/^descendants()/,/^}/p" -e "/^recover_sim()/,/^}/p" -e "/^run_invocation()/,/^}/p" -e "/^in_list()/,/^}/p" "$1")"
+            eval "$(/usr/bin/grep -E "^(LAUNCH_MARKER|NON_GATING)=" "$1")"
+            GREP=/usr/bin/grep; SCHEME=S; XCB_SCHEME=S; DEST=id=SELF-TEST; DD="$2/dd"; TEST_TARGET=T; RUN_DIR="$2/run"
+            LOG_CAP_BYTES=100000; TIMEOUT_MINS=15; STALL_SECS=30; POLL_SECS=1; BOOT_WAIT_SECS=5; RECOVERY=reboot
+            SIM_UDID=SELF-TEST; WEDGED=0; UNREAD=0; EMPTY=0; EXCLUDED=(); FAILURES_FILE="$2/run/failures.txt"; : > "$FAILURES_FILE"
+            R_LABEL=(); R_NSUITES=(); R_TESTS=(); R_PASSED=(); R_FAILED=(); R_SKIPPED=()
+            R_KNOWN=(); R_STATE=(); R_SECS=(); R_XCRESULT=(); R_MODE=(); R_RETRY=()
+            parse_xcresult() { set -- $TB_STUB_PLAN; shift $(( $(cat "$TB_STUB_DIR/calls") - 1 )); if [ "$1" = pass0 ]; then echo "COUNTS 0 0 0 0 0"; else echo "COUNTS 3 3 0 0 0"; fi; }
+            write_verdict() { :; }
+            k=1; for w in $TB_STUB_PLAN; do run_invocation "b$k" gating "Suite$k" >/dev/null 2>&1; k=$((k + 1)); done
+            ( eval "$(sed -n "/^# ── Summary/,\$p" "$1")" ) > "$2/summary.out" 2>&1; rc=$?
+            v="$(/usr/bin/grep -E "^VERDICT: " "$2/summary.out" | tail -1)"
+            set -- $v; printf "%s %s" "${2:-none}" "$rc"
+            for k in unread empty tests; do printf " %s" "$(printf "%s\n" "$v" | /usr/bin/grep -oE " $k=[0-9-]+" | tr -d " ")"; done
+        ' _ "$me" "$tdir"
+    }
+    for x in "nobundle|INCOMPLETE 2 unread=1 empty=0 tests=0" "pass0|INCOMPLETE 2 unread=0 empty=1 tests=0" \
+             "|INCOMPLETE 2 unread=0 empty=0 tests=0" "pass3 nobundle|INCOMPLETE 2 unread=1 empty=0 tests=3" \
+             "pass3 pass3|PASS 0   tests=6"; do
+        got="$(tb_verdict "${x%%|*}")"
+        [ "$got" = "${x#*|}" ] || { echo "self-test: a dry run of '${x%%|*}' expected '${x#*|}', got '$got'" >&2; n=1; }
+    done
+    rm -rf "$tdir"
+    if [ "$n" -eq 0 ]; then echo "self-test: a run with an unread or empty invocation, or no test at all, reads INCOMPLETE (exit 2), never PASS; two good invocations PASS OK"; else fails=1; fi
     [ "$fails" -eq 0 ] && { echo "self-test: PASS"; exit 0; }
     echo "self-test: FAIL" >&2; exit 1
 }
@@ -773,6 +825,8 @@ R_LABEL=(); R_NSUITES=(); R_TESTS=(); R_PASSED=(); R_FAILED=(); R_SKIPPED=()
 R_KNOWN=(); R_STATE=(); R_SECS=(); R_XCRESULT=(); R_MODE=(); R_RETRY=()
 FAILURES_FILE="$RUN_DIR/failures.txt"; : > "$FAILURES_FILE"
 WEDGED=0
+UNREAD=0   # completed, but no result bundle or one that cannot be read
+EMPTY=0    # a gating invocation that completed and ran no test
 
 parse_xcresult() { # xcresult-path label mode(gating|report-only)
     local xc="$1" label="$2" mode="$3"
@@ -894,6 +948,13 @@ run_invocation() { # label mode suite...
         printf '%s\n' "$parsed" | $GREP '^FAIL' >> "$FAILURES_FILE" || true
     fi
     set -- $counts
+    # A completed invocation verified nothing when its counts could not be
+    # read, or when a gating one ran no test: neither may pass as green.
+    if [ "$state" = "completed" ] && [ "$1" = "-1" ]; then
+        state="unread"; UNREAD=$((UNREAD + 1))
+    elif [ "$state" = "completed" ] && [ "$1" = "0" ] && [ "$mode" = "gating" ]; then
+        state="empty"; EMPTY=$((EMPTY + 1))
+    fi
     R_LABEL+=("$label"); R_NSUITES+=("$nsuites"); R_TESTS+=("$1")
     R_PASSED+=("$2"); R_FAILED+=("$3"); R_SKIPPED+=("$4"); R_KNOWN+=("$5")
     R_STATE+=("$state"); R_SECS+=("$((now - start))")
@@ -991,8 +1052,8 @@ if [ -n "$OFFENDERS" ]; then
     echo "$VERDICT_LINE"
     write_verdict FAIL "$TOTALS_LINE" "$VERDICT_LINE"
     exit 1
-elif [ "$WEDGED" -gt 0 ]; then
-    VERDICT_LINE="VERDICT: INCOMPLETE scheme=$SCHEME tests=$TOT_TESTS suites=$TOT_SUITES wedged=$WEDGED excluded=${#EXCLUDED[@]} (no gating reds in completed batches)"
+elif [ "$WEDGED" -gt 0 ] || [ "$UNREAD" -gt 0 ] || [ "$EMPTY" -gt 0 ] || [ "$TOT_TESTS" -eq 0 ]; then
+    VERDICT_LINE="VERDICT: INCOMPLETE scheme=$SCHEME tests=$TOT_TESTS suites=$TOT_SUITES wedged=$WEDGED unread=$UNREAD empty=$EMPTY excluded=${#EXCLUDED[@]} (no gating reds in completed batches)"
     echo "$VERDICT_LINE"
     write_verdict INCOMPLETE "$TOTALS_LINE" "$VERDICT_LINE"
     exit 2
