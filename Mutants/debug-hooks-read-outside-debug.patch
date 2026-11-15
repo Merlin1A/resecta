@@ -1,0 +1,24 @@
+Property: Every read of a DEBUG launch hook's name sits inside #if DEBUG, so a Release build compiles none of them.
+Area: launch hooks (DEBUG)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/DebugLaunchHookTests
+Must go red: ResectaAppTests/DebugLaunchHookTests everyHookReadIsInsideDebug
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/App/ResectaApp.swift b/Sources/ResectaApp/App/ResectaApp.swift
+index 70526438..876e52bb 100644
+--- a/Sources/ResectaApp/App/ResectaApp.swift
++++ b/Sources/ResectaApp/App/ResectaApp.swift
+@@ -598,13 +598,11 @@ struct ResectaApp: App {
+                 case .none:
+                     break
+                 }
+-                #if DEBUG
+                 // `--forceSnapshotOverlay` keeps the placeholder up across
+                 // a return to the foreground.
+                 if newPhase == .active, CommandLine.arguments.contains("--forceSnapshotOverlay") {
+                     obscureContent = true
+                 }
+-                #endif
+                 // Re-run the orphaned-temp-file sweep on every return
+                 // to the foreground. The launch `.task` above covers a
+                 // fresh process; a process that stays resident across many
