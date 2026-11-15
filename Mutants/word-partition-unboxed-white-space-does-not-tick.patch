@@ -5,10 +5,10 @@ Must go red: RedactionCoreTests/WordPartitionTests eachCase [white space the wal
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PageWords.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PageWords.swift
-index 4792020c..d8733c8a 100644
+index 635ba37e..42737361 100644
 --- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PageWords.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PageWords.swift
-@@ -84,13 +84,27 @@ package struct PageWords: Hashable, Sendable {
+@@ -90,13 +90,27 @@ package struct PageWords: Hashable, Sendable {
      /// none of whose letters has a box has source `none`.
      package init(text: String, boxes: [LetterBox], source: WordSource) {
          let units = Array(text.utf16)
@@ -35,6 +35,6 @@ index 4792020c..d8733c8a 100644
          var words: [PageWord] = []
 -        for letters in WordPartition.words(of: text) {
 +        for letters in grouped {
-             let rects = letters.flatMap { boxesAt[$0] ?? [] }
+             let letterBoxes = letters.flatMap { offset in (boxesAt[offset] ?? []).map { LetterBox(offset: offset, rect: $0) } }
+             let rects = letterBoxes.map(\.rect)
              let box = rects.dropFirst().reduce(rects.first) { $0?.union($1) }
-             words.append(PageWord(index: indices[letters[0]], letters: letters, box: box,
