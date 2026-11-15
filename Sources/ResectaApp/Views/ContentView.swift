@@ -1,4 +1,7 @@
 import SwiftUI
+#if DEBUG
+import RedactionEngine // the forced name-model failure below
+#endif
 
 // Workspace router and app-level concerns.
 // Owns: toast manager, pipeline-cancel scene-phase handler.
@@ -42,11 +45,45 @@ struct ContentView: View {
         #if DEBUG
         // Sim-verification hook: `--showToast` enqueues a two-sentence
         // warning toast once the workspace is up, so the toast's line cap
-        // can be photographed at accessibility sizes.
+        // can be photographed at accessibility sizes. `--showToast=<id>`
+        // shows one of the app's own toast messages instead
+        // (`ResectaApp.toastHook(for:)`).
         .task {
-            guard CommandLine.arguments.contains("--showToast") else { return }
-            try? await Task.sleep(for: .seconds(2))
-            toastManager.enqueue(DocumentEditorView.purgeRerunToastMessage, severity: .warning)
+            switch ResectaApp.toastHook(for: CommandLine.arguments) {
+            case .absent:
+                return
+            case .stop(let reason):
+                preconditionFailure(reason)
+            case .bare:
+                try? await Task.sleep(for: .seconds(2))
+                toastManager.enqueue(DocumentEditorView.purgeRerunToastMessage, severity: .warning)
+            case .named(let id):
+                try? await Task.sleep(for: .seconds(2))
+                toastManager.enqueue(id.message, severity: id.severity)
+            }
+        }
+        // `--forceDetectionDegrade`: once the test document is in the
+        // editor, the session records a scan kickoff whose name model
+        // failed, through the function a real kickoff calls, and posts
+        // the toast it returns; the Scan banner is then the app's own.
+        // The flag is cleared only for a new document, so it holds for
+        // the session.
+        .task {
+            guard CommandLine.arguments.contains("--forceDetectionDegrade") else { return }
+            for _ in 0..<120 {
+                if case .redact(let ws) = appCoordinator.activeWorkspace,
+                   ws.documentState.phaseKind == .editing {
+                    let diagnostics = GazetteerLoadDiagnostics(failedGazetteers: [
+                        GazetteerLoadDiagnostics.Gazetteer.nerNameModel.rawValue,
+                    ])
+                    if let toast = ws.redactionState.noteScanKickoffDiagnostics(diagnostics) {
+                        toastManager.enqueue(toast, severity: .warning)
+                    }
+                    return
+                }
+                try? await Task.sleep(for: .milliseconds(250))
+            }
+            preconditionFailure("--forceDetectionDegrade: no document reached the editor; pass --loadTestDocument")
         }
         #endif
         // Bottom toasts (info, success) — above page navigation bar

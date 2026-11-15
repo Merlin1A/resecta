@@ -122,6 +122,7 @@ struct SearchOCRSkipBanner: View {
         .background(Color.orange.opacity(0.08))
         .accessibilityElement(children: .combine)
         .accessibilityLabel(headline)
+        .accessibilityIdentifier("ocrSkipBanner")
     }
 }
 

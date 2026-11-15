@@ -104,6 +104,7 @@ struct FailedStateView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
+                .accessibilityIdentifier("failedStatePrimaryButton")
 
                 // Secondary: return to empty (start fresh) — only when return phase isn't already .empty
                 if case .empty = returnPhase {
