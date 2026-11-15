@@ -1,0 +1,19 @@
+Property: Only the box's own lines can give it the direction reason; another line's evidence keeps that line out of the stack and nothing more.
+Area: the page's complement (lines, runs, stacks, columns, bridges, direction)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/ComplementReadingTests (or on the host: cd Packages/RedactionEngine && swift test --filter ComplementReadingTests)
+Must go red: RedactionCoreTests/ComplementReadingTests neighbourEvidenceStaysWithItsLine
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
+index 050556d3..a227407c 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
+@@ -451,7 +451,7 @@ extension Complement {
+ 
+         let reading: LineReading
+         if !trusted { reading = .scanOrPicture }
+-        else if directionEvidence { reading = .direction }
++        else if directionEvidence || page.usable.contains(false) { reading = .direction }
+         else { reading = .column }
+         guard reading == .column else {
+             return BoxReading(reading: reading, trusted: trusted, directionEvidence: directionEvidence,

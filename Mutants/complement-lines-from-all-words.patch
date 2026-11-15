@@ -1,0 +1,19 @@
+Property: Lines, runs and stacks are built from the page's words minus every selected character, so the selected text changes nothing but the box's tight rectangle.
+Area: the page's complement (lines, runs, stacks, columns, bridges, direction)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/ComplementReadingTests (or on the host: cd Packages/RedactionEngine && swift test --filter ComplementReadingTests)
+Must go red: RedactionCoreTests/ComplementReadingTests selectedTextChangesNothingButTheTightRectangle; RedactionCoreTests/ComplementReadingTests whollySelectedNeighbourGivesNothing
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
+index 050556d3..7ef086ae 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
+@@ -183,7 +183,7 @@ package enum Complement {
+     /// ordinary gap between lines, and which lines are usable.
+     package static func page(words: PageWords, text: String, selected: Set<Int>,
+                              constants: ProvisionalConstants) -> PageComplement {
+-        let pieces = pieces(of: words, selected: selected)
++        let pieces = pieces(of: words, selected: [])
+         let lines = lines(of: pieces, constants: constants)
+         let units = Array(text.utf16)
+         let usable = lines.map { line in

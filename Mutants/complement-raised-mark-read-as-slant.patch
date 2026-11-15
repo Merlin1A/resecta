@@ -1,0 +1,19 @@
+Property: Direction is read from the letters of a word's most common height, so a raised mark or a small capital is no evidence of slant.
+Area: the page's complement (lines, runs, stacks, columns, bridges, direction)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/ComplementReadingTests (or on the host: cd Packages/RedactionEngine && swift test --filter ComplementReadingTests)
+Must go red: RedactionCoreTests/ComplementReadingTests raisedMark
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
+index 050556d3..8675cc68 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
+@@ -314,7 +314,7 @@ package enum Complement {
+         // before it (a mark on its letter, a joined glyph's second letter)
+         // is the same place and is left out.
+         var chosen: [ComplementLetter] = []
+-        for letter in letters where letter.height == height {
++        for letter in letters where letter.height >= 0 || height < 0 {
+             if let last = chosen.last, last.rect == letter.rect { continue }
+             chosen.append(letter)
+         }

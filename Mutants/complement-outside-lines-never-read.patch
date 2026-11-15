@@ -1,0 +1,19 @@
+Property: The nearest usable lines above and below the stack are read for the column, so a block of short rows between full-measure paragraphs reaches the paragraphs' measure.
+Area: the page's complement (lines, runs, stacks, columns, bridges, direction)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/ComplementReadingTests (or on the host: cd Packages/RedactionEngine && swift test --filter ComplementReadingTests)
+Must go red: RedactionCoreTests/ComplementReadingTests labelBlockReadsTheParagraphs; RedactionCoreTests/ComplementReadingTests addressBoxedLineByLine
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
+index 050556d3..c7a0a38a 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
+@@ -544,7 +544,7 @@ extension Complement {
+         let stackLines = stack + ownLines.sorted()
+         let reachRight = Swift.max(columnRight ?? anchor.hi, anchor.hi)
+         let reachLeft = Swift.min(columnLeft ?? anchor.lo, anchor.lo)
+-        for o in outside {
++        for o in outside where o < 0 {
+             for run in page.lines[o].runs.map(\.box) where overlapsRoom(run) && meetsAnchor(run) {
+                 if run.maxX > reachRight, spaceIsEmpty(right: true, from: reachRight, to: run.maxX, lines: stackLines, exceptMeeting: false) {
+                     columnRight = Swift.max(columnRight ?? run.maxX, run.maxX)
