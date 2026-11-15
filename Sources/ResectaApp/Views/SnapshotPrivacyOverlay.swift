@@ -33,9 +33,21 @@ struct SnapshotPrivacyOverlay: View {
         .ignoresSafeArea()
         // Accessibility: keep VoiceOver silent on the overlay — it's a
         // transient system-snapshot mask, not a user-facing surface.
+        #if DEBUG
+        // Under `--forceSnapshotOverlay` only, a UI test can reach it.
+        .accessibilityHidden(!Self.exposedForUITest)
+        .accessibilityIdentifier(Self.exposedForUITest ? "snapshotPrivacyOverlay" : "")
+        #else
         .accessibilityHidden(true)
+        #endif
         .allowsHitTesting(false)
     }
+
+    #if DEBUG
+    static var exposedForUITest: Bool {
+        CommandLine.arguments.contains("--forceSnapshotOverlay")
+    }
+    #endif
 }
 
 // MARK: - The cover window
