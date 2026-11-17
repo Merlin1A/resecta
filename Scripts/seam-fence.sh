@@ -36,12 +36,22 @@
 # site that is no longer in the tree is reported as gone; it may be taken off
 # its list, and it fails nothing.
 #
+# A fence that reads nothing holds nothing, so the tree must give each rule
+# something to read: every folder the rules read must exist (the core's
+# folder once the engine's manifest declares the core target), F2 must find
+# at least one producer type, and a rule with listed sites must read at least
+# one file. Each rule prints how many files it read. A tree that fails this
+# is a setup error, not a pass.
+#
 # Run from anywhere in the repo.
 #   Scripts/seam-fence.sh                      the fences over the tree
+#   Scripts/seam-fence.sh --files              the same, and the files each
+#       rule read
 #   Scripts/seam-fence.sh --self-test          three planted spellings per
 #       rule each read as an offence; their clean twins and the stated
 #       exceptions read as none; a listed site that has gone is reported and
-#       fails nothing; then the fences over the tree. Exit 0 when all hold.
+#       fails nothing; a tree that gives a rule nothing to read is a setup
+#       error; then the fences over the tree. Exit 0 when all hold.
 #   Scripts/seam-fence.sh --lists              this copy's lists, as JSON
 #   Scripts/seam-fence.sh --compare-lists BASE this copy's lists against those
 #       of BASE (another copy of this script, the base branch's): an entry of
@@ -65,6 +75,12 @@ A = "Sources/ResectaApp/"
 E = "Packages/RedactionEngine/Sources/RedactionEngine/"
 C = "Packages/RedactionEngine/Sources/RedactionCore/"
 RUNNER = "Packages/RedactionEngine/Tests/RedactionEngineTests/CorpusTests/"
+
+# The folders the rules read. Each must exist. The core's folder is required
+# only once the engine's manifest declares the core target.
+MANIFEST = "Packages/RedactionEngine/Package.swift"
+REQUIRED = [A, A + "State/", E, E + "Search/", E + "Detection/", E + "Verification/", RUNNER]
+CORE_TARGET = re.compile(r'\.target\s*\(\s*name\s*:\s*"RedactionCore"')
 
 # ------------------------------------------------------------- the lists
 
@@ -411,23 +427,32 @@ RULES = [
 
 # ------------------------------------------------------------ judging
 
-def judge(root, lists=None, names=None, quiet=False):
+def f5_files(root, names):
+    return [f for f in swift_files(root, [A, E, C])
+            if any(not matches(f, entry["owners"]) for entry in names)]
+
+def judge(root, lists=None, names=None, quiet=False, files_read=None):
     """Run every rule over `root` against `lists` (default: this copy's).
-    Returns (offences, gone) as lists of strings."""
+    Returns (offences, gone) as lists of strings. When `files_read` is a
+    dict, it is given each rule's files read, by rule."""
     lists = LISTS if lists is None else lists
     names = F5_NAMES if names is None else names
+    read_by = {} if files_read is None else files_read
     offences, gone = [], []
     for rid, title, rule in RULES:
         if rid == "F5":
             sites = rule_f5(root, names)
+            read_by[rid] = f5_files(root, names)
             for f, found in sorted(sites.items()):
                 for number, text in found:
                     offences.append(f"{rid} {f}:{number}: {text}")
             if not quiet:
-                print(f"{rid} {title}: {sum(len(v) for v in sites.values())} offence(s); {len(names)} name(s) listed")
+                print(f"{rid} {title}: {sum(len(v) for v in sites.values())} offence(s); "
+                      f"{len(names)} name(s) listed; {len(read_by[rid])} file(s) read")
             continue
         listed = lists.get(rid, {})
         sites = rule(root)
+        read_by[rid] = sorted(sites)
         count_seen = 0
         for f in sorted(set(sites) | set(listed)):
             allowed = collections.Counter(listed.get(f, []))
@@ -442,8 +467,57 @@ def judge(root, lists=None, names=None, quiet=False):
                     gone.append(f"{rid} {f}: {text} (listed {want}, seen {seen[text]})")
         if not quiet:
             n_listed = sum(len(v) for v in listed.values())
-            print(f"{rid} {title}: {count_seen} site(s) seen, {n_listed} listed")
+            print(f"{rid} {title}: {count_seen} site(s) seen, {n_listed} listed; "
+                  f"{len(read_by[rid])} file(s) read")
     return offences, gone
+
+def core_declared(root):
+    """Whether the engine's manifest declares the core target; None when the
+    manifest is missing."""
+    path = os.path.join(root, MANIFEST)
+    if not os.path.isfile(path):
+        return None
+    return bool(CORE_TARGET.search(blank(read(root, MANIFEST), True)[0]))
+
+def setup_errors(root, lists, files_read):
+    """Why the tree gives a rule nothing to read, one string a reason; none
+    when every rule has something to read. `files_read` is judge's files
+    read, by rule."""
+    errors = []
+    declared = core_declared(root)
+    if declared is None:
+        errors.append(f"the engine's manifest is missing: {MANIFEST}")
+    folders = REQUIRED + ([C] if declared else [])
+    for folder in folders:
+        if not os.path.isdir(os.path.join(root, folder)):
+            errors.append(f"a folder the rules read is missing: {folder}")
+    if lists.get("F2") and not producer_types(root):
+        errors.append("F2 found no producer type under the engine's Search or Detection folder")
+    for rid, listed in sorted(lists.items()):
+        if any(listed.values()) and not files_read.get(rid):
+            errors.append(f"{rid} has listed sites and read no file")
+    if declared and not files_read.get("F3"):
+        errors.append("F3 read no file, and the engine's manifest declares the core target")
+    return errors
+
+def run_tree(root, show_files=False, quiet=False):
+    """The fences over `root`: 0 clean, 1 an offence, 2 a setup error."""
+    files_read = {}
+    offences, gone = judge(root, quiet=quiet, files_read=files_read)
+    errors = setup_errors(root, LISTS, files_read)
+    if quiet:
+        return 2 if errors else (1 if offences else 0)
+    if show_files:
+        for rid, files in sorted(files_read.items()):
+            for f in files:
+                print(f"READ {rid} {f}")
+    status = report(offences, gone)
+    for e in errors:
+        print(f"SETUP ERROR {e}")
+    if errors:
+        print(f"SEAM-FENCE SETUP ERROR: {len(errors)} reason(s); the fences did not read the tree")
+        return 2
+    return status
 
 def report(offences, gone):
     for g in gone:
@@ -568,13 +642,51 @@ def self_test():
         # A widened name written from its own type's files is no offence.
         offences, _ = judge(tmp, empty, names, quiet=True)
         check("F5 a write from the type's own files reads as none", not offences)
+    # A tree that gives a rule nothing to read is a setup error.
+    with tempfile.TemporaryDirectory() as tmp:
+        def errors_with(lists):
+            files_read = {}
+            judge(tmp, lists, [], quiet=True, files_read=files_read)
+            return setup_errors(tmp, lists, files_read)
+        no_target = "// .target(name: \"RedactionCore\")\nlet package = 0\n"
+        with_target = "let package = [.target(name: \"RedactionCore\")]\n"
+        write(tmp, MANIFEST, no_target)
+        for folder in REQUIRED:
+            write(tmp, folder + "Placeholder.swift", "import Foundation\n")
+        write(tmp, E + "Search/Placeholder.swift", "struct PlantedProducerOne {}\n")
+        empty = {rid: {} for rid in LISTS}
+        check("a tree with every folder read, and no core target, is no setup error",
+              not errors_with(empty))
+        write(tmp, MANIFEST, with_target)
+        check("the core folder missing once the manifest declares the core target is a setup error",
+              len(errors_with(empty)) == 2)
+        write(tmp, C + "Placeholder.swift", "import Foundation\n")
+        check("the core folder present with the core target declared is no setup error",
+              not errors_with(empty))
+        os.remove(os.path.join(tmp, MANIFEST))
+        check("a missing manifest is a setup error", len(errors_with(empty)) == 1)
+        write(tmp, MANIFEST, no_target)
+        os.remove(os.path.join(tmp, RUNNER + "Placeholder.swift"))
+        os.rmdir(os.path.join(tmp, RUNNER))
+        check("a missing folder is a setup error", len(errors_with(empty)) == 1)
+        check("the fences over a tree missing a folder exit 2", run_tree(tmp, quiet=True) == 2)
+        write(tmp, RUNNER + "Placeholder.swift", "import Foundation\n")
+        f4_listed = dict(empty, F4={E + "Pipeline/Paint.swift": ["x"]})
+        check("a rule with listed sites that read no file is a setup error",
+              len(errors_with(f4_listed)) == 1)
+        write(tmp, E + "Pipeline/Paint.swift", "import Foundation\n")
+        check("the same rule with a file to read is no setup error", not errors_with(f4_listed))
+        write(tmp, E + "Search/Placeholder.swift", "import Foundation\n")
+        f2_listed = dict(empty, F2={E + "Verification/Placeholder.swift": ["PlantedProducerOne"]})
+        check("F2 with listed sites and no producer type is a setup error",
+              len(errors_with(f2_listed)) == 1)
     # The list comparison: an entry this copy adds is an offence.
     base = {rid: {f: list(v) for f, v in lst.items()} for rid, lst in LISTS.items()}
     grown = json.loads(json.dumps(base))
     grown.setdefault("F1", {}).setdefault(A + "Views/Planted.swift", []).append("let s = DocumentSearcher()")
     check("a list entry the change adds reads as an offence", len(list_growth(base, grown)) == 1)
     check("the same lists read as none", not list_growth(base, base))
-    expected = 6 * 4 + 4 + 2 + 2 + 1
+    expected = 6 * 4 + 4 + 2 + 2 + 1 + 9
     check(f"the self-test ran its {expected} cases", len(results) == expected)
     failed = [n for n, ok in results if not ok]
     print(f"self-test: {len(results) - len(failed)} of {len(results)} cases passed")
@@ -582,7 +694,7 @@ def self_test():
         print("SEAM-FENCE SELF-TEST FAIL")
         return 1
     print("--- the fences over the tree")
-    return report(*judge(ROOT))
+    return run_tree(ROOT)
 
 # ------------------------------------------------------------ the lists
 
@@ -598,7 +710,9 @@ def list_growth(base, mine):
 
 def main():
     if not ARGS:
-        return report(*judge(ROOT))
+        return run_tree(ROOT)
+    if ARGS == ["--files"]:
+        return run_tree(ROOT, show_files=True)
     if ARGS == ["--self-test"]:
         return self_test()
     if ARGS == ["--lists"]:
@@ -617,7 +731,7 @@ def main():
             return 1
         print("SEAM-FENCE LISTS OK: no entry joined a list")
         return 0
-    print("usage: seam-fence.sh [--self-test | --lists | --compare-lists BASE]", file=sys.stderr)
+    print("usage: seam-fence.sh [--files | --self-test | --lists | --compare-lists BASE]", file=sys.stderr)
     return 2
 
 sys.exit(main())
