@@ -1,0 +1,19 @@
+Property: The middle of a letter's box follows the page's stored rotation: on a page turned a quarter either way the 25 % inset runs along the frame's height and the 35 % inset across it. (A half turn swaps no axis, so its row reads the same with the rotation ignored.)
+Area: geometry (the middle of a letter's box, in the core)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/LetterBoxMiddleTests
+Must go red: RedactionCoreTests/LetterBoxMiddleTests middle [turned a quarter]; RedactionCoreTests/LetterBoxMiddleTests middle [turned three quarters]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/LetterBoxMiddle.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/LetterBoxMiddle.swift
+index f4177512..cccde92a 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/LetterBoxMiddle.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/LetterBoxMiddle.swift
+@@ -31,7 +31,7 @@ public enum LetterBoxMiddle {
+         if width < 0 { x += width; width = -width }
+         if height < 0 { y += height; height = -height }
+         guard width > 0, height > 0 else { return nil }
+-        let lineRunsAlongX = (((rotation % 360) + 360) % 360) % 180 == 0
++        let lineRunsAlongX = true
+         let dx = (lineRunsAlongX ? alongInset : acrossInset) * width
+         let dy = (lineRunsAlongX ? acrossInset : alongInset) * height
+         return CGRect(origin: CGPoint(x: x + dx, y: y + dy),
