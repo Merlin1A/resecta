@@ -1,0 +1,24 @@
+Property: Two boxes are equal only when both limit lines are; an absent limit line is not equal to a present one.
+Area: the box record's equality
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/PaintedBoxTests (or on the host: cd Packages/RedactionEngine && swift test --filter PaintedBoxTests)
+Must go red: RedactionCoreTests/PaintedBoxTests boxesAlikeButForOneLimitLineAreNotEqual
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintedBox.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintedBox.swift
+index e9b0e2df..d6ab9e05 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintedBox.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintedBox.swift
+@@ -132,6 +132,13 @@ package struct PaintedBox: Hashable, Sendable {
+     /// The box is painted as it was drawn: no margin, no limit.
+     package var asDrawn: Bool
+ 
++    package static func == (lhs: PaintedBox, rhs: PaintedBox) -> Bool {
++        lhs.regionIDs == rhs.regionIDs && lhs.inner == rhs.inner && lhs.paint == rhs.paint && lhs.tight == rhs.tight
++            && lhs.exposure == rhs.exposure && lhs.treatment == rhs.treatment && lhs.bandMade == rhs.bandMade
++            && lhs.inkEnlargedCovered == rhs.inkEnlargedCovered && lhs.inkEnlargedToCap == rhs.inkEnlargedToCap
++            && lhs.asDrawn == rhs.asDrawn
++    }
++
+     package init(
+         regionIDs: Set<UUID>, inner: PageRect64, paint: PageRect64, tight: PageRect64,
+         limitAbove: Int?, limitBelow: Int?, exposure: Exposure, treatment: SwitchTreatment,
