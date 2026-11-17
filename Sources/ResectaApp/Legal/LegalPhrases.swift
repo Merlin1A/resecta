@@ -33,5 +33,28 @@ public enum LegalPhrases {
         "military-grade",
         "bank-level",
         "certified",
+        // Length-claim stems: a box's width can still show how long the text
+        // under it was, so no sentence may say a box hides or conceals it.
+        // `Scripts/claims-lint.sh` also matches the paraphrases by pattern.
+        "hide text length",
+        "length hidden",
+        "hidden length",
+        "length is hidden",
+        "hides the length",
+        "hide the length",
+        "hides its length",
+        "hiding the length",
+        "hides how long",
+        "hide how long",
+        "conceals the length",
+        "conceal the length",
+        "masks the length",
+        "cannot show how long",
+        "can't show how long",
+        "no longer shows how long",
+        "can no longer show",
+        "width says nothing",
+        "says nothing about the text",
+        "no longer follows the text",
     ]
 }
