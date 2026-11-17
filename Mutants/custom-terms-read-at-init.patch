@@ -1,0 +1,19 @@
+Property: The custom-terms store holds its file's list from its first moment.
+Area: custom terms (store)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/UserTermsStoreHydrationTests -only-testing:ResectaAppTests/StoreHydrateOffMainActorTests
+Must go red: ResectaAppTests/UserTermsStoreHydrationTests "A term added the moment the store exists keeps every stored term" [.alwaysFlag]; ResectaAppTests/UserTermsStoreHydrationTests "A term added the moment the store exists keeps every stored term" [.neverFlag]; ResectaAppTests/UserTermsStoreHydrationTests "The duplicate check and the cap read the stored list from the first moment"; ResectaAppTests/StoreHydrateOffMainActorTests "UserTermsStore loads synchronously: the stored list is visible from init"
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/UserTermsStore.swift b/Sources/ResectaApp/State/UserTermsStore.swift
+index 47002a15..9246b80c 100644
+--- a/Sources/ResectaApp/State/UserTermsStore.swift
++++ b/Sources/ResectaApp/State/UserTermsStore.swift
+@@ -67,7 +67,7 @@ final class UserTermsStore {
+             fallback: .empty
+         )
+         storage.migrateLegacyDefaultsIfNeeded(from: legacyDefaults, key: Self.storageKey)
+-        self.blob = Self.sanitize(storage.load())
++        self.blob = .empty
+     }
+ 
+     // MARK: - Mutate
