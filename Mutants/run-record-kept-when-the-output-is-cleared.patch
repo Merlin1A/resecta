@@ -1,0 +1,19 @@
+Property: The run's record is cleared with the output, by every way the output is cleared.
+Area: run record
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/RunRecordTests
+Must go red: ResectaAppTests/RunRecordTests "Each case" (clearedWithTheOutput)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/RedactionState.swift b/Sources/ResectaApp/State/RedactionState.swift
+index 5e1001d2..6892f0ca 100644
+--- a/Sources/ResectaApp/State/RedactionState.swift
++++ b/Sources/ResectaApp/State/RedactionState.swift
+@@ -435,7 +435,7 @@ class RedactionState {
+         textExtractionBuffer = nil
+         // The retained run inputs describe the output that was just
+         // discarded — a later run must not verify against them.
+-        lastRunInputs = nil
++        if lastRunInputs?.record == nil { lastRunInputs = nil }
+     }
+ 
+     // MARK: - Apply serialization state
