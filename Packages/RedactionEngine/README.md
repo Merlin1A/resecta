@@ -20,10 +20,13 @@ package-level orientation lives in this README.
 
 ## Source layout
 
-The package source root is `Sources/RedactionEngine/`, organized into the
+The Swift source root is `Sources/RedactionEngine/`, organized into the
 top-level subdirectories below. The entries describe what each
 subsystem produces or consumes; the subsystems call each other directly
-and pass the shared `Models/` types between them.
+and pass the shared `Models/` types between them. A second target,
+`Sources/PDFKitGuard/`, ships in the same product: one Objective-C
+function that puts `-[PDFDocument dataRepresentation]` behind an exception
+boundary.
 
 - **Audit** — Loads and translates the rule catalog from bundled JSON,
   mapping engine-generated rule IDs to catalog version-stable
@@ -35,15 +38,13 @@ and pass the shared `Models/` types between them.
 - **Export** — Serializes search results and applied redactions into
   CSV and JSON audit artifacts with consistent schema versioning; matched
   text is reduced to its first and last two characters unless the caller
-  asks for the full text. The exporter returns bytes; the app writes them
-  into the hardened per-session export directory this module provides
-  (`TempExportDirectory`, `TempFileHardening`).
+  asks for the full text. The exporter returns bytes, and no app surface
+  calls it. The module also provides the hardened per-session directory
+  the app writes the redacted copy into (`TempExportDirectory`,
+  `TempFileHardening`).
 - **Import** — Analyzes PDF annotations using PDFKit to classify the
   document profile (unredacted, or redacted with a mark count) and
   extract annotation metadata from existing markup.
-- **Instrumentation** — Records cold-start timing metrics (engine-load
-  duration and first-detection timing) for performance analysis;
-  release-build implementation compiles to no-ops.
 - **Models** — Defines the data structures for the pipeline: detection
   results, page output, document profile (PDF annotation classification),
   pipeline modes, and verification metadata that cross subdirectory
@@ -93,9 +94,9 @@ runtime.
   produced per scan and held in memory; no engine API writes them to
   disk. The audit exporter returns CSV / JSON bytes that can carry matched
   text and page indices; no app surface calls it (the search sheet's
-  disabled audit-export surface was removed in 1.3.0). In the app target, the intra-session
-  result-diff fingerprint is composed from page, geometry and category
-  only — never a hash or copy of matched text.
+  disabled audit-export surface was removed in 1.3.0). In the app target,
+  the intra-session result-diff fingerprint is composed from page, geometry
+  and category only — never a hash or copy of matched text.
 - **Saved-search payloads carry query shape only.** In the app target,
   the `SavedSearch` Codable surface stores an id, a name, mode, query / terms,
   enabled categories, matching options, threshold floors, and filter
@@ -106,8 +107,9 @@ runtime.
   reports is drawn from a fixed list — the bundled gazetteer or a
   compiled-in profile — never from page text
   (`KeywordContributionTests`). A missing, truncated or altered asset
-  fails the signed-manifest check at first load, and detection degrades
-  with a visible banner.
+  fails the signed-manifest check at first load, and when a scan starts a
+  notice and a banner in the Scan interface say detection is degraded
+  (`THREAT-MODEL.md` §4).
 
 User-facing prose that touches the engine surface should use
 mechanism-description language (see the root
@@ -121,8 +123,9 @@ The gazetteer tables live at
 1. Build the table in resecta-datapipeline, which lists it with its size
    and SHA-256 in `gazetteer-manifest.json` and re-signs the manifest.
 2. Install the pipeline output into `Resources/Gazetteers/` (the directory
-   is `.copy`-bundled by [`Package.swift`](Package.swift)); the
-   shipped-asset hash script fails on a file the manifest does not list,
+   is `.copy`-bundled by [`Package.swift`](Package.swift));
+   `Scripts/verify-shipped-asset-hashes.sh` fails on a file the manifest
+   does not list,
    a listed file that is missing, and a size or digest mismatch.
 3. Add the loader under `Detection/Gazetteer/` with a `LoaderVersionFence`
    check, and decide whether it reads under `GazetteerTrust`.
@@ -134,8 +137,9 @@ The gazetteer tables live at
 The concurrency model:
 
 - The engine target compiles with `NonisolatedNonsendingByDefault`
-  (SE-0461). Functions are nonisolated by default; methods that need
-  parallel execution mark themselves `@concurrent`.
+  (SE-0461): a nonisolated `async` function runs in its caller's
+  isolation, and methods that need parallel execution mark themselves
+  `@concurrent`.
 - The iOS app target compiles with `MainActor` default isolation
   (SE-0466). The boundary between the two is the standard pattern:
   `MainActor` coordinator → `await engine.<concurrent method>` →
