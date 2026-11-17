@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Effective date:** 2026-11-03
+**Effective date:** 2026-11-17
 
 Resecta is an on-device document-redaction app for iOS. This Privacy Policy
 describes how Resecta handles information. It is written to satisfy Apple's
@@ -61,9 +61,9 @@ requests.
 Some preferences and data you create are stored locally on your device. Your
 Custom Terms and your saved-search and saved-regex libraries — the stores that
 hold text you typed — are kept as files in the app's private container with
-the iOS "complete" file-protection class applied and a system flag that
-excludes them from device backups, so they are not copied into iCloud or
-computer backups.
+the iOS "complete" file-protection class applied, and marked with the system
+flag that asks iOS to leave them out of iCloud and computer backups. The flag is
+a request to iOS; it does not guarantee that the files never appear in a backup. <!-- LegalPhrases:safe -->
 Your remaining preferences — your settings (export resolution, fill colour,
 default redaction mode, detection sensitivity, appearance, and the automatic
 verification and Paranoid Mode switches), the app version that last asked for
@@ -117,11 +117,13 @@ expects, that value stays as the writer wrote it, the export still completes,
 and the metadata check in the verification pass, when it runs, reports that a
 field was not replaced (the producer or timestamps, or the file identifier),
 without showing its value. The export therefore carries much less metadata than
-a typical PDF, but it is not metadata-free. The file name of a shared copy is
-redacted.pdf in version 1.3.1 and earlier, and in later versions redacted-
+a typical PDF, but it is not metadata-free. The file name of a shared copy
+depends on the version. In versions 1.0.0 to 1.2.0 it is redacted_ followed by
+the date and time of the export, so it records when you exported. In
+versions 1.3.0 and 1.3.1 it is redacted.pdf, and in later versions redacted-
 followed by a short code made from the redacted file itself (for example
-redacted-3f9a1c07.pdf). It carries nothing from your document's name and does
-not record when you exported it.
+redacted-3f9a1c07.pdf); neither records when you exported. In no version does
+the name carry anything from your document's name.
 
 Resecta opens PDF files, and JPEG, PNG and HEIC images chosen in Files or in
 the system Photos picker, or dropped onto an open document. Each image becomes
