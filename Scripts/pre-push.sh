@@ -2,13 +2,15 @@
 # pre-push.sh — local push-time test gate.
 #
 # Reads git's ref lines on stdin (<local ref> <local sha> <remote ref>
-# <remote sha>) and, for each pushed commit, runs the test schemes the change
-# touches through Scripts/test-batched.sh — build once, then serial
-# suite-level batches on the pinned simulator, each under a watchdog — unless
-# the runner's passing verdict for the same tree is already on disk.
-# Installed as .git/hooks/pre-push by Scripts/install-hooks.sh. Measured
-# wall-clock on an Apple-silicon dev machine (2026-08-27): ≈ 16 minutes for
-# both schemes (engine ≈ 7, app ≈ 9).
+# <remote sha>) and, for each pushed commit, checks what the change touches:
+# an engine change needs a passing host run of the engine's whole test suite
+# on the same tree, already on disk, and a compile of the app scheme; an app
+# change needs the compile. No simulator is used by default; the hosted
+# `sim-suite` check runs the app's suites on every pull request.
+# PREPUSH_SCHEME_BY_DIFF=0 brings back the simulator schemes through
+# Scripts/test-batched.sh (build once, then serial suite-level batches on the
+# pinned simulator, each under a watchdog), for every push.
+# Installed as .git/hooks/pre-push by Scripts/install-hooks.sh.
 #
 # In order:
 #   1. The stale-project check. ResectaApp.xcodeproj is generated from
@@ -30,18 +32,36 @@
 #      checked (no README.md, the tree cannot be written out, the script
 #      ends without its verdict line) is refused as "could not run"; a local
 #      origin/main without the script is a printed warning, not a refusal.
-#   3. Scheme by diff. The pushed commit is diffed against its merge base with
+#   3. Needs by diff. The pushed commit is diffed against its merge base with
 #      the LOCAL origin/main (never fetched) and each path is classed:
 #        engine       Packages/RedactionEngine/**, xcschemes/RedactionEngine.xcscheme
-#                     → both schemes (the app links the engine)
+#                     → engine-host and app-build (the app links the engine)
 #        app          Sources/**, Tests/**, UITestFixtures/**, Resources/**,
 #                     project.yml, regenerate.sh, xcschemes/ResectaApp.xcscheme,
-#                     EULA.md, PRIVACY.md (bundled by project.yml) → ResectaApp
+#                     EULA.md, PRIVACY.md (bundled by project.yml) → app-build
 #        no-scheme    other *.md, LICENSE, NOTICE, .github/**, .gitignore,
-#                     .gitattributes, Makefile, Scripts/** → no scheme; a
+#                     .gitattributes, Makefile, Scripts/** → nothing; a
 #                     Scripts/** path runs the two scripts' --self-test
-#        unclassified anything else → both schemes (each path printed)
-#      PREPUSH_SCHEME_BY_DIFF=0 needs both schemes for every push.
+#        unclassified anything else → engine-host and app-build (each path printed)
+#      PREPUSH_SCHEME_BY_DIFF=0 needs both simulator schemes, RedactionEngine
+#      and ResectaApp, for every push (steps 4 and 5 below).
+#   3a. engine-host: the host run is accepted, never made here. A verdict.json
+#      under $ENGINE_HOST_VERDICT_DIR (depth ≤ 3) with source
+#      "engine-host-run" must name the pushed commit's tree, have started and
+#      ended on one commit with clean tracked files, record the full-suite
+#      command `swift test --skip-build --no-parallel --skip
+#      FileProtectionTests`, and record an Xcode build that its own
+#      DEVELOPER_DIR still reports. The hook then reads the run's log itself
+#      (its sha256 must match the verdict's): the last "Test run with N tests
+#      in M suites" line must count tests and suites, and the issues it records,
+#      by file:line, must be exactly the judged rows of the pushed tree's
+#      Scripts/engine-host-known-reds.txt (location, count, judged yes/no). A
+#      row judged "no" is printed and never decides. A pushed list that
+#      differs from origin/main's is printed row by row. With no accepted
+#      verdict the push is refused.
+#   3b. app-build: `xcodebuild build-for-testing -scheme ResectaApp` for a
+#      generic simulator destination, compile only, on this checkout's HEAD
+#      with clean tracked files (otherwise the push is refused).
 #   4. Verdict acceptance. A needed scheme is not re-run when a verdict.json
 #      under /tmp/test-batched-<scheme>-*/ or $TEST_BATCHED_VERDICT_DIR
 #      (depth ≤ 3) was written by test-batched.sh for that scheme with
@@ -375,6 +395,173 @@ EOF
     return "$rc"
 }
 
+# The host run of the engine suite (step 3a). Prints "ACCEPT <path> <facts>"
+# for the newest acceptable verdict, "REJECT <path> <reason>" for each verdict
+# on the same tree it passed over, "LIST <text>" for each way the pushed
+# known-red list differs from origin/main's, "NOTE <text>" for a row judged
+# "no", and "COUNT <read> <same tree>" (tab-separated).
+read_host_verdicts() { # sha tree
+    python3 - "$1" "$2" "${ENGINE_HOST_VERDICT_DIR:-}" "$BASE_REF" <<'PYEOF'
+import hashlib, json, os, re, subprocess, sys
+sha, tree, vdir, base_ref = sys.argv[1:5]
+LIST = "Scripts/engine-host-known-reds.txt"
+COMMAND = "swift test --skip-build --no-parallel --skip FileProtectionTests"
+ISSUE_RE = re.compile(r"^✘ Test .* recorded an issue( with [0-9]+ arguments?.*)? at ([A-Za-z0-9_+]+\.swift:[0-9]+):[0-9]+: ", re.M)
+RUN_RE = re.compile(r"Test run with ([0-9]+) tests? in ([0-9]+) suites? (passed|failed)")
+
+def show(rev):
+    p = subprocess.run(["git", "show", "%s:%s" % (rev, LIST)], capture_output=True, text=True)
+    return p.stdout if p.returncode == 0 else None
+
+def parse(text):  # → ({location: count} judged, {location} not judged) or a reason
+    judged, free = {}, set()
+    for n, line in enumerate((text or "").splitlines(), 1):
+        if not line.strip() or line.startswith("#"):
+            continue
+        f = line.split("\t")
+        if len(f) != 3 or f[2] not in ("yes", "no") or not re.fullmatch(r"[A-Za-z0-9_+]+\.swift:[0-9]+", f[0]):
+            return "%s line %d is not 'location<TAB>count<TAB>yes|no'" % (LIST, n)
+        if f[2] == "no":
+            free.add(f[0])
+        elif not f[1].isdigit() or int(f[1]) < 1:
+            return "%s line %d: a judged row needs a count of 1 or more" % (LIST, n)
+        else:
+            judged[f[0]] = int(f[1])
+    return judged, free
+
+pushed = show(sha)
+if pushed is None:
+    print("NOTE\tthe pushed tree has no %s: no red is known, so any red refuses" % LIST)
+mine = parse(pushed)
+if isinstance(mine, str):
+    print("REJECT\t%s\t%s" % (sha[:8], mine)); print("COUNT\t0\t0"); sys.exit(0)
+judged, free = mine
+theirs = parse(show(base_ref))
+if not isinstance(theirs, str):
+    for loc in sorted(set(judged) | set(theirs[0])):
+        if judged.get(loc) != theirs[0].get(loc):
+            print("LIST\t%s: origin/main %s, pushed %s" % (loc, theirs[0].get(loc, "absent"), judged.get(loc, "absent")))
+    for loc in sorted(free ^ theirs[1]):
+        print("LIST\t%s (not judged): %s" % (loc, "added" if loc in free else "removed"))
+
+def xcode_build_now(dev):
+    env = dict(os.environ, DEVELOPER_DIR=dev)
+    try:
+        out = subprocess.run(["xcodebuild", "-version"], capture_output=True, text=True, timeout=120, env=env).stdout
+    except Exception:
+        return None
+    m = re.search(r"Build version (\S+)", out)
+    return m.group(1) if m else None
+
+def why_not(d):
+    if d.get("verdict") != "PASS":
+        return "verdict is %s, not PASS" % d.get("verdict")
+    if not (d.get("tracked_clean_start") is True and d.get("tracked_clean_end") is True):
+        return "tracked files were modified at the run's start or end"
+    if not d.get("head") or d.get("head") != d.get("head_end"):
+        return "the run started and ended on different commits"
+    if d.get("command") != COMMAND:
+        return "the command was %r, not the whole suite (%s)" % (d.get("command"), COMMAND)
+    dev = d.get("developer_dir") or ""
+    if not dev or not d.get("xcode_build") or d.get("xcode_build") != xcode_build_now(dev):
+        return "Xcode build %s under %s, now %s" % (d.get("xcode_build"), dev or "(no developer_dir)", xcode_build_now(dev) if dev else None)
+    try:
+        raw = open(d.get("log") or "", "rb").read()
+    except OSError:
+        return "its log %s cannot be read" % (d.get("log") or "(none)")
+    if hashlib.sha256(raw).hexdigest() != d.get("log_sha256"):
+        return "its log %s does not match its log_sha256" % d.get("log")
+    text = raw.decode("utf-8", "replace")
+    runs = RUN_RE.findall(text)
+    if not runs:
+        return "its log has no 'Test run with N tests in M suites' line: an empty or cut run"
+    tests, suites = int(runs[-1][0]), int(runs[-1][1])
+    if tests < 1 or suites < 1:
+        return "its log counts %d tests in %d suites" % (tests, suites)
+    got = {}
+    for m in ISSUE_RE.finditer(text):
+        got[m.group(2)] = got.get(m.group(2), 0) + 1
+    for loc in sorted(free):
+        if loc in got:
+            print("NOTE\t%s recorded %d issue(s); not judged (%s)" % (loc, got[loc], LIST))
+    reds = {k: v for k, v in got.items() if k not in free}
+    new = {k: v for k, v in reds.items() if judged.get(k) != v}
+    gone = {k: v for k, v in judged.items() if reds.get(k) != v}
+    if new or gone:
+        return "its reds differ from %s: recorded %s; listed %s" % (
+            LIST, ", ".join("%s ×%d" % kv for kv in sorted(new.items())) or "nothing new",
+            ", ".join("%s ×%d" % kv for kv in sorted(gone.items())) or "nothing missing")
+    return "%d tests in %d suites; reds %d at %d listed location(s)" % (tests, suites, sum(reds.values()), len(reds)), True
+
+paths = []
+if vdir and os.path.isdir(vdir):
+    for dp, dns, fns in os.walk(vdir):
+        rel = os.path.relpath(dp, vdir)
+        if (0 if rel == "." else rel.count(os.sep) + 1) >= 2:
+            dns[:] = []
+        if "verdict.json" in fns:
+            paths.append(os.path.join(dp, "verdict.json"))
+seen = same = 0
+accepted = None
+for p in sorted(set(paths), key=lambda p: os.path.getmtime(p), reverse=True):
+    try:
+        d = json.load(open(p))
+    except Exception:
+        continue
+    if not isinstance(d, dict) or d.get("source") != "engine-host-run":
+        continue
+    seen += 1
+    if d.get("tree") != tree:
+        continue
+    same += 1
+    if accepted:
+        continue
+    r = why_not(d)
+    if isinstance(r, tuple):
+        accepted = p
+        print("ACCEPT\t%s\t%s" % (p, r[0]))
+    else:
+        print("REJECT\t%s\t%s" % (p, r))
+print("COUNT\t%d\t%d" % (seen, same))
+PYEOF
+}
+
+accept_host_verdict() { # sha tree → 0 when a host run is accepted (every outcome printed)
+    local out kind p rest rc=1 tab
+    tab="$(printf '\t')"
+    if [ -z "${ENGINE_HOST_VERDICT_DIR:-}" ]; then
+        echo "→ pre-push: engine-host: ENGINE_HOST_VERDICT_DIR is unset — no host run to accept" >&2
+        return 1
+    fi
+    if ! out="$(read_host_verdicts "$1" "$2")"; then
+        echo "⚠  pre-push: engine-host: the verdict reader failed — no host run accepted" >&2
+        return 1
+    fi
+    while IFS="$tab" read -r kind p rest; do
+        case "$kind" in
+            ACCEPT) echo "→ pre-push: engine-host: accepted $p ($rest)" >&2; rc=0 ;;
+            REJECT) echo "→ pre-push: engine-host: not accepted $p — $rest" >&2 ;;
+            LIST)   echo "→ pre-push: engine-host: the known-red list differs from origin/main's: $p" >&2 ;;
+            NOTE)   echo "→ pre-push: engine-host: $p" >&2 ;;
+            COUNT)  echo "→ pre-push: engine-host: $p verdict file(s) read, $rest for tree ${2:0:8}" >&2 ;;
+        esac
+    done <<EOF
+$out
+EOF
+    return "$rc"
+}
+
+run_app_build() { # a compile of the app scheme and its test bundles; no simulator
+    local dd="${PREPUSH_APP_BUILD_DIR:-${TMPDIR:-/tmp}/pre-push-app-build}" rc=0
+    echo "→ pre-push: compiling ResectaApp (build-for-testing, generic simulator destination, no simulator)…" >&2
+    xcodebuild build-for-testing -scheme ResectaApp -destination 'generic/platform=iOS Simulator' \
+        -derivedDataPath "$dd" -quiet >&2 || rc=$?
+    if [ "$rc" -ne 0 ]; then
+        echo "✗ pre-push: the ResectaApp compile exited $rc — push blocked." >&2
+        exit 1
+    fi
+}
+
 run_scheme() { # scheme
     echo "→ pre-push: running $1 tests via the batched runner…" >&2
     local rc=0
@@ -414,7 +601,7 @@ self_test() {
     t="$(mktemp -d "${TMPDIR:-/tmp}/pre-push-selftest.XXXXXX")"
     trap 'rm -rf "$t"' EXIT
     repo="$t/repo"
-    mkdir -p "$t/bin" "$t/verdicts" "$repo/Sources" "$repo/Packages/RedactionEngine" "$repo/Scripts"
+    mkdir -p "$t/bin" "$t/verdicts" "$t/hostv" "$repo/Sources" "$repo/Packages/RedactionEngine" "$repo/Scripts"
 
     cat > "$t/bin/xcrun" <<'EOF'
 #!/bin/sh
@@ -426,8 +613,12 @@ esac
 EOF
     cat > "$t/bin/xcodebuild" <<'EOF'
 #!/bin/sh
-[ "$1" = "-version" ] || exit 1
-printf 'Xcode 0\nBuild version %s\n' "${STUB_XCODE_BUILD:-X1}"
+if [ "$1" = "-version" ]; then
+    printf 'Xcode 0\nBuild version %s\n' "${STUB_XCODE_BUILD:-X1}"
+    exit 0
+fi
+echo "xcodebuild $1" >> "$PREPUSH_SELFTEST_LOG"
+exit "${STUB_BUILD_RC:-0}"
 EOF
     cat > "$repo/Scripts/test-batched.sh" <<'EOF'
 #!/bin/sh
@@ -473,6 +664,7 @@ EOF
     echo 'let e = 1' > "$repo/Packages/RedactionEngine/E.swift"
     printf '# Self-test\ncounts: ok\n' > "$repo/README.md"
     printf '*.xcodeproj/\n' > "$repo/.gitignore"
+    printf '# known reds\nA.swift:1\t1\tyes\nB.swift:2\t2\tyes\nC.swift:3\t0\tno\n' > "$repo/Scripts/engine-host-known-reds.txt"
 
     g() { git -C "$repo" -c user.name=self-test -c user.email=self-test@example.invalid \
         -c commit.gpgsign=false -c core.hooksPath=/dev/null "$@"; }
@@ -499,8 +691,8 @@ EOF
         local input="$1"; shift
         : > "$t/runs"
         rc=0
-        out="$(cd "$repo" && printf '%s\n' "$input" | env -u SKIP_TESTS -u PREPUSH_SCHEME_BY_DIFF \
-            TEST_BATCHED_SIM_UDID=SELF-TEST-UDID TEST_BATCHED_VERDICT_DIR="$t/verdicts" \
+        out="$(cd "$repo" && printf '%s\n' "$input" | env -u SKIP_TESTS -u PREPUSH_SCHEME_BY_DIFF -u ENGINE_HOST_VERDICT_DIR -u STUB_BUILD_RC \
+            TEST_BATCHED_SIM_UDID=SELF-TEST-UDID TEST_BATCHED_VERDICT_DIR="$t/verdicts" ENGINE_HOST_VERDICT_DIR="$t/hostv" \
             PREPUSH_SELFTEST_LOG="$t/runs" PATH="$t/bin:$PATH" "$@" bash "${hook_script:-$me}" origin self-test 2>&1)" || rc=$?
     }
     line() { echo "refs/heads/topic $1 refs/heads/topic 0000000000000000000000000000000000000000"; }
@@ -573,18 +765,22 @@ PYEOF
         "PREPUSH_SCHEME_BY_DIFF=0" "→ needed RedactionEngine,ResectaApp · accepted none · ran RedactionEngine,ResectaApp"
     h="$(commit Sources/A.swift 'let b = 2' app)"
     hook "$(line "$h")"
-    check "an app-only change runs the app scheme only" 0 "test-batched.sh ResectaApp;" \
-        "engine 0 · app 1 · no-scheme 0 · unclassified 0 → needed ResectaApp · accepted none · ran ResectaApp"
-    hook "$(line "$h")" STUB_RUN_RC=1
-    check "a red run blocks the push" 1 "test-batched.sh ResectaApp;" "ResectaApp batched run exited 1"
+    check "an app-only change compiles the app scheme only, no simulator" 0 "xcodebuild build-for-testing;" \
+        "engine 0 · app 1 · no-scheme 0 · unclassified 0 → needed app-build · accepted none · ran app-build" \
+        "compiling ResectaApp (build-for-testing, generic simulator destination, no simulator)"
+    hook "$(line "$h")" STUB_BUILD_RC=65
+    check "a failed app compile blocks the push" 1 "xcodebuild build-for-testing;" "the ResectaApp compile exited 65"
+    hook "$(line "$h")" PREPUSH_SCHEME_BY_DIFF=0 STUB_RUN_RC=1
+    check "a red simulator run blocks the push" 1 "test-batched.sh RedactionEngine;" "RedactionEngine batched run exited 1"
     h="$(commit Packages/RedactionEngine/E.swift 'let f = 2' engine)"
     hook "$(line "$h")"
-    check "an engine change runs both schemes" 0 "test-batched.sh RedactionEngine;test-batched.sh ResectaApp;" \
-        "engine 1 · app 0 · no-scheme 0 · unclassified 0 → needed RedactionEngine,ResectaApp"
+    check "an engine change with no host run is refused, and nothing runs" 1 "" \
+        "engine 1 · app 0 · no-scheme 0 · unclassified 0 → needed engine-host,app-build · accepted none · ran none" \
+        "no passing host run of the engine suite covers tree"
     h="$(commit notes.txt note unclassified)"
     hook "$(line "$h")"
-    check "an unclassified path runs both schemes, printed" 0 "test-batched.sh RedactionEngine;test-batched.sh ResectaApp;" \
-        "unclassified path notes.txt" "unclassified 1 → needed RedactionEngine,ResectaApp"
+    check "an unclassified path needs the host run and the app compile, printed" 1 "" \
+        "unclassified path notes.txt" "unclassified 1 → needed engine-host,app-build"
     h="$(commit Scripts/test-batched.sh '# changed' scripts)"
     hook "$(line "$h")"
     check "a Scripts/ change runs the two self-tests" 0 "test-batched.sh --self-test;pre-push.sh --self-test;" \
@@ -596,22 +792,25 @@ PYEOF
     tree="$(g rev-parse "$h^{tree}")"
     echo 'let dirty = 1' >> "$repo/Sources/A.swift"
     hook "$(line "$h")"
-    check "a dirty tracked tree is refused" 1 "" "tracked files are modified — push refused"
+    check "a dirty tracked tree is refused" 1 "" "needs app-build, which compiles the working tree, and tracked files are modified — push refused"
     g checkout -q -- Sources/A.swift
     echo 'more' >> "$repo/README.md"; g commit -qam 'docs on top'
     hook "$(line "$h")"
     check "a commit that is not HEAD is refused" 1 "" "is not this checkout's HEAD"
 
-    # Verdict acceptance, field by field (the pushed commit is not HEAD, so
-    # only an accepted verdict lets it through).
+    # Simulator verdict acceptance, field by field, under
+    # PREPUSH_SCHEME_BY_DIFF=0 (the pushed commit is not HEAD, so only accepted
+    # verdicts let it through; a good RedactionEngine verdict sits beside each).
     forge "$t/verdicts/ok/run"
-    hook "$(line "$h")"
+    forge "$t/verdicts/e" scheme=RedactionEngine
+    hook "$(line "$h")" PREPUSH_SCHEME_BY_DIFF=0
     check "a matching verdict is accepted in place of a run" 0 "" \
         "ResectaApp: accepted $t/verdicts/ok/run/verdict.json (VERDICT: PASS scheme=ResectaApp" \
-        "→ needed ResectaApp · accepted ResectaApp · ran none"
+        "→ needed RedactionEngine,ResectaApp · accepted RedactionEngine,ResectaApp · ran none"
     rm -rf "$t/verdicts"/*
     forge "$t/verdicts/a/b/c"
-    hook "$(line "$h")"
+    forge "$t/verdicts/e" scheme=RedactionEngine
+    hook "$(line "$h")" PREPUSH_SCHEME_BY_DIFF=0
     check "a verdict deeper than three levels is not read" 1 "" ", 0 for tree ${tree:0:8}"
     for x in "source=other|, 0 for tree" "scheme=RedactionEngine|, 0 for tree" "tree=0000|, 0 for tree" \
              "verdict=FAIL|verdict is FAIL" "tracked_clean_start=false|tracked files were modified" \
@@ -622,18 +821,177 @@ PYEOF
              "counts.tests=null|counted no tests (tests=None)"; do
         rm -rf "$t/verdicts"/*
         forge "$t/verdicts/v" "${x%%|*}"
-        hook "$(line "$h")"
+        forge "$t/verdicts/e" scheme=RedactionEngine
+        hook "$(line "$h")" PREPUSH_SCHEME_BY_DIFF=0
         check "verdict refused: ${x%%|*}" 1 "" "${x#*|}"
     done
     rm -rf "$t/verdicts"/*
     forge "$t/verdicts/v"
-    hook "$(line "$h")" STUB_RUNTIME_BUILD=R2
+    hook "$(line "$h")" PREPUSH_SCHEME_BY_DIFF=0 STUB_RUNTIME_BUILD=R2
     check "verdict refused: the runtime build moved" 1 "" "runtime build R1, now R2"
-    hook "$(line "$h")" STUB_XCODE_BUILD=X2
+    hook "$(line "$h")" PREPUSH_SCHEME_BY_DIFF=0 STUB_XCODE_BUILD=X2
     check "verdict refused: the Xcode build moved" 1 "" "Xcode build X1, now X2"
-    hook "$(line "$h")" TEST_BATCHED_SIM_UDID=
+    hook "$(line "$h")" PREPUSH_SCHEME_BY_DIFF=0 TEST_BATCHED_SIM_UDID=
     check "verdict refused: no simulator pinned" 1 "" "TEST_BATCHED_SIM_UDID is unset"
     rm -rf "$t/verdicts"/*
+
+    # The host run of the engine suite (step 3a), on an engine change that is
+    # this checkout's HEAD, so an accepted run is followed by the app compile.
+    # forge_host dir log-kind [key=json ... | -loghash]: a verdict.json and its log.
+    forge_host() {
+        python3 - "$tree" "$h" "$@" <<'PYEOF'
+import hashlib, json, os, sys
+tree, head, d, kind, mods = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5:]
+os.makedirs(d, exist_ok=True)
+def red(loc): return "✘ Test planted() recorded an issue at %s:5: Expectation failed" % loc
+base = [red("A.swift:1"), red("B.swift:2"), red("B.swift:2")]
+lines = {"base": base, "base+timing": base + [red("C.swift:3")], "new": base + [red("D.swift:4")],
+         "gone": base[1:], "count": base[:2], "clean": [], "cleanred": [red("D.swift:4")],
+         "norun": base, "zero": []}[kind]
+run = {"clean": "✔ Test run with 10 tests in 3 suites passed after 1.0 seconds.",
+       "norun": "", "zero": "✔ Test run with 0 tests in 0 suites passed after 0.0 seconds."}.get(
+    kind, "✘ Test run with 10 tests in 3 suites failed after 1.0 seconds with %d issues." % len(lines))
+log = os.path.join(d, "hosttest.log")
+open(log, "w").write("\n".join(lines + [run]) + "\n")
+v = {"source": "engine-host-run", "verdict": "PASS", "tree": tree, "head": head, "head_end": head,
+     "tracked_clean_start": True, "tracked_clean_end": True,
+     "command": "swift test --skip-build --no-parallel --skip FileProtectionTests",
+     "developer_dir": "/stub/Developer", "xcode_build": "X1", "log": log,
+     "log_sha256": hashlib.sha256(open(log, "rb").read()).hexdigest()}
+for m in mods:
+    if m == "-loghash":
+        open(log, "a").write("one line more\n"); continue
+    k, _, val = m.partition("=")
+    try:
+        val = json.loads(val)
+    except ValueError:
+        pass
+    v[k] = val
+json.dump(v, open(os.path.join(d, "verdict.json"), "w"))
+PYEOF
+    }
+    local hv="$t/hostv/r/verdict.json" he
+    h="$(commit Packages/RedactionEngine/E.swift 'let g = 3' engine)"
+    tree="$(g rev-parse "$h^{tree}")"
+    forge_host "$t/hostv/r" base
+    hook "$(line "$h")"
+    check "host run: exactly the listed reds are accepted, then the app compiles" 0 "xcodebuild build-for-testing;" \
+        "engine-host: accepted $hv (10 tests in 3 suites; reds 3 at 2 listed location(s))" \
+        "→ needed engine-host,app-build · accepted engine-host · ran app-build"
+    hook "$(line "$h")" STUB_BUILD_RC=65
+    check "host run accepted, but a failed app compile still blocks the push" 1 "xcodebuild build-for-testing;" \
+        "engine-host: accepted" "the ResectaApp compile exited 65"
+    forge_host "$t/hostv/r" base+timing
+    hook "$(line "$h")"
+    check "host run: a row judged 'no' is printed and does not decide" 0 "xcodebuild build-for-testing;" \
+        "engine-host: C.swift:3 recorded 1 issue(s); not judged" "engine-host: accepted $hv"
+    for x in "new|its reds differ from Scripts/engine-host-known-reds.txt: recorded D.swift:4 ×1; listed nothing missing" \
+             "gone|recorded nothing new; listed A.swift:1 ×1" \
+             "count|recorded B.swift:2 ×1; listed B.swift:2 ×2" \
+             "norun|no 'Test run with N tests in M suites' line: an empty or cut run" \
+             "zero|its log counts 0 tests in 0 suites"; do
+        rm -rf "$t/hostv"/*
+        forge_host "$t/hostv/r" "${x%%|*}"
+        hook "$(line "$h")"
+        check "host run refused: a ${x%%|*} log" 1 "" "${x#*|}" "no passing host run of the engine suite covers tree ${tree:0:8}"
+    done
+    for x in "source=other|engine-host: 0 verdict file(s) read, 0 for tree" \
+             "tree=0000|engine-host: 1 verdict file(s) read, 0 for tree ${tree:0:8}" \
+             "verdict=FAIL|verdict is FAIL, not PASS" \
+             "tracked_clean_start=false|tracked files were modified" \
+             "head_end=0000|the run started and ended on different commits" \
+             "command=\"swift test --skip-build --filter E\"|not the whole suite" \
+             "developer_dir=\"\"|(no developer_dir)" \
+             "-loghash|does not match its log_sha256" \
+             "log=\"/nonexistent/no-such.log\"|cannot be read"; do
+        rm -rf "$t/hostv"/*
+        forge_host "$t/hostv/r" base "${x%%|*}"
+        hook "$(line "$h")"
+        check "host run refused: ${x%%|*}" 1 "" "${x#*|}" "no passing host run of the engine suite covers tree"
+    done
+    rm -rf "$t/hostv"/*
+    forge_host "$t/hostv/r" base
+    hook "$(line "$h")" STUB_XCODE_BUILD=X2
+    check "host run refused: the Xcode build under its DEVELOPER_DIR moved" 1 "" "Xcode build X1 under /stub/Developer, now X2"
+    rm -rf "$t/hostv"/*
+    hook "$(line "$h")"
+    check "host run refused: no verdict at all" 1 "" "engine-host: 0 verdict file(s) read, 0 for tree" \
+        "no passing host run of the engine suite covers tree ${tree:0:8}"
+    forge_host "$t/hostv/a/b/c" base
+    hook "$(line "$h")"
+    check "host run refused: a verdict deeper than three levels is not read" 1 "" "engine-host: 0 verdict file(s) read"
+    rm -rf "$t/hostv"/*
+    forge_host "$t/hostv/r" base
+    hook "$(line "$h")" ENGINE_HOST_VERDICT_DIR=
+    check "host run refused: ENGINE_HOST_VERDICT_DIR unset" 1 "" "ENGINE_HOST_VERDICT_DIR is unset"
+    he="$h"
+
+    # The known-red list travels with the pushed tree; a change to it is printed.
+    g reset -q --hard "$base"
+    echo 'let k = 4' >> "$repo/Packages/RedactionEngine/E.swift"
+    printf '# known reds\n' > "$repo/Scripts/engine-host-known-reds.txt"
+    g add -A && g commit -qm 'engine change, every known red mended'
+    h="$(g rev-parse HEAD)"; tree="$(g rev-parse "$h^{tree}")"
+    rm -rf "$t/hostv"/*
+    forge_host "$t/hostv/r" clean
+    hook "$(line "$h")"
+    check "host run: an empty list and a clean run pass" 0 "xcodebuild build-for-testing;test-batched.sh --self-test;pre-push.sh --self-test;" \
+        "engine-host: accepted $hv (10 tests in 3 suites; reds 0 at 0 listed location(s))" \
+        "engine-host: the known-red list differs from origin/main's: A.swift:1: origin/main 1, pushed absent" \
+        "engine-host: the known-red list differs from origin/main's: C.swift:3 (not judged): removed"
+    forge_host "$t/hostv/r" cleanred
+    hook "$(line "$h")"
+    check "host run refused: an empty list and a red that is not listed" 1 "" "recorded D.swift:4 ×1; listed nothing missing"
+    forge_host "$t/hostv/r" base
+    hook "$(line "$h")"
+    check "host run refused: an empty list and the old reds" 1 "" "recorded A.swift:1 ×1, B.swift:2 ×2"
+    g reset -q --hard "$base"
+    echo 'let k = 5' >> "$repo/Packages/RedactionEngine/E.swift"
+    printf 'A.swift:1 1 yes\n' > "$repo/Scripts/engine-host-known-reds.txt"
+    g add -A && g commit -qm 'a list row without tabs'
+    h="$(g rev-parse HEAD)"; tree="$(g rev-parse "$h^{tree}")"
+    rm -rf "$t/hostv"/*
+    forge_host "$t/hostv/r" base
+    hook "$(line "$h")"
+    check "host run refused: a list row that is not location, count, judged" 1 "" \
+        "Scripts/engine-host-known-reds.txt line 1 is not 'location<TAB>count<TAB>yes|no'"
+    g reset -q --hard "$base"
+    echo 'let k = 6' >> "$repo/Packages/RedactionEngine/E.swift"
+    g rm -q Scripts/engine-host-known-reds.txt && g add -A && g commit -qm 'no list'
+    h="$(g rev-parse HEAD)"; tree="$(g rev-parse "$h^{tree}")"
+    rm -rf "$t/hostv"/*
+    forge_host "$t/hostv/r" clean
+    hook "$(line "$h")"
+    check "host run: a pushed tree with no list knows no red, and a clean run passes" 0 \
+        "xcodebuild build-for-testing;test-batched.sh --self-test;pre-push.sh --self-test;" \
+        "engine-host: the pushed tree has no Scripts/engine-host-known-reds.txt" "engine-host: accepted"
+    forge_host "$t/hostv/r" base
+    hook "$(line "$h")"
+    check "host run refused: no list and a red run" 1 "" "recorded A.swift:1 ×1, B.swift:2 ×2"
+
+    # Planted failures for the host run: each copy must let through a case above.
+    h="$he"; tree="$(g rev-parse "$h^{tree}")"
+    g reset -q --hard "$h"
+    [ "$have_xg" = 1 ] && (cd "$repo" && xcodegen generate --quiet)
+    mut="$t/pre-push-mutant.sh"
+    sed 's/^    if new or gone:$/    if False:/' "$me" > "$mut"
+    rm -rf "$t/hostv"/*; forge_host "$t/hostv/r" new
+    hook_script="$mut"; hook "$(line "$h")"; hook_script=""
+    if cmp -s "$me" "$mut"; then rc=unchanged; fi
+    check "planted failure: without the reds comparison a new red is accepted" 0 "xcodebuild build-for-testing;"
+    sed '/^    if d.get("tree") != tree:$/{N;d;}' "$me" > "$mut"
+    rm -rf "$t/hostv"/*; forge_host "$t/hostv/r" base tree=0000
+    hook_script="$mut"; hook "$(line "$h")"; hook_script=""
+    if cmp -s "$me" "$mut"; then rc=unchanged; fi
+    check "planted failure: without the tree comparison another tree's run is accepted" 0 "xcodebuild build-for-testing;"
+    perl -0pe 's/(accept_host_verdict\(\) \{.*?)return "\$rc"/${1}return 0/s' "$me" > "$mut"
+    rm -rf "$t/hostv"/*
+    hook_script="$mut"; hook "$(line "$h")"; hook_script=""
+    if cmp -s "$me" "$mut"; then rc=unchanged; fi
+    check "planted failure: an acceptance that always says yes lets a missing run through" 0 "xcodebuild build-for-testing;"
+    rm -rf "$t/hostv"/*
+    g reset -q --hard "$base"
+    [ "$have_xg" = 1 ] && (cd "$repo" && xcodegen generate --quiet)
 
     # The stale-project check.
     if [ "$have_xg" = 1 ]; then
@@ -663,12 +1021,12 @@ PYEOF
             "DEVELOPMENT_TEAM = ABCDE12345;/mg' SelfTest.xcodeproj/project.pbxproj"
         (cd "$repo" && xcodegen generate --quiet)
         hook "$(line "$h")"
-        check "stale check: the regenerated project passes" 0 "test-batched.sh ResectaApp;" "generated project matches project.yml"
+        check "stale check: the regenerated project passes" 0 "xcodebuild build-for-testing;" "generated project matches project.yml"
         if PATH="$t/bin:/usr/bin:/bin:/usr/sbin:/sbin" command -v xcodegen >/dev/null 2>&1; then
             echo "self-test: SKIP no-xcodegen rule — xcodegen is in a system directory"
         else
             hook "$(line "$h")" PATH="$t/bin:/usr/bin:/bin:/usr/sbin:/sbin"
-            check "stale check: no xcodegen is a printed warning, not a refusal" 0 "test-batched.sh ResectaApp;" \
+            check "stale check: no xcodegen is a printed warning, not a refusal" 0 "xcodebuild build-for-testing;" \
                 "WARN xcodegen is not on PATH"
         fi
     else
@@ -704,7 +1062,7 @@ PYEOF
     check "a stale count refuses before a scheme runs" 1 "" "the documented counts do not match"
     h="$(commit Sources/A.swift 'let s = 9' app)"
     hook "$(line "$h")"
-    check "control: the same app change with matching counts runs the app scheme" 0 "test-batched.sh ResectaApp;" \
+    check "control: the same app change with matching counts compiles the app scheme" 0 "xcodebuild build-for-testing;" \
         "documented counts match the pushed tree"
     g reset -q --hard "$base"
     g rm -q README.md && g commit -qm 'no readme'
@@ -745,7 +1103,7 @@ PYEOF
     /usr/bin/grep -vx 'count_check || exit 1' "$me" > "$mut"
     g reset -q --hard "$h3"
     hook_script="$mut"; hook "$(line "$h3")"; hook_script=""
-    check "planted failure: without the count check the stale app change runs its scheme" 0 "test-batched.sh ResectaApp;"
+    check "planted failure: without the count check the stale app change compiles its scheme" 0 "xcodebuild build-for-testing;"
     sed 's/elif \[ "$rc" = 1 \] && \[ "${last#DOC-METRICS FAIL:}" != "$last" \]; then/elif [ "$rc" = 1 ] \&\& printf "%s\\n" "$out" | \/usr\/bin\/grep -q "^  DRIFT "; then/' "$me" > "$mut"
     hook_script="$mut"; hook "$(line "$cc6b")"; hook_script=""
     if cmp -s "$me" "$mut"; then rc=unchanged; fi
@@ -860,23 +1218,33 @@ EOF
         echo "→ pre-push: PREPUSH_SCHEME_BY_DIFF=0 — both schemes needed" >&2
         need="RedactionEngine ResectaApp"
     elif [ "$base8" = none ] || [ "$ne" -gt 0 ] || [ "$nu" -gt 0 ]; then
-        need="RedactionEngine ResectaApp"
+        need="engine-host app-build"
     elif [ "$na" -gt 0 ]; then
-        need="ResectaApp"
+        need="app-build"
     fi
     [ "$scripts" -eq 1 ] && need="${need:+$need }self-tests"
 
     tree="$(git rev-parse "$sha^{tree}")"
     acc=""
     for s in $need; do
-        if [ "$s" != self-tests ] && accept_verdict "$s" "$tree"; then acc="$acc $s"; continue; fi
+        if [ "$s" = engine-host ]; then
+            if accept_host_verdict "$sha" "$tree"; then acc="$acc $s"; continue; fi
+            echo "✗ pre-push: $ref ${sha:0:8} changes the engine and no passing host run of the engine suite covers tree ${tree:0:8} — push refused. Run \`swift test --skip-build --no-parallel --skip FileProtectionTests\` in Packages/RedactionEngine on this tree, write its verdict.json, and point ENGINE_HOST_VERDICT_DIR at it." >&2
+            REFUSED=$((REFUSED + 1))
+            continue
+        fi
+        if [ "$s" != self-tests ] && [ "$s" != app-build ] && accept_verdict "$s" "$tree"; then acc="$acc $s"; continue; fi
         if [ "$sha" = "$HEAD_SHA" ] && [ "$CLEAN" -eq 1 ]; then
             case " $TO_RUN " in *" $s "*) ;; *) TO_RUN="$TO_RUN $s" ;; esac
             continue
         fi
         if [ "$sha" != "$HEAD_SHA" ]; then why="${sha:0:8} is not this checkout's HEAD (${HEAD_SHA:0:8})"
         else why="tracked files are modified"; fi
-        echo "✗ pre-push: $ref ${sha:0:8} needs $s and no passing verdict covers tree ${tree:0:8}; the runner tests the working tree and $why — push refused." >&2
+        if [ "$s" = app-build ]; then
+            echo "✗ pre-push: $ref ${sha:0:8} needs app-build, which compiles the working tree, and $why — push refused." >&2
+        else
+            echo "✗ pre-push: $ref ${sha:0:8} needs $s and no passing verdict covers tree ${tree:0:8}; the runner tests the working tree and $why — push refused." >&2
+        fi
         REFUSED=$((REFUSED + 1))
     done
     P_LINE+=("diff $base8..${sha:0:8}: engine $ne · app $na · no-scheme $nn · unclassified $nu → needed $(join_list $need)")
@@ -904,9 +1272,13 @@ if [ "$REFUSED" -gt 0 ]; then
     exit 1
 fi
 
-for s in RedactionEngine ResectaApp self-tests; do
+for s in RedactionEngine ResectaApp app-build self-tests; do
     case " $TO_RUN " in *" $s "*) ;; *) continue ;; esac
-    if [ "$s" = self-tests ]; then run_self_tests; else run_scheme "$s"; fi
+    case "$s" in
+        self-tests) run_self_tests ;;
+        app-build)  run_app_build ;;
+        *)          run_scheme "$s" ;;
+    esac
 done
 
 summary 1

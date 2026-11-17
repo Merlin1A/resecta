@@ -1,0 +1,7 @@
+# Issues a macOS host run of the engine suite records, by test file:line, for Scripts/pre-push.sh: location<TAB>count<TAB>judged (yes|no); a "no" row never decides.
+HiddenGlyphStripTests.swift:277	1	yes
+InkFitBusyPoolTests.swift:191	1	yes
+PageImageInkFitShadeTests.swift:113	1	yes
+PageImageInkFitTests.swift:284	2	yes
+PageImageInkFitTests.swift:344	1	yes
+StressCorpusTests.swift:189	0	no
