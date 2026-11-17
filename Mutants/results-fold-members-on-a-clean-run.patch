@@ -1,0 +1,19 @@
+Property: On a run where every check passed, the row holds every check.
+Area: results (the passed checks' row)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationResultsActionsTests
+Must go red: ResectaAppTests/VerificationResultsActionsTests listRowHoldsThePassedChecks
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationDetailsSection.swift b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
+index d0a0e9ef..bbbacab8 100644
+--- a/Sources/ResectaApp/Views/VerificationDetailsSection.swift
++++ b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
+@@ -81,7 +81,7 @@ struct VerificationDetailsSection: View {
+     /// and the notes riding with them. The row is drawn exactly when this is
+     /// not empty.
+     static func listRowMembers(_ partition: VerificationLayerPartition) -> [Int] {
+-        partition.cluster
++        partition.passedCount == partition.total ? [] : partition.cluster
+     }
+ 
+     /// The cluster opens by default only when it holds riding notes and no
