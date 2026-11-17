@@ -1,0 +1,17 @@
+Property: A batched run that verified nothing (an invocation with no readable result, a gating one that ran no test, or no test at all) never reads PASS.
+Area: the batched test runner's verdict
+Test command: /bin/bash Scripts/test-batched.sh --self-test
+Must go red: the self-test's dry-run verdict check (check 14: "a dry run of 'nobundle' expected 'INCOMPLETE 2 unread=1 empty=0 tests=0'", and the same for 'pass0', '' and 'pass3 nobundle'); the self-test ends "self-test: FAIL", exit 1
+Apply in a scratch worktree with `git apply`; discard after.
+
+--- a/Scripts/test-batched.sh
++++ b/Scripts/test-batched.sh
+@@ -1052,7 +1052,7 @@
+     echo "$VERDICT_LINE"
+     write_verdict FAIL "$TOTALS_LINE" "$VERDICT_LINE"
+     exit 1
+-elif [ "$WEDGED" -gt 0 ] || [ "$UNREAD" -gt 0 ] || [ "$EMPTY" -gt 0 ] || [ "$TOT_TESTS" -eq 0 ]; then
++elif [ "$WEDGED" -gt 0 ]; then
+     VERDICT_LINE="VERDICT: INCOMPLETE scheme=$SCHEME tests=$TOT_TESTS suites=$TOT_SUITES wedged=$WEDGED unread=$UNREAD empty=$EMPTY excluded=${#EXCLUDED[@]} (no gating reds in completed batches)"
+     echo "$VERDICT_LINE"
+     write_verdict INCOMPLETE "$TOTALS_LINE" "$VERDICT_LINE"
