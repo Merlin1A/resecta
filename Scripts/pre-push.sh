@@ -780,7 +780,7 @@ PYEOF
     h="$(commit notes.txt note unclassified)"
     hook "$(line "$h")"
     check "an unclassified path needs the host run and the app compile, printed" 1 "" \
-        "unclassified path notes.txt" "unclassified 1 → needed engine-host,app-build"
+        "unclassified path notes.txt — the host run and the app compile" "unclassified 1 → needed engine-host,app-build"
     h="$(commit Scripts/test-batched.sh '# changed' scripts)"
     hook "$(line "$h")"
     check "a Scripts/ change runs the two self-tests" 0 "test-batched.sh --self-test;pre-push.sh --self-test;" \
@@ -1197,7 +1197,7 @@ while [ "$i" -lt "${#P_SHA[@]}" ]; do
     if [ -n "$base" ]; then
         base8="${base:0:8}"
     else
-        echo "⚠  pre-push: $ref ${sha:0:8} has no merge base with the local origin/main — every tracked path is diffed and both schemes are needed" >&2
+        echo "⚠  pre-push: $ref ${sha:0:8} has no merge base with the local origin/main — every tracked path is diffed; the host run and the app compile are needed" >&2
         base="$EMPTY_TREE"; base8=none
     fi
     ne=0; na=0; nn=0; nu=0; scripts=0
@@ -1208,7 +1208,7 @@ while [ "$i" -lt "${#P_SHA[@]}" ]; do
             engine) ne=$((ne + 1)) ;;
             app)    na=$((na + 1)) ;;
             none)   nn=$((nn + 1)); case "$f" in Scripts/*) scripts=1 ;; esac ;;
-            *)      nu=$((nu + 1)); echo "→ pre-push: unclassified path $f — both schemes" >&2 ;;
+            *)      nu=$((nu + 1)); echo "→ pre-push: unclassified path $f — the host run and the app compile" >&2 ;;
         esac
     done <<EOF
 $files
