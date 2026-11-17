@@ -186,10 +186,15 @@ struct StressCorpusTests {
             let currentMachine = MachineSpec.current()
             let sameMachine = baseline.machine?.matches(currentMachine) ?? false
             if sameMachine {
-                #expect(
-                    delta < 0.20,
-                    "Wall-clock regressed by \(Int(delta * 100))% vs baseline (current=\(result.wallClockSeconds)s baseline=\(baseline.wallClockSeconds)s)"
-                )
+                // On the Mac host the budget is report-only: a Debug build's
+                // wall clock there moves with whatever else the Mac is
+                // running, so a slow run is a known issue, not a failure.
+                withKnownIssue("On the Mac host the wall-clock budget is report-only: a Debug run's time moves with the Mac's load", isIntermittent: true) {
+                    #expect(
+                        delta < 0.20,
+                        "Wall-clock regressed by \(Int(delta * 100))% vs baseline (current=\(result.wallClockSeconds)s baseline=\(baseline.wallClockSeconds)s)"
+                    )
+                } when: { HostRun.isMac }
                 // Memory regression window, asserted only on the
                 // baseline's recorded machine (same gating logic as the
                 // wall-clock window — cross-machine memory numbers are not
