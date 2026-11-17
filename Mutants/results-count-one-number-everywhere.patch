@@ -1,0 +1,19 @@
+Property: The ring and the summary line count the same checks.
+Area: results (the check count)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationCheckCountTests -only-testing:ResectaAppTests/VerificationRowModelTests
+Must go red: ResectaAppTests/VerificationCheckCountTests secondNumberIsOneNumberEverywhere; ResectaAppTests/VerificationRowModelTests elevenSummaryLines
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationLayerPartition.swift b/Sources/ResectaApp/Views/VerificationLayerPartition.swift
+index 3ec1c31a..a9f89b2a 100644
+--- a/Sources/ResectaApp/Views/VerificationLayerPartition.swift
++++ b/Sources/ResectaApp/Views/VerificationLayerPartition.swift
+@@ -81,7 +81,7 @@ nonisolated struct VerificationLayerPartition: Equatable {
+     /// passed" when T = 1), where T counts only the checks that had
+     /// something to check; line 2 names the others.
+     var summaryLine1: String {
+-        let checked = totalWithSomethingToCheck
++        let checked = total
+         return "\(passedCount) of \(checked) \(checked == 1 ? "check" : "checks") passed"
+     }
+ 
