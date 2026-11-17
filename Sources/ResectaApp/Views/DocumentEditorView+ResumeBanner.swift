@@ -15,11 +15,11 @@ extension DocumentEditorView {
     /// The banner the editor shows after a run was paused by a
     /// backgrounding (cancel-from-redacting or -verifying): offers the
     /// pipeline again.
-    /// It is a record of a run that did not finish, so no timer ends it —
-    /// it stays until it is dismissed, Restart is tapped, or another run
-    /// starts (the banner leaves the screen with the editing phase, and
-    /// the pause it reported is over). Mounted by the top-banner slot,
-    /// which shows it only while editing.
+    /// It is a record of a run that did not finish, so neither a timer nor
+    /// its leaving the screen ends it: the pause ends when the banner is
+    /// closed, when a full run starts (`runFullPipeline`, after its refusal
+    /// check), or when the document is closed or replaced. Mounted by the
+    /// top-banner slot, which shows it only while editing.
     @ViewBuilder
     var resumeBannerOverlay: some View {
         InlineWarningBanner(
@@ -27,7 +27,6 @@ extension DocumentEditorView {
             primaryAction: (
                 label: "Restart",
                 action: {
-                    Self.clearBackgroundPause(documentState)
                     coordinator.runFullPipeline(documentOverride: documentOverride)
                 }
             ),
@@ -42,20 +41,12 @@ extension DocumentEditorView {
             standard: .move(edge: .top).combined(with: .opacity),
             reduceMotion: reduceMotion))
         .padding(.top, ResectaTokens.Spacing.toolbarClearance)
-        // Leaving the screen ends the pause: a run started from the
-        // toolbar instead of Restart supersedes the paused one, and a
-        // closed document resets the pair anyway.
-        .onDisappear {
-            Self.clearBackgroundPause(documentState)
-        }
     }
 
-    /// What the banner's primary action clears before it launches the run
-    /// it offers: the pause flag and the phase it was paused from — the
-    /// same pair the dismiss path and the banner's leaving clear. Left
-    /// set, the banner mounted again
-    /// when the resumed run returned to `.editing`. Static so the pin is testable
-    /// without a SwiftUI host.
+    /// What the banner's close clears: the pause flag and the phase it was
+    /// paused from, the same pair a full run's start clears. Left set, the
+    /// banner shows again whenever the editor is in `.editing`. Static so
+    /// the pin is testable without a SwiftUI host.
     static func clearBackgroundPause(_ documentState: DocumentState) {
         documentState.wasPausedByBackground = false
         documentState.pausedFromPhase = nil

@@ -1,0 +1,19 @@
+Property: The search remedy is left out by the part-of-a-word flag, not by which check it is.
+Area: the verification results row, opened
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationRowModelTests
+Must go red: ResectaAppTests/VerificationRowModelTests fragmentResultHasNoSearchLead; ResectaAppTests/VerificationRowModelTests expandedBlockItemsPerOutcome
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationRowModel.swift b/Sources/ResectaApp/Views/VerificationRowModel.swift
+index 02e3d401..3d2c6761 100644
+--- a/Sources/ResectaApp/Views/VerificationRowModel.swift
++++ b/Sources/ResectaApp/Views/VerificationRowModel.swift
+@@ -380,7 +380,7 @@ nonisolated struct VerificationRowModel: Equatable {
+             }
+             if composesTermCaption(layer) {
+                 let terms = normalizedTerms(layer.reviewTermTexts ?? [])
+-                var lines: [String] = layer.reviewIsFragment ? [] : [reviewLead(termCount: terms.count)]
++                var lines: [String] = layer.layer == .ocrCheck ? [] : [reviewLead(termCount: terms.count)]
+                 if layer.layer == .operatorReExtraction,
+                    let stop = contentStreamStopLine(pages: layer.pageReferences, pageCount: perPageModes.count) {
+                     lines.append(stop)

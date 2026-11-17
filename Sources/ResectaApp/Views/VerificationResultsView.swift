@@ -81,7 +81,8 @@ struct VerificationResultsView: View {
                         VerificationResultsActions(
                             report: report, canExport: canExport, outputExists: outputExists,
                             isVerificationStale: isVerificationStale, previewAvailable: previewAvailable,
-                            onExport: onExport, onRunVerification: onRunVerification)
+                            onExport: onExport, onRunVerification: onRunVerification,
+                            concealedPages: VerificationResultsActions.concealedPages(in: findings))
                             .padding(.top, ResectaTokens.Results.blockGap)
                         ResultsFindingsSection(
                             findings: findings, pagesOnChips: previewAvailable, onOpenPage: openPreview(at:))

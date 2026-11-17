@@ -10,8 +10,7 @@ import RedactionEngine
 /// existing `UserTermsIndex.compile(alwaysFlag:neverFlag:)` engine seam
 /// at scan kickoff.
 // nonisolated: a Sendable value blob persisted via the generic
-// `FileJSONBlob<T: Codable & Sendable>` and read off-MainActor on the
-// detached hydrate path. Under SE-0466 MainActor-default
+// `FileJSONBlob<T: Codable & Sendable>`. Under SE-0466 MainActor-default
 // the synthesized Decodable conformance would become main-actor-isolated and
 // fail the Sendable generic bound — keep the whole type nonisolated.
 nonisolated struct UserTermsBlob: Codable, Sendable, Equatable {
@@ -24,8 +23,8 @@ nonisolated struct UserTermsBlob: Codable, Sendable, Equatable {
 @MainActor
 final class UserTermsStore {
 
-    // `nonisolated` so the detached-task hydrate path
-    // can read these constants off-MainActor. They are compile-time
+    // `nonisolated` so the pure validation helpers below can read these
+    // constants without the main actor. They are compile-time
     // constants and never mutated, so opting out of @MainActor isolation
     // here is sound.
     // `storageKey` is the pre-file `UserDefaults` location, retained as
@@ -51,78 +50,24 @@ final class UserTermsStore {
 
     private let storage: FileJSONBlob<UserTermsBlob>
 
-    // Hydration-race barrier. The async-hydrate write-back must not
-    // clobber a term the user adds in the window between the detached snapshot
-    // and the MainActor write-back. Any mutation (via `persist()`) sets this,
-    // and `applyHydration` skips once it is set — storage is already
-    // authoritative because `persist()` wrote the user's change.
-    private var isHydrated = false
-
-    // Handle to the async-hydrate task so tests can deterministically
-    // await the write-back attempt. nil on the synchronous path.
-    private(set) var hydrationTask: Task<Void, Never>?
-
     /// Default production init — reads the Application Support file.
     convenience init() {
-        self.init(fileURL: Self.defaultFileURL, asyncHydrate: true)
+        self.init(fileURL: Self.defaultFileURL)
     }
 
-    // P2.1: `asyncHydrate` moves the file read + sanitize off the
-    // cold-start critical path. Default is false so tests calling
-    // `init(fileURL:legacyDefaults:)` keep their synchronous contract.
-    //
-    // The async path runs the file read and
-    // `sanitize` on a detached Task so the work happens off-MainActor.
-    // The previous `Task { @MainActor in ... }` formulation only
-    // deferred the work to a later MainActor tick — it never left the
-    // main thread. The detached awaiter hops back to MainActor here
-    // to publish the result.
-    //
-    // The one-shot legacy migration runs synchronously BEFORE the
-    // hydrate is spawned: it must complete before any read of the file,
-    // and running it inline keeps it out of the async-hydrate race
-    // window (a detached write racing an early user mutation could
-    // otherwise clobber the mutation). It is a no-op on every launch
-    // after the first — the legacy key is removed once migrated.
-    init(fileURL: URL, legacyDefaults: UserDefaults = .standard, asyncHydrate: Bool = false) {
+    // The file is read and cleaned here, synchronously, on purpose: the
+    // store holds the stored lists from its first moment, so no change
+    // (and no scan) can act on an empty list before a delayed read lands.
+    // The one-time move of the old settings record runs first, before the
+    // read, as it always has.
+    init(fileURL: URL, legacyDefaults: UserDefaults = .standard) {
         self.storage = FileJSONBlob(
             fileURL: fileURL,
             schemaVersion: Self.schemaVersion,
             fallback: .empty
         )
         storage.migrateLegacyDefaultsIfNeeded(from: legacyDefaults, key: Self.storageKey)
-        if asyncHydrate {
-            self.blob = .empty
-            let captured = self.storage
-            self.hydrationTask = Task { @MainActor in
-                let hydrated = await Task.detached {
-                    UserTermsStore.loadAndSanitize(from: captured)
-                }.value
-                self.applyHydration(hydrated)
-            }
-        } else {
-            let loaded = storage.load()
-            self.blob = Self.sanitize(loaded)
-            self.isHydrated = true
-        }
-    }
-
-    /// Publish the async-hydrate snapshot unless a mutation already
-    /// superseded it (see `isHydrated`). Internal — not private — so the race
-    /// guard is testable without depending on detached-task read timing.
-    func applyHydration(_ hydrated: UserTermsBlob) {
-        guard !isHydrated else { return }
-        blob = hydrated
-        isHydrated = true
-    }
-
-    /// A nonisolated helper invoked from `Task.detached` so
-    /// the file read and the `sanitize` pass run off-MainActor.
-    /// Pure function of the storage handle; no MainActor state read.
-    nonisolated private static func loadAndSanitize(
-        from storage: FileJSONBlob<UserTermsBlob>
-    ) -> UserTermsBlob {
-        sanitize(storage.load())
+        self.blob = Self.sanitize(storage.load())
     }
 
     // MARK: - Mutate
@@ -171,9 +116,8 @@ final class UserTermsStore {
     /// Accept the term if it passes length (a literal floor of
     /// `literalMinimumLength` scalars, the `patternLengthCap` ceiling) +
     /// (optional) regex validation.
-    /// `nonisolated` so the detached-task hydrate path
-    /// (via `sanitize`) can call this off-MainActor. Pure function —
-    /// reads only its argument and the `nonisolated` constants above.
+    /// `nonisolated`: a pure function — it reads only its argument and
+    /// the `nonisolated` constants above, so it needs no main actor.
     /// The shortest literal term, in Unicode scalars: a one-character
     /// literal matches inside nearly every word and fills a scan with
     /// matches before its later pages are read.
@@ -189,13 +133,12 @@ final class UserTermsStore {
         return true
     }
 
-    /// Drop invalid entries and cap each list at `perListCap`. Used on
-    /// hydrate so a corrupted or out-of-date blob can't leak invalid
-    /// terms into a scan.
+    /// Drop invalid entries and cap each list at `perListCap`. Used when
+    /// the file is read so a corrupted or out-of-date blob can't leak
+    /// invalid terms into a scan.
     ///
-    /// `nonisolated` so the detached-task hydrate path
-    /// can call this off-MainActor. The function is pure — reads only
-    /// its argument and the `nonisolated` validator helper below.
+    /// `nonisolated`: the function is pure — it reads only its argument
+    /// and the `nonisolated` validator helper above.
     nonisolated static func sanitize(_ blob: UserTermsBlob) -> UserTermsBlob {
         UserTermsBlob(
             alwaysFlag: Array(
@@ -208,9 +151,6 @@ final class UserTermsStore {
     }
 
     private func persist() {
-        // A real mutation supersedes any in-flight async-hydrate
-        // snapshot; mark hydrated so a late write-back is dropped.
-        isHydrated = true
         storage.save(blob)
     }
 }

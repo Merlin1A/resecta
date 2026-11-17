@@ -1,0 +1,20 @@
+Property: The paused notice's leaving the screen does not end the pause it reports.
+Area: the editor's paused notice
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/DocumentEditorViewBackgroundBannerTests
+Must go red: ResectaAppTests/DocumentEditorViewBackgroundBannerTests testPausedNoticeHasNoLeavingHook
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/DocumentEditorView+ResumeBanner.swift b/Sources/ResectaApp/Views/DocumentEditorView+ResumeBanner.swift
+index 55d8f833..dda2ca77 100644
+--- a/Sources/ResectaApp/Views/DocumentEditorView+ResumeBanner.swift
++++ b/Sources/ResectaApp/Views/DocumentEditorView+ResumeBanner.swift
+@@ -41,6 +41,9 @@ extension DocumentEditorView {
+             standard: .move(edge: .top).combined(with: .opacity),
+             reduceMotion: reduceMotion))
+         .padding(.top, ResectaTokens.Spacing.toolbarClearance)
++        .onDisappear {
++            Self.clearBackgroundPause(documentState)
++        }
+     }
+ 
+     /// What the banner's close clears: the pause flag and the phase it was

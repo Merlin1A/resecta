@@ -363,7 +363,10 @@ nonisolated struct VerificationRowModel: Equatable {
         }
     }
 
-    /// The expanded block's lead lines, by outcome.
+    /// The expanded block's lead lines, by outcome. A word check's
+    /// needs-review result opens with the search remedy, except when only
+    /// part of a word is readable beside its box: then the remedy is the
+    /// box, which the caption already gives, so no search line is added.
     static func lead(for layer: LayerResult, outcome: VerificationOutcome,
                      perPageModes: [PipelineMode]) -> [String] {
         switch outcome {
@@ -377,7 +380,7 @@ nonisolated struct VerificationRowModel: Equatable {
             }
             if composesTermCaption(layer) {
                 let terms = normalizedTerms(layer.reviewTermTexts ?? [])
-                var lines = [reviewLead(termCount: terms.count)]
+                var lines: [String] = layer.reviewIsFragment ? [] : [reviewLead(termCount: terms.count)]
                 if layer.layer == .operatorReExtraction,
                    let stop = contentStreamStopLine(pages: layer.pageReferences, pageCount: perPageModes.count) {
                     lines.append(stop)

@@ -10,9 +10,9 @@ import OSLog
 // attempted in v1 — future schema versions can add migration logic
 // inside `load()` by branching on `envelope.schemaVersion`.
 
-// nonisolated: a stateless UserDefaults persistence envelope used off-MainActor
-// on detached hydrate paths (e.g. UserTermsStore.loadAndSanitize). Keep it out
-// of the SE-0466 MainActor-default pinned project-wide.
+// nonisolated: a stateless UserDefaults persistence envelope, usable
+// off-MainActor. Keep it out of the SE-0466 MainActor-default pinned
+// project-wide.
 nonisolated struct UserDefaultsJSONBlob<T: Codable & Sendable>: @unchecked Sendable {
     let key: String
     let schemaVersion: UInt8
