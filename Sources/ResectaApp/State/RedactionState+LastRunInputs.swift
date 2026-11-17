@@ -23,5 +23,11 @@ extension RedactionState {
         /// The degrade-failure list at run entry; nil when not degraded.
         let degradeFailures: [String]?
         var burnedRegionVersion: Int? = nil  // the run's redacted region version
+        /// The regions the run burned, per page, as burned: clamped to the
+        /// page, with the size floor applied and the run's ink strips. A
+        /// re-check of this output hands these to the checks, not the
+        /// editor's live regions. Nil only where the inputs were built by
+        /// hand (the debug seed and tests).
+        var burnedRegions: [Int: [RedactionRegion]]? = nil
     }
 }
