@@ -172,6 +172,32 @@ struct VerificationRowPartTests {
                 == "Your search \u{201C}Delia\u{201D} still has 1 match on\(Self.nbsp)page\(Self.nbsp)1; 1 page could not be checked: 2")
     }
 
+    @Test("a Search Re-check needs-review row whose only matching search is unchecked: the engine's sentence, its clause once")
+    func recheckUncheckedRowShowsTheClauseOnce() {
+        let line = SearchRecheckQueryLine(label: "\u{201C}Delia\u{201D}", foundCount: 2, foundHitCap: false,
+                                          appliedCount: 1, remainingCount: 1, route: .textLayer, unchecked: true)
+        let sentence = "Re-ran 1 search \u{2014} 1 match remains on page 1, 1 page could not be checked: 2"
+        let layer = Self.row(.attention(sentence), .searchRecheck, pages: [0], terms: ["Delia"], lines: [line],
+                             part: "1 page could not be checked: 2", partPages: [1])
+        #expect(VerificationRowModel.composesRecheckCaption(layer) == false)
+        let caption = Self.caption(layer)
+        #expect(caption == sentence)
+        #expect(caption?.components(separatedBy: "could not be checked").count == 2)
+        let spoken = VerificationRowModel(layer: layer, perPageModes: []).spokenLabel
+        #expect(spoken.components(separatedBy: "could not be checked").count == 2)
+    }
+
+    @Test("a failed Search Re-check row, a match only partly covered: the engine's sentence, \"; \", the part")
+    func recheckFailedRowKeepsThePart() {
+        let line = SearchRecheckQueryLine(label: "\u{201C}Delia\u{201D}", foundCount: 2, foundHitCap: false,
+                                          appliedCount: 2, remainingCount: 0, route: .textLayer)
+        let layer = Self.row(.fail("1 match is only partly covered by its redaction box on page 1"), .searchRecheck,
+                             pages: [0], terms: ["Delia"], lines: [line],
+                             part: "1 page could not be checked: 2", partPages: [1])
+        #expect(Self.caption(layer)
+                == "1 match is only partly covered by its redaction box on page 1; 1 page could not be checked: 2")
+    }
+
     @Test("a part that ends in a full stop: the stop stays at the end, and there is none before \"; \"")
     func partKeepsItsFinalStop() {
         // The engine's own sentence, which ends in a full stop: the stop is

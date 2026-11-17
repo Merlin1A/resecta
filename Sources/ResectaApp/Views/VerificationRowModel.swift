@@ -330,11 +330,16 @@ nonisolated struct VerificationRowModel: Equatable {
     /// The caption under the title, by outcome — never by text. A failed or
     /// needs-review row whose check also could not read part of its input
     /// carries that part after the issue's caption: the caption less a final
-    /// full stop, "; ", then the part.
+    /// full stop, "; ", then the part. A Search Re-check needs-review row
+    /// whose caption is not composed from its query lines shows the engine's
+    /// own sentence, which already carries every could-not clause, so the
+    /// part is not added again.
     static func caption(for layer: LayerResult, outcome: VerificationOutcome,
                         perPageModes: [PipelineMode] = [], pagesOnChips: Bool = false) -> String? {
         let base = findCaption(for: layer, outcome: outcome, perPageModes: perPageModes, pagesOnChips: pagesOnChips)
         switch outcome {
+        case .needsReview where layer.layer == .searchRecheck && !composesRecheckCaption(layer):
+            return base
         case .failed, .needsReview:
             guard let part = layer.couldNotVerifyPart, let base else { return base }
             return (base.hasSuffix(".") ? String(base.dropLast()) : base) + "; " + part
