@@ -1,0 +1,21 @@
+Property: A box with a band none of whose regions is listed still gives its inner rectangle, after the last region.
+Area: the plan's rectangles of boxes with no listed region
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/TextPathRectangleTests (or on the host: cd Packages/RedactionEngine && swift test --filter TextPathRectangleTests)
+Must go red: RedactionCoreTests/TextPathRectangleTests list [a box with a band none of whose regions is listed]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/TextPathRectangle.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/TextPathRectangle.swift
+index 89f7ef68..3e769fb3 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/TextPathRectangle.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/TextPathRectangle.swift
+@@ -110,9 +110,7 @@ extension TextPathRectangle {
+                 list.append(TextPathRectangle(rect: strip, kind: .ordinary))
+             }
+         }
+-        for (index, box) in banded.enumerated() where !given[index] {
+-            list.append(TextPathRectangle(rect: points(box.inner), kind: .plansRectangle))
+-        }
++        // mutant: a banded box with no listed region is passed over
+         return list
+     }
+ 
