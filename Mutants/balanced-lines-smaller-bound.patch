@@ -1,0 +1,19 @@
+Property: The search starts from the larger of half the line and the widest run, not the smaller.
+Area: the results masthead, its balanced title and sentence
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BalancedLinesTests
+Must go red: ResectaAppTests/BalancedLinesTests narrowestWidthTable
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationMasthead.swift b/Sources/ResectaApp/Views/VerificationMasthead.swift
+index 03e46d31..3f84e788 100644
+--- a/Sources/ResectaApp/Views/VerificationMasthead.swift
++++ b/Sources/ResectaApp/Views/VerificationMasthead.swift
+@@ -501,7 +501,7 @@ struct BalancedLines: Layout {
+                                height: (CGFloat) -> CGFloat) -> CGFloat? {
+         guard let available, available.isFinite else { return available }
+         guard single > available else { return available }
+-        var low = min(available, max(available / 2, floor))
++        var low = min(available, min(available / 2, floor))
+         // `low` is never above `available`; at it there is nothing narrower.
+         if low == available { return available }
+         let target = height(available)

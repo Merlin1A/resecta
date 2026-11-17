@@ -1,0 +1,19 @@
+Property: A no-break space keeps its words in one run.
+Area: the results masthead, its balanced title and sentence
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BalancedLinesTests
+Must go red: ResectaAppTests/BalancedLinesTests narrowestWidthTable
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationMasthead.swift b/Sources/ResectaApp/Views/VerificationMasthead.swift
+index 03e46d31..c9fa6e00 100644
+--- a/Sources/ResectaApp/Views/VerificationMasthead.swift
++++ b/Sources/ResectaApp/Views/VerificationMasthead.swift
+@@ -454,7 +454,7 @@ struct BalancedText: View {
+     /// The text's unbreakable runs: split on ordinary spaces and line breaks
+     /// only. A no-break space does not end a run; it keeps its words together.
+     static func runs(of string: String) -> [Substring] {
+-        string.split(whereSeparator: { $0 == " " || $0 == "\n" })
++        string.split(whereSeparator: { $0 == " " || $0 == "\n" || $0 == "\u{00A0}" })
+     }
+ }
+ 
