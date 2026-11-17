@@ -93,6 +93,42 @@ struct VerificationDetailsSection: View {
         partition.total > 0 && partition.passedCount == partition.total
     }
 
+    // MARK: - The Detection Sweep's limit
+
+    /// Whether the card holds the row with the Detection Sweep's limit:
+    /// exactly when the run has the check and the sweep's own row is not in
+    /// view on the closed screen, so that the limit is in view once.
+    static func showsSweepLimit(runHasCheck: Bool, sweepRowInView: Bool) -> Bool {
+        runHasCheck && !sweepRowInView
+    }
+
+    /// The report's Detection Sweep check, by engine index: the check whose
+    /// closed row states the limit. A report whose checks did not run, and
+    /// the page-count stop, have none.
+    static func sweepIndex(_ report: VerificationReport) -> Int? {
+        report.layers.firstIndex { LayerResultRow.rowCaptionText(layer: $0) != nil }
+    }
+
+    /// Whether the sweep's own row is in view on the closed screen: in one
+    /// of the groups drawn above the list of checks, or in the headed list
+    /// a run where every check passed draws. A row inside the list of
+    /// checks does not count, even where the list arrives open: it can be
+    /// closed.
+    static func sweepRowInView(_ partition: VerificationLayerPartition, sweepIndex: Int) -> Bool {
+        groups(partition).contains { $0.indices.contains(sweepIndex) } || isEveryCheckPassed(partition)
+    }
+
+    /// The card's row with the Detection Sweep's limit, in the words of the
+    /// sweep's own closed row; nil where `showsSweepLimit` says no.
+    static func sweepLimitFact(report: VerificationReport) -> ResultsFact? {
+        let index = sweepIndex(report)
+        let partition = VerificationLayerPartition(layers: report.layers, perPageModes: report.perPageModes)
+        let inView = index.map { sweepRowInView(partition, sweepIndex: $0) } ?? false
+        guard showsSweepLimit(runHasCheck: index != nil, sweepRowInView: inView), let index,
+              let words = LayerResultRow.rowCaptionText(layer: report.layers[index]) else { return nil }
+        return ResultsFact(id: "sweepLimit", shown: words, identifier: "sweepLimitFact")
+    }
+
     /// The cluster opens by default only when it holds riding notes and no
     /// result section sits above it (the run section does not count).
     static func clusterOpensByDefault(_ partition: VerificationLayerPartition) -> Bool {
@@ -217,7 +253,8 @@ struct VerificationDetailsSection: View {
         ResultsFactCard.items(
             handedIn: facts, runLines: Self.runLineFacts(runFactsLines),
             showsPageModes: VerificationResultsView.showsPageModes(report: report),
-            deselection: Self.deselectionFact(snapshot: deselectionSnapshot))
+            deselection: Self.deselectionFact(snapshot: deselectionSnapshot),
+            sweepLimit: Self.sweepLimitFact(report: report))
     }
 
     @ViewBuilder

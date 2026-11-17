@@ -20,7 +20,8 @@ nonisolated struct ResultsFact: Equatable, Identifiable {
         case door(String)
     }
 
-    /// A stable name: it keys the open row and is the row's identifier.
+    /// A stable name: it keys the open row and, unless `identifier` is
+    /// given, is the row's identifier.
     let id: String
     /// Always in view: the first line, whole, and any instruction.
     let shown: String
@@ -29,6 +30,10 @@ nonisolated struct ResultsFact: Equatable, Identifiable {
     /// The label of a link row at the end of the opened part.
     var door: String? = nil
     var place: Place = .last
+    /// The row's identifier when it is not the `id`.
+    var identifier: String? = nil
+
+    var accessibilityIdentifier: String { identifier ?? id }
 
     /// The row opens, and has a chevron, exactly when it has something to
     /// open to.
@@ -49,17 +54,19 @@ nonisolated enum ResultsCardItem: Equatable {
 nonisolated enum ResultsFactCard {
     /// The card from top to bottom: handed-in facts placed first; the run's
     /// own lines in their order; handed-in facts about what was not read;
-    /// handed-in facts about pictures; Page Modes when it shows; the row
+    /// the Detection Sweep's limit when the card holds it; handed-in facts
+    /// about pictures; Page Modes when it shows; the row
     /// about items left unredacted; handed-in facts placed last. The card
     /// is drawn when this is not empty.
     static func items(handedIn: [ResultsFact], runLines: [ResultsFact], showsPageModes: Bool,
-                      deselection: ResultsFact?) -> [ResultsCardItem] {
+                      deselection: ResultsFact?, sweepLimit: ResultsFact? = nil) -> [ResultsCardItem] {
         func placed(_ place: ResultsFact.Place) -> [ResultsCardItem] {
             handedIn.filter { $0.place == place }.map(ResultsCardItem.fact)
         }
         var items = placed(.first)
         items += runLines.map(ResultsCardItem.fact)
         items += placed(.notRead)
+        if let sweepLimit { items.append(.fact(sweepLimit)) }
         items += placed(.pictures)
         if showsPageModes { items.append(.pageModes) }
         if let deselection { items.append(.fact(deselection)) }
@@ -117,12 +124,12 @@ struct ResultsFactRow: View {
             }
             .background(isOpen ? LayerResultRow.rowWash(colorScheme) : .clear)
             .accessibilityElement(children: .contain)
-            .accessibilityIdentifier(fact.id)
+            .accessibilityIdentifier(fact.accessibilityIdentifier)
         } else {
             shownText
                 .modifier(ResultsFactRowFrame())
                 .accessibilityElement(children: .combine)
-                .accessibilityIdentifier(fact.id)
+                .accessibilityIdentifier(fact.accessibilityIdentifier)
         }
     }
 
