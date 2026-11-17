@@ -175,10 +175,9 @@ final class SavedRegexStore {
         guard userSavedRegexes.count < Self.userSavedCap else { return .refused(.full) }
         guard DocumentSearcher.validateRegexPattern(trimmedPattern) != nil else { return .refused(.invalid) }
         guard !regexes.contains(where: { $0.label == trimmedLabel }) else { return .refused(.duplicate) }
-        userSavedRegexes.append(
-            SavedRegex(label: trimmedLabel, pattern: trimmedPattern)
-        )
-        persist()
+        let next = userSavedRegexes + [SavedRegex(label: trimmedLabel, pattern: trimmedPattern)]
+        guard persist(next, unrecognizedRows) else { return .notSaved }
+        userSavedRegexes = next
         return .saved
     }
 
@@ -188,8 +187,10 @@ final class SavedRegexStore {
     @discardableResult
     func deleteUserSaved(at offsets: IndexSet) -> ListChange {
         guard loadIfHeld() else { return .held }
-        userSavedRegexes.remove(atOffsets: offsets)
-        persist()
+        var next = userSavedRegexes
+        next.remove(atOffsets: offsets)
+        guard persist(next, unrecognizedRows) else { return .notSaved }
+        userSavedRegexes = next
         return .saved
     }
 
@@ -203,17 +204,19 @@ final class SavedRegexStore {
     @discardableResult
     func clearAllUserSaved() -> ListChange {
         guard loadIfHeld() else { return .held }
+        guard persist([], []) else { return .notSaved }
         userSavedRegexes = []
         unrecognizedRows = []
-        persist()
         return .saved
     }
 
-    private func persist() {
+    /// Write the next library to the file; true when the file holds it.
+    /// Changes no state.
+    private func persist(_ regexes: [SavedRegex], _ unrecognized: [RetainedJSONValue]) -> Bool {
         blob.save(SavedRegexEnvelope(
             schemaVersion: 1,
-            userSavedRegexes: userSavedRegexes,
-            unrecognized: unrecognizedRows
+            userSavedRegexes: regexes,
+            unrecognized: unrecognized
         ))
     }
 }

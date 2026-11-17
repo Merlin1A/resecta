@@ -55,7 +55,7 @@ struct FileJSONBlobTests {
         let blob = FileJSONBlob(
             fileURL: url, schemaVersion: 1, fallback: Payload(items: [:]))
         let value = Payload(items: ["ssn": 0.92, "name": 0.55])
-        blob.save(value)
+        #expect(blob.save(value))
         #expect(blob.load() == value)
     }
 
@@ -251,5 +251,72 @@ struct FileJSONBlobTests {
         let start = try #require(source.range(of: "func read() -> ReadOutcome {"))
         let end = try #require(source.range(of: "func storeValue(", range: start.upperBound..<source.endIndex))
         #expect(!source[start.upperBound..<end.lowerBound].contains("fileExists"))
+    }
+
+    // MARK: - The write reports
+
+    @Test("A save into a folder that cannot be written returns false and leaves the stored file as it was")
+    @MainActor
+    func saveIntoLockedFolder() throws {
+        let url = makeScratchFileURL()
+        defer { UnreadableFile.unlockFolder(url.deletingLastPathComponent()); removeScratch(url) }
+        let blob = FileJSONBlob<Payload>(fileURL: url, schemaVersion: 1, fallback: Payload(items: [:]))
+        #expect(blob.save(Payload(items: ["first": 1.0])))
+        let first = try Data(contentsOf: url)
+        try UnreadableFile.lockFolder(url.deletingLastPathComponent())
+
+        #expect(blob.save(Payload(items: ["second": 2.0])) == false)
+        #expect(try Data(contentsOf: url) == first)
+    }
+
+    @Test("A save of a value that cannot be encoded returns false and writes nothing")
+    func saveOfUnencodableValue() throws {
+        let url = makeScratchFileURL()
+        defer { removeScratch(url) }
+        let bad = Payload(items: ["nan": .nan])
+        #expect(throws: (any Error).self) { try JSONEncoder().encode(bad) }
+        let blob = FileJSONBlob<Payload>(fileURL: url, schemaVersion: 1, fallback: Payload(items: [:]))
+
+        #expect(blob.save(bad) == false)
+        #expect(!FileManager.default.fileExists(atPath: url.path))
+    }
+
+    @Test("A save whose replace fails returns false and leaves the stored file as it was")
+    func saveWhoseReplaceFails() throws {
+        let url = makeScratchFileURL()
+        defer {
+            try? FileManager.default.setAttributes([.immutable: false], ofItemAtPath: url.path)
+            removeScratch(url)
+        }
+        let blob = FileJSONBlob<Payload>(fileURL: url, schemaVersion: 1, fallback: Payload(items: [:]))
+        #expect(blob.save(Payload(items: ["first": 1.0])))
+        let first = try Data(contentsOf: url)
+        try FileManager.default.setAttributes([.immutable: true], ofItemAtPath: url.path)
+        let scratch = url.deletingLastPathComponent().appendingPathComponent("scratch.json")
+        try Data("x".utf8).write(to: scratch)
+        try #require((try? FileManager.default.replaceItemAt(url, withItemAt: scratch)) == nil,
+                     "replacing the immutable file must fail on this host")
+        try? FileManager.default.removeItem(at: scratch)
+
+        #expect(blob.save(Payload(items: ["second": 2.0])) == false)
+        #expect(try Data(contentsOf: url) == first)
+        let siblings = try FileManager.default.contentsOfDirectory(atPath: url.deletingLastPathComponent().path)
+        #expect(!siblings.contains { $0.hasPrefix(".\(url.lastPathComponent).tmp-") })
+    }
+
+    @Test("The saved answer is set after the file is placed and before its attributes are asserted again")
+    func savedAnswerPlacement() throws {
+        let source = try String(
+            contentsOf: URL(fileURLWithPath: "\(#filePath)")
+                .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+                .appendingPathComponent("Sources/ResectaApp/State/FileJSONBlob.swift"),
+            encoding: .utf8)
+        let start = try #require(source.range(of: "func save(_ value: T) -> Bool {"))
+        let body = source[start.upperBound...]
+        let move = try #require(body.range(of: "moveItem(at: tmpURL, to: fileURL)"))
+        let placed = try #require(body.range(of: "placed = true"))
+        let assertAgain = try #require(body.range(of: "TempFileHardening.applyProtection(fileURL"))
+        #expect(move.upperBound <= placed.lowerBound)
+        #expect(placed.upperBound <= assertAgain.lowerBound)
     }
 }

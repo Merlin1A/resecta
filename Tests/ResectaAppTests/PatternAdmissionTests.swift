@@ -76,6 +76,25 @@ struct PatternAdmissionTests {
         #expect(PatternAdmission.outcome(of: .saved) == .added)
     }
 
+    @Test("Admission reports a failed write as not saved")
+    func failedWriteIsNotSaved() async throws {
+        let suite = "pattern-admission-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("pattern-admission-\(UUID().uuidString)", isDirectory: true)
+        let fileURL = folder.appendingPathComponent("saved-regexes.v1.json")
+        defer { UnreadableFile.unlockFolder(folder); try? FileManager.default.removeItem(at: folder) }
+        let store = SavedRegexStore(fileURL: fileURL, legacyDefaults: defaults)
+        #expect(store.add(label: "Stored", pattern: "[0-9]{2}") == .saved)
+        try UnreadableFile.lockFolder(folder)
+
+        let outcome = await PatternAdmission.admit(label: "Ticket", pattern: "[A-Z]{2}-[0-9]{4}", into: store)
+
+        #expect(outcome == .notSaved)
+        #expect(store.userSavedRegexes.map(\.label) == ["Stored"])
+    }
+
     // MARK: - Helpers
 
     private func repoRoot(file: StaticString = #filePath) -> URL {
