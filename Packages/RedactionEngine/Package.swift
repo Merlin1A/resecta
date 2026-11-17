@@ -1,22 +1,32 @@
 // swift-tools-version: 6.2
 import PackageDescription
 
-let package = Package(
-    name: "RedactionEngine",
-    // The deployment floor stays iOS 26.0 by design. The runtime `.nameType` NER
-    // name model is reliably provisioned only on iOS 26.4+ (per the detection
-    // harness pin), but the 26.0 floor is intentional: non-NER detectors plus the
-    // auto-detect-degraded banner (which also fires when the NER MobileAsset is
-    // absent) cover the 26.0–26.3 gap. Do not raise it to 26.4 here — that would
-    // drop 26.0–26.3 devices.
-    // macOS is a TOOLING destination only (lets `swift test` run on Mac hosts);
-    // the shipping product is iOS. Platform seams are conditional-compilation
-    // only — the iOS compilation path is unchanged.
-    platforms: [.iOS(.v26), .macOS(.v15)],
-    products: [
-        .library(name: "RedactionEngine", targets: ["RedactionEngine", "PDFKitGuard"]),
-    ],
-    targets: [
+// The Foundation-only core: value types and pure judging code. It imports no
+// Apple framework, so it builds and tests on any Swift toolchain. On a host
+// without Darwin the manifest declares the core and its tests alone; the
+// engine target needs PDFKit and the rest and is declared on Apple hosts.
+let coreSettings: [SwiftSetting] = [
+    .enableUpcomingFeature("NonisolatedNonsendingByDefault"),
+]
+
+var products: [Product] = [
+    .library(name: "RedactionCore", targets: ["RedactionCore"]),
+]
+
+var targets: [Target] = [
+    .target(name: "RedactionCore", swiftSettings: coreSettings),
+    .testTarget(
+        name: "RedactionCoreTests",
+        dependencies: ["RedactionCore"],
+        swiftSettings: coreSettings
+    ),
+]
+
+#if canImport(Darwin)
+products = [
+    .library(name: "RedactionEngine", targets: ["RedactionEngine", "PDFKitGuard", "RedactionCore"]),
+]
+targets += [
         // One Objective-C function: `-[PDFDocument dataRepresentation]`
         // behind an exception boundary (a damaged `/Info` dictionary makes
         // PDFKit raise, which Swift cannot intercept). Exported with the
@@ -27,7 +37,7 @@ let package = Package(
         ),
         .target(
             name: "RedactionEngine",
-            dependencies: ["PDFKitGuard"],
+            dependencies: ["PDFKitGuard", "RedactionCore"],
             resources: [
                 .copy("Resources/Gazetteers"),
                 .copy("Resources/Classifier"),
@@ -74,5 +84,21 @@ let package = Package(
                 .enableUpcomingFeature("NonisolatedNonsendingByDefault"),
             ]
         ),
-    ]
+]
+#endif
+
+let package = Package(
+    name: "RedactionEngine",
+    // The deployment floor stays iOS 26.0 by design. The runtime `.nameType` NER
+    // name model is reliably provisioned only on iOS 26.4+ (per the detection
+    // harness pin), but the 26.0 floor is intentional: non-NER detectors plus the
+    // auto-detect-degraded banner (which also fires when the NER MobileAsset is
+    // absent) cover the 26.0–26.3 gap. Do not raise it to 26.4 here — that would
+    // drop 26.0–26.3 devices.
+    // macOS is a TOOLING destination only (lets `swift test` run on Mac hosts);
+    // the shipping product is iOS. Platform seams are conditional-compilation
+    // only — the iOS compilation path is unchanged.
+    platforms: [.iOS(.v26), .macOS(.v15)],
+    products: products,
+    targets: targets
 )

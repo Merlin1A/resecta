@@ -90,9 +90,10 @@ length_claims() { # $1 = doc|lines; doc: $2 = file; lines: "path:line:text" on s
 # Shipping markdown set (NOT internal /specs or test fixtures).
 DOCS="README.md ENGINEERING.md CONTRIBUTING.md CHANGELOG.md KNOWN_ISSUES.md EULA.md PRIVACY.md SECURITY.md THREAT-MODEL.md VERIFICATION-SPEC.md NOTICE Packages/RedactionEngine/README.md"
 
-# Swift trees whose string literals are user-facing copy: the app, and the
-# verification checks whose result copy the results screen shows.
-SWIFT_TREES="Sources/ResectaApp Packages/RedactionEngine/Sources/RedactionEngine/Verification"
+# Swift trees whose string literals are user-facing copy: the app, the
+# verification checks whose result copy the results screen shows, and the
+# engine's Foundation-only core, where judging code is written.
+SWIFT_TREES="Sources/ResectaApp Packages/RedactionEngine/Sources/RedactionEngine/Verification Packages/RedactionEngine/Sources/RedactionCore"
 LIST_FILE="Sources/ResectaApp/Legal/LegalPhrases.swift"
 
 # The banned terms as one case-insensitive ERE alternation, from the list file.
