@@ -3,7 +3,8 @@ import RedactionEngine
 
 // The results page's check sections, below the actions: Findings → Could
 // not verify → Notes → Nothing to check, each with its count; the
-// headerless run section (the run facts, Page Modes, the deselection row);
+// headerless card of facts about the PDF (handed-in facts, the run's own
+// lines, Page Modes, the deselection row: `ResultsFactCard.items`);
 // then one row for the checks that passed — or, on a run where every check
 // passed, the `Checks` list. One item is open at a time across the rows and
 // Page Modes. A page link asks the results view to push the Preview at
@@ -25,6 +26,10 @@ struct VerificationDetailsSection: View {
     var onOpenPage: (Int) -> Void = { _ in }
     /// Back to the editor with Scan running (the sweep's Review in Scan).
     var onReviewInScan: () -> Void = {}
+    /// Facts handed in for the card, each placed by its `place`.
+    var facts: [ResultsFact] = []
+    /// A fact's link row was tapped (the fact's id).
+    var onOpenDoor: (String) -> Void = { _ in }
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
@@ -33,6 +38,7 @@ struct VerificationDetailsSection: View {
     enum OpenItem: Hashable {
         case layer(Int)
         case pageModes
+        case fact(String)
     }
 
     @State private var openItem: OpenItem?
@@ -52,8 +58,9 @@ struct VerificationDetailsSection: View {
                 }
                 .padding(.top, ResectaTokens.Results.blockGap)
             }
-            if showsRunSection {
-                GroupedSection { runSection }
+            let card = cardItems
+            if !card.isEmpty {
+                GroupedSection { factCard(card) }
                     .padding(.top, ResectaTokens.Spacing.xl)
             }
             if Self.isEveryCheckPassed(partition) {
@@ -92,17 +99,15 @@ struct VerificationDetailsSection: View {
         partition.isWhollyClean && partition.clusterNoteCount > 0
     }
 
-    private var showsDeselection: Bool {
-        VerificationResultsView.shouldShowDeselectionRow(snapshot: deselectionSnapshot)
-    }
-
-    private var showsRunSection: Bool {
-        !runFactsLines.isEmpty || VerificationResultsView.showsPageModes(report: report) || showsDeselection
+    /// The one open item after a tap: the tapped item opens and whatever
+    /// was open closes; tapping the open item closes it.
+    static func openItem(afterTapping item: OpenItem, current: OpenItem?) -> OpenItem? {
+        current == item ? nil : item
     }
 
     private func toggle(_ item: OpenItem) {
         withAnimation(ResectaTokens.Anim.resolved(ResectaTokens.Anim.stateChange, reduceMotion: reduceMotion)) {
-            openItem = openItem == item ? nil : item
+            openItem = Self.openItem(afterTapping: item, current: openItem)
         }
     }
 
@@ -185,61 +190,48 @@ struct VerificationDetailsSection: View {
         }
     }
 
-    // MARK: - The run section
+    // MARK: - The card of facts
 
-    @ViewBuilder
-    private var runSection: some View {
-        ForEach(Array(runFactsLines.enumerated()), id: \.offset) { position, line in
-            if position > 0 { GroupedRowDivider() }
-            runSectionRow(symbol: "info.circle") {
-                Text(line)
-                    .font(.subheadline)
-                    .foregroundStyle(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .accessibilityElement(children: .combine)
-            .accessibilityIdentifier(position == 0 ? "runFactsStrip" : "runFactsLine_\(position)")
-        }
-        if VerificationResultsView.showsPageModes(report: report) {
-            if !runFactsLines.isEmpty { GroupedRowDivider() }
-            pageModesRow
-        }
-        if showsDeselection, let snapshot = deselectionSnapshot {
-            if !runFactsLines.isEmpty || VerificationResultsView.showsPageModes(report: report) {
-                GroupedRowDivider()
-            }
-            let rowText = VerificationResultsView.deselectionRowText(
-                deselected: snapshot.deselectedCount, total: snapshot.totalCount)
-            runSectionRow(symbol: "checklist.unchecked") {
-                Text(rowText)
-                    .font(.body)
-                    .foregroundStyle(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel(rowText)
-            .accessibilityIdentifier("deselectionRow")
+    /// The run's own lines as facts, in their order: each line whole, with
+    /// nothing behind a tap. The first carries the `runFactsStrip`
+    /// identifier.
+    static func runLineFacts(_ lines: [String]) -> [ResultsFact] {
+        lines.enumerated().map { position, line in
+            ResultsFact(id: position == 0 ? "runFactsStrip" : "runFactsLine_\(position)", shown: line)
         }
     }
 
-    /// A run-section row: a glyph in the lead column, the text at 56. Not
-    /// a button.
-    private func runSectionRow<Content: View>(symbol: String, @ViewBuilder content: () -> Content) -> some View {
-        HStack(alignment: .top, spacing: 0) {
-            Image(systemName: symbol)
-                .font(.system(size: ResectaTokens.Results.leadMark - 2))
-                .foregroundStyle(ResectaTokens.SemanticColor.supportText)
-                .frame(width: ResectaTokens.Results.leadColumn)
-                .padding(.leading, ResectaTokens.Spacing.md)
-                .padding(.trailing, ResectaTokens.Results.titleInset
-                         - ResectaTokens.Spacing.md - ResectaTokens.Results.leadColumn)
-                .accessibilityHidden(true)
-            content()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.trailing, ResectaTokens.Spacing.md)
+    /// The row about items left unredacted, when it shows.
+    static func deselectionFact(snapshot: RedactionState.DeselectionSnapshot?) -> ResultsFact? {
+        guard VerificationResultsView.shouldShowDeselectionRow(snapshot: snapshot), let snapshot else { return nil }
+        return deselectionFact(deselected: snapshot.deselectedCount, total: snapshot.totalCount)
+    }
+
+    /// The row's fact for these counts: the shipped sentence, nothing to open.
+    static func deselectionFact(deselected: Int, total: Int) -> ResultsFact {
+        ResultsFact(id: "deselectionRow",
+                    shown: VerificationResultsView.deselectionRowText(deselected: deselected, total: total))
+    }
+
+    private var cardItems: [ResultsCardItem] {
+        ResultsFactCard.items(
+            handedIn: facts, runLines: Self.runLineFacts(runFactsLines),
+            showsPageModes: VerificationResultsView.showsPageModes(report: report),
+            deselection: Self.deselectionFact(snapshot: deselectionSnapshot))
+    }
+
+    @ViewBuilder
+    private func factCard(_ items: [ResultsCardItem]) -> some View {
+        ForEach(Array(items.enumerated()), id: \.offset) { position, item in
+            if position > 0 { GroupedRowDivider(inset: ResectaTokens.Spacing.md) }
+            switch item {
+            case .pageModes:
+                pageModesRow
+            case .fact(let fact):
+                ResultsFactRow(fact: fact, isOpen: openItem == .fact(fact.id),
+                               onTap: { toggle(.fact(fact.id)) }, onDoor: { onOpenDoor(fact.id) })
+            }
         }
-        .padding(.vertical, ResectaTokens.Spacing.sm + ResectaTokens.Spacing.xs - 1)
-        .frame(minHeight: ResectaTokens.Results.rowMinHeight)
     }
 
     /// Page Modes: the summary, and opened, one line per mode with ranges,
@@ -250,13 +242,6 @@ struct VerificationDetailsSection: View {
         return VStack(alignment: .leading, spacing: 0) {
             Button { toggle(.pageModes) } label: {
                 HStack(alignment: .top, spacing: 0) {
-                    Image(systemName: "square.2.layers.3d")
-                        .font(.system(size: ResectaTokens.Results.leadMark - 2))
-                        .foregroundStyle(ResectaTokens.SemanticColor.supportText)
-                        .frame(width: ResectaTokens.Results.leadColumn)
-                        .padding(.leading, ResectaTokens.Spacing.md)
-                        .padding(.trailing, ResectaTokens.Results.titleInset
-                                 - ResectaTokens.Spacing.md - ResectaTokens.Results.leadColumn)
                     VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xxs) {
                         Text("Page Modes")
                             .font(.body)
@@ -266,6 +251,7 @@ struct VerificationDetailsSection: View {
                             .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, ResectaTokens.Spacing.md)
                     DisclosureChevron(isExpanded: isOpen, tint: Color(.secondaryLabel))
                         .frame(width: ResectaTokens.Results.chevronColumn)
                         .padding(.top, ResectaTokens.Spacing.xs)
@@ -297,7 +283,7 @@ struct VerificationDetailsSection: View {
                 }
                 .font(.footnote.monospacedDigit())
                 .foregroundStyle(ResectaTokens.SemanticColor.supportText)
-                .padding(.leading, ResectaTokens.Results.titleInset)
+                .padding(.leading, ResectaTokens.Spacing.md)
                 .padding(.trailing, ResectaTokens.Spacing.md)
                 .padding(.bottom, ResectaTokens.Spacing.md - 2)
                 .transition(.opacity)
