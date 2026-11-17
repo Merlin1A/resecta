@@ -1,0 +1,19 @@
+Property: The undo words go on a row only where Keep Editing is a row.
+Area: results (the buttons and their card)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationResultsActionsTests
+Must go red: ResectaAppTests/VerificationResultsActionsTests undoWordsAreDrawnOnceBesideKeepEditing; ResectaAppTests/VerificationResultsActionsTests undoWordsOnePlaceInEveryState
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationResultsActions.swift b/Sources/ResectaApp/Views/VerificationResultsActions.swift
+index d128977f..56c9f7fe 100644
+--- a/Sources/ResectaApp/Views/VerificationResultsActions.swift
++++ b/Sources/ResectaApp/Views/VerificationResultsActions.swift
+@@ -206,7 +206,7 @@ struct VerificationResultsActions: View {
+         let swapped = swapsPrimaryAction(report: report, shareDisabled: shareDisabled)
+         let rows = actionRows(report: report, outputExists: outputExists,
+                               previewAvailable: previewAvailable, swapped: swapped)
+-        if rows.contains(.keepEditing) { return [.onKeepEditingRow] }
++        if !rows.isEmpty { return [.onKeepEditingRow] }
+         return rows.isEmpty ? [.centredUnderReason] : [.underCard]
+     }
+ 
