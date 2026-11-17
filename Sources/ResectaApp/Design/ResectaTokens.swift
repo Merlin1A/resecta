@@ -344,6 +344,9 @@ enum ResectaTokens {
         static let chevronColumn: CGFloat = 12
         static let leadColumn: CGFloat = 28
         static let leadMark: CGFloat = 22
+        /// The passed checks' row tick: the body size at the default text
+        /// size, fixed.
+        static let clusterTick: CGFloat = 17
         static let titleInset: CGFloat = 56
         static let actionTile: CGFloat = 28
         static let actionTileRadius: CGFloat = 7

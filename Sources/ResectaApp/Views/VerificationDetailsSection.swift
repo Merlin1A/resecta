@@ -4,8 +4,9 @@ import RedactionEngine
 // The results page's check sections, below the actions: Findings → Could
 // not verify → Notes → Nothing to check, each with its count; the
 // headerless run section (the run facts, Page Modes, the deselection row);
-// then one row for the checks that passed — or, on a run where every check
-// passed, the `Checks` list. One item is open at a time across the rows and
+// then one row for the checks that passed, on every run with a passed check
+// or a riding note, which a tap opens to those checks. One item is open at
+// a time across the rows and
 // Page Modes. A page link asks the results view to push the Preview at
 // that page; it never changes the phase. The static copy builders the
 // display tests pin stay on `VerificationResultsView`, in the extension at
@@ -56,12 +57,7 @@ struct VerificationDetailsSection: View {
                 GroupedSection { runSection }
                     .padding(.top, ResectaTokens.Spacing.xl)
             }
-            if Self.isEveryCheckPassed(partition) {
-                GroupedSection(header: "Checks", spokenHeader: "Checks.") {
-                    layerRows(Array(report.layers.indices), layout: .bare, showsStatusWord: false)
-                }
-                .padding(.top, ResectaTokens.Results.blockGap)
-            } else if !partition.cluster.isEmpty {
+            if !Self.listRowMembers(partition).isEmpty {
                 GroupedSection { passCluster(partition) }
                     .padding(.top, ResectaTokens.Spacing.xl)
             }
@@ -81,9 +77,11 @@ struct VerificationDetailsSection: View {
         ].filter { !$0.1.isEmpty }
     }
 
-    /// A wholly clean run: every row Passed — the `Checks` list, no cluster.
-    static func isEveryCheckPassed(_ partition: VerificationLayerPartition) -> Bool {
-        partition.total > 0 && partition.passedCount == partition.total
+    /// The checks the list row opens to, by engine index: the passed checks
+    /// and the notes riding with them. The row is drawn exactly when this is
+    /// not empty.
+    static func listRowMembers(_ partition: VerificationLayerPartition) -> [Int] {
+        partition.cluster
     }
 
     /// The cluster opens by default only when it holds riding notes and no
@@ -142,17 +140,21 @@ struct VerificationDetailsSection: View {
     @ViewBuilder
     private func passCluster(_ partition: VerificationLayerPartition) -> some View {
         let isOpen = clusterExpanded ?? Self.clusterOpensByDefault(partition)
+        let members = Self.listRowMembers(partition)
         Button {
             withAnimation(ResectaTokens.Anim.resolved(ResectaTokens.Anim.stateChange, reduceMotion: reduceMotion)) {
-                if isOpen, case .layer(let open) = openItem, partition.cluster.contains(open) {
+                if isOpen, case .layer(let open) = openItem, members.contains(open) {
                     openItem = nil
                 }
                 clusterExpanded = !isOpen
             }
         } label: {
             HStack(spacing: 0) {
+                // A fixed size, as the marks of the rows around it: at the
+                // largest text sizes a tick that grew with the text outgrew
+                // its column.
                 Image(systemName: "checkmark")
-                    .font(.body.weight(.semibold))
+                    .font(.system(size: ResectaTokens.Results.clusterTick, weight: .semibold))
                     .foregroundStyle(VerificationOutcome.passed.textColor)
                     .frame(width: ResectaTokens.Results.leadColumn)
                     .padding(.leading, ResectaTokens.Spacing.md)
@@ -167,6 +169,7 @@ struct VerificationDetailsSection: View {
                     .padding(.leading, ResectaTokens.Spacing.sm)
                     .padding(.trailing, ResectaTokens.Spacing.md)
             }
+            .padding(.vertical, ResectaTokens.Results.rowVerticalPadding)
             .frame(minHeight: ResectaTokens.Results.rowMinHeight)
             .contentShape(Rectangle())
         }
@@ -175,7 +178,7 @@ struct VerificationDetailsSection: View {
         .accessibilityHint(isOpen ? "Hides the passed checks" : "Shows the passed checks")
         .accessibilityIdentifier("passedChecksCluster")
         if isOpen {
-            ForEach(partition.cluster, id: \.self) { index in
+            ForEach(members, id: \.self) { index in
                 GroupedRowDivider()
                 layerRow(index: index,
                          layout: partition.outcomes[index] == .note ? .lead : .member,

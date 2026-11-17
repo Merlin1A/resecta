@@ -95,10 +95,10 @@ nonisolated final class SearchRecheckUITests: XCTestCase {
         attachScreenshot(named: "search-recheck-01-checks-passed")
 
         // The headline states the counts (label = "{Title}. {P} of {T}
-        // checks passed. … {sentence}"). Every check passed, so the rows
-        // render as one `Checks` list below the fold — scroll for them;
-        // elements outside the scroll view's visible region are not
-        // reliably served to XCUITest.
+        // checks passed. … {sentence}"). Every check passed, so the checks
+        // fold into one closed row below the fold: scroll to it and open it
+        // before reading a check's row; elements outside the scroll view's
+        // visible region are not reliably served to XCUITest.
         let results = app.scrollViews["verificationResults"]
         XCTAssertTrue(results.waitForExistence(timeout: 10), "Results scroll view not found.")
         let masthead = app.descendants(matching: .any)["verificationMasthead"]
@@ -106,6 +106,11 @@ nonisolated final class SearchRecheckUITests: XCTestCase {
         XCTAssertTrue(masthead.label.hasPrefix("Checks Passed. 7 of 7 checks passed."),
                       "Secure Rasterization runs a 7-layer check, every one passing: \(masthead.label)")
         results.swipeUp()
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "layerResult_5").firstMatch.exists,
+                       "On a run where every check passed, the checks are inside the closed row.")
+        let cluster = app.buttons["passedChecksCluster"]
+        XCTAssertTrue(cluster.waitForExistence(timeout: 10), "The passed checks' row never appeared.")
+        cluster.tap()
 
         // The sixth row (zero-indexed identifier) is the Search Re-check in
         // Secure Rasterization. Collapsed, the row is one combined element
