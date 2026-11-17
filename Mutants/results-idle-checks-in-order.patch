@@ -1,0 +1,19 @@
+Property: The row's members are in the checks' own order, not passed then idle.
+Area: results (the passed checks' row)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationLayerPartitionTests
+Must go red: ResectaAppTests/VerificationLayerPartitionTests idleChecksJoinTheList
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationDetailsSection.swift b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
+index c854dbc1..c10b2c18 100644
+--- a/Sources/ResectaApp/Views/VerificationDetailsSection.swift
++++ b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
+@@ -85,7 +85,7 @@ struct VerificationDetailsSection: View {
+     /// riding note has no row. The row is drawn exactly when this is not
+     /// empty.
+     static func listRowMembers(_ partition: VerificationLayerPartition) -> [Int] {
+-        partition.cluster.isEmpty ? [] : (partition.cluster + partition.nothingToCheck).sorted()
++        partition.cluster.isEmpty ? [] : partition.cluster + partition.nothingToCheck
+     }
+ 
+     /// A member's row: a passed check has no mark; a riding note and a
