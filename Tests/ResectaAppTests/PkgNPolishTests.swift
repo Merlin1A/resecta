@@ -196,7 +196,7 @@ struct StoreHydrateOffMainActorTests {
                 "survivors load; the bad row parks instead of zeroing the list")
 
         // The re-save that used to make the loss permanent.
-        #expect(store.add(label: "Second", pattern: "[a-z]{2}"))
+        #expect(store.add(label: "Second", pattern: "[a-z]{2}") == .saved)
         let rawAfter = String(
             data: try Data(contentsOf: fileURL),
             encoding: .utf8)!

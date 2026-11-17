@@ -901,11 +901,11 @@ struct SavedSearchStoreTests {
         let b = SavedSearch(name: "Beta", mode: .text, queryText: "b")
         store.add(a)
         store.add(b)
-        #expect(store.rename(id: b.id, to: "Alpha") == false)
+        #expect(store.rename(id: b.id, to: "Alpha") == .refused(.duplicate))
         #expect(store.savedSearches.first(where: { $0.id == b.id })?.name == "Beta")
-        #expect(store.rename(id: b.id, to: "Beta"),
+        #expect(store.rename(id: b.id, to: "Beta") == .saved,
                 "renaming an entry to its own current name is a no-op success")
-        #expect(store.rename(id: b.id, to: "Gamma"))
+        #expect(store.rename(id: b.id, to: "Gamma") == .saved)
         #expect(store.savedSearches.first(where: { $0.id == b.id })?.name == "Gamma")
     }
 }
