@@ -86,10 +86,6 @@ struct DocumentEditorView: View {
     // Search sheet detent for auto-minimize on result navigation
     @State var searchSheetDetent: PresentationDetent = .medium
 
-    // Detection summary banner
-    @State var detectionBanner: DetectionBannerModel?
-    @State var dismissSummaryTask: Task<Void, Never>?
-
     /// Bindings to trigger import/settings from parent ContentView
     @Binding var showSettings: Bool
 
@@ -477,7 +473,6 @@ struct DocumentEditorView: View {
             beginExport: exportFlow.beginExport, concealedPages: shareConcealedPages
         ))
         .onDisappear {
-            dismissSummaryTask?.cancel()
             dismissTask?.cancel()
             // The per-window UndoManager outlives this document; clear
             // its stack on close so stale registrations (and the prior

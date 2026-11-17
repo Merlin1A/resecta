@@ -18,15 +18,10 @@ struct CopyOfRecordPolishTests {
             .appendingPathComponent(path), encoding: .utf8)
     }
 
-    @Test("The canvas banner after a Scan names the Scan; a scan that could not start says so, in the sheet's words")
-    func detectionBannerWording() {
-        let none3 = DocumentEditorView.detectionBannerModel(outcome: .nothingFound(pageCount: 3), scanSummary: nil)
-        #expect(none3?.message == "Scan found no items across 3 pages.")
-        let none1 = DocumentEditorView.detectionBannerModel(outcome: .nothingFound(pageCount: 1), scanSummary: nil)
-        #expect(none1?.message == "Scan found no items across 1 page.")
-        let failed = DocumentEditorView.detectionBannerModel(outcome: .failed, scanSummary: nil)
-        #expect(failed?.message == "The last scan couldn't start because the document wasn't ready.")
-        #expect(failed?.message == SearchEmptyStateCopy.description(for: .piiScanStartFailed))
+    @Test("A scan that could not start says so, in the sheet's words")
+    func scanStartFailedWording() {
+        #expect(SearchEmptyStateCopy.description(for: .piiScanStartFailed)
+                == "The last scan couldn't start because the document wasn't ready.")
     }
 
     @Test("The filtered-out description names the four filters Show All clears")
