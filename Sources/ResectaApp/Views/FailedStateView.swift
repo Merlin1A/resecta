@@ -92,9 +92,7 @@ struct FailedStateView: View {
                 y: ResectaTokens.Shadow.subtle.y
             )
             .accessibilityElement(children: .combine)
-            // On the card, not the screen: an identifier on the outer stack
-            // reaches every element inside it and hides the buttons' own.
-            .accessibilityIdentifier("failedState")
+            .accessibilityIdentifier("failedStateMessage")
 
             Spacer()
 
@@ -138,12 +136,17 @@ struct FailedStateView: View {
                 Button("Report an Issue") {
                     safariURL = SettingsView.Links.reportIssue
                 }
+                .accessibilityIdentifier("failedStateReportButton")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .padding(.top, ResectaTokens.Spacing.xs)
             }
             .padding(.bottom, ResectaTokens.Spacing.xl)
         }
+        // The screen contains its elements, so its identifier names the screen
+        // and the words and each button keep their own.
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("failedState")
         .sheet(item: $safariURL) { url in
             SafariView(url: url)
                 .ignoresSafeArea()
