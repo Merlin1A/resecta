@@ -1,0 +1,26 @@
+Property: The record's confirmed part holds every region as drawn, read from the live regions, never from the pages' clamped and floor-filtered ones.
+Area: run record
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/RunRecordTests
+Must go red: ResectaAppTests/RunRecordTests "Each case" (regionsAsDrawn)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/PipelineRunner.swift b/Sources/ResectaApp/State/PipelineRunner.swift
+index 54d27698..759372a2 100644
+--- a/Sources/ResectaApp/State/PipelineRunner.swift
++++ b/Sources/ResectaApp/State/PipelineRunner.swift
+@@ -281,11 +281,12 @@ struct PipelineRunner {
+         // Synchronous from here: one region state.
+         // The record's confirmed part first, from the live regions as drawn
+         // (the pages below hold them clamped and floor-filtered).
+-        let confirmed = RunInputs.confirmedRecord(
+-            pageCount: coordinator.documentState.pageCount,
+-            regions: redactionState.regions, settings: runSettings)
+         let pages = coordinator.buildPDFPageData(
+             effectiveMode: effectiveMode, runSettings: runSettings, inkPlans: sensitiveTerms.inkPlans)
++        let confirmed = RunInputs.confirmedRecord(
++            pageCount: coordinator.documentState.pageCount,
++            regions: Dictionary(uniqueKeysWithValues: pages.map { ($0.pageIndex, $0.regions) }),
++            settings: runSettings)
+         let burnedRegionVersion = redactionState.regionVersion
+         // The run's deselection facts. The value is recorded onto
+         // RedactionState only after `processDocument` returns (inside the
