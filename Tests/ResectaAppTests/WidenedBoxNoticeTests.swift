@@ -135,17 +135,24 @@ struct WidenedBoxNoticeTests {
 
     // MARK: - The capsule host
 
+    private static func occupant(activeTool: DocumentEditorView.DrawingTool?, addToSelection: Bool, phaseKind: DocumentState.PhaseKind,
+                                 widenedOnPage: Bool) -> BottomSlotOccupant? {
+        DocumentEditorView.bottomSlotOccupant(
+            phaseKind: phaseKind, messageShowing: false, selectionNewerThanMessage: false, firstTimeLineDue: false,
+            selectedCount: 0, addToSelection: addToSelection, activeTool: activeTool, widenedOnPage: widenedOnPage)
+    }
+
     @Test("The widened-box capsule shows while editing, after the drawing caption and Add to Selection")
     func capsulePrecedence() {
-        #expect(DocumentEditorView.bottomCapsule(
+        #expect(Self.occupant(
             activeTool: nil, addToSelection: false, phaseKind: .editing, widenedOnPage: true) == .widenedBoxes)
-        #expect(DocumentEditorView.bottomCapsule(
-            activeTool: .rectangle, addToSelection: false, phaseKind: .editing, widenedOnPage: true) == .drawing)
-        #expect(DocumentEditorView.bottomCapsule(
-            activeTool: nil, addToSelection: true, phaseKind: .editing, widenedOnPage: true) == .addToSelection)
-        #expect(DocumentEditorView.bottomCapsule(
+        #expect(Self.occupant(
+            activeTool: .rectangle, addToSelection: false, phaseKind: .editing, widenedOnPage: true) == .drawingCaption)
+        #expect(Self.occupant(
+            activeTool: nil, addToSelection: true, phaseKind: .editing, widenedOnPage: true) == .selection(adding: true))
+        #expect(Self.occupant(
             activeTool: nil, addToSelection: false, phaseKind: .verifying, widenedOnPage: true) == nil)
-        #expect(DocumentEditorView.bottomCapsule(
+        #expect(Self.occupant(
             activeTool: nil, addToSelection: false, phaseKind: .editing, widenedOnPage: false) == nil)
     }
 }
