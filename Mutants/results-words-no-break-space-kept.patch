@@ -1,0 +1,19 @@
+Property: A rebuilt sentence keeps the control name's no-break space.
+Area: results (the masthead's words)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationMastheadTests
+Must go red: ResectaAppTests/VerificationMastheadTests attentionIdentityKeyed; ResectaAppTests/VerificationMastheadTests sweepOnlyAttentionPointsToScan
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationMasthead.swift b/Sources/ResectaApp/Views/VerificationMasthead.swift
+index 22b7aca8..5c5f74e9 100644
+--- a/Sources/ResectaApp/Views/VerificationMasthead.swift
++++ b/Sources/ResectaApp/Views/VerificationMasthead.swift
+@@ -197,7 +197,7 @@ extension VerificationResultsView {
+             .flatMap(VerificationRowModel.matchingQueryLines)
+         if !searches.isEmpty {
+             return (searches.count == 1
+-                ? "\(keepEditing) and run your search again with Include OCR Pages on."
++                ? "Keep Editing and run your search again with Include OCR Pages on."
+                 : "\(keepEditing) and run your searches again with Include OCR Pages on.", false)
+         }
+         // The Detection Sweep lists no terms, and what it reads may sit in
