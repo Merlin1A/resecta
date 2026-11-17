@@ -282,9 +282,11 @@ struct SearchResultsSection: View {
                                     resultRow(for: result, showTermLabel: false, showsPageLabel: true)
                                 }
                             } header: {
-                                // The header echoes the term the user typed.
+                                // The header echoes the term the user typed,
+                                // in the page headers' compact style.
                                 Text("\"\(term)\" — \(termResults.count) match\(termResults.count == 1 ? "" : "es")\(conjunctionSuffix)")
                                     .privacySensitive()
+                                    .modifier(CompactSectionHeaderStyle())
                             }
                         }
                     }
@@ -295,12 +297,13 @@ struct SearchResultsSection: View {
                     // carries the page and no row shows `p.N`.
                     let pages = searchState.rowsByPage.keys.sorted()
                     ForEach(pages, id: \.self) { page in
-                        Section("Page \(page + 1)") {
-                            if let pageResults = searchState.rowsByPage[page] {
-                                ForEach(pageResults) { result in
-                                    resultRow(for: result, showTermLabel: isMultiTerm, showsPageLabel: false)
-                                }
+                        let pageResults = searchState.rowsByPage[page] ?? []
+                        Section {
+                            ForEach(pageResults) { result in
+                                resultRow(for: result, showTermLabel: isMultiTerm, showsPageLabel: false)
                             }
+                        } header: {
+                            pageHeader(page: page, rowCount: pageResults.count)
                         }
                     }
                 }
@@ -336,6 +339,34 @@ struct SearchResultsSection: View {
             // false affordance whose taps hit the footer. Clip so rows
             // never draw outside the list's own bounds.
             .clipped()
+    }
+
+    /// A page section's header: one compact line, the page's name as its
+    /// own text ("Page N", which the UI tests wait on) and, trailing, how
+    /// many rows are listed under it. When the two do not fit one line at
+    /// a large text size, the count goes under the name.
+    private func pageHeader(page: Int, rowCount: Int) -> some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline, spacing: ResectaTokens.Spacing.sm) {
+                pageHeaderName(page: page)
+                Spacer(minLength: 0)
+                pageHeaderCount(rowCount: rowCount)
+            }
+            VStack(alignment: .leading, spacing: 0) {
+                pageHeaderName(page: page)
+                pageHeaderCount(rowCount: rowCount)
+            }
+        }
+        .modifier(CompactSectionHeaderStyle())
+    }
+
+    private func pageHeaderName(page: Int) -> some View {
+        Text("Page \(page + 1)")
+            .fontWeight(.semibold)
+    }
+
+    private func pageHeaderCount(rowCount: Int) -> some View {
+        Text(SearchPageHeaderCopy.rowCount(rowCount, isScan: searchState.searchModeType == .piiScan))
     }
 
     /// Consumed by the `.onChange` on `resultsList`'s
@@ -565,5 +596,16 @@ struct SearchResultsSection: View {
                 Self.showAll(on: searchState)
             }
         }
+    }
+}
+
+/// The compact look of a results section's header: one subheadline line
+/// in the support grey, in the words as written (no capitals added).
+private struct CompactSectionHeaderStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .font(.subheadline)
+            .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+            .textCase(nil)
     }
 }

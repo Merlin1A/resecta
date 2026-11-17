@@ -22,6 +22,21 @@ enum SaturationBannerCopy {
     static let toggleCaseSensitive = "Toggle case-sensitive"
 }
 
+// MARK: - Page Header Count
+//
+// The trailing count on a page section's header: how many rows are listed
+// under that page, with filters applied. A Search row is a match; a Scan
+// row is an item.
+
+enum SearchPageHeaderCopy {
+    static func rowCount(_ count: Int, isScan: Bool) -> String {
+        if isScan {
+            return count == 1 ? "1 item" : "\(count) items"
+        }
+        return count == 1 ? "1 match" : "\(count) matches"
+    }
+}
+
 // MARK: - Empty State Strings
 //
 // Mode-specific actionable copy. Mechanism-description

@@ -70,17 +70,18 @@ struct SearchResultRow: View {
     /// shows whole in the collapsed row.
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
-    /// Width of the applied-marker slot between the bar and the circle.
-    static let appliedIndicatorWidth: CGFloat = 12
+    /// The row's inset above and below its content at the default text
+    /// size: the 46-pt circle with this much on each side sets the pitch
+    /// of a row with no small line.
+    static let verticalInset: CGFloat = 9
 
     /// Leading inset of the content column (meta line + window) from the
-    /// row's leading edge: bar + the applied slot (present only on an
-    /// applied row — the unapplied slot is `EmptyView`, zero width, the
-    /// chassis idiom) + the chassis inset + the selection circle + the
-    /// circle→content gap. The expanded rationale line aligns to it.
-    static func contentColumnLeadingInset(isApplied: Bool) -> CGFloat {
+    /// row's leading edge: bar + the chassis inset + the selection circle
+    /// + the circle→content gap. The applied mark sits on the circle and
+    /// takes no width, so applying a row does not move it. The expanded
+    /// rationale line aligns to it.
+    static func contentColumnLeadingInset() -> CGFloat {
         SearchRowConfidenceBar.width
-            + (isApplied ? appliedIndicatorWidth : 0)
             + ResectaTokens.Spacing.xs
             + ResectaTokens.TouchTarget.minimum
             + ResectaTokens.Spacing.sm
@@ -103,6 +104,10 @@ struct SearchResultRow: View {
             isCustomHit: isCustomHit
         )
         let showsTier = Self.showsTierWord(for: result)
+        let showsBadge = Self.showsSourceBadge(
+            for: result, isCustomHit: isCustomHit, isRegexHit: isRegexHit)
+        let showsMeta = Self.showsMetaLine(
+            showsBadge: showsBadge, showsPageLabel: showsPageLabel, showsTermLabel: showTermLabel)
         VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xxs) {
             // The tappable hit area is gesture-based (not an outer
             // Button) so the inner selection / chevron Buttons don't nest
@@ -110,33 +115,30 @@ struct SearchResultRow: View {
             // would otherwise dispatch outer + inner intent on the same
             // tap). PressHighlightModifier recreates the press dim.
             HStack(spacing: 0) {
-                SearchRowConfidenceBar(tier: tier, tooltip: barTooltip)
-                    .equatable()
-                // Applied-state indicator (12pt). Reserved slot between
-                // the confidence bar and the selection circle; empty
-                // when the row has not been applied. Decorative — the
-                // a11y contract names the page, never the marker.
-                Group {
-                    if isApplied {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.caption2)
-                            .foregroundStyle(.green)
-                    } else {
-                        EmptyView()
-                    }
+                // The bar is drawn only on a graded row (the rows whose
+                // grade is spoken); elsewhere its width stays, empty, so
+                // no row's circle moves sideways.
+                if Self.showsConfidenceBar(for: result) {
+                    SearchRowConfidenceBar(tier: tier, tooltip: barTooltip)
+                        .equatable()
+                } else {
+                    Color.clear
+                        .frame(width: SearchRowConfidenceBar.width)
+                        .accessibilityHidden(true)
                 }
-                .frame(width: Self.appliedIndicatorWidth)
-                .accessibilityHidden(true)
 
                 HStack(alignment: .top, spacing: 0) {
                     HStack(spacing: ResectaTokens.Spacing.sm) {
                         selectionCircle
                         VStack(alignment: .leading, spacing: 2) {
-                            metaLine(
-                                isCustomHit: isCustomHit,
-                                isRegexHit: isRegexHit,
-                                tier: tier
-                            )
+                            if showsMeta {
+                                metaLine(
+                                    showsBadge: showsBadge,
+                                    isCustomHit: isCustomHit,
+                                    isRegexHit: isRegexHit,
+                                    tier: tier
+                                )
+                            }
                             // The one text block: proportional context,
                             // the match run mono on the wash. Collapsed =
                             // two lines; expanded = the whole window.
@@ -195,6 +197,7 @@ struct SearchResultRow: View {
             }
         }
         .listRowBackground(isCurrent ? ResectaTokens.BrandTeal.tint.opacity(0.12) : nil)
+        .listRowInsets(.vertical, Self.verticalInset)
         // Immediate VoiceOver feedback on selection toggle
         .onChange(of: result.isSelected) { _, isSelected in
             if UIAccessibility.isVoiceOverRunning {
@@ -216,6 +219,18 @@ struct SearchResultRow: View {
                 .font(.title3)
                 .foregroundStyle(result.isSelected ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
                 .contentTransition(.symbolEffect(.replace))
+                // The applied mark rides the circle's lower trailing
+                // corner and takes no width. Decorative: the row's
+                // spoken label says "applied".
+                .overlay(alignment: .bottomTrailing) {
+                    if isApplied {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.caption2)
+                            .symbolRenderingMode(.palette)
+                            .foregroundStyle(.white, .green)
+                            .accessibilityHidden(true)
+                    }
+                }
         }
         .buttonStyle(.plain)
         .frame(
@@ -231,18 +246,21 @@ struct SearchResultRow: View {
     /// to follow the badge is retired — confidence is not spelled out
     /// on the row.
     private func metaLine(
+        showsBadge: Bool,
         isCustomHit: Bool,
         isRegexHit: Bool,
         tier: ConfidenceTier
     ) -> some View {
         HStack(spacing: ResectaTokens.Spacing.xs) {
-            SearchRowSourceBadge(
-                result: result,
-                isCustomHit: isCustomHit,
-                isRegexHit: isRegexHit,
-                tier: tier
-            )
-            .equatable()
+            if showsBadge {
+                SearchRowSourceBadge(
+                    result: result,
+                    isCustomHit: isCustomHit,
+                    isRegexHit: isRegexHit,
+                    tier: tier
+                )
+                .equatable()
+            }
             if showsPageLabel {
                 Text("p.\(result.pageIndex + 1)")
                     .font(.caption2)
@@ -318,7 +336,7 @@ struct SearchResultRow: View {
             .accessibilityLabel("View full rationale")
             .accessibilityHint("Opens the detector's full evidence breakdown")
         }
-        .padding(.leading, Self.contentColumnLeadingInset(isApplied: isApplied))
+        .padding(.leading, Self.contentColumnLeadingInset())
         .padding(.trailing, ResectaTokens.Spacing.sm)
         .padding(.bottom, ResectaTokens.Spacing.xxs)
     }
