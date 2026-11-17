@@ -20,6 +20,37 @@ extension DocumentEditorView {
         !sheetPresented && phaseKind == .editing && sameDocument
     }
 
+    /// The sheet slot presents a Search session only while the document is
+    /// being edited, imported, or shows its failed screen. Every other phase
+    /// is a run, its results, a share, or no document, and Search does not
+    /// stand over any of them. A new phase has to be decided here.
+    static func sheetSlotMayPresentSearch(in phase: DocumentState.PhaseKind) -> Bool {
+        switch phase {
+        case .editing, .importing, .failed:
+            return true
+        case .empty, .detecting, .redacting, .verifying, .verified, .exporting:
+            return false
+        }
+    }
+
+    /// A Search session that is present in a phase the slot does not
+    /// present it in has to come down.
+    static func searchMustComeDown(sessionPresent: Bool, phase: DocumentState.PhaseKind) -> Bool {
+        sessionPresent && !sheetSlotMayPresentSearch(in: phase)
+    }
+
+    /// Takes the Search session down when it is present outside the slot's
+    /// phases, so a session set over a run or its results is neither shown
+    /// nor left behind for the editor.
+    static func takeDownSearchOutsideItsPhases(
+        phase: DocumentState.PhaseKind, redactionState: RedactionState
+    ) {
+        guard searchMustComeDown(sessionPresent: redactionState.activeSearch != nil, phase: phase) else {
+            return
+        }
+        redactionState.dismissActiveSearch()
+    }
+
     /// Mirrors the `.sheet(item:)` getter: the slot is presenting whenever
     /// either source is live.
     var editorSheetIsPresented: Bool {
