@@ -68,6 +68,61 @@ struct VerificationResultsActionsTests {
                 + "Redact cleared undo; use Delete Region instead.")
     }
 
+    @Test("The undo words are drawn once, beside Keep Editing")
+    func undoWordsAreDrawnOnceBesideKeepEditing() throws {
+        typealias Place = Actions.UndoWordsPlace
+        // (seeded report, Share disabled, output exists, Preview available, where the words go)
+        let rows: [(String, Bool, Bool, Bool, Place)] = [
+            ("secureAllPass", false, true, true, .onKeepEditingRow),        // Keep Editing is a row
+            ("secureFail", false, true, true, .underCard),                  // it leads: failed
+            ("searchableAttentionFull", false, true, true, .underCard),     // it leads: needs review
+            ("secureAllPass", true, true, true, .underCard),                // it leads: Share disabled, the PDF present
+            ("secureAllPass", true, false, false, .centredUnderReason),     // it leads: the PDF gone, no rows
+            ("secureSkippedOff", false, true, true, .onKeepEditingRow),     // a row, after Run Verification
+        ]
+        var ran = 0
+        for (name, disabled, output, preview, place) in rows {
+            let report = try #require(Fixtures.all[name], "no seeded report \(name)")
+            let places = Actions.undoWordsPlaces(report: report, shareDisabled: disabled,
+                                                 outputExists: output, previewAvailable: preview)
+            #expect(places == [place], "\(name) disabled \(disabled) output \(output) preview \(preview)")
+            ran += 1
+        }
+        #expect(ran == 6)
+        // The skipped report's rows put Keep Editing after Run Verification.
+        let skipped = try #require(Fixtures.all["secureSkippedOff"])
+        #expect(Actions.actionRows(report: skipped, outputExists: true, previewAvailable: true,
+                                   swapped: false) == [.runVerification, .keepEditing, .preview])
+    }
+
+    @Test("Over every state, the undo words have one place, and it is beside Keep Editing")
+    func undoWordsOnePlaceInEveryState() {
+        let statuses: [VerificationStatus] = [.pass, .info("i"), .warn("w"), .attention("a"), .fail("f"), .skipped]
+        var cases = 0
+        for status in statuses {
+            for disabled in [false, true] {
+                for output in [false, true] {
+                    for preview in [false, true] {
+                        let report = Self.report(status)
+                        let places = Actions.undoWordsPlaces(report: report, shareDisabled: disabled,
+                                                             outputExists: output, previewAvailable: preview)
+                        let swapped = Actions.swapsPrimaryAction(report: report, shareDisabled: disabled)
+                        let rows = Actions.actionRows(report: report, outputExists: output,
+                                                      previewAvailable: preview, swapped: swapped)
+                        #expect(places.count == 1)
+                        // On the row exactly when Keep Editing is a row; centred
+                        // exactly when there is no card.
+                        #expect(places.contains(.onKeepEditingRow) == rows.contains(.keepEditing))
+                        #expect(places.contains(.centredUnderReason) == rows.isEmpty)
+                        #expect(places.contains(.onKeepEditingRow) == !swapped)
+                        cases += 1
+                    }
+                }
+            }
+        }
+        #expect(cases == 48)
+    }
+
     // MARK: - The Share hint (moved here with Share)
 
     static func willConfirm(_ report: VerificationReport, _ doc: DocumentState = DocumentState(),

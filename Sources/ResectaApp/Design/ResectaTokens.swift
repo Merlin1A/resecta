@@ -331,6 +331,9 @@ enum ResectaTokens {
         static let capsuleHeight: CGFloat = 50
         static let capsuleGap: CGFloat = 12
         static let capsuleStroke: CGFloat = 1.5
+        /// The capsule's label: 20 pt clear to each side, 12 above and below.
+        static let capsuleLabelInset: CGFloat = 20
+        static let capsuleLabelInsetVertical: CGFloat = 12
         /// The disabled reason under its capsule; the gap to the next block.
         static let reasonGap: CGFloat = 8
         static let blockGap: CGFloat = 24

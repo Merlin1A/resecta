@@ -84,6 +84,9 @@ struct VerificationResultsView: View {
                             onExport: onExport, onRunVerification: onRunVerification,
                             concealedPages: VerificationResultsActions.concealedPages(in: findings))
                             .padding(.top, ResectaTokens.Results.blockGap)
+                        // The small print about what Checks Passed means: no
+                        // sentences are supplied yet, so it draws nothing.
+                        ResultsScopeNote(report: report, sentences: [])
                         ResultsFindingsSection(
                             findings: findings, pagesOnChips: previewAvailable, onOpenPage: openPreview(at:))
                         VerificationDetailsSection(
