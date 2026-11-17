@@ -102,11 +102,23 @@ nonisolated struct VerificationLayerPartition: Equatable {
     }
 
     /// The pass cluster's row title: "N checks passed" / "1 check passed",
-    /// then " · 1 note" / " · K notes" when notes ride inside it.
+    /// then " · 1 note" / " · K notes" when notes ride inside it, then
+    /// " · I had nothing to check" when checks had nothing to check (they
+    /// sit inside the row with the passed checks).
     var clusterTitle: String {
-        let passed = passedCount == 1 ? "1 check passed" : "\(passedCount) checks passed"
-        guard let notes = VerificationOutcome.note.headerClause(count: clusterNoteCount) else { return passed }
-        return "\(passed) · \(notes)"
+        ([clusterTitleBase] + clusterTitleClauses).joined(separator: " · ")
+    }
+
+    /// The title's first part: "N checks passed" / "1 check passed".
+    var clusterTitleBase: String {
+        passedCount == 1 ? "1 check passed" : "\(passedCount) checks passed"
+    }
+
+    /// The title's clauses after the first part, in the shipped order: the
+    /// riding notes, then the checks that had nothing to check.
+    var clusterTitleClauses: [String] {
+        [VerificationOutcome.note.headerClause(count: clusterNoteCount),
+         VerificationOutcome.nothingToCheck.headerClause(count: nothingToCheck.count)].compactMap { $0 }
     }
 
     /// The cluster's spoken title: "9 checks passed, 1 note".

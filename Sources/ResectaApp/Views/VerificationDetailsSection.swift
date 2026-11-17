@@ -67,21 +67,39 @@ struct VerificationDetailsSection: View {
     // MARK: - The rules
 
     /// The groups above the cluster, in screen order, each with its rows'
-    /// engine indices; an empty group is left out.
+    /// engine indices; an empty group is left out. While the list row
+    /// exists the checks that had nothing to check are inside it, so their
+    /// group is drawn only on a run with no list row.
     static func groups(_ partition: VerificationLayerPartition) -> [(header: String, indices: [Int])] {
         [
             ("Findings", partition.findings),
             ("Could not verify", partition.couldNotVerify),
             ("Notes", partition.notes),
-            ("Nothing to check", partition.nothingToCheck),
+            ("Nothing to check", partition.cluster.isEmpty ? partition.nothingToCheck : []),
         ].filter { !$0.1.isEmpty }
     }
 
-    /// The checks the list row opens to, by engine index: the passed checks
-    /// and the notes riding with them. The row is drawn exactly when this is
-    /// not empty.
+    /// The checks the list row opens to, by engine index, in the checks'
+    /// own order: the passed checks, the notes riding with them and the
+    /// checks that had nothing to check. A run with no passed check and no
+    /// riding note has no row. The row is drawn exactly when this is not
+    /// empty.
     static func listRowMembers(_ partition: VerificationLayerPartition) -> [Int] {
-        partition.cluster
+        partition.cluster.isEmpty ? [] : (partition.cluster + partition.nothingToCheck).sorted()
+    }
+
+    /// A member's row: a passed check has no mark; a riding note and a
+    /// check that had nothing to check keep their mark and their caption.
+    static func memberLayout(_ outcome: VerificationOutcome) -> LayerResultRow.GroupedLayout {
+        outcome == .passed ? .member : .lead
+    }
+
+    /// The open item after the list row is tapped: closing the list closes
+    /// whichever of its members is open; any other open item stays.
+    static func openItemAfterTogglingList(isOpen: Bool, openItem: OpenItem?,
+                                          partition: VerificationLayerPartition) -> OpenItem? {
+        if isOpen, case .layer(let open) = openItem, listRowMembers(partition).contains(open) { return nil }
+        return openItem
     }
 
     /// The cluster opens by default only when it holds riding notes and no
@@ -134,8 +152,10 @@ struct VerificationDetailsSection: View {
 
     // MARK: - The pass cluster
 
-    /// One row — the pass mark, "N checks passed[ · k notes]", a chevron —
-    /// that opens to the passing checks and the notes riding with them.
+    /// One row — the pass mark, "N checks passed[ · k notes][ · i had
+    /// nothing to check]", a chevron — that opens to its members. The
+    /// clauses follow on the title's line when the whole title fits, and
+    /// go on a second line in the caption grey when it does not.
     /// Collapsing it closes an open member.
     @ViewBuilder
     private func passCluster(_ partition: VerificationLayerPartition) -> some View {
@@ -143,9 +163,7 @@ struct VerificationDetailsSection: View {
         let members = Self.listRowMembers(partition)
         Button {
             withAnimation(ResectaTokens.Anim.resolved(ResectaTokens.Anim.stateChange, reduceMotion: reduceMotion)) {
-                if isOpen, case .layer(let open) = openItem, members.contains(open) {
-                    openItem = nil
-                }
+                openItem = Self.openItemAfterTogglingList(isOpen: isOpen, openItem: openItem, partition: partition)
                 clusterExpanded = !isOpen
             }
         } label: {
@@ -160,10 +178,23 @@ struct VerificationDetailsSection: View {
                     .padding(.leading, ResectaTokens.Spacing.md)
                     .padding(.trailing, ResectaTokens.Results.titleInset
                              - ResectaTokens.Spacing.md - ResectaTokens.Results.leadColumn)
-                Text(partition.clusterTitle)
-                    .font(.body)
-                    .foregroundStyle(.primary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                ViewThatFits(in: .horizontal) {
+                    Text(partition.clusterTitle)
+                        .font(.body)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xxs) {
+                        Text(partition.clusterTitleBase)
+                            .font(.body)
+                            .foregroundStyle(.primary)
+                        if !partition.clusterTitleClauses.isEmpty {
+                            Text(partition.clusterTitleClauses.joined(separator: " · "))
+                                .font(.subheadline)
+                                .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 DisclosureChevron(isExpanded: isOpen, tint: Color(.secondaryLabel))
                     .frame(width: ResectaTokens.Results.chevronColumn)
                     .padding(.leading, ResectaTokens.Spacing.sm)
@@ -180,8 +211,7 @@ struct VerificationDetailsSection: View {
         if isOpen {
             ForEach(members, id: \.self) { index in
                 GroupedRowDivider()
-                layerRow(index: index,
-                         layout: partition.outcomes[index] == .note ? .lead : .member,
+                layerRow(index: index, layout: Self.memberLayout(partition.outcomes[index]),
                          showsStatusWord: false)
             }
             .transition(.opacity)
