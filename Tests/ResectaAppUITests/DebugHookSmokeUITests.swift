@@ -34,7 +34,7 @@ nonisolated final class DebugHookSmokeUITests: XCTestCase {
 
     private func assertToastShows(_ hook: String) {
         launch(["--loadTestDocument", hook])
-        XCTAssertTrue(element("toast").waitForExistence(timeout: 30),
+        XCTAssertTrue(element("toastMessage").waitForExistence(timeout: 30),
                       "No toast came up for \(hook).")
     }
 
