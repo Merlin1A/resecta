@@ -138,8 +138,8 @@ extension VerificationResultsView {
                 // True whether the setting is on or off: with it off, Redact
                 // would skip the checks again.
                 return couldNotVerify.count == 1
-                    ? "Run Redact with \(verifyBeforeExport) on to include the skipped check."
-                    : "Run Redact with \(verifyBeforeExport) on to include the skipped checks."
+                    ? "To include the skipped check, run Redact again with verification on."
+                    : "To include the skipped checks, run Redact again with verification on."
             }
             if !couldNotVerify.isEmpty {
                 return couldNotVerify.count == 1
@@ -197,8 +197,8 @@ extension VerificationResultsView {
             .flatMap(VerificationRowModel.matchingQueryLines)
         if !searches.isEmpty {
             return (searches.count == 1
-                ? "\(keepEditing) and run your search again with OCR on."
-                : "\(keepEditing) and run your searches again with OCR on.", false)
+                ? "\(keepEditing) and run your search again with Include OCR Pages on."
+                : "\(keepEditing) and run your searches again with Include OCR Pages on.", false)
         }
         // The Detection Sweep lists no terms, and what it reads may sit in
         // a page image text search does not reach: the sentence points to
@@ -210,11 +210,11 @@ extension VerificationResultsView {
     }
 
     /// The ATTENTION sentence when every review term's remaining matches
-    /// are ones the user left unapplied: the count and the term, else the
+    /// are ones the user left unredacted: the count and the term, else the
     /// count alone, so a term is never cut.
     private static func keptSentence(terms: [String], matches: Int) -> (text: String, quotesTerms: Bool) {
         let count = matches == 1 ? "1 match" : "\(matches) matches"
-        let tail = matches == 1 ? "unapplied; review it before you share." : "unapplied; review them before you share."
+        let tail = matches == 1 ? "unredacted; review it before you share." : "unredacted; review them before you share."
         if terms.count == 1 {
             let quoted = "You left \(count) of \u{201C}\(terms[0])\u{201D} \(tail)"
             if quoted.count <= mastheadSentenceLimit { return (quoted, true) }

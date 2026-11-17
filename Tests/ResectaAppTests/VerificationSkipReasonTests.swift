@@ -155,7 +155,7 @@ struct VerificationSkipReasonTests {
         #expect(VerificationResultsView.mastheadAccessibilityLabel(report: report)
                 == "Checks Passed. 7 of 7 checks passed. Look over the redacted PDF in Preview before you share it.")
         #expect(VerificationResultsView.mastheadAccessibilityLabel(report: .skipped(reason: .autoVerifyOff), mode: .secure)
-                == "Verification Skipped. Off in Settings. Run\u{00A0}Verification below before you share the PDF.")
+                == "Checks Not Run. Off in Settings. Run\u{00A0}Verification below before you share the PDF.")
     }
 
     @Test("No outcome-promise language in the reason-specific strings",

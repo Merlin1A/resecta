@@ -283,7 +283,7 @@ struct SettingsView: View {
                     // exporting looks like without the checks (mechanism
                     // description; the copy states what the app
                     // does, not an outcome).
-                    Text("Off: documents export without the post-redaction checks. The results screen will show Verification Skipped.")
+                    Text("Off: documents export without the post-redaction checks. The results screen will show Checks Not Run.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }

@@ -53,7 +53,7 @@ struct VerificationRunVerificationCardTests {
             durationSeconds: 0.5
         )
         #expect(VerificationResultsView.mastheadSubtitle(report: report)
-                == "Run Redact with Verify Before Export on to include the skipped checks.")
+                == "To include the skipped checks, run Redact again with verification on.")
         #expect(VerificationResultsView.mastheadTitle(report: report) == "Some Checks Incomplete")
     }
 
@@ -85,7 +85,7 @@ struct VerificationRunVerificationCardTests {
             durationSeconds: 0.5
         )
         #expect(VerificationResultsView.mastheadSubtitle(report: report)
-                == "Run Redact with Verify Before Export on to include the skipped check.")
+                == "To include the skipped check, run Redact again with verification on.")
     }
 
     // MARK: - RedactionState retention lifecycle
