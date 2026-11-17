@@ -88,20 +88,37 @@ struct RedactedPreviewView: View {
         return nil
     }
 
+    /// The label's colour per verdict, from the text tier: the failed and
+    /// needs-review shades, and the support grey for a run whose checks did
+    /// not run (the system's secondary grey, which `VerificationStatus`
+    /// gives that verdict elsewhere, measures under 4.5 to 1 on its wash at
+    /// this size). Nil where no label shows.
+    static func verdictCapsuleColor(verdict: VerificationStatus?) -> Color? {
+        guard let verdict else { return nil }
+        if verdict.isFail { return ResectaTokens.SemanticColor.failText }
+        if verdict.isAttention { return ResectaTokens.SemanticColor.attentionText }
+        if verdict.isSkipped { return ResectaTokens.SemanticColor.supportText }
+        return nil
+    }
+
+    /// The wash behind the label: the label's own colour at this opacity.
+    /// One value for all three labels, so they read as one family: the
+    /// largest at which each label measures at least 4.5 to 1 on its wash,
+    /// in light and in dark.
+    static let verdictCapsuleStrength: Double = 0.10
+
     @ViewBuilder
     private func verdictCapsule(text: String) -> some View {
-        // This is small `.caption` TEXT (plus its 12%
-        // wash background riding the same variable, mirroring
-        // ToastSeverity's text/fill pairing), not a glyph — routed
-        // through the WCAG-AA text tier rather than `.color`'s system
-        // hues.
-        let tint = verdict?.textColor ?? .secondary
+        // Small `.caption` text on a wash of its own colour, mirroring
+        // ToastSeverity's text/fill pairing: routed through the text tier
+        // rather than `.color`'s system hues.
+        let tint = Self.verdictCapsuleColor(verdict: verdict) ?? ResectaTokens.SemanticColor.supportText
         Text(text)
             .font(.caption.weight(.medium))
             .foregroundStyle(tint)
             .padding(.horizontal, ResectaTokens.Spacing.sm)
             .padding(.vertical, ResectaTokens.Spacing.xxs)
-            .background(tint.opacity(0.12), in: Capsule())
+            .background(tint.opacity(Self.verdictCapsuleStrength), in: Capsule())
             .accessibilityIdentifier("previewVerdictCapsule")
             .accessibilityLabel(text)
     }

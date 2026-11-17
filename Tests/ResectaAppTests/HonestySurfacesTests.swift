@@ -1,5 +1,7 @@
 import Testing
 import Foundation
+import SwiftUI
+import UIKit
 @testable import ResectaApp
 import RedactionEngine
 
@@ -146,6 +148,69 @@ struct PreviewVerdictCapsuleTests {
     func nilVerdictShowsNothing() {
         let text = RedactedPreviewView.verdictCapsuleText(verdict: nil)
         #expect(text == nil)
+    }
+
+    // The ground behind the capsule, by appearance (sRGB, 0 to 1), sampled
+    // beside the capsule on captures of the Preview opened from the three
+    // seeded reports that show a label: white in light, black in dark.
+    static let lightGround = (1.0, 1.0, 1.0)
+    static let darkGround = (0.0, 0.0, 0.0)
+
+    @Test("The label's colours come from the text tokens, on one wash that keeps 4.5 to 1")
+    func labelColoursComeFromTheTextTokens() throws {
+        let colour = RedactedPreviewView.verdictCapsuleColor
+        #expect(colour(.skipped) == ResectaTokens.SemanticColor.supportText)
+        #expect(colour(.attention("x")) == ResectaTokens.SemanticColor.attentionText)
+        #expect(colour(.fail("x")) == ResectaTokens.SemanticColor.failText)
+        let noLabel: [VerificationStatus?] = [.pass, .warn("w"), .info("i"), .notApplicable("n"), nil]
+        for verdict in noLabel {
+            #expect(colour(verdict) == nil, "\(String(describing: verdict)) shows no label")
+        }
+        // Only this label changes: other screens still give a run whose
+        // checks did not run the system's secondary grey.
+        #expect(VerificationStatus.skipped.textColor == .secondary)
+
+        // One strength serves all three labels, so they read as one
+        // family: the largest of 0.12, 0.10 and 0.08 at which each label
+        // reaches 4.5 to 1 on its wash, in light and in dark. The drawing
+        // reads the same constant.
+        #expect(RedactedPreviewView.verdictCapsuleStrength == 0.10)
+        let support = ResectaTokens.SemanticColor.supportText
+        #expect(try rgb(support, .light) != rgb(support, .dark),
+                "the tokens resolve per appearance on this host")
+        let labelled: [VerificationStatus] = [.skipped, .attention("x"), .fail("x")]
+        for (style, ground) in [(UIUserInterfaceStyle.light, Self.lightGround), (.dark, Self.darkGround)] {
+            for verdict in labelled {
+                let ink = try rgb(try #require(colour(verdict)), style)
+                let wash = blend(ink, over: ground, opacity: RedactedPreviewView.verdictCapsuleStrength)
+                let ratio = contrast(ink, wash)
+                #expect(ratio >= 4.5, "\(verdict), \(style == .dark ? "dark" : "light"): \(ratio) to 1")
+            }
+        }
+    }
+
+    private typealias RGB = (Double, Double, Double)
+
+    private func rgb(_ color: Color, _ style: UIUserInterfaceStyle) throws -> RGB {
+        let resolved = UIColor(color).resolvedColor(with: UITraitCollection(userInterfaceStyle: style))
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        try #require(resolved.getRed(&r, green: &g, blue: &b, alpha: &a))
+        return (Double(r), Double(g), Double(b))
+    }
+
+    private func blend(_ ink: RGB, over ground: RGB, opacity: Double) -> RGB {
+        (ink.0 * opacity + ground.0 * (1 - opacity),
+         ink.1 * opacity + ground.1 * (1 - opacity),
+         ink.2 * opacity + ground.2 * (1 - opacity))
+    }
+
+    /// WCAG 2's contrast ratio: (L1 + 0.05) / (L2 + 0.05) on relative
+    /// luminance, sRGB made linear.
+    private func contrast(_ a: RGB, _ b: RGB) -> Double {
+        func linear(_ v: Double) -> Double { v <= 0.04045 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4) }
+        func luminance(_ c: RGB) -> Double { 0.2126 * linear(c.0) + 0.7152 * linear(c.1) + 0.0722 * linear(c.2) }
+        let (x, y) = (luminance(a), luminance(b))
+        return (max(x, y) + 0.05) / (min(x, y) + 0.05)
     }
 }
 
