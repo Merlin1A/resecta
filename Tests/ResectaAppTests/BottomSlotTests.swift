@@ -109,6 +109,33 @@ struct BottomSlotTests {
         }
     }
 
+    @Test("The bar shows while one or more boxes are selected, with no drawing tool and no Add to Selection, while editing")
+    func selectionBarHoldsTheSlot() throws {
+        func plain(_ count: Int, tool: DocumentEditorView.DrawingTool? = nil, adding: Bool = false) -> BottomSlotOccupant? {
+            DocumentEditorView.bottomSlotOccupant(
+                phaseKind: .editing, messageShowing: false, selectionNewerThanMessage: false,
+                firstTimeLineDue: false, selectedCount: count, addToSelection: adding,
+                activeTool: tool, widenedOnPage: false)
+        }
+        #expect(plain(0) == nil)
+        #expect(plain(1) == .selection(adding: false))
+        #expect(plain(500) == .selection(adding: false))
+        #expect(plain(1, adding: true) == .selection(adding: true))
+        // The drawing tool's entry clears the selection; with none, its caption.
+        #expect(plain(0, tool: .rectangle) == .drawingCaption)
+        // The slot draws the bar itself, as `selectionBar`, and it takes touches.
+        #expect(DocumentEditorView.bottomSlotDrawsHere(.selection(adding: false)))
+        #expect(DocumentEditorView.bottomSlotIdentifier(.selection(adding: false)) == "selectionBar")
+        #expect(DocumentEditorView.bottomSlotIdentifier(.selection(adding: true)) == "addModeCapsule")
+        // The slot is told the real count.
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let source = try String(contentsOf: root.appendingPathComponent(
+            "Sources/ResectaApp/Views/DocumentEditorView+Caption.swift"), encoding: .utf8)
+        #expect(source.contains("selectedCount: redactionState.selectedRegionIDs.count,"))
+        #expect(source.contains("case .selection(adding: false): SelectionBar(toolbar: editorToolbar)"))
+    }
+
     @Test("The slot's measures")
     func measures() {
         // The canvas already ends 8 pt above the page bar's glass (the bar's

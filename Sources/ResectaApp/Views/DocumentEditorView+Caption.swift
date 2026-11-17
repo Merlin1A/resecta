@@ -147,7 +147,7 @@ extension DocumentEditorView {
             messageShowing: false,
             selectionNewerThanMessage: false,
             firstTimeLineDue: false,
-            selectedCount: 0,
+            selectedCount: redactionState.selectedRegionIDs.count,
             addToSelection: isMultiSelectActive,
             activeTool: activeTool,
             widenedOnPage: redactionState.pageHoldsWidenedBox(documentState.currentPageIndex)
@@ -159,18 +159,17 @@ extension DocumentEditorView {
                     identifier: Self.bottomSlotIdentifier(occupant),
                     label: slotAccessibilityLabel(occupant),
                     readsAsOne: occupant == .widenedBoxes,
-                    takesTouches: occupant == .selection(adding: true)
+                    takesTouches: occupant == .selection(adding: true) || occupant == .selection(adding: false)
                 ) {
                     switch occupant {
                     case .drawingCaption: drawingCaptionWords
                     case .selection(adding: true): addModeWords
+                    case .selection(adding: false): SelectionBar(toolbar: editorToolbar)
                     case .widenedBoxes: widenedBoxWords
                     // Drawn by the message host.
                     case .message: EmptyView()
                     // The first-time line.
                     case .firstTimeLine: EmptyView()
-                    // The selection bar.
-                    case .selection(adding: false): EmptyView()
                     }
                 }
                 .transition(.opacity)
@@ -180,12 +179,13 @@ extension DocumentEditorView {
         .animation(ResectaTokens.Anim.resolved(ResectaTokens.Anim.stateChange, reduceMotion: reduceMotion), value: occupant)
     }
 
-    /// The occupants this view draws: the drawing caption, Add to Selection
-    /// and the widened-box notice. The others are drawn by their own views.
+    /// The occupants this view draws: the drawing caption, the selection
+    /// (its bar, or Add to Selection) and the widened-box notice. The others
+    /// are drawn by their own views.
     static func bottomSlotDrawsHere(_ occupant: BottomSlotOccupant) -> Bool {
         switch occupant {
-        case .drawingCaption, .selection(adding: true), .widenedBoxes: true
-        case .message, .firstTimeLine, .selection(adding: false): false
+        case .drawingCaption, .selection, .widenedBoxes: true
+        case .message, .firstTimeLine: false
         }
     }
 
@@ -194,8 +194,9 @@ extension DocumentEditorView {
         switch occupant {
         case .drawingCaption: "drawingCaption"
         case .selection(adding: true): "addModeCapsule"
+        case .selection(adding: false): "selectionBar"
         case .widenedBoxes: "widenedBoxCapsule"
-        case .message, .firstTimeLine, .selection(adding: false): ""
+        case .message, .firstTimeLine: ""
         }
     }
 
@@ -204,6 +205,7 @@ extension DocumentEditorView {
         case .drawingCaption: Self.captionAccessibilityLabel(activeTool: activeTool)
         case .selection(adding: true): Self.addModeAccessibilityLabel(selectedCount: redactionState.selectedRegionIDs.count)
         case .widenedBoxes: Self.widenedBoxAccessibilityLabel
+        // The bar's parts speak for themselves.
         case .message, .firstTimeLine, .selection(adding: false): ""
         }
     }
@@ -263,8 +265,8 @@ extension DocumentEditorView {
 /// The bottom slot: draws its occupant centred, padded, on one glass shape,
 /// at least 120 pt wide and at most 360 pt (16 pt in from each screen edge).
 /// The glass shape is the occupant's accessibility element: its identifier,
-/// its one label, and whether it takes touches (only Add to Selection does,
-/// for Done).
+/// its one label, and whether it takes touches (the selection does: its
+/// bar's actions and Add to Selection's Done).
 struct BottomSlot<Content: View>: View {
     let footPadding: CGFloat
     let identifier: String

@@ -35,7 +35,90 @@ nonisolated final class CanvasSelectionUITests: XCTestCase {
     private static let centreA = CGVector(dx: 0.335, dy: 0.46)
     private static let centreB = CGVector(dx: 0.665, dy: 0.46)
     private static let emptyPage = CGVector(dx: 0.5, dy: 0.65)
-    private static let gutterBelowPage = CGVector(dx: 0.5, dy: 0.84)
+    // Beside the selection bar, which sits over the middle of the gutter
+    // while a box is selected.
+    private static let gutterBelowPage = CGVector(dx: 0.06, dy: 0.84)
+
+    // MARK: - The selection bar
+
+    nonisolated func barPart(_ identifier: String) -> XCUIElement {
+        app.descendants(matching: .any).matching(identifier: identifier).firstMatch
+    }
+
+    /// Draw box A alone and select it with a tap.
+    nonisolated func drawAndSelectOneBox() {
+        enterDrawMode()
+        window.coordinate(withNormalizedOffset: Self.boxA.from).press(
+            forDuration: 0.05, thenDragTo: window.coordinate(withNormalizedOffset: Self.boxA.to),
+            withVelocity: .slow, thenHoldForDuration: 0.2)
+        leaveDrawMode()
+        XCTAssertTrue(waitForRegionCount(1), "the box did not draw; the counter read \(currentRegionCount())")
+        tap(Self.centreA)
+        XCTAssertTrue(barPart("selectionBar").waitForExistence(timeout: 5), "Selecting a box must show the selection bar.")
+    }
+
+    func testSelectionBar_deleteOneBoxThenUndoBringsItBackSelected() {
+        drawAndSelectOneBox()
+        XCTAssertEqual(barPart("selectionBarCount").label, "Selection, 1 box")
+        XCTAssertTrue(barPart("selectionBarDuplicate").isEnabled, "Duplicate applies to one box.")
+        attachScreenshot(named: "selection-bar-one-box")
+        barPart("selectionBarDelete").tap()
+        XCTAssertTrue(waitForRegionCount(0), "Delete must remove the box; the counter read \(currentRegionCount())")
+        XCTAssertTrue(barPart("selectionBar").waitForNonExistence(timeout: 5), "With nothing selected the bar must leave.")
+        let notice = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Deleted'")).firstMatch
+        XCTAssertFalse(notice.waitForExistence(timeout: 2), "Deleting one box shows no message.")
+        app.buttons["undoButton"].tap()
+        XCTAssertTrue(waitForRegionCount(1), "Undo must bring the box back")
+        XCTAssertTrue(barPart("selectionBar").waitForExistence(timeout: 5), "Undo brings the box back selected, and the bar with it.")
+        XCTAssertEqual(barPart("selectionBarCount").label, "Selection, 1 box")
+    }
+
+    func testSelectionBar_duplicateSelectsTheCopy() {
+        drawAndSelectOneBox()
+        barPart("selectionBarDuplicate").tap()
+        XCTAssertTrue(waitForRegionCount(2), "Duplicate must add a copy; the counter read \(currentRegionCount())")
+        XCTAssertEqual(barPart("selectionBarCount").label, "Selection, 1 box", "the copy is the one selected")
+        attachScreenshot(named: "selection-bar-after-duplicate")
+        app.buttons["undoButton"].tap()
+        XCTAssertTrue(waitForRegionCount(1), "Undo must remove the copy")
+    }
+
+    func testSelectionBar_wholePageDimsDuplicate() {
+        let mark = app.buttons["pageNavMarkWholePage"]
+        XCTAssertTrue(mark.waitForExistence(timeout: 10))
+        mark.tap()
+        XCTAssertTrue(waitForRegionCount(1), "Mark Whole Page did not add a region.")
+        tap(CGVector(dx: 0.5, dy: 0.45))
+        XCTAssertTrue(barPart("selectionBar").waitForExistence(timeout: 5), "Selecting the whole-page box must show the bar.")
+        let duplicate = barPart("selectionBarDuplicate")
+        XCTAssertTrue(duplicate.exists, "Duplicate is dimmed, never removed.")
+        XCTAssertFalse(duplicate.isEnabled, "A whole page cannot be duplicated, as in the hold menu.")
+        attachScreenshot(named: "selection-bar-whole-page")
+    }
+
+    func testSelectionBar_atTheLargestSize_coversTheLetterPagesLastEightPoints() throws {
+        app.terminate()
+        app.launchArguments = ["--uitesting", "--loadTestDocument", "--multipageDoc",
+                               "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+        app.launch()
+        XCTAssertTrue(app.buttons["drawTool"].waitForExistence(timeout: 30), "The editor never appeared.")
+        XCTAssertTrue(counter.waitForExistence(timeout: 10))
+        XCTAssertGreaterThan(counter.frame.height, 40, "The largest text size did not take.")
+        let shot = try XCTUnwrap(CanvasPixelProbe(XCUIScreen.main.screenshot(), windowSize: window.frame.size))
+        let page = try XCTUnwrap(shot.fitPage(), "the page at fit is measurable")
+        drawAndSelectOneBox()
+        let bar = barPart("selectionBar")
+        let pageBar = barPart("pageNav")
+        XCTAssertTrue(pageBar.waitForExistence(timeout: 5))
+        let foot = (pageBar.frame.minY - 8) - bar.frame.maxY
+        XCTAssertEqual(foot, 8, accuracy: 1, "The bar's foot must be 8 pt above the page bar's glass; it is \(foot) pt.")
+        let covered = page.maxY - bar.frame.minY
+        XCTAssertTrue((6...14).contains(covered), "The bar covers \(covered) pt of the fit page's foot, not 6 to 14 (page \(page), bar \(bar.frame)).")
+        attachScreenshot(named: "selection-bar-largest-size")
+        // A tap on empty canvas ends the selection and the bar leaves.
+        tap(Self.emptyPage)
+        XCTAssertTrue(bar.waitForNonExistence(timeout: 5), "Ending the selection must take the bar away.")
+    }
 
     // MARK: - (i) A whole-page region and the gutter
 
@@ -209,7 +292,8 @@ private extension CanvasSelectionUITests {
     /// The overflow menu's delete row's label, or nil when it offers none.
     nonisolated func deleteRow() -> String? {
         openOverflow()
-        let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Delete'")).firstMatch
+        let row = app.buttons.matching(NSPredicate(
+            format: "label BEGINSWITH 'Delete' AND identifier != 'selectionBarDelete'")).firstMatch
         let label = row.waitForExistence(timeout: 2) ? row.label : nil
         dismissMenus()
         return label

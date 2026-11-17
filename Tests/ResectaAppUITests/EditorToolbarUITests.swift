@@ -200,4 +200,134 @@ nonisolated final class EditorToolbarUITests: XCTestCase {
         undo.tap()
         XCTAssertTrue(waitForLabel(counter, containing: "2 regions"), "The notice's Undo must restore both.")
     }
+
+    // MARK: - The selection bar
+
+    private func barPart(_ identifier: String) -> XCUIElement {
+        app.descendants(matching: .any).matching(identifier: identifier).firstMatch
+    }
+
+    /// The page's region count, read from the counter's label.
+    private func regionCount() -> Int {
+        let label = counter.label
+        guard let match = label.range(of: #"(\d+) regions?"#, options: .regularExpression) else { return 0 }
+        return Int(label[match].split(separator: " ").first ?? "") ?? -1
+    }
+
+    /// One box drawn and selected by a tap on it.
+    private func launchWithOneDrawnBoxSelected(textSize: String? = nil) {
+        app.launchArguments = ["--uitesting", "--loadTestDocument", "--multipageDoc"]
+            + (textSize.map { ["-UIPreferredContentSizeCategoryName", $0] } ?? [])
+        app.launch()
+        let mark = app.buttons["pageNavMarkWholePage"]
+        XCTAssertTrue(mark.waitForExistence(timeout: 30), "The page bar never appeared.")
+        if textSize != nil {
+            XCTAssertGreaterThan(counter.frame.height, 40, "The text size \(textSize ?? "") did not take.")
+        }
+        let draw = app.buttons["drawTool"].firstMatch
+        XCTAssertTrue(draw.waitForExistence(timeout: 10))
+        draw.tap()
+        let window = app.windows.firstMatch
+        window.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.40))
+            .press(forDuration: 0.1, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.6, dy: 0.45)))
+        draw.tap()
+        XCTAssertTrue(waitForLabel(counter, containing: "1 region"), "The drawn box did not count.")
+        window.coordinate(withNormalizedOffset: CGVector(dx: 0.42, dy: 0.425)).tap()
+        XCTAssertTrue(barPart("selectionBar").waitForExistence(timeout: 5), "Selecting the box must show the selection bar.")
+    }
+
+    func testSelectionBar_deleteTwoShowsTheMessageWithUndo() {
+        launchWithOneRegion()
+        let draw = app.buttons["drawTool"].firstMatch
+        XCTAssertTrue(draw.waitForExistence(timeout: 10))
+        draw.tap()
+        let window = app.windows.firstMatch
+        window.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.40))
+            .press(forDuration: 0.1, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.6, dy: 0.45)))
+        draw.tap()
+        XCTAssertTrue(waitForLabel(counter, containing: "2 regions"), "The drawn box did not count.")
+        openOverflowAndTap("Select Regions")
+        let selectAll = app.buttons["Select All on Page"].firstMatch
+        XCTAssertTrue(selectAll.waitForExistence(timeout: 5))
+        selectAll.tap()
+        XCTAssertTrue(barPart("selectionBar").waitForExistence(timeout: 5), "Two selected must show the selection bar.")
+        XCTAssertEqual(barPart("selectionBarCount").label, "Selection, 2 boxes")
+        XCTAssertTrue(barPart("selectionBarDuplicate").exists, "Duplicate is dimmed, never removed.")
+        XCTAssertFalse(barPart("selectionBarDuplicate").isEnabled, "Two boxes cannot be duplicated, as in the hold menu.")
+        attachScreenshot(named: "selection-bar-two-selected")
+        barPart("selectionBarDelete").tap()
+        XCTAssertTrue(waitForLabel(counter, containing: "0 regions"), "The bar's Delete must remove both at once.")
+        let notice = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH 'Deleted 2 regions.'")).firstMatch
+        XCTAssertTrue(notice.waitForExistence(timeout: 5), "Deleting two from the bar must show the notice.")
+        let undo = app.buttons["Undo action"].firstMatch
+        XCTAssertTrue(undo.waitForExistence(timeout: 5), "The notice must offer Undo.")
+        undo.tap()
+        XCTAssertTrue(waitForLabel(counter, containing: "2 regions"), "The notice's Undo must restore both.")
+    }
+
+    func testSelectionBar_hitFramesAtTheDefaultSize() {
+        launchWithOneDrawnBoxSelected()
+        let undo = app.buttons["undoButton"].firstMatch
+        /// A tap `dy` points from the centre of a part, then the count's change.
+        func tapChanges(_ identifier: String, dy: CGFloat, dx: CGFloat = 0) -> Int {
+            let before = regionCount()
+            let part = barPart(identifier)
+            XCTAssertTrue(part.waitForExistence(timeout: 5), "\(identifier) is missing.")
+            part.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).withOffset(CGVector(dx: dx, dy: dy)).tap()
+            usleep(800_000)
+            return regionCount() - before
+        }
+        XCTContext.runActivity(named: "frames: Duplicate \(barPart("selectionBarDuplicate").frame), Delete \(barPart("selectionBarDelete").frame)") { _ in }
+        for dy: CGFloat in [-21, 21] {
+            XCTAssertEqual(tapChanges("selectionBarDuplicate", dy: dy), 1, "A tap \(dy) pt from Duplicate's word must duplicate.")
+            undo.tap()
+            XCTAssertTrue(waitForLabel(counter, containing: "1 region"))
+            XCTAssertTrue(barPart("selectionBar").waitForExistence(timeout: 5))
+            XCTAssertEqual(tapChanges("selectionBarDelete", dy: dy), -1, "A tap \(dy) pt from Delete's word must delete.")
+            undo.tap()
+            XCTAssertTrue(waitForLabel(counter, containing: "1 region"))
+            XCTAssertTrue(barPart("selectionBar").waitForExistence(timeout: 5))
+        }
+        // Midway between the two words: exactly one of the two.
+        let duplicate = barPart("selectionBarDuplicate").frame, delete = barPart("selectionBarDelete").frame
+        let midway = (duplicate.midX + delete.midX) / 2 - duplicate.midX
+        let change = tapChanges("selectionBarDuplicate", dy: 0, dx: midway)
+        XCTAssertTrue(change == 1 || change == -1, "A tap between the words must run exactly one action; the count changed by \(change).")
+        undo.tap()
+        // Done, with Add to Selection on.
+        openOverflowAndTap("Add to Selection")
+        let capsule = barPart("addModeCapsule")
+        XCTAssertTrue(capsule.waitForExistence(timeout: 5), "Add to Selection must show its capsule.")
+        for dy: CGFloat in [-21, 21] {
+            barPart("addModeDoneButton").coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).withOffset(CGVector(dx: 0, dy: dy)).tap()
+            XCTAssertTrue(capsule.waitForNonExistence(timeout: 5), "A tap \(dy) pt from Done's word must end Add to Selection.")
+            if dy < 0 {
+                openOverflowAndTap("Add to Selection")
+                XCTAssertTrue(capsule.waitForExistence(timeout: 5))
+            }
+        }
+    }
+
+    func testSelectionBar_atAccessibilityOneAndTheLargestSize_holdsItsCeiling() {
+        var barFrames: [CGRect] = []
+        for size in ["UICTContentSizeCategoryAccessibilityM", "UICTContentSizeCategoryAccessibilityXXXL"] {
+            if !barFrames.isEmpty { app.terminate() }
+            launchWithOneDrawnBoxSelected(textSize: size)
+            let duplicate = barPart("selectionBarDuplicate"), delete = barPart("selectionBarDelete")
+            XCTAssertTrue(duplicate.waitForExistence(timeout: 5) && delete.exists, "Both actions must show at \(size).")
+            for (name, part) in [("Duplicate", duplicate), ("Delete", delete)] {
+                XCTAssertGreaterThanOrEqual(part.frame.width, 45.5, "\(name)'s frame is \(part.frame) at \(size).")
+                XCTAssertGreaterThanOrEqual(part.frame.height, 45.5, "\(name)'s frame is \(part.frame) at \(size).")
+            }
+            XCTAssertFalse(duplicate.frame.insetBy(dx: 0.5, dy: 0.5).intersects(delete.frame), "The two frames must not overlap at \(size).")
+            XCTAssertEqual(duplicate.label, "Duplicate Box")
+            XCTAssertEqual(delete.label, "Delete Box")
+            barFrames.append(barPart("selectionBar").frame)
+            attachScreenshot(named: "selection-bar-\(size)")
+        }
+        XCTAssertEqual(barFrames[0].width, barFrames[1].width, accuracy: 1, "The bar must stop growing at Accessibility 1: \(barFrames).")
+        XCTAssertEqual(barFrames[0].height, barFrames[1].height, accuracy: 1, "The bar must stop growing at Accessibility 1: \(barFrames).")
+        XCTAssertEqual(barFrames[0].minY, barFrames[1].minY, accuracy: 1, "The bar must stop growing at Accessibility 1: \(barFrames).")
+    }
 }

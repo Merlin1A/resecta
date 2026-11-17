@@ -147,10 +147,11 @@ extension RedactionState {
 
     /// Maximum number of regions a single lasso-marquee apply may select.
     /// Defensive cap against accidental select-all on huge documents; the
-    /// truncation surfaces as a `.warning` toast so the user can re-target.
+    /// cut is recorded (`lassoCut`) and the selection bar says so on a
+    /// second line, so the user can re-target.
     static let lassoSelectionCap: Int = 500
 
-    /// User-facing toast text shown when a lasso marquee would select
+    /// The selection bar's second line when a lasso marquee would select
     /// more regions than `lassoSelectionCap` permits. Mechanism-description
     /// language — "Selection limited to 500 regions"
     /// names the truncation observably without making a promise claim.
@@ -171,26 +172,22 @@ extension RedactionState {
     /// Enforces the 500-region cap (`lassoSelectionCap`) inside this
     /// method so any caller route — the overlay marquee path today,
     /// hypothetical future select-all-by-detector routes — inherits the
-    /// same defense automatically. On truncation, posts a `.warning`
-    /// toast via the caller-provided `toastManager`; severity is
-    /// intentionally `.warning` (not `.error`) because overflow is an
-    /// expected outcome on large documents, not a fault state.
+    /// same defense automatically. On truncation it records the cut in
+    /// `lassoCut`, which the selection bar shows as its second line; no
+    /// message is queued. A batch that is not cut clears the record.
     ///
     /// - Parameters:
     ///   - regions: Regions to mark selected. Order is preserved across
     ///     the truncation — the first `lassoSelectionCap` entries are
-    ///     kept; later entries are dropped silently after the toast.
-    ///   - toastManager: Optional ToastQueueManager for surfacing the
-    ///     overflow toast. Nil disables the toast surfacing (test seam).
+    ///     kept; later entries are dropped.
+    ///   - now: The time of the cut (a test seam).
     /// - Returns: A tuple naming the count actually selected and a flag
-    ///   recording whether the cap truncated the input. Both fields are
-    ///   available without inspecting the toast manager so tests can
-    ///   assert on the truncation contract directly.
+    ///   recording whether the cap truncated the input.
     @MainActor
     @discardableResult
     func applyBatch(
         _ regions: [RedactionRegion],
-        toastManager: ToastQueueManager? = nil
+        now: Date = .now
     ) -> (selected: Int, truncated: Bool) {
         let truncated = regions.count > Self.lassoSelectionCap
         let kept = truncated
@@ -200,15 +197,18 @@ extension RedactionState {
 
         selectedRegionIDs = newSelection
 
-        if truncated {
-            toastManager?.enqueue(
-                Self.lassoSelectionCapToastMessage,
-                severity: .warning
-            )
-        }
+        lassoCut = truncated ? LassoCut(at: now, selection: newSelection) : nil
 
         return (selected: newSelection.count, truncated: truncated)
     }
+}
+
+/// A lasso cut at the selection limit: when it was cut and the selection it
+/// left. The selection bar's second line lasts while the selection is still
+/// this one, for a few seconds.
+nonisolated struct LassoCut: Equatable, Sendable {
+    let at: Date
+    let selection: Set<UUID>
 }
 
 // MARK: - Apply prepare helper

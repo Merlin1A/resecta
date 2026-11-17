@@ -18,6 +18,11 @@ class RedactionState {
     /// Multi-region selection set. Single selection is the common case.
     var selectedRegionIDs: Set<UUID> = []
 
+    /// The last lasso cut at the selection limit, with the selection it
+    /// left; nil when the last lasso was not cut. The selection bar reads it
+    /// for its second line.
+    var lassoCut: LassoCut?
+
     /// Backward-compatible single-selection accessor.
     /// Get: returns the sole selected ID when exactly one is selected, else nil.
     /// Set: replaces the entire selection with a singleton (or clears).
