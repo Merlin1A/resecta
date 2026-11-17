@@ -2,23 +2,28 @@ import Testing
 import Foundation
 @testable import ResectaApp
 
-// The editor's one top-banner slot: the paused notice, the scan summary and
-// the import annotation notice share the canvas's top edge and show one at a
-// time — paused first, then the scan summary, then the annotation notice.
-// The precedence has one home (`TopBannerSlot`); the annotation notice's own
-// visibility reads only its own facts.
+// The editor's one top-banner slot: the paused notice and the import
+// annotation notice share the canvas's top edge and show one at a time,
+// paused first. The precedence has one home (`TopBannerSlot`); the
+// annotation notice's own visibility reads only its own facts.
 
 @MainActor
 @Suite("Editor top-banner slot")
 struct TopBannerSlotTests {
 
-    @Test("Paused beats the scan summary, which beats the annotation notice; nothing shows with none up")
+    @Test("Paused beats the annotation notice; nothing shows with neither up: every pair of inputs")
     func precedence() {
-        #expect(TopBannerSlot.winner(paused: true, detection: true, annotation: true) == .paused)
-        #expect(TopBannerSlot.winner(paused: true, detection: false, annotation: true) == .paused)
-        #expect(TopBannerSlot.winner(paused: false, detection: true, annotation: true) == .detection)
-        #expect(TopBannerSlot.winner(paused: false, detection: false, annotation: true) == .annotation)
-        #expect(TopBannerSlot.winner(paused: false, detection: false, annotation: false) == nil)
+        let rows: [(paused: Bool, annotation: Bool, winner: TopBannerSlot?)] = [
+            (paused: false, annotation: false, winner: nil),
+            (paused: false, annotation: true, winner: .annotation),
+            (paused: true, annotation: false, winner: .paused),
+            (paused: true, annotation: true, winner: .paused),
+        ]
+        #expect(rows.count == 4)
+        for row in rows {
+            #expect(TopBannerSlot.winner(paused: row.paused, annotation: row.annotation) == row.winner,
+                    "paused \(row.paused), annotation \(row.annotation)")
+        }
     }
 
     /// An editing document whose source carries a filled form field, so the
@@ -30,29 +35,28 @@ struct TopBannerSlotTests {
         return documentState
     }
 
-    @Test("The editor's read: a paused run takes the slot over the scan summary and the annotation notice")
+    @Test("The editor's read: a paused run takes the slot over the annotation notice")
     func pausedTakesTheSlot() {
         let documentState = Self.annotatedEditingDocument()
         documentState.wasPausedByBackground = true
-        #expect(TopBannerSlot.winner(documentState: documentState, detectionBannerPresent: true) == .paused)
+        #expect(TopBannerSlot.winner(documentState: documentState) == .paused)
     }
 
-    @Test("The editor's read: the scan summary waits for the paused notice, then takes the slot over the annotation notice")
-    func detectionFollowsPaused() {
+    @Test("The editor's read: with no pause, the annotation notice takes the slot")
+    func annotationTakesTheSlotWithNoPause() {
         let documentState = Self.annotatedEditingDocument()
-        #expect(TopBannerSlot.winner(documentState: documentState, detectionBannerPresent: true) == .detection)
-        #expect(TopBannerSlot.winner(documentState: documentState, detectionBannerPresent: false) == .annotation)
+        #expect(TopBannerSlot.winner(documentState: documentState) == .annotation)
     }
 
     @Test("The editor's read: a dismissed annotation notice and a phase other than editing leave the slot empty")
     func emptySlot() {
         let documentState = Self.annotatedEditingDocument()
         documentState.annotationNoticeDismissed = true
-        #expect(TopBannerSlot.winner(documentState: documentState, detectionBannerPresent: false) == nil)
+        #expect(TopBannerSlot.winner(documentState: documentState) == nil)
         let verifying = Self.annotatedEditingDocument()
         verifying.wasPausedByBackground = true
         verifying.phase = .verified(report: .skipped)
-        #expect(TopBannerSlot.winner(documentState: verifying, detectionBannerPresent: true) == nil)
+        #expect(TopBannerSlot.winner(documentState: verifying) == nil)
     }
 
     @Test("The annotation notice's visibility reads its own facts only")

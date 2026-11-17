@@ -194,9 +194,9 @@ struct DocumentEditorViewBackgroundBannerTests {
         documentState.phase = .editing
         documentState.wasPausedByBackground = true
         documentState.pausedFromPhase = .redacting
-        #expect(TopBannerSlot.winner(documentState: documentState, detectionBannerPresent: true) == .paused)
+        #expect(TopBannerSlot.winner(documentState: documentState) == .paused)
         DocumentEditorView.clearBackgroundPause(documentState)
-        #expect(TopBannerSlot.winner(documentState: documentState, detectionBannerPresent: true) == .detection)
+        #expect(TopBannerSlot.winner(documentState: documentState) == nil)
     }
 
     /// Leaving the app during Verify returns to the editor with the paused

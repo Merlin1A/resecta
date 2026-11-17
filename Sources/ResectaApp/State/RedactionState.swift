@@ -118,12 +118,8 @@ class RedactionState {
 
     /// Record of how the most recent Scan-interface run ended (results
     /// listed in-sheet). Written on every run exit path (staged, nothing
-    /// found, failed)
-    /// and read by `DocumentEditorView` to drive the detection summary
-    /// banner — zero/failed runs previously surfaced only as transient
-    /// toasts. `run` increments per record so two identical consecutive
-    /// outcomes still read as a change to `.onChange` observers.
-    /// Session-scoped; cleared on new-document import.
+    /// found, failed). The run reads its `ocrSkippedPages`
+    /// (`PipelineRunner`). Session-scoped; cleared on new-document import.
     struct DetectionRunRecord: Equatable {
         enum Outcome: Equatable {
             /// Findings listed in-sheet for review. Nothing is applied
@@ -134,8 +130,7 @@ class RedactionState {
             /// The run ended early on a render/detection error.
             case failed
         }
-        /// Present for Scan-interface (in-sheet) runs: the counts the
-        /// banner reports.
+        /// Present for Scan-interface (in-sheet) runs.
         struct ScanRunSummary: Equatable {
             let foundCount: Int
             let pageCount: Int

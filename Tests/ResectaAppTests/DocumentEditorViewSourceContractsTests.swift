@@ -4,14 +4,10 @@ import SwiftUI
 @testable import ResectaApp
 
 // Source-scanning contract pins for `DocumentEditorView.swift` surfaces
-// (and, since the detection banner moved into its own extension file,
-// `DocumentEditorView+DetectionBanner.swift`)
 // that render through a `private` type or a `@ViewBuilder` computed
 // property with no pure-function seam to unit-test directly — mirrors
 // `HonestySurfacesTests.loadRepoFile`'s technique.
 //
-//  - `DetectionSummaryBanner`'s glyph tint gates on
-//    `model.isWarning` instead of an unconditional `.orange`.
 //  - The editor toolbar's routine actions render
 //    neutral (`.tint(.primary)` on the three `ToolbarItemGroup`s); the
 //    Redact button is the one designated emphasis action and carries
@@ -23,22 +19,6 @@ import SwiftUI
 
 @Suite("DocumentEditorView source contracts")
 struct DocumentEditorViewSourceContractsTests {
-
-    @Test("DetectionSummaryBanner glyph has no unconditional .orange and gates on isWarning")
-    func detectionSummaryBannerTintGatesOnIsWarning() throws {
-        let source = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorView+DetectionBanner.swift")
-        guard let structRange = source.range(of: "private struct DetectionSummaryBanner"),
-              let bodyEnd = source.range(of: "\n    }", range: structRange.upperBound..<source.endIndex)
-        else {
-            Issue.record("Could not locate DetectionSummaryBanner")
-            return
-        }
-        let body = source[structRange.upperBound..<bodyEnd.lowerBound]
-        #expect(!body.contains(".foregroundStyle(.orange)"),
-                "the glyph must not carry an unconditional .orange tint")
-        #expect(body.contains("model.isWarning") && body.contains("SemanticColor.warningTint"),
-                "the glyph tint must gate on model.isWarning and reference the warningTint token")
-    }
 
     @Test("The toolbar groups, the iPhone … menu and the iPhone Undo control render neutral")
     func toolbarGroupsCarryNeutralTint() throws {
