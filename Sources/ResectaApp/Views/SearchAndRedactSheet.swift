@@ -683,7 +683,7 @@ struct SearchAndRedactSheet: View {
     ) -> some View {
         Image(systemName: systemName)
             .font(.system(size: glyphPointSize))
-            .foregroundStyle(.tint)
+            .foregroundStyle(ResectaTokens.BrandTeal.text)
             .frame(width: diameter, height: diameter)
             .background(CircularIconButtonStyle.wash, in: Circle())
             .frame(
@@ -867,19 +867,19 @@ struct SearchAndRedactSheet: View {
                 Text("\(idx + 1)/\(searchState.totalCount)")
                     .font(site.counterFont)
                     .monospacedDigit()
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                     .accessibilityLabel("Result \(idx + 1) of \(searchState.totalCount)")
             } else if let filteredPos = searchState.currentResultFilteredPosition {
                 Text("\(filteredPos)/\(searchState.filteredCount)")
                     .font(site.counterFont)
                     .monospacedDigit()
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                     .accessibilityLabel("Result \(filteredPos) of \(searchState.filteredCount), \(searchState.totalCount - searchState.filteredCount) filtered")
             } else {
                 Text("–/\(searchState.filteredCount)")
                     .font(site.counterFont)
                     .monospacedDigit()
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                     .accessibilityLabel("Current result hidden by filters, \(searchState.filteredCount) of \(searchState.totalCount) shown")
             }
         }

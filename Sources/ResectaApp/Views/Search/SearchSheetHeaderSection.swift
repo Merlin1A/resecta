@@ -90,7 +90,7 @@ struct SearchSheetHeaderSection: View {
                 .contentShape(Rectangle())
         }
             .buttonStyle(.plain)
-            .foregroundStyle(.tint)
+            .foregroundStyle(ResectaTokens.BrandTeal.text)
             .accessibilityIdentifier("searchDismissButton")
     }
 
@@ -116,7 +116,7 @@ struct SearchSheetHeaderSection: View {
             .fontWeight(.semibold)
             .foregroundStyle(applyDisabled
                 ? AnyShapeStyle(.tertiary)
-                : AnyShapeStyle(.tint))
+                : AnyShapeStyle(ResectaTokens.BrandTeal.text))
             .accessibilityIdentifier("searchApplyButton")
             .disabled(applyDisabled)
     }
@@ -206,7 +206,7 @@ extension SearchAndRedactSheet {
             pagesWithHits: pagesWithHits
         ))
         .font(.caption)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(ResectaTokens.SemanticColor.supportText)
         .padding(.horizontal, ResectaTokens.Spacing.md)
         .padding(.bottom, ResectaTokens.Spacing.xs)
         .accessibilityIdentifier("pagesWithHitsLine")

@@ -240,7 +240,7 @@ extension SearchResultRow {
     ) -> AttributedString {
         var attributed = AttributedString(snippet)
         attributed.font = .footnote
-        attributed.foregroundColor = .secondary
+        attributed.foregroundColor = ResectaTokens.SemanticColor.supportText
         guard let run = matchRun(in: attributed, matchRange: matchRange, matchedText: matchedText) else {
             return attributed
         }
