@@ -116,36 +116,36 @@ struct RecheckBurnedRegionsTests {
     /// floor; the re-check is handed the same.
     func sameRegionsOnRunAndRecheck() async throws {
         let o = try await Self.runThenRecheck()
-        let comment = Comment(rawValue: "run: \(Self.describe(o.onRun))\nre-check: \(Self.describe(o.onRecheck))\n"
+        let context = ("run: \(Self.describe(o.onRun))\nre-check: \(Self.describe(o.onRecheck))\n"
             + "run rows: \(Self.statuses(o.runReport))\nre-check rows: \(Self.statuses(o.recheckReport))")
-        let runPage = try #require(o.onRun[0], comment)
+        let runPage = try #require(o.onRun[0], "\(context)")
         // The run's own form, so the comparison below tests all three ways.
         #expect(runPage.first { $0.id == o.regionIDs.inked }?.inkStripRects.isEmpty == false,
-                "the run strips the name's hidden copy by its ink", comment)
+                "the run strips the name's hidden copy by its ink\n\(context)")
         #expect(runPage.first { $0.id == o.regionIDs.pastTheEdge }?.normalizedRect.maxX == 1,
-                "the run clamps the box past the edge", comment)
+                "the run clamps the box past the edge\n\(context)")
         #expect(!runPage.contains { $0.id == o.regionIDs.underTheFloor },
-                "the run drops the box under the floor", comment)
+                "the run drops the box under the floor\n\(context)")
 
-        #expect(o.onRecheck == o.onRun, "the re-check is handed the regions as the run burned them", comment)
+        #expect(o.onRecheck == o.onRun, "the re-check is handed the regions as the run burned them\n\(context)")
         #expect(o.onRecheck[0]?.contains { $0.id == o.regionIDs.underTheFloor } == false,
-                "the box under the floor reaches neither", comment)
+                "the box under the floor reaches neither\n\(context)")
     }
 
     /// Every row the re-check does not skip by design (the checks that read
     /// the run's own page artifacts) reads as it read on the run.
     func sameRowStatusesOnRunAndRecheck() async throws {
         let o = try await Self.runThenRecheck()
-        let comment = Comment(rawValue: "run rows: \(Self.statuses(o.runReport))\n"
+        let context = ("run rows: \(Self.statuses(o.runReport))\n"
             + "re-check rows: \(Self.statuses(o.recheckReport))")
         let onRun = Dictionary(o.runReport.layers.map { ($0.name, $0.status) }, uniquingKeysWith: { a, _ in a })
         var compared = 0
         for layer in o.recheckReport.layers where layer.status != .skipped {
-            let before = try #require(onRun[layer.name], "the row \(layer.name) is on the run's report", comment)
-            #expect("\(layer.status)" == "\(before)", "the row \(layer.name) reads the same on the re-check", comment)
+            let before = try #require(onRun[layer.name], "the row \(layer.name) is on the run's report\n\(context)")
+            #expect("\(layer.status)" == "\(before)", "the row \(layer.name) reads the same on the re-check\n\(context)")
             compared += 1
         }
-        #expect(compared > 0, "the re-check judged at least one row", comment)
+        #expect(compared > 0, "the re-check judged at least one row\n\(context)")
     }
 
     /// The kept regions are cleared with the output, with the rest of the
