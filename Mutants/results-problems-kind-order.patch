@@ -1,0 +1,26 @@
+Property: The kinds come in their declared order: boxed text still readable before part of boxed text.
+Area: results (the problems model)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationProblemModelTests
+Must go red: ResectaAppTests/VerificationProblemModelTests plainSentenceIsEarned; ResectaAppTests/VerificationProblemModelTests nothingDroppedNothingTwice
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationProblemModel.swift b/Sources/ResectaApp/Views/VerificationProblemModel.swift
+index c070f072..7fd091a4 100644
+--- a/Sources/ResectaApp/Views/VerificationProblemModel.swift
++++ b/Sources/ResectaApp/Views/VerificationProblemModel.swift
+@@ -136,7 +136,6 @@ nonisolated enum VerificationProblemModel {
+ 
+         var problems: [VerificationProblem] = []
+         problems += failed.map { one(.failedCheck, .failed, $0) }
+-        if !readable.isEmpty { problems.append(gathered(.boxedTextReadable, .needsReview, readable, words: true)) }
+         if !coveredPages.isEmpty {
+             problems.append(VerificationProblem(kind: .coveredTextInOriginal, mark: .needsReview, count: nil, words: [],
+                                     pages: sortedPages(coveredPages), checks: [],
+@@ -146,6 +145,7 @@ nonisolated enum VerificationProblemModel {
+             problems.append(gathered(.partOfBoxedText, partOfBoxedFailed ? .failed : .needsReview, partOfBoxed,
+                                      words: true))
+         }
++        if !readable.isEmpty { problems.append(gathered(.boxedTextReadable, .needsReview, readable, words: true)) }
+         if !matching.isEmpty {
+             problems.append(gathered(.searchesStillMatch, .needsReview, matching, count: matchingLines))
+         }
