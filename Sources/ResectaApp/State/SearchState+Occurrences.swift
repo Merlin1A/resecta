@@ -80,6 +80,16 @@ extension SearchState {
         return Self.occurrenceCount(results) - Self.occurrenceCount(known) - (done.count - known.count)
     }
 
+    /// Ticked occurrences none of whose lines produced a region or was
+    /// already covered by one: the ticked matches a run that replaces the
+    /// list loses. Reads every result, so a ticked row hidden by a filter
+    /// counts, as the footer counts it; a match on two lines counts once.
+    var selectedUnappliedOccurrenceCount: Int {
+        let done = appliedResultIDs.union(coveredResultIDs)
+        let doneKeys = Set(results.filter { done.contains($0.id) }.map(Self.occurrenceKey))
+        return Set(results.filter(\.isSelected).map(Self.occurrenceKey)).subtracting(doneKeys).count
+    }
+
     /// `count` (regions or results) less the extra lines of the wrapped
     /// matches among `ids`: a match on two lines counts once. Unchanged
     /// when nothing among `ids` wraps.
