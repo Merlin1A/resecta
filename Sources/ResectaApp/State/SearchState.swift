@@ -42,7 +42,7 @@ final class SearchState: Identifiable {
     var lastRunScanConfiguration: ScanRunConfiguration?
 
     /// One shot: the next run posts no re-run notice (a recall names its own
-    /// drop; an as-you-type run refines the query). Reset by that run.
+    /// drop, so its run says nothing more). Reset by that run.
     var skipNextRerunNotice = false
 
     /// One-shot arm for the toolbar Scan button's one-tap contract:
