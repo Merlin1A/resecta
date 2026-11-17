@@ -239,4 +239,46 @@ final class SettingsStateTests {
         #expect(state.pipelineMode == .secureRasterization)
     }
 
+    // MARK: - The box switch
+
+    @Test("The box switch is off by default, and Reset to Defaults turns it off")
+    func boxSwitchOffByDefault() {
+        let state = SettingsState(defaults: defaults)
+        #expect(state.boxesAcrossColumn == false)
+        state.boxesAcrossColumn = true
+        state.resetToDefaults()
+        #expect(state.boxesAcrossColumn == false)
+        #expect(SettingsState(defaults: defaults).boxesAcrossColumn == false)
+    }
+
+    @Test("The box switch is stored under one key")
+    func boxSwitchOneKey() {
+        let state = SettingsState(defaults: defaults)
+        let before = Set(defaults.dictionaryRepresentation().keys)
+        state.boxesAcrossColumn = true
+        let added = Set(defaults.dictionaryRepresentation().keys).subtracting(before)
+        #expect(added == [SettingsState.boxesAcrossColumnKey])
+        #expect(defaults.bool(forKey: SettingsState.boxesAcrossColumnKey))
+        #expect(SettingsState(defaults: defaults).boxesAcrossColumn == true)
+    }
+
+    @Test("Every screen that shows the box switch reads the one key, through the settings state")
+    func boxSwitchReadThroughOneKey() throws {
+        let sources = URL(fileURLWithPath: "\(#filePath)")
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/ResectaApp")
+        var keyUses = 0
+        var readers: [String] = []
+        let files = FileManager.default.enumerator(at: sources, includingPropertiesForKeys: nil)?
+            .compactMap { $0 as? URL }.filter { $0.pathExtension == "swift" } ?? []
+        for file in files {
+            let text = try String(contentsOf: file, encoding: .utf8)
+            keyUses += text.components(separatedBy: "\"boxesAcrossColumn.v1\"").count - 1
+            if text.contains("boxesAcrossColumn") { readers.append(file.lastPathComponent) }
+        }
+        #expect(keyUses == 1, "the key's literal is written once")
+        let view = try String(contentsOf: sources.appendingPathComponent("Views/SettingsView.swift"), encoding: .utf8)
+        #expect(view.contains("get: { settingsState.boxesAcrossColumn }"))
+        #expect(Set(readers) == ["SettingsState.swift", "SettingsView.swift"])
+    }
 }

@@ -32,7 +32,7 @@ struct EffectivePipelineModeTests {
     @MainActor
     @Test("Switch Mode is unavailable under Paranoid Mode and says why with the Settings sentence")
     func switchModeUnderParanoid() {
-        #expect(SettingsView.paranoidForcesSecureLine == "Pipeline mode is forced to Secure Rasterization.")
+        #expect(SettingsView.paranoidForcesSecureLine == "The redaction mode is forced to Secure Rasterization.")
         #expect(!DocumentEditorView.switchModeAvailable(phaseKind: .editing, paranoid: true))
         #expect(DocumentEditorView.switchModeAvailable(phaseKind: .editing, paranoid: false))
         #expect(!DocumentEditorView.switchModeAvailable(phaseKind: .verified, paranoid: false))
