@@ -331,9 +331,9 @@ struct SearchRecheckPipelineTests {
         // The Details summary counts only the passes and names the idle
         // re-check as a check that had nothing to check.
         let summary = VerificationResultsView.detailsSummaryText(for: report)
-        let total = report.layers.count
         let passed = report.layers.filter { $0.status == .pass }.count
         let notApplicableCount = report.layers.filter(\.status.isNotApplicable).count
+        let total = report.layers.count - notApplicableCount
         #expect(notApplicableCount >= 1)
         #expect(VerificationRowModel(layer: last, perPageModes: report.perPageModes).outcome == .nothingToCheck)
         #expect(summary.contains("\u{00A0}had nothing to check"), "\(summary)")

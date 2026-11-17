@@ -199,12 +199,12 @@ struct VerificationResultsActionsTests {
 
     // MARK: - The count ring
 
-    @Test("The ring: P of T with T every check, the verdict's tone; SKIPPED draws the slot")
+    @Test("The ring: P of T with T the checks that had something to check, the verdict's tone; SKIPPED draws the slot")
     func ringContent() {
         #expect(VerificationMasthead.ringContent(report: Fixtures.searchableAllRasterized)
-                == .count(passed: 10, total: 13, tone: .pass))
+                == .count(passed: 10, total: 10, tone: .pass))
         #expect(VerificationMasthead.ringContent(report: Fixtures.searchableAttentionMixed)
-                == .count(passed: 8, total: 13, tone: .attention))
+                == .count(passed: 8, total: 12, tone: .attention))
         #expect(VerificationMasthead.ringContent(report: Fixtures.secureWarningOnly)
                 == .count(passed: 6, total: 7, tone: .warn))
         #expect(VerificationMasthead.ringContent(report: Fixtures.pageCountGate)

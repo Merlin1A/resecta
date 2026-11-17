@@ -169,7 +169,7 @@ nonisolated final class SearchRecheckUITests: XCTestCase {
         XCTAssertTrue(results.waitForExistence(timeout: 10), "Results scroll view not found.")
         let masthead = app.descendants(matching: .any)["verificationMasthead"]
         XCTAssertTrue(masthead.waitForExistence(timeout: 10), "The results headline not found.")
-        XCTAssertTrue(masthead.label.contains("5 of 7 checks passed. 2\u{00A0}had nothing to check."),
+        XCTAssertTrue(masthead.label.contains("5 of 5 checks passed. 2\u{00A0}had nothing to check."),
                       "No typed search and no captured term: the re-check and the term check had nothing to check: \(masthead.label)")
         results.swipeUp()
         // The idle re-check sits above the pass cluster, so the cluster

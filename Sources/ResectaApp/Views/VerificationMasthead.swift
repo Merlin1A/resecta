@@ -314,7 +314,7 @@ struct VerificationMasthead: View {
         case .fail: tone = .fail
         }
         let partition = VerificationLayerPartition(layers: report.layers, perPageModes: report.perPageModes)
-        return .count(passed: partition.passedCount, total: partition.total, tone: tone)
+        return .count(passed: partition.passedCount, total: partition.totalWithSomethingToCheck, tone: tone)
     }
 
     /// The report the arc last drew in for: a remount (after Share, Cancel
