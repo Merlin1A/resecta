@@ -5,7 +5,8 @@ taps on the phone; the Mac records each step with Instruments over the
 cable, lists the app's data container and the crash-log folder before and
 after (names, sizes, dates and attributes; only new crash reports are
 copied), checks the PDFs the operator exports, and fills the run's record.
-Apple's command-line tools only (`xcrun devicectl`, `xcrun xctrace`); no
+Apple's command-line tools only for the device (`xcrun devicectl`,
+`xcrun xctrace`); no
 root, no jailbreak tooling, no simulator.
 
 ## Prerequisites
@@ -79,9 +80,9 @@ own slot) and `{{judge}}` (the judged PDFs).
 ## The inbox
 
 Exported PDFs reach the Mac by AirDrop and land in `~/Downloads`. A
-process without access to `~/Downloads` reads them from
-`~/Documents/resecta-sitting-inbox/` (`judge_pdf.py`'s default; pass it to
-`judge --inbox`) after a move by hand; run from your own terminal,
+process without access to `~/Downloads` needs them moved by hand to
+`~/Documents/resecta-sitting-inbox/`, `judge_pdf.py`'s default; pass that
+folder to `judge --inbox`. From your own terminal,
 `judge --inbox ~/Downloads` works too.
 
 ## What it never does
@@ -91,18 +92,21 @@ process without access to `~/Downloads` reads them from
 - Write to the app's data container or to another app's container.
 - Use `sudo`, `log collect` (it needs root), or any non-Apple device tool.
 - Boot or touch a simulator.
-- Open a PDF in an app or copy one anywhere; put page text, metadata
-  values or log message text into `facts.json` or the record beyond the
-  allow-listed phase names, numeric or key-only signpost messages, and the
-  diagnostics' format strings (templates, never their values).
+- Open a PDF in an app or copy one anywhere.
+- Put page text, metadata values or log message text into `facts.json` or
+  the record. The exceptions are the allow-listed phase names, numeric or
+  key-only signpost messages, and the diagnostics' format strings
+  (templates, never their values).
 
 The run directory itself is raw: each `row.trace`, its exported
 `tables/*.xml` (the log text of every process on the device) and any
 copied `.ips` report stay there, on this Mac. Share `facts.json`,
 `rows.jsonl`, `judge.json` and the record, not the run directory.
-`facts.json` carries file names from the app's container (PDFs outside
-`tmp/`, the pipeline outputs) and the names of other processes in a jetsam
-report; check them before sharing.
+`facts.json` carries file names from the app's container (every file added,
+removed or changed in a step, the stores, PDFs outside `tmp/`, the pipeline
+outputs) and the names of other processes in crash and jetsam reports; the
+record and `judge.json` carry the phone's name and the exported PDFs' file
+names. Check them before sharing.
 
 ## Not yet
 

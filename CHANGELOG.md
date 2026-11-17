@@ -6,9 +6,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
-## [1.3.2]
-
-Search matches a name that wraps between its words onto a second line, or breaks at its own hyphen, as one match, with a box on each line (on a scan, only where the print reads upright). On photos and scans, a typed search now boxes the words it matched instead of the whole line. On searchable scans, a word's invisible copy can sit slightly off the printed word; a box now removes that copy for each word it covers, even where it falls outside the box. Share now also asks you to confirm first when the Detection Sweep lists possible items outside your boxes, or when form values were not carried over; slide to share. Copies of different documents get their own names, so saving several in one folder no longer replaces one with another. A redaction and its checks keep the screen awake while they run.
+Search matches a name that wraps between its words onto a second line, or breaks at its own hyphen, as one match, with a box on each line (on a scan, only where the print reads upright). On photos and scans, a typed search now boxes the words it matched instead of the whole line. On a scan whose searchable text is an invisible layer over one picture of the page, a word's invisible copy can sit slightly off the printed word; where Resecta can match that page's hidden text to its print, a box now removes that copy for each word whose print it covers, even where it falls outside the box. Share now also asks you to confirm first when the Detection Sweep lists possible items outside your boxes, or when form values were not carried over; slide to share. Copies of different documents get their own names, so saving several in one folder no longer replaces one with another. A redaction and its checks keep the screen awake while they run.
 
 ### Added
 
@@ -18,24 +16,24 @@ Search matches a name that wraps between its words onto a second line, or breaks
 ### Changed
 
 - Share: the shared copy is named with a short code made from the redacted file itself (for example redacted-3f9a1c07.pdf), so saving several documents in one folder no longer asks to replace the last one; the name still carries nothing from the original document and no export time.
+- Share confirm: a second share of the same results asks again, so each send of a file with reported issues, unrun checks or covered text gets its own confirmation.
+- Results: an annotation in the original that hides text no box covers is listed under the results with its pages, and the text-layer check is titled for the redacted PDF it reads.
+- Share: when the Detection Sweep reports possible items or the original's filled form values were not carried over, Share asks first and lists them; the sweep's row also names what it does not read.
 - Documentation: the threat model names the import caps (500 pages, 5,000 points on a side, and an image that declares more than 100 million pixels refused before it is decoded); its network notes name the name-recognition model iOS fetches on its own and the iCloud download of a photo or a file stored only there; and its persistence note says the redacted output is moved into place in a single step and that a change to your regions deletes the previous output file at once.
 - Documentation: the threat model, the engineering notes and the README's claims map narrow the detection-data signature claim to what the key holder signed — the bytes the detector reads are the bytes the maintainer's signing run listed — and leave the installed app's integrity to the app-bundle code signature.
 - Documentation: the README says the app runs on iOS 26 or later.
 - Documentation: the README names 1.3.1 as the latest release.
 - Documentation: SECURITY.md's tag-verification example checks `v1.3.1`.
-- Documentation: the threat model's posture table names the 1.3.1 identity record (`RELEASES/1.3.1-identity.md`), `git tag -v v1.3.1` and `gh release verify v1.3.1`; v1.3.0 stays named as the first release published after immutable releases were turned on, and the section keeps its 2026-10-27 date.
+- Documentation: the threat model's posture table names the 1.3.1 identity record (`RELEASES/1.3.1-identity.md`), `git tag -v v1.3.1` and `gh release verify v1.3.1`; v1.3.0 stays named as the first release published after immutable releases were turned on.
 - Documentation: the engineering notes describe the fake-redaction suite's control, which asserts that the text survives when nothing is marked.
 - Documentation: accepted risk 9 now names the scanned-bar case; KNOWN_ISSUES KI-18.
 - Documentation: KNOWN_ISSUES describes the App Store release's results screen (KI-17, KI-19), the alignment guides as they are (KI-10), the Stop Processing control (KI-9), the third case in which Search reads a typed page's images (KI-13), and names Search before Scan (KI-22).
-- Documentation: the engineering notes name the two reference tables that stay live when the detection-data signature fails, the `PDFKitGuard` target and the fill's growth over ink that crosses a region's edge; the device-harness README names the scripts' options and prerequisites as they are.
-- Documentation: the privacy policy names the shared copy's file name by version (redacted.pdf through 1.3.1, then redacted- followed by a short code); its effective date moves to 2026-11-01.
-- Documentation: the README and the threat model say what verification checks and when sharing asks first.
+- Documentation: the engineering notes name the two reference tables that stay live when the detection-data signature fails and the fill's growth over ink that crosses a region's edge; the device-harness README names the scripts' options and prerequisites as they are.
+- Documentation: the privacy policy names the shared copy's file name by version (redacted.pdf through 1.3.1, then redacted- followed by a short code).
+- Documentation: the README and the threat model say what verification checks, and the threat model says when sharing asks first.
 - Documentation: the README and CONTRIBUTING say that the hosted unit suite is a required check, which test schemes the pre-push hook runs, that eleven suites are left out on the hosted runner (three of them ink-fit timing pins) and how they are reported, which performance suites gate, and what the detection-data check verifies; the workflow and runner comments say the same.
 - Documentation: the threat model's import list puts the size check first and names the page-geometry stage; its detection-data paragraph names the verification pass among the check's triggers, the Scan interface as where the degraded banner shows, and the two reference tables that stay live; its persistence note says where a file a failed delete leaves goes; the image limits and the ink test's render resolution read as the code has them; and its share-confirmation sentences describe the App Store release.
 - Documentation: the privacy policy says a page with a text layer that also carries images is read both ways, names the three system services that reach the network on their own, and says the metadata check reports that a field was not replaced without showing its value; the EULA says Secure Rasterization flattens every page; both effective dates move to 2026-11-03. The NOTICE says the OpenStreetMap and OpenAddresses rows cover inputs no build reads (the street-suffix staging file is a transcription of street-address-rb's MIT table), adds the usdl-regex (MIT) row behind part of the driver's-license pattern table, says the UK passport row carries number-format facts only, and that no ParaNames code is used.
-- Share confirm: a second share of the same results asks again, so each send of a file with reported issues, unrun checks or covered text gets its own confirmation.
-- Results: an annotation in the original that hides text no box covers is listed under the results with its pages, and the text-layer check is titled for the redacted PDF it reads.
-- Share: when the Detection Sweep reports possible items or the original's filled form values were not carried over, Share asks first and lists them; the sweep's row also names what it does not read.
 
 ### Fixed
 
@@ -56,20 +54,20 @@ Search matches a name that wraps between its words onto a second line, or breaks
 - Search: on a scanned page, a typed number or code made of digits that look like letters, such as a suite, room or case number, an amount or a member ID, is now found, and an accented name matches with or without its accents. Before, the recognised line was corrected toward letters while the typed text was not, so such numbers never matched.
 - Search: on a scanned page or photo, a Text or Multi-term match is boxed on the words it covers rather than the whole recognised line (KNOWN_ISSUES KI-17).
 - A highlight or form field in the original that hides one word of a line at its edge is now named as covering text: on a page whose text layer reads, it counts as a cover when it hides at least 60% of any one word under it, not 60% of its whole area.
-- Searchable Redaction: when Resecta cannot match a scanned page's hidden text to the printed words under a box, the page is exported as an image only, and the results show why.
+- Searchable Redaction: when a box that was not placed from a scanned page's own text, such as one you drew, duplicated, resized or moved, lies on a page whose hidden text Resecta cannot or does not match to the printed words, the page is exported as an image only, and the results show why.
 - Verification: a hidden copy of a covered word left in a Searchable export is now reported, on the page and box it belongs to.
 - Search: on some scanned documents, a box could be placed from another page's printed words. A page's box is no longer placed from another page of the same document.
 
 ### Security
 
-- `THREAT-MODEL.md` §7 is headed "Security posture", with its date and commit in its first sentence, so a link to it holds across re-dates. The branch-rules row names each repository's required check, the up-to-date-branch rule and the `rulesets/<id>` path, and says the admin role may bypass the ruleset on a pull request; the reporting and secrets rows give their public API paths and the contributors graph; the flag-check row names one launch argument. The rows the site's posture sheet also shows read as the site's do, and a note beneath the table names the checks that need a role on the repository. No state changed, and the section keeps its 2026-10-27 date.
+- `THREAT-MODEL.md` §7 is headed "Security posture", with its date and commit in its first sentence, so a link to it holds across re-dates. The branch-rules row names each repository's required check, the up-to-date-branch rule and the `rulesets/<id>` path, and says the admin role may bypass the ruleset on a pull request; the reporting and secrets rows give their public API paths and the contributors graph; the flag-check row names one launch argument. The rows the site's posture sheet also shows read as the site's do, and a note beneath the table names the checks that need a role on the repository. No state changed.
 - `SECURITY.md` says why `v1.0.0` and `v1.2.0` verify from a clone of `main`, names the public API path that lists published advisories, and states that the project has had no third-party security audit, runs no bug bounty, and makes no compliance claims.
 - `THREAT-MODEL.md` §7 re-dated at `05b7ae0a` (2026-10-27), each row re-checked: the identity-record row names the 1.3.0 record beside the 1.2.0 one, and the immutable-releases row names `gh release verify v1.3.0`, the first release published after the setting was turned on.
-- When saving or loading your saved searches, settings or other stored data failed, the error the app wrote to the device's system log could include part of the stored text (for example a custom search term). The log now names only the kind of error; the details are kept private.
-
+- When saving or loading your Custom Terms, saved searches or saved patterns failed, the error the app wrote to the device's system log could quote from the stored file (in the cases seen, a single character of a damaged file). The log now names only the kind of error; the details are kept private.
 - `THREAT-MODEL.md` §7 re-dated at `c91008ae` (2026-11-03): the app's unit-test suite has been a required check on `main` since 2026-10-27, and the branch-rules and unit-suite rows say so; the other rows re-checked.
 - Import: the active-content check no longer stalls on some documents.
-- Searchable Redaction: on a scanned page that carries its own hidden text, a box now removes the hidden copy of each word whose printed text it covers, even when that copy lies outside the box, including boxes drawn by hand, duplicated, resized or moved.
+- Searchable Redaction: on a scanned page whose hidden text is an invisible layer over one picture of the page, a box now removes the hidden copy of each word whose printed text it covers, even when that copy lies outside the box, including boxes drawn by hand, duplicated, resized or moved, where Resecta can match that page's hidden text to its print. Where it cannot, or on a scan of another kind, a box of those four kinds makes the page an image only.
+
 ### Internal
 
 - A target specification for the verification pass, VERIFICATION-SPEC.md, with a status line per rule; claims-lint covers it.
@@ -551,8 +549,7 @@ Initial public release.
 - **Pixel-destruction core shared by both modes.** Every page is rasterized, marked or not; vector text and images are converted into flat bitmap data, and the redaction process is designed to remove the original text layer from marked regions.
 - **Searchable Redaction text-layer design.** The reconstructed text layer uses a fresh monospace font with uniform spacing, designed to remove the glyph-positioning side channels identified in academic research on sandwich PDFs.
 
-[Unreleased]: https://github.com/Merlin1A/resecta/compare/v1.3.2...HEAD
-[1.3.2]: https://github.com/Merlin1A/resecta/compare/v1.3.1...v1.3.2
+[Unreleased]: https://github.com/Merlin1A/resecta/compare/v1.3.1...HEAD
 [1.3.1]: https://github.com/Merlin1A/resecta/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/Merlin1A/resecta/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/Merlin1A/resecta/compare/v1.1.0...v1.2.0

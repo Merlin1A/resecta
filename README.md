@@ -19,7 +19,7 @@ A black box drawn over text can leave the text underneath readable. Resecta is d
 
 **License:** [Apache License 2.0](./LICENSE)
 
-**Latest release:** 1.3.1 — see the [CHANGELOG](./CHANGELOG.md).
+**Latest release:** 1.3.1 — see the [CHANGELOG](./CHANGELOG.md). The `main` branch is ahead of that release: what has changed since is listed there under Unreleased, and where the app's behaviour differs, this page describes the release.
 
 ---
 
@@ -45,7 +45,9 @@ The core workflow is:
 ## Two modes
 
 - **Secure Rasterization** — produces image-only output and is the simplest approach for high-sensitivity documents. Verification runs as a 7-layer check.
-- **Searchable Redaction** — keeps a rebuilt copy of the non-redacted text for selection and search (it can differ from the page: `KNOWN_ISSUES.md` KI-27 and KI-29), using a fresh monospace font designed to reduce the glyph-positioning side channels identified in academic research. Verification runs as a 12-layer check (the five additional checks cover the preserved-text layer). If any unmarked text on a page shows no ink or almost none — white or near-white on white, invisible or nearly transparent, or under an opaque box drawn into the page — that page is exported as an image only. The stated limits: text covered by a picture in the page, text under a cover filled with a pattern, text under a bar that is part of a scanned picture, and text that shows faintly through a box that is not fully opaque can still enter the text layer (`KNOWN_ISSUES.md` KI-18).
+- **Searchable Redaction** — keeps a rebuilt copy of the non-redacted text for selection and search (it can differ from the page: `KNOWN_ISSUES.md` KI-27 and KI-29), using a fresh monospace font designed to reduce the glyph-positioning side channels identified in academic research. Verification runs as a 12-layer check (the five additional checks cover the preserved-text layer).
+  - If any unmarked text on a page shows no ink or almost none — white or near-white on white, invisible or nearly transparent, or under an opaque box drawn into the page — that page is exported as an image only.
+  - The stated limits: text covered by a picture in the page, text under a cover filled with a pattern, text under a bar that is part of a scanned picture, and text that shows faintly through a box that is not fully opaque can still enter the text layer (`KNOWN_ISSUES.md` KI-18).
 
 Both modes share the same pixel-destruction core. Settings holds the default mode and each document can override it; Paranoid Mode pins Secure Rasterization.
 
@@ -83,8 +85,8 @@ Resecta is designed to address specific risks that arise when sharing redacted d
 
 **In scope:**
 
-- **Residual text after redaction.** Both modes are designed to rasterize every page and leave the original text layer out of the rebuilt file; Searchable Redaction adds a rebuilt layer holding only unmarked text. The multi-layer verification pass then checks the output for redacted text that remains.
-- **Document metadata leakage.** Author, editing history, tagged structure, and other source metadata fields are stripped from exported documents. The rebuilt file does carry a producer tag — replaced with a fixed value ("Resecta") that identifies neither the operating system version nor the build — the writer's creation/modification timestamps, rewritten to a fixed date, and a file identifier derived from the file's own bytes; it is not metadata-free. See [`PRIVACY.md`](./PRIVACY.md).
+- **Residual text after redaction.** Both modes are designed to rasterize every page and leave the original text layer out of the rebuilt file; Searchable Redaction adds a rebuilt layer designed to hold only unmarked text; on a scanned page a box can leave the word in it (`KNOWN_ISSUES.md` KI-24), and the rebuilt text can differ from the page (KI-27 and KI-29). The multi-layer verification pass then checks the output for redacted text that remains.
+- **Document metadata leakage.** Author, editing history, tagged structure, and other source metadata fields are stripped from exported documents. The rebuilt file does carry a producer tag — replaced with a fixed value ("Resecta") that identifies neither the operating system version nor the build — the writer's creation/modification timestamps, rewritten to a fixed date, and a file identifier derived from the file's own bytes; it is not metadata-free, and some Searchable exports keep the real export time and iOS version (`KNOWN_ISSUES.md` KI-26). See [`PRIVACY.md`](./PRIVACY.md).
 - **Font-positioning side channels (Searchable Redaction).** The rebuilt text layer is drawn in a fresh monospace font on a uniform per-line pitch, designed to reduce the glyph-positioning side channels identified in academic research on PDFs that pair a page image with a hidden text layer.
 
 **Out of scope:**
@@ -96,11 +98,11 @@ Resecta is designed to address specific risks that arise when sharing redacted d
 
 ## How we verify these claims
 
-Each claim in the map below is paired with a mechanical check in this repo. The map is the short version; the depth, the design reasoning, and the honest limits of each check are in [`ENGINEERING.md`](./ENGINEERING.md). Paths in the map that do not start with `Scripts/` or `Tests/` are inside the engine package's sources or tests.
+Each claim in the map below is paired with a mechanical check in this repo. The map is the short version; the depth, the design reasoning, and the honest limits of each check are in [`ENGINEERING.md`](./ENGINEERING.md). Paths in the map that do not start with `Scripts/`, `Sources/` or `Tests/` are inside the engine package's sources or tests.
 
 | Claim | Check |
 | --- | --- |
-| Marked regions are destroyed, not covered | Per-region pixel readback after every fill (`Pipeline/PageRasterizer.swift`) — one wrong pixel fails the render, the page is re-rendered once at the lowest resolution tier, and a second failure fails the export; the classic annotation-over-text attacks are constructed and destroyed in `SecurityTests/FakeRedactionTests.swift` |
+| Marked regions are destroyed, not covered | Per-region pixel readback after every fill (`Pipeline/PageRasterizer.swift`) — one wrong pixel fails the render, the app re-renders the page once at the lowest resolution tier (`Sources/ResectaApp/State/PipelineCoordinator+Rasterization.swift`), and a second failure fails the export; the classic annotation-over-text attacks are constructed and destroyed in `SecurityTests/FakeRedactionTests.swift` |
 | The exported file is re-opened and re-checked | The 7/12-layer verification pass re-opens the output and scans its text, OCR of its rendered pages, the raw bytes across seven encodings (outside stream data) plus each page's decoded text, its structure and its metadata, re-runs each applied search on the output, and runs the app's structured detectors on the output to report what they flag — names and addresses are not swept (`Verification/VerificationEngine.swift`) |
 | Placement survives rotated pages | A rotation × crop-box-origin test matrix positions its regions with a transform written independently of the production code (`SecurityTests/RotatedPageCoordinateTests.swift`) |
 | No network requests of its own | A source grep for networking symbols returns no code references (the sole hit is a comment); the pre-commit hook rejects those symbols on added Swift source lines (`Scripts/audit-lint.sh`) |

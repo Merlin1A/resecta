@@ -13,8 +13,8 @@ Paths that start with `Pipeline/`, `Verification/`, `Detection/`,
 `Packages/RedactionEngine/` (under its `Sources/RedactionEngine/` or
 `Tests/RedactionEngineTests/`); the rest are relative to the repo root, apart
 from the data pipeline's own files named in §8. The line counts, the
-isolation opt-out count and the encoding count in this file are measured
-from the tree you are looking at by
+isolation opt-out count, the encoding count and the two logging counts in
+this file are measured from the tree you are looking at by
 `Scripts/doc-metrics.sh`, which the pull-request gate runs, not from a
 dashboard. If you have time for one path through the code, skip to
 [Where to start reading](#where-to-start-reading).
@@ -50,8 +50,8 @@ failure fails the whole export with an error rather than shipping (the retry
 is the app's: `rasterizeWithRetry` in
 `Sources/ResectaApp/State/PipelineCoordinator+Rasterization.swift`).
 
-**The honest limit:** pixel readback proves the fill is *complete* — every
-pixel inside the region carries the fill colour. It cannot prove the region
+**The honest limit:** pixel readback shows the fill is *complete* — every
+pixel inside the region carries the fill colour. It cannot show the region
 was in the *right place*. Placement is covered separately: by the rotation ×
 geometry test matrix (§4) and by the verification pass, which inspects the
 finished file with no knowledge of how it was produced (§2). And no automated
@@ -225,16 +225,15 @@ Overclaiming is a defect class here, tested like any other:
   sites pinned in the script with its reason — the same gate for me and for
   contributors (`CONTRIBUTING.md`).
 - The honesty-surface tests
-  (`Tests/ResectaAppTests/HonestySurfacesTests.swift`) pin the mount predicate
-  of the disclaimer naming the checks' limits on the verification results
-  screen and its single mount, and that failed,
-  attention-level and skipped verdicts surface an in-context cue on the
-  output preview. The honesty copy is
+  (`Tests/ResectaAppTests/HonestySurfacesTests.swift`) pin that the
+  disclaimer naming the checks' limits shows on the verification results
+  screen for every verdict, in one place, and that a failed, attention-level
+  or skipped verdict puts a cue on the output preview. The honesty copy is
   load-bearing UI, so its presence is a tested invariant, not a style choice.
 - `TransparencyClaimsTests` exists because I shipped an overclaim: early docs
   said user-entered Custom Terms don't persist across launches. They do (in
-  protected files under Application Support, documented in `PRIVACY.md` and
-  the README). I corrected the docs, then wrote a guard that reads the docs
+  protected files under Application Support, documented in `PRIVACY.md`).
+  I corrected the docs, then wrote a guard that reads the docs
   from the tree and goes red if `README.md` brings back the false
   non-persistence claim, or if any of README, ENGINEERING or THREAT-MODEL
   places the terms in the superseded store. That found-it, fixed-it,
@@ -249,37 +248,40 @@ are processed on device. To check it yourself:
 grep -rn "URLSession\|NWConnection" Sources/ Packages/RedactionEngine/Sources
 ```
 
-The expected result is a single match — a code comment noting the fact. The
-pre-commit hook rejects `URLSession`, `URLRequest`, `NWConnection`,
-`NWPathMonitor`, and `WKWebView` on every added Swift source line (the hook
-defines one override marker, for a Safari-view wrapper; no line in the tree
-uses it), and on every run that adds or changes a file it scans the whole
-shipping source — `Sources/`
-and the engine package, the test trees excluded — for the call-shaped
-networking and hand-off symbols: a bare `Link(`, `NWListener(`,
-`NWBrowser(`, `NSURLConnection(`, the CFNetwork socket and stream
-constructors, the BSD `socket(` / `connect(` / `getaddrinfo(` calls,
-`openURL`, `UIApplication.shared.open(`, an `import Network` line and the
-five symbols above in any code position, with comments and string literals
-skipped. Every hit must match a site pinned in
-the script with its reason, one pin per site: the file, the symbol and an
-identifier of the call, such as its destination. Today two sites are pinned,
-both in the Settings view: the Send Feedback link, a `mailto:` hand-off to
-Mail, and the Rate link, which opens the app's App Store page in the App
-Store app. A new use of one of those symbols fails the hook and the gate,
-including a second use in a file that already has a pinned site. The lint names those symbols and no others: a
-`Data(contentsOf:)` on a remote URL, SwiftUI's `AsyncImage`, an `import
-WebKit` or a configuration type such as `URLSessionConfiguration` is outside
-it and is held by review, as is the App Store review prompt (`requestReview`),
-which the system presents and which makes its own requests, so the property
-holds for what the lint names, not
-for every way the platform can reach the network. The in-app
-legal/support links open in a Safari view or Mail, each in its own process —
-the binary embeds no web engine of its own. The privacy manifest ships at `Resources/PrivacyInfo.xcprivacy`
-and declares no collected data types and no tracking, matching `PRIVACY.md`
-("Data Not Collected"). And the dependency footprint makes the review
-tractable: the app's only dependency is its own engine package — there is no
-third-party SDK to audit.
+The expected result is a single match — a code comment noting the fact.
+
+The pre-commit hook rejects `URLSession`, `URLRequest`, `NWConnection`,
+`NWPathMonitor`, and `WKWebView` on every added Swift source line (the
+networking rule has one override marker, `Networking:exempt SafariView`, for
+a Safari-view wrapper; no Swift line uses it), and on every run that adds or
+changes a file it scans the whole shipping source — `Sources/` and the engine
+package, the test trees excluded — for the call-shaped networking and
+hand-off symbols: a bare `Link(`, `NWListener(`, `NWBrowser(`,
+`NSURLConnection(`, the CFNetwork socket and stream constructors, the BSD
+`socket(` / `connect(` / `getaddrinfo(` calls, `openURL`,
+`UIApplication.shared.open(`, an `import Network` line and the five symbols
+above in any code position, with comments and string literals skipped. Every
+hit must match a site pinned in the script with its reason, one pin per site:
+the file, the symbol and an identifier of the call, such as its destination.
+Today two sites are pinned, both in the Settings view: the Send Feedback
+link, a `mailto:` hand-off to Mail, and the Rate link, which opens the app's
+App Store page in the App Store app. A new use of one of those symbols fails
+the hook and the gate, including a second use in a file that already has a
+pinned site.
+
+The lint names those symbols and no others: a `Data(contentsOf:)` on a remote
+URL, SwiftUI's `AsyncImage`, an `import WebKit` or a configuration type such
+as `URLSessionConfiguration` is outside it and is held by review, as is the
+App Store review prompt (`requestReview`), which the system presents and
+which makes its own requests, so the property holds for what the lint names,
+not for every way the platform can reach the network.
+
+The in-app legal/support links open in a Safari view or Mail, each in its own
+process — the binary embeds no web engine of its own. The privacy manifest
+ships at `Resources/PrivacyInfo.xcprivacy` and declares no collected data
+types and no tracking, matching `PRIVACY.md` ("Data Not Collected"). And the
+dependency footprint makes the review tractable: the app's only dependency is
+its own engine package — there is no third-party SDK to audit.
 
 The check without a computer is airplane mode: redaction works unchanged,
 which shows that it needs no network, not what the app does while online.
@@ -334,9 +336,9 @@ concurrent entry points. The working rules, checkable by grep:
   (`SearchResultsListObservationCrashTests`).
 - Memory hygiene is mechanical: bitmap buffers are wiped with `memset_s`
   (which the compiler cannot elide) before returning to the context pool;
-  temp export files are hardened, excluded from backups, and cleaned per
-  session — each property pinned by its own test
-  (`PixelBufferZeroizeTests`, `BackupExclusionTests`, `FileProtectionTests`;
+  temp export files are hardened, kept in a folder marked for exclusion
+  from backups, and cleaned per session — each property pinned by its own
+  test (`PixelBufferZeroizeTests`, `BackupExclusionTests`, `FileProtectionTests`;
   the zeroize timing budget sits in its own suite,
   `PixelBufferZeroizeTimingTests`, which the batched runner runs alone and
   report-only).
@@ -368,8 +370,10 @@ assets. The contract between the two repos is enforced, not eyeballed:
   the installed app is the app-bundle code signature, which seals these same
   files.** The manifest's per-asset digests, verified at first load, show
   that the bytes the detector reads are the bytes the maintainer's signing run
-  listed. On any verification failure, detection degrades with a
-  visible banner — never silently.
+  listed. On any verification failure, a one-time notice and a banner in the
+  Scan interface say detection is degraded when a scan starts; a
+  verification pass that runs without a scan shows no banner
+  (`THREAT-MODEL.md` §4).
 - What that verdict governs, precisely: one memoized verdict
   (`Detection/Gazetteer/GazetteerTrust.swift`, computed once per process) is
   consulted by both loading paths — the diagnostics loader and the public
@@ -381,10 +385,10 @@ assets. The contract between the two repos is enforced, not eyeballed:
   gazetteer.
 - Two reference tables load outside that verdict by design and stay live —
   the address-components gazetteer and the ZIP-to-state table — as do the
-  Classifier assets and the audit rule catalog;
-  a digest failure on one of them is recorded in the load diagnostics and
-  raises the banner, and the asset stays in use unless its own loader
-  rejects it, when its built-in fallback applies. The institution gazetteer is
+  Classifier assets and the audit rule catalog. A digest failure on one of
+  them is recorded in the load diagnostics and raises the banner, and the
+  asset stays in use unless its own loader rejects it, when its built-in
+  fallback applies. The institution gazetteer is
   also outside the verdict, but its only reader is the negative-context
   gazetteer, so it is not loaded while that loader is withheld. Every loader
   that decodes a
@@ -405,10 +409,11 @@ assets. The contract between the two repos is enforced, not eyeballed:
   test, not a silent skew. `Scripts/verify-shipped-asset-hashes.sh`, which the
   pull-request gate runs, pins the engine's classifier files
   `preset-thresholds.json` and `context-scorer.json` and the manifest public
-  key byte-exact and checks the signed manifest's asset list against the
+  key byte-exact, verifies the manifest's signature with a verifier outside
+  the engine, and checks the signed manifest's asset list against the
   shipped tree.
 
-The trust boundary this section implements — what the signature proves and
+The trust boundary this section implements — what the signature shows and
 what it does not — is stated for readers in [`THREAT-MODEL.md`](./THREAT-MODEL.md)
 §4, and the key's custody in the pipeline's `KEY-MANAGEMENT.md`.
 
@@ -432,26 +437,13 @@ search, rebuild, verify and export without the app's view code:
 - Export: `TempExportDirectory` · `TempFileHardening` · `ExportMetadata` ·
   `MatchAuditExporter`
 
-`TextSpan.words(fullyInside:on:)` returns the words of a page's text
-layer fully inside a region, in the displayed frame. At the start of each run
-the app captures a manual region's words, on pages with a usable text layer,
-as terms the verification pass searches for. It takes the words the
-searchable redaction would touch, line by line. A region over exactly one
-word keeps that word as one bounded term. Otherwise each captured line of two
-or more words becomes one term, the page text's own span from its first word
-to its last, and each word of the line joins as a bounded term when it holds
-a digit, is a capitalized word of two or three letters (a short surname such
-as Lee or Ng), or has four characters or more, and is not on the stop list of
-common words. Lines never join across. A region covering the whole page adds no
-term, and a region on a page without a usable text layer is counted, not
-captured.
-
-These are public because the app consumes them, or, for `ExportMetadata` and
-`MatchAuditExporter`, because a client outside the app needs them to write an
-audit record (the app itself does not call those two today), along with the
-types their signatures carry and whatever else the app names; everything else
-in the package is `internal` or on its way there, and the test suites reach it
-through `@testable import`, so narrowing the surface costs no coverage.
+These are public because the app consumes them, along with the types their
+signatures carry and whatever else the app names. `ExportMetadata` and
+`MatchAuditExporter` are the exception: a client outside the app needs them
+to write an audit record, and the app itself does not call those two today.
+Everything else in the package is `internal` or on its way there, and the
+test suites reach it through `@testable import`, so narrowing the surface
+costs no coverage.
 
 The check: `EnginePublicSurfaceTests` names every symbol in the list through a
 plain `import RedactionEngine`, so making one of them `internal` stops the
@@ -461,6 +453,20 @@ review question. The pull-request gate covers the count: it reads the package's
 `public` and `open` declaration lines and fails a change whose count exceeds the
 cap it carries (`Scripts/engine-public-surface-check.sh`), so a new `public`
 declaration spends headroom the change's description has to name.
+
+One note on the list. `TextSpan.words(fullyInside:on:)` returns the words of a
+page's text layer fully inside a region, in the displayed frame. At the start
+of each run the app captures a manual region's words, on pages with a usable
+text layer, as terms the verification pass searches for. It takes the words
+the searchable redaction would touch, line by line. A region over exactly one
+word keeps that word as one bounded term. Otherwise each captured line of two
+or more words becomes one term, the page text's own span from its first word
+to its last, and each word of the line joins as a bounded term when it holds a
+digit, is a capitalized word of two or three letters (a short surname such as
+Lee or Ng), or has four characters or more, and is not on the stop list of
+common words. A term never runs across two lines. A region covering the whole
+page adds no term, and a region on a page without a usable text layer is
+counted, not captured.
 
 ## Where to start reading
 

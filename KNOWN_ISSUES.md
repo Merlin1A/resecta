@@ -3,6 +3,8 @@
 > Tracked bugs, spec gaps, and implementation constraints.
 > Severity: Critical / High / Medium / Low–Medium / Low.
 > When fixed, move to the **Fixed** section with the resolution and date.
+>
+> Open entries describe the current App Store release (1.3.1). An entry whose fix is on `main` but not yet released stays open until the release that carries the fix.
 
 ---
 
@@ -89,7 +91,7 @@ A barcode or QR code in a photo is not read or flagged: text recognition reads p
 ### KI-12: Some Non-ASCII Passwords Do Not Unlock a Document (Low)
 **Affects:** Import (password-protected PDFs)
 
-A password that contains accented Latin letters, such as ä or é, does not open a PDF encrypted with 128-bit or 256-bit AES, even when it is the correct password: PDFKit refuses it, and the password sheet reports that the password did not open the document. A 256-bit AES PDF whose password is written in Chinese characters opens, but Search and the page preview on that document can stop with "Could not prepare the document for search", because PDFKit returns no copy of the unlocked document for Search to read.
+A password that contains accented Latin letters, such as ä or é, does not open a PDF encrypted with 128-bit or 256-bit AES, even when it is the correct password: PDFKit refuses it, and the password sheet reports that the password did not open the document. A 256-bit AES PDF whose password is written in Chinese characters opens, but Search on that document can stop with "Could not prepare the document for search", and the preview of matches as you type shows nothing, because PDFKit returns no copy of the unlocked document for Search to read.
 
 **Workaround:** Open the PDF with its password in another app, save a copy without a password, and import that copy.
 
@@ -98,7 +100,7 @@ A password that contains accented Latin letters, such as ä or é, does not open
 ### KI-13: Some Images on Typed Pages Are Not Read by Search (Low–Medium)
 **Affects:** Search (typed pages that also carry images)
 
-On a page with a text layer, Search also reads the page's images for text when one image holds at least 250,000 pixels or covers about half the page, or when the page's text layer is very short for its size (a stamp or a Bates line over a scan). Otherwise it does not read text in a smaller image (a thumbnail-sized photo), in an image written inline in the page's drawing instructions, or in text drawn as outlines rather than as characters. When you have applied at least one result of a typed search, the check after export reads every page of the redacted copy for that term and can report it if it is left in such an image. A search that found nothing is not run again after export, so a term that appears only in such an image is not reported. Names found by Scan are not checked that way.
+On a page with a text layer, Search also reads the page's images for text when one image holds at least 250,000 pixels, or at least half as many pixels as the page itself has at 100 dpi, or when the page's text layer is very short for its size (a stamp or a Bates line over a scan). Otherwise it does not read text in a smaller image (a thumbnail-sized photo), in an image written inline in the page's drawing instructions, or in text drawn as outlines rather than as characters. When you have applied at least one result of a typed search, the check after export reads every page of the redacted copy for that term and can report it if it is left in such an image. A search that found nothing is not run again after export, so a term that appears only in such an image is not reported. Names found by Scan are not checked that way.
 
 **Workaround:** Draw a region over the image.
 
@@ -107,7 +109,7 @@ On a page with a text layer, Search also reads the page's images for text when o
 ### KI-14: The No-Match Message Does Not Qualify Another App's OCR Text (Medium)
 **Affects:** Search (scanned PDFs whose text layer was made by another app's OCR)
 
-When Search reads pages by text recognition and a search returns no match, the message says how many pages were read that way, because a misread word does not match. A scanned PDF whose invisible text layer was made by another app's OCR is read as a page with text, so a search with no match on it shows the plain "No occurrences in the document" message, although that layer can hold the same misreads. Search's no-match message doesn't yet qualify pages whose text layer came from another app's OCR; check scanned pages by eye.
+When Search reads pages by text recognition and a search returns no match, the message says how many pages were read that way, because a misread word does not match. A scanned PDF whose invisible text layer was made by another app's OCR is counted as a page with text, so a search with no match on it shows the plain "No occurrences in the document" message, although that layer can hold the same misreads.
 
 **Workaround:** Check scanned pages by eye, or search a shorter part of the term.
 
@@ -145,7 +147,13 @@ A region you draw by hand on a page with no text layer (a photo, a screenshot or
 ### KI-18: A Bar or Cover Already in a Received Page Can Leave Text in a Searchable Export (Medium)
 **Affects:** Searchable Redaction (documents that were blacked out before you opened them)
 
-Searchable Redaction exports a page as an image only when it reads unmarked text there as showing no ink. Bars and covers of these kinds already in a received page can defeat that reading: a dark bar that is part of a scanned picture, whose scanning noise reads as ink, over a word the page's own OCR text layer still holds; a bar drawn over live text that is not fully opaque, so the text shows through faintly; and a cover drawn over live text that is filled with a pattern, such as hatching or dots, or is a picture. The page then keeps its text layer, the word under the bar or cover can be selected, copied and searched in the export, and verification reports it only if a detector in its final sweep flags it. The sweep reads the structured categories, and a detector can weigh the words around a number before it flags it; a name or an address is not swept. A cover that is an annotation, such as a highlight or a form field, is a different case: see KI-37.
+Searchable Redaction exports a page as an image only when it reads unmarked text there as showing no ink. Bars and covers of these kinds already in a received page can defeat that reading:
+
+- a dark bar that is part of a scanned picture, whose scanning noise reads as ink, over a word the page's own OCR text layer still holds;
+- a bar drawn over live text that is not fully opaque, so the text shows through faintly;
+- a cover drawn over live text that is filled with a pattern, such as hatching or dots, or is a picture.
+
+The page then keeps its text layer, the word under the bar or cover can be selected, copied and searched in the export, and verification reports it only if a detector in its final sweep flags it. The sweep reads the structured categories, and a detector can weigh the words around a number before it flags it; a name or an address is not swept. A cover that is an annotation, such as a highlight or a form field, is a different case: see KI-37.
 
 **Workaround:** For a document that was already blacked out, export with Secure Rasterization, which keeps no text layer.
 
@@ -208,6 +216,8 @@ On Searchable exports that need a large fallback font, such as Chinese or Japane
 
 A Searchable export carries a hidden copy of the page's text, which is what makes the file searchable. Where the original file draws two letters as one joined shape, as some typeset documents do for "fi", "fl" and "ff", the hidden copy can carry both letters twice: "Benefit" is written "Benefifit". The same can happen to a Thai syllable written with the vowel sign ำ and to an emoji made of several joined emoji. In the exported file a search for such a word can find nothing even though the word is printed on the page, and text copied from the file carries the doubles. The Character Count check can then warn on a file that is otherwise correct. Some Devanagari and Tamil marks can be missing from the hidden copy. The picture of the page is not affected. In the cases tested, a box that touched any part of such a joined shape removed all of its letters from the hidden copy. <!-- LegalPhrases:safe -->
 
+**Workaround:** If wrong text in the file would matter, export with Secure Rasterization, which keeps no text layer; the file then has no text to search or copy.
+
 ---
 
 ### KI-28: On a Scanned Page That Reads Sideways or Upside Down, a Multi-Word Search Can Miss Text That Runs onto the Next Line (Medium)
@@ -222,7 +232,9 @@ On a scanned page whose print reads sideways or upside down as the page is shown
 ### KI-29: In a Searchable Export, a Number Next to a Box Can Lose Digits in the Hidden Text (Low–Medium)
 **Affects:** Searchable Redaction
 
-The hidden copy of the page's text leaves out the characters closest to a box, on purpose: any character within three points (about a millimeter) of it. A number that stands beside a box, or on the line just above or below one, can lose the digits nearest the box that way, so "1290" can read "12" when it is copied or searched, while the page you see still shows the number, whole or in part. No boxed text comes back, and no digit is added. In some files the hidden copy also loses the space between two words.
+The hidden copy of the page's text leaves out the characters closest to a box, on purpose: any character within three points (about a millimeter) of it, on a line the box touches. A number that stands beside a box, or on a line just above or below that the box reaches into, can lose the digits nearest the box that way, so "1290" can read "12" when it is copied or searched, while the page you see still shows the number, whole or in part. A word can lose the letters nearest a box the same way. No boxed text comes back, and no digit is added. In some files the hidden copy also loses the space between two words.
+
+**Workaround:** If wrong text in the file would matter, export with Secure Rasterization, which keeps no text layer; the file then has no text to search or copy.
 
 ---
 
@@ -283,7 +295,7 @@ Search reads one page at a time. A name, address or other phrase that starts on 
 ## Fixed
 
 ### KI-8: Duplicate Regions from Multiple Scan Runs (Low) — FIXED (entry moved 2026-10-01)
-**Resolution:** Scan results are applied through the same path as search results, which skips a result that an existing region already covers by more than four fifths of its area, so applying the same scan twice adds no second region. The entry was stale.
+**Resolution:** Scan results are applied through the same path as search results, which skips a result that one existing region already covers whole, so applying the same scan twice adds no second region. The entry was stale.
 
 ---
 
