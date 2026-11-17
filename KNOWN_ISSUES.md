@@ -116,7 +116,7 @@ When Search reads pages by text recognition and a search returns no match, the m
 ### KI-15: A Word Split by a Hyphen Across Two Lines Is Not Matched Whole (Low)
 **Affects:** Search
 
-A word that a hyphen splits across two lines is matched as two separate words, so a search for the whole word does not match it.
+A word that a hyphen splits across two lines is matched as two separate words, so a search for the whole word does not match it. The same holds for a name or a number that breaks after its own hyphen, such as a double surname or a case number.
 
 **Workaround:** Search for each part, or draw a region over the word.
 
@@ -134,9 +134,9 @@ A photo whose full-size copy is kept only in iCloud, as with Optimize iPhone Sto
 ### KI-17: On a Photo or Scanned Page, a Search Box Covers the Whole Line (Low–Medium)
 **Affects:** Search (text read from a picture: a photo, a screenshot, a scan, or a photo on a typed page); hand-drawn regions on pages with no text layer
 
-On a page that is a picture, such as a photo, a screenshot or a scan without its own text, Search reads the text with on-device text recognition, which reports where each line is rather than each word. A box placed from a Search match on such a page covers the whole line that holds the match, so the other words on that line are covered too.
+On a page that is a picture, such as a photo, a screenshot or a scan without its own text, Search reads the text with on-device text recognition. A box placed from a Search match on such a page covers the whole line that holds the match, so the other words on that line are covered too.
 
-A region you draw by hand on a page with no text layer (a photo, a screenshot or a scan without its own text) is not read by any check: no words are captured under it, so the checks cannot tell what it covers. The Binary String Search check notes how many hand-drawn regions added no term (a region that covers its whole page, or one on a page with no text layer) but does not say which pages hold them.
+A region you draw by hand on a page with no text layer (a photo, a screenshot or a scan without its own text) is not read by any check: no words are captured under it, so the checks cannot tell what it covers. The Terms in Text & Bytes check notes how many hand-drawn regions added no term (a region that covers its whole page, or one on a page with no text layer) but does not say which pages hold them.
 
 **Workaround:** Before you tap Redact, select the box and drag its handles in to the word, leaving a margin around its letters: a box drawn to the edges of the letters can leave part of them readable. Check the page in the preview before you share. For a region you drew by hand on a page with no text layer, check in the preview that the region covers what you meant.
 
@@ -145,7 +145,7 @@ A region you draw by hand on a page with no text layer (a photo, a screenshot or
 ### KI-18: A Bar or Cover Already in a Received Page Can Leave Text in a Searchable Export (Medium)
 **Affects:** Searchable Redaction (documents that were blacked out before you opened them)
 
-Searchable Redaction exports a page as an image only when it reads unmarked text there as showing no ink. Bars and covers of these kinds already in a received page can defeat that reading: a dark bar that is part of a scanned picture, whose scanning noise reads as ink, over a word the page's own OCR text layer still holds; a bar drawn over live text that is not fully opaque, so the text shows through faintly; and a cover drawn over live text that is filled with a pattern, such as hatching or dots, or is a picture. The page then keeps its text layer, the word under the bar or cover can be selected, copied and searched in the export, and verification reports it only if a detector in its final sweep flags it. The sweep reads the structured categories, and a detector can weigh the words around a number before it flags it; a name or an address is not swept.
+Searchable Redaction exports a page as an image only when it reads unmarked text there as showing no ink. Bars and covers of these kinds already in a received page can defeat that reading: a dark bar that is part of a scanned picture, whose scanning noise reads as ink, over a word the page's own OCR text layer still holds; a bar drawn over live text that is not fully opaque, so the text shows through faintly; and a cover drawn over live text that is filled with a pattern, such as hatching or dots, or is a picture. The page then keeps its text layer, the word under the bar or cover can be selected, copied and searched in the export, and verification reports it only if a detector in its final sweep flags it. The sweep reads the structured categories, and a detector can weigh the words around a number before it flags it; a name or an address is not swept. A cover that is an annotation, such as a highlight or a form field, is a different case: see KI-37.
 
 **Workaround:** For a document that was already blacked out, export with Secure Rasterization, which keeps no text layer.
 
@@ -190,7 +190,7 @@ On iOS 27, the system's name model can be unavailable or unreliable. After the i
 ### KI-24: On a Scanned Page, a Box Can Leave the Word in a Searchable Export (High)
 **Affects:** Searchable Redaction (scanned pages that carry their own text, such as a scan made searchable by OCR)
 
-Some scanned PDFs carry an invisible layer of text over the picture of each page, which is what makes them searchable. That layer does not always line up with the printed words: a word's hidden copy can sit a little to one side of where it is printed. A box placed from a Search or Scan match of that text, and left where it was placed, removes the hidden copy where it is. Any other box removes only the hidden text under the box itself: one you draw by hand, one made with Duplicate Region, one you resize or move after placing it, or one placed where Resecta read the word from the page's picture because the hidden text spells it differently. On such a page the hidden copy of the word you covered can stay in a Searchable export, where it can be selected, copied and searched. Verification reports it only if a detector in its final sweep flags it. The sweep reads the structured categories, and a detector can weigh the words around a number before it flags it; a name or an address is not swept.
+Some scanned PDFs carry an invisible layer of text over the picture of each page, which is what makes them searchable. That layer does not always line up with the printed words: a word's hidden copy can sit a little to one side of where it is printed. A box placed from a Search or Scan match of that text, and left where it was placed, removes the hidden copy where it is. A box you draw by hand, or one made with Duplicate Region, removes only the hidden text under the box itself; so does one placed where Resecta read the word from the page's picture because the hidden text spells it differently. A box from Search or Scan that you resize or move still removes the hidden copy it was placed for, and under its new place only the hidden text there. On such a page the hidden copy of the word you covered can stay in a Searchable export, where it can be selected, copied and searched. Verification reports it only if a detector in its final sweep flags it. The sweep reads the structured categories, and a detector can weigh the words around a number before it flags it; a name or an address is not swept. On some scanned pages the box itself can sit off the printed word: see KI-33.
 
 **Workaround:** Export scanned documents with Secure Rasterization, which keeps no text layer.
 
@@ -223,6 +223,60 @@ On a scanned page whose print reads sideways or upside down as the page is shown
 **Affects:** Searchable Redaction
 
 The hidden copy of the page's text leaves out the characters closest to a box, on purpose: any character within three points (about a millimeter) of it. A number that stands beside a box, or on the line just above or below one, can lose the digits nearest the box that way, so "1290" can read "12" when it is copied or searched, while the page you see still shows the number, whole or in part. No boxed text comes back, and no digit is added. In some files the hidden copy also loses the space between two words.
+
+---
+
+### KI-33: On Some Scanned Pages, a Box From Search or Scan Can Sit Off the Printed Word (High)
+**Affects:** Secure Rasterization and Searchable Redaction (scanned pages that carry their own text: the printed word in either mode; a neighbouring word's hidden copy in Searchable Redaction only)
+
+Some scanned PDFs carry a layer of text with the picture of each page, which is what makes them searchable. That layer does not always line up with the printed words: a word's hidden copy can sit a little to one side of where it is printed. On some scanned pages Resecta does not move a box from Search or Scan onto the printed word, for example where the scanner stored the page as many small pictures, or where the text lies under the picture and is not invisible. There a box placed from a Search or Scan match, and left where it was placed, covers the text's place, not the print. Part of the printed word, or all of it, can stay readable, and the hidden copy of a neighbouring word whose print the box covers can stay in a Searchable export, where it can be selected, copied, and searched. Verification can miss the printed part: every check can pass. Nothing in the app says that a box was not moved onto the print. In the editor, before you export, the box sits off the printed word, and the preview shows the print beside the fill.
+
+**Workaround:** Before you export, check that each box on a scanned page covers the printed word. Where print shows beside a box, leave that box where it is and draw another box by hand over the print. Export scanned documents with Secure Rasterization, which keeps no text layer, and check each page in the preview before you share.
+
+---
+
+### KI-34: On a Photo or Scan, Search Can Miss a Number or Code Whose Digits Look Like Letters (Medium)
+**Affects:** Search in text read from a picture (a scan, photo or screenshot), on iOS 26 and iOS 27
+
+On a page that is a picture, such as a photo, a screenshot or a scan without its own text, Search reads the text with on-device text recognition and then corrects characters that are often read for one another: 0 and O, 1 and I, 5 and S, 8 and B. The correction can change a number or code that was read correctly, and the text you type is not changed the same way, so the search finds nothing. A number made only of the digits 0, 1, 5 and 8, on a line that is mostly words, can be turned into letters: "Suite 100" is searched as "Suite IOO", so a search for "100" does not find it. A short code that mixes letters and digits can turn either way: "4B" is searched as "48". A suite, room or case number, an amount such as "$1,000" and a member ID can be missed this way. A number that holds a 2, 3, 4, 6, 7 or 9 and no letters, such as most phone numbers, is not changed. No box is placed on a number Search does not find, so it stays readable in the export. When a search finds nothing at all, its message says how many pages were read by text recognition and to check those pages by eye; when the same number is found elsewhere in the document, nothing marks the one that was missed. A search that found nothing is not run again after export. <!-- LegalPhrases:safe -->
+
+**Workaround:** On such a page, draw a box with Rectangle over each number or code you need removed, check each such page in the preview before sharing, and draw a box over anything Search missed.
+
+---
+
+### KI-35: A Search Match That Runs onto a Second Line Can Be Boxed on One Line Only (Medium)
+**Affects:** Search (a name, address or other phrase that ends one line and continues on the next)
+
+Where Search finds a name, address or other phrase that ends one line and continues on the next, it lists it as two rows with the same text, one for each line, and counts it as two matches. Each row is ticked and applied on its own. One line can then get a box while the other gets none: when you tick only one of the two rows, when you untick one of them after Select All, when you tap Apply with the search sheet lowered, which marks only the line you are on, or when you delete one of the two boxes afterwards. The line left without a box stays readable in the export. Verification does not report it as part of the match: its Search Re-check looks for the whole phrase, which the export no longer holds once one line is covered, and reads the line without a box as a match you chose not to redact; its OCR of Page Images check does not read the words on the line above or below a box as part of the match. Verification reports that line only if a detector in its final sweep flags it; a name or an address is not swept. <!-- LegalPhrases:safe -->
+
+**Workaround:** When Search lists two rows on the same page with the same text, tick both before you tap Apply, or use Select All. With the search sheet lowered, step to the next result and apply it too. Before you tap Redact, check that each line of the phrase has its own box, and check the page in the preview before you share.
+
+---
+
+### KI-36: On Scanned Pages That Carry the Same Text, a Search or Scan Box Can Be Placed from Another Page (Medium)
+**Affects:** Search and Scan, in both export modes (scanned pages that carry their own text, such as a scan made searchable by OCR)
+
+Some scanned PDFs carry an invisible layer of text over the picture of each page, which is what makes them searchable. On such a page Resecta moves a box from Search or Scan onto the printed word, and it keeps what it read of a page so that it need not read it twice. It tells pages apart by their text, their size and their picture, not by which page they are. When two scanned pages carry exactly the same text, such as a sheet scanned twice or a form that repeats, and Resecta cannot tell their pictures apart, a box on the second page can be placed from the first page's printed words. If the two pages print the word at different places, the box sits off the word, and part of the printed word, or all of it, stays readable in the export; the word's hidden copy is still removed. The other page can be in the same document or in one you opened earlier without closing the app in between. In the editor, before you export, the box sits off the printed word. Verification can miss it: its OCR of Page Images check reports the word only when it reads the whole word outside every box, or at least three of its letters beside a box, and its Search Re-check places its own box the same way.
+
+**Workaround:** Before you tap Redact, check that each box Search or Scan placed on a scanned page covers the printed word. Where it does not, draw another box by hand over the word. Export scanned documents with Secure Rasterization, which keeps no text layer, and check each page in the preview before you share.
+
+---
+
+### KI-37: Text Under an Annotation in the Original Is Visible in the Export, and Share Does Not Always Say So (Low–Medium)
+**Affects:** Export, in both modes (documents with annotations over text, such as highlights, form fields, boxes or stamps)
+
+An annotation, such as a highlight, a form field, a box or a stamp, is kept with the page, not drawn into the page itself. Resecta rebuilds the redacted copy from the page's own content in both export modes, so the exported file is built without annotations, and text an annotation covered in the original is visible in the export unless a redaction box covers it. For most annotations a notice at import says so, and when you tap Share, Resecta asks "Share with covered text?" and names the pages where an annotation covers text that no redaction box covers. That question can miss a highlight or a form field that is much larger than the text it hides: one drawn over a word or a line at its edge and clear over the rest of its area. The page is then not named at Share, and for a form field with no value the notice at import can be missing too. No check reports such text, because the checks read the exported file, where the annotation is gone and the text is ordinary page text.
+
+**Workaround:** Before you tap Redact, draw a box with Rectangle over any text an annotation covers that must stay hidden. Check each such page in the preview before you share: the preview shows the redacted copy, which has no annotations. Changing the export mode does not help.
+
+---
+
+### KI-38: A Phrase That Continues on the Next Page Is Not Found by Search (Low–Medium)
+**Affects:** Search
+
+Search reads one page at a time. A name, address or other phrase that starts on the last line of one page and continues at the top of the next is not found by a search for the whole phrase. No box is placed on it, so it stays readable in the export. If the phrase appears nowhere else, Search shows its no-match message; if it does, nothing marks the one at the page break. Verification does not report it: its Search Re-check looks for the phrase the same way, and a search that found nothing is not run again after export.
+
+**Workaround:** Search each word of the phrase on its own, check the last line of each page and the first line of the next in the preview before sharing, and draw a box over anything Search missed.
 
 ---
 
