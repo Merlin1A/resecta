@@ -123,7 +123,7 @@ App source lives in `Sources/ResectaApp/`. The redaction engine is an SPM packag
    ./Scripts/install-hooks.sh
    ```
 
-   The pre-commit hook is a symlink to `Scripts/audit-lint.sh`, which runs the mechanical checks described in [`CONTRIBUTING.md`](./CONTRIBUTING.md); the pre-push hook runs the test schemes the change touches. Never bypass them with `--no-verify`.
+   The pre-commit hook is a symlink to `Scripts/audit-lint.sh`, which runs the mechanical checks described in [`CONTRIBUTING.md`](./CONTRIBUTING.md); the pre-push hook runs the checks the change touches. Never bypass them with `--no-verify`.
 
 2. **Generate the Xcode project.**
 
