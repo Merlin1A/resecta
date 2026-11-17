@@ -110,7 +110,7 @@ struct VerificationDetailsSection: View {
     private func layerRows(_ indices: [Int], layout: LayerResultRow.GroupedLayout, showsStatusWord: Bool) -> some View {
         ForEach(Array(indices.enumerated()), id: \.element) { position, index in
             if position > 0 {
-                GroupedRowDivider(inset: layout == .bare ? ResectaTokens.Spacing.md : ResectaTokens.Results.titleInset)
+                GroupedRowDivider(inset: ResectaTokens.Results.titleInset)
             }
             layerRow(index: index, layout: layout, showsStatusWord: showsStatusWord)
         }
