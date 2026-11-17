@@ -1,0 +1,20 @@
+Property: The box switch is stored under one key.
+Area: settings (box switch)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/SettingsStateTests
+Must go red: ResectaAppTests/SettingsStateTests "The box switch is stored under one key"
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/SettingsState.swift b/Sources/ResectaApp/State/SettingsState.swift
+index f1a29ef8..3f769ce9 100644
+--- a/Sources/ResectaApp/State/SettingsState.swift
++++ b/Sources/ResectaApp/State/SettingsState.swift
+@@ -100,7 +100,8 @@ class SettingsState {
+     static let boxesAcrossColumnKey = "boxesAcrossColumn.v1"
+     var boxesAcrossColumn: Bool = false {
+         didSet { guard !isInitializing else { return }
+-                defaults.set(boxesAcrossColumn, forKey: Self.boxesAcrossColumnKey) }
++                defaults.set(boxesAcrossColumn, forKey: Self.boxesAcrossColumnKey)
++                defaults.set(boxesAcrossColumn, forKey: "firstRun.boxesAcrossColumn") }
+     }
+ 
+     // MARK: - Detection preset + threshold vector
