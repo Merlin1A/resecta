@@ -125,7 +125,9 @@ extension PipelineCoordinator {
             sensitiveTerms: sensitiveTerms,
             appliedSearches: appliedSearches,
             burnedRegions: Dictionary(uniqueKeysWithValues: pages.compactMap {
-                $0.regions.isEmpty ? nil : ($0.pageIndex, $0.regions) })
+                $0.regions.isEmpty ? nil : ($0.pageIndex, $0.regions) }),
+            // No step of the run writes the record's second part yet.
+            produced: RunRecord.Produced()
         )
     }
 

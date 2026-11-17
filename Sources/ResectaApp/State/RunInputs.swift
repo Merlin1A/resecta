@@ -8,6 +8,26 @@ import RedactionEngine
 /// test with plain values.
 enum RunInputs {
 
+    /// The confirmed part of the run's record: the fill colour, the quality
+    /// and every region as drawn, one entry per page. It reads the live
+    /// regions, never the pages built from them: those hold the regions
+    /// after the clamp and the size floor, and a region the run drops must
+    /// still be in the record.
+    static func confirmedRecord(
+        pageCount: Int,
+        regions: [Int: [RedactionRegion]],
+        settings snapshot: PipelineCoordinator.RunSettings
+    ) -> RunRecord.Confirmed {
+        RunRecord.Confirmed(
+            fillColor: snapshot.fillColor,
+            exportDPI: snapshot.exportDPI,
+            pages: (0..<pageCount).map { page in
+                RunRecord.Page(pageIndex: page, regions: (regions[page] ?? []).map {
+                    RunRecord.DrawnRegion(id: $0.id, normalizedRect: $0.normalizedRect)
+                })
+            })
+    }
+
     /// Bridge the document and the applied regions into engine-ready
     /// `PDFPageData`, one per page, in page order.
     ///

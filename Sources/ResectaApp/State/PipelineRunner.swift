@@ -195,7 +195,8 @@ struct PipelineRunner {
                     deselection: deselectionSnapshot,
                     ocrSkippedPages: entry.ocrSkippedPages,
                     degradeFailures: entry.degradeFailures,
-                    burnedRegionVersion: entry.burnedRegionVersion)))
+                    burnedRegionVersion: entry.burnedRegionVersion,
+                    record: RunRecord(confirmed: entry.confirmed, produced: runContext.produced))))
 
             // --- Verification ---
             // Paranoid-mode override #2: paranoid
@@ -244,6 +245,9 @@ struct PipelineRunner {
         let burnedRegionVersion: Int
         /// How many times the capture ran: 1, or 2 after a re-run.
         let captureRuns: Int
+        /// The confirmed part of the run's record, read from the same
+        /// region state as `pages`.
+        let confirmed: RunRecord.Confirmed
     }
 
     /// Read the full run's entry snapshot. The manual-term capture
@@ -275,6 +279,11 @@ struct PipelineRunner {
         }
 
         // Synchronous from here: one region state.
+        // The record's confirmed part first, from the live regions as drawn
+        // (the pages below hold them clamped and floor-filtered).
+        let confirmed = RunInputs.confirmedRecord(
+            pageCount: coordinator.documentState.pageCount,
+            regions: redactionState.regions, settings: runSettings)
         let pages = coordinator.buildPDFPageData(
             effectiveMode: effectiveMode, runSettings: runSettings, inkPlans: sensitiveTerms.inkPlans)
         let burnedRegionVersion = redactionState.regionVersion
@@ -311,7 +320,8 @@ struct PipelineRunner {
             deselectionSnapshot: deselectionSnapshot,
             ocrSkippedPages: ocrSkippedPages, degradeFailures: degradeFailures,
             appliedSearches: appliedSearches,
-            burnedRegionVersion: burnedRegionVersion, captureRuns: captureRuns)
+            burnedRegionVersion: burnedRegionVersion, captureRuns: captureRuns,
+            confirmed: confirmed)
     }
 
     // MARK: - Verify-only re-run
