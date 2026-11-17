@@ -1,0 +1,20 @@
+Property: Selecting a match by character takes its own letters only: "Roe" in "Roe." selects three letters and the full stop stays.
+Area: selection by character
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/WordPartitionTests (or on the host: cd Packages/RedactionEngine && swift test --filter WordPartitionTests)
+Must go red: RedactionCoreTests/WordPartitionTests eachCase [Roe. matched by Roe: three letters selected, the full stop stays]; RedactionCoreTests/WordPartitionTests eachCase [a no-break space ticks]; RedactionCoreTests/WordPartitionTests eachCase [a zero-width space does not tick]; RedactionCoreTests/WordPartitionTests eachCase [a hyphenated word is one word]; RedactionCoreTests/WordPartitionTests eachCase [a joined letter is one character]; RedactionCoreTests/WordPartitionTests eachCase [a letter outside the basic plane takes two offsets in its word]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/WordSelection.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/WordSelection.swift
+index ab8ab17a..263e6c88 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/WordSelection.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/WordSelection.swift
+@@ -19,6 +19,9 @@ package struct WordSelection: Hashable, Sendable {
+                 offsets.insert(offset)
+             }
+         }
++        let indices = WordPartition.wordIndices(utf16: units)
++        let words = Set(offsets.map { indices[$0] })
++        offsets = Set(units.indices.filter { words.contains(indices[$0]) && !WordPartition.isWhiteSpace(units[$0]) })
+         return WordSelection(offsets: offsets)
+     }
+ 
