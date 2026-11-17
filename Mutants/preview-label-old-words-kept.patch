@@ -1,0 +1,20 @@
+Property: A failed run's label is the results title, not the old words.
+Area: the Preview of the redacted PDF, its label
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/PreviewVerdictCapsuleTests
+Must go red: ResectaAppTests/PreviewVerdictCapsuleTests failShowsCapsule; ResectaAppTests/PreviewVerdictCapsuleTests labelsAreTheResultsTitles
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/RedactedPreviewView.swift b/Sources/ResectaApp/Views/RedactedPreviewView.swift
+index 59f1f7f6..15a21248 100644
+--- a/Sources/ResectaApp/Views/RedactedPreviewView.swift
++++ b/Sources/ResectaApp/Views/RedactedPreviewView.swift
+@@ -85,7 +85,8 @@ struct RedactedPreviewView: View {
+     /// `VerificationResultsView.shouldAutoExpand`).
+     static func verdictCapsuleText(verdict: VerificationStatus?) -> String? {
+         guard let verdict else { return nil }
+-        if verdict.isFail || verdict.isAttention { return verdict.title }
++        if verdict.isFail { return "Issues Found — review before sharing" }
++        if verdict.isAttention { return verdict.title }
+         if verdict.isSkipped { return "Not verified" }
+         return nil
+     }

@@ -1,0 +1,19 @@
+Property: A run whose checks did not run keeps Not verified, not its title.
+Area: the Preview of the redacted PDF, its label
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/PreviewVerdictCapsuleTests
+Must go red: ResectaAppTests/PreviewVerdictCapsuleTests skippedShowsCapsule
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/RedactedPreviewView.swift b/Sources/ResectaApp/Views/RedactedPreviewView.swift
+index 59f1f7f6..485b6b4b 100644
+--- a/Sources/ResectaApp/Views/RedactedPreviewView.swift
++++ b/Sources/ResectaApp/Views/RedactedPreviewView.swift
+@@ -85,7 +85,7 @@ struct RedactedPreviewView: View {
+     /// `VerificationResultsView.shouldAutoExpand`).
+     static func verdictCapsuleText(verdict: VerificationStatus?) -> String? {
+         guard let verdict else { return nil }
+-        if verdict.isFail || verdict.isAttention { return verdict.title }
++        if verdict.isFail || verdict.isAttention || verdict.isSkipped { return verdict.title }
+         if verdict.isSkipped { return "Not verified" }
+         return nil
+     }
