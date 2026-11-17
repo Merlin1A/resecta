@@ -243,7 +243,8 @@ jobs:
       # (Scripts/seam-fence.sh). Runs the base branch's copy as the gate, so
       # a change cannot widen a list it is gated by, then compares this
       # change's lists with the base copy's (a site this change adds to a
-      # list is refused) and runs this change's self-test. On the change that
+      # list is refused) and runs this change's self-test. The gate's run
+      # lists the files each rule read. On the change that
       # first adds the script this change's copy runs report-only and the
       # fences gate from the next pull request.
       - name: Seam fences
@@ -260,7 +261,7 @@ jobs:
           if git show "${base}:Scripts/seam-fence.sh" > "$script" 2>/dev/null && [ -s "$script" ]; then
             chmod +x "$script"
             echo "seam fences from ${base}"
-            "$script"
+            "$script" --files
             Scripts/seam-fence.sh --compare-lists "$script"
             Scripts/seam-fence.sh --self-test
           else

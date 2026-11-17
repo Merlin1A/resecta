@@ -38,10 +38,11 @@
 #
 # A fence that reads nothing holds nothing, so the tree must give each rule
 # something to read: every folder the rules read must exist (the core's
-# folder once the engine's manifest declares the core target), F2 must find
-# at least one producer type, and a rule with listed sites must read at least
-# one file. Each rule prints how many files it read. A tree that fails this
-# is a setup error, not a pass.
+# folder once the engine's manifest declares the core target, and the folder
+# of each listed site's file), F2 must find at least one producer type, and a
+# rule with listed sites must read at least one file. Each rule prints how
+# many files it read. A tree that fails this is a setup error, not a pass,
+# and its run never prints the clean line.
 #
 # Run from anywhere in the repo.
 #   Scripts/seam-fence.sh                      the fences over the tree
@@ -61,7 +62,9 @@ set -euo pipefail
 ROOT="$(git rev-parse --show-toplevel)" || { echo "not in a git repo" >&2; exit 2; }
 exec python3 -I - "$ROOT" "$@" <<'PY'
 import collections
+import contextlib
 import fnmatch
+import io
 import json
 import os
 import re
@@ -488,6 +491,13 @@ def setup_errors(root, lists, files_read):
     if declared is None:
         errors.append(f"the engine's manifest is missing: {MANIFEST}")
     folders = REQUIRED + ([C] if declared else [])
+    # The folder of every listed site's file, so a moved folder cannot
+    # turn its listed sites into gone ones and pass.
+    for rid, listed in sorted(lists.items()):
+        for f, entries in sorted(listed.items()):
+            folder = os.path.dirname(f) + "/"
+            if entries and folder not in folders:
+                folders.append(folder)
     for folder in folders:
         if not os.path.isdir(os.path.join(root, folder)):
             errors.append(f"a folder the rules read is missing: {folder}")
@@ -511,19 +521,20 @@ def run_tree(root, show_files=False, quiet=False):
         for rid, files in sorted(files_read.items()):
             for f in files:
                 print(f"READ {rid} {f}")
-    status = report(offences, gone)
+    return report(offences, gone, errors)
+
+def report(offences, gone, errors=()):
+    """Print the run's lines and its last line; 0 clean, 1 an offence, 2 a
+    setup error. A setup error never prints the clean line."""
+    for g in gone:
+        print(f"GONE {g} — may be taken off its list")
+    for o in offences:
+        print(f"OFFENCE {o}")
     for e in errors:
         print(f"SETUP ERROR {e}")
     if errors:
         print(f"SEAM-FENCE SETUP ERROR: {len(errors)} reason(s); the fences did not read the tree")
         return 2
-    return status
-
-def report(offences, gone):
-    for g in gone:
-        print(f"GONE {g} — may be taken off its list")
-    for o in offences:
-        print(f"OFFENCE {o}")
     if offences:
         print(f"SEAM-FENCE FAIL: {len(offences)} offence(s)")
         return 1
@@ -670,12 +681,22 @@ def self_test():
         os.rmdir(os.path.join(tmp, RUNNER))
         check("a missing folder is a setup error", len(errors_with(empty)) == 1)
         check("the fences over a tree missing a folder exit 2", run_tree(tmp, quiet=True) == 2)
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            status = run_tree(tmp)
+        lines = printed.getvalue().splitlines()
+        check("printed, a tree missing a folder exits 2 and never reads OK",
+              status == 2 and lines and lines[-1].startswith("SEAM-FENCE SETUP ERROR")
+              and not any(line.startswith("SEAM-FENCE OK") for line in lines))
         write(tmp, RUNNER + "Placeholder.swift", "import Foundation\n")
-        f4_listed = dict(empty, F4={E + "Pipeline/Paint.swift": ["x"]})
+        f4_listed = dict(empty, F4={A + "State/RunInputs.swift": ["x"]})
         check("a rule with listed sites that read no file is a setup error",
               len(errors_with(f4_listed)) == 1)
-        write(tmp, E + "Pipeline/Paint.swift", "import Foundation\n")
+        write(tmp, A + "State/RunInputs.swift", "import Foundation\n")
         check("the same rule with a file to read is no setup error", not errors_with(f4_listed))
+        f4_listed["F4"] = {A + "State/RunInputs.swift": ["x"], E + "Pipeline/Paint.swift": ["y"]}
+        check("a listed site whose folder is missing is a setup error",
+              len(errors_with(f4_listed)) == 1)
         write(tmp, E + "Search/Placeholder.swift", "import Foundation\n")
         f2_listed = dict(empty, F2={E + "Verification/Placeholder.swift": ["PlantedProducerOne"]})
         check("F2 with listed sites and no producer type is a setup error",
@@ -686,7 +707,7 @@ def self_test():
     grown.setdefault("F1", {}).setdefault(A + "Views/Planted.swift", []).append("let s = DocumentSearcher()")
     check("a list entry the change adds reads as an offence", len(list_growth(base, grown)) == 1)
     check("the same lists read as none", not list_growth(base, base))
-    expected = 6 * 4 + 4 + 2 + 2 + 1 + 9
+    expected = 6 * 4 + 4 + 2 + 2 + 1 + 11
     check(f"the self-test ran its {expected} cases", len(results) == expected)
     failed = [n for n, ok in results if not ok]
     print(f"self-test: {len(results) - len(failed)} of {len(results)} cases passed")
