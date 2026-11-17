@@ -344,7 +344,7 @@ private let paintRuleCases: [PaintRuleCase] = [
 // MARK: - Properties over seeded boxes
 
 /// A small seeded generator, so the boxes are the same on every run.
-private struct SplitMix64 {
+private struct PixelPlanSplitMix64 {
     var state: UInt64
     mutating func next() -> UInt64 {
         state &+= 0x9E37_79B9_7F4A_7C15
@@ -360,7 +360,7 @@ private struct SplitMix64 {
 
 @Suite struct PixelPlanPropertyTests {
     @Test func everyBoxCoversItsSelectionOnTheImageItsBlocksAndItsMarginEdge() {
-        var g = SplitMix64(state: 0x5EED_0F_B0C5)
+        var g = PixelPlanSplitMix64(state: 0x5EED_0F_B0C5)
         let pages = [(letterWidth, letterHeight), (letterHeight, letterWidth), (a4Width, a4Height), (a4Height, a4Width)]
         var projected = 0
         for (w, h) in pages {
