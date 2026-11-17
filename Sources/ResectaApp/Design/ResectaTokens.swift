@@ -232,8 +232,6 @@ enum ResectaTokens {
         static let badgePII: Color = Color(.systemOrange)
 
         // Accent colors
-        /// Region count indicator in page navigation bar
-        static let regionCountAccent: Color = .orange
         /// Searchable mode icon/legend tint in verification results
         static let searchableMode: Color = .blue
         /// Warning banner background tint

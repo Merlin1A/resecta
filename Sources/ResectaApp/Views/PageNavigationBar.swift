@@ -7,8 +7,9 @@ import RedactionEngine
 // iPhone widths ("Previo…") — and the center counter drops the word
 // "Page"; the full words survive as accessibility labels. Matches the
 // sheet's result-nav chevron idiom. The whole-page control sits at the
-// trailing end in the same glyph grammar: one tap marks the page on
-// screen as a region, the next tap unmarks it. A one-page document gets
+// leading end, behind a hairline, in the same glyph grammar: one tap marks
+// the page on screen as a region, the next tap unmarks it. The count is one
+// grey at every number. A one-page document gets
 // the bar for its region count, without the page arrows or the control
 // (the editor's … menu keeps Mark Whole Page for that case).
 
@@ -23,6 +24,59 @@ struct PageNavigationBar: View {
         let marked = PageNavigationBar.isWholePageMarked(
             page: documentState.currentPageIndex, in: redactionState)
         HStack(spacing: ResectaTokens.Spacing.md) {
+            // The whole-page control. Never disabled: on a page it can
+            // show, the page on screen can always be marked or unmarked.
+            // Marked, it sits on a plain teal disc with a white glyph — a
+            // fill, never a second glass layer inside the glass bar.
+            if PageNavigationBar.showsMarkControl(pageCount: pageCount) {
+                Button {
+                    PageNavigationBar.toggleWholePage(
+                        redactionState: redactionState,
+                        documentState: documentState,
+                        undoManager: undoManager
+                    )
+                } label: {
+                    Image(systemName: "rectangle.inset.filled")
+                        .dynamicTypeSize(...PageNavigationBar.wholePageGlyphCeiling)
+                        .foregroundStyle(marked ? AnyShapeStyle(Color.white) : AnyShapeStyle(.tint))
+                        .frame(
+                            width: ResectaTokens.TouchTarget.minimum,
+                            height: ResectaTokens.TouchTarget.minimum
+                        )
+                        .background {
+                            if marked {
+                                Circle()
+                                    .fill(ResectaTokens.BrandTeal.fill)
+                                    .frame(
+                                        width: PageNavigationBar.markedDiscDiameter,
+                                        height: PageNavigationBar.markedDiscDiameter
+                                    )
+                            }
+                        }
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel(PageNavigationBar.wholePageActionLabel(marked: marked))
+                .accessibilityAddTraits(marked ? .isSelected : [])
+                .accessibilityIdentifier("pageNavMarkWholePage")
+                .accessibilityShowsLargeContentViewer {
+                    Label(PageNavigationBar.wholePageActionLabel(marked: marked), systemImage: "rectangle.inset.filled")
+                }
+                // The hairline between the control and the page arrows: an
+                // overlay, centred in the stack's gap, so the bar is no wider
+                // than without it. It takes no touch and is not spoken.
+                .overlay(alignment: .trailing) {
+                    Rectangle()
+                        .fill(Color(.separator))
+                        .frame(
+                            width: PageNavigationBar.wholePageDividerWidth,
+                            height: PageNavigationBar.wholePageDividerHeight(dynamicTypeSize: dynamicTypeSize)
+                        )
+                        .offset(x: (ResectaTokens.Spacing.md + PageNavigationBar.wholePageDividerWidth) / 2)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                }
+            }
+
             if PageNavigationBar.showsChevrons(pageCount: pageCount) {
                 Button {
                     PageNavigationBar.showPage(
@@ -76,9 +130,7 @@ struct PageNavigationBar: View {
                         .hidden()
                         .accessibilityHidden(true)
                     Text(PageNavigationBar.regionCountLabel(count))
-                        .foregroundStyle(count == 0
-                            ? AnyShapeStyle(.tertiary)
-                            : AnyShapeStyle(ResectaTokens.SemanticColor.regionCountAccent))
+                        .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                 }
                 .font(.caption.monospacedDigit())
             }
@@ -109,45 +161,6 @@ struct PageNavigationBar: View {
                 .accessibilityIdentifier("pageNavNext")
                 .disabled(documentState.currentPageIndex >= pageCount - 1)
             }
-
-            // The whole-page control. Never disabled: on a page it can
-            // show, the page on screen can always be marked or unmarked.
-            // Marked, it sits on a plain teal disc with a white glyph — a
-            // fill, never a second glass layer inside the glass bar.
-            if PageNavigationBar.showsMarkControl(pageCount: pageCount) {
-                Button {
-                    PageNavigationBar.toggleWholePage(
-                        redactionState: redactionState,
-                        documentState: documentState,
-                        undoManager: undoManager
-                    )
-                } label: {
-                    Image(systemName: "rectangle.inset.filled")
-                        .dynamicTypeSize(...PageNavigationBar.wholePageGlyphCeiling)
-                        .foregroundStyle(marked ? AnyShapeStyle(Color.white) : AnyShapeStyle(.tint))
-                        .frame(
-                            width: ResectaTokens.TouchTarget.minimum,
-                            height: ResectaTokens.TouchTarget.minimum
-                        )
-                        .background {
-                            if marked {
-                                Circle()
-                                    .fill(ResectaTokens.BrandTeal.fill)
-                                    .frame(
-                                        width: PageNavigationBar.markedDiscDiameter,
-                                        height: PageNavigationBar.markedDiscDiameter
-                                    )
-                            }
-                        }
-                        .contentShape(Rectangle())
-                }
-                .accessibilityLabel(PageNavigationBar.wholePageActionLabel(marked: marked))
-                .accessibilityAddTraits(marked ? .isSelected : [])
-                .accessibilityIdentifier("pageNavMarkWholePage")
-                .accessibilityShowsLargeContentViewer {
-                    Label(PageNavigationBar.wholePageActionLabel(marked: marked), systemImage: "rectangle.inset.filled")
-                }
-            }
         }
         .padding(.horizontal, ResectaTokens.Spacing.md)
         .padding(.vertical, ResectaTokens.Spacing.sm)
@@ -174,6 +187,15 @@ extension PageNavigationBar {
     /// The disc left showing beyond the symbol's corners at the ceiling, at
     /// the least.
     static let wholePageGlyphMargin: CGFloat = 4
+
+    /// The hairline after the control: 1 pt wide.
+    static let wholePageDividerWidth: CGFloat = 1
+
+    /// The hairline's height: 28 pt, or 44 pt at the accessibility sizes,
+    /// where the counter stacks.
+    static func wholePageDividerHeight(dynamicTypeSize: DynamicTypeSize) -> CGFloat {
+        counterStacks(dynamicTypeSize: dynamicTypeSize) ? 44 : 28
+    }
 
     /// The control's words, which are also the undo steps' names: Mark on
     /// an unmarked page, Unmark on a marked one.
