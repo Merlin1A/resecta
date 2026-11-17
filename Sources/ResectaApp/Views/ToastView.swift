@@ -83,7 +83,6 @@ struct ToastView: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isStaticText)
-        .accessibilityIdentifier("toast")
     }
 
     /// The toast's layout: the icon beside the text at the standard
