@@ -12,8 +12,15 @@
 # suites are excluded from the gating batches by policy.
 #
 # Usage:
-#   TEST_BATCHED_SIM_UDID=<udid> Scripts/test-batched.sh RedactionEngine|ResectaApp [--batch-size N] [--timeout-mins M]
+#   TEST_BATCHED_SIM_UDID=<udid> Scripts/test-batched.sh RedactionEngine|ResectaApp|ResectaAppUI [--batch-size N] [--timeout-mins M]
 #   Scripts/test-batched.sh --self-test
+#
+# ResectaAppUI runs the UI-test target (Tests/ResectaAppUITests) through the
+# app scheme, serially: one suite per invocation (--batch-size is fixed at
+# 1), each under the same watchdog, with the same verdict file. UI tests
+# drive the app on the simulator and cannot share it, so this mode never
+# batches them; it is still the batched runner's build-once, invocation-by-
+# invocation shape, never one full-parallel `xcodebuild test`.
 #
 # Environment:
 #   TEST_BATCHED_SIM_UDID  required — the simulator every invocation runs on,
@@ -99,6 +106,7 @@ GREP=/usr/bin/grep
 # has been red when paired with even one other suite.
 PERF_ALONE_RedactionEngine="CancellationLatencyTests PixelBufferZeroizeTimingTests ReverseRationalePerformanceTests StressCorpusTests ApplyPhaseMemoryStressTests ParallelLayerExecutionTests DetectionRasterizeOverlapTests Layer2OCRParallelismTests SearchRecheckParallelismTests PageImageInkFitStallTests"
 PERF_ALONE_ResectaApp="PageParallelRasterizationTests PageParallelRasterizationScheduleTests PageParallelRasterizationTimingTests"
+PERF_ALONE_ResectaAppUI=""
 
 # ALONE-GATING: perf-alone suites (above) whose reds still gate. Each runs
 # completely alone after the batches like the rest of the list, and a red in
@@ -125,6 +133,7 @@ PERF_ALONE_ResectaApp="PageParallelRasterizationTests PageParallelRasterizationS
 # report-only (perf-alone and on the exclusion list below).
 ALONE_GATING_RedactionEngine="PageImageInkFitStallTests"
 ALONE_GATING_ResectaApp="PageParallelRasterizationTests PageParallelRasterizationScheduleTests"
+ALONE_GATING_ResectaAppUI=""
 
 # Exclusion list (suite granularity): reds here do not gate the exit
 # status even inside normal batches.
@@ -157,13 +166,17 @@ usage() { sed -n '3,60p' "$0"; exit 64; }
 # runner addresses the type, so the extension's tests run with it).
 # Attribute-only detection used to miss implicit suites and the multi-line
 # `@Suite(` form, so their tests never ran under this runner. Validated
-# 2026-08-27 against the live trees: engine 207, app 209.
+# 2026-08-27 against the live trees: engine 207, app 209. The modifiers a
+# declaration may carry include `nonisolated`, the form every UI-test class
+# takes (`nonisolated final class …: XCTestCase`); adding it on 2026-11-05
+# left the unit trees' lists unchanged (engine 309, app 335) and found the
+# UI tree's 32 suites.
 enumerate_suites() { # test-source-dir — one suite name per line, sorted
     python3 - "$1" <<'PYEOF'
 import os, re, sys
 
 ATTRS = re.compile(r'^(?:@\w+(?:\([^)]*\))?\s*)+')
-MODS = r'(?:(?:private|fileprivate|internal|public|final)\s+)*'
+MODS = r'(?:(?:private|fileprivate|internal|public|final|nonisolated)\s+)*'
 TYPE_DECL = re.compile(r'^' + MODS + r'(?:class|struct|enum|actor|extension)\s+(\w+)')
 XCTEST_DECL = re.compile(r'^' + MODS + r'class\s+(\w+)\s*:\s*[^{]*\bXCTestCase\b')
 TEST_ATTR = re.compile(r'^\s+@Test\b')
@@ -435,7 +448,7 @@ STUB
         PATH="$tdir/bin:$PATH" TB_STUB_DIR="$tdir" TB_STUB_PLAN="$1" bash -c '
             eval "$(sed -n -e "/^descendants()/,/^}/p" -e "/^recover_sim()/,/^}/p" -e "/^run_invocation()/,/^}/p" "$1")"
             eval "$(/usr/bin/grep -E "^LAUNCH_MARKER=" "$1")"
-            GREP=/usr/bin/grep; SCHEME=S; DEST=id=SELF-TEST; DD="$2/dd"; TEST_TARGET=T; RUN_DIR="$2/run"
+            GREP=/usr/bin/grep; SCHEME=S; XCB_SCHEME=S; DEST=id=SELF-TEST; DD="$2/dd"; TEST_TARGET=T; RUN_DIR="$2/run"
             LOG_CAP_BYTES=100000; TIMEOUT_MINS=15; STALL_SECS=2; POLL_SECS=1; BOOT_WAIT_SECS=5; RECOVERY=reboot
             SIM_UDID=SELF-TEST; WEDGED=0; FAILURES_FILE="$2/run/failures.txt"; : > "$FAILURES_FILE"
             R_LABEL=(); R_NSUITES=(); R_TESTS=(); R_PASSED=(); R_FAILED=(); R_SKIPPED=()
@@ -482,6 +495,28 @@ STUB
     done
     case " $NON_GATING " in *" PageParallelRasterizationTimingTests "*) ;; *) echo "self-test: PageParallelRasterizationTimingTests is not report-only" >&2; n=1 ;; esac
     if [ "$n" -eq 0 ]; then echo "self-test: the rasterization correctness suites gate and only its timing suite is report-only OK"; else fails=1; fi
+    # 12. The UI-test mode: refuses without the simulator pin like the
+    #     others; runs the UI-test target through the app scheme, one suite
+    #     per invocation whatever --batch-size says; both xcodebuild calls
+    #     name the scheme variable the mode sets; the enumerator finds the
+    #     UI suites (XCTestCase subclasses), DocumentLinkUITests among them.
+    n=0
+    local rc=0
+    env -u TEST_BATCHED_SIM_UDID bash "$me" ResectaAppUI >/dev/null 2>&1 || rc=$?
+    [ "$rc" -eq 2 ] || { echo "self-test: ResectaAppUI expected exit 2 without TEST_BATCHED_SIM_UDID, got $rc" >&2; n=1; }
+    body="$(sed -n '/^    ResectaAppUI)$/,/;;/p' "$me")"
+    for pat in 'XCB_SCHEME="ResectaApp"' 'TEST_TARGET="ResectaAppUITests"' 'TEST_SRC="Tests/ResectaAppUITests"'; do
+        printf '%s\n' "$body" | $GREP -qF -- "$pat" || { echo "self-test: the ResectaAppUI mode does not set $pat" >&2; n=1; }
+    done
+    $GREP -qx '\[ "\$SCHEME" = "ResectaAppUI" \] && BATCH_SIZE=1' "$me" \
+        || { echo "self-test: the ResectaAppUI mode does not fix the batch size at 1 after the options" >&2; n=1; }
+    [ "$($GREP -cE '^[[:space:]]*(if ! )?xcodebuild [a-z-]+ -scheme "\$XCB_SCHEME" ' "$me")" -eq 2 ] \
+        || { echo "self-test: an xcodebuild call does not take -scheme \"\$XCB_SCHEME\"" >&2; n=1; }
+    local ui_suites
+    ui_suites="$(enumerate_suites "$(cd "$(dirname "$me")/.." && pwd)/Tests/ResectaAppUITests")"
+    printf '%s\n' "$ui_suites" | $GREP -qx DocumentLinkUITests \
+        || { echo "self-test: the enumerator does not find DocumentLinkUITests in the UI-test tree" >&2; n=1; }
+    if [ "$n" -eq 0 ]; then echo "self-test: ResectaAppUI runs the UI-test target serially (one suite per invocation, $(printf '%s\n' "$ui_suites" | $GREP -c .) suites) through the app scheme OK"; else fails=1; fi
     [ "$fails" -eq 0 ] && { echo "self-test: PASS"; exit 0; }
     echo "self-test: FAIL" >&2; exit 1
 }
@@ -493,6 +528,7 @@ case "$STALL_SECS" in ''|*[!0-9]*) echo "TEST_BATCHED_STALL_SECS must be a whole
 SCHEME="$1"; shift
 case "$SCHEME" in
     RedactionEngine)
+        XCB_SCHEME="RedactionEngine"
         TEST_TARGET="RedactionEngineTests"
         TEST_SRC="Packages/RedactionEngine/Tests/RedactionEngineTests"
         PERF_ALONE="$PERF_ALONE_RedactionEngine"
@@ -500,13 +536,22 @@ case "$SCHEME" in
         SETTLE_SECS=0
         ;;
     ResectaApp)
+        XCB_SCHEME="ResectaApp"
         TEST_TARGET="ResectaAppTests"
         TEST_SRC="Tests/ResectaAppTests"
         PERF_ALONE="$PERF_ALONE_ResectaApp"
         ALONE_GATING="$ALONE_GATING_ResectaApp"
         SETTLE_SECS=10   # app-host relaunch churn trips SBMainWorkspace without a settle
         ;;
-    *) echo "unknown scheme: $SCHEME (expected RedactionEngine or ResectaApp)" >&2; usage ;;
+    ResectaAppUI)
+        XCB_SCHEME="ResectaApp"   # the UI-test target is in the app scheme
+        TEST_TARGET="ResectaAppUITests"
+        TEST_SRC="Tests/ResectaAppUITests"
+        PERF_ALONE="$PERF_ALONE_ResectaAppUI"
+        ALONE_GATING="$ALONE_GATING_ResectaAppUI"
+        SETTLE_SECS=10   # each suite relaunches the app under test
+        ;;
+    *) echo "unknown scheme: $SCHEME (expected RedactionEngine, ResectaApp or ResectaAppUI)" >&2; usage ;;
 esac
 
 while [ $# -gt 0 ]; do
@@ -516,6 +561,8 @@ while [ $# -gt 0 ]; do
         *) echo "unknown option: $1" >&2; usage ;;
     esac
 done
+# The UI-test mode is serial by construction: one suite per invocation.
+[ "$SCHEME" = "ResectaAppUI" ] && BATCH_SIZE=1
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
@@ -592,7 +639,7 @@ echo "batchable: ${#BATCHABLE[@]}   perf-alone: ${#ALONE[@]}   excluded on this 
 
 echo "build-for-testing ($SCHEME) ..."
 BUILD_LOG="$RUN_DIR/build.log"
-if ! xcodebuild build-for-testing -scheme "$SCHEME" -destination "$DEST" -derivedDataPath "$DD" \
+if ! xcodebuild build-for-testing -scheme "$XCB_SCHEME" -destination "$DEST" -derivedDataPath "$DD" \
         > "$BUILD_LOG" 2>&1; then
     echo "BUILD FAILED — tail of $BUILD_LOG:" >&2
     tail -40 "$BUILD_LOG" >&2
@@ -700,7 +747,7 @@ run_invocation() { # label mode suite...
         state="completed"
         local lastsize size lastprogress
         start="$(date +%s)"
-        xcodebuild test-without-building -scheme "$SCHEME" -destination "$DEST" -derivedDataPath "$DD" \
+        xcodebuild test-without-building -scheme "$XCB_SCHEME" -destination "$DEST" -derivedDataPath "$DD" \
             -resultBundlePath "$xc" "${args[@]}" > "$raw" 2>&1 &
         local pid=$!
         lastsize=0; lastprogress="$start"

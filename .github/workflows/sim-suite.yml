@@ -1,9 +1,15 @@
 # The batched simulator suites (Scripts/test-batched.sh <scheme>) on a
-# hosted macos-26 runner: build once, then serial suite-level batches on
-# an iPhone 17 simulator under a watchdog, perf suites alone and
-# report-only. Both schemes run every Monday and on release tags, one job
-# each; a dispatch runs the scheme it names; ResectaApp alone runs on every
-# pull request to main as a required check (twenty to forty minutes),
+# hosted runner of the xcode-27 image, built with Xcode 27.2 (the release's
+# Xcode, pinned by path below): build once, then serial suite-level batches
+# on an iPhone 17 simulator under a watchdog, perf suites alone and
+# report-only. Each job runs one scheme on one iOS major: 27 (the newest
+# iOS 27 runtime on the image) or 26 (the deployment floor's leg, on an
+# iOS 26.1 runtime the job downloads). Every Monday and on release tags,
+# both schemes run on both majors, four jobs, and the iOS 27 ResectaApp job
+# also runs the UI-test target serially (Scripts/test-batched.sh
+# ResectaAppUI); a dispatch runs the scheme and major it names, with the UI
+# suites when asked; ResectaApp on iOS 27 alone runs on every pull request
+# to main as a required check (twenty to forty minutes),
 # documentation-only pull requests included: its honesty tests read the
 # README, ENGINEERING, THREAT-MODEL, PRIVACY and EULA text.
 # RedactionEngine here runs the engine package's suites on the simulator
@@ -41,6 +47,15 @@ on:
         type: choice
         options: [ResectaApp, RedactionEngine]
         default: ResectaApp
+      ios:
+        description: iOS major of the simulator (26 downloads the iOS 26.1 runtime)
+        type: choice
+        options: ['27', '26']
+        default: '27'
+      ui:
+        description: Also run the UI-test target serially (ResectaApp only)
+        type: boolean
+        default: false
   # KEEP-ALIVE: GitHub disables a scheduled workflow after sixty days
   # without repository activity (a commit inside that window keeps it
   # running); a disabled workflow is re-enabled by hand in the Actions
@@ -56,7 +71,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: sim-suite-${{ github.event.pull_request.number || github.ref }}-${{ inputs.scheme || 'both' }}
+  group: sim-suite-${{ github.event.pull_request.number || github.ref }}-${{ inputs.scheme || 'both' }}-${{ inputs.ios || 'all' }}
   cancel-in-progress: true
 
 defaults:
@@ -66,18 +81,24 @@ defaults:
 env:
   XCODEGEN_VERSION: 2.45.3
   XCODEGEN_SHA256: 0c90f4d28ca57335f9fa78cf5bf6dabfe20a232036dabe36de2eef79cb7c0878
+  # The release's Xcode by path, never the image's default (27.1); see
+  # ci.yml for the release-candidate note and the pin check.
+  DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
 
 jobs:
   sim-suite:
-    name: sim-suite (${{ matrix.scheme }})
-    runs-on: macos-26
+    # The iOS 27 jobs keep the plain name, so the pull-request job is still
+    # the required check `sim-suite (ResectaApp)`.
+    name: sim-suite (${{ matrix.scheme }}${{ matrix.ios == '26' && ', iOS 26' || '' }})
+    runs-on: xcode-27
     timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
-        scheme: ${{ github.event_name == 'workflow_dispatch' && fromJSON(format('["{0}"]', inputs.scheme || 'ResectaApp')) || github.event_name == 'pull_request' && fromJSON('["ResectaApp"]') || fromJSON('["ResectaApp", "RedactionEngine"]') }}
+        include: ${{ github.event_name == 'workflow_dispatch' && fromJSON(format('[{{"scheme":"{0}","ios":"{1}"}}]', inputs.scheme || 'ResectaApp', inputs.ios || '27')) || github.event_name == 'pull_request' && fromJSON('[{"scheme":"ResectaApp","ios":"27"}]') || fromJSON('[{"scheme":"ResectaApp","ios":"27"},{"scheme":"RedactionEngine","ios":"27"},{"scheme":"ResectaApp","ios":"26"},{"scheme":"RedactionEngine","ios":"26"}]') }}
     env:
       SCHEME: ${{ matrix.scheme }}
+      IOS_MAJOR: ${{ matrix.ios }}
       # Seconds of no output before the batched runner kills an invocation
       # (the local default is 180). See the header.
       TEST_BATCHED_STALL_SECS: '900'
@@ -123,17 +144,43 @@ jobs:
       - name: Generate the project
         run: ./regenerate.sh
 
-      - name: iOS 26 simulator runtime
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          pin=0
+          Scripts/toolchain-pin-check.sh --xcode || pin=$?
+          if [ "$pin" -ne 0 ]; then
+            echo "::warning::the Xcode that ran is not the release's pinned build (Scripts/toolchain-pin-check.sh --print-pin)"
+          fi
+
+      # The xcode-27 image carries iOS 27 runtimes only. The floor leg (iOS
+      # 26) downloads iOS 26.1, the floor leg's runtime of record, and makes
+      # an iPhone 17 on it when the download made none.
+      - name: Simulator runtime (iOS ${{ matrix.ios }})
         run: |
           xcrun simctl list runtimes
-          if xcrun simctl list runtimes | /usr/bin/grep -q 'iOS 26'; then
-            echo "iOS 26 runtime present; no download"
-          else
-            echo "no iOS 26 runtime on this image; downloading"
-            t0=$SECONDS
-            xcodebuild -downloadPlatform iOS
-            echo "runtime download: $((SECONDS - t0)) s"
-            xcrun simctl list runtimes
+          if [ "$IOS_MAJOR" = "26" ]; then
+            if xcrun simctl list runtimes | /usr/bin/grep -q '^iOS 26\.1 '; then
+              echo "iOS 26.1 runtime present; no download"
+            else
+              echo "downloading the iOS 26.1 runtime"
+              t0=$SECONDS
+              xcodebuild -downloadPlatform iOS -buildVersion 26.1
+              echo "runtime download: $((SECONDS - t0)) s"
+              xcrun simctl list runtimes
+            fi
+            rt=$(xcrun simctl list runtimes -j | python3 -c '
+          import json, sys
+          rs = [r for r in json.load(sys.stdin)["runtimes"] if r.get("isAvailable") and r.get("version", "").startswith("26.1")]
+          print(rs[0]["identifier"] if rs else "")
+          ')
+            [ -n "$rt" ] || { echo "::error::no available iOS 26.1 runtime after the download"; exit 1; }
+            if ! xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          sys.exit(0 if any(d["name"] == "iPhone 17" for d in json.load(sys.stdin)["devices"].get(sys.argv[1], [])) else 1)
+          ' "$rt"; then
+              xcrun simctl create "iPhone 17" com.apple.CoreSimulator.SimDeviceType.iPhone-17 "$rt"
+            fi
           fi
           xcrun simctl list devices available | /usr/bin/grep 'iPhone 17' || true
 
@@ -142,24 +189,30 @@ jobs:
       # invocation and erases the device; boot once here and wait for it.
       # The runner does not resolve simulators by name: the id found here is
       # exported as TEST_BATCHED_SIM_UDID (the job fails when none exists).
+      # The iPhone 17 on the newest runtime of the job's iOS major.
       - name: Boot the simulator
         run: |
-          udid=$(xcrun simctl list devices available -j | python3 -c '
-          import json, re, sys
+          read -r udid runtime < <(xcrun simctl list devices available -j | python3 -c '
+          import json, os, re, sys
+          major = int(os.environ["IOS_MAJOR"])
           best = None
           for runtime, devs in json.load(sys.stdin)["devices"].items():
               m = re.search(r"iOS-(\d+)-(\d+)$", runtime)
               ver = (int(m.group(1)), int(m.group(2))) if m else (0, 0)
+              if ver[0] != major:
+                  continue
               for d in devs:
                   if d["name"] != "iPhone 17":
                       continue
                   if best is None or ver > best[0]:
                       best = (ver, d["udid"], runtime)
           if best is None:
-              sys.exit("no iPhone 17 simulator")
-          print(best[1])
+              sys.exit("no iPhone 17 simulator on iOS %d" % major)
+          print(best[1], best[2])
           ')
-          echo "booting $udid"
+          [ -n "$udid" ] || { echo "::error::no iPhone 17 simulator on iOS $IOS_MAJOR"; exit 1; }
+          echo "booting $udid ($runtime)"
+          { echo "## simulator"; echo; echo "iPhone 17 \`$udid\` on \`$runtime\`"; } >> "$GITHUB_STEP_SUMMARY"
           t0=$SECONDS
           xcrun simctl boot "$udid"
           xcrun simctl bootstatus "$udid" -b
@@ -176,14 +229,37 @@ jobs:
           echo "SUITE_RC=$rc" >> "$GITHUB_ENV"
           exit "$rc"
 
+      # The UI-test target, serially (one suite per invocation, the same
+      # watchdog and verdict file), on the iOS 27 ResectaApp job of the
+      # weekly and tag runs and on a dispatch that asks for it; never on a
+      # pull request (a macOS slot). A red suite fails the job. The build is
+      # the bundles the unit run built (the same DerivedData).
+      - name: UI suites
+        if: ${{ !cancelled() && matrix.scheme == 'ResectaApp' && matrix.ios == '27' && (github.event_name == 'schedule' || startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.ui)) }}
+        run: |
+          t0=$SECONDS
+          rc=0
+          Scripts/test-batched.sh ResectaAppUI --timeout-mins 25 2>&1 | tee ui-batched.log || rc=$?
+          {
+            echo "## UI suites (ResectaAppUI)"
+            echo
+            echo "- wall: $((SECONDS - t0)) s · rc: $rc"
+            echo
+            echo '```'
+            /usr/bin/grep -E '^VERDICT:|^totals:|^OFFENDERS:' ui-batched.log || echo "(no verdict line)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$rc"
+
       # The editor's link-policy pins (Tests/ResectaAppUITests/
       # DocumentLinkUITests.swift) drive the built app and assert that a
-      # tapped link annotation does not leave the app. The batched runner
-      # never executes the UI-test bundle, so they run here on the weekly
-      # and tag runs only (never on a pull request: a macOS slot), against
-      # the bundles the runner already built and the simulator it used.
+      # tapped link annotation does not leave the app. On the iOS 27 job
+      # they run inside the UI suites above; on the iOS 26 floor job of the
+      # weekly and tag runs they run here alone (never on a pull request: a
+      # macOS slot), against the bundles the runner already built and the
+      # simulator it used.
       - name: Egress UI pins
-        if: ${{ !cancelled() && matrix.scheme == 'ResectaApp' && (github.event_name == 'schedule' || startsWith(github.ref, 'refs/tags/v')) }}
+        if: ${{ !cancelled() && matrix.scheme == 'ResectaApp' && matrix.ios == '26' && (github.event_name == 'schedule' || startsWith(github.ref, 'refs/tags/v')) }}
         run: |
           t0=$SECONDS
           rc=0
@@ -206,25 +282,31 @@ jobs:
       - name: Collect logs and failing result bundles
         if: always()
         run: |
-          run_dir=""
-          for d in /tmp/test-batched-"$SCHEME"-*/; do
-            if [ -d "$d" ]; then run_dir="${d%/}"; fi
-          done
           mkdir -p upload
-          cp batched.log upload/ 2>/dev/null || true
-          if [ -n "$run_dir" ]; then
-            cp "$run_dir"/*.log "$run_dir"/*.txt upload/ 2>/dev/null || true
+          cp batched.log ui-batched.log upload/ 2>/dev/null || true
+          # The scheme's run dir, and the UI suites' run dir when they ran
+          # (its logs and bundles go under upload/ui/).
+          for mode in "$SCHEME" ResectaAppUI; do
+            run_dir=""
+            for d in /tmp/test-batched-"$mode"-*/; do
+              if [ -d "$d" ]; then run_dir="${d%/}"; fi
+            done
+            [ -n "$run_dir" ] || continue
+            out=upload
+            [ "$mode" = ResectaAppUI ] && out=upload/ui
+            mkdir -p "$out"
+            cp "$run_dir"/*.log "$run_dir"/*.txt "$out"/ 2>/dev/null || true
             if [ -s "$run_dir/failures.txt" ]; then
               awk '{print $2}' "$run_dir/failures.txt" | sort -u | while read -r label; do
                 for xc in "$run_dir/$label".xcresult "$run_dir/$label"-r*.xcresult; do
-                  if [ -d "$xc" ]; then cp -R "$xc" upload/; fi
+                  if [ -d "$xc" ]; then cp -R "$xc" "$out"/; fi
                 done
               done
             fi
-          fi
+          done
           du -sh upload
           {
-            echo "## sim-suite ($SCHEME)"
+            echo "## sim-suite ($SCHEME, iOS $IOS_MAJOR)"
             echo
             echo "- wall: ${SUITE_SECS:-—} s · rc: ${SUITE_RC:-—}"
             echo
@@ -237,7 +319,7 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
-          name: sim-suite-logs-${{ matrix.scheme }}
+          name: sim-suite-logs-${{ matrix.scheme }}-ios${{ matrix.ios }}
           path: upload
           retention-days: 14
           if-no-files-found: warn

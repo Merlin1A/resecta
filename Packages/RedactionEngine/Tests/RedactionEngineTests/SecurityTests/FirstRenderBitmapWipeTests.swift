@@ -43,12 +43,14 @@ struct FirstRenderBitmapWipeTests {
 
     @Test("renderPage releases its bitmap context zeroed and hands back an image that keeps its pixels")
     func renderPageWipesItsContext() async throws {
-        let doc = try #require(PDFDocument(data: TestFixtures.blankPage()))
-        let page = try #require(doc.page(at: 0))
         let observation = Observation()
 
+        // The page is made inside the closure that renders it: Swift 6.4
+        // refuses to send a captured `PDFPage` to the `@concurrent` render.
         let image = try await FirstRenderBitmap.$wipeProbe.withValue(Self.observe(observation)) {
-            try await PageRasterizer().renderPage(page, pageIndex: 0, dpi: 36)
+            let doc = try #require(PDFDocument(data: TestFixtures.blankPage()))
+            let page = try #require(doc.page(at: 0))
+            return try await PageRasterizer().renderPage(page, pageIndex: 0, dpi: 36)
         }
 
         #expect(observation.probed == 1)
@@ -59,13 +61,14 @@ struct FirstRenderBitmapWipeTests {
 
     @Test("renderPageFromCGPage releases its bitmap context zeroed and hands back an image that keeps its pixels")
     func renderPageFromCGPageWipesItsContext() async throws {
-        let doc = try #require(PDFDocument(data: TestFixtures.blankPage()))
-        let page = try #require(doc.page(at: 0))
-        let cgPage = try #require(page.pageRef)
         let observation = Observation()
 
+        // As above: the page and its `CGPDFPage` are made inside the closure.
         let image = try await FirstRenderBitmap.$wipeProbe.withValue(Self.observe(observation)) {
-            try await PageRasterizer().renderPageFromCGPage(
+            let doc = try #require(PDFDocument(data: TestFixtures.blankPage()))
+            let page = try #require(doc.page(at: 0))
+            let cgPage = try #require(page.pageRef)
+            return try await PageRasterizer().renderPageFromCGPage(
                 cgPage, bounds: page.bounds(for: .cropBox), rotation: page.rotation,
                 pageIndex: 0, dpi: 36)
         }
