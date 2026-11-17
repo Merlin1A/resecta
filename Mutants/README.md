@@ -1,14 +1,14 @@
 # Mutants
 
 Each file here is a deliberate bug, kept as a patch, that the tests named in its header must fail on.
-A mutant is how a judging function shows that its tests can fail: if a patch applies and every named
+A mutant shows that a check's tests can fail: if a patch applies and every named
 test still passes, the tests do not pin the property the patch breaks.
 
 ## How to run one
 
-1. Make a scratch worktree at the commit under review: `git worktree add --detach ../mutant-check HEAD`.
+1. Make a scratch worktree at the commit under review: `git worktree add --detach ../mutant-check <commit>`.
 2. In it, `git apply Mutants/<name>.patch`.
-3. Run the test command in the patch's header (it names the scheme and the tests).
+3. Run the test command in the patch's header (it names the Xcode, the scheme and the tests; one patch has two commands).
 4. Every test listed under "Must go red" must fail. Record the result, then remove the worktree.
 
 The person who reviews a change runs its mutants; its author does not. A patch is named `<area>-<property>.patch`.
