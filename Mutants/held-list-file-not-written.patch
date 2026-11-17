@@ -1,7 +1,7 @@
 Property: A list is not written over a stored file that could not be read.
 Area: saved lists (stores)
-Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/StoreFileHardeningTests -only-testing:ResectaAppTests/SavedListsNoFailedWriteYetTests
-Must go red: ResectaAppTests/StoreFileHardeningTests "Custom Terms: while the stored file cannot be read, every change answers held and the file is left as it is" (every argument); ResectaAppTests/StoreFileHardeningTests "Custom Terms and Saved Regexes: an old settings record does not move over a file that cannot be read"; ResectaAppTests/SavedListsNoFailedWriteYetTests "Until a write reports, no change to a saved list answers not saved" [.held]
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/StoreFileHardeningTests
+Must go red: ResectaAppTests/StoreFileHardeningTests "Custom Terms: while the stored file cannot be read, every change answers held and the file is left as it is" (every argument); ResectaAppTests/StoreFileHardeningTests "Custom Terms and Saved Regexes: an old settings record does not move over a file that cannot be read"
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/State/UserTermsStore.swift b/Sources/ResectaApp/State/UserTermsStore.swift

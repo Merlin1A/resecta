@@ -1,0 +1,18 @@
+Property: A save that fails reports false, so a change it carried is not shown as made.
+Area: saved lists (file helper)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/FileJSONBlobTests -only-testing:ResectaAppTests/StoreFileHardeningTests -only-testing:ResectaAppTests/SavedSearchStoreHeldFileTests -only-testing:ResectaAppTests/SaveCurrentRegexCommitTests -only-testing:ResectaAppTests/PatternAdmissionTests -only-testing:ResectaAppTests/StoreScaffoldingTests
+Must go red: ResectaAppTests/FileJSONBlobTests "A save into a folder that cannot be written returns false and leaves the stored file as it was"; ResectaAppTests/FileJSONBlobTests "A save of a value that cannot be encoded returns false and writes nothing"; ResectaAppTests/FileJSONBlobTests "A save whose replace fails returns false and leaves the stored file as it was"; ResectaAppTests/StoreFileHardeningTests "Custom terms: a change whose write fails is not saved and leaves the lists as the file has them" (every argument); ResectaAppTests/StoreFileHardeningTests "Saved patterns: a change whose write fails is not saved and leaves the list as the file has it" (every argument); ResectaAppTests/SavedSearchStoreHeldFileTests "Saved searches: a change whose write fails is not saved and leaves the list as the file has it" (every argument); ResectaAppTests/SaveCurrentRegexCommitTests "A pattern whose write fails is reported as not saved, not as refused"; ResectaAppTests/PatternAdmissionTests "Admission reports a failed write as not saved"; ResectaAppTests/StoreScaffoldingTests "The legacy move keeps the key when the file cannot be written"
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/FileJSONBlob.swift b/Sources/ResectaApp/State/FileJSONBlob.swift
+index dbf45a31..0952d37c 100644
+--- a/Sources/ResectaApp/State/FileJSONBlob.swift
++++ b/Sources/ResectaApp/State/FileJSONBlob.swift
+@@ -166,6 +166,7 @@ nonisolated struct FileJSONBlob<T: Codable & Sendable>: Sendable {
+             try? FileManager.default.removeItem(at: tmpURL)
+             logger.warning(
+                 "FileJSONBlob[\(self.fileURL.lastPathComponent, privacy: .public)] write failed: \(LogSafeError.publicSummary(error), privacy: .public); \(String(describing: error), privacy: .private)")
++            return true
+         }
+         return placed
+     }

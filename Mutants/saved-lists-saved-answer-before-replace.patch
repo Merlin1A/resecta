@@ -1,0 +1,24 @@
+Property: A save reports true only once the file is placed.
+Area: saved lists (file helper)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/FileJSONBlobTests
+Must go red: ResectaAppTests/FileJSONBlobTests "A save whose replace fails returns false and leaves the stored file as it was"; ResectaAppTests/FileJSONBlobTests "The saved answer is set after the file is placed and before its attributes are asserted again"
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/FileJSONBlob.swift b/Sources/ResectaApp/State/FileJSONBlob.swift
+index dbf45a31..7b8d76b5 100644
+--- a/Sources/ResectaApp/State/FileJSONBlob.swift
++++ b/Sources/ResectaApp/State/FileJSONBlob.swift
+@@ -148,12 +148,12 @@ nonisolated struct FileJSONBlob<T: Codable & Sendable>: Sendable {
+             tmpValues.isExcludedFromBackup = true
+             var tmp = tmpURL
+             try tmp.setResourceValues(tmpValues)
++            placed = true
+             if FileManager.default.fileExists(atPath: fileURL.path) {
+                 _ = try FileManager.default.replaceItemAt(fileURL, withItemAt: tmpURL)
+             } else {
+                 try FileManager.default.moveItem(at: tmpURL, to: fileURL)
+             }
+-            placed = true
+             // Re-assert on the final URL — the engine-helper route does
+             // not read attributes back on every host, and the belt keeps
+             // the previous per-save re-application contract.
