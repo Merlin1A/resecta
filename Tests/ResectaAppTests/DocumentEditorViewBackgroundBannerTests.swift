@@ -165,11 +165,12 @@ struct DocumentEditorViewBackgroundBannerTests {
         #expect(doc.canStartPipeline == true)   // guard now passes
     }
 
-    /// The primary action clears the pause state before it launches the
-    /// run it offers, so when the resumed detection returns to `.editing`
-    /// the banner's guard (`wasPausedByBackground && phaseKind == .editing`)
-    /// reads false and the detection banner stands alone at the anchor.
-    @Test("Resume banner's primary action clears the pause flag and its phase")
+    /// Closing the paused notice clears the pause pair, so the banner's
+    /// guard (`wasPausedByBackground && phaseKind == .editing`) reads false
+    /// and the detection banner stands alone at the anchor. Restart no
+    /// longer clears the pair itself: the run's start does, after its
+    /// refusal check (`testFullRunStartClearsThePause`).
+    @Test("Closing the paused notice clears the pause flag and its phase")
     func testPrimaryActionClearsPauseState() {
         let documentState = DocumentState()
         documentState.phase = .editing
@@ -185,8 +186,8 @@ struct DocumentEditorViewBackgroundBannerTests {
 
     /// The paused notice records a run that did not finish, so time away
     /// does not end it: the slot reads only the pause pair, which the
-    /// banner's own dismiss and Restart (and its leaving the screen with
-    /// the editing phase) clear.
+    /// notice's close, a full run's start, and the document's close or
+    /// replacement clear.
     @Test("The paused notice keeps the top slot however long the app was away, until the pause is cleared")
     func testPausedNoticePersistsUntilCleared() {
         let documentState = DocumentState()
@@ -222,5 +223,126 @@ struct DocumentEditorViewBackgroundBannerTests {
         #expect(doc.pausedFromPhase == .verifying)
         #expect(doc.wasPausedByBackground && doc.phaseKind == .editing,
                 "the banner's mount predicate reads true")
+    }
+
+    // MARK: - The pause outlives the notice leaving the screen
+
+    /// The notice is drawn inside the editor's editing branch, which leaves
+    /// the screen under the screen-capture cover and during an import. Its
+    /// view holds no hook that ends the pause when it leaves; the pause pair
+    /// is ended in state only (the close, a full run's start, the document's
+    /// close or replacement).
+    @Test("The paused notice changes nothing when it leaves the screen")
+    func testPausedNoticeHasNoLeavingHook() throws {
+        let source = try String(contentsOf: URL(fileURLWithPath: "\(#filePath)")
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/ResectaApp/Views/DocumentEditorView+ResumeBanner.swift"),
+            encoding: .utf8)
+        #expect(source.contains("var resumeBannerOverlay"), "the notice's view is in this file")
+        #expect(!source.contains("onDisappear"))
+    }
+
+    /// The two ways an import over the open document goes back to it: it
+    /// fails (the failed screen's Return to Editor), or it is cancelled.
+    enum ImportReturnRoute: CaseIterable {
+        case failed
+        case cancelled
+    }
+
+    @Test("A pause survives an import that fails")
+    func testPauseSurvivesAnImportThatDoesNotOpen() {
+        #expect(ImportReturnRoute.allCases.count == 2)
+        for route in ImportReturnRoute.allCases {
+            let doc = DocumentState()
+            let redaction = RedactionState()
+            doc.sourceDocument = makeTestPDFDocument()
+            doc.phase = .editing
+            doc.wasPausedByBackground = true
+            doc.pausedFromPhase = .redacting
+
+            switch route {
+            case .failed:
+                ImportService.refuse(.tooLarge(bytesRead: 60 * 1024 * 1024), documentState: doc)
+                #expect(doc.phaseKind == .failed, "\(route)")
+                guard case .failed(let error, let returnPhase) = doc.phase else { continue }
+                #expect(FailedStateView.primaryAction(error: error, returnPhase: returnPhase) == .returnToEditor,
+                        "\(route)")
+                doc.transition(to: .editing)
+            case .cancelled:
+                doc.transition(to: .importing)
+                #expect(doc.phaseKind == .importing, "\(route)")
+                doc.cancelActivePipeline(redactionState: redaction)
+            }
+
+            #expect(doc.wasPausedByBackground && doc.phaseKind == .editing, "\(route)")
+            #expect(doc.pausedFromPhase == .redacting, "\(route)")
+        }
+    }
+
+    @Test("A full run's start clears the pause")
+    func testFullRunStartClearsThePause() {
+        let coord = makeLoadedCoordinator()
+        coord.redactionState.addRegion(
+            RedactionRegion(id: UUID(), normalizedRect: .init(x: 0.10, y: 0.10, width: 0.05, height: 0.02),
+                            source: .manual),
+            page: 0, undoManager: nil)
+        coord.documentState.wasPausedByBackground = true
+        coord.documentState.pausedFromPhase = .redacting
+
+        coord.runFullPipeline(documentOverride: nil)
+        defer { coord.documentState.cancelActivePipeline(redactionState: coord.redactionState) }
+
+        #expect(coord.documentState.activePipelineTask != nil, "the run started")
+        #expect(coord.documentState.wasPausedByBackground == false)
+        #expect(coord.documentState.pausedFromPhase == nil)
+    }
+
+    /// Each refusal the run's check returns, set up in state while editing.
+    enum RefusedRunRow: CaseIterable {
+        case selectedMatches
+        case noRegions
+        case busy
+    }
+
+    @Test("A refused run leaves the pause as it was")
+    func testRefusedRunLeavesThePause() {
+        #expect(RefusedRunRow.allCases.count == 3)
+        for row in RefusedRunRow.allCases {
+            let coord = makeLoadedCoordinator()
+            let doc = coord.documentState
+            let redaction = coord.redactionState
+            let expected: DocumentState.RedactRefusal
+            switch row {
+            case .selectedMatches:
+                let search = SearchState(defaults: makeScratchDefaults().0)
+                search.results = [SearchResult(
+                    pageIndex: 0, normalizedRect: .init(x: 0.1, y: 0.1, width: 0.2, height: 0.03),
+                    matchedText: "alpha", contextSnippet: "…alpha…", source: .textLayer, term: "alpha",
+                    isSelected: true)]
+                redaction.activeSearch = search
+                expected = .selectedMatches
+            case .noRegions:
+                expected = .noRegions
+            case .busy:
+                redaction.addRegion(
+                    RedactionRegion(id: UUID(), normalizedRect: .init(x: 0.10, y: 0.10, width: 0.05, height: 0.02),
+                                    source: .manual),
+                    page: 0, undoManager: nil)
+                doc.activePipelineTask = Task {}
+                expected = .busy
+            }
+            doc.wasPausedByBackground = true
+            doc.pausedFromPhase = .redacting
+            #expect(doc.phaseKind == .editing, "\(row)")
+            #expect(doc.redactRefusal(with: redaction) == expected, "\(row)")
+            let heldTask = doc.activePipelineTask
+
+            coord.runFullPipeline(documentOverride: nil)
+
+            #expect(doc.activePipelineTask == heldTask, "\(row): no run started")
+            #expect(doc.wasPausedByBackground == true, "\(row)")
+            #expect(doc.pausedFromPhase == .redacting, "\(row)")
+            doc.activePipelineTask = nil
+        }
     }
 }
