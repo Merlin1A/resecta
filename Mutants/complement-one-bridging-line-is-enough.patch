@@ -1,0 +1,19 @@
+Property: The words beside a box's room are its own run only when two lines bridge the room; one full-width line over a row proves nothing about the row.
+Area: the page's complement (lines, runs, stacks, columns, bridges, direction)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/ComplementReadingTests (or on the host: cd Packages/RedactionEngine && swift test --filter ComplementReadingTests)
+Must go red: RedactionCoreTests/ComplementReadingTests twoColumnsUnderATitle; RedactionCoreTests/ComplementReadingTests twoLineParagraphAlone
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
+index 050556d3..258376f9 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
+@@ -593,7 +593,7 @@ extension Complement {
+             }
+         }
+         var ownRun: PageRect64?
+-        if bridges.count >= constants.bridgingLines, let line {
++        if bridges.count >= 1, let line {
+             let ownLine = page.lines[line]
+             let beside = [before.max { $0.box.maxX < $1.box.maxX }, after.min { $0.box.minX < $1.box.minX }].compactMap { $0 }
+             for word in beside {

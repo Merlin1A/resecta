@@ -1,0 +1,23 @@
+Property: An outside line shows the column on a side only if the space between the stack's own reach and its reach holds no word of the stack's lines.
+Area: the page's complement (lines, runs, stacks, columns, bridges, direction)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/ComplementReadingTests (or on the host: cd Packages/RedactionEngine && swift test --filter ComplementReadingTests)
+Must go red: RedactionCoreTests/ComplementReadingTests noteBesideARowKeepsTheOutsideLinesOut
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
+index 050556d3..ec7cc561 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
+@@ -546,10 +546,10 @@ extension Complement {
+         let reachLeft = Swift.min(columnLeft ?? anchor.lo, anchor.lo)
+         for o in outside {
+             for run in page.lines[o].runs.map(\.box) where overlapsRoom(run) && meetsAnchor(run) {
+-                if run.maxX > reachRight, spaceIsEmpty(right: true, from: reachRight, to: run.maxX, lines: stackLines, exceptMeeting: false) {
++                if run.maxX > reachRight {
+                     columnRight = Swift.max(columnRight ?? run.maxX, run.maxX)
+                 }
+-                if run.minX < reachLeft, spaceIsEmpty(right: false, from: reachLeft, to: run.minX, lines: stackLines, exceptMeeting: false) {
++                if run.minX < reachLeft {
+                     columnLeft = Swift.min(columnLeft ?? run.minX, run.minX)
+                 }
+             }

@@ -1,0 +1,19 @@
+Property: Where a closed room has runs of the stack lying wholly inside it, only those show the column: a table cell's column is its own column's cells, never the row's.
+Area: the page's complement (lines, runs, stacks, columns, bridges, direction)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/ComplementReadingTests (or on the host: cd Packages/RedactionEngine && swift test --filter ComplementReadingTests)
+Must go red: RedactionCoreTests/ComplementReadingTests fixedTableReadsItsOwnColumn
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
+index 050556d3..8c84d490 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
+@@ -512,7 +512,7 @@ extension Complement {
+         var inside = false
+         if let l = roomLeft, let r = roomRight {
+             let within = candidates.filter { $0.minX >= l && $0.maxX <= r }
+-            if !within.isEmpty { candidates = within; inside = true }
++            if within.isEmpty && !within.isEmpty { candidates = within; inside = true }
+         }
+ 
+         /// The space past `from` up to `to` on a side holds no word of `lines`

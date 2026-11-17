@@ -103,6 +103,30 @@ package struct Ratio: Hashable, Sendable, Codable {
     }
 }
 
+/// When two lines of a page stand close enough to belong to one stack: by
+/// the page's ordinary gap between consecutive lines, in steps, when there
+/// are enough gaps to take it from; else by the lines' height alone.
+package struct BlockSpacing: Hashable, Sendable, Codable {
+    /// How far past the ordinary gap two lines may stand and still join, in
+    /// line heights.
+    package var excess: Ratio
+    /// The step the free space between lines is counted in, in whole
+    /// sixty-fourths of a point.
+    package var stepSixtyFourths: Int
+    /// The fewest gaps the ordinary gap is taken from.
+    package var fewestGaps: Int
+    /// With fewer gaps, two lines join when the free space between them is
+    /// under this many line heights.
+    package var withoutOrdinaryGap: Ratio
+
+    package init(excess: Ratio, stepSixtyFourths: Int, fewestGaps: Int, withoutOrdinaryGap: Ratio) {
+        self.excess = excess
+        self.stepSixtyFourths = stepSixtyFourths
+        self.fewestGaps = fewestGaps
+        self.withoutOrdinaryGap = withoutOrdinaryGap
+    }
+}
+
 /// A closed range of Unicode scalar values.
 package struct ScalarRange: Hashable, Sendable, Codable {
     package var first: UInt32
@@ -131,23 +155,39 @@ package struct ProvisionalConstants: Hashable, Sendable, Codable {
     /// The lowest quality the app paints at, in dots per inch.
     package var lowestQualityDPI: Int
     /// How far from level a line's print may lie and still read as level,
-    /// in degrees.
-    package var levelToleranceDegrees: Int
+    /// as the largest rise over run: one degree, its tangent
+    /// (0.0174550649…) rounded down to millionths, so the test at the edge
+    /// is a comparison of whole numbers.
+    package var levelSlope: Ratio
     /// Scalars of right-to-left scripts: a letter in one of these on a line
     /// is evidence that the line does not run left to right.
     package var rightToLeftScalars: [ScalarRange]
+    /// When two lines belong to one stack.
+    package var blockSpacing: BlockSpacing
 
     package init(
         runGap: Ratio, bridgingLines: Int, stopLineHeights: Ratio, stopPixels: Int,
-        lowestQualityDPI: Int, levelToleranceDegrees: Int, rightToLeftScalars: [ScalarRange]
+        lowestQualityDPI: Int, levelSlope: Ratio, rightToLeftScalars: [ScalarRange], blockSpacing: BlockSpacing
     ) {
         self.runGap = runGap
         self.bridgingLines = bridgingLines
         self.stopLineHeights = stopLineHeights
         self.stopPixels = stopPixels
         self.lowestQualityDPI = lowestQualityDPI
-        self.levelToleranceDegrees = levelToleranceDegrees
+        self.levelSlope = levelSlope
         self.rightToLeftScalars = rightToLeftScalars
+        self.blockSpacing = blockSpacing
+    }
+
+    /// Whether `scalar` is a letter of a right-to-left script: it lies in
+    /// one of the table's ranges and its general category is a letter (L*),
+    /// so the ranges' digits, marks and punctuation are not evidence.
+    package func isRightToLeftLetter(_ scalar: Unicode.Scalar) -> Bool {
+        guard rightToLeftScalars.contains(where: { $0.contains(scalar) }) else { return false }
+        switch scalar.properties.generalCategory {
+        case .uppercaseLetter, .lowercaseLetter, .titlecaseLetter, .modifierLetter, .otherLetter: return true
+        default: return false
+        }
     }
 
     /// `stopPixels` at `lowestQualityDPI`, in whole sixty-fourths of a point,
@@ -199,14 +239,16 @@ extension GeometryPolicy {
             stopLineHeights: Ratio(1, 2),
             stopPixels: 8,
             lowestQualityDPI: 150,
-            levelToleranceDegrees: 1,
+            levelSlope: Ratio(17_455, 1_000_000),
             rightToLeftScalars: [
                 ScalarRange(0x0590, 0x08FF),
                 ScalarRange(0xFB1D, 0xFDFF),
                 ScalarRange(0xFE70, 0xFEFC),
                 ScalarRange(0x10800, 0x10FFF),
                 ScalarRange(0x1E800, 0x1EFFF),
-            ]
+            ],
+            blockSpacing: BlockSpacing(excess: Ratio(1, 2), stepSixtyFourths: 32, fewestGaps: 4,
+                                       withoutOrdinaryGap: Ratio(1, 1))
         )
     )
 

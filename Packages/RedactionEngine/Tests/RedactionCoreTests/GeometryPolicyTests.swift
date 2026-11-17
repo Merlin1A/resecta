@@ -124,7 +124,9 @@ import RedactionCore
         #expect(constants.runGap == Ratio(1, 1))
         #expect(constants.bridgingLines == 2)
         #expect(constants.stopLineHeights == Ratio(1, 2))
-        #expect(constants.levelToleranceDegrees == 1)
+        #expect(constants.levelSlope == Ratio(17_455, 1_000_000))
+        #expect(constants.blockSpacing == BlockSpacing(excess: Ratio(1, 2), stepSixtyFourths: 32, fewestGaps: 4,
+                                                       withoutOrdinaryGap: Ratio(1, 1)), "half a line height; 0.5 pt steps; four gaps")
         #expect(constants.lowestQualityDPI == 150)
         #expect(constants.stopPixelsSixtyFourths == 246, "eight pixels at 150 dpi are 3.84 pt, 245.76 sixty-fourths")
     }
@@ -138,5 +140,48 @@ import RedactionCore
         for other: UInt32 in [0x0041, 0x058F, 0x0900, 0xFB1C, 0xFE6F, 0xFEFF, 0x107FF, 0x11000, 0x1E7FF, 0x1F000] {
             #expect(!listed(other), "U+\(String(other, radix: 16, uppercase: true))")
         }
+    }
+    @Test func theLevelSlopeIsOneDegreesTangentRoundedDownToMillionths() {
+        let slope = Self.policy.provisional.levelSlope
+        let tangent = tan(Double.pi / 180)
+        #expect(Double(slope.numerator) / Double(slope.denominator) <= tangent)
+        #expect(Double(slope.numerator + 1) / Double(slope.denominator) > tangent)
+    }
+
+    @Test func onlyTheRangesLettersAreRightToLeftEvidence() {
+        let constants = Self.policy.provisional
+        func evidence(_ value: UInt32) -> Bool { constants.isRightToLeftLetter(Unicode.Scalar(value)!) }
+        #expect(evidence(0x05D0), "Hebrew alef")
+        #expect(evidence(0x0627), "Arabic alef")
+        #expect(evidence(0xFEFB), "a presentation form of lam with alef")
+        #expect(!evidence(0x0660), "Arabic-Indic digit zero: a digit, not a letter")
+        #expect(!evidence(0x06F5), "extended Arabic-Indic digit five")
+        #expect(!evidence(0x064B), "fathatan: a combining mark")
+        #expect(!evidence(0x05B4), "Hebrew point hiriq: a combining mark")
+        #expect(!evidence(0x060C), "Arabic comma: punctuation")
+        #expect(!evidence(0x0041), "Latin capital A: outside the ranges")
+    }
+
+    /// The ranges were checked against the Unicode data files of the two
+    /// versions the toolchains here carry (16.0 on the Linux build, 17.0 on
+    /// the Mac): every letter of bidi class R or AL lies in a range, and
+    /// every letter in a range is R or AL. The counts below are the letters
+    /// (general category L*) in each range by those files; a toolchain with
+    /// other data counts differently, and the ranges are then checked again
+    /// against its files before this table is changed.
+    @Test func theRangesLettersAreTheCountsTheUnicodeDataGives() {
+        let ranges = Self.policy.provisional.rightToLeftScalars
+        let counts = ranges.map { range in
+            (range.first...range.last).reduce(0) { count, value in
+                guard let scalar = Unicode.Scalar(value) else { return count }
+                return Self.policy.provisional.isRightToLeftLetter(scalar) ? count + 1 : count
+            }
+        }
+        let version = Unicode.Scalar(0x1FAEA)!.properties.age.map { "\($0.major).\($0.minor)" }
+            ?? Unicode.Scalar(0x1CC00)!.properties.age.map { "\($0.major).\($0.minor)" } ?? "older"
+        let byVersion: [String: [Int]] = ["17.0": [475, 635, 140, 954, 407], "16.0": [474, 635, 140, 925, 407]]
+        let expected = byVersion[version]
+        #expect(expected != nil, "Unicode \(version): check the ranges against this version's data files")
+        if let expected { #expect(counts == expected, "Unicode \(version)") }
     }
 }
