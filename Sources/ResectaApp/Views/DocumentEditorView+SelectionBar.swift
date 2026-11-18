@@ -149,7 +149,15 @@ struct SelectionBar: View {
             }
         }
         // A tap on the bar stays on the bar: none reaches the page under it.
+        // The shape is the slot's whole glass, not only the row: a shape on
+        // the row alone also stopped the actions' 44-pt hit areas at the
+        // row's edge, so a tap near the glass's top or foot fell through to
+        // the page and ended the selection.
+        .padding(.vertical, Bar.bottomSlotVerticalPadding)
+        .padding(.horizontal, Bar.bottomSlotHorizontalPadding)
         .contentShape(Rectangle())
+        .padding(.vertical, -Bar.bottomSlotVerticalPadding)
+        .padding(.horizontal, -Bar.bottomSlotHorizontalPadding)
         .animation(ResectaTokens.Anim.resolved(ResectaTokens.Anim.stateChange, reduceMotion: reduceMotion), value: limitShows)
         .task(id: redactionState.lassoCut) { await runLimitLine() }
         // The line ends when the bar leaves.

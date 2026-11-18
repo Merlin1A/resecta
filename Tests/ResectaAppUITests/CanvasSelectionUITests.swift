@@ -106,14 +106,22 @@ nonisolated final class CanvasSelectionUITests: XCTestCase {
         XCTAssertGreaterThan(counter.frame.height, 40, "The largest text size did not take.")
         let shot = try XCTUnwrap(CanvasPixelProbe(XCUIScreen.main.screenshot(), windowSize: window.frame.size))
         let page = try XCTUnwrap(shot.fitPage(), "the page at fit is measurable")
+        // At the largest sizes the import's "Text layer detected" toast covers
+        // most of the page and takes the drag: draw once it has gone.
+        let toast = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Text layer detected")).firstMatch
+        XCTAssertTrue(toast.waitForNonExistence(timeout: 20), "The import toast never cleared off the page.")
         drawAndSelectOneBox()
         let bar = barPart("selectionBar")
         let pageBar = barPart("pageNav")
         XCTAssertTrue(pageBar.waitForExistence(timeout: 5))
-        let foot = (pageBar.frame.minY - 8) - bar.frame.maxY
+        // The bar's element reports its row, not its glass: the glass is the
+        // row and the slot's padding, 12 pt above and below, 16 pt beside.
+        let glass = bar.frame.insetBy(dx: -16, dy: -12)
+        let foot = (pageBar.frame.minY - 8) - glass.maxY
         XCTAssertEqual(foot, 8, accuracy: 1, "The bar's foot must be 8 pt above the page bar's glass; it is \(foot) pt.")
-        let covered = page.maxY - bar.frame.minY
-        XCTAssertTrue((6...14).contains(covered), "The bar covers \(covered) pt of the fit page's foot, not 6 to 14 (page \(page), bar \(bar.frame)).")
+        let covered = page.maxY - glass.minY
+        XCTAssertTrue((6...14).contains(covered), "The bar covers \(covered) pt of the fit page's foot, not 6 to 14 (page \(page), bar's glass \(glass)).")
         attachScreenshot(named: "selection-bar-largest-size")
         // A tap on empty canvas ends the selection and the bar leaves.
         tap(Self.emptyPage)

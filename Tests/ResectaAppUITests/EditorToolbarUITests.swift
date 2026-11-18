@@ -223,6 +223,11 @@ nonisolated final class EditorToolbarUITests: XCTestCase {
         XCTAssertTrue(mark.waitForExistence(timeout: 30), "The page bar never appeared.")
         if textSize != nil {
             XCTAssertGreaterThan(counter.frame.height, 40, "The text size \(textSize ?? "") did not take.")
+            // At the largest sizes the import's "Text layer detected" toast covers
+            // most of the page and takes the drag: draw once it has gone.
+            let toast = app.descendants(matching: .any)
+                .matching(NSPredicate(format: "label BEGINSWITH %@", "Text layer detected")).firstMatch
+            XCTAssertTrue(toast.waitForNonExistence(timeout: 20), "The import toast never cleared off the page.")
         }
         let draw = app.buttons["drawTool"].firstMatch
         XCTAssertTrue(draw.waitForExistence(timeout: 10))
