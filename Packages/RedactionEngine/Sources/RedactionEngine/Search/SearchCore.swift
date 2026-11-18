@@ -158,6 +158,11 @@ enum SearchCore {
         /// Empty on a page with none, and under the digit-separator strip,
         /// which has already removed them.
         var closedSpellingHyphens: [Int] = []
+        /// The page text as handed to `preparePage`, before any fold: the
+        /// page's own Characters, which the optional-space reading reads its
+        /// word edges on (`SearchCore+AlternateReadings.swift`). Empty on a
+        /// page built another way, which that reading then leaves alone.
+        var pageText: String = ""
 
         /// The `NSRange` in the RAW page text (`page.string`) of a base span:
         /// through `rawMap` on every page that has one (every page that is
@@ -321,7 +326,8 @@ enum SearchCore {
             baseChars: ext.offsetMap != nil ? Array(ext.baseText) : nil,
             rawMap: normalized.rawMap,
             closedSpellingHyphens: closedSpellingHyphens(
-                normalized.closedSpellingHyphens, searchText: ext.pageText, offsetMap: ext.offsetMap, options: options)
+                normalized.closedSpellingHyphens, searchText: ext.pageText, offsetMap: ext.offsetMap, options: options),
+            pageText: pageText
         )
     }
 
@@ -365,7 +371,7 @@ enum SearchCore {
     // MARK: - The literal matcher
 
     /// The literal cursor walk over the page as read (`literalSpans` adds the
-    /// closed-spelling reading to it). Locates `query` in `page.searchText` with
+    /// alternate readings to it). Locates `query` in `page.searchText` with
     /// `comparison` (the preview passes `.literal`, the full tier the
     /// composed-character-sequence default — both are the same NSString
     /// search; the comparison is a parameter so neither tier's count moves),

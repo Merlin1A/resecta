@@ -1,0 +1,19 @@
+Property: With whole word on, the optional-space walk keeps a match only where it stands as a whole word.
+Area: search, the optional-space walk
+Test command: cd Packages/RedactionEngine && swift test --filter 'OptionalSpaceMatchTests|OptionalSpaceSearchTests'
+Must go red: RedactionEngineTests/OptionalSpaceMatchTests "Each row's search over its page" [whole word: a run-together phrase inside a longer run is not found]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift
+index e22022ef..7ca3c485 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift
+@@ -464,7 +464,7 @@ extension SearchCore {
+                 } else {
+                     isBoundaried = isWholeWord(lower..<upper, in: text)
+                 }
+-                if !isBoundaried {
++                if !isBoundaried && false {
+                     cursor = past
+                     continue
+                 }
