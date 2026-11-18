@@ -433,4 +433,28 @@ struct PageRasterizerFallbackReasonTests {
         let result = try await rasterizer.rasterize(pageData, dpiCap: 150)
         #expect(result.fallbackReason == nil)
     }
+
+    /// A characterization pin: it records what the text-layer stage does
+    /// today, right or not. Every error inside the stage becomes the
+    /// fallback, cancellation included, so a cancelled task still gets its
+    /// value back with the reason recorded; the stage's signature does not
+    /// throw, so nothing passes it. Whether a cancellation should end the
+    /// page here instead is for the behaviour's owner to decide, and this
+    /// pin changes when that does.
+    @Test("Characterization pin: a cancelled text-layer stage records .extractionFailed")
+    func cancelledTextLayerStageRecordsExtractionFailed() async throws {
+        let data = TestFixtures.textLayerPDF(
+            text: "Sufficient plain English fixture text for a searchable page."
+        )
+        let pageData = try makePageData(
+            from: data, pipelineMode: .searchableRedaction, hasText: true
+        )
+        let rasterizer = PageRasterizer()
+        let size = effectiveBounds(pageData.cropBoxBounds, rotation: pageData.rotation).size
+        let state = await Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return await rasterizer.prepareTextLayer(pageData, effectiveSize: size)
+        }.value
+        #expect(state.fallbackReason == .extractionFailed)
+    }
 }
