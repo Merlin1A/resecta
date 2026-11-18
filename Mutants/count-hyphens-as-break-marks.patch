@@ -1,0 +1,18 @@
+Property: A printed hyphen is counted: one missing from the hidden text still fails both rows.
+Area: Character Count and Character Lineage, the break marks
+Test command: cd Packages/RedactionEngine && swift test --filter BreakMarkCountTests (or DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/BreakMarkCountTests)
+Must go red: RedactionEngineTests/BreakMarkCountTests predicateTable; RedactionEngineTests/BreakMarkCountTests aMissingPrintedHyphenStillFails; RedactionEngineTests/BreakMarkCountTests oneDefinitionOfTheSix
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/SandwichMetrics.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/SandwichMetrics.swift
+index 5ed06914..ef26662f 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/SandwichMetrics.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/SandwichMetrics.swift
+@@ -144,6 +144,7 @@ enum SandwichMetrics {
+     /// would change what the writer extracts and draws.
+     static func isOutsideCharacterCount(_ charString: String) -> Bool {
+         if isLineageWhitespace(charString) { return true }
++        if ["-", "\u{2010}", "\u{2011}"].contains(charString) { return true }
+         return charString.unicodeScalars.allSatisfy { TextNormalizer.breakMarks.contains($0) }
+     }
+ }

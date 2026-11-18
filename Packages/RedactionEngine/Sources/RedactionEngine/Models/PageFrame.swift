@@ -84,7 +84,8 @@ struct PageFrame: Sendable, Equatable {
     func sourceEntry(_ entry: CharacterInfo) -> CharacterInfo {
         CharacterInfo(
             character: entry.character, bounds: sourceRect(entry.bounds),
-            stringIndex: entry.stringIndex, lineIndex: entry.lineIndex)
+            stringIndex: entry.stringIndex, lineIndex: entry.lineIndex,
+            wordIndex: entry.wordIndex)
     }
 
     /// A region shape with its rects carried into the source frame (a rigid

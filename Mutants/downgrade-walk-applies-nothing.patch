@@ -1,0 +1,18 @@
+Property: The session-close walk hands every regular file under the folder it walks to the applier.
+Area: the session-close walk (TempFileHardening.downgradeTree)
+Test command: cd Packages/RedactionEngine && swift test --filter DowngradeTreeWalkTests (host; the walk is proved through its injected applier)
+Must go red: RedactionEngineTests/DowngradeTreeWalkTests walkHandsOnEachRegularFileOnce, failingFileDoesNotStopTheWalk
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Export/TempFileHardening.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Export/TempFileHardening.swift
+index bc39e8fc..190114f3 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Export/TempFileHardening.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Export/TempFileHardening.swift
+@@ -109,7 +109,6 @@ public enum TempFileHardening {
+             let isRegular = (try? fileURL.resourceValues(forKeys: [.isRegularFileKey]))?
+                 .isRegularFile ?? false
+             guard isRegular else { continue }
+-            try? apply(fileURL, level)
+         }
+     }
+ }

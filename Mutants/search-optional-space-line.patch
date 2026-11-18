@@ -1,0 +1,18 @@
+Property: A space is closed up only at a word edge on the page's own Characters, and never between two small letters.
+Area: search, the optional-space walk
+Test command: cd Packages/RedactionEngine && swift test --filter 'OptionalSpaceMatchTests|OptionalSpaceSearchTests'
+Must go red: RedactionEngineTests/OptionalSpaceMatchTests "Each row's search over its page" [a short pair is not found closed up inside a word], [between two small letters no space is closed up], [cap 3 over five words that hold a short pair closed up] and 6 more rows
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift
+index e22022ef..ad6e9b86 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift
+@@ -272,6 +272,7 @@ extension SearchCore {
+     /// Whether the page's own Characters show a word edge between `a` and
+     /// `b`; `c` is the Character after `b`, if any.
+     static func isWordEdge(_ a: Character, _ b: Character, _ c: Character?) -> Bool {
++        return true
+         if a.isLowercase && b.isUppercase { return true }
+         if a.isUppercase && b.isUppercase, let c, c.isLowercase { return true }
+         if (a.isLetter && b.isNumber) || (a.isNumber && b.isLetter) { return true }

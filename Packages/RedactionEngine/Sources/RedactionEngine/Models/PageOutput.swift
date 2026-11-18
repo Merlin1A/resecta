@@ -17,16 +17,24 @@ public struct PageOutput: Sendable {
     /// (`TextLayerReconstructor.drawInvisibleTextLayer`). 0 for an
     /// unrotated page; unread for Secure Rasterization pages.
     public let rotation: Int
+    /// The page's count of runs left out of its hidden text by the alphabet
+    /// rule: one for each run, by the page's one partition. Carried for a
+    /// page that stays Searchable and for one the alphabet rule made a
+    /// picture; zero for a page that became a picture for any other reason,
+    /// and zero until the alphabet rule marks runs.
+    public let runsLeftOut: Int
 
     public init(image: CGImage, size: CGSize,
                 textLayerEntries: [CharacterInfo]?,
                 redactionRectsInPoints: [CGRect] = [],
-                rotation: Int = 0) {
+                rotation: Int = 0,
+                runsLeftOut: Int = 0) {
         self.image = image
         self.size = size
         self.textLayerEntries = textLayerEntries
         self.redactionRectsInPoints = redactionRectsInPoints
         self.rotation = rotation
+        self.runsLeftOut = runsLeftOut
     }
 }
 

@@ -1,0 +1,19 @@
+Property: A space beside a one-letter word is never closed up.
+Area: search, the optional-space walk
+Test command: cd Packages/RedactionEngine && swift test --filter 'OptionalSpaceMatchTests|OptionalSpaceSearchTests'
+Must go red: RedactionEngineTests/OptionalSpaceMatchTests "Each row's search over its page" [a name with an initial run together is not found]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift
+index e22022ef..67a7218e 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift
+@@ -257,7 +257,7 @@ extension SearchCore {
+     static func spacedQuery(_ query: String) -> SpacedQuery? {
+         let words = query.split(separator: " ").map(String.init)
+         guard words.count >= 2 else { return nil }
+-        let free = zip(words, words.dropFirst()).map { !isOneCharacterWord($0) && !isOneCharacterWord($1) }
++        let free = zip(words, words.dropFirst()).map { _, _ in true }
+         guard free.contains(true) else { return nil }
+         return SpacedQuery(words: words, free: free,
+                            leadingSpace: query.first == " ", trailingSpace: query.last == " ")

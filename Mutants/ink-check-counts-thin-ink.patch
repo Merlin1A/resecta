@@ -1,0 +1,19 @@
+Property: A column or row counts only where its flooded ink is thicker than the larger of two pixels and an eighth of the line height.
+Area: the ink check's thickness rule
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests (or on the host: cd Packages/RedactionEngine && swift test --filter InkCheck)
+Must go red: RedactionCoreTests/InkCheckVerdictTests hairlineIsNotCounted
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/InkCheck.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/InkCheck.swift
+index e1ec5676..6bb1216e 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/InkCheck.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/InkCheck.swift
+@@ -144,7 +144,7 @@ package enum InkCheck {
+         let capPixels = ceilDivision(cap * dpi, perInch)
+         let ringPixels = max(3, ceilDivision(96 * dpi, perInch))      // 1.5 pt
+         let ruleLength = ceilDivision(3 * h * dpi, perInch)           // 3H
+-        let thin = max(2, ceilDivision(h * dpi, 8 * perInch))         // H/8
++        let thin = 0
+         let insetNumerator = 12 * h * dpi, insetDenominator = 100 * perInch
+         let inset = (2 * insetNumerator + insetDenominator) / (2 * insetDenominator)  // 0.12H, rounded
+ 

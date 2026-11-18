@@ -1,0 +1,21 @@
+Property: A closed-up match's span is its own Characters, taken through the page's offset map.
+Area: search, the optional-space walk
+Test command: cd Packages/RedactionEngine && swift test --filter 'OptionalSpaceMatchTests|OptionalSpaceSearchTests'
+Must go red: RedactionEngineTests/OptionalSpaceMatchTests "Each row's search over its page" [accents on: a run-together name with an accent is found, its raw range whole], [a ligature before a run-together phrase: the raw range is the phrase's own Characters] and 6 more rows; RedactionEngineTests/OptionalSpaceMatchTests "A twelve-word search is found spaced and with three of its spaces closed up"
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift
+index e22022ef..b8110a4e 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift
+@@ -431,8 +431,8 @@ extension SearchCore {
+                 }
+                 if refused { break }
+             }
+-            var first = searchedOffset[start]
+-            var last = searchedOffset[start + count - 1]
++            var first = start
++            var last = start + count - 1
+             if spaced.leadingSpace {
+                 let space = spaceBefore[start]
+                 if space >= 0, space == first - 1 { first = space } else { refused = true }

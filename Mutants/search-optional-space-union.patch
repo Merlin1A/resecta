@@ -1,0 +1,30 @@
+Property: The result is the union of today's walk and the optional-space walk: a closed-up match and an overlapping spaced one are both found.
+Area: search, the optional-space walk
+Test command: cd Packages/RedactionEngine && swift test --filter 'OptionalSpaceMatchTests|OptionalSpaceSearchTests'
+Must go red: RedactionEngineTests/OptionalSpaceMatchTests "Each row's search over its page" [a closed-up match and an overlapping spaced one are both found]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift
+index e22022ef..cf336f4f 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift
+@@ -94,8 +94,8 @@ extension SearchCore {
+             added += optionalSpaceSpans(in: page, query: query, comparison: comparison, wholeWord: wholeWord, cap: cap)
+         }
+         guard !added.isEmpty else { return asRead }
+-        var seen = Set(asRead.spans.map { SpanKey($0.searchedRange) })
+-        var merged = asRead.spans
++        var seen = Set<SpanKey>()
++        var merged: [MatchSpan] = []
+         for span in added where seen.insert(SpanKey(span.searchedRange)).inserted {
+             merged.append(span)
+         }
+@@ -442,7 +442,7 @@ extension SearchCore {
+                 if space >= 0, space == last + 1 { last = space } else { refused = true }
+             }
+             // A candidate with no closed-up space is today's walk's own.
+-            guard !refused, skipped > 0, first >= textOffset else { cursor = oneOn; continue }
++            guard !refused, first >= textOffset else { cursor = oneOn; continue }
+ 
+             let lower = text.index(textIndex, offsetBy: first - textOffset)
+             let upper = text.index(lower, offsetBy: last - first + 1)
