@@ -364,7 +364,9 @@ extension FilterResult {
     /// `\n`-bearing `page.string` output even when the filter's surviving
     /// set has no newline `CharacterInfo`). Whitespace carries no PII
     /// content; Layer 3 and Layer 10 surface any sensitive-
-    /// term overlap. The residual is documented in N2.
+    /// term overlap. The residual is documented in N2. A unit made only of
+    /// break marks (`TextNormalizer.breakMarks`: the soft hyphen and the
+    /// zero-width marks) is skipped on both sides too, as white space is.
     ///
     /// Iteration unit: NSString composed-character-sequence ranges over
     /// `run.text` — matches the verifier's `outputPage.string` iteration

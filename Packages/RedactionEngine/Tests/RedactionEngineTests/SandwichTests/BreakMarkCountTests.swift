@@ -124,7 +124,7 @@ struct BreakMarkCountTests {
         .fail("Character count deficit on page 1: output has \(output), expected \(expected)")
     }
 
-    // MARK: - The pages that failed (D-1 to D-4)
+    // MARK: - The pages that failed
 
     @Test("A tight page with a box and a kept soft hyphen: both rows pass, on the case and its control",
           arguments: ["\u{2248}", "x"])
@@ -170,7 +170,7 @@ struct BreakMarkCountTests {
         #expect(rows.lineage == .pass, "Character Lineage \(rows.lineage)")
     }
 
-    // MARK: - What still fails (D-5, D-9)
+    // MARK: - What still fails
 
     @Test("A kept letter missing from the hidden text still fails both rows, a deficit of one")
     func aMissingLetterStillFails() async throws {
@@ -198,7 +198,7 @@ struct BreakMarkCountTests {
         #expect(rows.lineage.isFail, "Character Lineage \(rows.lineage)")
     }
 
-    // MARK: - The predicate and the one list (D-6 to D-8)
+    // MARK: - The predicate and the one list
 
     static let sixMarks: [String] = ["\u{00AD}", "\u{200B}", "\u{200C}", "\u{200D}", "\u{2060}", "\u{FEFF}"]
 
@@ -261,7 +261,7 @@ struct BreakMarkCountTests {
         #expect(VerificationEngine.fragmentSeparators == separatorsBefore, "the OCR check's separators are the fifteen they were")
     }
 
-    // MARK: - Joined glyphs and the count's unit (D-10, D-11)
+    // MARK: - Joined glyphs and the count's unit
 
     @Test("A browser's page with two joined glyphs and three soft hyphens: both rows pass, each letter once")
     func browserPage() async throws {

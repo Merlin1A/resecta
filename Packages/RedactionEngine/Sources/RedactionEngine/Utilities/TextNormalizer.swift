@@ -90,7 +90,7 @@ public struct TextNormalizer: Sendable {
     /// space, non-joiner and joiner (U+200B, U+200C, U+200D), the word joiner
     /// (U+2060) and the zero-width no-break space (U+FEFF). Written here once;
     /// the run test below, the OCR check's separators
-    /// (`Layer2OCRCheck.fragmentSeparators`) and the character count's
+    /// (`VerificationEngine.fragmentSeparators`) and the character count's
     /// predicate (`SandwichMetrics.isOutsideCharacterCount`) read it.
     static let breakMarks: Set<Unicode.Scalar> = [
         "\u{00AD}", "\u{200B}", "\u{200C}", "\u{200D}", "\u{2060}", "\u{FEFF}",
