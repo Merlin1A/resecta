@@ -243,18 +243,24 @@ struct VerificationResultsActionsTests {
         #expect(!VerificationDetailsSection.clusterOpensByDefault(partition(Fixtures.searchableAllRasterized)))
     }
 
-    @Test("The list row holds the passed checks and the notes riding with them, on every run that has them")
+    @Test("The list row holds the passed checks and the notes riding with them, and the checks with nothing to check join it, on every run that has them")
     func listRowHoldsThePassedChecks() throws {
         func partition(_ report: VerificationReport) -> VerificationLayerPartition {
             VerificationLayerPartition(layers: report.layers, perPageModes: report.perPageModes)
         }
-        var examined = 0
+        var examined = 0, joined = 0
         for (name, report) in Fixtures.all {
-            #expect(VerificationDetailsSection.listRowMembers(partition(report)) == partition(report).cluster, "\(name)")
+            let p = partition(report)
+            // A run with a row of passed checks: the checks that had nothing
+            // to check sit in it too. A run without one: no row.
+            let expected = p.cluster.isEmpty ? [] : Set(p.cluster).union(p.nothingToCheck).sorted()
+            #expect(VerificationDetailsSection.listRowMembers(p) == expected, "\(name)")
+            if !p.cluster.isEmpty, !p.nothingToCheck.isEmpty { joined += 1 }
             examined += 1
         }
-        print("[list-row] seeded reports \(examined)")
+        print("[list-row] seeded reports \(examined), with checks that had nothing to check in the row \(joined)")
         #expect(examined == 18)
+        #expect(joined == 6, "the seeded reports whose row takes in checks that had nothing to check")
         // A run where every check passed: one row holding every check, closed.
         let clean = partition(Fixtures.secureAllPass)
         #expect(VerificationDetailsSection.listRowMembers(clean) == Array(Fixtures.secureAllPass.layers.indices))
