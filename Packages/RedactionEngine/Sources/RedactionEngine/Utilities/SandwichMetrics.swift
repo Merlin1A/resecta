@@ -9,8 +9,7 @@ import Foundation
 /// sandwich verification layers read the output back against the same
 /// numbers, so both sides must agree on them by construction. One home for
 /// the shared set keeps `Pipeline/` and `Verification/` from reaching into
-/// each other for a constant: the writer-local values (`baseFontSize`,
-/// `cellWidth`) stay with the reconstructor.
+/// each other for a constant.
 enum SandwichMetrics {
 
     // MARK: - Courier geometry
@@ -22,16 +21,10 @@ enum SandwichMetrics {
     /// advance is exactly `0.60009765625 × fontSize` for every probed size.
     static let courierAdvancePerPoint: CGFloat = 0.60009765625
 
-    /// Tolerance for the Layer 6 advance crosscheck at the 12pt REFERENCE
-    /// size (M1 tightening). The reconstructor derives line pitches from
-    /// source metrics, so the operative tolerance scales linearly with the
-    /// glyph's own point size via `advanceWidthTolerancePerPoint`; this
-    /// constant remains the 12pt anchor (and the value probe/test code
-    /// built against the 12pt-era geometry still reads).
-    static let advanceWidthTolerance: CGFloat = 0.25
-
-    /// Linear scaling of the advance tolerance: `0.25pt at 12pt`, applied
-    /// as `advanceWidthTolerancePerPoint × pointSize`.
+    /// Tolerance for the Layer 6 advance crosscheck (M1 tightening). The
+    /// reconstructor derives line pitches from source metrics, so the
+    /// tolerance scales linearly with the glyph's own point size:
+    /// `0.25pt at 12pt`, applied as `advanceWidthTolerancePerPoint × pointSize`.
     static let advanceWidthTolerancePerPoint: CGFloat = 0.25 / 12.0
 
     // MARK: - Line banding

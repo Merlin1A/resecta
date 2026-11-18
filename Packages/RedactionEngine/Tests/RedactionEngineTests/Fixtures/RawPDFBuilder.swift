@@ -1166,7 +1166,7 @@ enum TestFixtures {
     }
 
     /// Multi-line text PDF for Layer 9 round-trip tests. Each entry is drawn
-    /// at its own baseline so `groupIntoRuns` produces one run per line.
+    /// at its own baseline so `runMemberGroups` produces one run per line.
     /// Default font is Courier (source-output font alignment) but caller can
     /// override to exercise the non-Courier source path.
     static func multiLineTextLayerPDF(
@@ -1221,7 +1221,7 @@ enum TestFixtures {
     }
 
     /// Layer 9 round-trip fixture: three paragraphs separated by blank space.
-    /// `groupIntoRuns` produces three runs. PDFKit's `outputPage.string` may
+    /// `runMemberGroups` produces three runs. PDFKit's `outputPage.string` may
     /// synthesize inter-run whitespace; the test exercises whether such
     /// synthesized characters are reported with non-zero bounds (which would
     /// have flipped the pre-redesign hash via N2).
@@ -1328,13 +1328,13 @@ enum TestFixtures {
     /// `/ToUnicode`), and Layer 9 (lineage) FAIL, while Layer 10
     /// stays PASS. Built as a REAL Courier text layer via `UIGraphicsPDFRenderer`
     /// (like `multiLineTextLayerPDF`), each line on its own baseline so
-    /// `groupIntoRuns` sees distinct lines.
+    /// `runMemberGroups` sees distinct lines.
     ///
     /// Three failure substrates:
     ///   • **1b run-boundary merge** — table rows whose two columns are separated
-    ///     by a gap that breaks the run (`groupIntoRuns`: gap ≥ 1.5×prev.width)
+    ///     by a gap that breaks the run (`runMemberGroups`: gap ≥ 1.5×prev.width)
     ///     yet is narrow enough that the reconstructor's pinned-12pt redraw
-    ///     (`cellWidth` 7.20pt) overruns the next run's grid-snapped origin →
+    ///     (a 7.20pt cell) overruns the next run's grid-snapped origin →
     ///     boundary glyphs co-locate → PDFKit composed re-extraction merges them
     ///     → output composed count < surviving (Layer 7) and the composed
     ///     sequence diverges (Layer 9). At `sourceFontSize` 9pt the source
@@ -1360,7 +1360,7 @@ enum TestFixtures {
     ///   - sourceFontSize: source Courier point size (< the reconstructor's
     ///     pinned 12pt). Smaller widens the redraw overrun.
     ///   - rightX: x-origin of each row's right column (the left column starts
-    ///     at 72). Controls the inter-column gap that `groupIntoRuns` must split.
+    ///     at 72). Controls the inter-column gap that `runMemberGroups` must split.
     static func searchableMergeReproPDF(
         sourceFontSize: CGFloat = 7, rightX: CGFloat = 140
     ) -> Data {
@@ -1371,7 +1371,7 @@ enum TestFixtures {
         // gap, which survives extraction and keeps the row in one run — no
         // boundary merge. CTLineDraw-positioned columns reproduce the
         // born-digital gap shape, where the gap carries no surviving glyph, so
-        // `groupIntoRuns` actually splits the row.
+        // `runMemberGroups` actually splits the row.
         //
         // 1b run-boundary merge: each row's two columns are positioned with a
         // real coordinate gap and NO space characters. At 7pt the source
