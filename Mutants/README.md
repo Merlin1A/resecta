@@ -80,3 +80,4 @@ with its reason and the mutant that is caught in its place.
 | `preview-label-colour-not-from-the-status.patch` | The Preview's label takes its own colour; the status colour other screens read for a run whose checks did not run is unchanged. | ResectaAppTests/PreviewVerdictCapsuleTests labelColoursComeFromTheTextTokens |
 | `preview-label-wash-strength.patch` | The wash behind the Preview's label is weak enough that each label keeps 4.5 to 1 on it, in light and in dark. | ResectaAppTests/PreviewVerdictCapsuleTests labelColoursComeFromTheTextTokens |
 | `review-in-scan-text-teal.patch` | Review in Scan's words are drawn in the text teal, not the tint. | ResectaAppTests/ReviewInScanColourSourceTests reviewInScanUsesTheTextTeal |
+| `preview-label-capsule-base-removed.patch` | The Preview's label sits on the capsule's own opaque base, laid under its wash. | ResectaAppTests/PreviewVerdictCapsuleTests capsuleDrawsItsBase |
