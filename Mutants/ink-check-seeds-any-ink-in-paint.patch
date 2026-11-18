@@ -1,0 +1,23 @@
+Property: Seeds are ink in the box's tight rectangle, inset by 12 % of the line height at its top and bottom: never other ink inside the paint.
+Area: the ink check's seeds
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests (or on the host: cd Packages/RedactionEngine && swift test --filter InkCheck)
+Must go red: RedactionCoreTests/InkCheckVerdictTests insetInkIsNoSeed; RedactionCoreTests/InkCheckNeighbourTests bandFloodsOnlyTheValue
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/InkCheck.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/InkCheck.swift
+index e1ec5676..b66a802c 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/InkCheck.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/InkCheck.swift
+@@ -213,10 +213,8 @@ package enum InkCheck {
+             for x in tight.minX..<tight.maxX where isInk(x, y) { inkUnder += 1 }
+         }
+         let tightArea = (tight.maxX - tight.minX) * (tight.maxY - tight.minY)
+-        if tight.minY + inset < tight.maxY - inset {
+-            for y in (tight.minY + inset)..<(tight.maxY - inset) {
+-                for x in tight.minX..<tight.maxX { reach(x, y) }
+-            }
++        for y in painted.minY..<painted.maxY {
++            for x in painted.minX..<painted.maxX { reach(x, y) }
+         }
+ 
+         // The flood. Each pixel outside the painted rectangle widens the

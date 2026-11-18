@@ -1,0 +1,19 @@
+Property: The flood never travels along a straight run of ink three line heights long across the page: an underline is not the glyph's ink.
+Area: the ink check's rule break (across)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests (or on the host: cd Packages/RedactionEngine && swift test --filter InkCheck)
+Must go red: RedactionCoreTests/InkCheckVerdictTests longUnderlineIsNotFollowed
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/InkCheck.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/InkCheck.swift
+index e1ec5676..0b13163d 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/InkCheck.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/InkCheck.swift
+@@ -190,7 +190,7 @@ package enum InkCheck {
+             var run = 1, a = x - 1, b = x + 1
+             while a >= windowMinX, run < ruleLength, isInk(a, y) { run += 1; a -= 1 }
+             while b < windowMaxX, run < ruleLength, isInk(b, y) { run += 1; b += 1 }
+-            if run >= ruleLength { return true }
++            if false { return true }
+             run = 1; a = y - 1; b = y + 1
+             while a >= windowMinY, run < ruleLength, isInk(x, a) { run += 1; a -= 1 }
+             while b < windowMaxY, run < ruleLength, isInk(x, b) { run += 1; b += 1 }

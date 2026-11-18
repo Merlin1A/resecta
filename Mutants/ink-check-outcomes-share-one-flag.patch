@@ -1,0 +1,19 @@
+Property: A box enlarged to the cap sets only "enlarged to the cap", never "enlarged, ink covered": the two outcomes have a flag each.
+Area: the ink check's outcome on the box
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests (or on the host: cd Packages/RedactionEngine && swift test --filter InkCheck)
+Must go red: RedactionCoreTests/InkCheckApplyingTests pastCapSetsToCapOnly
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/InkCheck.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/InkCheck.swift
+index e1ec5676..86ccacab 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/InkCheck.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/InkCheck.swift
+@@ -319,7 +319,7 @@ extension PaintedBox {
+         if g.bottom > 0 { box.limitBelow = nil }
+         switch result.verdict {
+         case .escaped: box.inkEnlargedCovered = true
+-        case .pastCap: box.inkEnlargedToCap = true
++        case .pastCap: box.inkEnlargedCovered = true
+         case .clear, .residual, .absent, .indeterminate: break
+         }
+         return box

@@ -1,0 +1,19 @@
+Property: The residual allowance is the larger of 1 pt and 0.08 of the line height, not 1 pt alone.
+Area: the ink check's allowance
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests (or on the host: cd Packages/RedactionEngine && swift test --filter InkCheck)
+Must go red: RedactionCoreTests/InkCheckThresholdTests allowanceAtEightHundredths
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/InkCheck.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/InkCheck.swift
+index e1ec5676..06409f7b 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/InkCheck.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/InkCheck.swift
+@@ -261,7 +261,7 @@ package enum InkCheck {
+         func classify(_ past: Int) -> Reach {
+             if past == 0 { return .none }
+             if (past + 1) * perInch >= cap * dpi { return .pastCap }
+-            if past * perInch * 100 > dpi * max(6_400, 8 * h) { return .escaped }
++            if past * perInch * 100 > dpi * 6_400 { return .escaped }
+             return .residual
+         }
+         let reaches = [classify(pastLeft), classify(pastRight), classify(pastBottom), classify(pastTop)]

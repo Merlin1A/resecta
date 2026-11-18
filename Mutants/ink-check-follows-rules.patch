@@ -1,0 +1,19 @@
+Property: The flood never travels along a straight run of ink three line heights long up the page: a table's column line is not the glyph's ink.
+Area: the ink check's rule break (up)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests (or on the host: cd Packages/RedactionEngine && swift test --filter InkCheck)
+Must go red: RedactionCoreTests/InkCheckVerdictTests longRuleUpIsNotFollowed
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/InkCheck.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/InkCheck.swift
+index e1ec5676..d1ea391d 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/InkCheck.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/InkCheck.swift
+@@ -194,7 +194,7 @@ package enum InkCheck {
+             run = 1; a = y - 1; b = y + 1
+             while a >= windowMinY, run < ruleLength, isInk(x, a) { run += 1; a -= 1 }
+             while b < windowMaxY, run < ruleLength, isInk(x, b) { run += 1; b += 1 }
+-            return run >= ruleLength
++            return false
+         }
+ 
+         var flooded = [Bool](repeating: false, count: windowWidth * windowHeight)
