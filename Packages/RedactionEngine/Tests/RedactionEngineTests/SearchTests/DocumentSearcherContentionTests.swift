@@ -105,21 +105,28 @@ struct DocumentSearcherContentionTests {
 
     /// #7 — guard against a future edit dropping one of the per-page yields.
     /// Best-effort: on the build machine `#filePath` resolves and the count is
-    /// asserted strictly (searchText + searchRegex + both searchMultiTerm arms
-    /// + searchPII = 5). Off-machine the source is unreachable and the test
+    /// asserted strictly over every `DocumentSearcher*.swift` file (searchText +
+    /// searchRegex + both searchMultiTerm arms + searchPII = 5). Off-machine the source is unreachable and the test
     /// fails — the behavioral drain tests above are the portable coverage.
-    @Test("DocumentSearcher has exactly five per-page Task.yield() calls")
+    @Test("DocumentSearcher's files have exactly five per-page Task.yield() calls")
     func yieldCountGuard() throws {
         let packageRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()   // SearchTests
             .deletingLastPathComponent()   // RedactionEngineTests
             .deletingLastPathComponent()   // Tests
             .deletingLastPathComponent()   // <package root>
-        let source = packageRoot
-            .appendingPathComponent("Sources/RedactionEngine/Search/DocumentSearcher.swift")
-        let text = try #require(try? String(contentsOf: source, encoding: .utf8), "DocumentSearcher.swift not readable from the package root")
-        let count = text.components(separatedBy: "await Task.yield()").count - 1
-        #expect(count == 5, "expected 5 await Task.yield() in DocumentSearcher.swift, found \(count)")
+        let folder = packageRoot.appendingPathComponent("Sources/RedactionEngine/Search")
+        let names = try #require(try? FileManager.default.contentsOfDirectory(atPath: folder.path),
+                                 "the Search folder not readable from the package root")
+        let files = names.filter { $0.hasPrefix("DocumentSearcher") && $0.hasSuffix(".swift") }
+        #expect(files.contains("DocumentSearcher.swift"), "the main file is among them")
+        var count = 0
+        for name in files {
+            let text = try #require(try? String(contentsOf: folder.appendingPathComponent(name), encoding: .utf8),
+                                    "\(name) not readable")
+            count += text.components(separatedBy: "await Task.yield()").count - 1
+        }
+        #expect(count == 5, "expected 5 await Task.yield() across the DocumentSearcher files, found \(count)")
     }
 
     /// #8 — the per-page yield is behavior-neutral: the ordered result stream is
