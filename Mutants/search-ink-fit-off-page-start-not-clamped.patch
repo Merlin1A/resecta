@@ -1,0 +1,19 @@
+Property: The ink fit measures a line from its first letter even when that letter lies off the visible page: the clamped transform is gone and the ink fit falls back to the match's own width
+Area: Search, the ink fit beside a hit with no box
+Test command: swift test --no-parallel --filter '^RedactionEngineTests\.NoBoxHitTests/' (in Packages/RedactionEngine, DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer)
+Must go red: RedactionEngineTests/NoBoxHitTests inkFitLineStartOffPage
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
+index 9f68f67e..4ec5de6a 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
+@@ -162,7 +162,7 @@ extension DocumentSearcher {
+     /// there an off-page letter is a position to measure from, not a box to
+     /// paint, and the clamped edge keeps the drift bound as wide as it was.
+     nonisolated func clampedNormalizedRect(for selection: PDFSelection, page: PDFPage) -> CGRect? {
+-        visualBounds(for: selection, page: page).map(Self.normalized)
++        normalizedRect(for: selection, page: page)
+     }
+ 
+     private nonisolated static func normalized(_ visual: (bounds: CGRect, width: CGFloat, height: CGFloat)) -> CGRect {
