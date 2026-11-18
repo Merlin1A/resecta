@@ -68,7 +68,8 @@ extension DocumentSearcher {
             let (baseStartOffset, baseLength) = span.baseOffsets
             // The rect's range on the RAW page text.
             guard let nsRange = prepared.rawNSRange(of: span) else { continue }
-            if let rects = textLayerLines(for: nsRange, page: page) {
+            do {
+                let lines = textLayerLines(for: nsRange, page: page)
                 // Display span re-slices from the case-preserved
                 // analog at the already-mapped base offsets; matching stays
                 // on the normalized text. The
@@ -93,6 +94,15 @@ extension DocumentSearcher {
                     searchedText: searchPageText, searchedStart: matchStartOffset, searchedLength: matchLength
                 )
 
+                guard let rects = lines else {
+                    // Found, but no box: listed with its page, never dropped.
+                    results.append(.unboxed(
+                        pageIndex: pageIndex, matchedText: matchedText,
+                        contextSnippet: window.snippet, source: .textLayer, term: term,
+                        matchRangeInSnippet: window.matchRange,
+                        liesOffVisiblePage: liesOffVisiblePage(nsRange, page: page)))
+                    continue
+                }
                 // One result per line the match touches (the counting rule).
                 let occurrence = rects.count > 1 ? UUID() : nil
                 for line in rects {

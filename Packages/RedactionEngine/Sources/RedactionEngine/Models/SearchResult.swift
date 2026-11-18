@@ -49,6 +49,15 @@ public struct SearchResult: Sendable, Identifiable, Equatable {
     /// the drift envelope around the hidden glyphs (a larger box, never a
     /// smaller one). false on every other result.
     public let inkFitDegraded: Bool
+    /// false for a match that was found but could not be given a box: it is
+    /// listed with its page and no tick box, `normalizedRect` is `.zero`, it is
+    /// never selected and Apply makes no region from it. true for every other
+    /// result.
+    public let hasBox: Bool
+    /// The match lies on a line wholly outside the visible page (a crop box
+    /// reaching past the media box), the one reason a result has no box that
+    /// the app words differently. false on every other result.
+    public let liesOffVisiblePage: Bool
     /// The box the read itself gave this match, when merging two readings of
     /// a scanned page grew `normalizedRect` past it: what a hybrid page
     /// compares with its text-layer matches to tell a repeat. nil when
@@ -70,7 +79,9 @@ public struct SearchResult: Sendable, Identifiable, Equatable {
         matchRangeInSnippet: Range<Int>? = nil,
         occurrenceID: UUID? = nil,
         textLayerRect: CGRect? = nil,
-        inkFitDegraded: Bool = false
+        inkFitDegraded: Bool = false,
+        hasBox: Bool = true,
+        liesOffVisiblePage: Bool = false
     ) {
         self.id = id
         self.pageIndex = pageIndex
@@ -87,6 +98,30 @@ public struct SearchResult: Sendable, Identifiable, Equatable {
         self.occurrenceID = occurrenceID
         self.textLayerRect = textLayerRect
         self.inkFitDegraded = inkFitDegraded
+        self.hasBox = hasBox
+        self.liesOffVisiblePage = liesOffVisiblePage
+    }
+
+    /// A found match that could not be given a box: listed, never dropped.
+    static func unboxed(
+        pageIndex: Int,
+        matchedText: String,
+        contextSnippet: String,
+        source: SearchSource,
+        term: String,
+        piiCategory: PIICategory? = nil,
+        piiConfidence: Double? = nil,
+        rationale: MatchRationale? = nil,
+        matchRangeInSnippet: Range<Int>? = nil,
+        occurrenceID: UUID? = nil,
+        liesOffVisiblePage: Bool = false
+    ) -> SearchResult {
+        SearchResult(
+            pageIndex: pageIndex, normalizedRect: .zero, matchedText: matchedText,
+            contextSnippet: contextSnippet, source: source, term: term,
+            piiCategory: piiCategory, piiConfidence: piiConfidence, rationale: rationale,
+            matchRangeInSnippet: matchRangeInSnippet, occurrenceID: occurrenceID,
+            hasBox: false, liesOffVisiblePage: liesOffVisiblePage)
     }
 }
 

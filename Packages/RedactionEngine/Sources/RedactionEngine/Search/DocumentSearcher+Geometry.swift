@@ -145,6 +145,39 @@ extension DocumentSearcher {
     /// so every rect takes this path (SECURITY: a rect built any other way
     /// is a fill at the wrong pixel position).
     nonisolated func normalizedRect(for selection: PDFSelection, page: PDFPage) -> CGRect? {
+        guard let visual = visualBounds(for: selection, page: page) else { return nil }
+        // A rect with no overlap with the visible page before the clamp is no
+        // box (the clamp would move it onto the page's edge, over other print,
+        // or leave it with no area); a rect partly on the page is clamped.
+        let visiblePage = CGRect(x: 0, y: 0, width: visual.width, height: visual.height)
+        let overlap = visual.bounds.intersection(visiblePage)
+        guard !overlap.isNull, !overlap.isEmpty else { return nil }
+        return CGRect(
+            x: visual.bounds.minX / visual.width,
+            y: visual.bounds.minY / visual.height,
+            width: visual.bounds.width / visual.width,
+            height: visual.bounds.height / visual.height
+        ).clampedToNormalized()
+    }
+
+    /// Whether every line of the range lies wholly outside the visible page:
+    /// the reason its match has no box, when that is the reason.
+    nonisolated func liesOffVisiblePage(_ nsRange: NSRange, page: PDFPage) -> Bool {
+        guard let selection = page.selection(for: nsRange) else { return false }
+        let lines = selection.selectionsByLine()
+        guard !lines.isEmpty else { return false }
+        return lines.allSatisfy { line in
+            guard let visual = visualBounds(for: line, page: page) else { return false }
+            let overlap = visual.bounds.intersection(
+                CGRect(x: 0, y: 0, width: visual.width, height: visual.height))
+            return overlap.isNull || overlap.isEmpty
+        }
+    }
+
+    /// A selection's bounds in the page's visual space (crop-box local, after
+    /// the /Rotate mirror), with the visual page's width and height.
+    nonisolated func visualBounds(for selection: PDFSelection, page: PDFPage)
+        -> (bounds: CGRect, width: CGFloat, height: CGFloat)? {
         let absoluteBounds = selection.bounds(for: page)
         guard !absoluteBounds.isEmpty else { return nil }
 
@@ -192,14 +225,6 @@ extension DocumentSearcher {
         let effectiveHeight: CGFloat = (rotation == 90 || rotation == 270) ? rawW : rawH
 
         guard effectiveWidth > 0, effectiveHeight > 0 else { return nil }
-
-        let normalized = CGRect(
-            x: visualBounds.minX / effectiveWidth,
-            y: visualBounds.minY / effectiveHeight,
-            width: visualBounds.width / effectiveWidth,
-            height: visualBounds.height / effectiveHeight
-        ).clampedToNormalized()
-
-        return normalized
+        return (visualBounds, effectiveWidth, effectiveHeight)
     }
 }
