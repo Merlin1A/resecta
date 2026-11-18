@@ -19,7 +19,10 @@ import AppKit
 // under the box on that line are removed and the writer splits the line
 // there; the next piece starts on the line's cell grid, so it is not a whole
 // number of cells past the "≈". The control has "x" in its place, and the
-// ordinary page sets the same text on 14.4 pt lines.
+// ordinary page sets the same text on 14.4 pt lines. The text holds joined
+// letters ("fi" in "finished", "ffi" in "office", one of them on the box's
+// own line), whose line's hidden letters and drawn cells the writer moves;
+// the plain page sets the same lines with other words in their place.
 //
 // The made layers draw invisible Courier pieces the way the writer does
 // (one CTLineDraw per piece, at the piece's origin) on a page with no box.
@@ -38,13 +41,15 @@ struct Layer6CellGridTests {
         return CTLineCreateWithAttributedString(CFAttributedStringCreate(nil, text as CFString, attributes)!)
     }
 
-    static func lines(mark: String) -> [String] {
-        [
+    static func lines(mark: String, joinedLetters: Bool = true) -> [String] {
+        let finished = joinedLetters ? "finished" : "closed"
+        let office = joinedLetters ? "office" : "desk"
+        return [
             "The notes below cover the work done in the last quarter.",
-            "Each team lists what it finished and what is still open.",
+            "Each team lists what it \(finished) and what is still open.",
             "Open items carry a short line on what they wait for now.",
-            "Questions about these notes go to the office named here.",
-            "Each office keeps one copy of the list it calls Supply",
+            "Questions about these notes go to the \(office) named here.",
+            "Each \(office) keeps one copy of the list it calls Supply",
             "The cost rose \(mark) and the rest of the line runs on past it.",
             "The list is read again at the start of the next quarter.",
             "Nothing here changes the plan the teams agreed last year.",
@@ -52,8 +57,8 @@ struct Layer6CellGridTests {
     }
 
     /// The source page, with `/Rotate` set to `rotate` when it is not 0.
-    static func sourcePage(mark: String, leading: CGFloat, rotate: Int = 0) throws -> Data {
-        let text = lines(mark: mark)
+    static func sourcePage(mark: String, leading: CGFloat, rotate: Int = 0, joinedLetters: Bool = true) throws -> Data {
+        let text = lines(mark: mark, joinedLetters: joinedLetters)
         let top: CGFloat = 700
         let boxLine = text[4] as NSString
         let boxX = 72 + CTLineGetOffsetForStringIndex(helvetica(text[4]), boxLine.range(of: "Supply").location, nil)
@@ -80,8 +85,8 @@ struct Layer6CellGridTests {
 
     /// The page exported Searchable with a Search box for "Supply", through
     /// the corpus mirror's route, and verified once.
-    static func exportRun(mark: String, leading: CGFloat, rotate: Int = 0) async throws -> F.Run {
-        let data = try sourcePage(mark: mark, leading: leading, rotate: rotate)
+    static func exportRun(mark: String, leading: CGFloat, rotate: Int = 0, joinedLetters: Bool = true) async throws -> F.Run {
+        let data = try sourcePage(mark: mark, leading: leading, rotate: rotate, joinedLetters: joinedLetters)
         let source = try #require(PDFDocument(data: data)?.page(at: 0))
         let strip = try #require(F.hiddenRect(source, "Supply"))
         return try await F.mirrorRun(data, paint: strip, searchTerm: "Supply", strip: strip)
@@ -193,13 +198,27 @@ struct Layer6CellGridTests {
         #expect(run.report.layers.allSatisfy { !$0.status.isFail }, "with nothing else failing the headline is not Checks Failed")
     }
 
-    @Test("A-2: the control reads the edge warning and the ordinary page reads Passed (pins)",
+    /// How many lines of the source draw fewer glyphs than they hold
+    /// characters: a line with a joined letter pair.
+    static func linesWithJoinedLetters(_ text: [String]) -> Int {
+        text.filter { CTLineGetGlyphCount(helvetica($0)) < ($0 as NSString).length }.count
+    }
+
+    @Test("A-2: the control and the ordinary page read the edge warning, and the plain page reads Passed (pins)",
           .timeLimit(.minutes(3)))
     func a2() async throws {
         let control = try await Self.exportRun(mark: "x", leading: 11.5)
         #expect(try Self.positionsRow(control) == SandwichVerification.grazeWarning(pages: [0]))
+        // The box's own line holds the joined "ffi" of "office": the writer
+        // moves that line's drawn cells, and the "s" of "calls" grazes the
+        // box's edge.
+        try #require(Self.linesWithJoinedLetters(Self.lines(mark: "≈")) > 0, "the ordinary page must hold joined letters")
         let ordinary = try await Self.exportRun(mark: "≈", leading: 14.4)
-        #expect(try Self.positionsRow(ordinary) == .pass)
+        #expect(try Self.positionsRow(ordinary) == SandwichVerification.grazeWarning(pages: [0]))
+        try #require(Self.linesWithJoinedLetters(Self.lines(mark: "≈", joinedLetters: false)) == 0,
+                     "the plain page must hold no joined letters")
+        let plain = try await Self.exportRun(mark: "≈", leading: 14.4, joinedLetters: false)
+        #expect(try Self.positionsRow(plain) == .pass)
     }
 
     // MARK: - A-3, A-4 and A-8: made hidden layers
