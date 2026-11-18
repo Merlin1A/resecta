@@ -1,0 +1,19 @@
+Property: When no single picture passes the floors and the text layer is not thin, a page whose pictures, as painted, cover four fifths of the crop box carries image content.
+Area: Search, the census of image content
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'PageImageCensusPiecesTests|SearchPiecesReadTests'
+Must go red: RedactionEngineTests/PageImageCensusPiecesTests newlyTaken (Scans stored in pieces under a full text layer carry image content); RedactionEngineTests/SearchPiecesReadTests pictureWordFound (A word the picture shows and the text layer lacks is found with OCR pages included); RedactionEngineTests/SearchPiecesReadTests notReadSignal (With OCR pages left out, the page is reported as not read)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageImageCensus.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageImageCensus.swift
+index 629c6a6d..1f59a9f5 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageImageCensus.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageImageCensus.swift
+@@ -63,7 +63,7 @@ enum PageImageCensus {
+             return false
+         }
+         let map = PagePictureMap.cached(page, cgPage: cgPage)
+-        return !map.followed || map.coversThePage
++        return !map.followed
+     }
+ 
+     static func textDensity(meaningfulCount: Int, cropBox: CGRect) -> Double {

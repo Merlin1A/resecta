@@ -1,0 +1,18 @@
+Property: Where pictures are painted is read only for a page the size floors and the text density do not decide.
+Area: Search, the census of image content
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'PageImageCensusPiecesTests'
+Must go red: RedactionEngineTests/PageImageCensusPiecesTests mapReadOnlyWhenNeeded (Where pictures are painted is read only for a page the old terms do not decide)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageImageCensus.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageImageCensus.swift
+index 629c6a6d..a40d1727 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageImageCensus.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageImageCensus.swift
+@@ -55,6 +55,7 @@ enum PageImageCensus {
+     static func readCarriesImageContent(_ page: PDFPage) -> Bool {
+         let crop = page.bounds(for: .cropBox)
+         guard crop.width > 0, crop.height > 0, let cgPage = page.pageRef else { return false }
++        _ = PagePictureMap.cached(page, cgPage: cgPage)
+         if let pixels = largestImagePixelArea(of: cgPage) {
+             if pixels >= imagePixelFloor || imageShare(pixelArea: pixels, cropBox: crop) >= imageShareFloor { return true }
+             let meaningful = (page.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines).count
