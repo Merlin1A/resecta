@@ -4,8 +4,8 @@ import CoreGraphics
 import RedactionEngine
 @testable import ResectaApp
 
-/// K-03 in the app: a match with no box is listed, never selected, never
-/// applied, and not counted by Select All; its row carries BR-06's words.
+/// A match with no box, in the app: listed, never selected, never
+/// applied, and not counted by Select All; its row carries the approved words.
 @Suite("A hit with no box: the app's side", .tags(.search))
 @MainActor
 struct NoBoxRowTests {
@@ -22,7 +22,7 @@ struct NoBoxRowTests {
                      hasBox: false, liesOffVisiblePage: offPage)
     }
 
-    @Test("K3-05 Apply with one ordinary and one unboxed result makes one box; the unboxed row stays listed")
+    @Test("Apply with one ordinary and one unboxed result makes one box; the unboxed row stays listed")
     func applyMakesOneBox() {
         let ordinary = Self.boxed(selected: true)
         let noBox = Self.unboxed(selected: true)
@@ -60,16 +60,46 @@ struct NoBoxRowTests {
         #expect(state.totalCount == 2, "both are found matches")
     }
 
-    @Test("A match across a page break whose first part has no box is selected by its boxed part")
+    @Test("A match across a page break whose first part has no box: a no-box row for it and a tick row for the boxed part")
     func seamOccurrence() {
         let occurrence = UUID()
         let state = SearchState()
-        state.results = [Self.unboxed(page: 0, occurrence: occurrence), Self.boxed(page: 1, occurrence: occurrence)]
+        let noBox = Self.unboxed(page: 0, occurrence: occurrence), box = Self.boxed(page: 1, occurrence: occurrence)
+        state.results = [noBox, box]
+        #expect(state.rowsByPage[0]?.map(\.id) == [noBox.id], "the part with no box is its own row, on its own page")
+        #expect(state.rowsByPage[1]?.map(\.id) == [box.id], "the boxed part is a row of its own, with a tick box")
+        #expect(state.totalCount == 2)
         state.toggleSelectAll()
         #expect(state.results.map(\.isSelected) == [false, true])
+        state.toggleSelection(for: box.id)
+        #expect(state.results.map(\.isSelected) == [false, false], "the boxed part's row ticks and unticks it")
     }
 
-    @Test("The row's words are BR-06, word for word; off the visible page, its first sentence alone")
+    @Test("A match across a page break whose second part has no box: that part keeps its own no-box row")
+    func seamOccurrenceSecondPartUnboxed() {
+        let occurrence = UUID()
+        let state = SearchState()
+        let box = Self.boxed(page: 0, occurrence: occurrence), noBox = Self.unboxed(page: 1, occurrence: occurrence)
+        state.results = [box, noBox]
+        #expect(state.rowsByPage[0]?.map(\.id) == [box.id])
+        #expect(state.rowsByPage[1]?.map(\.id) == [noBox.id], "the part with no box is listed, never folded into the boxed row")
+        #expect(state.totalCount == 2)
+        state.toggleSelection(for: box.id)
+        #expect(state.results.map(\.isSelected) == [true, false])
+        #expect(state.pieces(of: box.id).map(\.id) == [box.id], "applying the boxed row applies its part alone")
+        #expect(state.pieces(of: noBox.id).map(\.id) == [noBox.id])
+    }
+
+    @Test("A match wrapped onto two boxed lines is still one row")
+    func wrappedBoxedLinesStayOneRow() {
+        let occurrence = UUID()
+        let state = SearchState()
+        state.results = [Self.boxed(page: 0, occurrence: occurrence), Self.boxed(page: 0, occurrence: occurrence)]
+        #expect(state.rowsByPage[0]?.count == 1)
+        #expect(state.totalCount == 1)
+    }
+
+    @Test("The row's words are the approved sentence, word for word; off the visible page, its first sentence alone")
     func words() {
         #expect(NoBoxRowCopy.sentence(pageIndex: 20, liesOffVisiblePage: false)
                 == "Found on page 21, but Resecta can't place a box on it. If you can see it there, draw a box by hand.")

@@ -13,9 +13,14 @@ import RedactionEngine
 extension SearchState {
 
     /// The occurrence `result` is a line of: its occurrence id, or its own
-    /// id for a result that does not wrap.
+    /// id for a result that does not wrap. A piece with no box is always its
+    /// own occurrence, so it gets its own row with its own words: a match
+    /// across a page break whose one part has a box and whose other has none
+    /// shows as a tick row for the boxed part and a no-box row for the other,
+    /// never one row that hides the part with no box or claims it for the
+    /// part with one.
     static func occurrenceKey(_ result: SearchResult) -> UUID {
-        result.occurrenceID ?? result.id
+        result.hasBox ? (result.occurrenceID ?? result.id) : result.id
     }
 
     /// One row per occurrence: the lead piece of each, in `results` order.
