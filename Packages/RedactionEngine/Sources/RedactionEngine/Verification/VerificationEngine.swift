@@ -172,6 +172,9 @@ public struct VerificationEngine: Sendable {
         // of its input, that part's sentence and pages (`CheckRow`).
         var partSentence: String? = nil
         var partPages: [Int]? = nil
+        // Display-only: where the check stopped at an issue before it had
+        // read everything (`CheckStop`); nil when it read everything.
+        var stopped: CheckStop? = nil
 
         // Each layer method calls
         // `try Task.checkCancellation()` on entry (and within long inner
@@ -190,6 +193,7 @@ public struct VerificationEngine: Sendable {
                 couldNotVerify = row0.couldNotVerify
                 partSentence = row0.partSentence
                 partPages = row0.partPages
+                stopped = row0.stopped
             case .ocrCheck:
                 // Layer 2's OCR gate applies the same per-term boundary
                 // discipline as the byte layers (String-space mirror in
@@ -217,6 +221,7 @@ public struct VerificationEngine: Sendable {
                 couldNotVerify = row2.couldNotVerify
                 partSentence = row2.partSentence
                 partPages = row2.partPages
+                stopped = row2.stopped
                 // Manual regions that added no term (whole-page, or no text layer): the clean line gains one sentence.
                 copyOverride = Self.manualRegionsWithoutTextCopy(status, count: manualRegionsWithoutText)
             case .structureCheck:
@@ -226,11 +231,13 @@ public struct VerificationEngine: Sendable {
                 couldNotVerify = row3.couldNotVerify
                 partSentence = row3.partSentence
                 partPages = row3.partPages
+                stopped = row3.stopped
             case .metadataCheck:
-                let (s4, cnv4, copy4) = try runLayer5Metadata(doc)
+                let (s4, cnv4, copy4, stop4) = try runLayer5Metadata(doc)
                 status = s4
                 couldNotVerify = cnv4
                 copyOverride = copy4
+                stopped = stop4
             // Layers 6–10: Sandwich-specific.
             // Only run for Searchable Redaction pages.
             case .spatialVerification:
@@ -427,7 +434,8 @@ public struct VerificationEngine: Sendable {
             couldNotVerify: couldNotVerify,
             reviewIsFragment: layerReviewIsFragment,
             couldNotVerifyPart: partSentence,
-            couldNotVerifyPartPages: partPages
+            couldNotVerifyPartPages: partPages,
+            stopped: stopped
         )
     }
 
@@ -549,17 +557,17 @@ public struct VerificationEngine: Sendable {
                     message, "Annotations found on \(pagePhrase(annotationPages, list: annotationList))"])
                 pages = Array(Set(pages + annotationPages)).sorted()
             }
-            return row(.fail(message), pages)
+            return row(.fail(message), pages).stopped(at: .bookmarksAndFormFieldsNotRead)
         }
         if !annotationPages.isEmpty {
             let list = annotationPages.map { String($0 + 1) }.joined(separator: ", ")
             return row(.fail("Annotations found on \(pagePhrase(annotationPages, list: list))"),
-                       annotationPages)
+                       annotationPages).stopped(at: .bookmarksAndFormFieldsNotRead)
         }
 
         // Check document-level structures
         if doc.outlineRoot != nil {
-            return row(.fail("Bookmarks found in output"), nil)
+            return row(.fail("Bookmarks found in output"), nil).stopped(at: .formFieldsNotRead)
         }
 
         // Check for /AcroForm via CGPDFDocument. A silent no-op on any nil

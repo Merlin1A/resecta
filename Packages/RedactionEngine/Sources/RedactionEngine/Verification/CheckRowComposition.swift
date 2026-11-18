@@ -42,6 +42,16 @@ struct CheckRow: Sendable, Equatable {
     var couldNotVerify: Bool
     var partSentence: String? = nil
     var partPages: [Int]? = nil
+    /// Where the check stopped at an issue before reading everything; nil
+    /// when it read everything.
+    var stopped: CheckStop? = nil
+
+    /// The same row, marked as stopped at `stop`.
+    func stopped(at stop: CheckStop) -> CheckRow {
+        var row = self
+        row.stopped = stop
+        return row
+    }
 
     static let passed = CheckRow(status: .pass, pages: nil, couldNotVerify: false)
 }

@@ -23,6 +23,7 @@ extension VerificationEngine {
         // /Encrypt is a trailer key, never the catalog's: an encrypted output FAILs, locked or not.
         if let cgDoc = loaded?.1, cgDoc.isEncrypted {
             return CheckRow(status: .fail("Encrypt found in document"), pages: nil, couldNotVerify: false)
+                .stopped(at: .stoppedAtThisFind)
         }
         guard let (pdfData, cgDoc) = loaded, let catalog = cgDoc.catalog else {
             return CheckRow(status: .warn("Could not inspect document structure"), pages: nil, couldNotVerify: true)
@@ -38,6 +39,7 @@ extension VerificationEngine {
             var obj: CGPDFObjectRef?
             if CGPDFDictionaryGetObject(catalog, key, &obj) {
                 return CheckRow(status: .fail("\(key) found in document catalog"), pages: nil, couldNotVerify: false)
+                    .stopped(at: .stoppedAtThisFind)
             }
         }
 
@@ -54,6 +56,7 @@ extension VerificationEngine {
                 if CGPDFDictionaryGetDictionary(namesDict, key, &subtree) {
                     return CheckRow(status: .fail("\(key) found under /Names in document catalog"),
                                     pages: nil, couldNotVerify: false)
+                        .stopped(at: .stoppedAtThisFind)
                 }
             }
         }
@@ -82,8 +85,10 @@ extension VerificationEngine {
         if !aaPages.isEmpty {
             let issue = (status: VerificationStatus.fail(
                 "Per-page /AA (automatic action) found on \(pageCountPhrase(aaPages.count))"), pages: Optional(aaPages))
-            return CheckRowComposition.compose(issue: issue, conditions: conditions, warnings: [])
-                ?? CheckRow(status: issue.status, pages: issue.pages, couldNotVerify: false)
+            // The warning entries and the end markers below are not read.
+            return (CheckRowComposition.compose(issue: issue, conditions: conditions, warnings: [])
+                ?? CheckRow(status: issue.status, pages: issue.pages, couldNotVerify: false))
+                .stopped(at: .stoppedAtThisFind)
         }
 
         // WARN-triggering keys
@@ -133,11 +138,13 @@ extension VerificationEngine {
     static let layer5FixedFieldsDetail =
         "Producer and timestamps carry the writer's fixed values; no file-specific metadata is present."
 
-    func runLayer5Metadata(_ doc: PDFDocument) throws -> (VerificationStatus, Bool, LayerCopy?) {
+    /// The fourth value is where the check stopped at an issue before it had
+    /// read everything; nil when it read everything.
+    func runLayer5Metadata(_ doc: PDFDocument) throws -> (VerificationStatus, Bool, LayerCopy?, CheckStop?) {
         // Entry-level cooperative cancellation.
         try Task.checkCancellation()
         guard let (pdfData, cgDoc) = loadPDFData(doc) else {
-            return (.warn("Could not inspect metadata"), true, nil)
+            return (.warn("Could not inspect metadata"), true, nil, nil)
         }
 
         // Scan for XMP metadata BEFORE the /Info guard. XMP lives in
@@ -154,7 +161,7 @@ extension VerificationEngine {
         guard let infoDict = cgDoc.info else {
             return (hasXMP
                 ? .warn("Auto-injected metadata present: XMP metadata")
-                : .pass, false, nil)
+                : .pass, false, nil, nil)
         }
 
         // Standard metadata keys to check. FAIL on key presence regardless of
@@ -172,7 +179,7 @@ extension VerificationEngine {
         for key in sensitiveKeys {
             var obj: CGPDFObjectRef?
             if CGPDFDictionaryGetObject(infoDict, key, &obj) {
-                return (.fail("Metadata key /\(key) present"), false, nil)
+                return (.fail("Metadata key /\(key) present"), false, nil, .stoppedAtThisFind)
             }
         }
 
@@ -220,7 +227,8 @@ extension VerificationEngine {
         }, nil)
         if !nonStandardKeys.isEmpty {
             // Do not include key values — just names
-            return (.fail("Non-standard /Info key(s): \(nonStandardKeys.joined(separator: ", "))"), false, nil)
+            return (.fail("Non-standard /Info key(s): \(nonStandardKeys.joined(separator: ", "))"), false, nil,
+                    .stoppedAtThisFind)
         }
 
         // Writer-field attestation. The writer rewrites the auto-injected
@@ -262,7 +270,10 @@ extension VerificationEngine {
             let warning = notRewritten
                 ? [CheckWarning(sentence: "Producer or timestamp fields were not rewritten to the fixed values", pages: nil)] : []
             if let row = CheckRowComposition.compose(issue: nil, conditions: conditions, warnings: warning) {
-                return (row.status, row.couldNotVerify, nil)
+                // The file ID is not checked after this return; a line says so
+                // only where a field was read as not rewritten (an issue), not
+                // where a value could not be read alone.
+                return (row.status, row.couldNotVerify, nil, notRewritten ? .stoppedAtThisFind : nil)
             }
         }
 
@@ -274,7 +285,7 @@ extension VerificationEngine {
         // a value. An absent pair stays on the paths below.
         if let idArray = cgDoc.fileIdentifier,
            !Self.fileIdentifierMatchesContents(idArray, pdfData: pdfData) {
-            return (.warn("File identifier was not derived from the file contents"), false, nil)
+            return (.warn("File identifier was not derived from the file contents"), false, nil, nil)
         }
 
         // XMP metadata — scanned above the /Info guard; fold the
@@ -292,14 +303,14 @@ extension VerificationEngine {
             // XMP is the sole entry.
             let onlyXMP = warnings.allSatisfy { $0 == "XMP metadata" }
             let prefix = onlyXMP ? "Auto-injected metadata present" : "Metadata present"
-            return (.warn("\(prefix): \(warnings.joined(separator: ", "))"), false, nil)
+            return (.warn("\(prefix): \(warnings.joined(separator: ", "))"), false, nil, nil)
         }
         if !infoFindings.isEmpty {
             // The three keys are always present by construction and were
             // attested above: a PASS that says what it read, never a note.
-            return (.pass, false, LayerCopy(short: "No issues found.", detail: Self.layer5FixedFieldsDetail))
+            return (.pass, false, LayerCopy(short: "No issues found.", detail: Self.layer5FixedFieldsDetail), nil)
         }
-        return (.pass, false, nil)
+        return (.pass, false, nil, nil)
     }
 
     /// True when the two strings of a trailer `/ID` array both equal the

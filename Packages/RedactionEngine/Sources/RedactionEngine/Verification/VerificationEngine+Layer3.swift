@@ -243,13 +243,16 @@ extension VerificationEngine {
                 .compactMap { $0 }
                 .joined(separator: "; ")
             let issue = (status: VerificationStatus.fail(message), pages: decodedHitPages.isEmpty ? nil : decodedHitPages)
-            return (CheckRowComposition.compose(issue: issue, conditions: conditions(), warnings: warnings())
-                        ?? CheckRow(status: issue.status, pages: issue.pages, couldNotVerify: false), nil)
+            // The EXIF pass below never runs after an issue.
+            return ((CheckRowComposition.compose(issue: issue, conditions: conditions(), warnings: warnings())
+                        ?? CheckRow(status: issue.status, pages: issue.pages, couldNotVerify: false))
+                        .stopped(at: .imageEXIFNotSearched), nil)
         }
         if let decodedResidualMessage {
             let issue = (status: VerificationStatus.attention(decodedResidualMessage), pages: Optional(decodedHitPages))
-            return (CheckRowComposition.compose(issue: issue, conditions: conditions(), warnings: warnings())
-                        ?? CheckRow(status: issue.status, pages: issue.pages, couldNotVerify: false), decodedTermTexts)
+            return ((CheckRowComposition.compose(issue: issue, conditions: conditions(), warnings: warnings())
+                        ?? CheckRow(status: issue.status, pages: issue.pages, couldNotVerify: false))
+                        .stopped(at: .imageEXIFNotSearched), decodedTermTexts)
         }
 
         // EXIF scan ("scan JPEG APP1/EXIF markers", WARN-only):
@@ -259,6 +262,9 @@ extension VerificationEngine {
         // skipped if a structural fragment WARN was already recorded. A page
         // the Core Graphics reader cannot open joins the unread pages; a
         // document with no pages has no page to report.
+        // Where the check stopped: before the EXIF pass when the fragment
+        // warning is held, or at the page of the first EXIF match.
+        var stop: CheckStop? = deferredWarn == nil ? nil : .imageEXIFNotSearched
         if deferredWarn == nil, cgDoc.numberOfPages >= 1 {
             for pageIdx in 1...cgDoc.numberOfPages {
                 try Task.checkCancellation()
@@ -271,6 +277,7 @@ extension VerificationEngine {
                 }) {
                     deferredWarn = (message: "Sensitive term found in embedded JPEG EXIF metadata on page \(pageIdx)",
                                     pages: [pageIdx - 1])
+                    stop = .exifSearchStopped(page: pageIdx - 1)
                     break
                 }
             }
@@ -279,7 +286,9 @@ extension VerificationEngine {
         // No issue: every could-not-verify condition, then the warning, in
         // one row (mark set); else the warning alone (mark clear); else a
         // PASS.
-        return (CheckRowComposition.compose(issue: nil, conditions: conditions(), warnings: warnings()) ?? .passed, nil)
+        var row = CheckRowComposition.compose(issue: nil, conditions: conditions(), warnings: warnings()) ?? .passed
+        row.stopped = stop
+        return (row, nil)
     }
 
     /// Byte ranges of PDF stream data (between `stream` and `endstream` markers).
