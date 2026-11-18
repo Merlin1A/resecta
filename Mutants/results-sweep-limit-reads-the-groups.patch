@@ -5,16 +5,15 @@ Must go red: ResectaAppTests/FactRowTests limitIsInViewExactlyOnce (secureAllFai
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Views/VerificationDetailsSection.swift b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
-index d8fbeaf8..412985b7 100644
+index a28ccc9f..734663f2 100644
 --- a/Sources/ResectaApp/Views/VerificationDetailsSection.swift
 +++ b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
-@@ -115,7 +115,8 @@ struct VerificationDetailsSection: View {
-     /// checks does not count, even where the list arrives open: it can be
-     /// closed.
+@@ -131,7 +131,7 @@ struct VerificationDetailsSection: View {
+     /// be closed. (A run where every check passed draws its checks inside
+     /// the closed row too, so the card holds the limit there.)
      static func sweepRowInView(_ partition: VerificationLayerPartition, sweepIndex: Int) -> Bool {
--        groups(partition).contains { $0.indices.contains(sweepIndex) } || isEveryCheckPassed(partition)
+-        groups(partition).contains { $0.indices.contains(sweepIndex) }
 +        [partition.findings, partition.notes, partition.nothingToCheck].contains { $0.contains(sweepIndex) }
-+            || isEveryCheckPassed(partition)
      }
  
      /// The card's row with the Detection Sweep's limit, in the words of the
