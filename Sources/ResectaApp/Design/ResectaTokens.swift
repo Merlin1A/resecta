@@ -584,10 +584,6 @@ enum ResectaTokens {
         static let attentionPulse: Animation = .easeInOut(duration: 0.45)
             .repeatCount(1, autoreverses: true)
 
-        // MARK: Verification
-        /// Status color change (gray → green/red)
-        static let colorTransition: Animation = .easeInOut(duration: 0.3)
-
         // MARK: Reduced Motion
         /// Returns the reduced-motion equivalent of an animation if the user prefers it.
         /// Call site reads accessibilityReduceMotion from @Environment and passes it in.

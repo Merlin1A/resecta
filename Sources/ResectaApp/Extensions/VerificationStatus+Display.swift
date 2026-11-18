@@ -6,20 +6,6 @@ import RedactionEngine
 
 extension VerificationStatus {
 
-    // MARK: - SF Symbols
-
-    var symbolName: String {
-        switch self {
-        case .pass:      "checkmark.shield.fill"
-        case .warn:      "exclamationmark.shield.fill"
-        case .info:      "info.circle.fill"
-        case .attention: "shield.lefthalf.filled"
-        case .fail:      "xmark.shield.fill"
-        case .skipped:   "shield.slash"
-        case .notApplicable: "minus.circle"
-        }
-    }
-
     // MARK: - Colors
 
     var color: Color {
@@ -67,7 +53,7 @@ extension VerificationStatus {
 
     // MARK: - Titles
 
-    /// The status-level title — the entry flash's, and the masthead's on
+    /// The status-level title: the masthead's on
     /// every verdict but a WARN with a check that could not verify, which
     /// the results view titles `Some Checks Incomplete` from its rows. An
     /// INFO never aggregates; it reads as a pass. The no-break space keeps
@@ -84,25 +70,6 @@ extension VerificationStatus {
     }
 
     // MARK: - Accessibility
-
-    /// Layer-scoped VoiceOver phrase for a single check, in the Verification
-    /// Details words (a skipped check could not verify). Never a phrase about
-    /// the OVERALL run: spoken per-layer mid-run, that would be the same
-    /// premature-confidence anchoring problem intermediateColor exists to
-    /// prevent. The run's end is spoken by
-    /// `VerificationResultsView.completionAnnouncement(report:)`, in the
-    /// masthead's words; the finished rows speak their outcome's word.
-    var layerAccessibilityPhrase: String {
-        switch self {
-        case .pass:      "Passed."
-        case .warn:      "Warning."
-        case .info:      "Note."
-        case .attention: "Needs review."
-        case .fail:      "Failed."
-        case .skipped:   "Could not verify."
-        case .notApplicable: "Nothing to check."
-        }
-    }
 }
 
 extension LayerResult {

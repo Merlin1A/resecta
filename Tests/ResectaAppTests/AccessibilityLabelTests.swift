@@ -244,24 +244,6 @@ struct AccessibilityLabelTests {
         LayerResultRow.accessibilityLabel(model: .init(layer: layer, perPageModes: []), layer: layer)
     }
 
-    @Test("Layer-scoped phrases never reuse the overall-run phrasing",
-          arguments: [
-            (VerificationStatus.pass, "Passed."),
-            (VerificationStatus.warn("w"), "Warning."),
-            (VerificationStatus.info("i"), "Note."),
-            (VerificationStatus.attention("a"), "Needs review."),
-            (VerificationStatus.fail("f"), "Failed."),
-            (VerificationStatus.skipped, "Could not verify."),
-          ])
-    func testLayerAccessibilityPhrase(status: VerificationStatus, expected: String) {
-        // Per-layer surfaces must not speak "All checks completed without
-        // issues." after each of up to 10 layers mid-run — that is the
-        // spoken twin of the premature-confidence anchoring that
-        // intermediateColor prevents visually.
-        #expect(status.layerAccessibilityPhrase == expected)
-        #expect(!status.layerAccessibilityPhrase.contains("without issues"))
-    }
-
     // The duration is not spoken: it is not
     // in the collapsed row any more (the expanded row's "Took … s" line is
     // its own reachable element), so the label ends at the pages.
