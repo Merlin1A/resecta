@@ -1,0 +1,23 @@
+Property: Character Count's expected count is one per kept entry, so a joined glyph written twice reads the excess warning.
+Area: Character Count and Character Lineage, the break marks
+Test command: cd Packages/RedactionEngine && swift test --filter BreakMarkCountTests (or DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/BreakMarkCountTests)
+Must go red: RedactionEngineTests/BreakMarkCountTests theCountsUnitIsTheEntry
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/CharacterFilter.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/CharacterFilter.swift
+index a9c047c6..05d1b7d1 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/CharacterFilter.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/CharacterFilter.swift
+@@ -304,9 +304,9 @@ extension FilterResult {
+             survivingCount: surviving.count,
+             boundaryCharacters: boundaryChars,
+             lineageHash: Self.computeLineageHash(over: surviving, frame: frame),
+-            survivingNonWhitespaceCount: surviving.count(where: {
+-                !SandwichMetrics.isOutsideCharacterCount($0.character)
+-            }),
++            survivingNonWhitespaceCount: surviving.reduce(0) { total, entry in
++                SandwichMetrics.isOutsideCharacterCount(entry.character) ? total : total + entry.character.count
++            },
+             drawnCellRuleExcludedCount: drawnCellRuleExcludedCount,
+             pageRotation: frame?.rotation ?? 0
+         )
