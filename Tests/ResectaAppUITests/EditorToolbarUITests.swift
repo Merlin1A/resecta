@@ -1,4 +1,5 @@
 import XCTest
+import UIKit
 
 /// UI tests for the editor's iPhone toolbar: the … menu's order, the one
 /// Undo control (a tap undoes; a touch and hold opens Undo and Redo named
@@ -314,6 +315,28 @@ nonisolated final class EditorToolbarUITests: XCTestCase {
                 openOverflowAndTap("Add to Selection")
                 XCTAssertTrue(capsule.waitForExistence(timeout: 5))
             }
+        }
+    }
+
+    /// The bar's words show whole at the default size: each part is at least
+    /// as wide as its words set in the bar's font. A part offered less than
+    /// its words draws them cut short ("Dupli…") in a narrower frame.
+    func testSelectionBar_wordsShowWholeAtTheDefaultSize() {
+        launchWithOneDrawnBoxSelected()
+        let pointSize = UIFont.preferredFont(forTextStyle: .subheadline).pointSize
+        func width(_ words: String, _ font: UIFont) -> CGFloat {
+            ceil((words as NSString).size(withAttributes: [.font: font]).width)
+        }
+        let parts: [(String, String, UIFont)] = [
+            ("selectionBarCount", "1 selected", .monospacedDigitSystemFont(ofSize: pointSize, weight: .regular)),
+            ("selectionBarDuplicate", "Duplicate", .systemFont(ofSize: pointSize, weight: .semibold)),
+            ("selectionBarDelete", "Delete", .systemFont(ofSize: pointSize, weight: .semibold)),
+        ]
+        for (identifier, words, font) in parts {
+            let part = barPart(identifier)
+            XCTAssertTrue(part.waitForExistence(timeout: 5), "\(identifier) is missing.")
+            XCTAssertGreaterThanOrEqual(part.frame.width, width(words, font) - 1,
+                "\"\(words)\" is cut short: its part is \(part.frame.width) pt wide, the words \(width(words, font)) pt.")
         }
     }
 

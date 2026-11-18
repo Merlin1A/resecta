@@ -245,10 +245,12 @@ struct SelectionBar: View {
     }
 }
 
-/// An action's tappable frame. A word: padded to the touch target's height,
-/// and beside it past half the gap to its neighbour, then the padding given
-/// back so the word does not move (as Add to Selection's Done). A symbol: a
-/// real 46 × 46 frame, reaching past the row above and below.
+/// An action's tappable frame. A word: its hit shape reaches to the touch
+/// target's height, and beside it past half the gap to its neighbour; a
+/// shape only, so the word lays out as its own words. Padding the word and
+/// giving the padding back took the side padding out of the width the word
+/// was offered, and the words were cut short ("Dupli…"). A symbol: a real
+/// 46 × 46 frame, reaching past the row above and below.
 struct SelectionBarHitArea: ViewModifier {
     let symbols: Bool
     let wordLineHeight: CGFloat
@@ -262,13 +264,25 @@ struct SelectionBarHitArea: ViewModifier {
                 .contentShape(Rectangle())
                 .padding(.vertical, -overhang)
         } else {
-            let vertical = DocumentEditorView.selectionBarHitPadding(lineHeight: wordLineHeight)
-            let side = DocumentEditorView.selectionBarWordSidePadding
-            content
-                .padding(.vertical, vertical).padding(.horizontal, side)
-                .frame(minWidth: size)
-                .contentShape(Rectangle())
-                .padding(.vertical, -vertical).padding(.horizontal, -side)
+            content.contentShape(SelectionBarWordHitShape(
+                vertical: DocumentEditorView.selectionBarHitPadding(lineHeight: wordLineHeight),
+                side: DocumentEditorView.selectionBarWordSidePadding,
+                leastWidth: size))
         }
+    }
+}
+
+/// A word's tappable shape: its drawn frame grown by `vertical` above and
+/// below and `side` beside it, and at least `leastWidth` wide, on the same
+/// centre.
+struct SelectionBarWordHitShape: Shape {
+    let vertical: CGFloat
+    let side: CGFloat
+    let leastWidth: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        let width = max(rect.width + 2 * side, leastWidth)
+        return Path(CGRect(x: rect.midX - width / 2, y: rect.minY - vertical,
+                           width: width, height: rect.height + 2 * vertical))
     }
 }
