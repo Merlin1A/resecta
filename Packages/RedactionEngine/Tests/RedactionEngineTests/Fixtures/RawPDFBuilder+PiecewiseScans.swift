@@ -139,13 +139,14 @@ enum PiecewiseScan {
     }
 
     /// One page: its content, its resources (the font `/F1` is added), its own
-    /// objects, and its turn.
+    /// objects, its turn, and its size (a letter page unless set).
     struct Page {
         var content: Data
         var resources: String = ""
         var objects: [Object] = []
         var rotate: Int = 0
         var contentEntries: String = ""
+        var size: CGSize = PiecewiseScan.page
 
         init(_ content: String, resources: String = "", objects: [Object] = [], rotate: Int = 0) {
             self.content = Data(content.utf8); self.resources = resources; self.objects = objects; self.rotate = rotate
@@ -170,7 +171,7 @@ enum PiecewiseScan {
             }
             kids.append(pageNumber)
             let turn = page.rotate == 0 ? "" : " /Rotate \(page.rotate)"
-            add(Data("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792]\(turn) /Contents \(contentNumber) 0 R /Resources << /Font << /F1 3 0 R >> \(refs(page.resources)) >> >>".utf8))
+            add(Data("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 \(n(page.size.width)) \(n(page.size.height))]\(turn) /Contents \(contentNumber) 0 R /Resources << /Font << /F1 3 0 R >> \(refs(page.resources)) >> >>".utf8))
             var content = Data("<< /Length \(page.content.count) \(page.contentEntries) >>\nstream\n".utf8)
             content.append(page.content); content.append(Data("\nendstream".utf8))
             add(content)
@@ -214,6 +215,18 @@ enum PiecewiseScan {
         var s = "q BT /F1 \(Int(pointSize)) Tf \(mode) Tr "
         for (line, x, y) in lines { s += "1 0 0 1 \(Int(x)) \(Int(y)) Tm (\(line)) Tj " }
         return s + "ET Q "
+    }
+
+    /// Four lines of invisible text below the printed ones, away from their
+    /// words: with the three lines, a text layer too long to read as a stamp
+    /// alone (over 200 characters on a letter page), as a scanner's own
+    /// recognition leaves.
+    static var fillerLayer: String {
+        [("Statement of account prepared for the holder named above", 380),
+         ("All amounts are shown in United States dollars and cents", 360),
+         ("Questions about this statement go to the branch office", 340),
+         ("Keep this page with your records for seven years", 320)]
+            .map { line($0.0, x: 100, y: CGFloat($0.1), mode: 3, size: 10) }.joined()
     }
 
     static func line(_ text: String, x: CGFloat, y: CGFloat, mode: Int = 0, size: Int = 14) -> String {

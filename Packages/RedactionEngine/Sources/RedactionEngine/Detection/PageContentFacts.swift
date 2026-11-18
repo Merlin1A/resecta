@@ -47,8 +47,8 @@ public struct PageContentFacts: Equatable, Sendable {
             usesType3Font: walk.type3Font)
     }
 
-    /// Whether a page draws an inline image, by the content walk alone; a
-    /// page that cannot be read answers true, as `read` does.
+    /// Whether a page draws an inline image, in its content or in a form
+    /// object its resources reach; a page that cannot be read does.
     static func drawsInlineImage(_ page: CGPDFPage) -> Bool {
         guard let dictionary = page.dictionary else { return true }
         let resources: CGPDFDictionaryRef?
