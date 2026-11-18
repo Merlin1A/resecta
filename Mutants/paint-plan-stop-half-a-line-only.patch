@@ -1,0 +1,19 @@
+Property: The stop's distance is the larger of half a line height and eight pixels at the lowest quality, so small print's next field is never painted.
+Area: the plan, the stop
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/PaintPlanBandTests (or on the host: cd Packages/RedactionEngine && swift test --filter 'PaintPlanBandTests')
+Must go red: RedactionCoreTests/PaintPlanBandTests smallPrintStop
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+index d31c2a6d..39cb9184 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+@@ -326,7 +326,7 @@ private struct Maker {
+         let c = policy.provisional
+         for row in rows {
+             let h = lineHeight(row)
+-            let stop = Swift.max(LineMargin.ceil(h, c.stopLineHeights), c.stopPixelsSixtyFourths)
++            let stop = LineMargin.ceil(h, c.stopLineHeights)
+             var lo = [row.tight.minX, row.columnLeft, row.ownRun?.minX].compactMap { $0 }.min()!
+             var hi = [row.tight.maxX, row.columnRight, row.ownRun?.maxX].compactMap { $0 }.max()!
+             let lineWords = row.line.map { complement.lines[$0].words } ?? []

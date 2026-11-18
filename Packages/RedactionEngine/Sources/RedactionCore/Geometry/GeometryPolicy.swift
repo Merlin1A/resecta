@@ -198,6 +198,63 @@ package struct ProvisionalConstants: Hashable, Sendable, Codable {
     }
 }
 
+/// The line margin a box's paint adds round its `inner`, in shares of the
+/// line's height H, and the limit it may not cross into a neighbouring
+/// line. Each side is rounded up to a whole sixty-fourth and then held at
+/// the cap; the end side is then held to half the gap to the next unselected
+/// character.
+package struct LineMargin: Hashable, Sendable, Codable {
+    package var top: Ratio
+    package var bottom: Ratio
+    package var start: Ratio
+    package var end: Ratio
+    /// The least the bottom, start and end sides are, in whole sixty-fourths.
+    package var floorSixtyFourths: Int
+    /// The most any side is, in whole sixty-fourths.
+    package var capSixtyFourths: Int
+    /// How far the paint may enter a neighbouring line's box: this share of
+    /// that line's letter size ...
+    package var limitShare: Ratio
+    /// ... plus this many sixty-fourths, as a ratio so 0.3 pt is exact.
+    package var limitExtraSixtyFourths: Ratio
+
+    package init(top: Ratio, bottom: Ratio, start: Ratio, end: Ratio, floorSixtyFourths: Int, capSixtyFourths: Int,
+                 limitShare: Ratio, limitExtraSixtyFourths: Ratio) {
+        self.top = top
+        self.bottom = bottom
+        self.start = start
+        self.end = end
+        self.floorSixtyFourths = floorSixtyFourths
+        self.capSixtyFourths = capSixtyFourths
+        self.limitShare = limitShare
+        self.limitExtraSixtyFourths = limitExtraSixtyFourths
+    }
+
+    /// ⌈H·r⌉ in whole sixty-fourths for a height `h` in sixty-fourths.
+    static func ceil(_ h: Int, _ r: Ratio) -> Int { (h * r.numerator + r.denominator - 1) / r.denominator }
+
+    /// The four sides for a box whose top row's line is `topHeight` tall, its
+    /// bottom row's `bottomHeight` and its tallest row's `alongHeight`, all in
+    /// sixty-fourths, before the end side's half-gap hold.
+    package func sides(topHeight: Int, bottomHeight: Int, alongHeight: Int) -> (top: Int, bottom: Int, start: Int, end: Int) {
+        let cap = capSixtyFourths
+        return (top: Swift.min(cap, Self.ceil(topHeight, top)),
+                bottom: Swift.min(cap, Swift.max(floorSixtyFourths, Self.ceil(bottomHeight, bottom))),
+                start: Swift.min(cap, Swift.max(floorSixtyFourths, Self.ceil(alongHeight, start))),
+                end: Swift.min(cap, Swift.max(floorSixtyFourths, Self.ceil(alongHeight, end))))
+    }
+
+    /// How far the paint may enter a line whose letter size is `letterSize`
+    /// sixty-fourths: ⌊share·size + extra⌋, rounded down so the limit lies
+    /// toward the box.
+    package func entry(letterSize: Int) -> Int {
+        let d = limitShare.denominator * limitExtraSixtyFourths.denominator
+        let n = letterSize * limitShare.numerator * limitExtraSixtyFourths.denominator
+            + limitExtraSixtyFourths.numerator * limitShare.denominator
+        return n >= 0 ? n / d : -((-n + d - 1) / d)
+    }
+}
+
 /// The policy that makes a page's plan: a table of rows, looked up by the
 /// region's kind, what was read of its line and the switch; the rule for the
 /// plan made from the regions as placed; and the constants the rows use.
@@ -207,12 +264,16 @@ package struct GeometryPolicy: Hashable, Sendable, Codable {
     /// The margin added on every side of a box whose paint rule is
     /// `placedPlusFixedMargin`, in whole sixty-fourths of a point.
     package var fixedMarginSixtyFourths: Int
+    /// The margin of a box whose paint rule is `lineMargin` or `band`.
+    package var margin: LineMargin
     package var provisional: ProvisionalConstants
 
-    package init(rows: [PolicyRow], asPlaced: PolicyRule, fixedMarginSixtyFourths: Int, provisional: ProvisionalConstants) {
+    package init(rows: [PolicyRow], asPlaced: PolicyRule, fixedMarginSixtyFourths: Int,
+                 margin: LineMargin = GeometryPolicy.lineMargin, provisional: ProvisionalConstants) {
         self.rows = rows
         self.asPlaced = asPlaced
         self.fixedMarginSixtyFourths = fixedMarginSixtyFourths
+        self.margin = margin
         self.provisional = provisional
     }
 
@@ -228,6 +289,15 @@ package struct GeometryPolicy: Hashable, Sendable, Codable {
 }
 
 extension GeometryPolicy {
+    /// The line margin: top 5/24 H; bottom max(0.5 pt, H/16); start
+    /// max(0.5 pt, H/10); end max(0.5 pt, H/4); each at most 8 pt. A
+    /// neighbouring line is entered by at most a fifth of its letter size
+    /// plus 0.3 pt (19.2 sixty-fourths).
+    package static let lineMargin = LineMargin(
+        top: Ratio(5, 24), bottom: Ratio(1, 16), start: Ratio(1, 10), end: Ratio(1, 4),
+        floorSixtyFourths: 32, capSixtyFourths: 512,
+        limitShare: Ratio(1, 5), limitExtraSixtyFourths: Ratio(96, 5))
+
     /// This release's table. Every row can show the covered value's length.
     package static let release = GeometryPolicy(
         rows: releaseRows,

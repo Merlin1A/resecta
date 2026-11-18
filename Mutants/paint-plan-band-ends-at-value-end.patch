@@ -1,0 +1,19 @@
+Property: A band runs to its column and its own run, not to the boxed value's end, so the band's width does not follow the value.
+Area: the plan, the band
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/PaintPlanBandTests -only-testing:RedactionCoreTests/PaintPlanModelTests (or on the host: cd Packages/RedactionEngine && swift test --filter 'PaintPlanBandTests|PaintPlanModelTests')
+Must go red: RedactionCoreTests/PaintPlanModelTests whichTemplatesReduce; RedactionCoreTests/PaintPlanBandTests labelRowShortAndLong; RedactionCoreTests/PaintPlanBandTests paragraphLineBand
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+index d31c2a6d..bbbd31d3 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+@@ -328,7 +328,7 @@ private struct Maker {
+             let h = lineHeight(row)
+             let stop = Swift.max(LineMargin.ceil(h, c.stopLineHeights), c.stopPixelsSixtyFourths)
+             var lo = [row.tight.minX, row.columnLeft, row.ownRun?.minX].compactMap { $0 }.min()!
+-            var hi = [row.tight.maxX, row.columnRight, row.ownRun?.maxX].compactMap { $0 }.max()!
++            var hi = row.tight.maxX
+             let lineWords = row.line.map { complement.lines[$0].words } ?? []
+             func inOwnRun(_ w: ComplementWord) -> Bool {
+                 guard let run = row.ownRun else { return false }

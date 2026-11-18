@@ -1,0 +1,19 @@
+Property: A region placed from the page's picture is scan or picture with the placed rectangle plus 1.5 pt, not a box by hand.
+Area: the plan, the kind of region
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/PaintPlanMakeTests (or on the host: cd Packages/RedactionEngine && swift test --filter 'PaintPlanMakeTests')
+Must go red: RedactionCoreTests/PaintPlanMakeTests noLayoutRows; RedactionCoreTests/PaintPlanMakeTests tableRowByRow
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+index d31c2a6d..c40304eb 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+@@ -235,7 +235,7 @@ private struct Maker {
+         let regions = group.map { placed[$0] }
+         let ids = Set(regions.map(\.region.id))
+         let placedRect = regions.dropFirst().reduce(regions[0].rect) { $0.union($1.rect) }
+-        let kind = regions[0].region.kind
++        let kind = regions[0].region.kind == .placedFromPicture ? RegionKind.placedFromTextThenEdited : regions[0].region.kind
+         let anchored = kind == .placedFromTextAnchored
+         let selected = anchored ? regions.reduce(into: Set<Int>()) { $0.formUnion($1.region.selected) } : []
+         let read = anchored ? reading(of: selected) : nil

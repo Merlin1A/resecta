@@ -1,0 +1,23 @@
+Property: Each end of a band stands the stop's distance short of the nearest word of its line that is not in the box's own run.
+Area: the plan, the stop
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/PaintPlanBandTests (or on the host: cd Packages/RedactionEngine && swift test --filter 'PaintPlanBandTests')
+Must go red: RedactionCoreTests/PaintPlanBandTests twoColumnsUnderATitle; RedactionCoreTests/PaintPlanBandTests tableRowUnderAMergedHeader; RedactionCoreTests/PaintPlanBandTests labelRowShortAndLong
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+index d31c2a6d..91b6ad7c 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+@@ -335,10 +335,10 @@ private struct Maker {
+                 return w.box.minX >= run.minX && w.box.maxX <= run.maxX
+             }
+             if let next = lineWords.filter({ $0.box.minX >= row.tight.maxX && !inOwnRun($0) }).map(\.box.minX).min() {
+-                hi = Swift.max(Swift.min(hi, next - stop), row.tight.maxX)
++                hi = Swift.max(Swift.min(hi, next), row.tight.maxX)
+             }
+             if let prev = lineWords.filter({ $0.box.maxX <= row.tight.minX && !inOwnRun($0) }).map(\.box.maxX).max() {
+-                lo = Swift.min(Swift.max(lo, prev + stop), row.tight.minX)
++                lo = Swift.min(Swift.max(lo, prev), row.tight.minX)
+             }
+             left = Swift.max(left, lo)
+             right = Swift.min(right, hi)

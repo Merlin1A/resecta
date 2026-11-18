@@ -1,0 +1,20 @@
+Property: No gap is measured to the box's ends: where the column meets the box's line is read from the room, so a short value and a long one get the same band.
+Area: the plan, the column read for the band
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/PaintPlanBandTests (or on the host: cd Packages/RedactionEngine && swift test --filter 'PaintPlanBandTests')
+Must go red: RedactionCoreTests/PaintPlanBandTests labelRowShortAndLong; RedactionCoreTests/PaintPlanBandTests valueLengthMovesNothing
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
+index e0be82ec..0e1f860c 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
+@@ -498,7 +498,8 @@ extension Complement {
+         // it is closed on both sides, the end of the word before or the start
+         // of the word after when it is open on one, and the box itself when
+         // it is alone on its line.
+-        let anchor: (lo: Int, hi: Int) = switch (roomLeft, roomRight) {
++        let anchor: (lo: Int, hi: Int) = (row.minX, row.maxX)
++        _ = switch (roomLeft, roomRight) {
+         case let (l?, r?): (l, r)
+         case let (l?, nil): (l, l)
+         case let (nil, r?): (r, r)
