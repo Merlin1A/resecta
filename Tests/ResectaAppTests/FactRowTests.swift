@@ -162,5 +162,77 @@ struct FactRowTests {
         for kept in ["\"runFactsStrip\"", "\"deselectionRow\"", "\"pageModesSection\""] {
             #expect(source.contains(kept), "\(kept)")
         }
+        // The rows are drawn in FactRow.swift: no symbol there either.
+        let rows = try String(contentsOf: URL(fileURLWithPath: "\(#filePath)")
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/ResectaApp/Views/FactRow.swift"), encoding: .utf8)
+        #expect(!rows.contains("Image("), "FactRow.swift draws no image")
+    }
+
+    // MARK: - The Detection Sweep's limit
+
+    typealias Section = VerificationDetailsSection
+
+    /// The card as the screen builds it for a seeded report, with one
+    /// handed-in fact in each place around the limit.
+    static func card(_ report: VerificationReport) -> [Item] {
+        ResultsFactCard.items(
+            handedIn: [fact("first", .first), fact("notRead", .notRead), fact("pictures", .pictures),
+                       fact("last", .last)],
+            runLines: [], showsPageModes: VerificationResultsView.showsPageModes(report: report),
+            deselection: nil, sweepLimit: Section.sweepLimitFact(report: report))
+    }
+
+    @Test("The limit's row: the sweep's own two sentences, after the facts about what was not read, before Page Modes")
+    func sweepLimitRowWordsAndPlace() {
+        var seeded = 0, holding = 0
+        for (name, report) in VerificationDebugFixtures.all {
+            seeded += 1
+            let items = Self.card(report)
+            guard let at = items.firstIndex(where: { if case .fact(let f) = $0 { f.id == "sweepLimit" } else { false } }),
+                  case .fact(let limit) = items[at] else { continue }
+            holding += 1
+            let sweep = report.layers[Section.sweepIndex(report)!]
+            #expect(limit.shown == LayerResultRow.rowCaptionText(layer: sweep), "\(name)")
+            #expect(limit.shown == "\(LayerResultRow.detectionSweepGateCaption) \(LayerResultRow.detectionSweepUnreadCaption)",
+                    "\(name)")
+            #expect(limit.more.isEmpty && !limit.opens, "\(name)")
+            #expect(limit.accessibilityIdentifier == "sweepLimitFact", "\(name)")
+            let notRead = items.firstIndex(of: .fact(Self.fact("notRead", .notRead)))!
+            let pictures = items.firstIndex(of: .fact(Self.fact("pictures", .pictures)))!
+            #expect(notRead < at && at < pictures, "\(name)")
+            if let pageModes = items.firstIndex(of: .pageModes) { #expect(at < pageModes, "\(name)") }
+        }
+        print("[sweep-limit] seeded reports \(seeded), cards holding the limit \(holding)")
+        #expect(seeded == 18)
+        #expect(holding > 0)
+    }
+
+    @Test("The limit is in view exactly once on the closed screen of every run that has the check")
+    func limitIsInViewExactlyOnce() {
+        // The rule's table: (the run has the check, the sweep's own row is in view, the card's row).
+        let table: [(Bool, Bool, Bool)] = [(true, false, true), (true, true, false), (false, false, false)]
+        for (hasCheck, inView, shows) in table {
+            #expect(Section.showsSweepLimit(runHasCheck: hasCheck, sweepRowInView: inView) == shows)
+        }
+        #expect(table.count == 3)
+        var seeded = 0, withCheck = 0, inCard = 0
+        for (name, report) in VerificationDebugFixtures.all {
+            seeded += 1
+            let partition = VerificationLayerPartition(layers: report.layers, perPageModes: report.perPageModes)
+            let sweep = report.layers.firstIndex { $0.layer == .detectionSweep }
+            // Counted from what the screen draws, not from the rule's own function.
+            let ownRow = sweep.map { index in
+                Section.groups(partition).contains { $0.indices.contains(index) }
+                    || Section.isEveryCheckPassed(partition)
+            } ?? false
+            let card = Self.card(report).contains { if case .fact(let f) = $0 { f.id == "sweepLimit" } else { false } }
+            #expect((ownRow ? 1 : 0) + (card ? 1 : 0) == (sweep == nil ? 0 : 1), "\(name)")
+            withCheck += sweep == nil ? 0 : 1
+            inCard += card ? 1 : 0
+        }
+        print("[sweep-limit] seeded reports \(seeded), with the check \(withCheck), limit in the card \(inCard)")
+        #expect(seeded == 18)
+        #expect(withCheck > 0 && withCheck < seeded)
     }
 }

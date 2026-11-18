@@ -1,0 +1,28 @@
+Property: The sweep's own closed row keeps its two sentences.
+Area: results (the Detection Sweep's limit)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationDisplayTests -only-testing:ResectaAppUITests/SearchRecheckUITests
+Must go red: ResectaAppTests/VerificationDisplayTests captionRendersCollapsedOnly; ResectaAppTests/VerificationDisplayTests spokenLabelCarriesTheGate; ResectaAppUITests/SearchRecheckUITests testDetectionSweep_drawnBox_rowPresentAndNoDetectionLine
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/LayerResultRow.swift b/Sources/ResectaApp/Views/LayerResultRow.swift
+index a06026f7..33e63eaa 100644
+--- a/Sources/ResectaApp/Views/LayerResultRow.swift
++++ b/Sources/ResectaApp/Views/LayerResultRow.swift
+@@ -228,7 +228,7 @@ struct LayerResultRow: View {
+     /// detail states it once already.
+     @ViewBuilder
+     private func gateLine(font: Font) -> some View {
+-        if !isExpanded, let caption = Self.rowCaptionText(layer: layer) {
++        if !isExpanded, false, let caption = Self.rowCaptionText(layer: layer) {
+             Text(caption)
+                 .font(font)
+                 .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+@@ -509,7 +509,7 @@ struct LayerResultRow: View {
+     /// announcements keep it.
+     static func accessibilityLabel(model: VerificationRowModel, layer: LayerResult) -> String {
+         var label = model.spokenLabel
+-        if let caption = Self.rowCaptionText(layer: layer) {
++        if false, let caption = Self.rowCaptionText(layer: layer) {
+             label += " \(caption)"
+         }
+         if let pages = VerificationRowModel.spokenPages(layer.pageReferences ?? []) {

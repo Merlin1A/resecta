@@ -68,3 +68,11 @@ with its reason and the mutant that is caught in its place.
 | `results-facts-door-row-height.patch` | The link row is at least 46 pt high, whatever its text's height. | ResectaAppTests/FactRowTests linkRowCanBeHit |
 | `results-facts-door-row-text-teal.patch` | The link row's label is in the teal made for text, not the tint. | ResectaAppTests/FactRowTests linkRowCanBeHit |
 | `results-facts-no-symbol.patch` | The card's rows carry no symbol in front. | ResectaAppTests/FactRowTests cardRowsCarryNoSymbol |
+| `results-sweep-limit-on-every-outcome.patch` | The limit's row shows on a run that did not pass as well as on one that did. | ResectaAppTests/FactRowTests limitIsInViewExactlyOnce (secureFail) |
+| `results-sweep-limit-only-with-the-check.patch` | A run without the Detection Sweep check has no limit row. | ResectaAppTests/FactRowTests limitIsInViewExactlyOnce |
+| `results-sweep-limit-words-read-not-typed.patch` | The limit's words are read from the sweep's own row, not typed again. | ResectaAppTests/FactRowTests sweepLimitRowWordsAndPlace |
+| `results-sweep-row-keeps-its-limit.patch` | The sweep's own closed row keeps its two sentences. | ResectaAppTests/VerificationDisplayTests captionRendersCollapsedOnly; ResectaAppTests/VerificationDisplayTests spokenLabelCarriesTheGate; ResectaAppUITests/SearchRecheckUITests testDetectionSweep_drawnBox_rowPresentAndNoDetectionLine |
+| `results-sweep-limit-before-page-modes.patch` | The limit's row comes before Page Modes and the facts about pictures. | ResectaAppTests/FactRowTests sweepLimitRowWordsAndPlace |
+| `results-sweep-limit-not-twice.patch` | The limit's row is not shown while the sweep's own row is in view in its group. | ResectaAppTests/FactRowTests limitIsInViewExactlyOnce (secureScreenshot) |
+| `results-sweep-limit-kept-when-list-opens.patch` | The limit's row stays where the list of checks arrives open. | ResectaAppTests/FactRowTests limitIsInViewExactlyOnce (securePassRidingNote) |
+| `results-sweep-limit-reads-the-groups.patch` | Whether the sweep's row is in view is read from the groups the screen draws, not from a list of its own. | ResectaAppTests/FactRowTests limitIsInViewExactlyOnce (secureAllFailed) |
