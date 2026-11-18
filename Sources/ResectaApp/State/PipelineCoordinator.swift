@@ -62,6 +62,9 @@ final class PipelineCoordinator: @unchecked Sendable {
     /// Test seam: receives the regions verification checks, as it hands
     /// them to the checks; never read by production code.
     var verificationRegionsSeam: (([Int: [RedactionRegion]]) -> Void)?
+    /// Test seam: receives the run's record verification hands the checks;
+    /// never read by production code.
+    var verificationRecordSeam: ((RunRecord?) -> Void)?
     #endif
 
     #if DEBUG

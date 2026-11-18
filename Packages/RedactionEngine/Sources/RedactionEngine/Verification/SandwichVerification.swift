@@ -165,13 +165,17 @@ struct SandwichVerification: Sendable {
     /// uses, over the core boxes. For a shape whose
     /// `bounds == expandedBounds` (the legacy construction) the two tiers
     /// coincide and the check reduces to its previous single-rect form.
+    ///
+    /// `kinds` gives each shape's kind on the page's text path, in the order
+    /// of `regionShapes`; nil reads every shape as ordinary.
     func verifySpatialExclusion(
         outputPage: PDFPage,
         regionShapes: [RegionShape],
+        kinds: [TextPathRectangle.Kind]? = nil,
         pageIndex: Int = 0
     ) async throws -> VerificationStatus {
         try await spatialExclusionOutcome(
-            outputPage: outputPage, regionShapes: regionShapes, pageIndex: pageIndex
+            outputPage: outputPage, regionShapes: regionShapes, kinds: kinds, pageIndex: pageIndex
         ).status
     }
 
@@ -184,6 +188,7 @@ struct SandwichVerification: Sendable {
     func spatialExclusionOutcome(
         outputPage: PDFPage,
         regionShapes: [RegionShape],
+        kinds: [TextPathRectangle.Kind]? = nil,
         pageIndex: Int = 0
     ) async throws -> (status: VerificationStatus, couldNotVerify: Bool, grazed: Bool) {
         // Entry-level cooperative cancellation.
@@ -208,12 +213,12 @@ struct SandwichVerification: Sendable {
         // is never masked by an edge graze, which is held for the exit.
         try Task.checkCancellation()
         if let failure = Self.spatialOverlapFailure(
-            regionShapes: regionShapes, scan: &scan, pageIndex: pageIndex) {
+            regionShapes: regionShapes, kinds: kinds, scan: &scan, pageIndex: pageIndex) {
             return (failure, false, false)
         }
         try Task.checkCancellation()
         if let failure = Self.advanceLatticeFailure(
-            regionShapes: regionShapes, scan: scan, pageIndex: pageIndex) {
+            regionShapes: regionShapes, kinds: kinds, scan: scan, pageIndex: pageIndex) {
             return (failure, false, false)
         }
         if scan.zeroBoundsUnits > 0 {

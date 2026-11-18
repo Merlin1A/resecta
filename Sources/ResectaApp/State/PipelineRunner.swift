@@ -215,7 +215,8 @@ struct PipelineRunner {
             if verifyForRun {
                 return try await verify(
                     runContext: runContext, effectiveMode: effectiveMode,
-                    burnedRegionVersion: entry.burnedRegionVersion)
+                    burnedRegionVersion: entry.burnedRegionVersion,
+                    record: RunRecord(confirmed: entry.confirmed, produced: runContext.produced))
             } else {
                 sink(.verificationSkipped(burnedRegionVersion: entry.burnedRegionVersion))
                 return .completed
@@ -402,9 +403,11 @@ struct PipelineRunner {
             // stand in only where no inputs were kept (the debug seed).
             burnedRegions: retained?.burnedRegions ?? coordinator.redactionState.regions
         )
+        // The record of the run that made this output, as on the run; nil
+        // only where no inputs were kept (the debug seed).
         return try await verify(
             runContext: runContext, effectiveMode: effectiveMode,
-            burnedRegionVersion: burnedRegionVersion)
+            burnedRegionVersion: burnedRegionVersion, record: retained?.record)
     }
 
     // MARK: - Verification
@@ -429,9 +432,11 @@ struct PipelineRunner {
     /// method loads the output, snapshots the MainActor-isolated inputs,
     /// adapts the orchestrator's events to the `.verifying` transitions and
     /// the VoiceOver announcements, and publishes the report.
+    ///
+    /// `record` is the run's record, handed to the position check.
     private func verify(
         runContext: PipelineCoordinator.PipelineRunContext, effectiveMode: PipelineMode,
-        burnedRegionVersion: Int
+        burnedRegionVersion: Int, record: RunRecord?
     ) async throws -> PipelineRunOutcome {
         // The first verifying step goes out before the loads below suspend.
         // The redacted copy is built and its inputs recorded, so from here a
@@ -484,6 +489,7 @@ struct PipelineRunner {
 
         #if DEBUG
         coordinator.verificationRegionsSeam?(runContext.burnedRegions)
+        coordinator.verificationRecordSeam?(record)
         #endif
         let report = try await VerificationOrchestrator().run(
             outputDocument: wrappedDoc,
@@ -497,6 +503,7 @@ struct PipelineRunner {
             appliedSearches: runContext.appliedSearches,
             manualRegionsWithoutText: runContext.sensitiveTerms.manualRegionsWithoutText,
             sourceDocument: sourceCopy,
+            record: record,
             provisionLayerDocuments: { layers in
                 // Provision one PDFDocument instance per parallel layer off
                 // MainActor. nil ⇒ at least one re-open failed.
