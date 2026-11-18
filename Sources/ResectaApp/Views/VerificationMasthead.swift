@@ -303,7 +303,8 @@ struct VerificationMasthead: View {
     }
 
     /// What the ring shows: SKIPPED's slot, or P of T with the verdict's
-    /// tone. T counts every check; INFO reads as a pass.
+    /// tone. T counts the checks that had something to check; INFO reads
+    /// as a pass.
     static func ringContent(report: VerificationReport) -> CountRing.Content {
         let tone: CountRing.Tone
         switch report.overallStatus {
