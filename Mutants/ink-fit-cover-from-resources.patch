@@ -1,0 +1,19 @@
+Property: A page's cover is read from the pictures it paints, never from the images its resources reach.
+Area: ink fit (Search), which pages are fitted
+Test command: cd Packages/RedactionEngine && swift test --filter 'InkFitPiecewiseScanTests'
+Must go red: RedactionEngineTests/InkFitPiecewiseScanTests gateByTable (Which pages are fitted, by table): G7, G4
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
+index 35d94d09..e5aecdf9 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
+@@ -67,7 +67,7 @@ extension DocumentSearcher {
+     nonisolated static func printIsAPicture(pageScale: Bool, page: PDFPage, cgPage: CGPDFPage) -> Bool {
+         if pageScale { return true }
+         let map = PagePictureMap.cached(page, cgPage: cgPage)
+-        return !map.followed || map.coversThePage
++        return !map.followed || PageImageCensus.largestImagePixelArea(of: cgPage) != nil
+     }
+ 
+     /// An image object covering at least `PageImageCensus.imageShareFloor` of

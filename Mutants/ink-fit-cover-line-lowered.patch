@@ -1,0 +1,21 @@
+Property: The line for "the pictures cover the page" is four fifths of the crop box.
+Area: ink fit (Search), which pages are fitted
+Test command: cd Packages/RedactionEngine && swift test --filter 'InkFitPiecewiseScanTests|PagePictureMapTests'
+Must go red: RedactionEngineTests/InkFitPiecewiseScanTests gateByTable (Which pages are fitted, by table): G6; RedactionEngineTests/PagePictureMapTests coverIsExact (The area pictures cover together is exact, and the line is four fifths): U10
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift
+index 4e79431c..b58ee1f8 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift
+@@ -9,8 +9,8 @@ import PDFKit
+ /// cover from this one map, and keep no line of their own.
+ struct PagePictureMap: Equatable, Sendable {
+     /// The share of the crop box the pictures must cover together: four fifths.
+-    static let pageCoverNumerator = 4
+-    static let pageCoverDenominator = 5
++    static let pageCoverNumerator = 3
++    static let pageCoverDenominator = 10
+     /// More pictures than this on one page and its painting is not followed.
+     static let pictureLimit = 4_096
+ 

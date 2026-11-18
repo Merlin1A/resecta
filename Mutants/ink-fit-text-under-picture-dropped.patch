@@ -1,0 +1,19 @@
+Property: A page whose visible text starts inside opaque pictures painted after it, which cover four fifths of the page, is fitted.
+Area: ink fit (Search), which pages are fitted
+Test command: cd Packages/RedactionEngine && swift test --filter 'InkFitPiecewiseScanTests'
+Must go red: RedactionEngineTests/InkFitPiecewiseScanTests gateByTable (Which pages are fitted, by table): G8, G12, G21; RedactionEngineTests/InkFitPiecewiseScanTests boxCoversThePrint (On a scan stored in pieces the box covers the printed word)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
+index 35d94d09..8589be63 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
+@@ -24,7 +24,7 @@ extension DocumentSearcher {
+         if needsPictureMap(showsInvisibleText: invisible, largestImageIsPageScale: pageScale,
+                            reachesImage: reaches, drawsInlineImage: inline) {
+             answer = invisible ? printIsAPicture(pageScale: pageScale, page: page, cgPage: cgPage)
+-                : PagePictureMap.cached(page, cgPage: cgPage).hidesVisibleText
++                : false
+         } else {
+             answer = invisible && pageScale
+         }

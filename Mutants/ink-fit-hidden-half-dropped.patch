@@ -1,0 +1,20 @@
+Property: Visible text is fitted only where it lies under later opaque pictures, never because the page carries a picture of the page.
+Area: ink fit (Search), which pages are fitted
+Test command: cd Packages/RedactionEngine && swift test --filter 'InkFitPiecewiseScanTests'
+Must go red: RedactionEngineTests/InkFitPiecewiseScanTests gateByTable (Which pages are fitted, by table): G13, G14, G15, G16, G19, G20
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
+index 35d94d09..62bd3226 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
+@@ -23,8 +23,7 @@ extension DocumentSearcher {
+         let answer: Bool
+         if needsPictureMap(showsInvisibleText: invisible, largestImageIsPageScale: pageScale,
+                            reachesImage: reaches, drawsInlineImage: inline) {
+-            answer = invisible ? printIsAPicture(pageScale: pageScale, page: page, cgPage: cgPage)
+-                : PagePictureMap.cached(page, cgPage: cgPage).hidesVisibleText
++            answer = printIsAPicture(pageScale: pageScale, page: page, cgPage: cgPage)
+         } else {
+             answer = invisible && pageScale
+         }
