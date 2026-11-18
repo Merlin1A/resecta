@@ -22,7 +22,10 @@ struct VerificationProgressLineTests {
     }
 
     static let group: [VerificationLayer] = [.textExtraction, .ocrCheck, .binaryStringSearch]
-    static let t0 = Date(timeIntervalSince1970: 1_000_000)
+    // Date's own zero: a time t0 + s holds s exactly, so the view's Date
+    // arithmetic and this test's clock agree at the 0.3 s and 0.5 s edges
+    // (far from it, adding a fraction of a second rounds).
+    static let t0 = Date(timeIntervalSinceReferenceDate: 0)
 
     // MARK: - The cases table, then the replays
 

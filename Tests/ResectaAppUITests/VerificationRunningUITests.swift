@@ -40,9 +40,7 @@ nonisolated final class VerificationRunningUITests: XCTestCase {
             .press(forDuration: 0.05,
                    thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.70, dy: 0.62)))
         drawTool.tap()
-        let redact = app.buttons["redactButton"].firstMatch
-        XCTAssertTrue(redact.waitForExistence(timeout: 10), "Redact never appeared in the bar.")
-        redact.tap()
+        tapRedact()
         let running = app.descendants(matching: .any)["verificationBanner"]
         if !running.waitForExistence(timeout: 120) {
             if app.descendants(matching: .any)["verificationMasthead"].exists {
@@ -85,5 +83,21 @@ nonisolated final class VerificationRunningUITests: XCTestCase {
         XCTAssertFalse(block.intersects(trust.frame),
                        "The trust line lies over the block: block \(block), trust line \(trust.frame).")
         attachScreenshot(named: "running-03-largest")
+    }
+
+    /// Redact sits in the bar beside Undo; at the largest text sizes it is
+    /// first in the … menu (DocumentEditorToolbar's overflow sections).
+    private func tapRedact() {
+        let redact = app.buttons["redactButton"].firstMatch
+        if redact.waitForExistence(timeout: 5), redact.isHittable {
+            redact.tap()
+            return
+        }
+        let overflow = app.editorOverflowButton
+        XCTAssertTrue(overflow.waitForExistence(timeout: 10), "The … menu button never appeared.")
+        overflow.tap()
+        let row = app.buttons["Redact"].firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 5), "Redact is neither in the bar nor in the … menu.")
+        row.tap()
     }
 }
