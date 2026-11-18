@@ -82,25 +82,43 @@ enum PageTextPath {
         }
         let painted = try steps.paintMarks(filtered.surviving, paintedRectangles)
 
-        // The whole-word closure over every marked word, then the drawn-cell
-        // rule on what is left.
-        let closed = closeOverMarkedWords(filtered, marked: alphabet.wordIndices.union(painted))
+        // The whole-word closure over every marked word and every word the
+        // filter took a letter of, then the drawn-cell rule on what is left.
+        // A word the rule takes a letter of leaves whole too, and the rule
+        // runs again on the lines that changed, until nothing more leaves.
+        let filterTook = wordsLosingALetter(before: folded, after: filtered.surviving)
+        var current = closeOverMarkedWords(
+            filtered, marked: alphabet.wordIndices.union(painted).union(filterTook))
         let shapes = rects.map {
             RegionShape(expandedBounds: $0.insetBy(dx: -safetyMargin, dy: -safetyMargin), bounds: $0)
         }
-        let validated = TextLayerReconstructor.validateSurvivors(
-            closed, regionShapes: shapes, frame: frame)
-        // A line the hidden text's faces cannot lay out leaves no text the
-        // page can write: a picture with no searchable text left. A layout
-        // that does not settle outside the regions is a fault.
-        guard validated.laidOut else {
-            return Result(outcome: .picture(.noWritableText), runsLeftOut: 0,
-                          drawnCellDropped: validated.dropped)
+        var drawnCellDropped = 0
+        var passes = 0
+        while true {
+            let pass = TextLayerReconstructor.validateSurvivors(
+                current, regionShapes: shapes, frame: frame)
+            drawnCellDropped += pass.dropped
+            // A line the hidden text's faces cannot lay out leaves no text the
+            // page can write: a picture with no searchable text left. A layout
+            // that does not settle outside the regions is a fault.
+            guard pass.laidOut else {
+                return Result(outcome: .picture(.noWritableText), runsLeftOut: 0,
+                              drawnCellDropped: drawnCellDropped)
+            }
+            guard pass.settled else {
+                return Result(outcome: .picture(.extractionFailed), runsLeftOut: 0,
+                              drawnCellDropped: drawnCellDropped)
+            }
+            let ruleTook = wordsLosingALetter(before: current.surviving, after: pass.result.surviving)
+            current = closeOverMarkedWords(pass.result, marked: ruleTook)
+            if ruleTook.isEmpty { break }
+            passes += 1
+            guard passes < TextLayerReconstructor.drawnCellRulePassLimit else {
+                return Result(outcome: .picture(.extractionFailed), runsLeftOut: 0,
+                              drawnCellDropped: drawnCellDropped)
+            }
         }
-        guard validated.settled else {
-            return Result(outcome: .picture(.extractionFailed), runsLeftOut: 0,
-                          drawnCellDropped: validated.dropped)
-        }
+        let validated = (result: current, dropped: drawnCellDropped)
         if validated.result.surviving.isEmpty, !alphabet.wordIndices.isEmpty,
            let reason = alphabet.reasonIfNoWordLeft {
             return Result(outcome: .picture(reason), runsLeftOut: alphabet.runsLeftOut,
@@ -118,6 +136,20 @@ enum PageTextPath {
             outcome: .written(entries: validated.result.surviving, digest: digest, removalRects: rects),
             runsLeftOut: alphabet.runsLeftOut, drawnCellDropped: validated.dropped,
             hiddenTextLines: validated.lines)
+    }
+
+    /// The words that lost at least one letter between `before` and `after`
+    /// (`after` a subset of `before`). White space is no letter of a word:
+    /// a space that leaves takes no word with it.
+    static func wordsLosingALetter(before: [CharacterInfo], after: [CharacterInfo]) -> Set<Int> {
+        var count: [Int: Int] = [:]
+        for entry in before where !SandwichMetrics.isLineageWhitespace(entry.character) {
+            count[entry.wordIndex, default: 0] += 1
+        }
+        for entry in after where !SandwichMetrics.isLineageWhitespace(entry.character) {
+            count[entry.wordIndex, default: 0] -= 1
+        }
+        return Set(count.filter { $0.value > 0 }.keys)
     }
 
     /// `result` with every survivor of a marked word left out, counted as

@@ -192,7 +192,7 @@ enum TextLayerReconstructor {
             let heights: [CGFloat]
         }
         let infos: [GroupInfo] = groups.map { members in
-            let text = members.map { entries[$0].character }.joined()
+            let text = groupText(members, entries)
             let ns = text as NSString
             var len = 0
             var off = 0
@@ -258,7 +258,10 @@ enum TextLayerReconstructor {
                 // each member's UTF-16 offset inside the line text.
                 func append(_ g: GroupInfo) {
                     var offset = (text as NSString).length
-                    for m in g.members {
+                    for (i, m) in g.members.enumerated() {
+                        if i > 0, wordBreak(between: entries[g.members[i - 1]], and: entries[m]) {
+                            offset += 1
+                        }
                         sources.append((m, offset))
                         offset += (entries[m].character as NSString).length
                     }
@@ -324,6 +327,25 @@ enum TextLayerReconstructor {
             result.append(contentsOf: assembled.lines)
         }
         return result
+    }
+
+    /// A run's text: its members' characters, with one space where two
+    /// neighbouring members belong to different words and neither is white
+    /// space, so the hidden text breaks where the page's text does.
+    static func groupText(_ members: [Int], _ entries: [CharacterInfo]) -> String {
+        var text = ""
+        for (i, m) in members.enumerated() {
+            if i > 0, wordBreak(between: entries[members[i - 1]], and: entries[m]) { text += " " }
+            text += entries[m].character
+        }
+        return text
+    }
+
+    /// Whether the writer puts a space between `a` and the next entry `b`.
+    static func wordBreak(between a: CharacterInfo, and b: CharacterInfo) -> Bool {
+        a.wordIndex != b.wordIndex
+            && !SandwichMetrics.isLineageWhitespace(a.character)
+            && !SandwichMetrics.isLineageWhitespace(b.character)
     }
 
     /// The line assembly in the page's SOURCE frame. On an unrotated page
