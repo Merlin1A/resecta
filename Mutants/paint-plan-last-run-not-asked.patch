@@ -1,0 +1,22 @@
+Property: A room open on one side is bridged only by a line whose run there is the last (or first) run of its line.
+Area: the plan, the bridges
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/PaintPlanBandTests (or on the host: cd Packages/RedactionEngine && swift test --filter 'PaintPlanBandTests')
+Must go red: RedactionCoreTests/PaintPlanBandTests leftColumnStaysInItsColumn
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
+index e0be82ec..ad54e8a6 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
+@@ -585,9 +585,9 @@ extension Complement {
+                     case let (l?, r?):
+                         bridged = runs.contains { $0.box.minX <= l && $0.box.maxX >= r }
+                     case let (l?, nil):
+-                        bridged = runs.last.map { $0.box.minX <= l && $0.box.maxX - l >= height } ?? false
++                        bridged = runs.contains { $0.box.minX <= l && $0.box.maxX - l >= height }
+                     case let (nil, r?):
+-                        bridged = runs.first.map { $0.box.maxX >= r && r - $0.box.minX >= height } ?? false
++                        bridged = runs.contains { $0.box.maxX >= r && r - $0.box.minX >= height }
+                     case (nil, nil):
+                         bridged = false
+                     }

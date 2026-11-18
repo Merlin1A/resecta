@@ -1,0 +1,19 @@
+Property: Past the stack, the nearest usable line above and below shows how far the column reaches.
+Area: the plan, the column read for the band
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/PaintPlanBandTests (or on the host: cd Packages/RedactionEngine && swift test --filter 'PaintPlanBandTests')
+Must go red: RedactionCoreTests/PaintPlanBandTests labelBlockReachesTheParagraphs; RedactionCoreTests/PaintPlanBandTests addressLineByLine
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
+index e0be82ec..70f34d16 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
+@@ -547,7 +547,7 @@ extension Complement {
+         let stackLines = stack + ownLines.sorted()
+         let reachRight = Swift.max(columnRight ?? anchor.hi, anchor.hi)
+         let reachLeft = Swift.min(columnLeft ?? anchor.lo, anchor.lo)
+-        for o in outside {
++        for o in [Int]() where outside.contains(o) {
+             for run in page.lines[o].runs.map(\.box) where overlapsRoom(run) && meetsAnchor(run) {
+                 if run.maxX > reachRight, spaceIsEmpty(right: true, from: reachRight, to: run.maxX, lines: stackLines, exceptMeeting: false) {
+                     columnRight = Swift.max(columnRight ?? run.maxX, run.maxX)

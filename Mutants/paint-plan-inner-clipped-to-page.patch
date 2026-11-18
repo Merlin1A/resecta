@@ -1,0 +1,19 @@
+Property: Neither inner nor paint is clipped to the page in the plan; only the pixel step clips.
+Area: the plan, a region's rectangle
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/PaintPlanMakeTests (or on the host: cd Packages/RedactionEngine && swift test --filter 'PaintPlanMakeTests')
+Must go red: RedactionCoreTests/PaintPlanMakeTests halfOffThePage
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+index d31c2a6d..2252ca14 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+@@ -44,7 +44,7 @@ extension PageRect64 {
+     /// lies 2³⁰ sixty-fourths or more from the origin.
+     package init?(share: PointRect, widthSixtyFourths: Int, heightSixtyFourths: Int) {
+         let w = Double(widthSixtyFourths), h = Double(heightSixtyFourths)
+-        let sides = [share.minX * w, share.minY * h, share.maxX * w, share.maxY * h]
++        let sides = [max(0, share.minX * w), max(0, share.minY * h), min(w, share.maxX * w), min(h, share.maxY * h)]
+         guard sides.allSatisfy({ $0.isFinite && abs($0) < 0x1p30 }) else { return nil }
+         self.init(minX: Int(sides[0].rounded(.down)), minY: Int(sides[1].rounded(.down)),
+                   maxX: Int(sides[2].rounded(.up)), maxY: Int(sides[3].rounded(.up)))

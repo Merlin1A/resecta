@@ -1,0 +1,27 @@
+Property: A box's paint is held at the limit line of the neighbouring line above and below.
+Area: the plan, the ruled margin's limit
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/PaintPlanMakeTests (or on the host: cd Packages/RedactionEngine && swift test --filter 'PaintPlanMakeTests')
+Must go red: RedactionCoreTests/PaintPlanMakeTests tightPageCutsTheTopMargin; RedactionCoreTests/PaintPlanMakeTests smallTypeNeighbour; RedactionCoreTests/PaintPlanMakeTests limitNeverInsideInner
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+index d31c2a6d..2d9fe8d8 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+@@ -379,14 +379,14 @@ private struct Maker {
+             let line = complement.lines[n]
+             let limit = Swift.max(line.box.minY + policy.margin.entry(letterSize: Self.letterSize(line)), inner.maxY)
+             above = limit
+-            paint.maxY = Swift.min(paint.maxY, limit)
++            _ = limit
+         }
+         if let n = neighbours.filter({ complement.lines[$0].box.minY + complement.lines[$0].box.maxY < middle2 })
+             .max(by: { complement.lines[$0].box.maxY < complement.lines[$1].box.maxY }) {
+             let line = complement.lines[n]
+             let limit = Swift.min(line.box.maxY - policy.margin.entry(letterSize: Self.letterSize(line)), inner.minY)
+             below = limit
+-            paint.minY = Swift.max(paint.minY, limit)
++            _ = limit
+         }
+         return (paint, above, below)
+     }

@@ -1,0 +1,19 @@
+Property: The limit a neighbouring line sets is read from the most common height among its letters, never from its tallest letter.
+Area: the plan, the line margin
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/PaintPlanMakeTests (or on the host: cd Packages/RedactionEngine && swift test --filter 'PaintPlanMakeTests')
+Must go red: RedactionCoreTests/PaintPlanMakeTests mixedHeightNeighbour
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+index d31c2a6d..d7a6c855 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+@@ -396,7 +396,7 @@ private struct Maker {
+     static func letterSize(_ line: ComplementLine) -> Int {
+         var counts: [Int: Int] = [:]
+         for word in line.words { for letter in word.letters { counts[letter.height, default: 0] += 1 } }
+-        return counts.max { a, b in a.value != b.value ? a.value < b.value : a.key < b.key }?.key ?? line.height
++        return counts.keys.max() ?? line.height
+     }
+ 
+     // MARK: - The facts
