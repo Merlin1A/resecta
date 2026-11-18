@@ -29,7 +29,12 @@ struct TextPathRectangleTests {
     static let inner = PageRect64(minX: 6_080, minY: 44_672, maxX: 12_160, maxY: 45_664)
     static let innerPoints = rect(95, 698, 95, 15.5)
 
-    static func box(over ids: Set<UUID>, _ treatment: SwitchTreatment, bandMade: Bool) -> PaintedBox {
+    /// A second box's inner rectangle: 100 to 180 pt across, 700 to 712 pt up.
+    static let secondInner = PageRect64(minX: 6_400, minY: 44_800, maxX: 11_520, maxY: 45_568)
+    static let secondInnerPoints = rect(100, 700, 80, 12)
+
+    static func box(over ids: Set<UUID>, _ treatment: SwitchTreatment, bandMade: Bool,
+                    inner: PageRect64 = TextPathRectangleTests.inner) -> PaintedBox {
         PaintedBox(
             regionIDs: ids, inner: inner, paint: inner, tight: inner,
             limitAbove: nil, limitBelow: nil, exposure: .canShowLength, treatment: treatment,
@@ -39,6 +44,7 @@ struct TextPathRectangleTests {
     static func ordinary(_ r: CGRect) -> TextPathRectangle { TextPathRectangle(rect: r, kind: .ordinary) }
     static func under(_ r: CGRect) -> TextPathRectangle { TextPathRectangle(rect: r, kind: .underWidenedBox) }
     static let plan = TextPathRectangle(rect: innerPoints, kind: .plansRectangle)
+    static let secondPlan = TextPathRectangle(rect: secondInnerPoints, kind: .plansRectangle)
 
     /// Each region's own rectangle, then its hidden letters' rectangle, then
     /// its ink strips: the list a Searchable export strips under today.
@@ -102,11 +108,25 @@ struct TextPathRectangleTests {
              regions: [regionA, regionB],
              runs: [("over an unlisted region", [box(over: [z], .widened, bandMade: true)])],
              expected: todaysList + [plan]),
+        // The region is read under the first box; the second box's inner
+        // rectangle is never given at a region, so it comes after the last
+        // one. Both are kept.
+        Case(name: "two boxes with a band over one region",
+             regions: [regionA, regionB],
+             runs: [("both over the first", [
+                box(over: [a], .widened, bandMade: true),
+                box(over: [a], .alreadyAsWide, bandMade: true, inner: secondInner),
+             ])],
+             expected: [
+                plan, under(rect(100, 700, 80, 12)), ordinary(rect(98, 699, 84, 14)),
+                ordinary(rect(100, 690, 30, 8)), ordinary(rect(140, 690, 30.5, 8)),
+                ordinary(rect(100, 650, 60, 12)), secondPlan,
+             ]),
     ]
 
-    @Test("The table holds six cases")
+    @Test("The table holds seven cases")
     func tableLength() {
-        #expect(Self.cases.count == 6)
+        #expect(Self.cases.count == 7)
     }
 
     @Test("Each region's rectangles, and a banded box's inner rectangle at its first region", arguments: cases)
