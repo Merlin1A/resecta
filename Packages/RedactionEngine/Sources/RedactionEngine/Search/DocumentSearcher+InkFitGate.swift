@@ -5,31 +5,42 @@ import PDFKit
 // Which pages the ink fit runs on (`DocumentSearcher+InkFit.swift`): pages whose
 // text does not sit on its own print. Either the page shows text in an invisible
 // render mode and its print is a picture, or text it shows in a visible mode lies
-// under pictures that hide it.
+// under pictures that hide it, or it draws a picture and its painting cannot be
+// followed.
 
 extension DocumentSearcher {
     /// Whether the fit runs on the page: (1) it shows text in an invisible mode
     /// and its print is a picture, or (2) text it shows in a visible mode lies
-    /// under pictures painted after it that hide it. Where pictures are painted
-    /// is read only for a page the answer depends on. Read once per page.
+    /// under pictures painted after it that hide it, or (3) it draws a picture
+    /// and its painting cannot be followed. Where pictures are painted is read
+    /// only for a page the answer depends on. Read once per page.
     nonisolated static func carriesHiddenTextOverImage(_ page: PDFPage, cgPage: CGPDFPage) -> Bool {
         if let known = HiddenTextOverImageCache.shared.value(for: page) { return known }
         let invisible = showsInvisibleText(cgPage)
         let pageScale = carriesPageScaleImage(page, cgPage: cgPage)
-        // The last two facts matter only without invisible text, and the last
-        // only when no image object is reached: they are read only then.
+        // The last facts matter only without invisible text, and each only
+        // when the ones before it found no picture: they are read only then.
         let reaches = !invisible && PageImageCensus.largestImagePixelArea(of: cgPage) != nil
         let inline = !invisible && !reaches && PageContentFacts.read(cgPage).drawsInlineImage
+        // A picture inside a tiling pattern is seen by neither fact above.
+        let patterned = !invisible && !reaches && !inline && PictureWalk.patternsHoldPicture(cgPage)
         let answer: Bool
         if needsPictureMap(showsInvisibleText: invisible, largestImageIsPageScale: pageScale,
-                           reachesImage: reaches, drawsInlineImage: inline) {
+                           reachesImage: reaches || patterned, drawsInlineImage: inline) {
             answer = invisible ? printIsAPicture(pageScale: pageScale, page: page, cgPage: cgPage)
-                : PagePictureMap.cached(page, cgPage: cgPage).hidesVisibleText
+                : Self.visibleTextIsHidden(PagePictureMap.cached(page, cgPage: cgPage))
         } else {
             answer = invisible && pageScale
         }
         HiddenTextOverImageCache.shared.set(answer, for: page)
         return answer
+    }
+
+    /// A page with no invisible text that draws a picture: its visible text
+    /// lies under pictures that hide it, or its painting cannot be followed,
+    /// so where its print lies is not known.
+    nonisolated static func visibleTextIsHidden(_ map: PagePictureMap) -> Bool {
+        !map.followed || map.hidesVisibleText
     }
 
     /// Whether a page fitted only by the wider gate (its pictures cover it, or

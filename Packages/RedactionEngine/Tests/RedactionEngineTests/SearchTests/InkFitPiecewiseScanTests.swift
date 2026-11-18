@@ -121,6 +121,41 @@ struct InkFitPiecewiseScanTests {
         }
     }
 
+    @Test("A typed page that draws a picture and whose painting cannot be followed is fitted")
+    func unfollowedTypedPageIsFitted() throws {
+        let dot = S.image(S.Gray(width: 2, height: 2, value: 0))
+        let names = "/XObject << /I0 @0@ >>"
+        let draws = { (n: Int) in String(repeating: "q 10 0 0 10 20 20 cm /I0 Do Q ", count: n) }
+        // Forms seven deep, each drawing the next `times` times, the last drawing the picture.
+        func forms(_ times: Int) -> Data {
+            var objects = [dot]
+            for k in 0..<7 {
+                objects.append(k < 6 ? S.form(String(repeating: "/F Do ", count: times), resources: "/XObject << /F @\(k + 2)@ >>")
+                                     : S.form("q 10 0 0 10 20 20 cm /I0 Do Q", resources: names))
+            }
+            return S.document([S.Page(S.typedText + "/F Do", resources: "/XObject << /F @1@ >>", objects: objects)])
+        }
+        let pattern = S.Object(dictionary: "/Type /Pattern /PatternType 1 /PaintType 1 /TilingType 1 /BBox [0 0 10 10] /XStep 10 /YStep 10 /Resources << /XObject << /I0 @0@ >> >>",
+                               stream: Data("q 10 0 0 10 0 0 cm /I0 Do Q".utf8))
+        let rows: [(String, Data, Bool)] = [
+            ("1,093 forms drawn", forms(3), true),
+            ("127 forms drawn", forms(2), false),
+            ("4,097 pictures", S.document([S.Page(S.typedText + draws(4_097), resources: names, objects: [dot])]), true),
+            ("4,096 pictures", S.document([S.Page(S.typedText + draws(4_096), resources: names, objects: [dot])]), false),
+            ("a picture in a tiling pattern", S.document([S.Page(S.typedText + "q /Pattern cs /T1 scn 20 20 10 10 re f Q",
+                resources: "/Pattern << /T1 @1@ >>", objects: [dot, pattern])]), true),
+            ("a tiling pattern with no picture", S.document([S.Page(S.typedText + "q /Pattern cs /T1 scn 20 20 10 10 re f Q",
+                resources: "/Pattern << /T1 @0@ >>", objects: [S.Object(dictionary: "/Type /Pattern /PatternType 1 /PaintType 1 /TilingType 1 /BBox [0 0 10 10] /XStep 10 /YStep 10 /Resources << >>",
+                                                                         stream: Data("0 0 5 5 re f".utf8))])]), false),
+        ]
+        #expect(rows.count == 6)
+        for (key, data, fitted) in rows {
+            let (document, page, cgPage) = try #require(S.pdfPage(data))
+            defer { withExtendedLifetime(document) {} }
+            #expect(DocumentSearcher.carriesHiddenTextOverImage(page, cgPage: cgPage) == fitted, "\(key): fitted \(fitted)")
+        }
+    }
+
     // MARK: - The box on the print
 
     static func hits(_ document: PDFDocument, _ word: String) async -> [SearchResult] {

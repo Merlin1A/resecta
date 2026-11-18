@@ -331,6 +331,25 @@ final class PictureWalk {
         if !canFollow { followed = false }
     }
 
+    /// Whether the page's resources (own or inherited) hold a tiling pattern
+    /// that holds a picture or cannot be read: a picture the page may draw
+    /// that no image census sees. Each pattern is read once.
+    static func patternsHoldPicture(_ page: CGPDFPage) -> Bool {
+        guard let dictionary = page.dictionary,
+              case .found(let resources) = TextLayerExtractor.inheritedResources(of: dictionary) else { return false }
+        var patterns: CGPDFDictionaryRef?
+        guard CGPDFDictionaryGetDictionary(resources, "Pattern", &patterns), let patterns else { return false }
+        var streams: [CGPDFStreamRef] = []
+        CGPDFDictionaryApplyBlock(patterns, { _, value, _ in
+            var stream: CGPDFStreamRef?
+            if CGPDFObjectGetValue(value, .stream, &stream), let stream { streams.append(stream) }
+            return true
+        }, nil)
+        let content = CGPDFContentStreamCreateWithPage(page)
+        defer { CGPDFContentStreamRelease(content) }
+        return streams.contains { !patternCanBeFollowed($0, content: content) }
+    }
+
     /// Whether a tiling pattern holds no picture and can be read.
     static func patternCanBeFollowed(_ stream: CGPDFStreamRef, content: CGPDFContentStreamRef) -> Bool {
         guard let dictionary = CGPDFStreamGetDictionary(stream) else { return false }
