@@ -263,8 +263,11 @@ struct PageImageInkFitStallTests {
     }
 
     /// The word fitted on page B (page 3 of the statement), chosen for its
-    /// rows to spare on the fit's line check at both raster sizes (N-30a).
-    static let otherPageWord = "Hartwell"
+    /// rows to spare on the fit's line check at both raster sizes:
+    /// "Ending" (the heading "Daily Ending Balance") had 27 rows to spare on
+    /// the raster before the raster rule and 31 after it. "Hartwell" in the
+    /// running head had 0 before and -8 after.
+    static let otherPageWord = "Ending"
 
     @Test("A page read that stalls on the Vision lane degrades only its own page: another page reads off the stalled lane and fits as it does with nothing stalled")
     func stallOnOnePageLeavesOthersFitted() async throws {
