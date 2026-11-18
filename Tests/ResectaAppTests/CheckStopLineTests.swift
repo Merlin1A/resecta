@@ -10,7 +10,7 @@ import Foundation
 // whatever lead the row has, and a check that read everything shows none.
 
 @Suite("The results row says where a check stopped")
-struct CheckStopLineTests {
+nonisolated struct CheckStopLineTests {
 
     static let tbl = "Image EXIF was not searched after this match."
     static let tal = "Bookmarks and form fields were not read after this find."  // LegalPhrases:safe (approved row words)
