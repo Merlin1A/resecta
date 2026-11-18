@@ -93,7 +93,7 @@ struct PageImageCensusPiecesTests {
             Row(name: "C4 strips of 150 rows at 150 dpi", data: Self.fullScan(.strips(rows: 150), dpi: 150), carries: true),
             Row(name: "C5 tiles of 200 px", data: Self.fullScan(.tiles(200)), carries: true),
             Row(name: "C6 strips stored turned", data: Self.fullScan(.turnedStrips(rows: 96)), carries: true),
-            Row(name: "C7 inline strips, no image object", data: Self.fullScan(.inlineStrips(rows: 96)), carries: true),
+            Row(name: "C7 inline strips, no image object, visible text before them", data: Self.fullScan(.inlineStrips(rows: 96), layer: .visibleBefore), carries: true),
             Row(name: "C8 visible text before strips that hide it", data: Self.fullScan(.strips(rows: 96), layer: .visibleBefore), carries: true),
             Row(name: "C12 pictures over exactly four fifths of the crop box", data: Self.coverPage(height: 640), carries: true),
         ])
