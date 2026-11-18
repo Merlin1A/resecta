@@ -95,9 +95,9 @@ struct NotSearchedList: View {
     /// characters as a person sees them, not in scalars.
     static func shownName(_ name: String, sectionHasButton: Bool, otherNames: [String]) -> String {
         guard sectionHasButton, name.count > shownNameLimit else { return name }
-        let shortened = shortened(name)
-        let clashes = otherNames.contains { $0 != name && $0.count > shownNameLimit && shortened($0) == shortened }
-        return clashes ? name : shortened
+        let short = Self.shortened(name)
+        let clashes = otherNames.contains { $0 != name && $0.count > shownNameLimit && Self.shortened($0) == short }
+        return clashes ? name : short
     }
 
     private static func shortened(_ name: String) -> String {
