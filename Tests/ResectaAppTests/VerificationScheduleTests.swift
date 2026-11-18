@@ -119,7 +119,7 @@ struct VerificationScheduleTests {
         #expect(VerificationRowModel(layer: row, perPageModes: []).outcome == .nothingToCheck)
         #expect(!row.status.isInfo && !row.status.isWarn && !row.status.isAttention && !row.status.isFail && !row.status.isSkipped)
         #expect(VerificationRowModel(layer: row, perPageModes: []).caption == "No searches to re-run.")
-        #expect(row.completionAnnouncement(layerNumber: 6)
-                == "Layer 6, Search Re-check, \(row.status.layerAccessibilityPhrase) \(SearchRecheck.infoMessage)")
+        // Nothing to check: not spoken when it finishes mid-run.
+        #expect(row.runningAnnouncement == nil)
     }
 }

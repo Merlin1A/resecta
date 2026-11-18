@@ -1,160 +1,145 @@
 import SwiftUI
 import RedactionEngine
 
-// Progressive reveal during verification.
-// Full-screen view — verification is a distinct workflow phase.
-// Intermediate colors prevent premature confidence anchoring.
-// "In Progress" banner with .thickMaterial persists until all layers complete.
-// Cancel is in the toolbar, not in this view.
+// While the checks run: one grey ring where the results will show theirs,
+// with the number of results published so far; the title; one line with
+// the system's small spinner; and the trust line in the flow below. The
+// results fade in with their ring in the same place: this screen is laid
+// out as the results screen is (`VerificationResultsView.body`), so the
+// two rings share one frame. Stop is in the bar, not in this view.
 
 struct VerificationProgressView: View {
     @Environment(DocumentState.self) private var documentState
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @AccessibilityFocusState private var blockFocused: Bool
+
+    /// How often the line and the long-run line are read again: the line
+    /// names a check half a second after it is announced.
+    static let tick: TimeInterval = 0.25
 
     /// Reads pipelineProgress for all display data. Only pipelineProgress changes
     /// on verification layer ticks, so this view re-evaluates independently of the
     /// parent DocumentEditorView body.
     var body: some View {
         let progress = documentState.pipelineProgress
-        let completedLayers = progress?.completedLayers ?? []
-        let totalLayers = progress?.total ?? 0
-        let currentLayer = progress?.current ?? 0
-        let layerName = progress?.stepDescription ?? ""
-        let animationKey: String = completedLayers.enumerated().map { idx, layer in
-            let statusKey: String
-            switch layer.status {
-            case .pass: statusKey = "p"
-            case .warn(let msg): statusKey = "w:\(msg)"
-            case .info(let msg): statusKey = "i:\(msg)"
-            case .attention(let msg): statusKey = "a:\(msg)"
-            case .fail(let msg): statusKey = "f:\(msg)"
-            case .skipped: statusKey = "s"
-            case .notApplicable(let msg): statusKey = "n:\(msg)"
-            }
-            return "\(idx):\(statusKey)"
-        }.joined(separator: "|")
-
-        ScrollView {
-            VStack(spacing: ResectaTokens.Spacing.xl) {
-                shieldHero
-
-                // Persistent "Verification In Progress" banner using .thickMaterial
-                VStack(spacing: ResectaTokens.Spacing.xxs) {
-                    Text("Verification In Progress")
-                        .font(.headline)
-                    // .contentTransition(.numericText()) for smooth digit transitions
-                    Text("\(completedLayers.count) of \(totalLayers) checks completed")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .contentTransition(.numericText())
-                }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(.thickMaterial, in: RoundedRectangle(cornerRadius: ResectaTokens.CornerRadius.toast))
-                .accessibilityIdentifier("verificationBanner")
-                .frame(maxWidth: columnMaxWidth)
-
-                VStack(spacing: ResectaTokens.Spacing.md) {
-                    // Completed layers — intermediate colors
-                    ForEach(Array(completedLayers.enumerated()), id: \.offset) { index, layer in
-                        LayerResultRow(
-                            layer: layer,
-                            layerIndex: index + 1,
-                            isExpanded: false,
-                            onTap: {},
-                            useIntermediateColors: true,
-                            isExpandable: false
-                        )
-                        // Folded the hand-rolled reduceMotion ternary
-                        // into the resolver — identical behavior, one
-                        // canonical seam.
-                        .transition(ResectaTokens.Anim.resolvedTransition(
-                            standard: .asymmetric(
-                                insertion: .move(edge: .bottom).combined(with: .opacity),
-                                removal: .opacity
-                            ),
-                            reduceMotion: reduceMotion))
-                        .accessibilityIdentifier("layerResult_\(index)")
-                        .frame(maxWidth: columnMaxWidth)
-                    }
-
-                    // Currently running layer — spinner
-                    if currentLayer <= totalLayers {
-                        HStack(spacing: ResectaTokens.Spacing.sm) {
-                            ProgressView()
-                                .controlSize(.small)
-                                .frame(width: 28)
-
-                            VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xxs) {
-                                Text(layerName)
-                                    .font(.subheadline.weight(.medium))
-                                Text("Checking\u{2026}")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+        NavigationStack {
+            ZStack {
+                Color(.systemGroupedBackground)
+                    .ignoresSafeArea()
+                GeometryReader { geometry in
+                    ScrollView(.vertical, showsIndicators: false) {
+                        TimelineView(.periodic(from: .now, by: Self.tick)) { context in
+                            let state = Self.state(progress, now: context.date)
+                            let longRun = Self.showsLongRunLine(progress, now: context.date)
+                            VStack(spacing: 0) {
+                                block(state, longRun: longRun)
+                                // The trust line follows the block in the
+                                // flow, never over it: near the foot when
+                                // there is room, pushed down when the text
+                                // grows.
+                                Spacer(minLength: ResectaTokens.Results.blockGap)
+                                TrustLine()
+                                    .accessibilityIdentifier("verificationTrustLine")
                             }
-
-                            Spacer()
+                            .onChange(of: Self.stillCheckingDue(progress, now: context.date)) { _, due in
+                                guard due != nil else { return }
+                                AccessibilityNotification.Announcement(
+                                    VerificationProgressLine.stillChecking(finished: state.finished, total: state.total)
+                                ).post()
+                            }
                         }
-                        .padding(ResectaTokens.Spacing.sm)
-                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: ResectaTokens.CornerRadius.toast))
+                        .padding(.horizontal, ResectaTokens.Spacing.md)
+                        .padding(.top, ResectaTokens.Spacing.lg)
+                        .padding(.bottom, ResectaTokens.Spacing.lg)
                         .frame(maxWidth: columnMaxWidth)
+                        .frame(maxWidth: .infinity, minHeight: geometry.size.height, alignment: .top)
                     }
-
-                    // Animated shimmer placeholders for remaining layers.
-                    // Reduced motion: static .quaternary fill (no animation).
-                    let remainingStart = completedLayers.count + 1
-                    if remainingStart < totalLayers {
-                        ForEach(remainingStart..<totalLayers, id: \.self) { _ in
-                            VerificationShimmerRow(reduceMotion: reduceMotion)
-                                .frame(maxWidth: columnMaxWidth)
-                        }
-                    }
-
-                    // Trust strip below the shimmers — verification is
-                    // the only multi-second wait in the app, so the privacy
-                    // reassurance fits the moment. Mirrors HomeView's strip
-                    // exactly; reuses the shared trust line.
-                    trustStrip
                 }
             }
-            .padding()
-            .animation(ResectaTokens.Anim.modeTransition, value: animationKey)
         }
         .accessibilityIdentifier("verificationProgress")
+        .onAppear { blockFocused = true }
     }
 
-    // MARK: - Subviews
+    // MARK: - The block
 
-    // Shield stays `.secondary` / gray (not green — premature confidence
-    // anchoring). Size bumps from 40pt → 56pt for parity with
-    // HomeView masthead; color is constrained, not size, so the bump is
-    // spec-neutral. `.hierarchical` rendering picks up the secondary tint.
-    // VoiceOver: hidden — the banner ("Verification In Progress" + count)
-    // and the running-layer label already convey the same state.
-    private var shieldHero: some View {
-        VStack(spacing: ResectaTokens.Spacing.xs) {
-            Image(systemName: "shield.fill")
-                .font(.system(size: 56))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(.secondary)
-                .accessibilityHidden(true)
-
-            // Reduce-motion fallback for the "stalled" read of a large static
-            // shield. Non-reduced-motion users get the banner's
-            // .contentTransition(.numericText()) count instead.
-            if reduceMotion {
-                Text("Verifying\u{2026}")
+    /// The ring, the title, the line and, on a long run, its second line:
+    /// one header element for VoiceOver, its label from shipped words.
+    private func block(_ state: VerificationProgressLine, longRun: Bool) -> some View {
+        VStack(spacing: 0) {
+            CountRing(content: .running(finished: state.finished, total: state.total))
+            BalancedLines {
+                Text("Verification In Progress")
+                    .font(.title.bold())
+                    .foregroundStyle(.primary)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(.top, ResectaTokens.Results.ringToTitle)
+            HStack(alignment: .firstTextBaseline, spacing: ResectaTokens.Spacing.xs) {
+                // The spinner stays on the line's first line when it wraps.
+                ProgressView()
+                    .controlSize(.small)
+                    .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4 }
+                Text(VerificationProgressLine.text(state.line))
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: ResectaTokens.Results.sentenceMaxWidth)
+            .padding(.top, ResectaTokens.Results.titleToSentence)
+            if longRun {
+                Text(VerificationProgressLine.longRunLine)
+                    .font(.footnote)
+                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: ResectaTokens.Results.sentenceMaxWidth)
+                    .padding(.top, ResectaTokens.Spacing.sm)
+                    .transition(.opacity)
             }
         }
-        .padding(.top, ResectaTokens.Spacing.xl)
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Self.spokenLabel(state, longRun: longRun))
+        .accessibilityAddTraits(.isHeader)
+        .accessibilityIdentifier("verificationBanner")
+        .accessibilityFocused($blockFocused)
     }
 
-    private var trustStrip: some View {
-        TrustLine()
-            .frame(maxWidth: columnMaxWidth)
+    // MARK: - The rules read from the progress
+
+    /// The figure and the line at `now`.
+    static func state(_ progress: DocumentState.PipelineProgress?, now: Date) -> VerificationProgressLine {
+        let running = progress?.running
+        return VerificationProgressLine.make(
+            finished: progress?.completedLayers.count ?? 0, total: progress?.total ?? 0,
+            running: running?.layer, runningOpensGroup: running?.opensGroup ?? false,
+            secondsRunning: running.map { now.timeIntervalSince($0.since) } ?? 0,
+            typedSearchApplied: progress?.typedSearchApplied ?? false)
+    }
+
+    /// The long-run line shows from `longRunDelay` after the checks began.
+    static func showsLongRunLine(_ progress: DocumentState.PipelineProgress?, now: Date) -> Bool {
+        guard let began = progress?.checksBegan else { return false }
+        return now.timeIntervalSince(began) >= VerificationProgressLine.longRunDelay
+    }
+
+    /// The change the spoken reminder is due for: the last change, once
+    /// nothing has changed for `stillCheckingDelay`; nil before.
+    static func stillCheckingDue(_ progress: DocumentState.PipelineProgress?, now: Date) -> Date? {
+        guard let last = progress?.lastChange,
+              now.timeIntervalSince(last) >= VerificationProgressLine.stillCheckingDelay else { return nil }
+        return last
+    }
+
+    /// "Verification In Progress. 5 of 14 checks completed. Checking."
+    static func spokenLabel(_ state: VerificationProgressLine, longRun: Bool) -> String {
+        var parts = ["Verification In Progress."]
+        if state.total > 0 { parts.append("\(state.finished) of \(state.total) checks completed.") }
+        parts.append(VerificationProgressLine.spoken(state.line))
+        if longRun { parts.append(VerificationProgressLine.longRunLine) }
+        return parts.joined(separator: " ")
     }
 
     // MARK: - Layout helpers
@@ -173,64 +158,5 @@ struct VerificationProgressView: View {
         horizontalSizeClass == .regular
             ? ResectaTokens.BrandedSurface.panelMaxWidthRegular
             : ResectaTokens.BrandedSurface.panelMaxWidthCompact
-    }
-}
-
-// MARK: - Shimmer Placeholder Row
-
-/// Animated shimmer row for not-yet-started verification layers.
-/// Reduced motion: static fill with no animation.
-private struct VerificationShimmerRow: View {
-    let reduceMotion: Bool
-    @State private var shimmerPhase: CGFloat = -1
-
-    var body: some View {
-        HStack(spacing: ResectaTokens.Spacing.sm) {
-            Circle()
-                .fill(.quaternary)
-                .frame(width: 28, height: 28)
-            VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xxs) {
-                shimmerBar(maxWidth: .infinity, height: 14)
-                shimmerBar(maxWidth: 100, height: 10)
-            }
-            Spacer()
-        }
-        .padding(ResectaTokens.Spacing.sm)
-        .background(.regularMaterial, in: RoundedRectangle(
-            cornerRadius: ResectaTokens.CornerRadius.toast))
-        .accessibilityLabel("Verification check pending")
-        .onAppear {
-            guard !reduceMotion else { return }
-            withAnimation(
-                .linear(duration: 1.5)
-                .repeatForever(autoreverses: false)
-            ) {
-                shimmerPhase = 1
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func shimmerBar(maxWidth: CGFloat, height: CGFloat) -> some View {
-        RoundedRectangle(cornerRadius: ResectaTokens.CornerRadius.small)
-            .fill(.quaternary)
-            .frame(maxWidth: maxWidth, alignment: .leading)
-            .frame(height: height)
-            .overlay {
-                if !reduceMotion {
-                    // `.primary` resolves to near-black in light mode
-                    // and near-white in dark mode, so the shimmer band
-                    // reads against `.quaternary` in both schemes (the
-                    // prior `.white.opacity(0.15)` was invisible on
-                    // light-gray placeholders).
-                    LinearGradient(
-                        colors: [.clear, .primary.opacity(0.10), .clear],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                    .offset(x: shimmerPhase * 200)
-                }
-            }
-            .clipped()
     }
 }

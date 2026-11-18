@@ -315,9 +315,19 @@ enum ResectaTokens {
         /// verdict's text colour, never a solid ring.
         static let zeroTrackOpacityLight: Double = 0.24
         static let zeroTrackOpacityDark: Double = 0.40
-        /// The arc's draw-in: once, after the entry flash.
-        static let arcDrawIn: Animation = .easeOut(duration: 0.6)
-        static let arcDrawInDelay: TimeInterval = 1.2
+        /// The word under the figure while the checks run.
+        static let ringRunningWord: CGFloat = 11
+        /// The running arc's growth per result; under Reduce Motion its
+        /// cross-fade.
+        static let runningArcGrow: TimeInterval = 0.35
+        static let runningArcFade: TimeInterval = 0.2
+        /// The running screen and the results screen cross-fade; under
+        /// Reduce Motion, a shorter fade.
+        static let handOff: TimeInterval = 0.35
+        static let handOffReduced: TimeInterval = 0.2
+        /// After the results appear, the bar's trailing button ignores taps
+        /// this long (it was Stop a moment before).
+        static let lateTapGuard: TimeInterval = 0.3
 
         /// Gaps of the masthead: ring → title 12, title → sentence 4,
         /// sentence → the first capsule 24. The sentence's column cap.

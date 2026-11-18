@@ -106,17 +106,18 @@ extension VerificationStatus {
 }
 
 extension LayerResult {
-    /// Spoken announcement when this layer completes mid-run
-    /// (PipelineCoordinator's `UIAccessibility.post(.announcement, …)`
-    /// sites). warn/fail/info append `shortDescription` — for those rows it
-    /// IS the payload ("OCR could not be run on 1 page."); pass/skipped stay
-    /// a plain phrase so an eleven-layer run isn't eleven sentences of filler.
-    func completionAnnouncement(layerNumber: Int) -> String {
-        switch status {
-        case .warn, .fail, .info, .attention, .notApplicable:
-            "Layer \(layerNumber), \(name), \(status.layerAccessibilityPhrase) \(shortDescription)"
-        case .pass, .skipped:
-            "Layer \(layerNumber), \(name), \(status.layerAccessibilityPhrase)"
+    /// Spoken when this check finishes mid-run: the words its row's label
+    /// opens with on the results screen, "‹title›, ‹outcome word›." Nothing
+    /// for a check that passed or had nothing to check, so a run of
+    /// thirteen checks is not thirteen sentences. No document text.
+    var runningAnnouncement: String? {
+        let model = VerificationRowModel(layer: self, perPageModes: [])
+        switch model.outcome {
+        case .passed, .nothingToCheck: return nil
+        default: return VerificationRowModel.sentence("\(model.title), \(model.outcome.word)")
         }
     }
+
+    /// At most one announcement in this many seconds while the checks run.
+    static let runningAnnouncementGap: TimeInterval = 3
 }
