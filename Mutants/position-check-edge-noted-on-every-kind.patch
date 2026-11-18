@@ -1,7 +1,7 @@
 Property: The edge note is read against the ordinary rectangles only: a plan's rectangle and a rectangle under a widened box note no edge.
 Area: position check
 Test command: cd Packages/RedactionEngine && swift test --filter PositionCheckRecordTests
-Must go red: RedactionEngineTests/PositionCheckRecordTests "Each case" (plansRectangleNotesNoEdge)
+Must go red: RedactionEngineTests/PositionCheckRecordTests "Each case" (plansRectangleNotesNoEdge, breakAtTheWidenedBox, regionOutsideItsWidenedBox)
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification+SpatialExclusion.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification+SpatialExclusion.swift

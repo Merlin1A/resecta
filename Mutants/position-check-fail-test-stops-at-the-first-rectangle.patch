@@ -1,7 +1,7 @@
 Property: The failing test is read against every rectangle a character touches, not only the first.
 Area: position check
 Test command: cd Packages/RedactionEngine && swift test --filter PositionCheckRecordTests
-Must go red: RedactionEngineTests/PositionCheckRecordTests "Each case" (centredInALaterRectangle)
+Must go red: RedactionEngineTests/PositionCheckRecordTests "Each case" (centredInALaterRectangle, regionOutsideItsWidenedBox)
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification+SpatialExclusion.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification+SpatialExclusion.swift

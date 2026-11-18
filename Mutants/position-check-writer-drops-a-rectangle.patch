@@ -1,7 +1,7 @@
 Property: The writer keeps every rectangle of its own list: a word under a box leaves the text layer, and the writer's list is the check's list.
 Area: position check
 Test command: cd Packages/RedactionEngine && swift test --filter PositionCheckListTests
-Must go red: RedactionEngineTests/PositionCheckListTests "Five exports: the writer's list is the check's list of the first two kinds"
+Must go red: RedactionEngineTests/PositionCheckListTests "Five exports: the writer's list is the check's list of the first two kinds" (the writer reports one rectangle fewer; the first export's position check reads Failed)
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift
