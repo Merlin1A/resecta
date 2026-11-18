@@ -72,7 +72,8 @@ enum OCRMatchSkeleton {
         })
         return SearchCore.PreparedPage(
             searchText: text, nsString: text as NSString, baseText: page.baseText,
-            offsetMap: page.offsetMap, baseChars: page.baseChars, rawMap: page.rawMap)
+            offsetMap: page.offsetMap, baseChars: page.baseChars, rawMap: page.rawMap,
+            closedSpellingHyphens: page.closedSpellingHyphens)
     }
 
     /// A typed query without its leading and trailing symbols (a currency

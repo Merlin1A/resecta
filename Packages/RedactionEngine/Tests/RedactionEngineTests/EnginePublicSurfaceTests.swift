@@ -40,8 +40,9 @@ struct EnginePublicSurfaceTests {
             SearchResult.self,
             SearchPreviewResult.self,
             TextSpan.self,
+            PageSearchCoverage.self,
         ]
-        #expect(types.count == 22)
+        #expect(types.count == 23)
         #expect(DocumentSearcher.maxResults > 0)
         #expect(DocumentSearcher.validateRegexPattern("[a-z]+") != nil)
     }

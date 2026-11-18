@@ -13,15 +13,6 @@ import Foundation
 // band's quantized size class — bounded bits, redundant with the visible
 // raster.
 
-/// Text run: a group of adjacent characters on the same line.
-/// Retained for the 12pt-era grid model that probe and
-/// unit tests still measure; the production draw path is line-based
-/// (`TextLayerLine`) as of J-12.
-struct TextRun {
-    let origin: CGPoint
-    let text: String
-}
-
 /// One assembled drawn line (J-12): same-band run groups merged X-ascending
 /// with whole-cell bridge spaces, at the band's pooled quantized pitch.
 struct TextLayerLine {
@@ -43,22 +34,6 @@ struct SourcedTextLayerLine {
 /// Reconstructs the invisible text layer for Searchable Redaction output.
 /// Must be called AFTER the page image has been drawn into the CGContext.
 enum TextLayerReconstructor {
-
-    /// Reference font size. The J-12 layout derives per-band sizes from
-    /// source metrics; this constant anchors the verifier's
-    /// tolerance scaling (`advanceWidthTolerancePerPoint` = 0.25 / 12) and
-    /// the legacy 12pt-era grid model that tests and probes still measure.
-    internal static let baseFontSize: CGFloat = 12.0
-
-    /// Per-cell horizontal advance in points at the 12pt reference size.
-    /// Courier's monospace advance is `0.60009765625 × fontSize` for every
-    /// probed size (CoreText's 16-bit fixed-point representation of Adobe
-    /// Font Metrics' 600-units-per-em Courier advance, 600/1000 = 0.6).
-    /// The J-12 layout computes each band's cell as
-    /// `courierAdvancePerPoint × bandFontSize`; this constant remains the
-    /// 12pt-era reference.
-    internal static let cellWidth: CGFloat =
-        SandwichMetrics.courierAdvancePerPoint * baseFontSize
 
     // MARK: - Drawing
 
@@ -178,18 +153,9 @@ enum TextLayerReconstructor {
     ///  6. **Fit clamp** — if any assembled line would end less than one
     ///     cell inside the page box, the whole band steps down one
     ///     quantization step and re-assembles.
-    static func layoutLines(
-        _ entries: [CharacterInfo],
-        pageWidth: CGFloat,
-        redactionRects: [CGRect]
-    ) -> [TextLayerLine] {
-        layoutLinesWithSources(
-            entries, pageWidth: pageWidth, redactionRects: redactionRects
-        ).map(\.line)
-    }
-
-    /// `layoutLines` with provenance: the same assembly, each line carrying
-    /// which entry every drawn composed character came from.
+    ///
+    /// Each line carries its provenance: which entry every drawn composed
+    /// character came from.
     static func layoutLinesWithSources(
         _ entries: [CharacterInfo],
         pageWidth: CGFloat,
@@ -460,22 +426,6 @@ enum TextLayerReconstructor {
             regionShapes: regionShapes.map(frame.sourceShape))
     }
 
-    /// Rect-only form of `inRegionDrawnGlyphIndices(entries:pageWidth:regionShapes:)`.
-    static func inRegionDrawnGlyphIndices(
-        entries: [CharacterInfo],
-        pageWidth: CGFloat,
-        redactionRects: [CGRect]
-    ) -> IndexSet {
-        inRegionDrawnGlyphIndices(
-            entries: entries, pageWidth: pageWidth,
-            regionShapes: redactionRects.map {
-                RegionShape(
-                    expandedBounds: $0.insetBy(
-                        dx: -safetyMarginPoints, dy: -safetyMarginPoints),
-                    bounds: $0)
-            })
-    }
-
     /// The drawn-cell rule applied to a filter result: every survivor the rule
     /// returns is dropped (counted into `excludedCount`) and the layout
     /// re-flowed, until no drawn cell is centred inside a region — so the
@@ -537,9 +487,8 @@ enum TextLayerReconstructor {
     /// Sorting: bottom-to-top (higher midY first = lower on page in PDF coords),
     /// left-to-right. Adjacent characters within 1.5× character width are grouped.
     /// This sort + adjacency rule is the shared run definition: the J-12
-    /// line layout, the filter-side lineage walk
-    /// (`FilterResult.computeLineageHash`), and the legacy `groupIntoRuns`
-    /// all derive from it.
+    /// line layout and the filter-side lineage walk
+    /// (`FilterResult.computeLineageHash`) both derive from it.
     ///
     /// The same-line test uses a SYMMETRIC per-pair line height —
     /// `min(a.height, b.height) × 0.5` at both comparison sites. The prior
@@ -579,26 +528,5 @@ enum TextLayerReconstructor {
         }
         groups.append(current)
         return groups
-    }
-
-    /// Legacy run view over `runMemberGroups` (12pt-era grid model): run
-    /// origin X snaps to the GLOBAL reference cell grid. The production
-    /// draw path no longer consumes this — `layoutLines` snaps each band
-    /// to its own derived grid — but the run definition itself (sort +
-    /// adjacency) is unchanged and tests/probes measuring the run
-    /// structure still read it.
-    static func groupIntoRuns(_ entries: [CharacterInfo]) -> [TextRun] {
-        runMemberGroups(entries).map { members in
-            TextRun(
-                origin: snappedOrigin(entries[members[0]].bounds.origin),
-                text: members.map { entries[$0].character }.joined())
-        }
-    }
-
-    /// Snap an origin's X coordinate to the 12pt-era reference cell grid.
-    /// Y is left unmodified. Legacy: the J-12 layout snaps to each band's
-    /// own grid (`courierAdvancePerPoint × bandSize`) inside `layoutLines`.
-    static func snappedOrigin(_ origin: CGPoint) -> CGPoint {
-        CGPoint(x: floor(origin.x / cellWidth) * cellWidth, y: origin.y)
     }
 }

@@ -12,16 +12,15 @@ import UIKit
 // band's source glyph widths, capped at the band's median glyph height,
 // quantized to 0.5pt — with same-band groups bridged into one CTLine by
 // whole-cell spaces (never across a redaction rect) and an assembled-line
-// fit clamp. The 12pt-era grid model (`groupIntoRuns`, `snappedOrigin`,
-// `cellWidth`) remains the shared run definition and is pinned below as the
-// legacy view.
+// fit clamp. The run definition (`runMemberGroups`), shared with the
+// filter's lineage walk, is pinned below.
 
 @Suite("Text Layer Reconstruction")
 struct TextLayerReconstructorTests {
 
-    // MARK: - groupIntoRuns (shared run definition)
+    // MARK: - runMemberGroups (shared run definition)
 
-    @Test("Single character produces single run with grid-snapped origin")
+    @Test("Single character produces a single run")
     func singleCharacterRun() {
         let chars = [CharacterInfo(
             character: "A",
@@ -29,17 +28,7 @@ struct TextLayerReconstructorTests {
             stringIndex: 0
         )]
 
-        let runs = TextLayerReconstructor.groupIntoRuns(chars)
-        #expect(runs.count == 1)
-        #expect(runs[0].text == "A")
-        // Origin X must be a multiple of cellWidth (7.20…pt). For minX=100,
-        // floor(100/7.2)=13, so the snapped origin is 13 × 7.2 = 93.6…
-        let cellWidth = TextLayerReconstructor.cellWidth
-        let snappedX = floor(100 / cellWidth) * cellWidth
-        #expect(runs[0].origin.x == snappedX,
-                "Run origin X must snap to the cell grid")
-        // Y is left unsnapped — vertical line geometry tracks the source.
-        #expect(runs[0].origin.y == 400)
+        #expect(TextLayerReconstructor.runMemberGroups(chars) == [[0]])
     }
 
     @Test("Adjacent characters on same line grouped into one run")
@@ -52,13 +41,7 @@ struct TextLayerReconstructorTests {
             )
         }
 
-        let runs = TextLayerReconstructor.groupIntoRuns(chars)
-        #expect(runs.count == 1)
-        #expect(runs[0].text == "Hello")
-        let cellWidth = TextLayerReconstructor.cellWidth
-        let snappedX = floor(100 / cellWidth) * cellWidth
-        #expect(runs[0].origin.x == snappedX,
-                "Group origin X is the snap of the first character's minX")
+        #expect(TextLayerReconstructor.runMemberGroups(chars) == [[0, 1, 2, 3, 4]])
     }
 
     @Test("Characters on different lines produce separate runs")
@@ -70,8 +53,7 @@ struct TextLayerReconstructorTests {
             character: "B", bounds: CGRect(x: 100, y: 350, width: 15, height: 20), stringIndex: 1
         )
 
-        let runs = TextLayerReconstructor.groupIntoRuns([line1, line2])
-        #expect(runs.count == 2)
+        #expect(TextLayerReconstructor.runMemberGroups([line1, line2]) == [[0], [1]])
     }
 
     @Test("Wide gap between characters splits into separate runs")
@@ -83,21 +65,13 @@ struct TextLayerReconstructorTests {
             character: "B", bounds: CGRect(x: 300, y: 400, width: 15, height: 20), stringIndex: 1
         )
 
-        let runs = TextLayerReconstructor.groupIntoRuns([a, b])
-        #expect(runs.count == 2)
-        let cellWidth = TextLayerReconstructor.cellWidth
-        let snappedA = floor(100 / cellWidth) * cellWidth
-        let snappedB = floor(300 / cellWidth) * cellWidth
-        #expect(runs[0].origin.x == snappedA)
-        #expect(runs[1].origin.x == snappedB,
-                "Each new run snaps its origin X independently")
+        #expect(TextLayerReconstructor.runMemberGroups([a, b]) == [[0], [1]])
     }
 
     @Test("Empty input produces no runs")
     func emptyInput() {
-        let runs = TextLayerReconstructor.groupIntoRuns([])
-        #expect(runs.isEmpty)
-        #expect(TextLayerReconstructor.layoutLines(
+        #expect(TextLayerReconstructor.runMemberGroups([]).isEmpty)
+        #expect(TextLayerReconstructor.layoutLinesWithSources(
             [], pageWidth: 612, redactionRects: []).isEmpty)
     }
 
@@ -173,8 +147,8 @@ struct TextLayerReconstructorTests {
 
         // Assembled line origins land inside the zero-origin output page box
         // (effective size = cropBox size for an un-rotated page).
-        let lines = TextLayerReconstructor.layoutLines(
-            chars, pageWidth: cropBox.width, redactionRects: [])
+        let lines = TextLayerReconstructor.layoutLinesWithSources(
+            chars, pageWidth: cropBox.width, redactionRects: []).map(\.line)
         for line in lines {
             #expect(line.origin.x >= -1 && line.origin.x <= cropBox.width + 1,
                     "line origin X must sit inside the output page box")
@@ -183,38 +157,13 @@ struct TextLayerReconstructorTests {
         }
     }
 
-    // MARK: - Reference-grid invariants (legacy 12pt-era model)
+    // MARK: - Advance tolerance
 
-    @Test("Cell width is 0.60009765625 × baseFontSize")
-    func cellWidthConstantMatchesPlan() {
-        let expected = SandwichMetrics.courierAdvancePerPoint
-            * TextLayerReconstructor.baseFontSize
-        #expect(TextLayerReconstructor.cellWidth == expected)
-        // Anchor value at 12pt base.
-        #expect(abs(TextLayerReconstructor.cellWidth - 7.20117_1875) < 0.0001)
-    }
-
-    @Test("Base font size is the 12pt REFERENCE constant (band sizes are derived)")
-    func baseFontSizeIsConstant() {
-        // The constant no longer pins the drawn
-        // size — `layoutLines` derives one quantized pitch per band — but
-        // it anchors the verifier's linear tolerance scaling
-        // (`advanceWidthTolerancePerPoint × pointSize` == 0.25 at 12pt).
-        #expect(TextLayerReconstructor.baseFontSize == 12.0)
-        #expect(abs(SandwichMetrics.advanceWidthTolerancePerPoint
-                    * TextLayerReconstructor.baseFontSize - 0.25) < 1e-9)
-    }
-
-    @Test("snappedOrigin floors X to a multiple of cellWidth, leaves Y alone")
-    func snappedOriginContract() {
-        let cellWidth = TextLayerReconstructor.cellWidth
-        let raw = CGPoint(x: 100, y: 400)
-        let snapped = TextLayerReconstructor.snappedOrigin(raw)
-        #expect(snapped.x == floor(100 / cellWidth) * cellWidth)
-        #expect(snapped.y == 400, "Y is not modified by the grid snap")
-        // Origin already on the grid is a no-op.
-        let onGrid = CGPoint(x: cellWidth * 5, y: 400)
-        #expect(TextLayerReconstructor.snappedOrigin(onGrid) == onGrid)
+    @Test("The advance tolerance is 0.25 pt at the 12 pt reference size")
+    func advanceToleranceAtReferenceSize() {
+        // The verifier scales its advance tolerance linearly with the
+        // glyph's own point size (`advanceWidthTolerancePerPoint × pointSize`).
+        #expect(abs(SandwichMetrics.advanceWidthTolerancePerPoint * 12.0 - 0.25) < 1e-9)
     }
 
     // MARK: - layoutLines
@@ -228,8 +177,8 @@ struct TextLayerReconstructorTests {
             CharacterInfo(character: "A", bounds: CGRect(x: 72, y: 700, width: 14, height: 20), stringIndex: 0),
             CharacterInfo(character: "B", bounds: CGRect(x: 86, y: 700, width: 14, height: 20), stringIndex: 1),
         ]
-        let lines = TextLayerReconstructor.layoutLines(
-            entries, pageWidth: 612, redactionRects: [])
+        let lines = TextLayerReconstructor.layoutLinesWithSources(
+            entries, pageWidth: 612, redactionRects: []).map(\.line)
         #expect(lines.count == 1)
         #expect(lines[0].fontSize == 20.0,
                 "Height cap binds and the size lands on the quantization grid")
@@ -245,8 +194,8 @@ struct TextLayerReconstructorTests {
             CharacterInfo(character: "x", bounds: CGRect(x: 72, y: 700, width: 5, height: 12), stringIndex: 0),
             CharacterInfo(character: "y", bounds: CGRect(x: 77, y: 700, width: 5, height: 12), stringIndex: 1),
         ]
-        let narrowLines = TextLayerReconstructor.layoutLines(
-            narrow, pageWidth: 612, redactionRects: [])
+        let narrowLines = TextLayerReconstructor.layoutLinesWithSources(
+            narrow, pageWidth: 612, redactionRects: []).map(\.line)
         #expect(narrowLines.first?.fontSize == 8.5,
                 "Sum-matched sizing binds when under the height cap")
     }
@@ -260,8 +209,8 @@ struct TextLayerReconstructorTests {
             CharacterInfo(character: "C", bounds: CGRect(x: 160, y: 400, width: 6, height: 10), stringIndex: 2),
             CharacterInfo(character: "D", bounds: CGRect(x: 166, y: 400, width: 6, height: 10), stringIndex: 3),
         ]
-        let bridged = TextLayerReconstructor.layoutLines(
-            entries, pageWidth: 612, redactionRects: [])
+        let bridged = TextLayerReconstructor.layoutLinesWithSources(
+            entries, pageWidth: 612, redactionRects: []).map(\.line)
         #expect(bridged.count == 1, "Same-band groups assemble into one line")
         if let line = bridged.first {
             #expect(line.text.hasPrefix("AB") && line.text.hasSuffix("CD"))
@@ -274,8 +223,8 @@ struct TextLayerReconstructorTests {
         // The same geometry with a redaction rect inside the gap: the
         // bridge would cross it, so the line splits into two.
         let region = CGRect(x: 120, y: 395, width: 30, height: 20)
-        let split = TextLayerReconstructor.layoutLines(
-            entries, pageWidth: 612, redactionRects: [region])
+        let split = TextLayerReconstructor.layoutLinesWithSources(
+            entries, pageWidth: 612, redactionRects: [region]).map(\.line)
         #expect(split.count == 2,
                 "A bridge never crosses a redaction rect — the line splits")
         #expect(split.first?.text == "AB")
@@ -299,8 +248,8 @@ struct TextLayerReconstructorTests {
                 bounds: CGRect(x: 420 + Double(i) * 10, y: 300, width: 10, height: 12),
                 stringIndex: i)
         }
-        let lines = TextLayerReconstructor.layoutLines(
-            entries, pageWidth: 612, redactionRects: [])
+        let lines = TextLayerReconstructor.layoutLinesWithSources(
+            entries, pageWidth: 612, redactionRects: []).map(\.line)
         #expect(lines.count == 1)
         if let line = lines.first {
             #expect(line.fontSize < 12.0, "The fit clamp engaged")
@@ -379,9 +328,9 @@ struct TextLayerReconstructorTests {
             CharacterInfo(character: "A", bounds: CGRect(x: 72, y: 700, width: 14, height: 20), stringIndex: 0),
             CharacterInfo(character: "B", bounds: CGRect(x: 86, y: 700, width: 14, height: 20), stringIndex: 1),
         ]
-        let expectedSize = TextLayerReconstructor.layoutLines(
+        let expectedSize = TextLayerReconstructor.layoutLinesWithSources(
             entries, pageWidth: pageSize.width, redactionRects: []
-        ).first?.fontSize
+        ).map(\.line).first?.fontSize
 
         let tempURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("test_fontsize_\(UUID().uuidString).pdf")
@@ -466,11 +415,11 @@ struct TextLayerReconstructorTests {
         #expect(colon.character == ":")
         #expect(minEdgeDistance(colon.bounds, to: region) >= safetyMarginPoints + 0.5,
                 "the fixture's colon must clear the filter's halo, else the filter would drop it")
-        let lines = TextLayerReconstructor.layoutLines(entries, pageWidth: 612, redactionRects: [region])
+        let lines = TextLayerReconstructor.layoutLinesWithSources(entries, pageWidth: 612, redactionRects: [region]).map(\.line)
         #expect(lines.first?.fontSize == 6.5,
                 "band pitch 35 / (9 × 0.6001) = 6.48 → 6.5; got \(lines.first?.fontSize ?? -1)")
-        let hits = TextLayerReconstructor.inRegionDrawnGlyphIndices(
-            entries: entries, pageWidth: 612, redactionRects: [region])
+        let hits = drawnCellHits(
+            entries: entries, pageWidth: 612, rects: [region])
         #expect(hits == IndexSet(integer: 4), "exactly the colon; got \(Array(hits))")
 
         // Applied: the colon is dropped and counted; the re-flowed layout is clean.
@@ -544,16 +493,11 @@ struct TextLayerReconstructorTests {
                 normalizedToPDFPageCoordinates($0.normalizedRect, pageRect: basis)
             }
             let surviving = try await filterCharacters(characters: chars, redactionRects: rects).surviving
-            let hits = TextLayerReconstructor.inRegionDrawnGlyphIndices(
-                entries: surviving, pageWidth: basis.width, redactionRects: rects)
+            let hits = drawnCellHits(
+                entries: surviving, pageWidth: basis.width, rects: rects)
             #expect(hits.isEmpty, "page \(pi + 1): \(hits.count) drawn cell(s) inside the band")
             let sourced = TextLayerReconstructor.layoutLinesWithSources(
                 surviving, pageWidth: basis.width, redactionRects: rects)
-            let plain = TextLayerReconstructor.layoutLines(
-                surviving, pageWidth: basis.width, redactionRects: rects)
-            #expect(sourced.map(\.line.text) == plain.map(\.text))
-            #expect(sourced.map(\.line.origin) == plain.map(\.origin))
-            #expect(sourced.map(\.line.fontSize) == plain.map(\.fontSize))
             let drawn = sourced.flatMap { $0.sources.map(\.entry) }
             #expect(drawn.count == surviving.count && Set(drawn).count == surviving.count,
                     "page \(pi + 1): provenance must cover each entry exactly once")
@@ -569,13 +513,13 @@ struct TextLayerReconstructorTests {
             origin: .zero,
             size: effectiveBounds(rpage.bounds(for: .cropBox), rotation: rpage.rotation).size)
         #expect(!rchars.isEmpty)
-        #expect(TextLayerReconstructor.inRegionDrawnGlyphIndices(
-            entries: rchars, pageWidth: rbasis.width, redactionRects: []).isEmpty)
+        #expect(drawnCellHits(
+            entries: rchars, pageWidth: rbasis.width, rects: []).isEmpty)
         let cornerRect = normalizedToPDFPageCoordinates(
             CGRect(x: 0, y: 0, width: 0.05, height: 0.05), pageRect: rbasis)
         let rsurviving = try await filterCharacters(characters: rchars, redactionRects: [cornerRect]).surviving
-        #expect(TextLayerReconstructor.inRegionDrawnGlyphIndices(
-            entries: rsurviving, pageWidth: rbasis.width, redactionRects: [cornerRect]).isEmpty)
+        #expect(drawnCellHits(
+            entries: rsurviving, pageWidth: rbasis.width, rects: [cornerRect]).isEmpty)
     }
 
     // MARK: - Rotated pages: the source-frame assembly
@@ -690,4 +634,19 @@ struct TextLayerReconstructorTests {
         let tampered = try await SandwichVerification().verifyCharacterLineage(outputPage: page, digest: dropped)
         #expect(tampered.isFail, "r=\(rotation): a glyph the digest does not carry must FAIL Layer 9")
     }
+}
+
+/// The drawn-cell rule on plain rects: each rect is its region's
+/// un-expanded bounds, and the filter's halo its expanded bounds.
+private func drawnCellHits(
+    entries: [CharacterInfo], pageWidth: CGFloat, rects: [CGRect]
+) -> IndexSet {
+    TextLayerReconstructor.inRegionDrawnGlyphIndices(
+        entries: entries, pageWidth: pageWidth,
+        regionShapes: rects.map {
+            RegionShape(
+                expandedBounds: $0.insetBy(
+                    dx: -safetyMarginPoints, dy: -safetyMarginPoints),
+                bounds: $0)
+        })
 }

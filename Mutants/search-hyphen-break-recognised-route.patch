@@ -1,0 +1,20 @@
+Property: The recognised-text route's skeleton page keeps the line-end hyphens the closed-spelling walk drops.
+Area: search (literal matching)
+Test command: xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/HyphenBreakClosedSpellingTests -only-testing:RedactionEngineTests/HyphenBreakClosedSpellingSearchTests
+Must go red: RedactionEngineTests/HyphenBreakClosedSpellingSearchTests "The recognised route: lines joined across 'Bright-' and 'water' match the closed spelling, boxed on each word"
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/OCRMatchSkeleton.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/OCRMatchSkeleton.swift
+index b64e6622..5031704c 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/OCRMatchSkeleton.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/OCRMatchSkeleton.swift
+@@ -72,8 +72,7 @@ enum OCRMatchSkeleton {
+         })
+         return SearchCore.PreparedPage(
+             searchText: text, nsString: text as NSString, baseText: page.baseText,
+-            offsetMap: page.offsetMap, baseChars: page.baseChars, rawMap: page.rawMap,
+-            closedSpellingHyphens: page.closedSpellingHyphens)
++            offsetMap: page.offsetMap, baseChars: page.baseChars, rawMap: page.rawMap) // mutant: the offsets are lost
+     }
+ 
+     /// A typed query without its leading and trailing symbols (a currency

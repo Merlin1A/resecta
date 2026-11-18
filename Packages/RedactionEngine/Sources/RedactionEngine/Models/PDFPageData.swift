@@ -13,7 +13,7 @@ import CoreGraphics
 /// are pre-extracted SERIALLY at build time (`PipelineCoordinator.buildPDFPageData`);
 /// the concurrent render path is then CG-only (`renderPageFromCGPage`). The live
 /// `PDFPage` (`page`) is read inside a concurrent task only by the read-only
-/// dimension pre-flight (`validatePage`) and searchable text extraction
+/// dimension pre-flight (`validatePageGeometry`, `validatePageMemory`) and searchable text extraction
 /// (`extractCharacters`) — undocumented-but-empirically-validated paths covered
 /// by `PDFKitConcurrencyStressTests`. `@unchecked Sendable`: `PDFPage` /
 /// `CGPDFPage` are not Sendable; this struct asserts the access discipline above.

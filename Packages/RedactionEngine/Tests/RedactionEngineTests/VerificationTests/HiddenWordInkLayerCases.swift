@@ -14,7 +14,13 @@ import PDFKit
 // the leak or flags only a neighbour; with the check, each reads Checks Failed
 // with the check's row failing on page 1. Each case first asserts that the
 // leak is in the export, so a case that passes is never a case whose page
-// stopped leaking.
+// stopped leaking. Every box these cases draw is one the app marks as not
+// placed from the page's text (a hand box, or a Search box widened by hand),
+// so the app itself either strips the word's hidden copy by its ink or writes
+// the page as an image; the export here is built with that page kept in
+// Searchable (`HiddenWordInkFixtures.pagesKeepingUnanchoredBoxesSearchable`),
+// an export the app does not write today, on which the check must fail all
+// the same.
 //
 // The other cases pin what the check must not do: fail a clean export, run in
 // Secure, read the source on a page it has nothing to check, pass when it

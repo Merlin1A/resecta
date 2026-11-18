@@ -1,0 +1,28 @@
+Property: A box not placed from the page's own text, on a page that is not plain and that no ink plan covers, writes the page as an image.
+Area: page mode (Detection)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/PageModeDecisionTests
+Must go red: RedactionEngineTests/PageModeDecisionTests "the arms in order: the other mode, no rich text, a trigger, an unanchored box, then Searchable"; RedactionEngineTests/PageModeDecisionTests "the page's facts are not read when every box is anchored"
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageModeDecision.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageModeDecision.swift
+index b818f907..5ee9f1a8 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageModeDecision.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageModeDecision.swift
+@@ -60,17 +60,6 @@ public enum PageModeDecision {
+             if let trigger = TextLayerDetector.checkFallbackTriggers(page) {
+                 pageMode = .secureRasterization
+                 fallbackReason = trigger
+-            } else if !inkPlanCovers, !PageContentFacts.keepsTextLayer(
+-                regions: pageRegions, facts: { readFacts(page.pageRef) }
+-            ) {
+-                // A box not placed from this page's own text (drawn,
+-                // duplicated, read from the picture, moved or resized)
+-                // on a page whose text layer need not sit on its print,
+-                // with no ink plan that covers it: the covered words'
+-                // text may lie outside the box, so the page is written as
+-                // an image only.
+-                pageMode = .secureRasterization
+-                fallbackReason = .unanchoredRegion
+             } else {
+                 pageMode = .searchableRedaction
+             }

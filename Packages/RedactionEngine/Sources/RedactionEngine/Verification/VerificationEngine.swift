@@ -409,8 +409,9 @@ public struct VerificationEngine: Sendable {
     /// Else the skipped accounting below. INFO rows and PASS rows rank
     /// alike: all of them → overall PASS. One exhaustive switch classifies
     /// each layer, so a new status case is a compile error here, not a
-    /// silent PASS.
+    /// silent PASS. An empty list is `.skipped`: nothing was verified.
     public func aggregateStatus(_ layers: [LayerResult]) -> VerificationStatus {
+        guard !layers.isEmpty else { return .skipped }
         var firstFail: String?
         var firstAttention: String?
         var firstWarn: String?

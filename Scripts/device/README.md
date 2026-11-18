@@ -104,9 +104,10 @@ copied `.ips` report stay there, on this Mac. Share `facts.json`,
 `rows.jsonl`, `judge.json` and the record, not the run directory.
 `facts.json` carries file names from the app's container (every file added,
 removed or changed in a step, the stores, PDFs outside `tmp/`, the pipeline
-outputs) and the names of other processes in crash and jetsam reports; the
-record and `judge.json` carry the phone's name and the exported PDFs' file
-names. Check them before sharing.
+outputs) and the names of other processes in crash and jetsam reports. The
+record carries the phone's name and the exported PDFs' file names, and
+`judge.json` carries those file names and the inbox folder's path, which
+includes this Mac's home-folder name. Check them before sharing.
 
 ## Not yet
 

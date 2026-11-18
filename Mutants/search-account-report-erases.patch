@@ -1,0 +1,19 @@
+Property: A report only adds facts: a later report never removes what an earlier one gave.
+Area: Search, the account of what was read
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/AccountOfWhatWasReadTests (or on the host: cd Packages/RedactionEngine && swift test --filter AccountOfWhatWasReadTests)
+Must go red: RedactionEngineTests/AccountOfWhatWasReadTests row [C-14 another app's hidden text with recognition on is read through it, and qualified]; RedactionEngineTests/AccountOfWhatWasReadTests row [C-17b a success after a failure leaves the page not read]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/AccountOfWhatWasRead.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/AccountOfWhatWasRead.swift
+index 7a7931a3..51b68841 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/AccountOfWhatWasRead.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/AccountOfWhatWasRead.swift
+@@ -204,7 +204,7 @@ struct AccountOfWhatWasRead: Sendable, Equatable {
+     /// Adds a report's facts to one page. A page outside the document is ignored.
+     mutating func record(_ reported: Facts, forPage page: Int) {
+         guard facts.indices.contains(page) else { return }
+-        facts[page].formUnion(reported)
++        facts[page] = reported
+     }
+ 
+     mutating func record(_ coverage: PageSearchCoverage) {

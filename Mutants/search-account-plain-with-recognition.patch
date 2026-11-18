@@ -1,0 +1,19 @@
+Property: The plain no-match is allowed only when every page was read from its own text or is blank, never when a page was read by recognition.
+Area: Search, the account of what was read
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/AccountOfWhatWasReadTests (or on the host: cd Packages/RedactionEngine && swift test --filter AccountOfWhatWasReadTests)
+Must go red: RedactionEngineTests/AccountOfWhatWasReadTests row [C-13 a page read by recognition is counted in the qualified no-match]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/AccountOfWhatWasRead.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/AccountOfWhatWasRead.swift
+index 7a7931a3..c116a926 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/AccountOfWhatWasRead.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/AccountOfWhatWasRead.swift
+@@ -254,7 +254,7 @@ struct AccountOfWhatWasRead: Sendable, Equatable {
+ 
+         /// True only when every page was read from its own text or is blank.
+         var plainNoMatchAllowed: Bool {
+-            states.allSatisfy { $0 == .readFromOwnText || $0 == .readBlank }
++            states.allSatisfy { $0 == .readFromOwnText || $0 == .readBlank || $0 == .readByRecognition }
+         }
+ 
+         /// The pages a qualified no-match counts: read by recognition, or

@@ -85,7 +85,7 @@ extension DocumentSearcher {
     /// PDFPage.selection(for:) → .bounds(for: page) → PDF points (bottom-left,
     /// UN-ROTATED space). Transform to post-rotation visual
     /// space before normalizing, so normalized coords align with the post-rotation
-    /// bitmap produced by renderPage()/getDrawingTransform().
+    /// bitmap produced by renderPageFromCGPage()/getDrawingTransform().
     ///
     /// SECURITY NOTE: Wrong normalization = fill at wrong pixel position = data leak.
     /// On a page whose text lies over a page-scale image the box is the ink

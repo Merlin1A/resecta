@@ -1,0 +1,19 @@
+Property: A kind is decided from structured fields, not from the words of an engine sentence.
+Area: results (the problems model)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationProblemModelTests
+Must go red: ResectaAppTests/VerificationProblemModelTests plainSentenceIsEarned
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationProblemModel.swift b/Sources/ResectaApp/Views/VerificationProblemModel.swift
+index c070f072..aca2d3ef 100644
+--- a/Sources/ResectaApp/Views/VerificationProblemModel.swift
++++ b/Sources/ResectaApp/Views/VerificationProblemModel.swift
+@@ -107,7 +107,7 @@ nonisolated enum VerificationProblemModel {
+                 // A failed Search Re-check that names pages missed coverage;
+                 // one with no pages failed in another way (every check can
+                 // fail with an unexpected error and no pages).
+-                if layer.layer == .searchRecheck, !check.pages.isEmpty {
++                if layer.layer == .searchRecheck, layer.shortDescription.contains("page") {
+                     partOfBoxed.append(check)
+                     partOfBoxedFailed = true
+                 } else {

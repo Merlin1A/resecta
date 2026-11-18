@@ -97,11 +97,11 @@ struct RegionCoverageTests {
         let trueRect = try #require(DocumentSearcher().boundingRect(for: range, page: page))
         let driftedRect = trueRect.offsetBy(dx: trueRect.width * 2, dy: 0)
         let request = TestFixtures.textRequest("SEED")
-        let drifted = await RegionCoverage.check(
+        let drifted = try await RegionCoverage.check(
             source: SendablePDFDocument(source), requests: [request],
             regions: [0: [RedactionRegion(id: UUID(), normalizedRect: driftedRect, source: .searchMatch(term: "SEED"))]])
         #expect(drifted.shortfalls.count == 1 && drifted.shortfalls.first?.pageIndex == 0, "\(drifted.shortfalls)")
-        let manual = await RegionCoverage.check(
+        let manual = try await RegionCoverage.check(
             source: SendablePDFDocument(source), requests: [request],
             regions: [0: [RedactionRegion(id: UUID(), normalizedRect: driftedRect, source: .manual)]])
         #expect(manual.shortfalls.isEmpty, "\(manual.shortfalls)")
@@ -115,7 +115,7 @@ struct RegionCoverageTests {
         let shortBox = CGRect(x: (50 + 120) / 612.0, y: 520 / 792.0, width: 180 / 612.0, height: 150 / 792.0)
         let options = SearchOptions()
         let ocrRequest = TestFixtures.textRequest("SEED", options: options)
-        let sparse = await RegionCoverage.check(
+        let sparse = try await RegionCoverage.check(
             source: SendablePDFDocument(scanned), requests: [ocrRequest],
             regions: [0: [RedactionRegion(id: UUID(), normalizedRect: shortBox, source: .searchMatch(term: "SEED"))]])
         #expect(!sparse.shortfalls.isEmpty, "the OCR-read match under a short box is a shortfall; got \(sparse)")
@@ -312,15 +312,15 @@ struct RegionCoverageTests {
         try #require(source.pageCount == 2)
         let box = region(0.1, 0.1, 0.2, 0.05)
         let request = TestFixtures.textRequest("SEED", pages: [0, 1])
-        let direct = await RegionCoverage.check(
+        let direct = try await RegionCoverage.check(
             source: SendablePDFDocument(source), requests: [request], regions: [0: [box], 1: [box]])
         #expect(direct.shortfalls.isEmpty)
         #expect(direct.unreadPages == [1], "the oversize page under a box is unread; got \(direct.unreadPages)")
         // A page the request's boxes are not on is not the check's question.
-        let elsewhere = await RegionCoverage.check(
+        let elsewhere = try await RegionCoverage.check(
             source: SendablePDFDocument(source), requests: [TestFixtures.textRequest("SEED", pages: [0])], regions: [0: [box], 1: [box]])
         #expect(elsewhere.unreadPages.isEmpty, "got \(elsewhere.unreadPages)")
-        let noBoxes = await RegionCoverage.check(
+        let noBoxes = try await RegionCoverage.check(
             source: SendablePDFDocument(source), requests: [request], regions: [0: [box]])
         #expect(noBoxes.unreadPages.isEmpty, "got \(noBoxes.unreadPages)")
         // Through the layer: a could-not-verify WARN naming the page.

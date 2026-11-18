@@ -38,21 +38,28 @@ public struct OCREngine: Sendable {
         let normalizedRect: CGRect
     }
 
-    /// The words of a recognised line with their boxes; a word Vision gives
-    /// no box for is left out.
-    static func wordBoxes(of candidate: VNRecognizedText) -> [WordBox] {
-        let line = candidate.string
-        var boxes: [WordBox] = []
+    /// The whitespace-separated words of a recognised line, in order: the
+    /// words `wordBoxes(of:)` boxes, and the words a match touches.
+    static func wordRanges(in line: String) -> [Range<String.Index>] {
+        var ranges: [Range<String.Index>] = []
         var index = line.startIndex
         while index < line.endIndex {
             guard let start = line[index...].firstIndex(where: { !$0.isWhitespace }) else { break }
             let end = line[start...].firstIndex(where: \.isWhitespace) ?? line.endIndex
-            if let box = try? candidate.boundingBox(for: start..<end)?.boundingBox {
-                boxes.append(WordBox(range: NSRange(start..<end, in: line), normalizedRect: box))
-            }
+            ranges.append(start..<end)
             index = end
         }
-        return boxes
+        return ranges
+    }
+
+    /// The words of a recognised line with their boxes; a word Vision gives
+    /// no box for is left out.
+    static func wordBoxes(of candidate: VNRecognizedText) -> [WordBox] {
+        let line = candidate.string
+        return wordRanges(in: line).compactMap { range in
+            guard let box = try? candidate.boundingBox(for: range)?.boundingBox else { return nil }
+            return WordBox(range: NSRange(range, in: line), normalizedRect: box)
+        }
     }
 
     /// One whitespace-separated token of a recognised line, with its own box

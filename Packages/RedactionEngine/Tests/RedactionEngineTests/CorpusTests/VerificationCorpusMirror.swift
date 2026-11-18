@@ -117,10 +117,14 @@ extension VerificationCorpusRunnerTests {
     /// dimension floor and clamp (`PipelineCoordinator.buildPDFPageData`).
     /// Returns nil for a below-floor box so the caller can record the drop.
     /// `polygon` is always false (see `RegionSetSpec.polygon`).
+    /// This is the one place the runner sets `textAnchored`.
     static func region(from seed: RegionSeed, polygon: Bool) -> RedactionRegion? {
         guard seed.rect.width > 0.001, seed.rect.height > 0.001 else { return nil }
         let clamped = seed.rect.clampedToNormalized()
-        return RedactionRegion(id: UUID(), normalizedRect: clamped, source: .manual)
+        // The corpus's seeds stand for values a search found in the page's
+        // own text, so each region is marked as placed from that text, as
+        // the app marks a box made from a text-layer match.
+        return RedactionRegion(id: UUID(), normalizedRect: clamped, source: .manual, textAnchored: true)
     }
 
     /// Sensitive terms for the burned regions, mirroring the app's
@@ -267,8 +271,9 @@ extension VerificationCorpusRunnerTests {
     /// Mirror of `PipelineCoordinator.buildPDFPageData` for a harness-loaded
     /// document: serial pre-extraction of cropBox + cgPage, the region floor
     /// (applied by the caller via `region(from:polygon:)`), the per-page mode
-    /// selection with `TextLayerDetector.checkFallbackTriggers`, and the
-    /// serial `hasText` read for searchable pages.
+    /// from the app's own decision (`PageModeDecision.decide`, with no ink
+    /// plan: the runner has none), and the serial `hasText` read for
+    /// searchable pages.
     static func buildPages(
         doc: PDFDocument,
         effectiveMode: PipelineMode,
@@ -282,22 +287,10 @@ extension VerificationCorpusRunnerTests {
             let cgPage = page.pageRef
             let pageRegions = regionsByPage[i] ?? []
 
-            let pageMode: PipelineMode
-            var fallbackReason: TextLayerDetector.FallbackReason?
-            if effectiveMode == .searchableRedaction,
-               textLayerStatus[i] == .rich {
-                if let trigger = TextLayerDetector.checkFallbackTriggers(page) {
-                    pageMode = .secureRasterization
-                    fallbackReason = trigger
-                } else {
-                    pageMode = .searchableRedaction
-                }
-            } else {
-                pageMode = .secureRasterization
-                if effectiveMode == .searchableRedaction {
-                    fallbackReason = .noExtractableText
-                }
-            }
+            let (pageMode, fallbackReason) = PageModeDecision.decide(
+                effectiveMode: effectiveMode, textLayerStatus: textLayerStatus[i], page: page,
+                pageRegions: pageRegions, inkPlanCovers: false
+            )
             let hasText = pageMode == .searchableRedaction
                 ? (page.string?.isEmpty == false) : false
 

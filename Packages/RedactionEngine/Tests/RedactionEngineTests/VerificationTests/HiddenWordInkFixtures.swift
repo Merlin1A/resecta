@@ -14,11 +14,15 @@ import PDFKit
 // no picture), a rotated page with an offset crop box, and other lines.
 //
 // The leaking outputs come from the corpus mirror's route
-// (`VerificationCorpusRunnerTests.buildPages` → `runRedaction` →
-// `runVerificationSweep`), not from the app's run: the mirror builds its
-// pages without the app's page bridge, so a box over a word's print strips
-// only the hidden glyphs under the box and the word's drifted copy stays in
-// the export. That is the export the check exists to stop.
+// (`runRedaction` → `runVerificationSweep`), with the pages built here by
+// `pagesKeepingUnanchoredBoxesSearchable`, not from the app's run: a box over
+// a word's print strips only the hidden glyphs under the box and the word's
+// drifted copy stays in the export. That is the export the check exists to
+// stop. The app does not write that export today: for a box not placed from
+// the page's text, on a page that is not plain, it strips the word's hidden
+// copy by its ink where an ink plan covers the box, and otherwise writes the
+// page as an image (`PageModeDecision`). The check must fail on such an
+// export all the same.
 
 enum HiddenWordInkFixtures {
     private typealias Mirror = VerificationCorpusRunnerTests
@@ -177,6 +181,47 @@ enum HiddenWordInkFixtures {
         let report: VerificationReport
     }
 
+    /// The pages of an export the app does not write today: a box not placed
+    /// from the page's own text, on a page that is not plain, kept in
+    /// Searchable. Each page's mode is the app's decision with the page's
+    /// facts read as plain, so such a box does not send its page to a
+    /// picture; every other arm (the other mode, no rich text, a trigger) is
+    /// the app's. The pages are otherwise built as the corpus mirror builds
+    /// them (`VerificationCorpusRunnerTests.buildPages`). For tests of a
+    /// verification check on such an export only.
+    static func pagesKeepingUnanchoredBoxesSearchable(
+        doc: PDFDocument,
+        effectiveMode: PipelineMode,
+        regionsByPage: [Int: [RedactionRegion]],
+        textLayerStatus: [Int: TextLayerStatus],
+        hasHiddenOCG: Bool
+    ) -> [PDFPageData] {
+        let readAsPlain = PageContentFacts(
+            reachesImage: false, drawsInlineImage: false, showsInvisibleText: false, usesType3Font: false)
+        return (0..<doc.pageCount).compactMap { i -> PDFPageData? in
+            guard let page = doc.page(at: i) else { return nil }
+            let cropBoxBounds = page.bounds(for: .cropBox)
+            let cgPage = page.pageRef
+            let pageRegions = regionsByPage[i] ?? []
+            let (pageMode, fallbackReason) = PageModeDecision.decide(
+                effectiveMode: effectiveMode, textLayerStatus: textLayerStatus[i], page: page,
+                pageRegions: pageRegions, inkPlanCovers: false, readFacts: { _ in readAsPlain })
+            let hasText = pageMode == .searchableRedaction
+                ? (page.string?.isEmpty == false) : false
+            return PDFPageData(
+                page: page, pageIndex: i, regions: pageRegions,
+                fillColor: .black,
+                targetDPI: 300,
+                pipelineMode: pageMode,
+                rotation: page.rotation,
+                hasHiddenOCG: hasHiddenOCG,
+                cropBoxBounds: cropBoxBounds,
+                cgPage: cgPage,
+                hasText: hasText,
+                fallbackReason: fallbackReason)
+        }
+    }
+
     /// A box at `paint` (a hand box, or a Search box for `searchTerm` with its
     /// hidden-glyph `strip`) on page 1 of `data`, exported in `mode` through the
     /// mirror's route and verified once.
@@ -202,8 +247,9 @@ enum HiddenWordInkFixtures {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("hidden-word-case-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let outputURL = dir.appendingPathComponent("output.pdf")
-        let pages = Mirror.buildPages(doc: doc, effectiveMode: mode, regionsByPage: regionsByPage,
-                                      textLayerStatus: status, hasHiddenOCG: Mirror.documentHasHiddenOCG(doc))
+        let pages = pagesKeepingUnanchoredBoxesSearchable(
+            doc: doc, effectiveMode: mode, regionsByPage: regionsByPage,
+            textLayerStatus: status, hasHiddenOCG: Mirror.documentHasHiddenOCG(doc))
         let outcome = try await Mirror.runRedaction(pages: pages, outputURL: outputURL)
         let report = try await Mirror.runVerificationSweep(
             outputURL: outputURL, sourcePageCount: doc.pageCount, regions: regionsByPage,

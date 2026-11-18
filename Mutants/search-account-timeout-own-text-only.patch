@@ -1,0 +1,19 @@
+Property: A pattern that ran out of time leaves the page partly read whatever it was read from, not only with its own text.
+Area: Search, the account of what was read
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/AccountOfWhatWasReadTests (or on the host: cd Packages/RedactionEngine && swift test --filter AccountOfWhatWasReadTests)
+Must go red: RedactionEngineTests/AccountOfWhatWasReadTests row [C-24 a timeout on a page read by recognition leaves it partly read]; RedactionEngineTests/AccountOfWhatWasReadTests row [C-25 every set of facts at every place gives exactly one state, and a failure never a better one]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/AccountOfWhatWasRead.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/AccountOfWhatWasRead.swift
+index 7a7931a3..afd50a63 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/AccountOfWhatWasRead.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/AccountOfWhatWasRead.swift
+@@ -175,7 +175,7 @@ struct AccountOfWhatWasRead: Sendable, Equatable {
+     private static func partReasons(of facts: Facts, position: Position) -> Set<Reason> {
+         var reasons: Set<Reason> = []
+         if position == .onTheResultLimitPage || position == .onTheStopPage { reasons.insert(.runEndedOnThisPage) }
+-        if facts.contains(.patternTimedOut) { reasons.insert(.patternTimedOut) }
++        if facts.contains(.patternTimedOut), facts.contains(.ownText) { reasons.insert(.patternTimedOut) }
+         if facts.contains(.smallPictures) { reasons.insert(.smallPictures) }
+         if facts.contains(.ownText) {
+             if facts.contains(.recognitionFailed) { reasons.insert(.recognitionFailed) }

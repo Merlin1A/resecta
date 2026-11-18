@@ -100,7 +100,11 @@ struct DetectionSweep: Sendable {
                 outputDocument: outputDocument, requests: scanRequests)
         }
         try Task.checkCancellation()
-        return Self.fold(requests: scanRequests, observations: observed, pageCount: pageCount)
+        // Every page of the output, and every request on each page read: a
+        // page or a count the pass did not give is a page not checked.
+        let whole = RecheckObservation.completed(
+            observed, pageCount: pageCount, requestCount: scanRequests.count)
+        return Self.fold(requests: scanRequests, observations: whole, pageCount: pageCount)
     }
 
     private static let idle = Outcome(

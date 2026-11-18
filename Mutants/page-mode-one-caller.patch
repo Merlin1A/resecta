@@ -1,0 +1,20 @@
+Property: Outside the detector and its tests, the trigger check is called in one place: the page mode decision.
+Area: page mode (Detection)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/PageModeDecisionTests
+Must go red: RedactionEngineTests/PageModeDecisionTests "the trigger check is called in one file outside the detector and its tests"
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Tests/RedactionEngineTests/CorpusTests/VerificationCorpusMirror.swift b/Packages/RedactionEngine/Tests/RedactionEngineTests/CorpusTests/VerificationCorpusMirror.swift
+index 282edb05..ab61fd9f 100644
+--- a/Packages/RedactionEngine/Tests/RedactionEngineTests/CorpusTests/VerificationCorpusMirror.swift
++++ b/Packages/RedactionEngine/Tests/RedactionEngineTests/CorpusTests/VerificationCorpusMirror.swift
+@@ -291,6 +291,9 @@ extension VerificationCorpusRunnerTests {
+                 effectiveMode: effectiveMode, textLayerStatus: textLayerStatus[i], page: page,
+                 pageRegions: pageRegions, inkPlanCovers: false
+             )
++            let copyTrigger = effectiveMode == .searchableRedaction && textLayerStatus[i] == .rich
++                ? TextLayerDetector.checkFallbackTriggers(page) : nil
++            assert(copyTrigger == nil || pageMode == .secureRasterization)
+             let hasText = pageMode == .searchableRedaction
+                 ? (page.string?.isEmpty == false) : false
+ 

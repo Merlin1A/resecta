@@ -40,6 +40,10 @@ struct OCRPageCache {
     /// evicted with `lines`.
     private var fastLines: [Int: [OCREngine.TextLine]] = [:]
     private var fastNormalized: [Int: NormalizedPage] = [:]
+    /// The dark share of the picture behind each page whose accurate read
+    /// returned no line (`PageInk`); keyed and evicted with `lines`. A page
+    /// with an empty read and no share here reads as ink.
+    private var emptyReadShares: [Int: PageInk.DarkShare] = [:]
 
     /// A cache hit: records the access for eviction ordering and returns
     /// the page's lines; nil on a miss.
@@ -51,13 +55,30 @@ struct OCRPageCache {
     }
 
     /// Inserts a page's lines through the eviction path (evict BEFORE
-    /// insert) and records the access.
-    mutating func insert(_ newLines: [OCREngine.TextLine], fast: [OCREngine.TextLine]? = nil, for pageIndex: Int) {
+    /// insert) and records the access. When the accurate read is empty,
+    /// `picture` (the image recognition was given, and its scale) is
+    /// measured for ink once, and the share kept with the page, so a cached
+    /// page reports what a fresh read reported.
+    mutating func insert(_ newLines: [OCREngine.TextLine], fast: [OCREngine.TextLine]? = nil, for pageIndex: Int,
+                         picture: (image: CGImage, pixelsPerInch: Double)? = nil,
+                         inkSetting: PageInk.Setting? = PageInk.setting) {
         evictIfNeeded()
         counter += 1
         access[pageIndex] = counter
         lines[pageIndex] = newLines
         fastLines[pageIndex] = fast
+        emptyReadShares[pageIndex] = newLines.isEmpty
+            ? PageInk.emptyReadShare(of: picture?.image, pixelsPerInch: picture?.pixelsPerInch ?? 0,
+                                     setting: inkSetting)
+            : nil
+    }
+
+    /// Of a cached page whose accurate read returned no line: blank or ink,
+    /// by the share kept with it. Nil when the page is not cached or its
+    /// accurate read returned a line. Does not touch the access order.
+    func emptyRead(for pageIndex: Int, inkSetting: PageInk.Setting? = PageInk.setting) -> PageSearchCoverage.EmptyRead? {
+        guard let cached = lines[pageIndex], cached.isEmpty else { return nil }
+        return PageInk.emptyRead(emptyReadShares[pageIndex], setting: inkSetting)
     }
 
     /// The page's fast-recognition lines, when read; does not touch the
@@ -87,6 +108,7 @@ struct OCRPageCache {
                 normalized.removeValue(forKey: lruPage)
                 fastLines.removeValue(forKey: lruPage)
                 fastNormalized.removeValue(forKey: lruPage)
+                emptyReadShares.removeValue(forKey: lruPage)
             }
         }
     }
@@ -123,6 +145,7 @@ struct OCRPageCache {
         normalized.removeAll()
         fastLines.removeAll()
         fastNormalized.removeAll()
+        emptyReadShares.removeAll()
         counter = 0
         var added = 0
         var idx = 0
@@ -147,6 +170,7 @@ struct OCRPageCache {
         access[pageIndex] = counter
         lines[pageIndex] = newLines
         normalized.removeValue(forKey: pageIndex)
+        emptyReadShares.removeValue(forKey: pageIndex)
     }
 
     mutating func seedFastLines(_ newLines: [OCREngine.TextLine], forPageIndex pageIndex: Int) {

@@ -1,0 +1,19 @@
+Property: An empty recognition result is blank only when its picture holds less ink than the floor; it is not always read.
+Area: Search, the account of what was read
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/AccountOfWhatWasReadTests (or on the host: cd Packages/RedactionEngine && swift test --filter AccountOfWhatWasReadTests)
+Must go red: RedactionEngineTests/AccountOfWhatWasReadTests row [C-19 an empty read on a picture with one line of print is not read]; RedactionEngineTests/AccountOfWhatWasReadTests row [C-20 a cached empty read reports what the fresh read did]; RedactionEngineTests/AccountOfWhatWasReadTests row [C-21 an empty read with no picture at hand is ink]; RedactionEngineTests/AccountOfWhatWasReadTests row [While no floor is set, every empty read is ink]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/PageInk.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/PageInk.swift
+index f2528b8b..37c98856 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/PageInk.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/PageInk.swift
+@@ -48,7 +48,7 @@ enum PageInk {
+ 
+     /// The empty read's answer from the share kept with it.
+     static func emptyRead(_ share: DarkShare?, setting: Setting? = PageInk.setting) -> PageSearchCoverage.EmptyRead {
+-        hasInk(share, floor: setting?.floor) ? .ink : .blank
++        .blank
+     }
+ 
+     /// The floor set from the two real ranges: the geometric mean of the

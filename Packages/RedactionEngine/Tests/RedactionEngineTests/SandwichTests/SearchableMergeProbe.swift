@@ -106,8 +106,8 @@ enum ProbeMeasureError: Error { case noOutput }
 
 enum SearchableMergeProbe {
 
-    static let cellWidth = TextLayerReconstructor.cellWidth          // 7.20117…pt
-    static let advanceTol = SandwichMetrics.advanceWidthTolerance // 0.25pt
+    static let cellWidth = SandwichMetrics.courierAdvancePerPoint * 12.0 // the 12 pt reference cell, 7.20117…pt
+    static let advanceTol: CGFloat = 0.25 // at 12 pt (`advanceWidthTolerancePerPoint × 12`)
     static let courierPerPt = SandwichMetrics.courierAdvancePerPoint
 
     /// Run verification layers `0..<count` on an output document. Returns the
@@ -432,7 +432,7 @@ enum SearchableMergeProbe {
         guard let ctx = CGContext(url as CFURL, mediaBox: &box, nil) else { return Data() }
         let font = CTFontCreateWithName("Courier" as CFString, 12.0, nil)
         let cw = cellWidth
-        // Same sort groupIntoRuns uses (Y desc, then X asc) so lines are stable.
+        // Same sort runMemberGroups uses (Y desc, then X asc) so lines are stable.
         let sorted = chars.sorted {
             if abs($0.bounds.midY - $1.bounds.midY) > $0.bounds.height * 0.5 {
                 return $0.bounds.midY > $1.bounds.midY
@@ -466,7 +466,7 @@ enum SearchableMergeProbe {
     /// Construct a surviving set mimicking a born-digital small-font two-column
     /// table: each row's left column starts at x=72, the right column at
     /// `rightX`, with per-glyph advance `advance` (the cell width the reconstructor
-    /// does NOT honor — it redraws at 7.20pt). The gap breaks `groupIntoRuns`
+    /// does NOT honor — it redraws at 7.20pt). The gap breaks `runMemberGroups`
     /// into two runs whose 12pt redraw overlaps. `y` descends per row.
     static func constructedTableSurviving(
         rows: [(left: String, right: String)],
@@ -512,13 +512,13 @@ enum SearchableMergeProbe {
     }
 
     /// Source-side (pre-reconstruction) structure of a surviving set. Explains
-    /// why `groupIntoRuns` does or does not split a line. Geometry/counts only.
+    /// why `runMemberGroups` does or does not split a line. Geometry/counts only.
     struct SourceAnalysis: Sendable {
         var survivingCount = 0
         var whitespaceCount = 0   // surviving chars that are whitespace (bridge gaps)
         var multiScalarCount = 0  // surviving graphemes with >1 unicode scalar
         var lineCount = 0
-        var breakCount = 0        // same-line adjacencies groupIntoRuns would split
+        var breakCount = 0        // same-line adjacencies runMemberGroups would split
         var sampleBreakGaps: [Double] = []  // first few break gaps (points)
         var medianGlyphWidth = 0.0
     }
@@ -532,7 +532,7 @@ enum SearchableMergeProbe {
             widths.append(Double(c.bounds.width))
         }
         if !widths.isEmpty { a.medianGlyphWidth = widths.sorted()[widths.count / 2] }
-        // Mirror groupIntoRuns' sort + adjacency rule exactly.
+        // Mirror runMemberGroups' sort + adjacency rule exactly.
         let sorted = chars.sorted {
             if abs($0.bounds.midY - $1.bounds.midY) > $0.bounds.height * 0.5 {
                 return $0.bounds.midY > $1.bounds.midY
@@ -559,12 +559,14 @@ enum SearchableMergeProbe {
         return a
     }
 
-    /// `groupIntoRuns` structure of a surviving set: run count + per-run length.
+    /// `runMemberGroups` structure of a surviving set: run count + per-run length.
     static func runStructure(_ chars: [CharacterInfo]) -> (runCount: Int, runLengths: [Int]) {
-        let runs = TextLayerReconstructor.groupIntoRuns(chars)
-        let lengths = runs.map { ($0.text as NSString).length == 0 ? 0
-            : composedLength(of: $0.text) }
-        return (runs.count, lengths)
+        let groups = TextLayerReconstructor.runMemberGroups(chars)
+        let lengths = groups.map { members -> Int in
+            let text = members.map { chars[$0].character }.joined()
+            return (text as NSString).length == 0 ? 0 : composedLength(of: text)
+        }
+        return (groups.count, lengths)
     }
 
     /// Number of NSString composed-character sequences in a string.

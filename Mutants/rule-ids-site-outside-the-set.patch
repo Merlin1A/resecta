@@ -1,0 +1,19 @@
+Property: A rule id written at a detection site is in the emitted set, and a match carrying an id outside it fails the family check.
+Area: the emitted rule ids, a detection site
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/EmittedRuleIDTests (or on the host: cd Packages/RedactionEngine && swift test --filter EmittedRuleIDTests)
+Must go red: RedactionEngineTests/EmittedRuleIDTests sourcesWriteExactlyTheEmittedSet; RedactionEngineTests/EmittedRuleIDTests everyFamilyYieldsEmittedIDs
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/Account/AccountDetector.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/Account/AccountDetector.swift
+index ab9828da..c9f414b8 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/Account/AccountDetector.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/Account/AccountDetector.swift
+@@ -50,7 +50,7 @@ struct AccountDetector: FamilyDetector {
+ 
+     func detect(in text: NSString, range: NSRange) -> [PIIDetector.PIIMatch] {
+         let fullText = text as String
+-        let ruleID = "account.regex"
++        let ruleID = "account.pattern"
+         return Self.pattern.matches(in: fullText, range: range).compactMap { match in
+             let matchedText = text.substring(with: match.range)
+             let confidence = scorer.score(
