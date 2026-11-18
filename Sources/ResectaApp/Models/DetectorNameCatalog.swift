@@ -4,8 +4,7 @@ import Foundation
 // mapping consumed by every rationale surface (ReverseRationalePopover,
 // SearchResultRow inline expander, MatchRationaleSheet, plus the canvas
 // viewers RegionRationaleSheet / RegionInfoPopover). Display vocabulary
-// ONLY: the audit-export vocabulary is a contract surface and keeps the
-// raw engine ruleIDs (RuleCatalog owns that translation).
+// ONLY: the engine's raw ruleIDs are unchanged by it.
 //
 // Fail-open contract: an unmapped ruleID renders the raw ID verbatim —
 // never blank. Surfaces keep the raw ID available in a secondary /
@@ -14,9 +13,8 @@ import Foundation
 enum DetectorNameCatalog {
 
     /// Engine ruleID → human-readable detector name. Keys mirror the
-    /// engine-emission vocabulary that `RuleCatalog.engineToCatalog`
-    /// aliases, plus the synthetic IDs (`user.alwaysFlag`, `pii.other`)
-    /// that intentionally have no catalog entry.
+    /// engine's `PIIDetector.emittedRuleIDs` (which includes the synthetic
+    /// IDs `user.alwaysFlag` and `pii.other`) and `reservedRuleIDs`.
     static let names: [String: String] = [
         // SSN — state-machine pass + regex fallback.
         "ssn.state-machine":    "SSN pattern check",

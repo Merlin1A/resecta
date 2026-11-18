@@ -1,0 +1,19 @@
+Property: No detection site writes a reserved rule id.
+Area: the emitted rule ids, the reserved set
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/EmittedRuleIDTests (or on the host: cd Packages/RedactionEngine && swift test --filter EmittedRuleIDTests)
+Must go red: RedactionEngineTests/EmittedRuleIDTests noSourceWritesAReservedID; RedactionEngineTests/EmittedRuleIDTests sourcesWriteExactlyTheEmittedSet; RedactionEngineTests/EmittedRuleIDTests everyFamilyYieldsEmittedIDs
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/NPI/NPIDetector.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/NPI/NPIDetector.swift
+index 1d6fbe9e..0a8351a2 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/NPI/NPIDetector.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/NPI/NPIDetector.swift
+@@ -41,7 +41,7 @@ struct NPIDetector: FamilyDetector {
+ 
+     func detect(in text: NSString, range: NSRange) -> [PIIDetector.PIIMatch] {
+         let fullText = text as String
+-        let ruleID = "npi.80840"
++        let ruleID = "barcode.vision"
+         return Self.pattern.matches(in: fullText, range: range).compactMap { match in
+             let matchedText = text.substring(with: match.range)
+             guard NPILuhn80840.isValid(matchedText) else { return nil }

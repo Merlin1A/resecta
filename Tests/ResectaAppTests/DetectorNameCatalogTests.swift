@@ -19,12 +19,12 @@ struct DetectorNameCatalogTests {
         #expect(DetectorNameCatalog.humanName(forRuleID: "pii.other") == "Other detector")
     }
 
-    @Test("Every RuleCatalog engine ruleID has a human name")
+    @Test("Every emitted or reserved engine ruleID has a human name")
     func fullEngineVocabularyCovered() {
-        // The engine-emission vocabulary is authoritatively enumerated by
-        // RuleCatalog's alias-map keys; any new emission added there must
-        // gain a display name here or this test flags the gap.
-        for ruleID in RuleCatalog.knownEngineRuleIDs {
+        // The engine's emitted set is held equal to the ids its detection
+        // sources write (EmittedRuleIDTests); any new emission added there
+        // must gain a display name here or this test flags the gap.
+        for ruleID in PIIDetector.emittedRuleIDs.union(PIIDetector.reservedRuleIDs) {
             #expect(DetectorNameCatalog.humanName(forRuleID: ruleID) != nil,
                     "missing human name for engine ruleID: \(ruleID)")
         }

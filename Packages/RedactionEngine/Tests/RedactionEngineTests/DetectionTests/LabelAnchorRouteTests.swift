@@ -219,7 +219,7 @@ struct LabelAnchorRouteTests {
         #expect(hit.rationale?.preThresholdScore == 0.65)
         #expect(hit.rationale?.finalScore == 0.65)
         #expect(hit.rationale?.signals == [.regexPattern(name: "name.label-anchor.label-colon")])
-        #expect(RuleCatalog.knownEngineRuleIDs.contains(Self.ruleID))
+        #expect(PIIDetector.emittedRuleIDs.contains(Self.ruleID))
     }
 
     @Test("The organisation marker set is case-folded and period-free")

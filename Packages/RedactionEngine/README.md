@@ -28,9 +28,7 @@ and pass the shared `Models/` types between them. A second target,
 function that puts `-[PDFDocument dataRepresentation]` behind an exception
 boundary.
 
-- **Audit** — Loads and translates the rule catalog from bundled JSON,
-  mapping engine-generated rule IDs to catalog version-stable
-  identifiers for audit-export record binding.
+- **Audit** — Reads the gazetteer manifest's version from bundled JSON.
 - **Detection** — The PII detectors the search path runs (regex and
   NLTagger matching, spatial address assembly, calibrated scoring and
   cross-category overlap resolution) and the document-type classifier

@@ -40,13 +40,14 @@ public struct MatchAuditRecord: Codable, Sendable, Equatable {
     /// Optional reviewer note captured alongside the exemption tag.
     let foiaNote: String?
     /// The rule catalog's `version` for the rule that fired (e.g. "1.0").
-    /// Nil when the engine emits a ruleID without a catalog alias
-    /// (synthetic `user.alwaysFlag`, fallback `pii.other`). Resolved via
-    /// `RuleCatalog.shared.entry(forEngineRuleID:)`.
+    /// Nil unless the code that builds the record supplies one: nothing
+    /// in the engine looks it up, and the exporter copies it through
+    /// unchanged.
     let ruleVersion: String?
     /// `version` field from `gazetteer-manifest.json` (e.g.
-    /// "1.0.0"). Nil when the manifest is absent (test contexts) or
-    /// when a decode error occurred (logged in `ExportMetadataLoader`).
+    /// "1.0.0"). Nil unless the code that builds the record supplies
+    /// one: nothing in the engine reads the manifest into it, and the
+    /// exporter copies it through unchanged.
     let gazetteerManifestVersion: String?
 
     public init(
