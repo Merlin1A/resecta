@@ -47,6 +47,7 @@ struct HiddenTextFontsTests {
         Run(name: "an English word holding the replacement character", text: "Rep\u{FFFD}rt"),
         Run(name: "an English word holding a direction mark", text: "Report\u{200E}"),
         Run(name: "a year followed by a Han character", text: "2024\u{5E74}"),
+        Run(name: "an English word with an emoji in it", text: "Done\u{1F600}"),
     ]
 
     @Test("A run with a character no face has, or one the hidden text never holds, cannot be written",
@@ -56,9 +57,9 @@ struct HiddenTextFontsTests {
         #expect(HiddenTextFonts.choice(for: run.text) == nil)
     }
 
-    @Test("The runs left out on every build are eleven")
+    @Test("The runs left out on every build are twelve")
     func outLength() {
-        #expect(Self.outOnEveryBuild.count == 11)
+        #expect(Self.outOnEveryBuild.count == 12)
     }
 
     @Test("The object mark is passed over: it is no reason to leave a run out")
