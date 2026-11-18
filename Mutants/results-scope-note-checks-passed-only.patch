@@ -13,7 +13,7 @@ index 672065ac..26e5c141 100644
      static func shows(report: VerificationReport, sentences: [String]) -> Bool {
          !sentences.isEmpty
 -            && VerificationResultsView.mastheadTitle(report: report) == VerificationStatus.pass.title
-+            && VerificationResultsView.mastheadTitle(report: report) != VerificationStatus.fail.title
++            && VerificationResultsView.mastheadTitle(report: report) != VerificationStatus.fail("").title
      }
  
      /// The paragraph drawn, or nil.
