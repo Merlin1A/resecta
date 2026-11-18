@@ -319,9 +319,11 @@ nonisolated final class EditorToolbarUITests: XCTestCase {
     }
 
     /// The bar's words show whole at the default size: each part is at least
-    /// as wide as its words set in the bar's font. A part offered less than
-    /// its words draws them cut short ("Dupli…") in a narrower frame.
-    func testSelectionBar_wordsShowWholeAtTheDefaultSize() {
+    /// as wide as its words set in the bar's font, and Duplicate's teal ink
+    /// is as wide as its word. A part's frame can stay wide while the word
+    /// inside it is offered less and drawn cut short ("Dupli…"), so the ink
+    /// is read from the screen, not from the frame.
+    func testSelectionBar_wordsShowWholeAtTheDefaultSize() throws {
         launchWithOneDrawnBoxSelected()
         let pointSize = UIFont.preferredFont(forTextStyle: .subheadline).pointSize
         func width(_ words: String, _ font: UIFont) -> CGFloat {
@@ -338,6 +340,15 @@ nonisolated final class EditorToolbarUITests: XCTestCase {
             XCTAssertGreaterThanOrEqual(part.frame.width, width(words, font) - 1,
                 "\"\(words)\" is cut short: its part is \(part.frame.width) pt wide, the words \(width(words, font)) pt.")
         }
+        // Duplicate's word is drawn in the brand teal: its ink, a few points
+        // narrower than its set width for the letters' side bearings, and
+        // about 24 pt narrower when the word is cut short.
+        let duplicate = barPart("selectionBarDuplicate")
+        let probe = try XCTUnwrap(CanvasPixelProbe(XCUIScreen.main.screenshot(), windowSize: app.windows.firstMatch.frame.size))
+        let ink = try XCTUnwrap(probe.tintBounds(.teal, in: duplicate.frame), "No teal ink inside Duplicate's part.")
+        let set = width("Duplicate", .systemFont(ofSize: pointSize, weight: .semibold))
+        XCTAssertGreaterThanOrEqual(ink.width, set - 4,
+            "\"Duplicate\" is drawn cut short: its teal ink is \(ink.width) pt wide, the word \(set) pt.")
     }
 
     func testSelectionBar_atAccessibilityOneAndTheLargestSize_holdsItsCeiling() {
