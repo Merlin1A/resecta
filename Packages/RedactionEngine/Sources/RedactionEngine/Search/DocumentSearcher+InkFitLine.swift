@@ -19,7 +19,7 @@ extension DocumentSearcher {
         while first < range.location,
               let scalar = Unicode.Scalar(text.character(at: first)), CharacterSet.whitespaces.contains(scalar) { first += 1 }
         guard let start = page.selection(for: NSRange(location: first, length: 1))
-                .flatMap({ DocumentSearcher().normalizedRect(for: $0, page: page) }) else { return box.width }
+                .flatMap({ DocumentSearcher().clampedNormalizedRect(for: $0, page: page) }) else { return box.width }
         let startBox = frame.toReading(CGRect(x: start.minX * visual.width, y: start.minY * visual.height,
                                               width: start.width * visual.width, height: start.height * visual.height))
         return max(box.maxX - startBox.minX, 0)

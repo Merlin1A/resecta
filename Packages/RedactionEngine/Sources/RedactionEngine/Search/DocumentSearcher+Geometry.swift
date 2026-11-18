@@ -152,7 +152,21 @@ extension DocumentSearcher {
         let visiblePage = CGRect(x: 0, y: 0, width: visual.width, height: visual.height)
         let overlap = visual.bounds.intersection(visiblePage)
         guard !overlap.isNull, !overlap.isEmpty else { return nil }
-        return CGRect(
+        return Self.normalized(visual)
+    }
+
+    /// The same transform with no visible-page test: a rect wholly off the
+    /// visible page is clamped onto its edge, as every rect was before an
+    /// off-page match was given no box. The ink fit measures with it (a
+    /// line's first letter, a letter's layer box, the reading direction):
+    /// there an off-page letter is a position to measure from, not a box to
+    /// paint, and the clamped edge keeps the drift bound as wide as it was.
+    nonisolated func clampedNormalizedRect(for selection: PDFSelection, page: PDFPage) -> CGRect? {
+        visualBounds(for: selection, page: page).map(Self.normalized)
+    }
+
+    private nonisolated static func normalized(_ visual: (bounds: CGRect, width: CGFloat, height: CGFloat)) -> CGRect {
+        CGRect(
             x: visual.bounds.minX / visual.width,
             y: visual.bounds.minY / visual.height,
             width: visual.bounds.width / visual.width,

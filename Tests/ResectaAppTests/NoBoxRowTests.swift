@@ -99,6 +99,26 @@ struct NoBoxRowTests {
         #expect(state.totalCount == 1)
     }
 
+    @Test("The scan's deselection snapshot leaves out a result with no box: nobody un-ticked it")
+    func snapshotLeavesItOut() throws {
+        let state = SearchState()
+        state.searchModeType = .piiScan
+        let left = SearchResult(pageIndex: 0, normalizedRect: CGRect(x: 0.1, y: 0.3, width: 0.2, height: 0.03),
+                                matchedText: "487-63-2210", contextSnippet: "…487-63-2210…", source: .textLayer,
+                                term: "SSN", isSelected: false, piiCategory: .ssn, piiConfidence: 0.9)
+        let noBox = SearchResult(pageIndex: 0, normalizedRect: .zero, matchedText: "487-63-2211",
+                                 contextSnippet: "…487-63-2211…", source: .textLayer, term: "SSN", isSelected: false,
+                                 piiCategory: .ssn, piiConfidence: 0.9, hasBox: false)
+        state.results = [left, noBox]
+        state.setCoverageReport(CoverageReport(
+            scannedPageCount: 1, enabledCategories: [.ssn], candidateCountByCategory: [.ssn: 2],
+            appliedCount: 0, deselectedCount: 0, belowThresholdSuppressedCount: 0,
+            overlapSuppressedCountByCategory: [:],
+            startedAt: Date(timeIntervalSince1970: 0), completedAt: Date(timeIntervalSince1970: 1)))
+        let snapshot = try #require(state.deselectionSnapshotForRun())
+        #expect(snapshot.items.map(\.id) == [left.id], "only the boxed match a person left un-ticked")
+    }
+
     @Test("The row's words are the approved sentence, word for word; off the visible page, its first sentence alone")
     func words() {
         #expect(NoBoxRowCopy.sentence(pageIndex: 20, liesOffVisiblePage: false)

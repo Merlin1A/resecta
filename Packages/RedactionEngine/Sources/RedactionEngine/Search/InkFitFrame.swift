@@ -59,9 +59,9 @@ extension DocumentSearcher {
         text.enumerateSubstrings(in: NSRange(location: 0, length: text.length), options: .byWords) { word, range, _, stop in
             guard let word, word.count >= 3, range.length >= 3 else { return }
             guard let first = page.selection(for: NSRange(location: range.location, length: 1))
-                    .flatMap({ searcher.normalizedRect(for: $0, page: page) }),
+                    .flatMap({ searcher.clampedNormalizedRect(for: $0, page: page) }),
                   let last = page.selection(for: NSRange(location: NSMaxRange(range) - 1, length: 1))
-                    .flatMap({ searcher.normalizedRect(for: $0, page: page) }) else { return }
+                    .flatMap({ searcher.clampedNormalizedRect(for: $0, page: page) }) else { return }
             let dx = (last.midX - first.midX) * visual.width, dy = (last.midY - first.midY) * visual.height
             let length = hypot(dx, dy)
             guard length > 0 else { return }

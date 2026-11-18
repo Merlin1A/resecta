@@ -150,6 +150,53 @@ struct NoBoxHitTests {
         Self.expectOneUnboxed(hits, offPage: true, "off the visible page")
     }
 
+    /// One page whose crop box reaches past its media box sideways: the
+    /// visible page starts at x = 100, so the line drawn from x = 72 has its
+    /// first letters off the page and its last word on it.
+    static func lineStartingOffPage() -> Data {
+        let stream = "BT /F1 18 Tf 72 400 Td (AB VISIBLE WORDS MATCHWORD) Tj ET"
+        return buildRawPDF(objects: [
+            PDFObject(id: 1, content: "<< /Type /Catalog /Pages 2 0 R >>"),
+            PDFObject(id: 2, content: "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+            PDFObject(id: 3, content: "<< /Type /Page /Parent 2 0 R /MediaBox [100 0 612 792] /CropBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>"),
+            PDFObject(id: 4, content: "<< /Length \(stream.utf8.count) >>\nstream\n\(stream)\nendstream"),
+            PDFObject(id: 5, content: "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"),
+        ], rootId: 1)
+    }
+
+    @Test("the ink fit measures a line whose first letter is off the visible page from the page's edge, as before")
+    func inkFitLineStartOffPage() throws {
+        let doc = try #require(PDFDocument(data: Self.lineStartingOffPage()))
+        let page = try #require(doc.page(at: 0))
+        let text = try #require(page.string) as NSString
+        let first = text.range(of: "A"), match = text.range(of: "MATCHWORD")
+        try #require(first.location != NSNotFound && match.location != NSNotFound)
+        let searcher = DocumentSearcher()
+        let firstLetter = try #require(page.selection(for: first))
+        // The premise: the line's first letter lies wholly off the visible page.
+        #expect(searcher.normalizedRect(for: firstLetter, page: page) == nil, "the first letter has no box of its own")
+        let clamped = try #require(searcher.clampedNormalizedRect(for: firstLetter, page: page))
+        #expect(clamped.minX == 0, "measured from the page's left edge")
+        let cropBox = page.bounds(for: .cropBox)
+        let visual = CGSize(width: cropBox.width, height: cropBox.height)
+        let matchRect = try #require(searcher.normalizedRect(for: try #require(page.selection(for: match)), page: page))
+        let box = CGRect(x: matchRect.minX * visual.width, y: matchRect.minY * visual.height,
+                         width: matchRect.width * visual.width, height: matchRect.height * visual.height)
+        let distance = DocumentSearcher.distanceFromLineStart(of: match, box: box, page: page,
+                                                              visual: visual, frame: .upright(visual))
+        #expect(abs(distance - box.maxX) < 0.001, "from the clamped first letter to the match's end: the drift bound as wide as before")
+        #expect(distance > box.width + 1, "never the match's own width, the narrower bound")
+    }
+
+    @Test("a line partly on the visible page keeps its box, clamped to the page's edge")
+    func partlyVisibleLineKeepsItsBox() async throws {
+        let hits = try await Self.results(Self.lineStartingOffPage(), .text("AB VISIBLE", options: SearchOptions()))
+        #expect(hits.count == 1)
+        let hit = try #require(hits.first)
+        #expect(hit.hasBox, "part of the line is on the page: it keeps a box")
+        #expect(hit.normalizedRect.minX == 0 && hit.normalizedRect.width > 0, "clamped to the page's left edge")
+    }
+
     @Test("an always-flag term with no width is one row with no box")
     func alwaysFlagText() async throws {
         let searcher = DocumentSearcher()
