@@ -144,7 +144,10 @@ extension VerificationEngine {
     /// The source page's hidden characters, in `page.string` order: each
     /// composed character that is not whitespace, boxed by its own selection
     /// in the frame the regions use, with its line. A character PDFKit gives
-    /// no box is left out (the writer cannot have drawn it either).
+    /// no box is left out (the writer cannot have drawn it either). A
+    /// character wholly off the visible page keeps its box clamped to the
+    /// page's edge (`clampedNormalizedRect`): it stays a candidate the
+    /// export's words are aligned against.
     static func hiddenWordInkSourceGlyphs(_ page: PDFPage) -> [HiddenWordInkGlyph] {
         let text = (page.string ?? "") as NSString
         let searcher = DocumentSearcher()
@@ -154,7 +157,7 @@ extension VerificationEngine {
             text.enumerateSubstrings(in: lineRange, options: .byComposedCharacterSequences) { sub, range, _, _ in
                 guard let sub, let char = sub.first, !char.isWhitespace,
                       let selection = page.selection(for: range),
-                      let rect = searcher.normalizedRect(for: selection, page: page) else { return }
+                      let rect = searcher.clampedNormalizedRect(for: selection, page: page) else { return }
                 glyphs.append(HiddenWordInkGlyph(char: char, rect: rect, line: line))
             }
             line += 1
