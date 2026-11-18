@@ -224,7 +224,6 @@ struct FactRowTests {
             // Counted from what the screen draws, not from the rule's own function.
             let ownRow = sweep.map { index in
                 Section.groups(partition).contains { $0.indices.contains(index) }
-                    || Section.isEveryCheckPassed(partition)
             } ?? false
             let card = Self.card(report).contains { if case .fact(let f) = $0 { f.id == "sweepLimit" } else { false } }
             #expect((ownRow ? 1 : 0) + (card ? 1 : 0) == (sweep == nil ? 0 : 1), "\(name)")

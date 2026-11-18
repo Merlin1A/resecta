@@ -126,12 +126,12 @@ struct VerificationDetailsSection: View {
     }
 
     /// Whether the sweep's own row is in view on the closed screen: in one
-    /// of the groups drawn above the list of checks, or in the headed list
-    /// a run where every check passed draws. A row inside the list of
-    /// checks does not count, even where the list arrives open: it can be
-    /// closed.
+    /// of the groups drawn above the list of checks. A row inside the list
+    /// of checks does not count, even where the list arrives open: it can
+    /// be closed. (A run where every check passed draws its checks inside
+    /// the closed row too, so the card holds the limit there.)
     static func sweepRowInView(_ partition: VerificationLayerPartition, sweepIndex: Int) -> Bool {
-        groups(partition).contains { $0.indices.contains(sweepIndex) } || isEveryCheckPassed(partition)
+        groups(partition).contains { $0.indices.contains(sweepIndex) }
     }
 
     /// The card's row with the Detection Sweep's limit, in the words of the
