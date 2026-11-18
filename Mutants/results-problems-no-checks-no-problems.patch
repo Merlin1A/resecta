@@ -1,0 +1,21 @@
+Property: A report with no checks has no problem with a check behind it.
+Area: results (the problems model)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationProblemModelTests
+Must go red: ResectaAppTests/VerificationProblemModelTests reportsWhoseChecksDidNotRun
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationProblemModel.swift b/Sources/ResectaApp/Views/VerificationProblemModel.swift
+index c070f072..61abe569 100644
+--- a/Sources/ResectaApp/Views/VerificationProblemModel.swift
++++ b/Sources/ResectaApp/Views/VerificationProblemModel.swift
+@@ -83,6 +83,10 @@ nonisolated enum VerificationProblemModel {
+     /// (`DocumentState.sourceFilledFormFieldCount`). A report with no checks
+     /// yields only the two kinds with no check behind them.
+     static func derive(report: VerificationReport, coveredPages: [Int], formValueCount: Int) -> [VerificationProblem] {
++        if report.layers.isEmpty {
++            return [VerificationProblem(kind: .skippedChecks, mark: .couldNotVerify, count: 0, words: [], pages: [],
++                                        checks: [], id: name(.skippedChecks))]
++        }
+         var failed: [VerificationProblem.Check] = []
+         var readable: [VerificationProblem.Check] = []
+         var partOfBoxed: [VerificationProblem.Check] = []
