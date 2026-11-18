@@ -162,6 +162,11 @@ struct FactRowTests {
         for kept in ["\"runFactsStrip\"", "\"deselectionRow\"", "\"pageModesSection\""] {
             #expect(source.contains(kept), "\(kept)")
         }
+        // The rows are drawn in FactRow.swift: no symbol there either.
+        let rows = try String(contentsOf: URL(fileURLWithPath: "\(#filePath)")
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/ResectaApp/Views/FactRow.swift"), encoding: .utf8)
+        #expect(!rows.contains("Image("), "FactRow.swift draws no image")
     }
 
     // MARK: - The Detection Sweep's limit
