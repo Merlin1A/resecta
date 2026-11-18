@@ -34,6 +34,14 @@ nonisolated final class VerificationRunningUITests: XCTestCase {
         let drawTool = app.buttons["drawTool"]
         XCTAssertTrue(drawTool.waitForExistence(timeout: 30),
                       "The editor's Rectangle tool never appeared — check the --loadTestDocument launch hook.")
+        // At the largest text size the import's "Text layer detected" toast
+        // runs to full height over the middle of the page while it shows, so
+        // a drag then lands on the toast and draws nothing (a recording
+        // shows it at 6 s). Draw once it has gone, as
+        // SearchAccessibilitySizeUITests waits before its tap.
+        let toast = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Text layer detected")).firstMatch
+        XCTAssertTrue(toast.waitForNonExistence(timeout: 20), "The import toast never cleared off the page.")
         setDrawTool("Drawing mode active")
         let window = app.windows.firstMatch
         window.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.55))
