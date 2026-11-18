@@ -499,8 +499,9 @@ private extension UXFixesUITests {
         return value.hasPrefix("On") || value == "1" || row.isSelected ? .on : .off
     }
 
-    /// Close the overflow menu by tapping the navigation bar near its leading
-    /// end, which holds no control, so the tap cannot change editor state. Not
+    /// Close the overflow menu by tapping the navigation bar 8 pt in from its
+    /// leading edge, before the toolbar's first group (it starts at 16 pt; the
+    /// Rectangle tool's frame at 20), so the tap cannot change editor state. Not
     /// its middle: the open menu, anchored to More, covers it, so a tap there
     /// lands inside the menu and leaves it up. Not the toolbar's blank strip,
     /// which can leave the menu up, nor the page bar's counter, which now
@@ -509,7 +510,7 @@ private extension UXFixesUITests {
     nonisolated func closeOverflowMenu(rows: [XCUIElement]) {
         let navigationBar = app.navigationBars.firstMatch
         XCTAssertTrue(navigationBar.waitForExistence(timeout: 5), "The navigation bar never appeared.")
-        navigationBar.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.5)).tap()
+        navigationBar.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0.5)).withOffset(CGVector(dx: 8, dy: 0)).tap()
         for row in rows {
             XCTAssertTrue(row.waitForNonExistence(timeout: 5), "The overflow menu did not close.")
         }
