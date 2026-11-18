@@ -22,8 +22,9 @@
 # a file that a leg's grep cannot read (grep's exit 2), in every leg. A
 # matcher that fails (keep_offending or length_claims exiting non-zero) fails
 # the lint too, and so does a line filter that fails: the sweep runs with set -e
-# off, so each call is checked. The tree's path is read as text, never as a
-# pattern.
+# off, so each call is checked. The root is matched and cut as fixed text,
+# never as a pattern. The Swift tree operands are not yet quoted, so a checkout
+# path holding a space or a glob character is not yet supported.
 #
 # Usage: Scripts/claims-lint.sh              (the sweep; exit 0 PASS, 1 FAIL)
 #        Scripts/claims-lint.sh --self-test  (scratch trees; reads only the list file, for the
