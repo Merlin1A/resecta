@@ -269,7 +269,7 @@ struct PageImageReadTests {
             var cursor = 0
             var claimed: [Range<Int>] = []
             for index in 0..<source.pageCount {
-                let image = source.images(onPage: index)
+                guard case .success(let image) = source.images(onPage: index) else { continue }
                 guard image.count == 1, F.sha256(image[0].bytes) == F.sha256(pictures[index]),
                       let range = PageImageLocator.place(image[0].bytes, in: file, from: cursor, avoiding: claimed) else { continue }
                 claimed.append(range)

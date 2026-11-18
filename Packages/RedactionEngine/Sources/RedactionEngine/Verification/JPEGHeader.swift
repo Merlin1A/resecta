@@ -200,6 +200,8 @@ struct JPEGHeader: Sendable {
 
             case 0xDA:
                 guard sawFrame else { throw refuse(.scanBeforeFrame, i) }
+                // The component count is read only from inside the segment.
+                guard length >= 3 else { throw refuse(.scanNotEveryComponent, i) }
                 let count = Int(b[body])
                 guard count == header.components.count, length == 6 + 2 * count else {
                     throw refuse(.scanNotEveryComponent, i)
