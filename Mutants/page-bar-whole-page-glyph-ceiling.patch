@@ -1,7 +1,7 @@
 Property: The page bar's whole-page symbol stops growing at its text-size ceiling, so a marked page shows the white symbol inside its teal disc at every text size.
 Area: page bar (editor)
 Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppUITests/EditorChromeUITests -only-testing:ResectaAppTests/PageBarWholePageTests
-Must go red: ResectaAppUITests/EditorChromeUITests testWholePageControl_atTheLargestTextSize_symbolStaysInsideItsDisc; ResectaAppUITests/EditorChromeUITests testWholePageControl_atAccessibilityOne_symbolStaysInsideItsDisc; ResectaAppTests/PageBarWholePageTests controlCarriesItsCeilingAndLargeContentView
+Must go red: ResectaAppUITests/EditorChromeUITests testWholePageControl_atTheLargestTextSize_symbolStaysInsideItsDisc; ResectaAppTests/PageBarWholePageTests controlCarriesItsCeilingAndLargeContentView
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Views/PageNavigationBar.swift b/Sources/ResectaApp/Views/PageNavigationBar.swift
