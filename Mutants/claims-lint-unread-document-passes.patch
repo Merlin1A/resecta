@@ -5,10 +5,10 @@ Must go red: the self-test case "a listed document the banned-term matcher canno
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Scripts/claims-lint.sh b/Scripts/claims-lint.sh
-index 266a76f1..984e47af 100755
+index 3c4a664c..5f3f2f99 100755
 --- a/Scripts/claims-lint.sh
 +++ b/Scripts/claims-lint.sh
-@@ -151,10 +151,6 @@ sweep() { # $1 = the tree root
+@@ -153,10 +153,6 @@ sweep() { # $1 = the tree root
          fi
          # grep exits 1 for no match and 2 when it cannot read the file.
          grc=0; raw=$("$GREP" -nEi "$PATTERNS" "$ROOT/$f") || grc=$?
@@ -16,6 +16,6 @@ index 266a76f1..984e47af 100755
 -            echo "CLAIMS-LINT FAIL: the banned terms could not be matched on $f"
 -            fail=1
 -        fi
-         hits=$(printf '%s\n' "$raw" | keep_offending "$PATTERNS")
-         if [ -n "$hits" ]; then
-             echo "CLAIMS-LINT FAIL: $f"
+         hits=$(printf '%s\n' "$raw" | keep_offending "$PATTERNS") || {
+             echo "CLAIMS-LINT FAIL: the banned-term matcher did not run on $f"
+             fail=1

@@ -1,0 +1,22 @@
+Property: A banned-term matcher that fails on the Swift string literals fails the lint.
+Area: claims lint (Scripts/claims-lint.sh)
+Test command: Scripts/claims-lint.sh --self-test
+Must go red: the self-test case "a banned-term matcher that fails on the Swift string literals" (the self-test ends FAIL)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Scripts/claims-lint.sh b/Scripts/claims-lint.sh
+index 3c4a664c..d0b041c5 100755
+--- a/Scripts/claims-lint.sh
++++ b/Scripts/claims-lint.sh
+@@ -197,10 +197,7 @@ sweep() { # $1 = the tree root
+             | "$GREP" -v "^$ROOT/$LIST_FILE:" \
+             | "$GREP" '"' \
+             | "$GREP" -vE '^[^:]+:[0-9]+:[[:space:]]*//' \
+-            | keep_offending "$PATTERNS") || {
+-            echo "CLAIMS-LINT FAIL: the banned-term matcher did not run on the Swift string literals"
+-            fail=1
+-        }
++            | keep_offending "$PATTERNS")
+         if [ -n "$SWIFT_HITS" ]; then
+             echo "CLAIMS-LINT FAIL (Swift string literals):"
+             echo "$SWIFT_HITS"

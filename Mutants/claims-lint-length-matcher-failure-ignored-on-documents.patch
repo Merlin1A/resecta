@@ -1,0 +1,22 @@
+Property: A length-claim matcher that fails on a listed document fails the lint.
+Area: claims lint (Scripts/claims-lint.sh)
+Test command: Scripts/claims-lint.sh --self-test
+Must go red: the self-test case "a length-claim matcher that fails on a listed document" (the self-test ends FAIL)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Scripts/claims-lint.sh b/Scripts/claims-lint.sh
+index 3c4a664c..31d74a25 100755
+--- a/Scripts/claims-lint.sh
++++ b/Scripts/claims-lint.sh
+@@ -167,10 +167,7 @@ sweep() { # $1 = the tree root
+             fail=1
+         fi
+         if [ "$LENGTH_PATTERNS" = on ]; then
+-            if ! hits=$(length_claims doc "$ROOT/$f"); then
+-                echo "CLAIMS-LINT FAIL: the length-claim patterns did not run on $f"
+-                fail=1
+-            fi
++            hits=$(length_claims doc "$ROOT/$f")
+             hits=$(printf '%s' "$hits" | sed "s|^$ROOT/||")
+             if [ -n "$hits" ]; then
+                 echo "CLAIMS-LINT FAIL (length claim): $f"
