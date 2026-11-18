@@ -148,13 +148,16 @@ enum InkContrastFloor {
     /// above the box's bottom — between the baseline and the x-height in a
     /// Latin face, where every letter and digit has both stroke and space.
     /// The font's height runs across the displayed frame on a page turned a
-    /// quarter. Nil when the band covers no pixel.
+    /// quarter. Nil when the band covers no pixel. `content`: the page's
+    /// content basis, as the fills map on it; nil for a bitmap whose content
+    /// spans it exactly.
     static func glyphCore(
-        _ normalized: CGRect, rotation: Int, bitmapWidth: Int, bitmapHeight: Int
+        _ normalized: CGRect, rotation: Int, bitmapWidth: Int, bitmapHeight: Int, content: CGSize? = nil
     ) -> CGRect? {
         let w = CGFloat(bitmapWidth), h = CGFloat(bitmapHeight)
-        var minX = normalized.minX * w, maxX = normalized.maxX * w
-        var minY = normalized.minY * h, maxY = normalized.maxY * h
+        let cw = content?.width ?? w, ch = content?.height ?? h
+        var minX = normalized.minX * cw, maxX = normalized.maxX * cw
+        var minY = normalized.minY * ch, maxY = normalized.maxY * ch
         if (((rotation % 360) + 360) % 360) % 180 == 0 {
             (minY, maxY) = (minY + 0.35 * (maxY - minY), minY + 0.65 * (maxY - minY))
         } else {
