@@ -96,7 +96,7 @@ public final class PageRasterizer: @unchecked Sendable {
     /// Drop every entry in the per-rasterizer bitmap pool. Called from
     /// `PipelineCoordinator.memoryWarningTask` after iOS posts a memory
     /// warning, so the up to ~135 MB of held bitmap buffers (4 entries ×
-    /// a ~33.7 MB US-Letter raster: 2550×3301 px × 4 B at 300 DPI) are
+    /// a ~33.7 MB US-Letter raster: 2550×3300 px × 4 B at 300 DPI) are
     /// released immediately rather than waiting for the rasterizer to drop at
     /// run end. Idempotent and thread-safe against in-flight
     /// `rasterize(...)` calls (pool guards `entries` internally).
@@ -681,10 +681,12 @@ public final class PageRasterizer: @unchecked Sendable {
             ? CGSize(width: rawRect.height, height: rawRect.width)
             : rawRect.size
 
-        // Compute pixel dimensions at target DPI
+        // The raster's size by the raster rule; the drawing scale stays dpi / 72.
         let scale = dpi / 72.0
-        let pw = Int(ceil(effectiveSize.width * scale))
-        let ph = Int(ceil(effectiveSize.height * scale))
+        guard let raster = Self.rasterPixelSize(bounds: rawRect, rotation: rotation, dpi: dpi) else {
+            throw PipelineError.redactionError(.bitmapCreationFailed(pageIndex: pageIndex))
+        }
+        let pw = raster.width, ph = raster.height
 
         guard let ctx = createBitmapContext(width: pw, height: ph) else {
             throw PipelineError.redactionError(.bitmapCreationFailed(pageIndex: pageIndex))
@@ -737,6 +739,18 @@ public final class PageRasterizer: @unchecked Sendable {
 }
 
 extension PageRasterizer {
+    /// The raster's size by the raster rule (`PixelPlan`): each side in whole
+    /// sixty-fourths, then ⌈S·d / 4608⌉ pixels. Nil for a refused side or DPI.
+    static func rasterPixelSize(bounds: CGRect, rotation: Int, dpi: CGFloat) -> (width: Int, height: Int)? {
+        let size = effectiveBounds(bounds, rotation: rotation).size
+        guard dpi.rounded() == dpi,
+              let w = PixelPlan.sixtyFourths(ofSide: Double(size.width)),
+              let h = PixelPlan.sixtyFourths(ofSide: Double(size.height)),
+              let raster = PixelPlan.Raster(widthSixtyFourths: w, heightSixtyFourths: h, dpi: Int(dpi))
+        else { return nil }
+        return (raster.pixelWidth, raster.pixelHeight)
+    }
+
     /// The transform that draws `cgPage`'s `box` into `targetRect` in the
     /// rotation frame PDFKit reports (`rotation`, the `PDFPage.rotation`
     /// every region is built in). CoreGraphics' `getDrawingTransform`
