@@ -34,12 +34,14 @@ nonisolated final class VerificationRunningUITests: XCTestCase {
         let drawTool = app.buttons["drawTool"]
         XCTAssertTrue(drawTool.waitForExistence(timeout: 30),
                       "The editor's Rectangle tool never appeared — check the --loadTestDocument launch hook.")
-        drawTool.tap()
+        setDrawTool("Drawing mode active")
         let window = app.windows.firstMatch
         window.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.55))
             .press(forDuration: 0.05,
-                   thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.70, dy: 0.62)))
-        drawTool.tap()
+                   thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.70, dy: 0.62)),
+                   withVelocity: .slow, thenHoldForDuration: 0.2)
+        setDrawTool("Tap to enter drawing mode")
+        XCTAssertTrue(waitForOneRegion(), "The drag drew no box, so Redact cannot start a run.")
         tapRedact()
         let running = app.descendants(matching: .any)["verificationBanner"]
         if !running.waitForExistence(timeout: 120) {
@@ -83,6 +85,33 @@ nonisolated final class VerificationRunningUITests: XCTestCase {
         XCTAssertFalse(block.intersects(trust.frame),
                        "The trust line lies over the block: block \(block), trust line \(trust.frame).")
         attachScreenshot(named: "running-03-largest")
+    }
+
+    /// Taps the Rectangle tool until it reads `value` (its accessibility
+    /// value, or the label on iOS 27), as the canvas tests do: one tap may
+    /// land before the bar is ready, most of all at the largest text sizes.
+    private func setDrawTool(_ value: String) {
+        let tool = app.buttons["drawTool"]
+        for _ in 0..<3 {
+            tool.tap()
+            let deadline = Date().addingTimeInterval(6)
+            while Date() < deadline {
+                if tool.drawToolReads(value) { return }
+                usleep(250_000)
+            }
+        }
+        XCTFail("The Rectangle tool never read \(value).")
+    }
+
+    /// Whether the page counter reads one region within 8 seconds.
+    private func waitForOneRegion() -> Bool {
+        let counter = app.descendants(matching: .any).matching(identifier: "pageNavCounter").firstMatch
+        let deadline = Date().addingTimeInterval(8)
+        while Date() < deadline {
+            if counter.exists, counter.label.range(of: #"\b1 region\b"#, options: .regularExpression) != nil { return true }
+            usleep(250_000)
+        }
+        return false
     }
 
     /// Redact sits in the bar beside Undo; at the largest text sizes it is
