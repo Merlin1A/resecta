@@ -120,6 +120,9 @@ extension PipelineCoordinator {
             throw CancellationError()
         }
 
+        // What the writer says it did joins what the rasterizer said: which
+        // way found the information dictionary for the fixed-value rewrite.
+        produced.record(writer: await reconstructor.produced)
         return PipelineRunContext(
             outputURL: outputURL,
             filterDigests: filterDigests,

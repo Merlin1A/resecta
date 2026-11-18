@@ -17,8 +17,9 @@ import OSLog
 /// write model. The per-page verification retry re-rasterizes and re-appends
 /// *before* a page is drawn, so no page is ever replaced after the fact. The
 /// output bytes do not depend on when a page is drawn: `CGPDFContext`
-/// re-encodes each drawn image independently, and pages are drawn in
-/// 0..<count append order, so the PDF, its metadata, and the atomic-rename
+/// writes each drawn page image's JPEG bytes into the file unchanged
+/// (measured on 193 of 193 pages), and pages are drawn in 0..<count append
+/// order, so the PDF, its metadata, and the atomic-rename
 /// pattern are the same whether pages are buffered or drawn as they arrive.
 ///
 /// Atomicity: the temp file at `tempURL` is created on the first `appendPage`
@@ -157,11 +158,10 @@ public actor PDFStreamReconstructor {
         let ownMediaBox: Data? = page.size == firstPageSize
             ? nil : Data(bytes: &pageBox, count: MemoryLayout<CGRect>.size)
         let didWrite: Bool = autoreleasepool {
-            // Decode the buffered JPEG. CGPDFContext
-            // re-encodes any drawn image, so passthrough is not preserved in
-            // the output stream; the output bytes do not depend on when a
-            // page is drawn. The decode cost (a few milliseconds) is paid
-            // once per page.
+            // Wrap the buffered JPEG as an image. CGPDFContext writes the
+            // JPEG's bytes into the output stream unchanged (measured on 193
+            // of 193 pages), so the output bytes do not depend on when a page
+            // is drawn. The cost (a few milliseconds) is paid once per page.
             guard let provider = CGDataProvider(data: page.jpegData as CFData),
                   let jpegImage = CGImage(
                       jpegDataProviderSource: provider,
@@ -220,7 +220,7 @@ public actor PDFStreamReconstructor {
         // overwritten at its exact length), so every xref offset stays
         // valid. Any anomaly leaves that literal untouched — the export
         // never fails on this step.
-        Self.overwriteInfoLiterals(at: tempURL)
+        infoDictionaryWay = Self.overwriteInfoLiterals(at: tempURL)
 
         // The writer also stamps a random per-export `/ID` pair in the
         // trailer. Both halves are rewritten, at their exact offsets, to the
@@ -239,6 +239,21 @@ public actor PDFStreamReconstructor {
         // file on failure, and an unprotected file is no worse than the
         // prior contract. We deliberately do NOT throw.
         try? TempFileHardening.applyProtection(tempURL, level: .complete)
+    }
+
+    // MARK: - What the producer says it did
+
+    /// Which way found the information dictionary for the rewrite; nil until
+    /// `finalize` has run it.
+    private var infoDictionaryWay: RunRecord.InfoDictionaryWay?
+
+    /// The producer's own account of this file, for the run's record: which
+    /// way found the information dictionary. Read after `finalize`; nothing
+    /// in the producer reads it back.
+    public var produced: RunRecord.Produced {
+        var produced = RunRecord.Produced()
+        produced.infoDictionary = infoDictionaryWay
+        return produced
     }
 
     // MARK: - Info literal rewrite
@@ -277,8 +292,18 @@ public actor PDFStreamReconstructor {
         subsystem: "app.resecta.engine", category: "pdf-reconstructor")
 
     /// Replace the contents of the single `/Producer (…)`, `/CreationDate (…)`
-    /// and `/ModDate (…)` literals near the end of the finished file with the
-    /// fixed values, preserving the total byte length. The producer
+    /// and `/ModDate (…)` literals of the file's information dictionary with
+    /// the fixed values, preserving the total byte length, and say which way
+    /// found the dictionary.
+    ///
+    /// The dictionary is looked for in two ways, in this order. First through
+    /// the file's own index (`PDFTrailerLocator`): the literals are looked
+    /// for inside the dictionary the trailer names, and nowhere else, so a
+    /// dictionary that lies before the tail window is reached and a
+    /// look-alike elsewhere is never touched. Where that way refuses, the
+    /// search of the file's tail below runs exactly as it did before the
+    /// index was read.
+    /// The producer
     /// replacement writes `value + ")"` and pads the remainder with spaces
     /// *after* the closing paren, inside the `/Info` dictionary, where
     /// whitespace between entries is insignificant; each date is overwritten
@@ -296,7 +321,50 @@ public actor PDFStreamReconstructor {
     /// tail window, more than one, an unterminated literal, an
     /// existing producer value shorter than the fixed one, or a date value
     /// whose length differs from the fixed one's.
-    static func overwriteInfoLiterals(at url: URL) {
+    @discardableResult
+    static func overwriteInfoLiterals(at url: URL) -> RunRecord.InfoDictionaryWay {
+        var refusal = RunRecord.IndexRefusal.indexUnreadable
+        do {
+            // The first way. The file is read mapped and the dictionary's
+            // bytes copied out (at most 4,096), so the mapping is released
+            // before the handle writes.
+            let byIndex: (start: Int, dictionary: Data)? = try {
+                let fileData = try Data(contentsOf: url, options: .alwaysMapped)
+                switch PDFTrailerLocator.locate(in: fileData) {
+                case .found(let found):
+                    return (found.dictionary.lowerBound, fileData.subdata(in: found.dictionary))
+                case .refused(let reason):
+                    refusal = reason
+                    return nil
+                }
+            }()
+
+            if let byIndex {
+                let handle = try FileHandle(forUpdating: url)
+                defer { try? handle.close() }
+                for rewrite in infoLiteralRewrites {
+                    guard let patch = rewriteBytes(for: rewrite, in: byIndex.dictionary) else { continue }
+                    try handle.seek(toOffset: UInt64(byIndex.start + patch.offset))
+                    try handle.write(contentsOf: patch.bytes)
+                }
+                return .byIndex
+            }
+        } catch { // LegalPhrases:safe (Swift keyword)
+            // Mechanism-only logging; the export proceeds with
+            // the writer's own values rather than failing.
+            infoRewriteLogger.warning(
+                "info literal rewrite skipped (metadata: \(error.localizedDescription, privacy: .public))")
+            return .neither(indexRefused: refusal)
+        }
+        // The second way, used only where the first refused.
+        return overwriteInfoLiteralsInTail(at: url)
+            ? .byTail(indexRefused: refusal) : .neither(indexRefused: refusal)
+    }
+
+    /// The second way: the search of the file's last 262,144 bytes for the
+    /// three literals, as it ran before the index was read, byte for byte.
+    /// True when it rewrote at least one literal.
+    static func overwriteInfoLiteralsInTail(at url: URL) -> Bool {
         do {
             let handle = try FileHandle(forUpdating: url)
             defer { try? handle.close() }
@@ -312,18 +380,22 @@ public actor PDFStreamReconstructor {
             let windowStart = fileSize - windowLength
             try handle.seek(toOffset: windowStart)
             guard let window = try handle.read(upToCount: Int(windowLength)),
-                  !window.isEmpty else { return }
+                  !window.isEmpty else { return false }
 
+            var rewritten = false
             for rewrite in infoLiteralRewrites {
                 guard let patch = rewriteBytes(for: rewrite, in: window) else { continue }
                 try handle.seek(toOffset: windowStart + UInt64(patch.offset))
                 try handle.write(contentsOf: patch.bytes)
+                rewritten = true
             }
+            return rewritten
         } catch { // LegalPhrases:safe (Swift keyword)
             // Mechanism-only logging; the export proceeds with
             // the writer's own values rather than failing.
             infoRewriteLogger.warning(
                 "info literal rewrite skipped (metadata: \(error.localizedDescription, privacy: .public))")
+            return false
         }
     }
 
@@ -434,7 +506,9 @@ public actor PDFStreamReconstructor {
     /// identical content end with the same pair.
     ///
     /// Guards (each leaves the pair untouched and the export never fails):
-    /// no `/ID [` marker in the tail window, more than one, or a pair that
+    /// no `/ID [` marker where it is looked for (inside the trailer the
+    /// file's index names, or, where the index cannot be followed, in the
+    /// tail window), more than one, or a pair that
     /// is not two 32-character hex strings closed by `]`. The file is read
     /// memory-mapped for the digest and the mapping is released before the
     /// handle writes.
@@ -442,9 +516,7 @@ public actor PDFStreamReconstructor {
         do {
             let patch: (location: PDFFileIdentifier.Location, payload: Data)? = try {
                 let fileData = try Data(contentsOf: url, options: .alwaysMapped)
-                let tailStart = max(fileData.startIndex,
-                                    fileData.endIndex - PDFFileIdentifier.tailWindowLength)
-                guard let location = PDFFileIdentifier.locate(in: fileData[tailStart...]) else {
+                guard let location = PDFFileIdentifier.location(in: fileData) else {
                     return nil
                 }
                 let digest = PDFFileIdentifier.digest(of: fileData, zeroing: location)

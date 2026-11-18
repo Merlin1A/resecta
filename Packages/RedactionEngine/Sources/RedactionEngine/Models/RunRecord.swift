@@ -160,6 +160,13 @@ extension RunRecord.Produced {
             regionsPaintedOutsideThePlan[pageIndex] = result.regionsPaintedOutsideThePlan
         }
     }
+
+    /// Records what the writer reports for the file: which way found the
+    /// information dictionary for its rewrite. The one writer of that field
+    /// in a run; what the rasterizer recorded is kept.
+    public mutating func record(writer account: RunRecord.Produced) {
+        infoDictionary = account.infoDictionary
+    }
 }
 
 extension RunRecord {
@@ -221,5 +228,9 @@ extension RunRecord {
         case dictionaryNotClosed
         /// A key occurs twice in the dictionary.
         case repeatedKey
+        /// The index could not be read: no `startxref` near the end, an
+        /// offset that is not a number or lies past the end, a table whose
+        /// entries do not parse, or a trailer that does not close.
+        case indexUnreadable
     }
 }

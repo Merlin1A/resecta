@@ -14,6 +14,8 @@ enum ProductionPageLoop {
         let filterDigests: [PageFilterDigest?]
         let perPageModes: [PipelineMode]
         let perPageFallbackReasons: [TextLayerDetector.FallbackReason?]
+        /// What the producer says it did, as the app's run takes it.
+        var produced = RunRecord.Produced()
     }
 
     /// Mirror of `PipelineCoordinator.processDocument` + `rasterizeWithRetry`:
@@ -67,6 +69,6 @@ enum ProductionPageLoop {
         _ = try FileManager.default.replaceItemAt(outputURL, withItemAt: tempURL)
         return RedactionOutcome(
             filterDigests: digests, perPageModes: modes,
-            perPageFallbackReasons: reasons)
+            perPageFallbackReasons: reasons, produced: await reconstructor.produced)
     }
 }

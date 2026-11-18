@@ -99,6 +99,11 @@ struct CheckStopTests {
     static func blank(_ n: Int) -> [Page] { Array(repeating: Page(), count: n) }
     static let text = Page(content: "BT /F1 24 Tf 72 700 Td (\(term) Ostrander) Tj ET")
     static var fixedProducer: String { PDFStreamReconstructor.fixedProducerValue }
+    /// The three fields as the writer leaves them after its rewrite.
+    static var fixedFields: String {
+        let date = PDFStreamReconstructor.fixedDateValue
+        return "/Producer (\(fixedProducer)) /CreationDate (\(date)) /ModDate (\(date))"
+    }
     static let wrongID = "/ID [<00112233445566778899AABBCCDDEEFF> <00112233445566778899AABBCCDDEEFF>]"
 
     // MARK: - The table
@@ -179,11 +184,11 @@ struct CheckStopTests {
              stopped: .stoppedAtThisFind),
         Case(id: "S-15", layer: .metadataCheck, mode: .secureRasterization, terms: [],
              data: { pdf(blank(1), info: "/Producer (Another Writer)", trailer: wrongID) },
-             status: "warn", message: "Producer or timestamp fields were not rewritten to the fixed values", pages: nil,
+             status: "attention", message: "Producer or timestamp fields were not rewritten to the fixed values", pages: nil,
              stopped: .stoppedAtThisFind),
         Case(id: "S-16", layer: .metadataCheck, mode: .secureRasterization, terms: [],
-             data: { pdf(blank(1), info: "/Producer (\(fixedProducer))", trailer: wrongID) },
-             status: "warn", message: "File identifier was not derived from the file contents", pages: nil,
+             data: { pdf(blank(1), info: fixedFields, trailer: wrongID) },
+             status: "attention", message: "File identifier was not derived from the file contents", pages: nil,
              stopped: nil),
         Case(id: "S-17", layer: .operatorReExtraction, mode: .searchableRedaction, terms: [term],
              data: { var p = blank(5); p[2] = text; return pdf(p) },

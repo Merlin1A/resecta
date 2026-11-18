@@ -247,11 +247,13 @@ public struct VerificationEngine: Sendable {
                 partPages = row3.partPages
                 stopped = row3.stopped
             case .metadataCheck:
-                let (s4, cnv4, copy4, stop4) = try runLayer5Metadata(doc)
-                status = s4
-                couldNotVerify = cnv4
+                let (row4, copy4) = try runLayer5Metadata(doc)
+                status = row4.status
+                couldNotVerify = row4.couldNotVerify
+                partSentence = row4.partSentence
+                partPages = row4.partPages
                 copyOverride = copy4
-                stopped = stop4
+                stopped = row4.stopped
             // Layers 6–10: Sandwich-specific.
             // Only run for Searchable Redaction pages.
             case .spatialVerification:

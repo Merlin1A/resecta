@@ -138,13 +138,20 @@ extension VerificationEngine {
     static let layer5FixedFieldsDetail =
         "Producer and timestamps carry the writer's fixed values; no file-specific metadata is present."
 
-    /// The fourth value is where the check stopped at an issue before it had
-    /// read everything; nil when it read everything.
-    func runLayer5Metadata(_ doc: PDFDocument) throws -> (VerificationStatus, Bool, LayerCopy?, CheckStop?) {
+    /// The engine's result for metadata it could not read: could not verify.
+    static let metadataNotInspected = CheckRow(
+        status: .warn("Could not inspect metadata"), pages: nil, couldNotVerify: true)
+
+    /// The check's row, with where it stopped at an issue before it had read
+    /// everything, and its pass copy.
+    func runLayer5Metadata(_ doc: PDFDocument) throws -> (row: CheckRow, copy: LayerCopy?) {
+        func row(_ status: VerificationStatus, stopped: CheckStop? = nil) -> CheckRow {
+            CheckRow(status: status, pages: nil, couldNotVerify: false, stopped: stopped)
+        }
         // Entry-level cooperative cancellation.
         try Task.checkCancellation()
         guard let (pdfData, cgDoc) = loadPDFData(doc) else {
-            return (.warn("Could not inspect metadata"), true, nil, nil)
+            return (Self.metadataNotInspected, nil)
         }
 
         // Scan for XMP metadata BEFORE the /Info guard. XMP lives in
@@ -156,12 +163,11 @@ extension VerificationEngine {
             || pdfData.range(of: "<x:xmpmeta>".data(using: .ascii)!) != nil
             || pdfData.range(of: "<rdf:RDF".data(using: .ascii)!) != nil
 
-        // Check /Info dictionary. When absent, the XMP scan above is still
-        // authoritative — surface it rather than passing blind.
+        // The writer always writes an information dictionary, so a file
+        // without one is a read that failed or a file that is not the
+        // writer's: it could not be verified, never a pass.
         guard let infoDict = cgDoc.info else {
-            return (hasXMP
-                ? .warn("Auto-injected metadata present: XMP metadata")
-                : .pass, false, nil, nil)
+            return (Self.metadataNotInspected, nil)
         }
 
         // Standard metadata keys to check. FAIL on key presence regardless of
@@ -179,7 +185,7 @@ extension VerificationEngine {
         for key in sensitiveKeys {
             var obj: CGPDFObjectRef?
             if CGPDFDictionaryGetObject(infoDict, key, &obj) {
-                return (.fail("Metadata key /\(key) present"), false, nil, .stoppedAtThisFind)
+                return (row(.fail("Metadata key /\(key) present"), stopped: .stoppedAtThisFind), nil)
             }
         }
 
@@ -227,8 +233,8 @@ extension VerificationEngine {
         }, nil)
         if !nonStandardKeys.isEmpty {
             // Do not include key values — just names
-            return (.fail("Non-standard /Info key(s): \(nonStandardKeys.joined(separator: ", "))"), false, nil,
-                    .stoppedAtThisFind)
+            return (row(.fail("Non-standard /Info key(s): \(nonStandardKeys.joined(separator: ", "))"),
+                        stopped: .stoppedAtThisFind), nil)
         }
 
         // Writer-field attestation. The writer rewrites the auto-injected
@@ -241,9 +247,11 @@ extension VerificationEngine {
         // auto-injected metadata. The producer rewrite pads with spaces
         // after the closing paren, so the decoded literal is the bare fixed
         // value; trailing spaces inside a literal are tolerated. A value
-        // that does not decode counts as not rewritten. An absent key stays
-        // on the paths below. One message covers all three fields; never
-        // echo a value in it.
+        // that is not the fixed one is an issue that reads Needs review, in
+        // both modes; so is a field that is absent, or present but not a
+        // string, since the writer always writes all three as strings. A
+        // value that does not decode could not be inspected. One message
+        // covers all three fields; never echo a value in it.
         let fixedWriterFields = [
             ("Producer", PDFStreamReconstructor.fixedProducerValue),
             ("CreationDate", PDFStreamReconstructor.fixedDateValue),
@@ -256,7 +264,10 @@ extension VerificationEngine {
         var notRewritten = false
         for (key, fixedValue) in fixedWriterFields {
             var ref: CGPDFStringRef?
-            guard CGPDFDictionaryGetString(infoDict, key, &ref), let ref else { continue }
+            guard CGPDFDictionaryGetString(infoDict, key, &ref), let ref else {
+                notRewritten = true
+                continue
+            }
             guard var value = PDFStringDecode.decode(ref) else {
                 undecodable = true
                 continue
@@ -267,13 +278,13 @@ extension VerificationEngine {
         if undecodable || notRewritten {
             let conditions = undecodable
                 ? [UnverifiedCondition(sentence: "Could not inspect metadata", pages: [])] : []
-            let warning = notRewritten
-                ? [CheckWarning(sentence: "Producer or timestamp fields were not rewritten to the fixed values", pages: nil)] : []
-            if let row = CheckRowComposition.compose(issue: nil, conditions: conditions, warnings: warning) {
+            let issue: (status: VerificationStatus, pages: [Int]?)? = notRewritten
+                ? (.attention("Producer or timestamp fields were not rewritten to the fixed values"), nil) : nil
+            if let composed = CheckRowComposition.compose(issue: issue, conditions: conditions, warnings: []) {
                 // The file ID is not checked after this return; a line says so
                 // only where a field was read as not rewritten (an issue), not
                 // where a value could not be read alone.
-                return (row.status, row.couldNotVerify, nil, notRewritten ? .stoppedAtThisFind : nil)
+                return (notRewritten ? composed.stopped(at: .stoppedAtThisFind) : composed, nil)
             }
         }
 
@@ -282,10 +293,20 @@ extension VerificationEngine {
         // file's own bytes (`PDFFileIdentifier`); recompute it here and
         // report a pair that was not derived that way — after the fixed
         // fields, ahead of /Trapped and XMP, one message that never carries
-        // a value. An absent pair stays on the paths below.
-        if let idArray = cgDoc.fileIdentifier,
-           !Self.fileIdentifierMatchesContents(idArray, pdfData: pdfData) {
-            return (.warn("File identifier was not derived from the file contents"), false, nil, nil)
+        // a value. A pair that was not derived that way reads Needs review;
+        // the writer always writes one, so a file without a pair, or one
+        // whose identifier cannot be recomputed at all, could not be
+        // verified.
+        guard let idArray = cgDoc.fileIdentifier else {
+            return (Self.metadataNotInspected, nil)
+        }
+        switch Self.fileIdentifierAgainstContents(idArray, pdfData: pdfData) {
+        case .derived:
+            break
+        case .notDerived:
+            return (row(.attention("File identifier was not derived from the file contents")), nil)
+        case .cannotRecompute:
+            return (Self.metadataNotInspected, nil)
         }
 
         // XMP metadata — scanned above the /Info guard; fold the
@@ -303,31 +324,40 @@ extension VerificationEngine {
             // XMP is the sole entry.
             let onlyXMP = warnings.allSatisfy { $0 == "XMP metadata" }
             let prefix = onlyXMP ? "Auto-injected metadata present" : "Metadata present"
-            return (.warn("\(prefix): \(warnings.joined(separator: ", "))"), false, nil, nil)
+            return (row(.warn("\(prefix): \(warnings.joined(separator: ", "))")), nil)
         }
         if !infoFindings.isEmpty {
             // The three keys are always present by construction and were
             // attested above: a PASS that says what it read, never a note.
-            return (.pass, false, LayerCopy(short: "No issues found.", detail: Self.layer5FixedFieldsDetail), nil)
+            return (row(.pass), LayerCopy(short: "No issues found.", detail: Self.layer5FixedFieldsDetail))
         }
-        return (.pass, false, nil, nil)
+        return (row(.pass), nil)
     }
 
-    /// True when the two strings of a trailer `/ID` array both equal the
-    /// identifier recomputed from `pdfData`. An array that is not two
-    /// strings, or a pair the locator cannot read from the file's tail in
-    /// the writer's shape, is by construction not the writer's derived
-    /// value.
-    static func fileIdentifierMatchesContents(_ idArray: CGPDFArrayRef, pdfData: Data) -> Bool {
-        guard CGPDFArrayGetCount(idArray) == 2 else { return false }
+    /// How a trailer `/ID` array stands against the identifier derived from
+    /// the file's own bytes.
+    enum FileIdentifierStanding: Equatable {
+        /// Both strings equal the recomputed identifier.
+        case derived
+        /// The array is not two strings of the identifier's length, or they
+        /// differ from the recomputed identifier.
+        case notDerived
+        /// The identifier cannot be recomputed: the pair cannot be located
+        /// in the writer's shape through the file's index or in its tail.
+        case cannotRecompute
+    }
+
+    static func fileIdentifierAgainstContents(_ idArray: CGPDFArrayRef, pdfData: Data) -> FileIdentifierStanding {
+        guard CGPDFArrayGetCount(idArray) == 2 else { return .notDerived }
         var halves: [Data] = []
         for index in 0..<2 {
             var ref: CGPDFStringRef?
             guard CGPDFArrayGetString(idArray, index, &ref), let ref,
-                  let bytes = CGPDFStringGetBytePtr(ref) else { return false }
+                  let bytes = CGPDFStringGetBytePtr(ref) else { return .notDerived }
             halves.append(Data(bytes: bytes, count: CGPDFStringGetLength(ref)))
         }
-        guard let expected = PDFFileIdentifier.recomputedIdentifier(for: pdfData) else { return false }
-        return halves[0] == expected && halves[1] == expected
+        guard halves.allSatisfy({ $0.count == PDFFileIdentifier.identifierLength }) else { return .notDerived }
+        guard let expected = PDFFileIdentifier.recomputedIdentifier(for: pdfData) else { return .cannotRecompute }
+        return halves[0] == expected && halves[1] == expected ? .derived : .notDerived
     }
 }
