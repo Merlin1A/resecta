@@ -75,7 +75,7 @@ extension DetectionOrchestrator {
     /// bucket increment `suppressedCountByCategory[category]`.
     ///
     /// `.other` matches have no `PIICategory` (see
-    /// `SearchTypes.swift:70`); losing `.other` members are not counted.
+    /// `PIICategory.init?(piiKind:)`); losing `.other` members are not counted.
     ///
     /// The surviving match's range is widened to the COALESCED span of
     /// its overlap group, so a partially-overlapping loser's non-overlapping
