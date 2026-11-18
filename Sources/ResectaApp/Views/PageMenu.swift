@@ -79,7 +79,10 @@ struct PageMenu<Label: View>: View {
             TextField(PageMenuWords.fieldHint(pageCount: pageCount), text: $typed)
                 .keyboardType(.numberPad)
             Button(PageMenuWords.go) {
-                if let typedPage { show(typedPage - 1) }
+                // Read the field when Go is pressed: the prompt's buttons
+                // keep the action they were first given, so a page read when
+                // the bar was drawn would be the empty field's.
+                if let page = RedactionState.typedPage(typed, pageCount: pageCount) { show(page - 1) }
                 // Close it here: iOS 27 does not always write the dismissal
                 // back through the binding.
                 if #available(iOS 27, *) { showsPrompt = false }
