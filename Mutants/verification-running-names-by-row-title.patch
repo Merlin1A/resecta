@@ -1,0 +1,19 @@
+Property: A named check is called by its row's title, never the engine's name.
+Area: verification (the screen while the checks run)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationProgressLineTests
+Must go red: ResectaAppTests/VerificationProgressLineTests progressLineTable
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/VerificationProgressLine.swift b/Sources/ResectaApp/State/VerificationProgressLine.swift
+index 97d60830..a47ea5be 100644
+--- a/Sources/ResectaApp/State/VerificationProgressLine.swift
++++ b/Sources/ResectaApp/State/VerificationProgressLine.swift
+@@ -38,7 +38,7 @@ nonisolated struct VerificationProgressLine: Equatable {
+     static func text(_ line: Line) -> String {
+         switch line {
+         case .checking: "Checking\u{2026}"
+-        case .naming(let layer): "Checking \(VerificationRowModel.title(for: layer))\u{2026}"
++        case .naming(let layer): "Checking \(layer.name)\u{2026}"
+         }
+     }
+ 
