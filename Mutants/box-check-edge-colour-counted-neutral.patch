@@ -1,0 +1,19 @@
+Property: A colour block that touches the unit and is not wholly inside the painted area is tested before it is counted neutral.
+Area: the box check over the stored page picture
+Test command: cd Packages/RedactionEngine && swift test --skip-build --no-parallel --filter 'BoxCheckTests|BoxCheckRuleTests' (after swift build --build-tests)
+Must go red: RedactionEngineTests/BoxCheckTests each [10: the same box beside a colour picture]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
+index 9c70a425..20fbb65a 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
+@@ -291,7 +291,7 @@ enum ExactFillCheck {
+                         let inside = painted.contains(e)
+                         guard inside || overlaps(e, unit) else { continue }
+                         guard bx < wide, by < high else { return .couldNotFinish(.evidenceShort, counts) }
+-                        let neutral = isNeutral(walk.blocks[c][by * wide + bx])
++                        let neutral = inside ? isNeutral(walk.blocks[c][by * wide + bx]) : true
+                         if inside {
+                             counts.colourInside += 1
+                             if neutral { counts.colourInsideNeutral += 1 } else {

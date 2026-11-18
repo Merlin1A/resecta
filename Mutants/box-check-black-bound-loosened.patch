@@ -1,0 +1,19 @@
+Property: A black brightness block is exactly the fill only at or below -1021, the value that decodes to 0 at every sample; a box painted at level 1 is not the fill.
+Area: the box check over the stored page picture
+Test command: cd Packages/RedactionEngine && swift test --skip-build --no-parallel --filter 'BoxCheckTests|BoxCheckRuleTests' (after swift build --build-tests)
+Must go red: RedactionEngineTests/BoxCheckTests each [16: a box painted at level 1, not 0]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
+index 9c70a425..f050ca50 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
+@@ -154,7 +154,7 @@ enum ExactFillCheck {
+     static func isExactFill(_ b: CodedBlock, _ fill: FillColor) -> Bool {
+         guard b.flat else { return false }
+         switch fill {
+-        case .black: return b.dcTimesStep <= -1021
++        case .black: return b.dcTimesStep <= -1016
+         case .white: return b.dcTimesStep >= 1013
+         }
+     }

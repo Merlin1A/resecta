@@ -58,6 +58,14 @@ struct BoxCheckTests {
         #expect(Set(Self.cases.map(\.number)).count == 23)
     }
 
+    @Test("The check's planted failures are eight, each a patch in the repository's Mutants folder")
+    func plantedFailures() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("../../../../../Mutants").standardized
+        let names = try FileManager.default.contentsOfDirectory(atPath: root.path)
+            .filter { $0.hasPrefix("box-check-") && $0.hasSuffix(".patch") }
+        #expect(names.count == 8, "\(names.sorted())")
+    }
+
     // MARK: - helpers
 
     /// A box at these pixel lines on an H-row frame at quality d, and the rule's paint for it.
@@ -165,6 +173,9 @@ struct BoxCheckTests {
             let smaller = F.judge(b, report: F.report(part, height: 600), on: walk, dpi: 300, sides: Self.square)
             let none = F.judge(b, report: nil, on: walk, dpi: 300, sides: Self.square)
             #expect(Self.isIssue(smaller) && Self.isIssue(none), "\(smaller) · \(none)")
+            // The unit is worked out from the box alone: the smaller report leaves it as it is.
+            #expect(Self.counts(smaller)?.unitExpected == Self.counts(none)?.unitExpected,
+                    "\(String(describing: Self.counts(smaller))) against \(String(describing: Self.counts(none)))")
         case 18:
             let (b, p) = Self.boxAt(Lines(left: 96, top: 96, right: 224, bottom: 160), dpi: 300, width: 600, height: 600)
             let (walk, _) = F.walk(F.picture(width: 600, height: 600, marks: [F.Mark(lines: p, rgb: (0, 0, 0.03))]))
