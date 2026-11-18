@@ -1,0 +1,18 @@
+Property: A page's one image is accepted only when its SHA-256 equals the hash recorded for the page.
+Area: the reader of a page's stored picture (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --package-path Packages/RedactionEngine --filter PageImageReadTests
+Must go red: RedactionEngineTests/PageImageReadTests row [24: one byte changed in a page picture: the hash differs]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PageImageLocator.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PageImageLocator.swift
+index 26ef1ee1..1ebe9c63 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PageImageLocator.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PageImageLocator.swift
+@@ -130,7 +130,6 @@ enum PageImageLocator {
+         guard image.isJPEG else { return refuse(.notJPEG) }
+         guard index < recordedHashes.count else { return refuse(.noRecordedHash) }
+         let hash = Data(SHA256.hash(data: image.bytes))
+-        guard hash == recordedHashes[index] else { return refuse(.hashDiffers) }
+         if located[hash] != nil { return .success(image.bytes) }
+         guard let range = place(image.bytes, in: fileData, from: cursor, avoiding: claimed) else {
+             return refuse(.bytesNotInFile)

@@ -113,11 +113,11 @@ public actor PDFStreamReconstructor {
     /// bytes, bypassing JPEG encoding, so the per-page decode-guard drop path
     /// is reachable from a test without a genuinely-undecodable `CGImage`.
     /// `internal` — visible only to `@testable` test builds, never to the
-    /// production app module.
-    func appendUnencodedPageForTesting(jpegData: Data, size: CGSize) {
+    /// production app module. `textLayerEntries` makes it a Searchable page.
+    func appendUnencodedPageForTesting(jpegData: Data, size: CGSize, textLayerEntries: [CharacterInfo]? = nil) {
         drawBufferedPage(BufferedPage(
             jpegData: jpegData, size: size,
-            textLayerEntries: nil, redactionRectsInPoints: [], rotation: 0))
+            textLayerEntries: textLayerEntries, redactionRectsInPoints: [], rotation: 0))
         _appendedPageCount += 1
     }
 

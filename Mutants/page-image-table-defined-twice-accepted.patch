@@ -1,0 +1,19 @@
+Property: Every table is defined once.
+Area: the reader of a page's stored picture (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --package-path Packages/RedactionEngine --filter PageImageReadTests
+Must go red: RedactionEngineTests/PageImageReadTests row [22: an Adobe segment; a table defined twice; ...], the second file
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/JPEGHeader.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/JPEGHeader.swift
+index 4e176683..96bfb1f0 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/JPEGHeader.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/JPEGHeader.swift
+@@ -135,7 +135,7 @@ struct JPEGHeader: Sendable {
+                 while p < end {
+                     let precision = Int(b[p] >> 4), id = Int(b[p] & 15)
+                     guard precision == 0, id <= 3, p + 65 <= end else { throw refuse(.quantiserTable, p) }
+-                    guard quantDefined.insert(id).inserted else { throw refuse(.tableDefinedTwice, p) }
++                    quantDefined.insert(id)
+                     for k in 1...64 where b[p + k] == 0 { throw refuse(.quantiserStepZero, p) }
+                     header.dcStep[id] = Int(b[p + 1])
+                     p += 65
