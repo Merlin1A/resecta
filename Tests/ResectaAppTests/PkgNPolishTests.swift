@@ -174,7 +174,7 @@ struct StoreHydrateOffMainActorTests {
         }
 
         let seed = SavedRegexStore(fileURL: fileURL, legacyDefaults: defaults)
-        #expect(seed.add(label: "Keep", pattern: "\\d{3}"))
+        #expect(seed.add(label: "Keep", pattern: "\\d{3}") == .saved)
 
         // Corrupt one row in the stored file (outer FileJSONBlob
         // envelope → payload → userSavedRegexes; the envelope JSON is

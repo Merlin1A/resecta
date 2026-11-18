@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import RedactionEngine
 @testable import ResectaApp
 
 // No write reports its outcome yet, so no change to a saved list can answer

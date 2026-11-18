@@ -883,11 +883,11 @@ struct SavedSearchStoreTests {
             .appendingPathComponent("saved-search-add-\(UUID().uuidString).json")
         defer { try? FileManager.default.removeItem(at: url) }
         let store = SavedSearchStore(fileURL: url)
-        #expect(store.add(SavedSearch(name: "Payroll sweep", mode: .text, queryText: "acct")))
-        #expect(store.add(SavedSearch(name: "Payroll sweep", mode: .regex, queryText: "\\d+")) == false)
+        #expect(store.add(SavedSearch(name: "Payroll sweep", mode: .text, queryText: "acct")) == .saved)
+        #expect(store.add(SavedSearch(name: "Payroll sweep", mode: .regex, queryText: "\\d+")) == .refused(.duplicate))
         #expect(store.savedSearches.count == 1)
         // A distinct name still lands.
-        #expect(store.add(SavedSearch(name: "Payroll sweep 2", mode: .text, queryText: "acct")))
+        #expect(store.add(SavedSearch(name: "Payroll sweep 2", mode: .text, queryText: "acct")) == .saved)
         #expect(store.savedSearches.count == 2)
     }
 
