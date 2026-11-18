@@ -2,18 +2,56 @@ import CoreGraphics
 import Foundation
 import PDFKit
 
-// Which pages the ink fit runs on (`DocumentSearcher+InkFit.swift`): a page-scale
-// image under text shown in an invisible render mode.
+// Which pages the ink fit runs on (`DocumentSearcher+InkFit.swift`): pages whose
+// text does not sit on its own print. Either the page shows text in an invisible
+// render mode and its print is a picture, or text it shows in a visible mode lies
+// under pictures that hide it.
 
 extension DocumentSearcher {
-    /// A page-scale image under text shown in an invisible render mode: the
-    /// page's glyphs leave no ink of their own (a hidden layer over a picture
-    /// of the page). Read once per page.
+    /// Whether the fit runs on the page: (1) it shows text in an invisible mode
+    /// and its print is a picture, or (2) text it shows in a visible mode lies
+    /// under pictures painted after it that hide it. Where pictures are painted
+    /// is read only for a page the answer depends on. Read once per page.
     nonisolated static func carriesHiddenTextOverImage(_ page: PDFPage, cgPage: CGPDFPage) -> Bool {
         if let known = HiddenTextOverImageCache.shared.value(for: page) { return known }
-        let answer = carriesPageScaleImage(page, cgPage: cgPage) && showsInvisibleText(cgPage)
+        let invisible = showsInvisibleText(cgPage)
+        let pageScale = carriesPageScaleImage(page, cgPage: cgPage)
+        // The last two facts matter only without invisible text, and the last
+        // only when no image object is reached: they are read only then.
+        let reaches = !invisible && PageImageCensus.largestImagePixelArea(of: cgPage) != nil
+        let inline = !invisible && !reaches && PageContentFacts.read(cgPage).drawsInlineImage
+        let answer: Bool
+        if needsPictureMap(showsInvisibleText: invisible, largestImageIsPageScale: pageScale,
+                           reachesImage: reaches, drawsInlineImage: inline) {
+            answer = invisible ? printIsAPicture(pageScale: pageScale, page: page, cgPage: cgPage)
+                : PagePictureMap.cached(page, cgPage: cgPage).hidesVisibleText
+        } else {
+            answer = invisible && pageScale
+        }
         HiddenTextOverImageCache.shared.set(answer, for: page)
         return answer
+    }
+
+    /// Whether the gate's answer depends on where the page's pictures are
+    /// painted: a page with invisible text and no page-scale image, or a page
+    /// with no invisible text that draws a picture at all.
+    nonisolated static func needsPictureMap(showsInvisibleText: Bool, largestImageIsPageScale: Bool,
+                                            reachesImage: Bool, drawsInlineImage: Bool) -> Bool {
+        (showsInvisibleText && !largestImageIsPageScale) || (!showsInvisibleText && (reachesImage || drawsInlineImage))
+    }
+
+    /// Whether the page's print is a picture: its largest image is page-scale,
+    /// or its pictures as painted cover the page by the map's line, or its
+    /// painting cannot be followed.
+    nonisolated static func printIsAPicture(_ page: PDFPage, cgPage: CGPDFPage) -> Bool {
+        printIsAPicture(pageScale: carriesPageScaleImage(page, cgPage: cgPage), page: page, cgPage: cgPage)
+    }
+
+    /// `printIsAPicture` with the largest-image answer already read.
+    nonisolated static func printIsAPicture(pageScale: Bool, page: PDFPage, cgPage: CGPDFPage) -> Bool {
+        if pageScale { return true }
+        let map = PagePictureMap.cached(page, cgPage: cgPage)
+        return !map.followed || map.coversThePage
     }
 
     /// An image object covering at least `PageImageCensus.imageShareFloor` of
