@@ -1,5 +1,5 @@
 Property: A match found with no box is listed, never dropped: site 5, an always-flag term on the text layer
-Area: Search, a hit with no box (K-03)
+Area: Search, a hit with no box
 Test command: swift test --filter '^RedactionEngineTests\.NoBoxHitTests/' (in Packages/RedactionEngine, DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer)
 Must go red: RedactionEngineTests/NoBoxHitTests alwaysFlagText
 Apply in a scratch worktree with `git apply`; discard after.

@@ -4,7 +4,7 @@ import RedactionEngine
 // The row of a match that was found but could not be given a box
 // (`SearchResult.hasBox == false`): listed with its page and no tick box,
 // never dropped. A caution triangle sits in the tick circle's place and
-// the approved sentence (BR-06) is a quiet line under the context. Apply
+// the approved sentence is a quiet line under the context. Apply
 // makes no region from it (`prepareApply`) and Select All does not count it.
 // Its guards elsewhere: `SearchState.setSelection` never selects it (the one
 // selection primitive), `toggleSelectAll` and `toggleSelection` skip it, the
@@ -15,7 +15,7 @@ import RedactionEngine
 // whole page, and the draw nudge never offers it.
 
 enum NoBoxRowCopy {
-    /// BR-06, word for word, with the page number as its variable. A match
+    /// The approved sentence, word for word, with the page number as its variable. A match
     /// on a line wholly outside the visible page shows the first sentence
     /// alone: the second would point at something that is not there.
     static func sentence(pageIndex: Int, liesOffVisiblePage: Bool) -> String {

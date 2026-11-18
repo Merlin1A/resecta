@@ -3,7 +3,7 @@ import Foundation
 import PDFKit
 @testable import RedactionEngine
 
-/// K-03: a match that is found but cannot be given a box is listed with its
+/// A match that is found but cannot be given a box is listed with its
 /// page and no box, never dropped (the product rule), at every site that used to
 /// drop it. Planted cases: a word drawn under a zero text matrix (PDFKit gives
 /// its characters no bounds), a line wholly outside the visible page, and, at
@@ -94,19 +94,19 @@ struct NoBoxHitTests {
 
     // MARK: - The cases
 
-    @Test("K3-01 typed search: a word with no width is one row with its page and no box")
+    @Test("typed search: a word with no width is one row with its page and no box")
     func typed() async throws {
         let hits = try await Self.results(Self.pageWithUnboxableWord(hidden: "QUARTZ7"), .text("QUARTZ7", options: SearchOptions()))
         Self.expectOneUnboxed(hits, page: 1, "typed")
     }
 
-    @Test("K3-02 a pattern that matches the word with no width is one row with no box")
+    @Test("a pattern that matches the word with no width is one row with no box")
     func pattern() async throws {
         let hits = try await Self.results(Self.pageWithUnboxableWord(hidden: "QUARTZ7"), .regex("QUARTZ\\d", options: SearchOptions()))
         Self.expectOneUnboxed(hits, page: 1, "pattern")
     }
 
-    @Test("K3-03 Scan: an e-mail address with no width is one row with no box")
+    @Test("Scan: an e-mail address with no width is one row with no box")
     func scanText() async throws {
         let hits = try await Self.results(Self.pageWithUnboxableWord(hidden: "jane.doe@example.com"),
                                           .piiScan(categories: [.email], options: SearchOptions()))
@@ -114,14 +114,14 @@ struct NoBoxHitTests {
         Self.expectOneUnboxed(hits, page: 1, "scan, text layer")
     }
 
-    @Test("K3-04 an ordinary hit keeps its box")
+    @Test("an ordinary hit keeps its box")
     func ordinary() async throws {
         let hits = try await Self.results(Self.pageWithUnboxableWord(hidden: "QUARTZ7"), .text("statement", options: SearchOptions()))
         #expect(hits.count == 1)
         #expect(hits.first.map { $0.hasBox && $0.normalizedRect.width > 0 && !$0.liesOffVisiblePage } == true)
     }
 
-    @Test("K3-06 the Search Re-check on an output where an unboxed match remains reads one remaining")
+    @Test("the Search Re-check on an output where an unboxed match remains reads one remaining")
     func recheckCountsIt() async throws {
         // An output page whose text layer the Re-check trusts, holding a match
         // with no box (its line lies outside the visible page). A word with no
@@ -135,7 +135,7 @@ struct NoBoxHitTests {
                 "the match remains, so the Re-check asks (route \(String(describing: observation.route)))")
     }
 
-    @Test("K3-07 Scan on a recognised page: a match with no line to be placed on is one row with no box")
+    @Test("Scan on a recognised page: a match with no line to be placed on is one row with no box")
     func scanRecognised() async throws {
         let hits = try await Self.recognisedUnplaced("Contact jane.doe@example.com today",
                                                      .piiScan(categories: [.email], options: SearchOptions(includeOCR: true)))
@@ -143,14 +143,14 @@ struct NoBoxHitTests {
         Self.expectOneUnboxed(hits, "scan, recognised")
     }
 
-    @Test("K3-08 a line wholly outside the visible page is one row with no box, marked off the page")
+    @Test("a line wholly outside the visible page is one row with no box, marked off the page")
     func offVisiblePage() async throws {
         let hits = try await Self.results(TestFixtures.offCropBoxTextPDF(cropBoxPastMediaBox: true),
                                           .text("PLANT-ENGCROP-01", options: SearchOptions()))
         Self.expectOneUnboxed(hits, offPage: true, "off the visible page")
     }
 
-    @Test("K3-09 an always-flag term with no width is one row with no box")
+    @Test("an always-flag term with no width is one row with no box")
     func alwaysFlagText() async throws {
         let searcher = DocumentSearcher()
         await searcher.setUserTerms(UserTermsIndex(matcher: UserTermMatcher.compile(
@@ -161,7 +161,7 @@ struct NoBoxHitTests {
         Self.expectOneUnboxed(hits, page: 1, "always-flag, text layer")
     }
 
-    @Test("K3-10 an always-flag term on a recognised page with no line to be placed on is one row with no box")
+    @Test("an always-flag term on a recognised page with no line to be placed on is one row with no box")
     func alwaysFlagRecognised() async throws {
         let hits = try await Self.recognisedUnplaced("Ref QUARTZ7 filed", .piiScan(categories: [.ssn], options: SearchOptions(includeOCR: true)),
                                                      alwaysFlag: "QUARTZ7")
@@ -169,13 +169,13 @@ struct NoBoxHitTests {
         Self.expectOneUnboxed(hits, "always-flag, recognised")
     }
 
-    @Test("K3-11 a pattern on a recognised page with no line to be placed on is one row with no box")
+    @Test("a pattern on a recognised page with no line to be placed on is one row with no box")
     func patternRecognised() async throws {
         let hits = try await Self.recognisedUnplaced("Invoice INV-00731 due", .regex("INV-\\d+", options: SearchOptions(includeOCR: true)))
         Self.expectOneUnboxed(hits, "pattern, recognised")
     }
 
-    @Test("K3-12 a match across a page break whose second part has no box: both parts listed, one boxed")
+    @Test("a match across a page break whose second part has no box: both parts listed, one boxed")
     func pageSeam() async throws {
         let hits = try await Self.results(Self.seamWithUnboxedSecondPart(), .text("Delia Hartwell", options: SearchOptions()))
         #expect(hits.count == 2, "both parts listed: \(hits.map { ($0.pageIndex, $0.hasBox) })")
