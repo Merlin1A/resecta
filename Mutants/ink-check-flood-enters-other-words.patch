@@ -1,0 +1,19 @@
+Property: The flood never enters another word's box.
+Area: the ink check's flood
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests (or on the host: cd Packages/RedactionEngine && swift test --filter InkCheck)
+Must go red: RedactionCoreTests/InkCheckVerdictTests neighbouringWordsBoxIsNotEntered; RedactionCoreTests/InkCheckNeighbourTests tightPageWidensNoBox, bandFloodsOnlyTheValue
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/InkCheck.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/InkCheck.swift
+index e1ec5676..d2807b1f 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/InkCheck.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/InkCheck.swift
+@@ -202,7 +202,7 @@ package enum InkCheck {
+         func reach(_ x: Int, _ y: Int) {
+             guard x >= windowMinX, x < windowMaxX, y >= windowMinY, y < windowMaxY else { return }
+             let i = index(x, y)
+-            guard !flooded[i], !blocked[i], isInk(x, y), !isOnRule(x, y) else { return }
++            guard !flooded[i], isInk(x, y), !isOnRule(x, y) else { return }
+             flooded[i] = true
+             stack.append((x, y))
+         }

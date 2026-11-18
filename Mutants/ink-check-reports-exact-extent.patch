@@ -1,0 +1,19 @@
+Property: An escaped side grows in whole steps of half a line height, so the growth does not tell how far the ink runs.
+Area: the ink check's growth steps
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests (or on the host: cd Packages/RedactionEngine && swift test --filter InkCheck)
+Must go red: RedactionCoreTests/InkCheckThresholdTests growthIsInSteps; RedactionCoreTests/InkCheckVerdictTests inkPastTheRightEdgeWidensThatSide
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/InkCheck.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/InkCheck.swift
+index e1ec5676..38af19a9 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/InkCheck.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/InkCheck.swift
+@@ -275,7 +275,7 @@ package enum InkCheck {
+             case .escaped:
+                 let n = need()
+                 let steps = max(1, ceilDivision(2 * n, h))
+-                return min(ceilDivision(steps * h, 2), max(n, cap))
++                return n
+             case .none, .residual: return 0
+             }
+         }
