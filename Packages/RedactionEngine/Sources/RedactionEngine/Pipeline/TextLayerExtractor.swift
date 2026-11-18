@@ -49,6 +49,8 @@ public struct TextLayerExtractor: Sendable {
 
         guard let pageText = page.string else { return [] }
         let nsText = pageText as NSString
+        // Each offset's word, by the page's one partition.
+        let wordIndices = WordPartition.wordIndices(of: pageText)
         let totalCodeUnits = page.numberOfCharacters  // UTF-16 count
         var characters: [CharacterInfo] = []
         characters.reserveCapacity(totalCodeUnits)
@@ -183,7 +185,8 @@ public struct TextLayerExtractor: Sendable {
             }
             characters.append(CharacterInfo(
                 character: char, bounds: bounds, stringIndex: utf16Offset,
-                lineIndex: lineIndex
+                lineIndex: lineIndex,
+                wordIndex: utf16Offset < wordIndices.count ? wordIndices[utf16Offset] : wordIndices.last ?? 0
             ))
             previousLocalWidth = localBounds.width
 
