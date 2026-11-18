@@ -1,0 +1,19 @@
+Property: A whitespace offset is skipped as a separator clamp only when its selection does not begin with the offset's own character, so a word space whose selection runs on into the next letter is not skipped by this test. A space whose selection begins with the glyph before it is skipped as well, though it is the page's own word space; the walk in 1.3.1 and 1.3.2 skips it too (measured on one Tamil page: three word breaks).
+Area: text layer (Searchable)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/JoinedGlyphExtractionTests
+Must go red: RedactionEngineTests/JoinedGlyphExtractionTests entryForEntry; RedactionEngineTests/JoinedGlyphExtractionTests bothDirections; RedactionEngineTests/JoinedGlyphExtractionTests wordSpaceAfterAJoinedGlyph
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextLayerExtractor.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextLayerExtractor.swift
+index 234241d0..2b47575c 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextLayerExtractor.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextLayerExtractor.swift
+@@ -158,7 +158,7 @@ public struct TextLayerExtractor: Sendable {
+                 // the page's own word space; the walk in 1.3.1 and 1.3.2
+                 // skips it too (measured on one Tamil page: three word
+                 // breaks).
+-                if !selected.hasPrefix(substring) {
++                if selected != substring {  // mutant: the separator test compares the whole selection again
+                     utf16Offset += max(composedRange.length, 1)
+                     continue
+                 }
