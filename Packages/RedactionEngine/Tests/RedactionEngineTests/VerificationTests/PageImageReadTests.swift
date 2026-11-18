@@ -30,6 +30,16 @@ struct PageImageReadTests {
         F.encode(F.madePage(width: 1275, height: 1650, gray: gray, mark: mark, noise: noise, blank: blank))
     }
 
+    /// The stored page image of this runtime (see the README beside it), its
+    /// digest pinned. The byte-edit cases are made from it.
+    static let storedMacPageImageSHA256 = "ad4cbdc71d4cc899bdc62a9dc0936f70df4ebdf36a131e4fb245b60e8529101d"
+
+    static func stored() throws -> Data {
+        let url = try #require(Bundle.module.url(forResource: "page-image-macos-27.2", withExtension: "jpg",
+                                                 subdirectory: "TestResources/PageImages"))
+        return try Data(contentsOf: url)
+    }
+
     static func walked(_ jpeg: Data) throws -> PageImageWalk {
         switch try JPEGEntropyWalk.walk(jpeg) {
         case .success(let walk): return walk
@@ -106,7 +116,7 @@ struct PageImageReadTests {
             }
         }),
         Case(number: 20, name: "the stream cut short; one byte after the end marker; the coded data zeroed", body: {
-            let jpeg = page(mark: 20)
+            let jpeg = try stored()
             let last = try #require(F.restartMarkers(jpeg).last, "the writer's picture carries restart markers")
             var cut = jpeg
             cut.removeSubrange(last..<F.codedData(jpeg).upperBound)
@@ -120,13 +130,13 @@ struct PageImageReadTests {
             try expectRefused(zeroed, .restartMarkerOrder, "20 zeroed")
         }),
         Case(number: 21, name: "a progressive picture; a 12-bit picture", body: {
-            let jpeg = page(mark: 21)
+            let jpeg = try stored()
             let frame = F.segment(0xC0, in: jpeg)
             try expectRefused(F.setting(frame.at + 1, to: 0xC2, in: jpeg), .notBaselineSequential, "21 progressive")
             try expectRefused(F.setting(frame.at + 4, to: 12, in: jpeg), .precisionNotEightBits, "21 twelve bits")
         }),
         Case(number: 22, name: "an Adobe segment; a table defined twice; a table never used; a fill byte before a marker", body: {
-            let jpeg = page(mark: 22)
+            let jpeg = try stored()
             let afterJFIF = F.segment(0xE0, in: jpeg).at + F.segment(0xE0, in: jpeg).length
             let adobe = F.segmentBytes(0xEE, body: Array("Adobe".utf8) + [0, 100, 0, 0, 0, 0, 1])
             try expectRefused(F.inserting(adobe, at: afterJFIF, in: jpeg), .adobeSegment, "22 Adobe")
@@ -138,7 +148,7 @@ struct PageImageReadTests {
             try expectRefused(F.inserting([0xFF], at: F.segment(0xC0, in: jpeg).at, in: jpeg), .fillByteBeforeMarker, "22 fill byte")
         }),
         Case(number: 23, name: "unlisted segments of more than 4,096 bytes", body: {
-            let jpeg = page(mark: 23)
+            let jpeg = try stored()
             let comment = F.segmentBytes(0xFE, body: [UInt8](repeating: 0x41, count: PageImageLimits.unlistedSegmentBytes))
             try expectRefused(F.inserting(comment, at: F.segment(0xC0, in: jpeg).at, in: jpeg), .unlistedSegmentsOverLimit, "23 unlisted")
             #expect(PageImageLimits.unlistedSegmentBytes == 4_096)
@@ -175,7 +185,7 @@ struct PageImageReadTests {
             #expect(report.outcomes[0].kind.rowClass != .passed)
         }),
         Case(number: 28, name: "restart markers swapped; the restart definition removed while the markers stay", body: {
-            let jpeg = page(mark: 28)
+            let jpeg = try stored()
             let markers = F.restartMarkers(jpeg)
             try #require(markers.count >= 2, "the writer's picture carries restart markers")
             var swapped = jpeg
@@ -196,9 +206,20 @@ struct PageImageReadTests {
         try await c.body()
     }
 
+    @Test("The stored page image of the Mac is the pinned one, and is read whole")
+    func storedPageImage() throws {
+        let jpeg = try Self.stored()
+        #expect(F.sha256(jpeg).map { String(format: "%02x", $0) }.joined() == Self.storedMacPageImageSHA256)
+        let w = try Self.walked(jpeg)
+        #expect(w.width == 1275 && w.height == 1650 && w.hasColour)
+        #expect(w.bytesConsumed == jpeg.count)
+        #expect(w.restartCount > 0, "the writer's picture declares restarts")
+        print("PAGEIMAGE stored Mac: sampling \(w.components.map { "\($0.horizontal)x\($0.vertical)" }), groups \(w.blockGroupCount), restarts \(w.restartCount), unlisted \(w.unlistedSegments.map { "\(String($0.marker, radix: 16)):\($0.length)" }), padding not ones \(w.paddingNotOnes)")
+    }
+
     @Test("A header that declares more than 4,000,000 blocks is refused before any byte of its coded data")
     func tooManyBlocksAtTheHeader() throws {
-        let jpeg = Self.page(mark: 30)
+        let jpeg = try Self.stored()
         let frame = F.segment(0xC0, in: jpeg)
         var big = jpeg
         big.replaceSubrange((frame.at + 5)..<(frame.at + 9), with: [0xFF, 0xFF, 0xFF, 0xFF])
