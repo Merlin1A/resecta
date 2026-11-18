@@ -1,0 +1,19 @@
+Property: A page with no invisible text that draws a picture and whose painting cannot be followed is fitted.
+Area: ink fit (Search), which pages are fitted
+Test command: cd Packages/RedactionEngine && swift test --filter 'InkFitPiecewiseScanTests|PagePictureMapTests'
+Must go red: RedactionEngineTests/InkFitPiecewiseScanTests unfollowedTypedPageIsFitted (A typed page that draws a picture and whose painting cannot be followed is fitted): 1,093 forms drawn, 4,097 pictures, a picture in a tiling pattern
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
+index e81653e2..d6efdd50 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
+@@ -40,7 +40,7 @@ extension DocumentSearcher {
+     /// lies under pictures that hide it, or its painting cannot be followed,
+     /// so where its print lies is not known.
+     nonisolated static func visibleTextIsHidden(_ map: PagePictureMap) -> Bool {
+-        !map.followed || map.hidesVisibleText
++        map.hidesVisibleText
+     }
+ 
+     /// Whether a page fitted only by the wider gate (its pictures cover it, or

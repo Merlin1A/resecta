@@ -5,7 +5,7 @@ Must go red: RedactionEngineTests/InkFitPiecewiseScanTests gateByTable (Which pa
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift
-index 4e79431c..b58ee1f8 100644
+index 4faafb81..2a7c79cc 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift
 @@ -9,8 +9,8 @@ import PDFKit
@@ -18,4 +18,4 @@ index 4e79431c..b58ee1f8 100644
 +    static let pageCoverDenominator = 10
      /// More pictures than this on one page and its painting is not followed.
      static let pictureLimit = 4_096
- 
+     /// More forms drawn than this on one page, or more forms looked into for

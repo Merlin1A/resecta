@@ -5,15 +5,15 @@ Must go red: RedactionEngineTests/InkFitPiecewiseScanTests gateByTable (Which pa
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
-index 35d94d09..62bd3226 100644
+index e81653e2..599307f9 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
-@@ -23,8 +23,7 @@ extension DocumentSearcher {
+@@ -27,8 +27,7 @@ extension DocumentSearcher {
          let answer: Bool
          if needsPictureMap(showsInvisibleText: invisible, largestImageIsPageScale: pageScale,
-                            reachesImage: reaches, drawsInlineImage: inline) {
+                            reachesImage: reaches || patterned, drawsInlineImage: inline) {
 -            answer = invisible ? printIsAPicture(pageScale: pageScale, page: page, cgPage: cgPage)
--                : PagePictureMap.cached(page, cgPage: cgPage).hidesVisibleText
+-                : Self.visibleTextIsHidden(PagePictureMap.cached(page, cgPage: cgPage))
 +            answer = printIsAPicture(pageScale: pageScale, page: page, cgPage: cgPage)
          } else {
              answer = invisible && pageScale

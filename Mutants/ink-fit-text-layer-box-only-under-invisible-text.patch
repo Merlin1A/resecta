@@ -1,0 +1,19 @@
+Property: A result on every fitted page carries the text layer's own box, on a page whose visible text lies under pictures as on one with invisible text.
+Area: ink fit (Search), which pages are fitted
+Test command: cd Packages/RedactionEngine && swift test --filter 'InkFitPiecewiseScanTests|PagePictureMapTests'
+Must go red: RedactionEngineTests/InkFitPiecewiseScanTests textLayerBoxOverTheWord (On a page whose visible text lies under pictures, a result carries the text layer's box over the word): G8, G12, G21
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
+index 1f8ee9eb..d13051b9 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
+@@ -124,7 +124,7 @@ extension DocumentSearcher {
+     /// `lineRects`' as they are.
+     nonisolated func textLayerAndInkRects(for nsRange: NSRange, page: PDFPage)
+         -> (paint: [CGRect], strip: [CGRect], degraded: Bool)? {
+-        guard let cgPage = page.pageRef, Self.carriesHiddenTextOverImage(page, cgPage: cgPage),
++        guard let cgPage = page.pageRef, Self.showsInvisibleText(cgPage), Self.carriesHiddenTextOverImage(page, cgPage: cgPage),
+               let selection = page.selection(for: nsRange) else { return nil }
+         let lines = selection.selectionsByLine()
+         var paint: [CGRect] = [], strip: [CGRect] = [], degraded = false
