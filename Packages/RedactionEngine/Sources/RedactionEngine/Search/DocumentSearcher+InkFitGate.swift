@@ -59,11 +59,6 @@ extension DocumentSearcher {
     /// Whether the page's print is a picture: its largest image is page-scale,
     /// or its pictures as painted cover the page by the map's line, or its
     /// painting cannot be followed.
-    nonisolated static func printIsAPicture(_ page: PDFPage, cgPage: CGPDFPage) -> Bool {
-        printIsAPicture(pageScale: carriesPageScaleImage(page, cgPage: cgPage), page: page, cgPage: cgPage)
-    }
-
-    /// `printIsAPicture` with the largest-image answer already read.
     nonisolated static func printIsAPicture(pageScale: Bool, page: PDFPage, cgPage: CGPDFPage) -> Bool {
         if pageScale { return true }
         let map = PagePictureMap.cached(page, cgPage: cgPage)
