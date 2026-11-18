@@ -1,0 +1,19 @@
+Property: A word the filter takes a letter of leaves whole: no part of a word is written.
+Area: hidden text (whole source words)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter "WholeSourceWordsTests"
+Must go red: RedactionEngineTests/WholeSourceWordsTests wholeWords [part of a number boxed]; RedactionEngineTests/WholeSourceWordsTests wholeWords [a boxed name and its full stop]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
+index a1fda75e..88ade656 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
+@@ -86,7 +86,7 @@ enum PageTextPath {
+         // runs again on the lines that changed, until nothing more leaves.
+         let filterTook = wordsLosingALetter(before: folded, after: filtered.surviving)
+         var current = closeOverMarkedWords(
+-            filtered, marked: alphabet.wordIndices.union(painted).union(filterTook))
++            filtered, marked: alphabet.wordIndices.union(painted))
+         let shapes = rects.map {
+             RegionShape(expandedBounds: $0.insetBy(dx: -safetyMargin, dy: -safetyMargin), bounds: $0)
+         }
