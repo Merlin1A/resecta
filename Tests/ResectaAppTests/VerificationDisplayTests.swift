@@ -86,7 +86,7 @@ struct VerificationDisplayTests {
     // preview's verdict capsule is small `.caption` TEXT, so it was
     // missed by name-based searches keyed on "status"/"Status".
     @Test("Source pin: RedactedPreviewView's verdict capsule takes its colour from verdictCapsuleColor, not .color")
-    func redactedPreviewVerdictCapsuleUsesTextColor() throws {
+    func redactedPreviewVerdictCapsuleUsesItsColourFunction() throws {
         let source = try loadRepoFile("Sources/ResectaApp/Views/RedactedPreviewView.swift")
         #expect(source.contains("Self.verdictCapsuleColor(verdict: verdict)"),
                 "the verdict capsule's small-text tint must read verdictCapsuleColor, which returns the text tokens")

@@ -5,15 +5,15 @@ Must go red: ResectaAppTests/PreviewVerdictCapsuleTests labelColoursComeFromTheT
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Views/RedactedPreviewView.swift b/Sources/ResectaApp/Views/RedactedPreviewView.swift
-index 4956c4f9..de695612 100644
+index 94f7577d..90dda301 100644
 --- a/Sources/ResectaApp/Views/RedactedPreviewView.swift
 +++ b/Sources/ResectaApp/Views/RedactedPreviewView.swift
 @@ -105,7 +105,7 @@ struct RedactedPreviewView: View {
-     /// One value for all three labels, so they read as one family: the
-     /// largest at which each label measures at least 4.5 to 1 on its wash,
-     /// in light and in dark.
+     /// over the capsule's base. One value for all three labels, so they read
+     /// as one family: the largest at which each label measures at least 4.5
+     /// to 1 on its wash, in light and in dark.
 -    static let verdictCapsuleStrength: Double = 0.10
 +    static let verdictCapsuleStrength: Double = 0.12
  
-     @ViewBuilder
-     private func verdictCapsule(text: String) -> some View {
+     /// The capsule's own opaque ground, under the wash: the system background
+     /// (white in light; black, or #1C1C1E on a raised screen, in dark). The

@@ -183,6 +183,9 @@ struct PreviewVerdictCapsuleTests {
         #expect(try rgb(support, Self.grounds[0].1) != rgb(support, Self.grounds[1].1),
                 "the tokens resolve per appearance on this host")
         let base = RedactedPreviewView.verdictCapsuleBase
+        for (name, traits) in Self.grounds {
+            #expect(UIColor(base).resolvedColor(with: traits).cgColor.alpha == 1, "the base is opaque, \(name)")
+        }
         let resolvedBases = try Self.grounds.map { try rgb(base, $0.1) }
         let expectedBases: [[Double]] = [[1, 1, 1], [0, 0, 0], [0x1C / 255.0, 0x1C / 255.0, 0x1E / 255.0]]
         for (got, want) in zip(resolvedBases.map { [$0.0, $0.1, $0.2] }, expectedBases) {
