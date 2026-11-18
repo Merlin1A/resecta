@@ -1,0 +1,18 @@
+Property: The walk decodes exactly the block groups the frame declares; an end marker before them is a stream cut short.
+Area: the reader of a page's stored picture (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --package-path Packages/RedactionEngine --filter PageImageReadTests
+Must go red: RedactionEngineTests/PageImageReadTests row [20: the stream cut short; ...], the file cut at its last restart with its end marker kept
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/JPEGEntropyWalk.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/JPEGEntropyWalk.swift
+index bf40ac85..f7c9f594 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/JPEGEntropyWalk.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/JPEGEntropyWalk.swift
+@@ -141,6 +141,7 @@ enum JPEGEntropyWalk {
+             if group % columns == 0 && Task.isCancelled { throw .cancelled }
+             if header.restartInterval > 0 && group > 0 && group % header.restartInterval == 0 {
+                 if !reader.alignToByte() { paddingNotOnes += 1 }
++                if reader.position + 1 < b.count, b[reader.position] == 0xFF, b[reader.position + 1] == 0xD9 { break }
+                 try expectRestart(b, at: reader.position, number: nextRestart)
+                 reader.position += 2
+                 nextRestart = (nextRestart + 1) & 7
