@@ -19,7 +19,9 @@
 # LegalPhrases.wordEdgeTerms, is read the same way and matched only where a
 # term stands whole (no letter, digit or underscore at either end); it fails
 # closed too. A listed document that is not there fails the lint, and so does
-# a file that a leg's grep cannot read (grep's exit 2), in every leg.
+# a file that a leg's grep cannot read (grep's exit 2), in every leg. A
+# matcher that fails (keep_offending or length_claims exiting non-zero) fails
+# the lint too: the sweep runs with set -e off, so each call is checked.
 #
 # Usage: Scripts/claims-lint.sh              (the sweep; exit 0 PASS, 1 FAIL)
 #        Scripts/claims-lint.sh --self-test  (scratch trees; reads only the list file, for the
@@ -155,7 +157,10 @@ sweep() { # $1 = the tree root
             echo "CLAIMS-LINT FAIL: the banned terms could not be matched on $f"
             fail=1
         fi
-        hits=$(printf '%s\n' "$raw" | keep_offending "$PATTERNS")
+        hits=$(printf '%s\n' "$raw" | keep_offending "$PATTERNS") || {
+            echo "CLAIMS-LINT FAIL: the banned-term matcher did not run on $f"
+            fail=1
+        }
         if [ -n "$hits" ]; then
             echo "CLAIMS-LINT FAIL: $f"
             echo "$hits"
@@ -192,7 +197,10 @@ sweep() { # $1 = the tree root
             | "$GREP" -v "^$ROOT/$LIST_FILE:" \
             | "$GREP" '"' \
             | "$GREP" -vE '^[^:]+:[0-9]+:[[:space:]]*//' \
-            | keep_offending "$PATTERNS")
+            | keep_offending "$PATTERNS") || {
+            echo "CLAIMS-LINT FAIL: the banned-term matcher did not run on the Swift string literals"
+            fail=1
+        }
         if [ -n "$SWIFT_HITS" ]; then
             echo "CLAIMS-LINT FAIL (Swift string literals):"
             echo "$SWIFT_HITS"
@@ -372,6 +380,41 @@ LINES
                                  check "a Swift file the banned-term matcher cannot read" "$d" FAIL; chmod 644 "$d/Sources/ResectaApp/Views/X.swift"
     LENGTH_PATTERNS=on
     d=$(case_tree lencomment);   printf '// "Widen Boxes masks the length of short names." is banned\n' > "$d/Sources/ResectaApp/Views/X.swift"; check "a length claim in a Swift comment line" "$d" PASS
+    # A matcher that fails fails the sweep. A stand-in perl, first on PATH for
+    # these cases only, exits 3 for the one matcher call CL_PLANT names and
+    # hands every other call to the real perl: keep:<text> fails the banned-term
+    # matcher on input that holds <text>; length:doc and length:lines fail the
+    # length-claim matcher on a document and on the Swift lines.
+    real_perl=$(command -v perl)
+    mkdir -p "$T/plant"
+    cat > "$T/plant/perl" <<PLANT
+#!/bin/sh
+case "\$1" in
+    -ne) in=\$(cat)
+         case "\$CL_PLANT" in keep:*) case "\$in" in *"\${CL_PLANT#keep:}"*) exit 3 ;; esac ;; esac
+         printf '%s\n' "\$in" | exec "$real_perl" "\$@" ;;
+    -e)  case "\$CL_PLANT" in
+             length:doc) [ "\$3" = doc ] && exit 3 ;;
+             length:lines) [ "\$3" = lines ] && exit 3 ;;
+         esac ;;
+esac
+exec "$real_perl" "\$@"
+PLANT
+    chmod +x "$T/plant/perl"
+    plant() { # $1 = CL_PLANT value, $2 = case name, $3 = root
+        saved_path=$PATH; PATH="$T/plant:$PATH"; CL_PLANT=$1; export CL_PLANT
+        check "$2" "$3" FAIL
+        PATH=$saved_path; unset CL_PLANT
+    }
+    LENGTH_PATTERNS=off
+    d=$(case_tree keepdoc);      printf 'This guarantees removal, plantdoc.\n' >> "$d/README.md"
+                                 plant keep:plantdoc "a banned-term matcher that fails on a listed document" "$d"
+    d=$(case_tree keepswift);    printf 'let s = "this guarantees removal, plantswift"\n' > "$d/Sources/ResectaApp/Views/X.swift"
+                                 plant keep:plantswift "a banned-term matcher that fails on the Swift string literals" "$d"
+    LENGTH_PATTERNS=on
+    d=$(case_tree lengthdoc);    plant length:doc "a length-claim matcher that fails on a listed document" "$d"
+    d=$(case_tree lengthswift);  printf 'let s = "clean"\n' > "$d/Sources/ResectaApp/Views/X.swift"
+                                 plant length:lines "a length-claim matcher that fails on the Swift string literals" "$d"
     if [ "$bad" -eq 0 ]; then echo "claims-lint --self-test: PASS"; else echo "claims-lint --self-test: FAIL"; return 1; fi
 }
 
