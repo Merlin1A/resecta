@@ -116,9 +116,10 @@ enum SandwichMetrics {
     /// hand-built test digests) and passes without comparing.
     static let emptyLineageDigest = Data(SHA256().finalize())
 
-    /// Whitespace skip predicate shared by the filter-side lineage walk
+    /// Whitespace skip predicate. The filter-side lineage walk
     /// (`FilterResult.computeLineageHash`) and the verifier's output walk
-    /// (`SandwichVerification.computeOutputLineageHash`). PDFKit's
+    /// (`SandwichVerification.computeOutputLineageHash`) read it through
+    /// `isOutsideCharacterCount`, which also leaves out break marks. PDFKit's
     /// `page.string` synthesizes inter-run whitespace asymmetrically between
     /// the source (`extractCharacters`) and output (reconstructed) views;
     /// skipping whitespace on both sides keeps the hash domain a
@@ -126,5 +127,23 @@ enum SandwichMetrics {
     static func isLineageWhitespace(_ charString: String) -> Bool {
         guard !charString.isEmpty else { return true }
         return charString.allSatisfy { $0.isWhitespace }
+    }
+
+    /// What Character Count and Character Lineage leave out, the same on
+    /// both sides of each comparison: lineage whitespace, or a unit made only
+    /// of break marks (`TextNormalizer.breakMarks`). A source page may give a
+    /// soft hyphen a box, so the filter keeps it, while the reader of the
+    /// redrawn text layer does not return it; counting it on one side only
+    /// failed a correct file. Skipping it on both sides makes the result the
+    /// same whether or not a reader returns the mark. A hyphen that prints
+    /// ("-", U+2010, U+2011) is not a break mark and is counted.
+    ///
+    /// Only the two checks' four walks use this. The other callers of
+    /// `isLineageWhitespace` (the source extractor, the ink test, the axis
+    /// read and the position check) keep that predicate: changing it there
+    /// would change what the writer extracts and draws.
+    static func isOutsideCharacterCount(_ charString: String) -> Bool {
+        if isLineageWhitespace(charString) { return true }
+        return charString.unicodeScalars.allSatisfy { TextNormalizer.breakMarks.contains($0) }
     }
 }

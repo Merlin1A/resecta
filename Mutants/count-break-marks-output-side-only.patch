@@ -1,0 +1,28 @@
+Property: A soft hyphen the source page gave a box, and the redrawn text does not return, fails neither count check.
+Area: Character Count and Character Lineage, the break marks
+Test command: cd Packages/RedactionEngine && swift test --filter BreakMarkCountTests (or DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/BreakMarkCountTests)
+Must go red: RedactionEngineTests/BreakMarkCountTests tightPageWithASoftHyphen; RedactionEngineTests/BreakMarkCountTests loosePageWithTwoSoftHyphens; RedactionEngineTests/BreakMarkCountTests loosePageWithNoBox
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/CharacterFilter.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/CharacterFilter.swift
+index a9c047c6..2faa79ea 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/CharacterFilter.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/CharacterFilter.swift
+@@ -305,7 +305,7 @@ extension FilterResult {
+             boundaryCharacters: boundaryChars,
+             lineageHash: Self.computeLineageHash(over: surviving, frame: frame),
+             survivingNonWhitespaceCount: surviving.count(where: {
+-                !SandwichMetrics.isOutsideCharacterCount($0.character)
++                !SandwichMetrics.isLineageWhitespace($0.character)
+             }),
+             drawnCellRuleExcludedCount: drawnCellRuleExcludedCount,
+             pageRotation: frame?.rotation ?? 0
+@@ -393,7 +393,7 @@ extension FilterResult {
+                 let range = nsText.rangeOfComposedCharacterSequence(at: offset)
+                 let charString = nsText.substring(with: range)
+                 offset += max(range.length, 1)
+-                guard !SandwichMetrics.isOutsideCharacterCount(charString) else { continue }
++                guard !SandwichMetrics.isLineageWhitespace(charString) else { continue }
+                 hasher.update(data: Data(charString.utf8))
+                 hasher.update(data: separator)
+                 hasher.update(data: Data(String(globalPos).utf8))

@@ -303,8 +303,9 @@ struct SandwichVerification: Sendable {
 
     /// Count non-whitespace characters using composed-character-sequence
     /// iteration, matching extractCharacters()'s unit and the
-    /// output lineage walk's two skip conditions (zero bounds, lineage
-    /// whitespace — see `computeOutputLineageHash`).
+    /// output lineage walk's two skip conditions (zero bounds, and
+    /// `SandwichMetrics.isOutsideCharacterCount` — see
+    /// `computeOutputLineageHash`).
     ///
     /// The nil-selection and zero-bounds skips here are the SAME predicate
     /// `computeOutputLineageHash` applies: Layer 7's count and Layer 9's hash
@@ -327,9 +328,10 @@ struct SandwichVerification: Sendable {
             bandCounter += 1
             let composedRange = nsText.rangeOfComposedCharacterSequence(at: utf16Offset)
             // Only count characters with non-zero bounds (matching
-            // extractCharacters behavior) whose text is not lineage
-            // whitespace (the shared Layer 7 / Layer 9 count domain).
-            if !SandwichMetrics.isLineageWhitespace(nsText.substring(with: composedRange)),
+            // extractCharacters behavior) whose text is neither lineage
+            // whitespace nor a break mark (the shared Layer 7 / Layer 9
+            // count domain, `SandwichMetrics.isOutsideCharacterCount`).
+            if !SandwichMetrics.isOutsideCharacterCount(nsText.substring(with: composedRange)),
                let sel = page.selection(for: composedRange) {
                 let bounds = sel.bounds(for: page)
                 if bounds.width > 0 && bounds.height > 0 {
@@ -598,7 +600,7 @@ struct SandwichVerification: Sendable {
             let bounds = sel.bounds(for: outputPage)
             guard bounds.width > 0 && bounds.height > 0 else { continue }
             let charString = nsText.substring(with: composedRange)
-            guard !SandwichMetrics.isLineageWhitespace(charString) else { continue }
+            guard !SandwichMetrics.isOutsideCharacterCount(charString) else { continue }
             let placed = frame.isUnrotated
                 ? bounds
                 : frame.sourceRect(bounds.offsetBy(dx: -pageBox.minX, dy: -pageBox.minY))

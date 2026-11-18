@@ -1,0 +1,28 @@
+Property: Both sides of the two count checks leave out the break marks, so the result is the same whether a reader returns a soft hyphen or not.
+Area: Character Count and Character Lineage, the break marks
+Test command: cd Packages/RedactionEngine && swift test --filter BreakMarkCountTests (or DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/BreakMarkCountTests)
+Must go red: RedactionEngineTests/BreakMarkCountTests outputWalksSkipASoftHyphen
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification.swift
+index 5bd1c6eb..142b946b 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification.swift
+@@ -331,7 +331,7 @@ struct SandwichVerification: Sendable {
+             // extractCharacters behavior) whose text is neither lineage
+             // whitespace nor a break mark (the shared Layer 7 / Layer 9
+             // count domain, `SandwichMetrics.isOutsideCharacterCount`).
+-            if !SandwichMetrics.isOutsideCharacterCount(nsText.substring(with: composedRange)),
++            if !SandwichMetrics.isLineageWhitespace(nsText.substring(with: composedRange)),
+                let sel = page.selection(for: composedRange) {
+                 let bounds = sel.bounds(for: page)
+                 if bounds.width > 0 && bounds.height > 0 {
+@@ -600,7 +600,7 @@ struct SandwichVerification: Sendable {
+             let bounds = sel.bounds(for: outputPage)
+             guard bounds.width > 0 && bounds.height > 0 else { continue }
+             let charString = nsText.substring(with: composedRange)
+-            guard !SandwichMetrics.isOutsideCharacterCount(charString) else { continue }
++            guard !SandwichMetrics.isLineageWhitespace(charString) else { continue }
+             let placed = frame.isUnrotated
+                 ? bounds
+                 : frame.sourceRect(bounds.offsetBy(dx: -pageBox.minX, dy: -pageBox.minY))
