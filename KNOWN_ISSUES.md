@@ -207,7 +207,7 @@ Some scanned PDFs carry an invisible layer of text over the picture of each page
 ### KI-26: Some Searchable Exports Keep the Real Export Time and iOS Version (Low)
 **Affects:** Searchable Redaction
 
-On Searchable exports that need a large fallback font, such as Chinese or Japanese text, the file keeps the real export time and iOS version instead of the fixed values. No document content is affected. Checks report this as a metadata warning.
+On Searchable exports that need a large fallback font, such as Chinese or Japanese text, the file keeps the real export time and iOS version instead of the fixed values: its Producer field names the iOS version and build, and its creation and change dates are the time of the export. No document content is affected. Metadata Check reports this as a warning: "Producer or timestamp fields were not rewritten to the fixed values". The results of such an export read Checks Failed, because Font Verification reports the fallback font in the hidden text.
 
 ---
 
@@ -254,6 +254,8 @@ On a page that is a picture, such as a photo, a screenshot or a scan without its
 
 **Workaround:** On such a page, draw a box with Rectangle over each number or code you need removed, check each such page in the preview before sharing, and draw a box over anything Search missed.
 
+Scan can miss a phone or Social Security number the same way: see KI-39.
+
 ---
 
 ### KI-35: A Search Match That Runs onto a Second Line Can Be Boxed on One Line Only (Medium)
@@ -289,6 +291,51 @@ An annotation, such as a highlight, a form field, a box or a stamp, is kept with
 Search reads one page at a time. A name, address or other phrase that starts on the last line of one page and continues at the top of the next is not found by a search for the whole phrase. No box is placed on it, so it stays readable in the export. If the phrase appears nowhere else, Search shows its no-match message; if it does, nothing marks the one at the page break. Verification does not report it: its Search Re-check looks for the phrase the same way, and a search that found nothing is not run again after export.
 
 **Workaround:** Search each word of the phrase on its own, check the last line of each page and the first line of the next in the preview before sharing, and draw a box over anything Search missed.
+
+---
+
+### KI-39: On a Photo or Scan, Scan Can Miss a Phone or Social Security Number Whose Digits Look Like Letters (Medium)
+**Affects:** Scan in text read from a picture (a scan, photo or screenshot), on iOS 26 and iOS 27
+
+On a page that is a picture, such as a photo, a screenshot or a scan without its own text, Search and Scan read the text with on-device text recognition and then correct characters that are often read for one another: 0 and O, 1 and I, 5 and S, 8 and B. KI-34 says what this does to Search. Scan makes the correction before its detectors read the line. A number in which every digit is 0, 1, 5 or 8, on a line that is otherwise mostly words, can be turned into letters: "Call 515-555-0181" is read by the detectors as "Call SIS-SSS-OIBI", so Scan does not list the phone number. A Social Security number can be missed the same way. A number with a 2, 3, 4, 6, 7 or 9 in any of its groups, such as "(208) 555-0147", or a date such as "01/05/1988", is not changed. No box is placed on a number Scan does not list, so it stays readable in the export. Verification can miss it too: its Detection Sweep runs the detectors again on the export, which reads the page the same way. A search for the number does not match it either.
+
+**Workaround:** On such a page, draw a box with Rectangle over each phone, Social Security or other number you need removed, check each such page in the preview before sharing, and draw a box over anything Scan missed.
+
+---
+
+### KI-40: On a Scan Stored as Many Small Pictures, Search Does Not Read the Picture (Medium)
+**Affects:** Search (scanned pages that carry their own text)
+
+On a page with a text layer, Search also reads the page's images for text when one image holds at least 250,000 pixels, or at least half as many pixels as the page itself has at 100 dpi, or when the page's text layer is very short for its size. Some scanners store a page's picture as many narrow strips, each smaller than that, so on such a page Search reads the page's own text and does not read the picture, with or without Include OCR Pages. A word that is printed on the page but missing from that text, or spelled differently in it, is not found, and nothing in the app says the picture was not read. No box is placed on it, so it stays readable in the export. When you have applied at least one result of the same search, the check after export reads every page of the redacted copy for that term and can report it. A search that found nothing is not run again after export, so a word Search did not match anywhere in the document is not reported, and every check can pass.
+
+**Workaround:** On a scanned document, look over each page for the words you searched for, check each such page in the preview before sharing, and draw a box over anything Search missed.
+
+---
+
+### KI-41: On Some Typeset Pages, a Multi-Word Search Can Miss Text on a Tightly Set Line (Medium)
+**Affects:** Search on typed pages whose lines are justified, such as pages made with pdfTeX, which many LaTeX documents use
+
+On such a page, the text the page carries can leave out the space between words on a tightly set line: "between Halvorsen Marine Supply, Inc." is read as "betweenHalvorsenMarineSupply,Inc." Search matches what you type against that text, so a search for two or more words, such as a full name or a company name, does not match them on that line. No box is placed there, so the words stay readable in the export. When you have applied at least one result of the same search elsewhere in the document, the checks after export read every page of the redacted copy for that text and can report it: OCR Check and Search Re-check can flag the page, and the results then read Needs Review. A search that found nothing is not run again after export, so text Search did not match anywhere in the document is not reported.
+
+**Workaround:** Search each word of the name on its own with Whole word off, check each such page in the preview before sharing, and draw a box over anything Search missed.
+
+---
+
+### KI-42: In a Searchable Export, Colour Emoji Can Show Twice (Low)
+**Affects:** Searchable Redaction (pages whose text includes colour emoji)
+
+A Searchable export carries a hidden copy of the page's text, drawn over the picture of the page, which is what makes the file searchable. Colour emoji in that hidden copy are not hidden: they are drawn as visible pictures. On the exported page each such emoji can then show twice, once in the picture of the page and once from the hidden copy, and one can lie partly over the edge of a box. No text or emoji that a box covers is drawn this way. The results of such an export read Checks Failed: Font Verification reports the emoji font in the hidden copy.
+
+**Workaround:** Export such a document with Secure Rasterization, which keeps no text layer; the file then has no text to search or copy.
+
+---
+
+### KI-43: A Word Drawn at Zero Size Can Get a Box Over Other Words (Low)
+**Affects:** Search and Scan (typed pages that carry a word drawn at zero size, as in a tampered or unusual file)
+
+A PDF page can carry a word drawn at zero size: the word is part of the page's text, but nothing of it is printed. When Search or Scan matches such a word on a page that also has printed text, the box is placed where PDFKit, the system's PDF reader, reports the word, and that box can lie over printed words you did not search for. When you apply it, those words are covered in the export. The box shows in the editor, and the covered words show in the preview before you share. No check after export reports it.
+
+**Workaround:** Before you tap Redact, check that each box Search or Scan placed covers only what you searched for. Where one covers other words, select the box and drag its handles in, or delete it. Export such a document with Secure Rasterization, which keeps no text layer.
 
 ---
 
