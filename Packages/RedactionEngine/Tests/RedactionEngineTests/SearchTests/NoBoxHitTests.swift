@@ -175,8 +175,6 @@ struct NoBoxHitTests {
         let firstLetter = try #require(page.selection(for: first))
         // The premise: the line's first letter lies wholly off the visible page.
         #expect(searcher.normalizedRect(for: firstLetter, page: page) == nil, "the first letter has no box of its own")
-        let clamped = try #require(searcher.clampedNormalizedRect(for: firstLetter, page: page))
-        #expect(clamped.minX == 0, "measured from the page's left edge")
         let cropBox = page.bounds(for: .cropBox)
         let visual = CGSize(width: cropBox.width, height: cropBox.height)
         let matchSelection = try #require(page.selection(for: match))
@@ -187,6 +185,7 @@ struct NoBoxHitTests {
                                                               visual: visual, frame: .upright(visual))
         #expect(abs(distance - box.maxX) < 0.001, "from the clamped first letter to the match's end: the drift bound as wide as before")
         #expect(distance > box.width + 1, "never the match's own width, the narrower bound")
+        #expect(searcher.clampedNormalizedRect(for: firstLetter, page: page)?.minX == 0, "measured from the page's left edge")
     }
 
     @Test("a line partly on the visible page keeps its box, clamped to the page's edge")
