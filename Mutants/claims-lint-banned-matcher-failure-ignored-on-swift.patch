@@ -5,18 +5,18 @@ Must go red: the self-test case "a banned-term matcher that fails on the Swift s
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Scripts/claims-lint.sh b/Scripts/claims-lint.sh
-index 3c4a664c..d0b041c5 100755
+index 78ef4ae3..db0633d3 100755
 --- a/Scripts/claims-lint.sh
 +++ b/Scripts/claims-lint.sh
-@@ -197,10 +197,7 @@ sweep() { # $1 = the tree root
-             | "$GREP" -v "^$ROOT/$LIST_FILE:" \
-             | "$GREP" '"' \
-             | "$GREP" -vE '^[^:]+:[0-9]+:[[:space:]]*//' \
--            | keep_offending "$PATTERNS") || {
+@@ -220,10 +220,7 @@ sweep() { # $1 = the tree root
+             echo "CLAIMS-LINT FAIL: the Swift string literals could not be filtered for the banned terms"
+             fail=1
+         }
+-        SWIFT_HITS=$(printf '%s\n' "$lines" | keep_offending "$PATTERNS") || {
 -            echo "CLAIMS-LINT FAIL: the banned-term matcher did not run on the Swift string literals"
 -            fail=1
 -        }
-+            | keep_offending "$PATTERNS")
++        SWIFT_HITS=$(printf '%s\n' "$lines" | keep_offending "$PATTERNS")
          if [ -n "$SWIFT_HITS" ]; then
              echo "CLAIMS-LINT FAIL (Swift string literals):"
              echo "$SWIFT_HITS"

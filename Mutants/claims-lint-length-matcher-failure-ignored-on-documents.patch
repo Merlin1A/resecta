@@ -5,10 +5,10 @@ Must go red: the self-test case "a length-claim matcher that fails on a listed d
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Scripts/claims-lint.sh b/Scripts/claims-lint.sh
-index 3c4a664c..31d74a25 100755
+index 78ef4ae3..cc181c9c 100755
 --- a/Scripts/claims-lint.sh
 +++ b/Scripts/claims-lint.sh
-@@ -167,10 +167,7 @@ sweep() { # $1 = the tree root
+@@ -187,10 +187,7 @@ sweep() { # $1 = the tree root
              fail=1
          fi
          if [ "$LENGTH_PATTERNS" = on ]; then
@@ -17,6 +17,6 @@ index 3c4a664c..31d74a25 100755
 -                fail=1
 -            fi
 +            hits=$(length_claims doc "$ROOT/$f")
-             hits=$(printf '%s' "$hits" | sed "s|^$ROOT/||")
-             if [ -n "$hits" ]; then
-                 echo "CLAIMS-LINT FAIL (length claim): $f"
+             hits=$(printf '%s' "$hits" | strip_root "$ROOT") || {
+                 echo "CLAIMS-LINT FAIL: the length claims on $f could not be shown"
+                 fail=1

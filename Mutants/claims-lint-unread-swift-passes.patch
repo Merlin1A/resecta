@@ -5,10 +5,10 @@ Must go red: the self-test case "a Swift file the banned-term matcher cannot rea
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Scripts/claims-lint.sh b/Scripts/claims-lint.sh
-index 266a76f1..de41c09a 100755
+index 78ef4ae3..39dbc7b9 100755
 --- a/Scripts/claims-lint.sh
 +++ b/Scripts/claims-lint.sh
-@@ -184,10 +184,6 @@ sweep() { # $1 = the tree root
+@@ -212,10 +212,6 @@ sweep() { # $1 = the tree root
      if [ -n "$trees" ]; then
          # shellcheck disable=SC2086
          grc=0; raw=$("$GREP" -rnEi "$PATTERNS" $trees --include='*.swift') || grc=$?
@@ -16,6 +16,6 @@ index 266a76f1..de41c09a 100755
 -            echo "CLAIMS-LINT FAIL: the banned terms could not be matched on every Swift file"
 -            fail=1
 -        fi
-         SWIFT_HITS=$(printf '%s\n' "$raw" \
-             | "$GREP" -v "^$ROOT/$LIST_FILE:" \
-             | "$GREP" '"' \
+         lines=$(printf '%s\n' "$raw" | swift_literal_lines "$ROOT/$LIST_FILE" banned) || {
+             echo "CLAIMS-LINT FAIL: the Swift string literals could not be filtered for the banned terms"
+             fail=1

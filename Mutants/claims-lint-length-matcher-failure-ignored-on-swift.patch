@@ -5,18 +5,18 @@ Must go red: the self-test case "a length-claim matcher that fails on the Swift 
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Scripts/claims-lint.sh b/Scripts/claims-lint.sh
-index 3c4a664c..ea8dac69 100755
+index 78ef4ae3..cf1efbaa 100755
 --- a/Scripts/claims-lint.sh
 +++ b/Scripts/claims-lint.sh
-@@ -216,10 +216,7 @@ sweep() { # $1 = the tree root
-             LENGTH_HITS=$(printf '%s\n' "$raw" \
-                 | "$GREP" -v "^$ROOT/$LIST_FILE:" \
-                 | "$GREP" -vE '^[^:]+:[0-9]+:[[:space:]]*//' \
--                | length_claims lines) || {
+@@ -240,10 +240,7 @@ sweep() { # $1 = the tree root
+                 echo "CLAIMS-LINT FAIL: the Swift string literals could not be filtered for the length claims"
+                 fail=1
+             }
+-            LENGTH_HITS=$(printf '%s\n' "$lines" | length_claims lines) || {
 -                echo "CLAIMS-LINT FAIL: the length-claim patterns did not run on the Swift string literals"
 -                fail=1
 -            }
-+                | length_claims lines)
++            LENGTH_HITS=$(printf '%s\n' "$lines" | length_claims lines)
              if [ -n "$LENGTH_HITS" ]; then
                  echo "CLAIMS-LINT FAIL (length claim, Swift string literals):"
                  echo "$LENGTH_HITS"

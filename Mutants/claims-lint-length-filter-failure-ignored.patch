@@ -1,0 +1,22 @@
+Property: A Swift line filter that fails for the length claims fails the lint.
+Area: claims lint (Scripts/claims-lint.sh)
+Test command: Scripts/claims-lint.sh --self-test
+Must go red: the self-test case "a Swift line filter that fails for the length claims" (the self-test ends FAIL)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Scripts/claims-lint.sh b/Scripts/claims-lint.sh
+index 78ef4ae3..521dd534 100755
+--- a/Scripts/claims-lint.sh
++++ b/Scripts/claims-lint.sh
+@@ -236,10 +236,7 @@ sweep() { # $1 = the tree root
+                 echo "CLAIMS-LINT FAIL: the length-claim patterns could not read every Swift file"
+                 fail=1
+             fi
+-            lines=$(printf '%s\n' "$raw" | swift_literal_lines "$ROOT/$LIST_FILE" length) || {
+-                echo "CLAIMS-LINT FAIL: the Swift string literals could not be filtered for the length claims"
+-                fail=1
+-            }
++            lines=$(printf '%s\n' "$raw" | swift_literal_lines "$ROOT/$LIST_FILE" length)
+             LENGTH_HITS=$(printf '%s\n' "$lines" | length_claims lines) || {
+                 echo "CLAIMS-LINT FAIL: the length-claim patterns did not run on the Swift string literals"
+                 fail=1
