@@ -393,8 +393,13 @@ enum TextLayerReconstructor {
             guard let ctLine = HiddenTextLine.layout(line.text, size: line.fontSize) else {
                 return (hits, false)
             }
-            var ascent: CGFloat = 0, descent: CGFloat = 0
-            CTLineGetTypographicBounds(ctLine, &ascent, &descent, nil)
+            // The cell's height is the Courier face's own, as the writer's
+            // base formula takes it: a line's typographic bounds are the
+            // largest over its glyph runs, so a run in a substituted face
+            // would move every cell's height and centre on the line.
+            let courier = CTFontCreateWithName("Courier" as CFString, line.fontSize, nil)
+            let ascent = CTFontGetAscent(courier)
+            let descent = CTFontGetDescent(courier)
             let fraction = SandwichMetrics.descentFraction(
                 family: "Courier", pointSize: line.fontSize)
             for (entry, offset) in sourced.sources {

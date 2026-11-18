@@ -143,6 +143,46 @@ struct PageTextPathTests {
         }
     }
 
+    /// Lines with a character Courier has no glyph for, which the system
+    /// draws in a face of its own, and a line of only zero-width marks.
+    static let mixedLines = ["Report \u{6F22} 12", "Report \u{F0B7} 12", "\u{200B}\u{FEFF}"]
+
+    @Test("On a line with a run the system draws in another face, every cell keeps Courier's own height and centre",
+          arguments: mixedLines)
+    func mixedLineKeepsCourierCells(_ text: String) throws {
+        var entries: [CharacterInfo] = []
+        var word = 0
+        for (i, scalar) in text.unicodeScalars.enumerated() {
+            if scalar == " " { word += 1 }
+            entries.append(CharacterInfo(
+                character: String(scalar), bounds: CGRect(x: 72 + CGFloat(i) * 7.2, y: 700, width: 7.2, height: 12),
+                stringIndex: i, lineIndex: 0, wordIndex: word))
+        }
+        let lines = TextLayerReconstructor.layoutLinesWithSources(entries, pageWidth: 612, redactionRects: [])
+        try #require(lines.count == 1, "\(lines.map(\.line.text))")
+        let line = lines[0].line
+        let courier = CTFontCreateWithName("Courier" as CFString, line.fontSize, nil)
+        let ascent = CTFontGetAscent(courier), descent = CTFontGetDescent(courier)
+        if text.unicodeScalars.contains("\u{6F22}") {
+            // The case has power: this line's own bounds are not Courier's,
+            // so a cell measured by them would sit elsewhere.
+            let laid = try #require(HiddenTextLine.layout(line.text, size: line.fontSize))
+            var lineAscent: CGFloat = 0, lineDescent: CGFloat = 0
+            CTLineGetTypographicBounds(laid, &lineAscent, &lineDescent, nil)
+            #expect(lineAscent + lineDescent > ascent + descent + 0.2,
+                    "line \(lineAscent)+\(lineDescent), Courier \(ascent)+\(descent)")
+        }
+        // The base formula's centre: the cell from the baseline less
+        // Courier's descent, Courier's ascent plus descent tall.
+        let centreY = line.origin.y - descent + (ascent + descent) / 2
+        let strip = CGRect(x: 0, y: centreY - 0.05, width: 612, height: 0.1)
+        let found = TextLayerReconstructor.drawnCellHits(
+            entries: entries, pageWidth: 612,
+            regionShapes: [RegionShape(expandedBounds: strip, bounds: strip)])
+        #expect(found.laidOut)
+        #expect(found.hits == IndexSet(entries.indices), "\(text.debugDescription): hit \(Array(found.hits)) of \(entries.count)")
+    }
+
     struct Fault: Error {}
 
     @Test("A step that fails makes the path fail, and the rasterizer then writes a picture")
