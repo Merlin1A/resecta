@@ -1,0 +1,22 @@
+Property: A run line is shown whole; its instruction never goes behind a tap.
+Area: results (the card of facts)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/FactRowTests
+Must go red: ResectaAppTests/FactRowTests todaysLinesAreShownWhole
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationDetailsSection.swift b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
+index b08232b0..e5f80050 100644
+--- a/Sources/ResectaApp/Views/VerificationDetailsSection.swift
++++ b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
+@@ -197,7 +197,10 @@ struct VerificationDetailsSection: View {
+     /// identifier.
+     static func runLineFacts(_ lines: [String]) -> [ResultsFact] {
+         lines.enumerated().map { position, line in
+-            ResultsFact(id: position == 0 ? "runFactsStrip" : "runFactsLine_\(position)", shown: line)
++            let cut = line.firstIndex(of: ".").map { line.index(after: $0) } ?? line.endIndex
++            return ResultsFact(id: position == 0 ? "runFactsStrip" : "runFactsLine_\(position)",
++                               shown: String(line[..<cut]),
++                               more: cut == line.endIndex ? [] : [String(line[cut...]).trimmingCharacters(in: .whitespaces)])
+         }
+     }
+ 
