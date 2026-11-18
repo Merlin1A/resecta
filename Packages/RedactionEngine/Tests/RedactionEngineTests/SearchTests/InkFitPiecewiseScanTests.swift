@@ -179,6 +179,99 @@ struct InkFitPiecewiseScanTests {
         }
     }
 
+    @Test("On a page whose visible text lies under pictures, a result carries the text layer's box over the word")
+    func textLayerBoxOverTheWord() async throws {
+        let rows: [(String, Data)] = [
+            ("G8", S.scan(.strips(rows: 128), shift: Self.half, layer: .visibleBefore)),
+            ("G12", S.scan(.one, shift: Self.half, layer: .visibleBefore)),
+            ("G21", S.scan(.inlineStrips(rows: 128), shift: Self.half, layer: .visibleBefore)),
+        ]
+        #expect(rows.count == 3)
+        // The text is drawn at the unshifted positions: the word's own glyphs.
+        let glyphs = S.wordInk(shift: 0).insetBy(dx: 1, dy: 1)
+        for (key, data) in rows {
+            let (document, page, _) = try #require(S.pdfPage(data))
+            defer { withExtendedLifetime(document) {} }
+            let hit = try #require(await Self.hits(document, S.word).first, "\(key): matched")
+            let layer = try #require(hit.textLayerRect, "\(key): the result carries the text layer's box")
+            let points = PageImageInkFitTests.points(layer, page.bounds(for: .cropBox).size)
+            #expect(points.contains(glyphs), "\(key): the text layer's box \(points) holds the word's glyphs \(glyphs)")
+        }
+    }
+
+    // MARK: - A light row through a word
+
+    /// The print with `blank` rows of the 300 dpi picture made white through
+    /// the middle of the word, its darkest ink `ink`, stored in two strips
+    /// that meet at those rows (the lower one placed `drop` points lower), or
+    /// stored whole; the text layer half a word to one side, invisible.
+    static func seamScan(blank: Int, drop: CGFloat, ink: UInt8 = 0, whole: Bool = false) -> Data {
+        var g = S.print(dpi: 300, shift: half)
+        if ink > 0 {
+            let light = 255 - Int(ink)
+            for i in g.pixels.indices {
+                let dark: Int = 255 - Int(g.pixels[i])
+                g.pixels[i] = UInt8(255 - dark * light / 255)
+            }
+        }
+        let seam = Int(((S.page.height - S.wordInk(shift: half).midY) * 300 / 72).rounded())
+        for r in seam..<(seam + blank) { for c in 0..<g.width { g.pixels[r * g.width + c] = 255 } }
+        if whole {
+            return S.document([S.Page("q 612 0 0 792 0 0 cm /S0 Do Q " + S.text(mode: 3), resources: "/XObject << /S0 @0@ >>", objects: [S.image(g)])])
+        }
+        let unit: CGFloat = 72 / 300
+        let top = g.piece(rows: 0..<seam, columns: 0..<g.width), bottom = g.piece(rows: seam..<g.height, columns: 0..<g.width)
+        let topHeight = CGFloat(seam) * unit, bottomHeight = CGFloat(g.height - seam) * unit
+        let ops = "q 612 0 0 \(S.n(topHeight)) 0 \(S.n(S.page.height - topHeight)) cm /S0 Do Q "
+            + "q 612 0 0 \(S.n(bottomHeight)) 0 \(S.n(-drop)) cm /S1 Do Q "
+        return S.document([S.Page(ops + S.text(mode: 3), resources: "/XObject << /S0 @0@ /S1 @1@ >>",
+                                  objects: [S.image(top), S.image(bottom)])])
+    }
+
+    /// The word's ink at `threshold` in its own rectangle from the font, a
+    /// point and more around it, and how much of it lies outside `boxes`;
+    /// read over the whole rectangle, so a light row through the word does
+    /// not end the count.
+    static func wordInkOutside(_ page: PDFPage, word: CGRect, boxes: [CGRect], threshold: UInt8) throws -> (ink: Int, outside: Int) {
+        let bounds = page.bounds(for: .cropBox)
+        let frame = DocumentSearcher.readingFrame(of: page, visual: bounds.size)
+        let window = frame.toReading(word).insetBy(dx: -1, dy: -2), reading = boxes.map(frame.toReading)
+        let cgPage = try #require(page.pageRef)
+        let bitmap = try #require(DocumentSearcher.renderGray(
+            cgPage, rotation: page.rotation, visual: bounds.size, window: window, frame: frame)).reading(threshold: threshold)
+        let scale = DocumentSearcher.inkFitScale
+        var ink = 0, outside = 0
+        for y in 0..<bitmap.height {
+            for x in 0..<bitmap.width where bitmap.isInk(x, y) {
+                ink += 1
+                let point = CGPoint(x: window.minX + (CGFloat(x) + 0.5) / scale, y: window.minY + (CGFloat(y) + 0.5) / scale)
+                if !reading.contains(where: { $0.contains(point) }) { outside += 1 }
+            }
+        }
+        return (ink, outside)
+    }
+
+    @Test("A light row through a word leaves none of the word outside the paint")
+    func lightRowThroughAWord() async throws {
+        let rows: [(String, Data, UInt8)] = [
+            ("a blank picture row where two strips meet", Self.seamScan(blank: 1, drop: 0), DocumentSearcher.inkFitThreshold),
+            ("three blank picture rows where two strips meet", Self.seamScan(blank: 3, drop: 0), DocumentSearcher.inkFitThreshold),
+            ("a gap of 0.3 pt between two strips", Self.seamScan(blank: 0, drop: 0.3), DocumentSearcher.inkFitThreshold),
+            ("a seam 0.1 pt off on faint grey ink", Self.seamScan(blank: 0, drop: 0.1, ink: 150), DocumentSearcher.inkFitLightThreshold),
+            ("one image, a blank picture row", Self.seamScan(blank: 1, drop: 0, whole: true), DocumentSearcher.inkFitThreshold),
+            ("one image, three blank picture rows", Self.seamScan(blank: 3, drop: 0, whole: true), DocumentSearcher.inkFitThreshold),
+        ]
+        #expect(rows.count == 6)
+        let word = S.wordInk(shift: Self.half)
+        for (key, data, threshold) in rows {
+            let (document, page, box) = try await Self.box(data)
+            defer { withExtendedLifetime(document) {} }
+            let read = try Self.wordInkOutside(page, word: word, boxes: [box], threshold: threshold)
+            #expect(read.ink > 0, "\(key): the word's ink is read")
+            #expect(read.outside == 0, "\(key): \(read.outside) of \(read.ink) ink points of the word outside the paint \(box)")
+        }
+    }
+
     // MARK: - When the map is read
 
     @Test("Where pictures are painted is read only for pages that need it")
@@ -240,8 +333,10 @@ struct InkFitPiecewiseScanTests {
             ("X3", S.scan(.one, shift: 0, layer: .visibleBefore)),
         ]
         for (key, data) in drawnRows {
-            let (document, page, _) = try #require(S.pdfPage(data))
+            let (document, page, cgPage) = try #require(S.pdfPage(data))
             defer { withExtendedLifetime(document) {} }
+            // The wider gate takes the page, so "no plan" is the rule's answer.
+            try #require(DocumentSearcher.carriesHiddenTextOverImage(page, cgPage: cgPage), "\(key): the page is fitted")
             let drawn = RedactionRegion(id: UUID(), normalizedRect: Self.normalized(S.wordInk(shift: 0).insetBy(dx: -1, dy: -1)),
                                         source: .manual)
             let plan = await Self.plan([drawn], on: page)
