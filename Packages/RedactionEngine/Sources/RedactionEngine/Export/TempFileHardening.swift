@@ -80,16 +80,22 @@ public enum TempFileHardening {
     /// after the device is locked. Errors on individual files are swallowed
     /// — best-effort traversal — but caller may observe the first thrown
     /// error from the top-level enumerator if the root is unreadable.
+    ///
+    /// `apply` is the call made for each file the walk selects; it is
+    /// `applyProtection(_:level:)` unless a test hands in its own, so the
+    /// walk can be proved where the protection class cannot be read back
+    /// (the simulator does not change a class through `setAttributes`).
     public static func downgradeTree(
         at root: URL,
-        to level: TempFileProtection
+        to level: TempFileProtection,
+        applying apply: (URL, TempFileProtection) throws -> Void = { try applyProtection($0, level: $1) }
     ) {
         let fm = FileManager.default
         // If the root itself is a file, just downgrade it.
         var isDir: ObjCBool = false
         guard fm.fileExists(atPath: root.path, isDirectory: &isDir) else { return }
         if !isDir.boolValue {
-            try? applyProtection(root, level: level)
+            try? apply(root, level)
             return
         }
 
@@ -103,7 +109,7 @@ public enum TempFileHardening {
             let isRegular = (try? fileURL.resourceValues(forKeys: [.isRegularFileKey]))?
                 .isRegularFile ?? false
             guard isRegular else { continue }
-            try? applyProtection(fileURL, level: level)
+            try? apply(fileURL, level)
         }
     }
 }
