@@ -143,7 +143,7 @@ extension DocumentEditorView {
     var captionOverlay: some View {
         let occupant = Self.bottomSlotOccupant(
             phaseKind: documentState.phaseKind,
-            // Wired by the packages that draw them.
+            // The message and the first-time line have no view yet, so they never ask for the slot.
             messageShowing: false,
             selectionNewerThanMessage: false,
             firstTimeLineDue: false,
