@@ -1,0 +1,18 @@
+Property: A run none of the three faces can draw is left out and counted, never handed to the system to draw in a face of its choosing.
+Area: hidden text (the alphabet, wired into the text path)
+Test command: cd Packages/RedactionEngine && swift test --filter "HiddenTextAlphabetExportTests|TextPathAlphabetFaultTests|HiddenTextFontsTests" (or DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/HiddenTextAlphabetExportTests -only-testing:RedactionEngineTests/TextPathAlphabetFaultTests -only-testing:RedactionEngineTests/HiddenTextFontsTests)
+Must go red: RedactionEngineTests/HiddenTextAlphabetExportTests exportsAsListed [English and Chinese words]; RedactionEngineTests/HiddenTextAlphabetExportTests exportsAsListed [a page wholly in Chinese]; RedactionEngineTests/HiddenTextAlphabetExportTests emojiDrawsNoImage
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/HiddenTextFonts.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/HiddenTextFonts.swift
+index a8296b86..041a66f2 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/HiddenTextFonts.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/HiddenTextFonts.swift
+@@ -51,6 +51,7 @@ enum HiddenTextFonts {
+     static func choice(for run: String) -> Choice? {
+         let characters = run.filter { $0.unicodeScalars.elementsEqual([NeverWrittenCharacters.objectMark]) == false }
+         if characters.unicodeScalars.contains(where: NeverWrittenCharacters.contains) { return nil }
++        if !characters.isEmpty { return .oneFont("Courier") }
+         if let whole = faces.first(where: { face in characters.allSatisfy { hasGlyphs(for: $0, in: face.1) } }) {
+             return .oneFont(whole.0)
+         }

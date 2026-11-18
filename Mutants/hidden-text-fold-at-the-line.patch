@@ -1,0 +1,30 @@
+Property: The fold runs before the record: a joined letter stored as one character is recorded as its letters, so the record and the written text agree.
+Area: hidden text (the alphabet, wired into the text path)
+Test command: cd Packages/RedactionEngine && swift test --filter "HiddenTextAlphabetExportTests|TextPathAlphabetFaultTests|HiddenTextFontsTests" (or DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/HiddenTextAlphabetExportTests -only-testing:RedactionEngineTests/TextPathAlphabetFaultTests -only-testing:RedactionEngineTests/HiddenTextFontsTests)
+Must go red: RedactionEngineTests/HiddenTextAlphabetExportTests exportsAsListed [fi stored as one character three times]; RedactionEngineTests/HiddenTextAlphabetExportTests exportsAsListed [the seven joined letters, each stored as one character]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/HiddenTextLine.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/HiddenTextLine.swift
+index a8349bed..49af103b 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/HiddenTextLine.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/HiddenTextLine.swift
+@@ -9,6 +9,7 @@ import Foundation
+ /// then a picture, and at write time its hidden text is not written.
+ enum HiddenTextLine {
+     static func layout(_ text: String, size: CGFloat) -> CTLine? {
++        let text = String(text.unicodeScalars.map { JoinedLetters.letters(of: $0) ?? String($0) }.joined())
+         let attributed = NSMutableAttributedString()
+         // One font object per face for the line, so text in one face is one
+         // glyph run.
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextPathFold.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextPathFold.swift
+index 03fe2a5f..8827c890 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextPathFold.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextPathFold.swift
+@@ -5,6 +5,6 @@ import Foundation
+ /// marks taken out.
+ enum TextPathFold {
+     static func fold(_ entries: [CharacterInfo]) -> [CharacterInfo] {
+-        JoinedLetterFold.fold(entries)
++        entries
+     }
+ }
