@@ -1,0 +1,32 @@
+Property: A run shows the column only where it meets the box's own line and no other run of the stack's lines stands past the box's reach, so a column never runs across a gutter into the next column.
+Area: the page's complement (lines, runs, stacks, columns, bridges, direction)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/ComplementReadingTests (or on the host: cd Packages/RedactionEngine && swift test --filter ComplementReadingTests)
+Must go red: RedactionCoreTests/ComplementReadingTests shorterRightColumnKeepsTheBandInItsColumn; RedactionCoreTests/ComplementReadingTests linesThatAreNotTheLastRunOfTheirLineDoNotBridge
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
+index 050556d3..cc09d831 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
+@@ -532,10 +532,10 @@ extension Complement {
+         var columnLeft: Int?
+         var columnRight: Int?
+         for c in candidates {
+-            if inside || (meetsAnchor(c) && spaceIsEmpty(right: true, from: anchor.hi, to: c.maxX, lines: stack, exceptMeeting: true)) {
++            if true {
+                 columnRight = Swift.max(columnRight ?? c.maxX, c.maxX)
+             }
+-            if inside || (meetsAnchor(c) && spaceIsEmpty(right: false, from: anchor.lo, to: c.minX, lines: stack, exceptMeeting: true)) {
++            if true {
+                 columnLeft = Swift.min(columnLeft ?? c.minX, c.minX)
+             }
+         }
+@@ -545,7 +545,7 @@ extension Complement {
+         let reachRight = Swift.max(columnRight ?? anchor.hi, anchor.hi)
+         let reachLeft = Swift.min(columnLeft ?? anchor.lo, anchor.lo)
+         for o in outside {
+-            for run in page.lines[o].runs.map(\.box) where overlapsRoom(run) && meetsAnchor(run) {
++            for run in page.lines[o].runs.map(\.box) where overlapsRoom(run) {
+                 if run.maxX > reachRight, spaceIsEmpty(right: true, from: reachRight, to: run.maxX, lines: stackLines, exceptMeeting: false) {
+                     columnRight = Swift.max(columnRight ?? run.maxX, run.maxX)
+                 }

@@ -1,0 +1,22 @@
+Property: A box already as wide as its line is in neither count: not among the widened boxes, not among those that could not be widened.
+Area: the switch's counts
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/PaintedBoxTests (or on the host: cd Packages/RedactionEngine && swift test --filter PaintedBoxTests)
+Must go red: RedactionCoreTests/PaintedBoxTests aBoxAlreadyAsWideAsItsLineIsInNeitherCount
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintedBox.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintedBox.swift
+index e9b0e2df..259e634f 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintedBox.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintedBox.swift
+@@ -81,9 +81,9 @@ package enum SwitchTreatment: Hashable, Sendable {
+     /// one that fell back are counted in neither.
+     package var count: Count? {
+         switch self {
+-        case .widened: .widened
++        case .widened, .alreadyAsWide: .widened
+         case .couldNotWiden(let reason): .couldNotWiden(reason)
+-        case .notAsked, .alreadyAsWide, .fellBack: nil
++        case .notAsked, .fellBack: nil
+         }
+     }
+ }

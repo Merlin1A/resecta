@@ -12,8 +12,15 @@
 # suites are excluded from the gating batches by policy.
 #
 # Usage:
-#   TEST_BATCHED_SIM_UDID=<udid> Scripts/test-batched.sh RedactionEngine|ResectaApp [--batch-size N] [--timeout-mins M]
+#   TEST_BATCHED_SIM_UDID=<udid> Scripts/test-batched.sh RedactionEngine|ResectaApp|ResectaAppUI [--batch-size N] [--timeout-mins M]
 #   Scripts/test-batched.sh --self-test
+#
+# ResectaAppUI runs the UI-test target (Tests/ResectaAppUITests) through the
+# app scheme, serially: one suite per invocation (--batch-size is fixed at
+# 1), each under the same watchdog, with the same verdict file. UI tests
+# drive the app on the simulator and cannot share it, so this mode never
+# batches them; it is still the batched runner's build-once, invocation-by-
+# invocation shape, never one full-parallel `xcodebuild test`.
 #
 # Environment:
 #   TEST_BATCHED_SIM_UDID  required — the simulator every invocation runs on,
@@ -59,7 +66,10 @@
 #   1  at least one red outside the exclusion list (offenders printed)
 #   2  no gating reds, but >=1 invocation wedged, or hit a test-host launch
 #      refusal or a launch hang twice — those suites are unverified,
-#      coverage incomplete;
+#      coverage incomplete; or completed with no result bundle, or one that
+#      cannot be read (unread); or a gating invocation ran no test (empty);
+#      or the run counted no test at all — a run that verified nothing is
+#      never a pass;
 #      also when TEST_BATCHED_SIM_UDID is unset (nothing ran)
 #
 # A launch hang — the watchdog fires before the log shows any suite or
@@ -99,6 +109,7 @@ GREP=/usr/bin/grep
 # has been red when paired with even one other suite.
 PERF_ALONE_RedactionEngine="CancellationLatencyTests PixelBufferZeroizeTimingTests ReverseRationalePerformanceTests StressCorpusTests ApplyPhaseMemoryStressTests ParallelLayerExecutionTests DetectionRasterizeOverlapTests Layer2OCRParallelismTests SearchRecheckParallelismTests PageImageInkFitStallTests"
 PERF_ALONE_ResectaApp="PageParallelRasterizationTests PageParallelRasterizationScheduleTests PageParallelRasterizationTimingTests"
+PERF_ALONE_ResectaAppUI=""
 
 # ALONE-GATING: perf-alone suites (above) whose reds still gate. Each runs
 # completely alone after the batches like the rest of the list, and a red in
@@ -125,6 +136,7 @@ PERF_ALONE_ResectaApp="PageParallelRasterizationTests PageParallelRasterizationS
 # report-only (perf-alone and on the exclusion list below).
 ALONE_GATING_RedactionEngine="PageImageInkFitStallTests"
 ALONE_GATING_ResectaApp="PageParallelRasterizationTests PageParallelRasterizationScheduleTests"
+ALONE_GATING_ResectaAppUI=""
 
 # Exclusion list (suite granularity): reds here do not gate the exit
 # status even inside normal batches.
@@ -157,13 +169,17 @@ usage() { sed -n '3,60p' "$0"; exit 64; }
 # runner addresses the type, so the extension's tests run with it).
 # Attribute-only detection used to miss implicit suites and the multi-line
 # `@Suite(` form, so their tests never ran under this runner. Validated
-# 2026-08-27 against the live trees: engine 207, app 209.
+# 2026-08-27 against the live trees: engine 207, app 209. The modifiers a
+# declaration may carry include `nonisolated`, the form every UI-test class
+# takes (`nonisolated final class …: XCTestCase`); adding it on 2026-11-05
+# left the unit trees' lists unchanged (engine 309, app 335) and found the
+# UI tree's 32 suites.
 enumerate_suites() { # test-source-dir — one suite name per line, sorted
     python3 - "$1" <<'PYEOF'
 import os, re, sys
 
 ATTRS = re.compile(r'^(?:@\w+(?:\([^)]*\))?\s*)+')
-MODS = r'(?:(?:private|fileprivate|internal|public|final)\s+)*'
+MODS = r'(?:(?:private|fileprivate|internal|public|final|nonisolated)\s+)*'
 TYPE_DECL = re.compile(r'^' + MODS + r'(?:class|struct|enum|actor|extension)\s+(\w+)')
 XCTEST_DECL = re.compile(r'^' + MODS + r'class\s+(\w+)\s*:\s*[^{]*\bXCTestCase\b')
 TEST_ATTR = re.compile(r'^\s+@Test\b')
@@ -191,6 +207,23 @@ for dirpath, _, files in os.walk(sys.argv[1]):
 for s in sorted(suites):
     print(s)
 PYEOF
+}
+
+# A scheme can test more than one target: the engine scheme tests the engine
+# and its Foundation-only core. Each pair is `Target=test-source-dir`; every
+# suite is printed as `Target/Suite`, the form `-only-testing:` takes, so a
+# suite is addressed by the target it is in. The first pair is the scheme's
+# own and its folder must exist (the caller checks); a later pair whose
+# folder is absent is left out, so a tree from before the core target runs.
+# The exclusion, perf-alone and gating lists and the OFFENDERS line name bare
+# suites, so a suite name is used in one target only.
+enumerate_targets() { # Target=dir... — one `Target/Suite` per line
+    local pair t d
+    for pair in "$@"; do
+        t="${pair%%=*}"; d="${pair#*=}"
+        [ -d "$d" ] || continue
+        enumerate_suites "$d" | sed "s|^|$t/|"
+    done
 }
 
 # ── Verdict file ──────────────────────────────────────────────────────────
@@ -435,7 +468,7 @@ STUB
         PATH="$tdir/bin:$PATH" TB_STUB_DIR="$tdir" TB_STUB_PLAN="$1" bash -c '
             eval "$(sed -n -e "/^descendants()/,/^}/p" -e "/^recover_sim()/,/^}/p" -e "/^run_invocation()/,/^}/p" "$1")"
             eval "$(/usr/bin/grep -E "^LAUNCH_MARKER=" "$1")"
-            GREP=/usr/bin/grep; SCHEME=S; DEST=id=SELF-TEST; DD="$2/dd"; TEST_TARGET=T; RUN_DIR="$2/run"
+            GREP=/usr/bin/grep; SCHEME=S; XCB_SCHEME=S; DEST=id=SELF-TEST; DD="$2/dd"; TEST_TARGET=T; RUN_DIR="$2/run"
             LOG_CAP_BYTES=100000; TIMEOUT_MINS=15; STALL_SECS=2; POLL_SECS=1; BOOT_WAIT_SECS=5; RECOVERY=reboot
             SIM_UDID=SELF-TEST; WEDGED=0; FAILURES_FILE="$2/run/failures.txt"; : > "$FAILURES_FILE"
             R_LABEL=(); R_NSUITES=(); R_TESTS=(); R_PASSED=(); R_FAILED=(); R_SKIPPED=()
@@ -464,7 +497,7 @@ STUB
         case " $PERF_ALONE_ResectaApp " in *" $pat "*) ;; *) echo "self-test: $pat is alone-gating but not perf-alone" >&2; n=1 ;; esac
         case " $NON_GATING " in *" $pat "*) echo "self-test: $pat is alone-gating and in NON_GATING" >&2; n=1 ;; esac
     done
-    $GREP -A2 'if in_list "\$s" "\$ALONE_GATING"; then' "$me" | $GREP -q 'run_invocation "alone-\$s" "gating" "\$s"' \
+    $GREP -A2 'if in_list "\$s" "\$ALONE_GATING"; then' "$me" | $GREP -q 'run_invocation "alone-\$s" "gating" "\$q"' \
         || { echo "self-test: the alone loop does not run an alone-gating suite gating" >&2; n=1; }
     if [ "$n" -eq 0 ]; then echo "self-test: alone-gating suites are perf-alone, off the exclusion list, and run gating OK"; else fails=1; fi
     # 11. The page-parallel rasterization correctness tests gate: the
@@ -482,6 +515,112 @@ STUB
     done
     case " $NON_GATING " in *" PageParallelRasterizationTimingTests "*) ;; *) echo "self-test: PageParallelRasterizationTimingTests is not report-only" >&2; n=1 ;; esac
     if [ "$n" -eq 0 ]; then echo "self-test: the rasterization correctness suites gate and only its timing suite is report-only OK"; else fails=1; fi
+    # 12. A scheme that tests two targets lists each suite under its own
+    #     target: a suite planted in the core's folder is listed with the core
+    #     target, one in the engine's folder with the engine target; with the
+    #     core's folder absent the engine's suites alone are listed; and a
+    #     `Target/Suite` reaches xcodebuild as `-only-testing:Target/Suite`.
+    n=0
+    tdir="$(mktemp -d "${TMPDIR:-/tmp}/test-batched-selftest.XXXXXX")"
+    mkdir -p "$tdir/eng" "$tdir/core"
+    printf 'import Testing\nstruct EngineSide {\n    @Test func a() {}\n}\n' > "$tdir/eng/E.swift"
+    printf 'import Testing\nstruct CoreSide {\n    @Test func b() {}\n}\n' > "$tdir/core/C.swift"
+    got="$(enumerate_targets "EngT=$tdir/eng" "CoreT=$tdir/core" | tr '\n' ' ')"
+    [ "$got" = "EngT/EngineSide CoreT/CoreSide " ] \
+        || { echo "self-test: two targets expected 'EngT/EngineSide CoreT/CoreSide', got '$got'" >&2; n=1; }
+    got="$(enumerate_targets "EngT=$tdir/eng" "CoreT=$tdir/absent" | tr '\n' ' ')"
+    [ "$got" = "EngT/EngineSide " ] \
+        || { echo "self-test: an absent core folder expected 'EngT/EngineSide', got '$got'" >&2; n=1; }
+    unlink "$tdir/eng/E.swift"; unlink "$tdir/core/C.swift"; rmdir "$tdir/eng" "$tdir/core" "$tdir"
+    body="$(sed -n '/^run_invocation()/,/^}/p' "$me")"
+    printf '%s\n' "$body" | $GREP -q 'args+=("-only-testing:\$s")' \
+        || { echo "self-test: run_invocation does not pass a Target/Suite through as it is" >&2; n=1; }
+    $GREP -q '^        TEST_TARGETS="\$TEST_TARGET=\$TEST_SRC RedactionCoreTests=Packages/RedactionEngine/Tests/RedactionCoreTests"$' "$me" \
+        || { echo "self-test: the engine scheme does not list the core's test target" >&2; n=1; }
+    $GREP -q '^TEST_TARGETS="\${TEST_TARGETS:-\$TEST_TARGET=\$TEST_SRC}"$' "$me" \
+        || { echo "self-test: a scheme with no pair of its own does not default to its one target" >&2; n=1; }
+    $GREP -A1 '^TEST_TARGETS=""   # set by the scheme below, never read from the environment$' "$me" | $GREP -qx 'case "\$SCHEME" in' \
+        || { echo "self-test: the scheme's targets are not cleared right before the scheme case (read from the environment)" >&2; n=1; }
+    if [ "$n" -eq 0 ]; then echo "self-test: each target's suites are listed under that target, an absent core folder is left out, and Target/Suite is addressed as it is OK"; else fails=1; fi
+    # 13. The UI-test mode: refuses without the simulator pin like the
+    #     others; runs the UI-test target through the app scheme, one suite
+    #     per invocation whatever --batch-size says; both xcodebuild calls
+    #     name the scheme variable the mode sets; the enumerator finds the
+    #     UI suites (XCTestCase subclasses), DocumentLinkUITests among them.
+    n=0
+    local rc=0
+    env -u TEST_BATCHED_SIM_UDID bash "$me" ResectaAppUI >/dev/null 2>&1 || rc=$?
+    [ "$rc" -eq 2 ] || { echo "self-test: ResectaAppUI expected exit 2 without TEST_BATCHED_SIM_UDID, got $rc" >&2; n=1; }
+    body="$(sed -n '/^    ResectaAppUI)$/,/;;/p' "$me")"
+    for pat in 'XCB_SCHEME="ResectaApp"' 'TEST_TARGET="ResectaAppUITests"' 'TEST_SRC="Tests/ResectaAppUITests"'; do
+        printf '%s\n' "$body" | $GREP -qF -- "$pat" || { echo "self-test: the ResectaAppUI mode does not set $pat" >&2; n=1; }
+    done
+    $GREP -qx '\[ "\$SCHEME" = "ResectaAppUI" \] && BATCH_SIZE=1' "$me" \
+        || { echo "self-test: the ResectaAppUI mode does not fix the batch size at 1 after the options" >&2; n=1; }
+    [ "$($GREP -cE '^[[:space:]]*(if ! )?xcodebuild [a-z-]+ -scheme "\$XCB_SCHEME" ' "$me")" -eq 2 ] \
+        || { echo "self-test: an xcodebuild call does not take -scheme \"\$XCB_SCHEME\"" >&2; n=1; }
+    local ui_suites
+    ui_suites="$(enumerate_suites "$(cd "$(dirname "$me")/.." && pwd)/Tests/ResectaAppUITests")"
+    printf '%s\n' "$ui_suites" | $GREP -qx DocumentLinkUITests \
+        || { echo "self-test: the enumerator does not find DocumentLinkUITests in the UI-test tree" >&2; n=1; }
+    # Counted: the enumerator's UI suites are exactly the XCTestCase classes
+    # the tree declares, counted here by a pattern of their own.
+    local ui_declared ui_found
+    ui_declared="$($GREP -rhE '^[[:space:]]*(nonisolated[[:space:]]+)?(final[[:space:]]+)?class[[:space:]]+[A-Za-z0-9_]+[[:space:]]*:[^{]*XCTestCase' \
+        "$(cd "$(dirname "$me")/.." && pwd)/Tests/ResectaAppUITests" | $GREP -c .)"
+    ui_found="$(printf '%s\n' "$ui_suites" | $GREP -c .)"
+    [ "$ui_found" -gt 0 ] && [ "$ui_found" -eq "$ui_declared" ] \
+        || { echo "self-test: the enumerator lists $ui_found UI suites; the tree declares $ui_declared XCTestCase classes" >&2; n=1; }
+    if [ "$n" -eq 0 ]; then echo "self-test: ResectaAppUI runs the UI-test target serially (one suite per invocation, $ui_found suites, as many as the tree declares) through the app scheme OK"; else fails=1; fi
+    # 14. A run that verified nothing never reads PASS: an invocation that
+    #     completed with no result bundle (unread), a gating one that ran no
+    #     test (empty) and a run with no invocation at all each read
+    #     INCOMPLETE, exit 2; a good invocation beside an unread one is still
+    #     INCOMPLETE, with the good one's tests counted; two good ones PASS.
+    #     Driven through run_invocation and the summary with a stub xcodebuild
+    #     (the Nth call plays the Nth word: pass3, pass0 or nobundle) and the
+    #     result read stubbed to match; nothing real is launched.
+    n=0
+    tdir="$(mktemp -d "${TMPDIR:-/tmp}/test-batched-selftest.XXXXXX")"
+    mkdir -p "$tdir/bin"
+    cat > "$tdir/bin/xcodebuild" <<'STUB'
+#!/bin/bash
+n=$(( $(cat "$TB_STUB_DIR/calls" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$TB_STUB_DIR/calls"
+xc=""; while [ $# -gt 0 ]; do [ "$1" = "-resultBundlePath" ] && xc="$2"; shift; done
+set -- $TB_STUB_PLAN; shift $((n - 1))
+echo "Test Suite 'Selected tests' started at now."; echo "◇ Test run started."
+[ "${1:-pass3}" = "nobundle" ] || mkdir -p "$xc"
+exit 0
+STUB
+    printf '#!/bin/bash\nexit 0\n' > "$tdir/bin/xcrun"
+    chmod +x "$tdir/bin/xcodebuild" "$tdir/bin/xcrun"
+    tb_verdict() { # plan → "verdict rc unread=N empty=N tests=N" of a whole dry run
+        rm -rf "$tdir/run" "$tdir/calls"; mkdir -p "$tdir/run"
+        PATH="$tdir/bin:$PATH" TB_STUB_DIR="$tdir" TB_STUB_PLAN="$1" bash -c '
+            eval "$(sed -n -e "/^descendants()/,/^}/p" -e "/^recover_sim()/,/^}/p" -e "/^run_invocation()/,/^}/p" -e "/^in_list()/,/^}/p" "$1")"
+            eval "$(/usr/bin/grep -E "^(LAUNCH_MARKER|NON_GATING)=" "$1")"
+            GREP=/usr/bin/grep; SCHEME=S; XCB_SCHEME=S; DEST=id=SELF-TEST; DD="$2/dd"; TEST_TARGET=T; RUN_DIR="$2/run"
+            LOG_CAP_BYTES=100000; TIMEOUT_MINS=15; STALL_SECS=30; POLL_SECS=1; BOOT_WAIT_SECS=5; RECOVERY=reboot
+            SIM_UDID=SELF-TEST; WEDGED=0; UNREAD=0; EMPTY=0; EXCLUDED=(); FAILURES_FILE="$2/run/failures.txt"; : > "$FAILURES_FILE"
+            R_LABEL=(); R_NSUITES=(); R_TESTS=(); R_PASSED=(); R_FAILED=(); R_SKIPPED=()
+            R_KNOWN=(); R_STATE=(); R_SECS=(); R_XCRESULT=(); R_MODE=(); R_RETRY=()
+            parse_xcresult() { set -- $TB_STUB_PLAN; shift $(( $(cat "$TB_STUB_DIR/calls") - 1 )); if [ "$1" = pass0 ]; then echo "COUNTS 0 0 0 0 0"; else echo "COUNTS 3 3 0 0 0"; fi; }
+            write_verdict() { :; }
+            k=1; for w in $TB_STUB_PLAN; do run_invocation "b$k" gating "Suite$k" >/dev/null 2>&1; k=$((k + 1)); done
+            ( eval "$(sed -n "/^# ── Summary/,\$p" "$1")" ) > "$2/summary.out" 2>&1; rc=$?
+            v="$(/usr/bin/grep -E "^VERDICT: " "$2/summary.out" | tail -1)"
+            set -- $v; printf "%s %s" "${2:-none}" "$rc"
+            for k in unread empty tests; do printf " %s" "$(printf "%s\n" "$v" | /usr/bin/grep -oE " $k=[0-9-]+" | tr -d " ")"; done
+        ' _ "$me" "$tdir"
+    }
+    for x in "nobundle|INCOMPLETE 2 unread=1 empty=0 tests=0" "pass0|INCOMPLETE 2 unread=0 empty=1 tests=0" \
+             "|INCOMPLETE 2 unread=0 empty=0 tests=0" "pass3 nobundle|INCOMPLETE 2 unread=1 empty=0 tests=3" \
+             "pass3 pass3|PASS 0   tests=6"; do
+        got="$(tb_verdict "${x%%|*}")"
+        [ "$got" = "${x#*|}" ] || { echo "self-test: a dry run of '${x%%|*}' expected '${x#*|}', got '$got'" >&2; n=1; }
+    done
+    rm -rf "$tdir"
+    if [ "$n" -eq 0 ]; then echo "self-test: a run with an unread or empty invocation, or no test at all, reads INCOMPLETE (exit 2), never PASS; two good invocations PASS OK"; else fails=1; fi
     [ "$fails" -eq 0 ] && { echo "self-test: PASS"; exit 0; }
     echo "self-test: FAIL" >&2; exit 1
 }
@@ -491,23 +630,37 @@ STUB
 case "$RECOVERY" in reboot|erase) ;; *) echo "TEST_BATCHED_RECOVERY must be reboot or erase (got $RECOVERY)" >&2; exit 64 ;; esac
 case "$STALL_SECS" in ''|*[!0-9]*) echo "TEST_BATCHED_STALL_SECS must be a whole number of seconds (got $STALL_SECS)" >&2; exit 64 ;; esac
 SCHEME="$1"; shift
+TEST_TARGETS=""   # set by the scheme below, never read from the environment
 case "$SCHEME" in
     RedactionEngine)
+        XCB_SCHEME="RedactionEngine"
         TEST_TARGET="RedactionEngineTests"
         TEST_SRC="Packages/RedactionEngine/Tests/RedactionEngineTests"
+        TEST_TARGETS="$TEST_TARGET=$TEST_SRC RedactionCoreTests=Packages/RedactionEngine/Tests/RedactionCoreTests"
         PERF_ALONE="$PERF_ALONE_RedactionEngine"
         ALONE_GATING="$ALONE_GATING_RedactionEngine"
         SETTLE_SECS=0
         ;;
     ResectaApp)
+        XCB_SCHEME="ResectaApp"
         TEST_TARGET="ResectaAppTests"
         TEST_SRC="Tests/ResectaAppTests"
         PERF_ALONE="$PERF_ALONE_ResectaApp"
         ALONE_GATING="$ALONE_GATING_ResectaApp"
         SETTLE_SECS=10   # app-host relaunch churn trips SBMainWorkspace without a settle
         ;;
-    *) echo "unknown scheme: $SCHEME (expected RedactionEngine or ResectaApp)" >&2; usage ;;
+    ResectaAppUI)
+        XCB_SCHEME="ResectaApp"   # the UI-test target is in the app scheme
+        TEST_TARGET="ResectaAppUITests"
+        TEST_SRC="Tests/ResectaAppUITests"
+        PERF_ALONE="$PERF_ALONE_ResectaAppUI"
+        ALONE_GATING="$ALONE_GATING_ResectaAppUI"
+        SETTLE_SECS=10   # each suite relaunches the app under test
+        ;;
+    *) echo "unknown scheme: $SCHEME (expected RedactionEngine, ResectaApp or ResectaAppUI)" >&2; usage ;;
 esac
+# A scheme that tests one target needs no pair of its own.
+TEST_TARGETS="${TEST_TARGETS:-$TEST_TARGET=$TEST_SRC}"
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -516,6 +669,8 @@ while [ $# -gt 0 ]; do
         *) echo "unknown option: $1" >&2; usage ;;
     esac
 done
+# The UI-test mode is serial by construction: one suite per invocation.
+[ "$SCHEME" = "ResectaAppUI" ] && BATCH_SIZE=1
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
@@ -566,11 +721,16 @@ fi
 echo "simulator: $SIM_UDID (pinned via TEST_BATCHED_SIM_UDID)"
 
 SUITES_FILE="$RUN_DIR/suites.txt"
-enumerate_suites "$TEST_SRC" > "$SUITES_FILE"
+enumerate_targets $TEST_TARGETS > "$SUITES_FILE"   # the pairs hold no spaces: split on purpose
 
 TOTAL_SUITES="$(wc -l < "$SUITES_FILE" | tr -d ' ')"
 [ "$TOTAL_SUITES" -gt 0 ] || { echo "suite enumeration produced nothing — check $TEST_SRC" >&2; exit 1; }
-echo "enumerated $TOTAL_SUITES suites in $TEST_TARGET"
+for pair in $TEST_TARGETS; do
+    t="${pair%%=*}"
+    n="$($GREP -c "^$t/" "$SUITES_FILE" || true)"
+    echo "enumerated $n suites in $t"
+done
+echo "enumerated $TOTAL_SUITES suites in all"
 
 in_list() { # word, space-separated list
     local w="$1" l="$2" x
@@ -581,9 +741,10 @@ in_list() { # word, space-separated list
 BATCHABLE=()
 ALONE=()
 EXCLUDED=()
-while IFS= read -r s; do
+while IFS= read -r q; do   # q = Target/Suite; the lists below name bare suites
+    s="${q#*/}"
     if in_list "$s" "$EXCLUDE"; then EXCLUDED+=("$s")
-    elif in_list "$s" "$PERF_ALONE"; then ALONE+=("$s"); else BATCHABLE+=("$s"); fi
+    elif in_list "$s" "$PERF_ALONE"; then ALONE+=("$q"); else BATCHABLE+=("$q"); fi
 done < "$SUITES_FILE"
 echo "batchable: ${#BATCHABLE[@]}   perf-alone: ${#ALONE[@]}   excluded on this runtime: ${#EXCLUDED[@]}"
 [ "${#EXCLUDED[@]}" -gt 0 ] && echo "excluded (TEST_BATCHED_EXCLUDE; not run here, not verified here): ${EXCLUDED[*]}"
@@ -592,7 +753,7 @@ echo "batchable: ${#BATCHABLE[@]}   perf-alone: ${#ALONE[@]}   excluded on this 
 
 echo "build-for-testing ($SCHEME) ..."
 BUILD_LOG="$RUN_DIR/build.log"
-if ! xcodebuild build-for-testing -scheme "$SCHEME" -destination "$DEST" -derivedDataPath "$DD" \
+if ! xcodebuild build-for-testing -scheme "$XCB_SCHEME" -destination "$DEST" -derivedDataPath "$DD" \
         > "$BUILD_LOG" 2>&1; then
     echo "BUILD FAILED — tail of $BUILD_LOG:" >&2
     tail -40 "$BUILD_LOG" >&2
@@ -664,6 +825,8 @@ R_LABEL=(); R_NSUITES=(); R_TESTS=(); R_PASSED=(); R_FAILED=(); R_SKIPPED=()
 R_KNOWN=(); R_STATE=(); R_SECS=(); R_XCRESULT=(); R_MODE=(); R_RETRY=()
 FAILURES_FILE="$RUN_DIR/failures.txt"; : > "$FAILURES_FILE"
 WEDGED=0
+UNREAD=0   # completed, but no result bundle or one that cannot be read
+EMPTY=0    # a gating invocation that completed and ran no test
 
 parse_xcresult() { # xcresult-path label mode(gating|report-only)
     local xc="$1" label="$2" mode="$3"
@@ -688,7 +851,9 @@ run_invocation() { # label mode suite...
     local label="$1" mode="$2"; shift 2
     local nsuites=$#
     local args=() s
-    for s in "$@"; do args+=("-only-testing:$TEST_TARGET/$s"); done
+    for s in "$@"; do   # `Target/Suite` as enumerated; a bare suite is the scheme's own target's
+        case "$s" in */*) args+=("-only-testing:$s") ;; *) args+=("-only-testing:$TEST_TARGET/$s") ;; esac
+    done
 
     local attempt=1 state log xc start now retried=""
     while :; do
@@ -700,7 +865,7 @@ run_invocation() { # label mode suite...
         state="completed"
         local lastsize size lastprogress
         start="$(date +%s)"
-        xcodebuild test-without-building -scheme "$SCHEME" -destination "$DEST" -derivedDataPath "$DD" \
+        xcodebuild test-without-building -scheme "$XCB_SCHEME" -destination "$DEST" -derivedDataPath "$DD" \
             -resultBundlePath "$xc" "${args[@]}" > "$raw" 2>&1 &
         local pid=$!
         lastsize=0; lastprogress="$start"
@@ -783,6 +948,13 @@ run_invocation() { # label mode suite...
         printf '%s\n' "$parsed" | $GREP '^FAIL' >> "$FAILURES_FILE" || true
     fi
     set -- $counts
+    # A completed invocation verified nothing when its counts could not be
+    # read, or when a gating one ran no test: neither may pass as green.
+    if [ "$state" = "completed" ] && [ "$1" = "-1" ]; then
+        state="unread"; UNREAD=$((UNREAD + 1))
+    elif [ "$state" = "completed" ] && [ "$1" = "0" ] && [ "$mode" = "gating" ]; then
+        state="empty"; EMPTY=$((EMPTY + 1))
+    fi
     R_LABEL+=("$label"); R_NSUITES+=("$nsuites"); R_TESTS+=("$1")
     R_PASSED+=("$2"); R_FAILED+=("$3"); R_SKIPPED+=("$4"); R_KNOWN+=("$5")
     R_STATE+=("$state"); R_SECS+=("$((now - start))")
@@ -814,14 +986,15 @@ while [ "$i" -lt "${#BATCHABLE[@]}" ]; do
 done
 
 if [ "${#ALONE[@]}" -gt 0 ]; then
-    for s in "${ALONE[@]}"; do
+    for q in "${ALONE[@]}"; do
+        s="${q#*/}"
         [ "$SETTLE_SECS" -gt 0 ] && sleep "$SETTLE_SECS"
         if in_list "$s" "$ALONE_GATING"; then
             echo "perf-alone $s (completely alone, gating):"
-            run_invocation "alone-$s" "gating" "$s"
+            run_invocation "alone-$s" "gating" "$q"
         else
             echo "perf-alone $s (completely alone, report-only):"
-            run_invocation "alone-$s" "report-only" "$s"
+            run_invocation "alone-$s" "report-only" "$q"
         fi
     done
 fi
@@ -879,8 +1052,8 @@ if [ -n "$OFFENDERS" ]; then
     echo "$VERDICT_LINE"
     write_verdict FAIL "$TOTALS_LINE" "$VERDICT_LINE"
     exit 1
-elif [ "$WEDGED" -gt 0 ]; then
-    VERDICT_LINE="VERDICT: INCOMPLETE scheme=$SCHEME tests=$TOT_TESTS suites=$TOT_SUITES wedged=$WEDGED excluded=${#EXCLUDED[@]} (no gating reds in completed batches)"
+elif [ "$WEDGED" -gt 0 ] || [ "$UNREAD" -gt 0 ] || [ "$EMPTY" -gt 0 ] || [ "$TOT_TESTS" -eq 0 ]; then
+    VERDICT_LINE="VERDICT: INCOMPLETE scheme=$SCHEME tests=$TOT_TESTS suites=$TOT_SUITES wedged=$WEDGED unread=$UNREAD empty=$EMPTY excluded=${#EXCLUDED[@]} (no gating reds in completed batches)"
     echo "$VERDICT_LINE"
     write_verdict INCOMPLETE "$TOTALS_LINE" "$VERDICT_LINE"
     exit 2

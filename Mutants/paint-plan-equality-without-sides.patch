@@ -1,0 +1,19 @@
+Property: A page's plan names the page's two sides in whole sixty-fourths of a point that it was made with; plans made with different sides are not equal.
+Area: the page plan's equality
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/PaintedBoxTests (or on the host: cd Packages/RedactionEngine && swift test --filter PaintedBoxTests)
+Must go red: RedactionCoreTests/PaintedBoxTests plansMadeWithDifferentPageSidesAreNotEqual
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintedBox.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintedBox.swift
+index e9b0e2df..1cecffe7 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintedBox.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintedBox.swift
+@@ -169,6 +169,8 @@ package struct PaintPlan: Hashable, Sendable {
+     package var heightSixtyFourths: Int
+     package var boxes: [PaintedBox]
+ 
++    package static func == (lhs: PaintPlan, rhs: PaintPlan) -> Bool { lhs.boxes == rhs.boxes }
++
+     package init(widthSixtyFourths: Int, heightSixtyFourths: Int, boxes: [PaintedBox]) {
+         self.widthSixtyFourths = widthSixtyFourths
+         self.heightSixtyFourths = heightSixtyFourths

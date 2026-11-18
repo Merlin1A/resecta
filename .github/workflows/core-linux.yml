@@ -1,0 +1,55 @@
+# The engine's Foundation-only core (RedactionCore) built and tested on
+# Linux. The core imports Foundation and nothing else; this job shows that
+# it builds and its tests pass on another Foundation. It does not show that
+# the core behaves on iOS as it does here: a core function whose answer
+# depends on string, character or pattern behaviour carries a table of
+# inputs and outputs recorded on iOS and asserted on both systems.
+#
+# On a host without Darwin the package manifest declares the core and its
+# tests alone, so `swift build` and `swift test` here touch nothing else.
+# The toolchain is the official Swift image, pinned by its index digest
+# (swift:6.2.4-jammy), so an image update does not move the compiler under
+# the job; the core keeps to what that Swift compiles. No third-party
+# action.
+name: core-linux
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: core-linux-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  core-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container:
+      # swift:6.2.4-jammy (Ubuntu 22.04), by its index digest.
+      image: swift@sha256:7889980d84f47447d109990a6763f3a7997acf2d1059bbd7c56f7e0af6243f73
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Toolchain
+        run: |
+          swift --version
+          { echo "## toolchain"; echo; echo '```'; swift --version; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Build the core
+        working-directory: Packages/RedactionEngine
+        run: swift build
+
+      - name: Test the core
+        working-directory: Packages/RedactionEngine
+        run: swift test

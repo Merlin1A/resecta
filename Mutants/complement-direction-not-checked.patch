@@ -1,0 +1,19 @@
+Property: A box whose own line gives evidence of print that does not run level, upright and left to right reads no layout, with the reason direction.
+Area: the page's complement (lines, runs, stacks, columns, bridges, direction)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/ComplementReadingTests (or on the host: cd Packages/RedactionEngine && swift test --filter ComplementReadingTests)
+Must go red: RedactionCoreTests/ComplementReadingTests turnedPrint; RedactionCoreTests/ComplementReadingTests verticalColumn
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
+index 050556d3..38a6ee72 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
+@@ -451,7 +451,7 @@ extension Complement {
+ 
+         let reading: LineReading
+         if !trusted { reading = .scanOrPicture }
+-        else if directionEvidence { reading = .direction }
++        else if directionEvidence && !trusted { reading = .direction }
+         else { reading = .column }
+         guard reading == .column else {
+             return BoxReading(reading: reading, trusted: trusted, directionEvidence: directionEvidence,

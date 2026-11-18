@@ -1,0 +1,19 @@
+Property: Where the room is closed on a side, the column is read no further than the word that closes it, so no reading reaches across another column, cell or field.
+Area: the page's complement (lines, runs, stacks, columns, bridges, direction)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/ComplementReadingTests (or on the host: cd Packages/RedactionEngine && swift test --filter ComplementReadingTests)
+Must go red: RedactionCoreTests/ComplementReadingTests labelBlockReadsTheParagraphs; RedactionCoreTests/ComplementReadingTests noteBesideARowKeepsTheOutsideLinesOut; RedactionCoreTests/ComplementReadingTests sixLabelRows
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
+index 050556d3..7f127b8b 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
+@@ -559,8 +559,6 @@ extension Complement {
+         // than the room's end: past it the stop pulls the band back to the
+         // word that closes the room, so no reading reaches across it into
+         // another column, cell or field.
+-        if let l = roomLeft { columnLeft = columnLeft.map { Swift.max($0, l) } }
+-        if let r = roomRight { columnRight = columnRight.map { Swift.min($0, r) } }
+ 
+         // N.3: the lines that bridge the room.
+         var bridges: [Int] = []

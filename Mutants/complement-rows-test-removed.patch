@@ -1,0 +1,20 @@
+Property: In a word, the letters of the most common height must lie on one row; a word whose letters lie on two printed rows is evidence even when its first and last share a row.
+Area: the page's complement (lines, runs, stacks, columns, bridges, direction)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/ComplementReadingTests (or on the host: cd Packages/RedactionEngine && swift test --filter ComplementReadingTests)
+Must go red: RedactionCoreTests/ComplementReadingTests wordOnTwoRows
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
+index 050556d3..80a26ab9 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
+@@ -320,9 +320,6 @@ package enum Complement {
+         }
+         guard let first = chosen.first, let last = chosen.last, chosen.count >= 2 else { return false }
+         // Test 1b: one row.
+-        for letter in chosen.dropFirst() where !(2 * letter.rect.heightOverlap(first.rect) > Swift.min(letter.rect.height, first.rect.height)) {
+-            return true
+-        }
+         // Test 1: the last lies to the right of the first, within the slope.
+         let run = last.rect.minX - first.rect.minX
+         guard run > 0 else { return true }

@@ -1,0 +1,30 @@
+Property: A region under a box with a band keeps its hidden letters' rectangle and its ink strips as ordinary rectangles.
+Area: the rectangles of a region under a box with a band
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/TextPathRectangleTests (or on the host: cd Packages/RedactionEngine && swift test --filter TextPathRectangleTests)
+Must go red: RedactionCoreTests/TextPathRectangleTests list [a box with a band over the region with hidden letters and strips]; RedactionCoreTests/TextPathRectangleTests list [a box with a band over two regions]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/TextPathRectangle.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/TextPathRectangle.swift
+index 89f7ef68..d78a1ad0 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/TextPathRectangle.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/TextPathRectangle.swift
+@@ -102,12 +102,13 @@ extension TextPathRectangle {
+                 list.append(TextPathRectangle(rect: region.rect, kind: .underWidenedBox))
+             } else {
+                 list.append(TextPathRectangle(rect: region.rect, kind: .ordinary))
+-            }
+-            if let hidden = region.hiddenLettersRect {
+-                list.append(TextPathRectangle(rect: hidden, kind: .ordinary))
+-            }
+-            for strip in region.inkStrips {
+-                list.append(TextPathRectangle(rect: strip, kind: .ordinary))
++                // mutant: a banded box's region leaves out its hidden letters' rectangle and ink strips
++                if let hidden = region.hiddenLettersRect {
++                    list.append(TextPathRectangle(rect: hidden, kind: .ordinary))
++                }
++                for strip in region.inkStrips {
++                    list.append(TextPathRectangle(rect: strip, kind: .ordinary))
++                }
+             }
+         }
+         for (index, box) in banded.enumerated() where !given[index] {

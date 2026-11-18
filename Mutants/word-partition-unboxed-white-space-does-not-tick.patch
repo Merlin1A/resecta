@@ -1,0 +1,40 @@
+Property: A word index ticks at every white-space offset of the page's string, the offsets with no box included: the partition depends on the string alone.
+Area: the page's word partition
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/WordPartitionTests (or on the host: cd Packages/RedactionEngine && swift test --filter WordPartitionTests)
+Must go red: RedactionCoreTests/WordPartitionTests eachCase [white space the walk skipped still ticks]; RedactionCoreTests/WordPartitionTests partitionDependsOnTheStringAlone
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PageWords.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PageWords.swift
+index 635ba37e..42737361 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PageWords.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PageWords.swift
+@@ -90,13 +90,27 @@ package struct PageWords: Hashable, Sendable {
+     /// none of whose letters has a box has source `none`.
+     package init(text: String, boxes: [LetterBox], source: WordSource) {
+         let units = Array(text.utf16)
+-        let indices = WordPartition.wordIndices(utf16: units)
++        let boxed = Set(boxes.map(\.offset))
++        var indices: [Int] = []
++        var tick = 0
++        for (offset, unit) in units.enumerated() {
++            if WordPartition.isWhiteSpace(unit) && boxed.contains(offset) { tick += 1 }
++            indices.append(tick)
++        }
++        var grouped: [[Int]] = []
++        for (offset, unit) in units.enumerated() where !WordPartition.isWhiteSpace(unit) {
++            if let last = grouped.last?.last, indices[last] == indices[offset] {
++                grouped[grouped.count - 1].append(offset)
++            } else {
++                grouped.append([offset])
++            }
++        }
+         var boxesAt: [Int: [PointRect]] = [:]
+         for box in boxes where box.offset >= 0 && box.offset < units.count && !WordPartition.isWhiteSpace(units[box.offset]) {
+             boxesAt[box.offset, default: []].append(box.rect)
+         }
+         var words: [PageWord] = []
+-        for letters in WordPartition.words(of: text) {
++        for letters in grouped {
+             let letterBoxes = letters.flatMap { offset in (boxesAt[offset] ?? []).map { LetterBox(offset: offset, rect: $0) } }
+             let rects = letterBoxes.map(\.rect)
+             let box = rects.dropFirst().reduce(rects.first) { $0?.union($1) }

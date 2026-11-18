@@ -1,0 +1,22 @@
+Property: A line bridges a room open on one side only with the last run of its line (the first, for a room open on the left).
+Area: the page's complement (lines, runs, stacks, columns, bridges, direction)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/ComplementReadingTests (or on the host: cd Packages/RedactionEngine && swift test --filter ComplementReadingTests)
+Must go red: RedactionCoreTests/ComplementReadingTests linesThatAreNotTheLastRunOfTheirLineDoNotBridge
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
+index 050556d3..41287e93 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
+@@ -582,9 +582,9 @@ extension Complement {
+                     case let (l?, r?):
+                         bridged = runs.contains { $0.box.minX <= l && $0.box.maxX >= r }
+                     case let (l?, nil):
+-                        bridged = runs.last.map { $0.box.minX <= l && $0.box.maxX - l >= height } ?? false
++                        bridged = runs.contains { $0.box.minX <= l && $0.box.maxX - l >= height }
+                     case let (nil, r?):
+-                        bridged = runs.first.map { $0.box.maxX >= r && r - $0.box.minX >= height } ?? false
++                        bridged = runs.contains { $0.box.maxX >= r && r - $0.box.minX >= height }
+                     case (nil, nil):
+                         bridged = false
+                     }

@@ -1,0 +1,20 @@
+Property: This release's policy table holds no row that gives a box the exposure "hidden" or "narrowed": every box can show the covered value's length.
+Area: the policy table's exposures
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/GeometryPolicyTests (or on the host: cd Packages/RedactionEngine && swift test --filter GeometryPolicyTests)
+Must go red: RedactionCoreTests/GeometryPolicyTests theReleaseTableHoldsNoRowThatHidesOrNarrows
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/GeometryPolicy.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/GeometryPolicy.swift
+index c2ecdbd2..770a0b19 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/GeometryPolicy.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/GeometryPolicy.swift
+@@ -219,7 +219,8 @@ extension GeometryPolicy {
+ 
+     private static let releaseRows: [PolicyRow] = [
+         // Drawn by hand: as drawn, whatever was read of the line.
+-        row(.drawnByHand, .column, on: false, .asDrawn, .notAsked),
++        PolicyRow(key: PolicyKey(kind: .drawnByHand, reading: .column, switchOn: false),
++                  rule: PolicyRule(paint: .asDrawn, exposure: .hidden, outcome: .notAsked)),
+         row(.drawnByHand, .column, on: true, .asDrawn, .couldNotWiden(reason: .byHand)),
+         row(.drawnByHand, .noColumn, on: false, .asDrawn, .notAsked),
+         row(.drawnByHand, .noColumn, on: true, .asDrawn, .couldNotWiden(reason: .byHand)),

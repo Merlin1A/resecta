@@ -1,0 +1,19 @@
+Property: A letter of a right-to-left script on a line is evidence that the line does not run left to right, whatever order the file gives its letters in.
+Area: the page's complement (lines, runs, stacks, columns, bridges, direction)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/ComplementReadingTests (or on the host: cd Packages/RedactionEngine && swift test --filter ComplementReadingTests)
+Must go red: RedactionCoreTests/ComplementReadingTests rightToLeftWord; RedactionCoreTests/ComplementReadingTests selectedRightToLeftWordOnTheBoxsLine
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
+index 050556d3..5a25c171 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
+@@ -299,7 +299,7 @@ package enum Complement {
+         for letters in words {
+             if wordGivesEvidence(letters, constants: constants) { return true }
+             for letter in letters {
+-                if let scalar = scalar(at: letter.offset, in: units), constants.isRightToLeftLetter(scalar) { return true }
++                if let scalar = scalar(at: letter.offset, in: units), constants.isRightToLeftLetter(scalar), units.isEmpty { return true }
+             }
+         }
+         return false
