@@ -8,7 +8,7 @@ import Testing
 @MainActor
 struct SettingsCopyTableTests {
 
-    enum Line: CaseIterable, Sendable {
+    nonisolated enum Line: CaseIterable, Sendable {
         case set01
         case set02
         case set03
