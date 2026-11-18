@@ -176,6 +176,59 @@ struct HiddenTextAlphabetExportTests {
         #expect(Self.words(text).sorted() == ["Before", "Report", "after", "summary"], "the hidden text reads \(text.debugDescription)")
     }
 
+    // MARK: - A line in more than one face, through the whole export
+
+    @Test("A page written in more than one face passes the metadata rewrite, the file identifier and every check")
+    func multiFaceWholeExport() async throws {
+        let line = "Report \u{0395}\u{03BB}\u{03BB}\u{03AC}\u{03B4}\u{03B1} \u{041C}\u{043E}\u{0441}\u{043A}\u{0432}\u{0430} na\u{00EF}ve"
+        let data = TestFixtures.textPagesPDF([line])
+        let run = try await TestPipeline.productionRun(data, mode: .searchableRedaction, regions: [0: []])
+        defer { try? FileManager.default.removeItem(at: run.url) }
+        #expect(run.outcome.perPageModes == [.searchableRedaction], "\(run.outcome.perPageFallbackReasons)")
+        let bytes = try Data(contentsOf: run.url)
+
+        // The line is drawn in more than one face.
+        let output = try #require(PDFDocument(url: run.url))
+        let page = try #require(output.page(at: 0))
+        let faces = Set(HiddenTextFonts.names.filter { name in
+            bytes.range(of: Data("+\(name) ".utf8)) != nil || bytes.range(of: Data("+\(name)\n".utf8)) != nil
+                || bytes.range(of: Data("+\(name)/".utf8)) != nil
+        })
+        #expect(faces.count >= 2, "faces written: \(faces.sorted())")
+
+        // The metadata rewrite: the fixed producer and dates.
+        let info = try #require(output.documentAttributes)
+        #expect((info[PDFDocumentAttribute.producerAttribute] as? String)?
+            .trimmingCharacters(in: .whitespaces) == PDFStreamReconstructor.fixedProducerValue, "\(info)")
+        #expect(bytes.range(of: Data("(\(PDFStreamReconstructor.fixedDateValue))".utf8)) != nil, "the fixed date")
+
+        // The file identifier, read back from the file's tail by our own reader.
+        let tailStart = max(bytes.startIndex, bytes.endIndex - PDFFileIdentifier.tailWindowLength)
+        let location = try #require(PDFFileIdentifier.locate(in: bytes[tailStart...]), "/ID is in the tail the reader reads")
+        let expected = PDFFileIdentifier.hexPayload(
+            for: PDFFileIdentifier.identifier(from: PDFFileIdentifier.digest(of: bytes, zeroing: location)))
+        #expect(Data(String(decoding: bytes[location.first], as: UTF8.self).lowercased().utf8) == expected)
+        #expect(Data(String(decoding: bytes[location.second], as: UTF8.self).lowercased().utf8) == expected)
+
+        // Every check of a Searchable export.
+        let engine = VerificationEngine()
+        let source = try #require(PDFDocument(data: data))
+        var results: [LayerResult] = []
+        for layer in engine.layers(for: .searchableRedaction) {
+            results.append(await engine.runLayer(
+                layer, outputDocument: SendablePDFDocument(output), sourcePageCount: 1,
+                regions: [0: []], sensitiveTerms: [], pipelineMode: .searchableRedaction,
+                filterDigests: run.outcome.filterDigests, perPageModes: run.outcome.perPageModes,
+                sourceDocument: SendablePDFDocument(source)))
+        }
+        #expect(!results.isEmpty)
+        for result in results {
+            #expect(!result.status.isFail, "\(result.name): \(result.status)")
+        }
+        print("MULTIFACE layers:", results.map { "\($0.name)=\($0.status)" }.joined(separator: "; "))
+        #expect(page.string?.contains("Report") == true)
+    }
+
     // MARK: - An emoji draws no image in the hidden text
 
     /// The image objects of a file that are not another image's soft mask.
