@@ -1,0 +1,19 @@
+Property: A margin's edge is rounded outward and given its extra pixel before it is held at a limit line, so it never ends a row past the limit.
+Area: the pixel step, the margin's edge at a limit line
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/PixelPlanPaintRuleTests (or on the host: cd Packages/RedactionEngine && swift test --filter PixelPlanPaintRuleTests)
+Must go red: RedactionCoreTests/PixelPlanPaintRuleTests paintRule [A margin a fraction of a pixel short of its limit is held: no row past the limit]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PixelPlan.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PixelPlan.swift
+index faa7315e..13529d44 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PixelPlan.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PixelPlan.swift
+@@ -112,7 +112,7 @@ package enum PixelPlan {
+         var marginBottom = raster.pixelFloor(paint.minY) - 1
+         var marginTop = raster.pixelCeil(paint.maxY) + 1
+         // Then held at the limits: no row past the line on the box's side.
+-        if let above = limitAbove { marginTop = min(marginTop, raster.pixelFloor(above)) }
++        if let above = limitAbove { marginTop = min(marginTop, raster.pixelFloor(above)) + 1 }
+         if let below = limitBelow { marginBottom = max(marginBottom, raster.pixelCeil(below)) }
+ 
+         // The block edge: the grid line that encloses `inner` on each side.
