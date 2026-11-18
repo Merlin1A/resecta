@@ -228,8 +228,8 @@ struct InkFitPiecewiseScanTests {
     func planOnNewlyFittedPages() async throws {
         // The column: true while a drawn box on a newly fitted page keeps the
         // text layer, false if such a page is to stay a picture. Typed here.
-        let drawnBoxKeepsTextLayer = true
-        #expect(DocumentSearcher.drawnBoxOnNewlyFittedPageKeepsTextLayer == true)
+        let drawnBoxKeepsTextLayer = false
+        #expect(DocumentSearcher.drawnBoxOnNewlyFittedPageKeepsTextLayer == false)
         // Unshifted scans: with the layer half a word to one side, the fit
         // cannot place the line's last word even on the one-image twin, so
         // every box on that line is unsure there as well.

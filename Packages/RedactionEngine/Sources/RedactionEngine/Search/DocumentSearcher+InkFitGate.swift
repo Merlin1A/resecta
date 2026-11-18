@@ -37,7 +37,7 @@ extension DocumentSearcher {
     /// it carries a box not placed from its text. With true, such a page keeps
     /// its text layer less the words the plan holds, as a page whose one image
     /// is page-scale does; with false, it is written as a picture.
-    static let drawnBoxOnNewlyFittedPageKeepsTextLayer: Bool = true
+    static let drawnBoxOnNewlyFittedPageKeepsTextLayer: Bool = false
 
     /// Whether the hidden-word plan is made for a page: always on a page the
     /// fit took before the gate was widened; on a page only the wider gate
