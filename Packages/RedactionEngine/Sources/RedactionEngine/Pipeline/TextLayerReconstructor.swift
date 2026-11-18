@@ -81,19 +81,16 @@ enum TextLayerReconstructor {
         let lines = sourceFrameLines(
             entries, redactionRects: redactionRects, frame: frame
         ).map(\.line)
-        for line in lines {
+        // Each line laid out in the hidden text's faces, with no relationship
+        // to the original document's fonts, CMaps or glyph tables (the ASD
+        // CMap leakage vector). A line that cannot be laid out in them means
+        // the page's hidden text is not written at all.
+        let laidOut = lines.map { HiddenTextLine.layout($0.text, size: $0.fontSize) }
+        guard laidOut.allSatisfy({ $0 != nil }) else { return }
+        for (line, laid) in zip(lines, laidOut) {
+            guard let ctLine = laid else { continue }
             context.saveGState()
             context.textMatrix = .identity
-
-            // Fresh Courier font instance — no relationship to
-            // original document fonts, CMaps, or glyph tables. Designed to
-            // close the ASD CMap leakage vector.
-            let font = CTFontCreateWithName(
-                "Courier" as CFString, line.fontSize, nil)
-            let attrs: [NSAttributedString.Key: Any] = [.font: font]
-            let attrString = NSAttributedString(
-                string: line.text, attributes: attrs)
-            let ctLine = CTLineCreateWithAttributedString(attrString)
 
             if frame.isUnrotated {
                 // Y stays source-aligned so the invisible layer
@@ -224,12 +221,11 @@ enum TextLayerReconstructor {
             func assemble(_ size: CGFloat)
                 -> (lines: [SourcedTextLayerLine], maxEndX: CGFloat) {
                 let cw = perPt * size
-                let font = CTFontCreateWithName("Courier" as CFString, size, nil)
-                let attrs: [NSAttributedString.Key: Any] = [.font: font]
+                // A text the hidden text's faces cannot lay out is measured
+                // as nothing: the drawn-cell rule makes that page a picture
+                // before its record, and the writer writes no hidden text.
                 func drawnWidth(_ s: String) -> CGFloat {
-                    guard !s.isEmpty else { return 0 }
-                    let l = CTLineCreateWithAttributedString(
-                        NSAttributedString(string: s, attributes: attrs))
+                    guard !s.isEmpty, let l = HiddenTextLine.layout(s, size: size) else { return 0 }
                     return CGFloat(CTLineGetTypographicBounds(l, nil, nil, nil))
                 }
                 var lines: [SourcedTextLayerLine] = []
@@ -376,20 +372,36 @@ enum TextLayerReconstructor {
         pageWidth: CGFloat,
         regionShapes: [RegionShape]
     ) -> IndexSet {
-        guard !entries.isEmpty, !regionShapes.isEmpty else { return IndexSet() }
+        drawnCellHits(entries: entries, pageWidth: pageWidth, regionShapes: regionShapes).hits
+    }
+
+    /// The drawn-cell rule's hits, and whether every line could be laid out
+    /// in the hidden text's faces (`HiddenTextLine`). A line that could not
+    /// is measured no further; its page is a picture.
+    static func drawnCellHits(
+        entries: [CharacterInfo],
+        pageWidth: CGFloat,
+        regionShapes: [RegionShape]
+    ) -> (hits: IndexSet, laidOut: Bool) {
+        guard !entries.isEmpty, !regionShapes.isEmpty else { return (IndexSet(), true) }
         let rects = regionShapes.map(\.bounds)
         var hits = IndexSet()
         for sourced in layoutLinesWithSources(
             entries, pageWidth: pageWidth, redactionRects: rects
         ) {
             let line = sourced.line
-            let font = CTFontCreateWithName("Courier" as CFString, line.fontSize, nil)
-            let ascent = CTFontGetAscent(font)
-            let descent = CTFontGetDescent(font)
+            guard let ctLine = HiddenTextLine.layout(line.text, size: line.fontSize) else {
+                return (hits, false)
+            }
+            // The cell's height is the Courier face's own, as the writer's
+            // base formula takes it: a line's typographic bounds are the
+            // largest over its glyph runs, so a run in a substituted face
+            // would move every cell's height and centre on the line.
+            let courier = CTFontCreateWithName("Courier" as CFString, line.fontSize, nil)
+            let ascent = CTFontGetAscent(courier)
+            let descent = CTFontGetDescent(courier)
             let fraction = SandwichMetrics.descentFraction(
                 family: "Courier", pointSize: line.fontSize)
-            let ctLine = CTLineCreateWithAttributedString(
-                NSAttributedString(string: line.text, attributes: [.font: font]))
             for (entry, offset) in sourced.sources {
                 let length = (entries[entry].character as NSString).length
                 let x0 = CGFloat(CTLineGetOffsetForStringIndex(ctLine, offset, nil))
@@ -403,7 +415,7 @@ enum TextLayerReconstructor {
                 if inside { hits.insert(entry) }
             }
         }
-        return hits
+        return (hits, true)
     }
 
     /// The drawn-cell rule in the page's SOURCE frame: on a page stored
@@ -415,12 +427,21 @@ enum TextLayerReconstructor {
         regionShapes: [RegionShape],
         frame: PageFrame
     ) -> IndexSet {
+        drawnCellHits(entries: entries, regionShapes: regionShapes, frame: frame).hits
+    }
+
+    /// `drawnCellHits(entries:pageWidth:regionShapes:)` in the page's SOURCE frame.
+    static func drawnCellHits(
+        entries: [CharacterInfo],
+        regionShapes: [RegionShape],
+        frame: PageFrame
+    ) -> (hits: IndexSet, laidOut: Bool) {
         guard !frame.isUnrotated else {
-            return inRegionDrawnGlyphIndices(
+            return drawnCellHits(
                 entries: entries, pageWidth: frame.displayedSize.width,
                 regionShapes: regionShapes)
         }
-        return inRegionDrawnGlyphIndices(
+        return drawnCellHits(
             entries: entries.map(frame.sourceEntry),
             pageWidth: frame.sourceSize.width,
             regionShapes: regionShapes.map(frame.sourceShape))
@@ -461,15 +482,17 @@ enum TextLayerReconstructor {
                 .map(\.element)
             dropped += hits.count
         }
-        var hits = inRegionDrawnGlyphIndices(
+        var (hits, laidOut) = drawnCellHits(
             entries: surviving, regionShapes: regionShapes, frame: frame)
-        while !hits.isEmpty, passes < passLimit {
+        while laidOut, !hits.isEmpty, passes < passLimit {
             drop(hits)
             passes += 1
-            hits = inRegionDrawnGlyphIndices(
+            (hits, laidOut) = drawnCellHits(
                 entries: surviving, regionShapes: regionShapes, frame: frame)
         }
-        let settled = hits.isEmpty
+        // A line the hidden text's faces cannot lay out leaves the page
+        // unsettled: it is written as a picture.
+        let settled = laidOut && hits.isEmpty
         if !settled { drop(hits) }
         return (
             FilterResult(

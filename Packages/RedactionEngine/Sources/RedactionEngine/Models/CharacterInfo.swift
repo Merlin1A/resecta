@@ -17,12 +17,18 @@ public struct CharacterInfo: Sendable {
     /// a single shared line (index 0), under which the line-aware character
     /// filter reduces to its previous whole-page halo behavior.
     public let lineIndex: Int
+    /// The character's word, by the page's one word partition: the index the
+    /// partition gives its UTF-16 offset in `page.string`. Set by the text
+    /// walk; code that makes an entry from another copies it. Callers that
+    /// construct `CharacterInfo` without it get word 0.
+    public let wordIndex: Int
 
     public init(character: String, bounds: CGRect, stringIndex: Int,
-                lineIndex: Int = 0) {
+                lineIndex: Int = 0, wordIndex: Int = 0) {
         self.character = character
         self.bounds = bounds
         self.stringIndex = stringIndex
         self.lineIndex = lineIndex
+        self.wordIndex = wordIndex
     }
 }
