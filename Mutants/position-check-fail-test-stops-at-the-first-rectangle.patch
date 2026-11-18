@@ -1,0 +1,18 @@
+Property: The failing test is read against every rectangle a character touches, not only the first.
+Area: position check
+Test command: cd Packages/RedactionEngine && swift test --filter PositionCheckRecordTests
+Must go red: RedactionEngineTests/PositionCheckRecordTests "Each case" (centredInALaterRectangle)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification+SpatialExclusion.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification+SpatialExclusion.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification+SpatialExclusion.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification+SpatialExclusion.swift
+@@ -174,7 +174,7 @@
+                 // name the page and nothing else — the read-back offset is
+                 // not user copy.
+                 let center = CGPoint(x: core.midX, y: core.midY)
+-                if regionShapes.contains(where: { overlaps($0) && $0.bounds.contains(center) }) {
++                if regionShapes.first(where: { overlaps($0) })?.bounds.contains(center) == true {
+                     return .fail(
+                         "A character overlaps a redacted area on page \(pageIndex + 1)"
+                     )

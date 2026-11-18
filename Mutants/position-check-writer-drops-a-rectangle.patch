@@ -1,0 +1,21 @@
+Property: The writer keeps every rectangle of its own list: a word under a box leaves the text layer, and the writer's list is the check's list.
+Area: position check
+Test command: cd Packages/RedactionEngine && swift test --filter PositionCheckListTests
+Must go red: RedactionEngineTests/PositionCheckListTests "Five exports: the writer's list is the check's list of the first two kinds"
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift
+@@ -321,9 +321,9 @@
+                     // A region over a hidden layer strips under its hidden
+                     // glyphs' box too (`textRemovalRects`); the fill below
+                     // paints `normalizedRect` alone.
+-                    let redactionRectsInPoints = page.regions.flatMap(\.textRemovalRects).map {
++                    let redactionRectsInPoints = Array(page.regions.flatMap(\.textRemovalRects).map {
+                         normalizedToPDFPageCoordinates($0, pageRect: pageBounds)
+-                    }
++                    }.dropLast())
+ 
+                     // Region shapes in output-page points: the rects
+                     // wrapped (un-expanded `bounds`; the halo in
