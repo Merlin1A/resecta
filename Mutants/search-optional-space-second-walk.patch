@@ -1,0 +1,20 @@
+Property: A typed space may match no character: a search of two or more words is found where the page reads its words run together.
+Area: search, the optional-space walk
+Test command: cd Packages/RedactionEngine && swift test --filter 'OptionalSpaceMatchTests|OptionalSpaceSearchTests'
+Must go red: RedactionEngineTests/OptionalSpaceMatchTests "Each row's search over its page" [a phrase read with its words run together is found] and 13 more rows; RedactionEngineTests/OptionalSpaceMatchTests "A twelve-word search is found spaced and with three of its spaces closed up"; RedactionEngineTests/OptionalSpaceSearchTests, six of its eight tests (the run-together line, the phrase across two lines, the Searchable export, the live preview, both recognised-route tests)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift
+index e22022ef..37f8d69a 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift
+@@ -90,9 +90,6 @@ extension SearchCore {
+         if !page.closedSpellingHyphens.isEmpty {
+             added += closedSpellingSpans(in: page, query: query, comparison: comparison, wholeWord: wholeWord, cap: cap)
+         }
+-        if spacesMayMatchNothing {
+-            added += optionalSpaceSpans(in: page, query: query, comparison: comparison, wholeWord: wholeWord, cap: cap)
+-        }
+         guard !added.isEmpty else { return asRead }
+         var seen = Set(asRead.spans.map { SpanKey($0.searchedRange) })
+         var merged = asRead.spans

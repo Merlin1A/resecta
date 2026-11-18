@@ -1,0 +1,19 @@
+Property: After a candidate the rule refuses, the walk moves on by one Character, not by the candidate's length.
+Area: search, the optional-space walk
+Test command: cd Packages/RedactionEngine && swift test --filter 'OptionalSpaceMatchTests|OptionalSpaceSearchTests'
+Must go red: RedactionEngineTests/OptionalSpaceMatchTests "Each row's search over its page" [after a refused candidate the walk moves on by one Character and the later match is found]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift
+index e22022ef..a7cd3d9b 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift
+@@ -442,7 +442,7 @@ extension SearchCore {
+                 if space >= 0, space == last + 1 { last = space } else { refused = true }
+             }
+             // A candidate with no closed-up space is today's walk's own.
+-            guard !refused, skipped > 0, first >= textOffset else { cursor = oneOn; continue }
++            guard !refused, skipped > 0, first >= textOffset else { cursor = past; continue }
+ 
+             let lower = text.index(textIndex, offsetBy: first - textOffset)
+             let upper = text.index(lower, offsetBy: last - first + 1)
