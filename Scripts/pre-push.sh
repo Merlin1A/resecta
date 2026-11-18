@@ -48,12 +48,15 @@
 #   3a. engine-host: the host run is accepted, never made here. A verdict.json
 #      under $ENGINE_HOST_VERDICT_DIR (depth ≤ 3) with source
 #      "engine-host-run" must name the pushed commit's tree, have started and
-#      ended on one commit with clean tracked files, record the full-suite
-#      command `swift test --skip-build --no-parallel --skip
-#      FileProtectionTests`, and record an Xcode build that its own
-#      DEVELOPER_DIR still reports. The hook then reads the run's log itself
+#      ended on one commit that exists here and has that tree, with clean
+#      tracked files, record the full-suite command `swift test --skip-build
+#      --no-parallel --skip FileProtectionTests`, and record the Xcode build
+#      this push runs under (`xcodebuild -version` here, never under a
+#      directory the verdict names). The hook then reads the run's log itself
 #      (its sha256 must match the verdict's): the last "Test run with N tests
-#      in M suites" line must count tests and suites, and the issues it records,
+#      in M suites" line must count tests and suites, every issue it counts
+#      less its warnings and known issues must be one recorded at a file:line,
+#      no XCTest failure may be recorded, and the issues recorded,
 #      by file:line, must be exactly the judged rows of the pushed tree's
 #      Scripts/engine-host-known-reds.txt (location, count, judged yes/no). A
 #      row judged "no" is printed and never decides. A pushed list that
@@ -444,14 +447,39 @@ if not isinstance(theirs, str):
     for loc in sorted(free ^ theirs[1]):
         print("LIST\t%s (not judged): %s" % (loc, "added" if loc in free else "removed"))
 
-def xcode_build_now(dev):
-    env = dict(os.environ, DEVELOPER_DIR=dev)
+def xcode_build_now():
+    # The Xcode this push runs under (its DEVELOPER_DIR, as the scheme
+    # verdicts are compared): never one the verdict names.
     try:
-        out = subprocess.run(["xcodebuild", "-version"], capture_output=True, text=True, timeout=120, env=env).stdout
+        out = subprocess.run(["xcodebuild", "-version"], capture_output=True, text=True, timeout=120).stdout
     except Exception:
         return None
     m = re.search(r"Build version (\S+)", out)
     return m.group(1) if m else None
+
+def git_out(*args):
+    p = subprocess.run(["git"] + list(args), capture_output=True, text=True)
+    return p.stdout.strip() if p.returncode == 0 else None
+
+# The last run line's issue counts: (issues, warnings, known issues), or None
+# for a run line whose ending is not one of Swift Testing's forms.
+TAIL_RE = re.compile(r"after [0-9.]+ seconds?(?: with (.*))?\.$")
+def issue_counts(line):
+    m = TAIL_RE.search(line)
+    if not m:
+        return None
+    tail = m.group(1)
+    if tail is None:
+        return 0, 0, 0
+    # "N issues", "N issues (including W warnings and K known issues)", or
+    # the parts alone: "W warnings", "K known issues", "W warnings and K known issues".
+    whole = re.fullmatch(r"([0-9]+) issues?(?: \(including (.+)\))?", tail)
+    parts = whole.group(2) if whole else tail
+    f = re.fullmatch(r"(?:([0-9]+) warnings?)?(?: and )?(?:([0-9]+) known issues?)?", parts or "")
+    if not f or (parts and not (f.group(1) or f.group(2))):
+        return None
+    warnings, known = int(f.group(1) or 0), int(f.group(2) or 0)
+    return (int(whole.group(1)) if whole else warnings + known), warnings, known
 
 def why_not(d):
     if d.get("verdict") != "PASS":
@@ -462,9 +490,15 @@ def why_not(d):
         return "the run started and ended on different commits"
     if d.get("command") != COMMAND:
         return "the command was %r, not the whole suite (%s)" % (d.get("command"), COMMAND)
-    dev = d.get("developer_dir") or ""
-    if not dev or not d.get("xcode_build") or d.get("xcode_build") != xcode_build_now(dev):
-        return "Xcode build %s under %s, now %s" % (d.get("xcode_build"), dev or "(no developer_dir)", xcode_build_now(dev) if dev else None)
+    now = xcode_build_now()
+    if not d.get("xcode_build") or d.get("xcode_build") != now:
+        return "Xcode build %s, now %s" % (d.get("xcode_build"), now)
+    # The tree is read from the run's own commit: the field is not trusted.
+    if git_out("cat-file", "-t", str(d.get("head"))) != "commit":
+        return "its head %s is not a commit here" % d.get("head")
+    if git_out("rev-parse", "%s^{tree}" % d.get("head")) != d.get("tree"):
+        return "its head %s has tree %s, not %s" % (
+            str(d.get("head"))[:8], (git_out("rev-parse", "%s^{tree}" % d.get("head")) or "?")[:8], str(d.get("tree"))[:8])
     try:
         raw = open(d.get("log") or "", "rb").read()
     except OSError:
@@ -478,9 +512,21 @@ def why_not(d):
     tests, suites = int(runs[-1][0]), int(runs[-1][1])
     if tests < 1 or suites < 1:
         return "its log counts %d tests in %d suites" % (tests, suites)
+    xctest = [int(f) for f in re.findall(r"Executed [0-9]+ tests?, with ([0-9]+) failures?", text)]
+    if any(xctest):
+        return "its log records %d XCTest failure(s)" % sum(xctest)
     got = {}
     for m in ISSUE_RE.finditer(text):
         got[m.group(2)] = got.get(m.group(2), 0) + 1
+    # Every issue the run line counts must be one read above, at a location.
+    last = [l for l in text.splitlines() if RUN_RE.search(l)][-1]
+    counts = issue_counts(last.rstrip())
+    if counts is None:
+        return "its run line's ending is not read: %r" % last.strip()[-80:]
+    issues, warnings, known = counts
+    if issues - warnings - known != sum(got.values()):
+        return "its run line counts %d issue(s) (%d warnings, %d known); %d read at a location" % (
+            issues, warnings, known, sum(got.values()))
     for loc in sorted(free):
         if loc in got:
             print("NOTE\t%s recorded %d issue(s); not judged (%s)" % (loc, got[loc], LIST))
@@ -614,7 +660,10 @@ EOF
     cat > "$t/bin/xcodebuild" <<'EOF'
 #!/bin/sh
 if [ "$1" = "-version" ]; then
-    printf 'Xcode 0\nBuild version %s\n' "${STUB_XCODE_BUILD:-X1}"
+    case "${DEVELOPER_DIR:-}" in
+        /other/Developer) printf 'Xcode 0\nBuild version X9\n' ;;
+        *) printf 'Xcode 0\nBuild version %s\n' "${STUB_XCODE_BUILD:-X1}" ;;
+    esac
     exit 0
 fi
 echo "xcodebuild $1" >> "$PREPUSH_SELFTEST_LOG"
@@ -845,11 +894,21 @@ tree, head, d, kind, mods = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], 
 os.makedirs(d, exist_ok=True)
 def red(loc): return "✘ Test planted() recorded an issue at %s:5: Expectation failed" % loc
 base = [red("A.swift:1"), red("B.swift:2"), red("B.swift:2")]
+warn = '⚠︎ Test planted() recorded a warning at W.swift:7:5: slow'
+known = '━ Test planted() recorded a known issue at K.swift:8:5: Expectation failed'
 lines = {"base": base, "base+timing": base + [red("C.swift:3")], "new": base + [red("D.swift:4")],
          "gone": base[1:], "count": base[:2], "clean": [], "cleanred": [red("D.swift:4")],
-         "norun": base, "zero": []}[kind]
+         "norun": base, "zero": [],
+         "suite": base + ['✘ Suite "Planted" recorded an issue at Planted.swift:9:1: Expectation failed'],
+         "noloc": base + ['✘ Test "x" recorded an issue: Time limit was exceeded'],
+         "odd": base + [red("B-2.swift:2")],
+         "xctest": base + ["\t Executed 2 tests, with 1 failure (0 unexpected) in 0.1 (0.1) seconds"],
+         "warned": base + [warn, warn, known], "oddtail": base}[kind]
 run = {"clean": "✔ Test run with 10 tests in 3 suites passed after 1.0 seconds.",
-       "norun": "", "zero": "✔ Test run with 0 tests in 0 suites passed after 0.0 seconds."}.get(
+       "norun": "", "zero": "✔ Test run with 0 tests in 0 suites passed after 0.0 seconds.",
+       "xctest": "✘ Test run with 10 tests in 3 suites failed after 1.0 seconds with 3 issues.",
+       "warned": "✘ Test run with 10 tests in 3 suites failed after 1.0 seconds with 6 issues (including 2 warnings and 1 known issue).",
+       "oddtail": "✘ Test run with 10 tests in 3 suites failed after 1.0 seconds with some issues."}.get(
     kind, "✘ Test run with 10 tests in 3 suites failed after 1.0 seconds with %d issues." % len(lines))
 log = os.path.join(d, "hosttest.log")
 open(log, "w").write("\n".join(lines + [run]) + "\n")
@@ -901,7 +960,6 @@ PYEOF
              "tracked_clean_start=false|tracked files were modified" \
              "head_end=0000|the run started and ended on different commits" \
              "command=\"swift test --skip-build --filter E\"|not the whole suite" \
-             "developer_dir=\"\"|(no developer_dir)" \
              "-loghash|does not match its log_sha256" \
              "log=\"/nonexistent/no-such.log\"|cannot be read"; do
         rm -rf "$t/hostv"/*
@@ -912,7 +970,34 @@ PYEOF
     rm -rf "$t/hostv"/*
     forge_host "$t/hostv/r" base
     hook "$(line "$h")" STUB_XCODE_BUILD=X2
-    check "host run refused: the Xcode build under its DEVELOPER_DIR moved" 1 "" "Xcode build X1 under /stub/Developer, now X2"
+    check "host run refused: the Xcode build the push runs under moved" 1 "" "Xcode build X1, now X2"
+    rm -rf "$t/hostv"/*
+    forge_host "$t/hostv/r" base developer_dir=/other/Developer xcode_build=X9
+    hook "$(line "$h")"
+    check "host run refused: a verdict naming another Xcode is compared with this push's" 1 "" "Xcode build X9, now X1"
+    rm -rf "$t/hostv"/*
+    forge_host "$t/hostv/r" base head=0000000000000000000000000000000000000000 head_end=0000000000000000000000000000000000000000
+    hook "$(line "$h")"
+    check "host run refused: a head that is not a commit" 1 "" "its head 0000000000000000000000000000000000000000 is not a commit here"
+    rm -rf "$t/hostv"/*
+    forge_host "$t/hostv/r" base "head=$base" "head_end=$base"
+    hook "$(line "$h")"
+    check "host run refused: a head whose tree is not the verdict's" 1 "" "its head ${base:0:8} has tree"
+    for x in "suite|its run line counts 4 issue(s) (0 warnings, 0 known); 3 read at a location" \
+             "noloc|its run line counts 4 issue(s) (0 warnings, 0 known); 3 read at a location" \
+             "odd|its run line counts 4 issue(s) (0 warnings, 0 known); 3 read at a location" \
+             "xctest|its log records 1 XCTest failure(s)" \
+             "oddtail|its run line's ending is not read"; do
+        rm -rf "$t/hostv"/*
+        forge_host "$t/hostv/r" "${x%%|*}"
+        hook "$(line "$h")"
+        check "host run refused: an issue the reds cannot account for (${x%%|*})" 1 "" "${x#*|}"
+    done
+    rm -rf "$t/hostv"/*
+    forge_host "$t/hostv/r" warned
+    hook "$(line "$h")"
+    check "host run: warnings and known issues are taken off the run line's count" 0 "xcodebuild build-for-testing;" \
+        "engine-host: accepted $hv (10 tests in 3 suites; reds 3 at 2 listed location(s))"
     rm -rf "$t/hostv"/*
     hook "$(line "$h")"
     check "host run refused: no verdict at all" 1 "" "engine-host: 0 verdict file(s) read, 0 for tree" \
@@ -980,10 +1065,20 @@ PYEOF
     if cmp -s "$me" "$mut"; then rc=unchanged; fi
     check "planted failure: without the reds comparison a new red is accepted" 0 "xcodebuild build-for-testing;"
     sed '/^    if d.get("tree") != tree:$/{N;d;}' "$me" > "$mut"
-    rm -rf "$t/hostv"/*; forge_host "$t/hostv/r" base tree=0000
+    rm -rf "$t/hostv"/*; forge_host "$t/hostv/r" base "tree=$(g rev-parse "$base^{tree}")" "head=$base" "head_end=$base"
     hook_script="$mut"; hook "$(line "$h")"; hook_script=""
     if cmp -s "$me" "$mut"; then rc=unchanged; fi
     check "planted failure: without the tree comparison another tree's run is accepted" 0 "xcodebuild build-for-testing;"
+    sed 's/^    if issues - warnings - known != sum(got.values()):$/    if False:/' "$me" > "$mut"
+    rm -rf "$t/hostv"/*; forge_host "$t/hostv/r" suite
+    hook_script="$mut"; hook "$(line "$h")"; hook_script=""
+    if cmp -s "$me" "$mut"; then rc=unchanged; fi
+    check "planted failure: without the run line's count a suite-level issue is accepted" 0 "xcodebuild build-for-testing;"
+    sed 's/^    if git_out("rev-parse", "%s^{tree}" % d.get("head")) != d.get("tree"):$/    if False:/' "$me" > "$mut"
+    rm -rf "$t/hostv"/*; forge_host "$t/hostv/r" base "head=$base" "head_end=$base"
+    hook_script="$mut"; hook "$(line "$h")"; hook_script=""
+    if cmp -s "$me" "$mut"; then rc=unchanged; fi
+    check "planted failure: without the head's own tree a verdict for another commit is accepted" 0 "xcodebuild build-for-testing;"
     perl -0pe 's/(accept_host_verdict\(\) \{.*?)return "\$rc"/${1}return 0/s' "$me" > "$mut"
     rm -rf "$t/hostv"/*
     hook_script="$mut"; hook "$(line "$h")"; hook_script=""
