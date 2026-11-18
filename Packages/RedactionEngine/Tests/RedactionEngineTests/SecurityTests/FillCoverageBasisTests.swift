@@ -145,6 +145,16 @@ struct FillCoverageBasisTests {
         // Short of the edge: the fill's far side is not clipped by the bitmap,
         // so a fill and its readback on different bases do not meet.
         GainedSide(side: 302.626, dpi: 300, start: 280.5, across: false, end: 295.4),
+        // The near edges: the content basis moves a fill down or left by up
+        // to a pixel, so a bar near the bottom or left whose far edge leaves
+        // a sliver of ink in its last row or column (0.02 px) must stay
+        // covered on both bases.
+        GainedSide(side: 302.626, dpi: 300, start: 0, across: false, end: 2.4048),
+        GainedSide(side: 302.626, dpi: 300, start: 0.7, across: true, end: 9.6048),
+        GainedSide(side: 203.266, dpi: 300, start: 0, across: false, end: 1.2048),
+        GainedSide(side: 656.266, dpi: 200, start: 0, across: false, end: 2.5272),
+        GainedSide(side: 656.266, dpi: 200, start: 0.4, across: true, end: 7.5672),
+        GainedSide(side: 209.266, dpi: 150, start: 0.5, across: true, end: 4.8096),
     ]
 
     /// The cases whose first line CoreGraphics' own anti-aliased fill inks.
