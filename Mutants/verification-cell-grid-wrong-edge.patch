@@ -1,0 +1,21 @@
+Property: On a page written from a turned source the grid runs from the top edge when the run reads downward and from the bottom edge when it reads upward, never the other way round.
+Area: Character Positions spacing test (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/Layer6CellGridTests
+Must go red: RedactionEngineTests/Layer6CellGridTests a5
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification+SpatialExclusion.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification+SpatialExclusion.swift
+index 1c6e33e8..64fbe2fb 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification+SpatialExclusion.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification+SpatialExclusion.swift
+@@ -338,8 +338,8 @@ extension SandwichVerification {
+             fromEdge = bounds.minX - scan.pageBox.minX
+         case .vertical(let downward):
+             fromEdge = downward
+-                ? scan.pageBox.maxY - bounds.maxY
+-                : bounds.minY - scan.pageBox.minY
++                ? bounds.minY - scan.pageBox.minY
++                : scan.pageBox.maxY - bounds.maxY
+         }
+         let cells = (fromEdge / cell).rounded()
+         return abs(fromEdge - cells * cell) <= tolerance
