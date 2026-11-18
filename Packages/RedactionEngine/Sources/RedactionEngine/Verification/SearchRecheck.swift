@@ -81,7 +81,7 @@ struct SearchRecheck: Sendable {
         var unreadPages: [Int] = []
         var comparedMatches = 0
         if let coverageSource {
-            let coverage = await RegionCoverage.check(
+            let coverage = try await RegionCoverage.check(
                 source: coverageSource, requests: requests, regions: regions)
             shortfalls = coverage.shortfalls.map {
                 Shortfall(page: $0.pageIndex, displayText: requests[$0.requestIndex].record.query.displayText)
@@ -126,7 +126,11 @@ struct SearchRecheck: Sendable {
                 outputDocument: outputDocument, requests: typedRequests)
         }
         try Task.checkCancellation()
-        return Self.fold(requests: typedRequests, observations: observed, pageCount: pageCount,
+        // Every page of the output, and every request on each page read: a
+        // page or a count the pass did not give is a page not checked.
+        let whole = RecheckObservation.completed(
+            observed, pageCount: pageCount, requestCount: typedRequests.count)
+        return Self.fold(requests: typedRequests, observations: whole, pageCount: pageCount,
                          shortfalls: shortfalls, coverageRan: coverageRan, coverageUnreadPages: unreadPages)
     }
 

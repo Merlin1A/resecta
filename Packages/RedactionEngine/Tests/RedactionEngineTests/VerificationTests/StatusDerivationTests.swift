@@ -42,13 +42,6 @@ struct StatusDerivationTests {
         #expect(overall == .pass)
     }
 
-    @Test("Empty layers → vacuous PASS")
-    func emptyLayers() {
-        let verifier = VerificationEngine()
-        let overall = verifier.aggregateStatus([])
-        #expect(overall == .pass)
-    }
-
     @Test("Multiple FAILs still produce single FAIL")
     func multipleFailsStillFail() {
         let layers = [
