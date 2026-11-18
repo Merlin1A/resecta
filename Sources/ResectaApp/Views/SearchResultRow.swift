@@ -130,7 +130,7 @@ struct SearchResultRow: View {
 
                 HStack(alignment: .top, spacing: 0) {
                     HStack(spacing: ResectaTokens.Spacing.sm) {
-                        selectionCircle
+                        if result.hasBox { selectionCircle } else { noBoxMark }
                         VStack(alignment: .leading, spacing: 2) {
                             metaLine(
                                 isCustomHit: isCustomHit,
@@ -149,6 +149,7 @@ struct SearchResultRow: View {
                                        ? nil
                                        : Self.collapsedLineLimit(for: dynamicTypeSize))
                             .privacySensitive()
+                            if !result.hasBox { noBoxLine }
                         }
                     }
                     .padding(.leading, ResectaTokens.Spacing.xs)
@@ -169,10 +170,13 @@ struct SearchResultRow: View {
                     .accessibilityIdentifier(Self.accessibilityIdentifier(for: result))
                     .accessibilityAddTraits(result.isSelected ? .isSelected : [])
                     .accessibilityAction {
-                        result.isSelected.toggle()
+                        // A row with no box has no tick box to toggle.
+                        if result.hasBox { result.isSelected.toggle() }
                     }
-                    .accessibilityAction(named: "Toggle selection") {
-                        result.isSelected.toggle()
+                    .accessibilityActions {
+                        if result.hasBox {
+                            Button("Toggle selection") { result.isSelected.toggle() }
+                        }
                     }
 
                     // The chevron sits OUTSIDE the merge so it stays a

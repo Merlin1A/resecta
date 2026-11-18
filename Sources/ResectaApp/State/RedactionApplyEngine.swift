@@ -319,7 +319,8 @@ nonisolated func prepareApply(
     var coveringRectsByPage = existingRectsByPage
     var coveringStripRectsByPage = existingStripRectsByPage
 
-    for result in selected {
+    // A match with no box never becomes a region (it is listed, not applied).
+    for result in selected where result.hasBox {
         // Skip results an existing or just-created region already covers.
         if resultIsCovered(result, paints: coveringRectsByPage[result.pageIndex] ?? [],
                            strips: coveringStripRectsByPage[result.pageIndex] ?? []) {

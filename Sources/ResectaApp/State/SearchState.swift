@@ -288,7 +288,7 @@ final class SearchState: Identifiable {
             return nil
         }
         return RedactionState.DeselectionSnapshot(
-            items: results.filter { !$0.isSelected }, totalCount: totalCount)
+            items: results.filter { !$0.isSelected && $0.hasBox }, totalCount: totalCount)
     }
 
     /// Accumulate per-page overlap-suppressed counts. Invoked from
@@ -758,7 +758,7 @@ final class SearchState: Identifiable {
     /// by `coverageReportForDisplay()`. Derived from live `isSelected` state,
     /// so it returns to 0 with `results` on `clear()` / `clearResults()`.
     var deselectedCount: Int {
-        Self.occurrenceCount(results.filter { !$0.isSelected })
+        Self.occurrenceCount(results.filter { !$0.isSelected && $0.hasBox })
     }
 
     /// Total match count (a match wrapped onto two lines counts once).
@@ -959,7 +959,7 @@ final class SearchState: Identifiable {
     @discardableResult
     func selectCurrentMatchIfNoneSelected() -> Bool {
         if results.contains(where: { $0.isSelected }) { return true }
-        guard let id = currentResult?.id else { return false }
+        guard let id = currentResult.flatMap({ $0.hasBox ? $0.id : nil }) else { return false }
         toggleSelection(for: id)
         return true
     }
@@ -1137,7 +1137,7 @@ final class SearchState: Identifiable {
     /// results — pinned by `SearchStateSelectionTests`.
     func setSelection(where predicate: (SearchResult) -> Bool) {
         let decided = Self.occurrenceSelection(results, where: predicate)
-        for i in results.indices { results[i].isSelected = decided[Self.occurrenceKey(results[i])] ?? false }
+        for i in results.indices { results[i].isSelected = results[i].hasBox && (decided[Self.occurrenceKey(results[i])] ?? false) }
         resultVersion += 1
     }
 
@@ -1147,7 +1147,7 @@ final class SearchState: Identifiable {
     /// their existing `isSelected`. The captured `filteredIDs` + `target`
     /// makes the predicate a pure function of `result.id`.
     func toggleSelectAll() {
-        let filtered = filteredResults
+        let filtered = filteredResults.filter(\.hasBox)
         let filteredIDs = Set(filtered.map(\.id))
         let target = !filtered.allSatisfy(\.isSelected)
         setSelection { result in
@@ -1156,7 +1156,7 @@ final class SearchState: Identifiable {
     }
 
     func toggleSelection(for id: UUID) {
-        guard let result = results.first(where: { $0.id == id }) else { return }
+        guard let result = results.first(where: { $0.id == id }), result.hasBox else { return }
         let key = Self.occurrenceKey(result), target = !result.isSelected
         setSelection { Self.occurrenceKey($0) == key ? target : $0.isSelected }
     }

@@ -37,7 +37,7 @@ extension RedactionState {
         guard !results.isEmpty else { return nil }
         let addedRect = addedRegion.normalizedRect
         for result in results {
-            guard result.pageIndex == page else { continue }
+            guard result.pageIndex == page, result.hasBox else { continue }
             guard result.piiCategory != nil else { continue }
             guard !appliedIDs.contains(result.id) else { continue }
             let resultRect = result.normalizedRect

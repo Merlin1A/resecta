@@ -35,7 +35,9 @@ extension SearchState {
         _ results: [SearchResult], where predicate: (SearchResult) -> Bool
     ) -> [UUID: Bool] {
         var decided: [UUID: Bool] = [:]
-        for result in results where decided[occurrenceKey(result)] == nil {
+        // An occurrence is decided by its first piece with a box (a piece
+        // with no box has no tick box to decide by).
+        for result in results where result.hasBox && decided[occurrenceKey(result)] == nil {
             decided[occurrenceKey(result)] = predicate(result)
         }
         return decided
