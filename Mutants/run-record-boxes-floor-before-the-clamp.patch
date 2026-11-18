@@ -5,15 +5,15 @@ Must go red: RedactionEngineTests/RunRecordBoxesTests "Each case" (whollyOff); R
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RedactionRegion.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RedactionRegion.swift
-index b1d1dcec..ea48548c 100644
+index 8454420d..ca54b660 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RedactionRegion.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RedactionRegion.swift
-@@ -174,7 +174,6 @@ extension RedactionRegion {
-     /// page wide and more than 0.001 high. The page builder and the run's
-     /// record both read this one test, on today's clamp.
+@@ -175,7 +175,6 @@ extension RedactionRegion {
+     /// admission floor decides (`RegionAdmission`). The page builder and the
+     /// run's record both read this one test.
      public static func isAdmitted(normalizedRect: CGRect) -> Bool {
 -        let clamped = normalizedRect.clampedToNormalized()
--        return clamped.width > 0.001 && clamped.height > 0.001
-+        return normalizedRect.width > 0.001 && normalizedRect.height > 0.001
+-        return RegionAdmission.admits(clampedWidth: Double(clamped.width), clampedHeight: Double(clamped.height))
++        return RegionAdmission.admits(clampedWidth: Double(normalizedRect.width), clampedHeight: Double(normalizedRect.height))
      }
  }

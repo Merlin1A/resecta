@@ -5,22 +5,22 @@ Must go red: ResectaAppTests/RunRecordTests "Each case" (regionsAsDrawn)
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/State/PipelineRunner.swift b/Sources/ResectaApp/State/PipelineRunner.swift
-index 54d27698..759372a2 100644
+index 41b05fce..e3994d77 100644
 --- a/Sources/ResectaApp/State/PipelineRunner.swift
 +++ b/Sources/ResectaApp/State/PipelineRunner.swift
-@@ -281,11 +281,12 @@ struct PipelineRunner {
-         // Synchronous from here: one region state.
-         // The record's confirmed part first, from the live regions as drawn
-         // (the pages below hold them clamped and floor-filtered).
--        let confirmed = RunInputs.confirmedRecord(
--            pageCount: coordinator.documentState.pageCount,
+@@ -284,7 +284,14 @@ struct PipelineRunner {
+         let confirmed = RunInputs.confirmedRecord(
+             pageCount: coordinator.documentState.pageCount,
+             geometry: coordinator.documentState.sourceDocument.map(RunInputs.pageGeometry(of:)) ?? [:],
 -            regions: redactionState.regions, settings: runSettings)
-         let pages = coordinator.buildPDFPageData(
-             effectiveMode: effectiveMode, runSettings: runSettings, inkPlans: sensitiveTerms.inkPlans)
-+        let confirmed = RunInputs.confirmedRecord(
-+            pageCount: coordinator.documentState.pageCount,
-+            regions: Dictionary(uniqueKeysWithValues: pages.map { ($0.pageIndex, $0.regions) }),
++            regions: redactionState.regions.mapValues { regions in
++                regions.filter { RedactionRegion.isAdmitted(normalizedRect: $0.normalizedRect) }.map { region in
++                    var clamped = region
++                    clamped.normalizedRect = region.normalizedRect.clampedToNormalized()
++                    return clamped
++                }
++            },
 +            settings: runSettings)
-         let burnedRegionVersion = redactionState.regionVersion
-         // The run's deselection facts. The value is recorded onto
-         // RedactionState only after `processDocument` returns (inside the
+         let pages = coordinator.buildPDFPageData(
+             effectiveMode: effectiveMode, runSettings: runSettings, inkPlans: sensitiveTerms.inkPlans,
+             record: confirmed)
