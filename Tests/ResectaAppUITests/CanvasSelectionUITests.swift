@@ -6,8 +6,8 @@ import XCTest
 /// Region", "Delete N Regions", or absent when nothing is selected), the
 /// long-press menu's rows, and the Undo button. Points are window-normalized
 /// so the suite reads the same on the 390- and 402-point simulators; an open
-/// menu is closed by tapping the middle of the navigation bar, which holds no
-/// control.
+/// menu is closed by tapping the navigation bar near its leading end, which
+/// holds no control and lies outside the open menu.
 ///
 /// nonisolated: an XCUITest drives a separate process and touches no
 /// @MainActor state.
@@ -172,13 +172,14 @@ private extension CanvasSelectionUITests {
         app.descendants(matching: .any).matching(identifier: "pageNavCounter").firstMatch
     }
 
-    /// Close an open overflow or long-press menu with a tap on the middle of
-    /// the navigation bar, which holds no control (the page bar's counter now
-    /// opens the page menu).
+    /// Close an open overflow or long-press menu with a tap on the navigation
+    /// bar near its leading end, which holds no control and lies outside the
+    /// open menu (the overflow menu covers the bar's middle; the page bar's
+    /// counter now opens the page menu).
     nonisolated func dismissMenus() {
         let navigationBar = app.navigationBars.firstMatch
         XCTAssertTrue(navigationBar.waitForExistence(timeout: 5), "The navigation bar never appeared.")
-        navigationBar.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        navigationBar.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.5)).tap()
         usleep(500_000)
     }
 
