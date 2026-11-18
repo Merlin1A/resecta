@@ -19,11 +19,14 @@ import Foundation
 enum PageTextPath {
 
     /// The path's steps. The default is the real step for each; a test
-    /// replaces one, within `$steps.withValue`, to make it fault.
+    /// replaces one, within `$steps.withValue`, to make it fault. The fold
+    /// and the alphabet marks may also return nothing (nil), which the real
+    /// steps never do: the page is then a picture, as when a step throws.
+    /// Neither step has a time limit of its own.
     struct Steps: Sendable {
-        var fold: @Sendable ([CharacterInfo]) throws -> [CharacterInfo]
+        var fold: @Sendable ([CharacterInfo]) throws -> [CharacterInfo]?
         var filter: @Sendable ([CharacterInfo], [CGRect]) async throws -> FilterResult
-        var alphabetMarks: @Sendable ([CharacterInfo]) throws -> TextPathAlphabetMarks.Marks
+        var alphabetMarks: @Sendable ([CharacterInfo]) throws -> TextPathAlphabetMarks.Marks?
         /// The words the paint covers, by the page's one partition, from the
         /// survivors and the painted rectangles. Nothing until the plan
         /// switch hands in painted rectangles.
@@ -67,9 +70,14 @@ enum PageTextPath {
         let steps = Self.steps
         let rects = textPathRectangles.filter { $0.kind != .underWidenedBox }.map(\.rect)
 
-        let folded = try steps.fold(entries)
+        // A step that returns nothing writes no text: the page is a picture.
+        guard let folded = try steps.fold(entries) else {
+            return Result(outcome: .picture(.extractionFailed), runsLeftOut: 0, drawnCellDropped: 0)
+        }
         let filtered = try await steps.filter(folded, rects)
-        let alphabet = try steps.alphabetMarks(filtered.surviving)
+        guard let alphabet = try steps.alphabetMarks(filtered.surviving) else {
+            return Result(outcome: .picture(.extractionFailed), runsLeftOut: 0, drawnCellDropped: 0)
+        }
         let painted = try steps.paintMarks(filtered.surviving, paintedRectangles)
 
         // The whole-word closure over every marked word, then the drawn-cell
