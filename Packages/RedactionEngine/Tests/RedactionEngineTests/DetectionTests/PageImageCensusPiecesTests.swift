@@ -141,6 +141,30 @@ struct PageImageCensusPiecesTests {
         }
     }
 
+    /// A measurement, never in the gate (RESECTA_PIECES_TIMING=1, from an
+    /// optimised build): the census read afresh on a typed letter, a letter
+    /// with a letterhead logo and a scan in strips, 50 new documents each.
+    @Test("The census's reading time on typed pages and on a scan in strips",
+          .enabled(if: ProcessInfo.processInfo.environment["RESECTA_PIECES_TIMING"] == "1"))
+    func readingTime() throws {
+        let pages: [(String, Data)] = [
+            ("typed letter", Self.typedLetter()),
+            ("letter with a letterhead logo", TestFixtures.letterWithImagePDF(width: 600, height: 300)),
+            ("strips of 96 rows", Self.fullScan(.strips(rows: 96))),
+        ]
+        for (name, data) in pages {
+            var times: [Double] = []
+            for _ in 0..<50 {
+                let (_, page, _) = try #require(S.pdfPage(data))
+                let start = DispatchTime.now().uptimeNanoseconds
+                _ = PageImageCensus.readCarriesImageContent(page)
+                times.append(Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000)
+            }
+            times.sort()
+            print(String(format: "CENSUS-TIMING %@: median %.3f ms, largest %.3f ms (50 pages)", name, times[25], times[49]))
+        }
+    }
+
     @Test("The census returns the answer it keeps for the page")
     func keptAnswer() throws {
         let (_, typed, _) = try #require(S.pdfPage(Self.typedLetter()))
