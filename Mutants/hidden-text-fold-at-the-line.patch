@@ -1,7 +1,7 @@
 Property: The fold runs before the record: a joined letter stored as one character is recorded as its letters, so the record and the written text agree.
 Area: hidden text (the alphabet, wired into the text path)
 Test command: cd Packages/RedactionEngine && swift test --filter "HiddenTextAlphabetExportTests|TextPathAlphabetFaultTests|HiddenTextFontsTests" (or DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/HiddenTextAlphabetExportTests -only-testing:RedactionEngineTests/TextPathAlphabetFaultTests -only-testing:RedactionEngineTests/HiddenTextFontsTests)
-Must go red: RedactionEngineTests/HiddenTextAlphabetExportTests exportsAsListed [fi stored as one character three times]; RedactionEngineTests/HiddenTextAlphabetExportTests exportsAsListed [the seven joined letters, each stored as one character]
+Must go red: RedactionEngineTests/HiddenTextAlphabetExportTests exportsAsListed [the seven joined letters, each stored as one character]; RedactionEngineTests/HiddenTextAlphabetExportTests marksAreNotWritten; RedactionEngineTests/HiddenTextAlphabetExportTests objectMarkBetweenWords (the page of fi stored three times stays green: the reader already gives its letters, so the fold has nothing to do there)
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/HiddenTextLine.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/HiddenTextLine.swift

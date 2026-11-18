@@ -1,7 +1,7 @@
 Property: A run none of the three faces can draw is left out and counted, never handed to the system to draw in a face of its choosing.
 Area: hidden text (the alphabet, wired into the text path)
 Test command: cd Packages/RedactionEngine && swift test --filter "HiddenTextAlphabetExportTests|TextPathAlphabetFaultTests|HiddenTextFontsTests" (or DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/HiddenTextAlphabetExportTests -only-testing:RedactionEngineTests/TextPathAlphabetFaultTests -only-testing:RedactionEngineTests/HiddenTextFontsTests)
-Must go red: RedactionEngineTests/HiddenTextAlphabetExportTests exportsAsListed [English and Chinese words]; RedactionEngineTests/HiddenTextAlphabetExportTests exportsAsListed [a page wholly in Chinese]; RedactionEngineTests/HiddenTextAlphabetExportTests emojiDrawsNoImage
+Must go red: RedactionEngineTests/HiddenTextFontsTests leftOutOnEveryBuild; RedactionEngineTests/HiddenTextAlphabetExportTests exportsAsListed [English and Chinese words]; RedactionEngineTests/HiddenTextAlphabetExportTests exportsAsListed [a page wholly in Chinese] (the emoji image count stays green: the line's own face check still refuses the system's face)
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/HiddenTextFonts.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/HiddenTextFonts.swift
