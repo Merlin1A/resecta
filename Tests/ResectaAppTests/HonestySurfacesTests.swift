@@ -150,13 +150,17 @@ struct PreviewVerdictCapsuleTests {
         #expect(text == nil)
     }
 
-    // The ground behind the capsule, by appearance (sRGB, 0 to 1), sampled
-    // beside the capsule on captures of the Preview opened from the three
-    // seeded reports that show a label: white in light, black in dark.
-    static let lightGround = (1.0, 1.0, 1.0)
-    static let darkGround = (0.0, 0.0, 0.0)
+    // The capsule's own base is the label's ground, whatever scrolls under
+    // the navigation bar: resolved for light, dark, and dark on a raised
+    // screen (white, black and #1C1C1E).
+    static var grounds: [(String, UITraitCollection)] {
+        [("light", UITraitCollection(userInterfaceStyle: .light)),
+         ("dark", UITraitCollection(userInterfaceStyle: .dark)),
+         ("dark, raised", UITraitCollection(traitsFrom: [
+            UITraitCollection(userInterfaceStyle: .dark), UITraitCollection(userInterfaceLevel: .elevated)]))]
+    }
 
-    @Test("The label's colours come from the text tokens, on one wash that keeps 4.5 to 1")
+    @Test("The label's colours come from the text tokens, on one wash over its own base that keeps 4.5 to 1")
     func labelColoursComeFromTheTextTokens() throws {
         let colour = RedactedPreviewView.verdictCapsuleColor
         #expect(colour(.skipped) == ResectaTokens.SemanticColor.supportText)
@@ -176,23 +180,43 @@ struct PreviewVerdictCapsuleTests {
         // reads the same constant.
         #expect(RedactedPreviewView.verdictCapsuleStrength == 0.10)
         let support = ResectaTokens.SemanticColor.supportText
-        #expect(try rgb(support, .light) != rgb(support, .dark),
+        #expect(try rgb(support, Self.grounds[0].1) != rgb(support, Self.grounds[1].1),
                 "the tokens resolve per appearance on this host")
+        let base = RedactedPreviewView.verdictCapsuleBase
+        let resolvedBases = try Self.grounds.map { try rgb(base, $0.1) }
+        let expectedBases: [[Double]] = [[1, 1, 1], [0, 0, 0], [0x1C / 255.0, 0x1C / 255.0, 0x1E / 255.0]]
+        for (got, want) in zip(resolvedBases.map { [$0.0, $0.1, $0.2] }, expectedBases) {
+            #expect(zip(got, want).allSatisfy { abs($0 - $1) < 0.002 },
+                    "the base is opaque white, black and #1C1C1E: \(got)")
+        }
         let labelled: [VerificationStatus] = [.skipped, .attention("x"), .fail("x")]
-        for (style, ground) in [(UIUserInterfaceStyle.light, Self.lightGround), (.dark, Self.darkGround)] {
+        for ((name, traits), ground) in zip(Self.grounds, resolvedBases) {
             for verdict in labelled {
-                let ink = try rgb(try #require(colour(verdict)), style)
+                let ink = try rgb(try #require(colour(verdict)), traits)
                 let wash = blend(ink, over: ground, opacity: RedactedPreviewView.verdictCapsuleStrength)
                 let ratio = contrast(ink, wash)
-                #expect(ratio >= 4.5, "\(verdict), \(style == .dark ? "dark" : "light"): \(ratio) to 1")
+                #expect(ratio >= 4.5, "\(verdict), \(name): \(ratio) to 1")
             }
         }
     }
 
+    @Test("The capsule lays its opaque base under the wash")
+    func capsuleDrawsItsBase() throws {
+        let root = URL(fileURLWithPath: "\(#filePath)")
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let source = try String(contentsOf: root.appendingPathComponent(
+            "Sources/ResectaApp/Views/RedactedPreviewView.swift"), encoding: .utf8)
+        let wash = ".background(tint.opacity(Self.verdictCapsuleStrength), in: Capsule())"
+        let base = ".background(Self.verdictCapsuleBase, in: Capsule())"
+        // A later background modifier draws behind an earlier one.
+        let order = try #require(source.range(of: wash)).upperBound <= (try #require(source.range(of: base))).lowerBound
+        #expect(order, "the base follows the wash, so it is drawn under it")
+    }
+
     private typealias RGB = (Double, Double, Double)
 
-    private func rgb(_ color: Color, _ style: UIUserInterfaceStyle) throws -> RGB {
-        let resolved = UIColor(color).resolvedColor(with: UITraitCollection(userInterfaceStyle: style))
+    private func rgb(_ color: Color, _ traits: UITraitCollection) throws -> RGB {
+        let resolved = UIColor(color).resolvedColor(with: traits)
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
         try #require(resolved.getRed(&r, green: &g, blue: &b, alpha: &a))
         return (Double(r), Double(g), Double(b))

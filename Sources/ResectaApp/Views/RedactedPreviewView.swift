@@ -101,11 +101,18 @@ struct RedactedPreviewView: View {
         return nil
     }
 
-    /// The wash behind the label: the label's own colour at this opacity.
-    /// One value for all three labels, so they read as one family: the
-    /// largest at which each label measures at least 4.5 to 1 on its wash,
-    /// in light and in dark.
+    /// The wash behind the label: the label's own colour at this opacity,
+    /// over the capsule's base. One value for all three labels, so they read
+    /// as one family: the largest at which each label measures at least 4.5
+    /// to 1 on its wash, in light and in dark.
     static let verdictCapsuleStrength: Double = 0.10
+
+    /// The capsule's own opaque ground, under the wash: the system background
+    /// (white in light; black, or #1C1C1E on a raised screen, in dark). The
+    /// label sits in the navigation bar, where the page, the grey around it
+    /// or the bar's material can show through as the document scrolls; on
+    /// its own ground the label keeps one measured contrast over all of them.
+    static let verdictCapsuleBase: Color = Color(uiColor: .systemBackground)
 
     @ViewBuilder
     private func verdictCapsule(text: String) -> some View {
@@ -119,6 +126,7 @@ struct RedactedPreviewView: View {
             .padding(.horizontal, ResectaTokens.Spacing.sm)
             .padding(.vertical, ResectaTokens.Spacing.xxs)
             .background(tint.opacity(Self.verdictCapsuleStrength), in: Capsule())
+            .background(Self.verdictCapsuleBase, in: Capsule())
             .accessibilityIdentifier("previewVerdictCapsule")
             .accessibilityLabel(text)
     }
