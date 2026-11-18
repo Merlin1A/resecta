@@ -1,8 +1,10 @@
 import Foundation
 
-/// The text path's alphabet marks, part of its fifth step: the words of the
-/// filter's survivors the hidden text cannot write. A slot the alphabet's
-/// second part fills; until then it marks nothing.
+/// The text path's alphabet marks, part of its fifth step: the runs of the
+/// filter's survivors the hidden text cannot write. A run is a word of the
+/// page's one partition, its white space left out (a line's end is white
+/// space). A run is marked when none of the three faces can write it, or it
+/// holds a character the hidden text never holds (`HiddenTextFonts`).
 enum TextPathAlphabetMarks {
 
     /// What the alphabet rule marks on one page.
@@ -19,6 +21,14 @@ enum TextPathAlphabetMarks {
     }
 
     static func marks(_ survivors: [CharacterInfo]) -> Marks {
-        .none
+        var order: [Int] = []
+        var runs: [Int: String] = [:]
+        for entry in survivors where !SandwichMetrics.isLineageWhitespace(entry.character) {
+            if runs[entry.wordIndex] == nil { order.append(entry.wordIndex) }
+            runs[entry.wordIndex, default: ""] += entry.character
+        }
+        let marked = Set(order.filter { !HiddenTextFonts.canBeWritten(runs[$0] ?? "") })
+        guard !marked.isEmpty else { return .none }
+        return Marks(wordIndices: marked, runsLeftOut: marked.count, reasonIfNoWordLeft: .noWritableText)
     }
 }

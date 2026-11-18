@@ -43,10 +43,14 @@ enum HiddenTextFonts {
     /// faces has a glyph for it. `run` is one run's text after the fold. The
     /// object mark is a break between runs and never written; where one is
     /// in `run`, it is passed over and is no reason to leave the run out.
+    /// The faces this system has, by name, read once: a font is immutable
+    /// and safe to share across threads.
+    nonisolated(unsafe) static let faces: [(name: String, font: CTFont)] =
+        names.compactMap { name in font(named: name).map { (name, $0) } }
+
     static func choice(for run: String) -> Choice? {
         let characters = run.filter { $0.unicodeScalars.elementsEqual([NeverWrittenCharacters.objectMark]) == false }
         if characters.unicodeScalars.contains(where: NeverWrittenCharacters.contains) { return nil }
-        let faces = names.compactMap { name in font(named: name).map { (name, $0) } }
         if let whole = faces.first(where: { face in characters.allSatisfy { hasGlyphs(for: $0, in: face.1) } }) {
             return .oneFont(whole.0)
         }
