@@ -182,14 +182,15 @@ public final class PageRasterizer: @unchecked Sendable {
 
     /// A Searchable page's text layer as it crosses the render: the
     /// surviving characters, their digest, the removal rectangles the line
-    /// assembly reads, and the page's fallback reason. `prepareTextLayer`
-    /// writes it; after the render, only the ink test changes it: it may
-    /// drop the text layer and record why.
+    /// assembly reads, the page's fallback reason and its count of runs left
+    /// out. `prepareTextLayer` writes it; after the render, only the ink test
+    /// changes it: it may drop the text layer and record why.
     struct TextLayerState {
         var entries: [CharacterInfo]?
         var digest: PageFilterDigest?
         var removalRects: [CGRect]
         var fallbackReason: TextLayerDetector.FallbackReason?
+        var runsLeftOut: Int = 0
     }
 
     /// The front gate, the test seam, the mode check and the DPI. Throws
@@ -283,6 +284,8 @@ public final class PageRasterizer: @unchecked Sendable {
         // reason recorded at build time (non-nil only for fallback pages of a
         // Searchable-mode run); the runtime fallback paths below overwrite it.
         var fallbackReason = page.fallbackReason
+        // The text path's count of runs left out (zero unless the path ran).
+        var runsLeftOut = 0
 
         if page.pipelineMode == .searchableRedaction {
             let extractor = TextLayerExtractor()
@@ -324,60 +327,39 @@ public final class PageRasterizer: @unchecked Sendable {
                     let redactionRectsInPoints = page.regions.flatMap(\.textRemovalRects).map {
                         normalizedToPDFPageCoordinates($0, pageRect: pageBounds)
                     }
-
-                    // Region shapes in output-page points: the rects
-                    // wrapped (un-expanded `bounds`; the halo in
-                    // `expandedBounds`). The drawn-cell rule below reads them.
-                    let shapes: [RegionShape] = redactionRectsInPoints.map { rect in
-                        RegionShape(
-                            expandedBounds: rect.insetBy(dx: -safetyMarginPoints, dy: -safetyMarginPoints),
-                            bounds: rect
-                        )
-                    }
-                    // Filter characters against redaction regions
-                    let filterResult = try await filterCharacters(
-                        characters: characters,
-                        redactionRects: redactionRectsInPoints
-                    )
-
-                    // The writer-side drawn-cell rule: a survivor the filter
-                    // keeps on its SOURCE box can still be DRAWN inside a
-                    // region (the band's Courier cursor carries a group's
-                    // last glyphs right of their source positions where the
-                    // source font is narrower than the band pitch). The
-                    // layout is validated BEFORE the digest is taken, so the
-                    // digest, the drawn layer and Layer 6 agree by
-                    // construction. The frame carries the page's rotation:
-                    // the rule, the writer and the lineage digest all work
-                    // in the SOURCE frame of a rotated page.
+                    // The frame carries the page's rotation: the drawn-cell
+                    // rule, the writer and the lineage digest all work in the
+                    // SOURCE frame of a rotated page.
                     let frame = PageFrame(
                         rotation: page.rotation, displayedSize: effectiveSize)
-                    let validated = TextLayerReconstructor.validateSurvivors(
-                        filterResult, regionShapes: shapes, frame: frame
-                    )
-                    if validated.dropped > 0 {
+                    // The page's text path: the filter, the drawn-cell rule
+                    // and the record, each step through its seam
+                    // (`PageTextPath`). Its rectangles are the removal
+                    // rectangles above, every one ordinary; nothing is painted
+                    // by a plan yet.
+                    let path = try await PageTextPath.run(
+                        entries: characters, frame: frame,
+                        textPathRectangles: redactionRectsInPoints.map {
+                            TextPathRectangle(rect: $0, kind: .ordinary)
+                        },
+                        paintedRectangles: [], pageIndex: page.pageIndex)
+                    if path.drawnCellDropped > 0 {
                         pageRasterizerLogger.log(
-                            "page \(page.pageIndex): \(validated.dropped, privacy: .public) surviving character(s) whose drawn cell lay inside a redaction region were dropped from the text layer"
+                            "page \(page.pageIndex): \(path.drawnCellDropped, privacy: .public) surviving character(s) whose drawn cell lay inside a redaction region were dropped from the text layer"
                         )
                     }
-
-                    if validated.settled {
-                        textLayerEntries = validated.result.surviving
-                        redactionRectsForTextLayer = redactionRectsInPoints
-                        pageDigest = validated.result.toDigest(
-                            pageIndex: page.pageIndex,
-                            redactionRects: redactionRectsInPoints,
-                            safetyMargin: safetyMarginPoints,
-                            drawnCellRuleExcludedCount: validated.dropped,
-                            frame: frame
-                        )
-                    } else {
-                        // The re-flow limit left a drawn cell inside a
-                        // region: the rule has not seen the layout settle,
-                        // so the page is written without a text layer —
-                        // the same arm as an extraction that threw (entries
-                        // and digest never set, the reason recorded).
-                        fallbackReason = .extractionFailed
+                    runsLeftOut = path.runsLeftOut
+                    switch path.outcome {
+                    case .written(let entries, let digest, let removalRects):
+                        textLayerEntries = entries
+                        redactionRectsForTextLayer = removalRects
+                        pageDigest = digest
+                    case .picture(let reason):
+                        // The page is written without a text layer (entries
+                        // and digest never set, the reason recorded). Today
+                        // the one such outcome is the drawn-cell rule's
+                        // re-flow limit leaving a cell inside a region.
+                        fallbackReason = reason
                         pageRasterizerLogger.log(
                             "page \(page.pageIndex) fell back to secure rasterization at runtime (the text layer did not settle outside the redaction regions)"
                         )
@@ -406,7 +388,8 @@ public final class PageRasterizer: @unchecked Sendable {
 
         return TextLayerState(
             entries: textLayerEntries, digest: pageDigest,
-            removalRects: redactionRectsForTextLayer, fallbackReason: fallbackReason
+            removalRects: redactionRectsForTextLayer, fallbackReason: fallbackReason,
+            runsLeftOut: runsLeftOut
         )
     }
 
@@ -447,6 +430,7 @@ public final class PageRasterizer: @unchecked Sendable {
             textLayer.entries = nil
             textLayer.removalRects = []
             textLayer.digest = nil
+            textLayer.runsLeftOut = 0
             if Self.inkTestCanRun(context: ctx, pageSize: effectiveSize) {
                 textLayer.fallbackReason = .hiddenText
                 pageRasterizerLogger.log(
@@ -524,7 +508,8 @@ public final class PageRasterizer: @unchecked Sendable {
             size: effectiveSize,
             textLayerEntries: textLayer.entries,
             redactionRectsInPoints: textLayer.removalRects,
-            rotation: page.rotation
+            rotation: page.rotation,
+            runsLeftOut: textLayer.runsLeftOut
         )
         return RasterizeResult(pageOutput: output, filterDigest: textLayer.digest,
                                fallbackReason: textLayer.fallbackReason)
