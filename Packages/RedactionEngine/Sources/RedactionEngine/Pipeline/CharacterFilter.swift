@@ -305,7 +305,7 @@ extension FilterResult {
             boundaryCharacters: boundaryChars,
             lineageHash: Self.computeLineageHash(over: surviving, frame: frame),
             survivingNonWhitespaceCount: surviving.count(where: {
-                !SandwichMetrics.isLineageWhitespace($0.character)
+                !SandwichMetrics.isOutsideCharacterCount($0.character)
             }),
             drawnCellRuleExcludedCount: drawnCellRuleExcludedCount,
             pageRotation: frame?.rotation ?? 0
@@ -393,7 +393,7 @@ extension FilterResult {
                 let range = nsText.rangeOfComposedCharacterSequence(at: offset)
                 let charString = nsText.substring(with: range)
                 offset += max(range.length, 1)
-                guard !SandwichMetrics.isLineageWhitespace(charString) else { continue }
+                guard !SandwichMetrics.isOutsideCharacterCount(charString) else { continue }
                 hasher.update(data: Data(charString.utf8))
                 hasher.update(data: separator)
                 hasher.update(data: Data(String(globalPos).utf8))

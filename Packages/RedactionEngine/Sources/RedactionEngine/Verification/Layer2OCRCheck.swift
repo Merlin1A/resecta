@@ -302,10 +302,9 @@ extension VerificationEngine {
     /// The separators the fragment comparison ignores on both sides: a
     /// space, the hyphens, the soft hyphen and the zero-width characters —
     /// the marks a box edge, a line break or OCR may add or drop.
-    static let fragmentSeparators: Set<Character> = [
+    static let fragmentSeparators: Set<Character> = Set<Character>([
         " ", "\u{00A0}", "-", "\u{2010}", "\u{2011}", "\u{2012}", "\u{2013}", "\u{2014}", "\u{2212}",
-        "\u{00AD}", "\u{200B}", "\u{200C}", "\u{200D}", "\u{2060}", "\u{FEFF}",
-    ]
+    ]).union(TextNormalizer.breakMarks.map(Character.init))
 
     /// `text` in the search path's normalized form, lowercased, minus the
     /// separators.

@@ -85,17 +85,22 @@ public struct TextNormalizer: Sendable {
         return character.unicodeScalars.allSatisfy { (0x0000...0x001F).contains($0.value) }
     }
 
-    /// A character a run is made of: a spacing character, one of the
-    /// zero-width joiners and marks a layout engine leaves between glyphs,
-    /// or a soft hyphen (U+00AD, a break opportunity inside a word).
+    /// The six break marks a run can hold, none of which a reader shows: the
+    /// soft hyphen (U+00AD, a break opportunity inside a word), the zero-width
+    /// space, non-joiner and joiner (U+200B, U+200C, U+200D), the word joiner
+    /// (U+2060) and the zero-width no-break space (U+FEFF). Written here once;
+    /// the run test below, the OCR check's separators
+    /// (`Layer2OCRCheck.fragmentSeparators`) and the character count's
+    /// predicate (`SandwichMetrics.isOutsideCharacterCount`) read it.
+    static let breakMarks: Set<Unicode.Scalar> = [
+        "\u{00AD}", "\u{200B}", "\u{200C}", "\u{200D}", "\u{2060}", "\u{FEFF}",
+    ]
+
+    /// A character a run is made of: a spacing character, or one made only
+    /// of break marks (`breakMarks`).
     static func isRunCharacter(_ character: Character) -> Bool {
         if isSpacingCharacter(character) { return true }
-        return character.unicodeScalars.allSatisfy { scalar in
-            switch scalar.value {
-            case 0x00AD, 0x200B, 0x200C, 0x200D, 0x2060, 0xFEFF: return true
-            default: return false
-            }
-        }
+        return character.unicodeScalars.allSatisfy { breakMarks.contains($0) }
     }
 
     /// The hard hyphens a layout engine may break a line after.
