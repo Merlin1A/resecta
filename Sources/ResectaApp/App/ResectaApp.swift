@@ -245,6 +245,7 @@ struct ResectaApp: App {
                                             }
                                         }
                                         if let run = VerificationDebugFixtures.runInputs(for: String(name)) {
+                                            // Seeded by hand: no run, so no record.
                                             ws.redactionState.recordLastRunInputs(.init(
                                                 perPageModes: run.modes, perPageFallbackReasons: run.reasons,
                                                 sensitiveTerms: SensitiveTermSet(terms: [], manualRegionsWithoutText: 0),

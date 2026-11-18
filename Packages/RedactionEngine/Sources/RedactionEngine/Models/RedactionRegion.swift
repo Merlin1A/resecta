@@ -167,3 +167,14 @@ extension CGRect {
         return CGRect(x: cx, y: cy, width: cw, height: ch)
     }
 }
+
+extension RedactionRegion {
+    /// Admission: whether a region drawn at `normalizedRect` reaches a run. It
+    /// does when its rectangle, clamped to the page, is more than 0.001 of the
+    /// page wide and more than 0.001 high. The page builder and the run's
+    /// record both read this one test, on today's clamp.
+    public static func isAdmitted(normalizedRect: CGRect) -> Bool {
+        let clamped = normalizedRect.clampedToNormalized()
+        return clamped.width > 0.001 && clamped.height > 0.001
+    }
+}
