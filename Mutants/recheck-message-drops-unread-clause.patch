@@ -1,0 +1,18 @@
+Property: A Search Re-check that needs review names in its message every clause its could-not part lists, so the results screen can show the message alone.
+Area: Search Re-check rows (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --package-path Packages/RedactionEngine --filter SearchRecheckPartInMessageTests
+Must go red: RedactionEngineTests/SearchRecheckPartInMessageTests row [every page opens; the coverage check could not read page 2], [page 2 does not open; the coverage check could not read page 2], and the two "could not read page 2 and compared nothing for both" cases
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SearchRecheck.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SearchRecheck.swift
+index 9b6a38a7..acbec4bd 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SearchRecheck.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SearchRecheck.swift
+@@ -427,7 +427,6 @@ struct SearchRecheck: Sendable {
+             let message = "Re-ran \(searches) — \(remainSentence)"
+                 + (k == 0 ? "" : ", \(uncheckedClause)")
+                 + (coverageRan ? "" : "; \(Self.coverageNotRunClause)")
+-                + (coverageUnreadPages.isEmpty ? "" : "; \(Self.coverageUnreadClause(coverageUnreadPages))")
+                 + coverageComparedNothingClauses.map { "; \($0)" }.joined()
+             let detail = joined([Self.detailLead, routeSentence, remainSentence + ".",
+                                  k == 0 ? "" : uncheckedClause + ".",
