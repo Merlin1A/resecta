@@ -1,0 +1,19 @@
+Property: The walk meets restart markers in order.
+Area: the reader of a page's stored picture (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --package-path Packages/RedactionEngine --filter PageImageReadTests
+Must go red: RedactionEngineTests/PageImageReadTests row [28: restart markers swapped; ...], the swapped file
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/JPEGEntropyWalk.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/JPEGEntropyWalk.swift
+index bf40ac85..108641df 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/JPEGEntropyWalk.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/JPEGEntropyWalk.swift
+@@ -113,7 +113,7 @@ enum JPEGEntropyWalk {
+         guard b[p] == 0xFF else { throw refused(.restartMarkerOrder, p) }
+         if b[p + 1] == 0xFF { throw refused(.fillByteBeforeMarker, p) }
+         if b[p + 1] == 0xD9 { throw refused(.scanCutShort, p) }
+-        guard Int(b[p + 1]) == 0xD0 + number else { throw refused(.restartMarkerOrder, p) }
++        guard (0xD0...0xD7).contains(Int(b[p + 1])) else { throw refused(.restartMarkerOrder, p) }
+     }
+ 
+     private static func decode(_ b: UnsafeBufferPointer<UInt8>, sha256: Data) throws(Stop) -> PageImageWalk {
