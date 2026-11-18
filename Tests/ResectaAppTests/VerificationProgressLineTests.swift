@@ -110,7 +110,8 @@ struct VerificationProgressLineTests {
             (.finish(.detectionSweep), 100, 7, .checking),
         ])
         print("[progress-line] rows \(ran), replay steps \(a) \(b) \(c)")
-        #expect([a, b, c] == [14, 13, 13])
+        let steps: [Int] = [a, b, c]
+        #expect(steps == [14, 13, 13])
     }
 
     enum Step { case start(VerificationLayer), finish(VerificationLayer), wait }
