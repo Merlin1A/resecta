@@ -262,7 +262,11 @@ struct PageImageInkFitStallTests {
         let started: Date, answered: Date, ended: Date
     }
 
-    @Test("A page read that stalls on the Vision lane degrades only its own page: another page reads off the stalled lane and fits, not degraded")
+    /// The word fitted on page B (page 3 of the statement), chosen for its
+    /// rows to spare on the fit's line check at both raster sizes (N-30a).
+    static let otherPageWord = "Hartwell"
+
+    @Test("A page read that stalls on the Vision lane degrades only its own page: another page reads off the stalled lane and fits as it does with nothing stalled")
     func stallOnOnePageLeavesOthersFitted() async throws {
         // An export of this test's own: a small mark in a blank corner of
         // both pages makes their content keys no other test's, so the
@@ -277,6 +281,35 @@ struct PageImageInkFitStallTests {
         let url = try await TestPipeline.processAndExport(data, mode: .searchableRedaction, regions: regions, dpi: 300)
         defer { try? FileManager.default.removeItem(at: url) }
         let exported = try Data(contentsOf: url)
+        @Sendable func fit(_ shared: SendablePDFDocument, _ index: Int, _ word: String) async -> Fit? {
+            guard let page = shared.document.page(at: index) else { return nil }
+            let range = ((page.string ?? "") as NSString).range(of: word)
+            guard let raw = page.selection(for: range).flatMap({ DocumentSearcher().normalizedRect(for: $0, page: page) }) else { return nil }
+            let started = Date()
+            // Read as a search reads it (awaited), then fitted.
+            await DocumentSearcher.prepareInkFit(page)
+            let answered = Date()
+            let fit = DocumentSearcher.inkFit(raw, page: page, text: word, range: range, paintOnly: true)
+            return Fit(rect: fit.rect, degraded: fit.degraded, raw: raw, started: started, answered: answered, ended: Date())
+        }
+        func margin(_ shared: SendablePDFDocument, _ index: Int) -> Int? {
+            guard let page = shared.document.page(at: index), let cg = page.pageRef else { return nil }
+            let key = InkTokenCache.key(page: page, cgPage: cg, visual: page.bounds(for: .cropBox).size)
+            return DocumentSearcher.inkFitLineMargins.value(for: key) ?? nil
+        }
+        // The control: page B fitted with nothing stalled, on a document of
+        // its own. A word whose fit is degraded here sits on the fit's own
+        // rules, and its stalled run could show no leak; the test needs a word
+        // that fits, and prints by how much (rows to spare on `inkBox`'s line
+        // check). A new session after it, so the stalled run reads and fits
+        // afresh instead of taking the control's cached read or box.
+        let word = Self.otherPageWord
+        let control = SendablePDFDocument(try #require(PDFDocument(data: exported)))
+        let c = try #require(await fit(control, 2, word))
+        let controlMargin = margin(control, 2)
+        print("stall pin: control fit of \(word) on page B, rows to spare \(controlMargin.map(String.init) ?? "none")")
+        try #require(!c.degraded, "the control fit of \(word) is degraded with nothing stalled (rows to spare \(controlMargin.map(String.init) ?? "none")): the word sits on the fit's rules, so it cannot show a stall's leak")
+        DocumentSearcher.startNewInkFitSession()
         // Each page on a document of its own, so the two fits share no PDF objects.
         let stalled = SendablePDFDocument(try #require(PDFDocument(data: exported)))
         let other = SendablePDFDocument(try #require(PDFDocument(data: exported)))
@@ -290,35 +323,28 @@ struct PageImageInkFitStallTests {
         // Every Vision job for page A from here on is the stall: a read of
         // A's at a lane's head after this instant is a stalled one.
         let armed = Date()
-        @Sendable func fit(_ shared: SendablePDFDocument, _ index: Int) async -> Fit? {
-            guard let page = shared.document.page(at: index) else { return nil }
-            let range = ((page.string ?? "") as NSString).range(of: "Hartwell")
-            guard let raw = page.selection(for: range).flatMap({ DocumentSearcher().normalizedRect(for: $0, page: page) }) else { return nil }
-            let started = Date()
-            // Read as a search reads it (awaited), then fitted.
-            await DocumentSearcher.prepareInkFit(page)
-            let answered = Date()
-            let fit = DocumentSearcher.inkFit(raw, page: page, text: "Hartwell", range: range, paintOnly: true)
-            return Fit(rect: fit.rect, degraded: fit.degraded, raw: raw, started: started, answered: answered, ended: Date())
-        }
         func stalledHead() -> Date? { InkFitLaneTimes.shared.began(keyA).flatMap { $0 > armed ? $0 : nil } }
         // Page A's read takes the Vision lane and stalls there; page B's
         // read is sent once A's is seen at the lane's head, so it is sent
         // while A's stall holds that lane.
         let aDone = Done()
-        let a = Task.detached { () -> Fit? in defer { aDone.set() }; return await fit(stalled, 1) }
+        let a = Task.detached { () -> Fit? in defer { aDone.set() }; return await fit(stalled, 1, "Hartwell") }
         var seen: Date?
         while seen == nil, !aDone.isSet, Date().timeIntervalSince(armed) < DocumentSearcher.inkFitReadBackstop {
             if stalledHead() != nil { seen = Date() } else { try await Task.sleep(for: .milliseconds(5)) }
         }
-        let b = try #require(await Task.detached { await fit(other, 2) }.value)
+        let b = try #require(await Task.detached { await fit(other, 2, word) }.value)
         let aResult = try #require(await a.value)
         #expect(aResult.degraded, "the stalled page's fit is degraded")
+        // A's stall changes nothing about B: the fit it gets with nothing stalled.
         #expect(!b.degraded, "the other page's fit is not degraded by page A's stall")
+        #expect(b.degraded == c.degraded && b.rect == c.rect,
+                "the other page's fit under A's stall \(b.rect) (degraded \(b.degraded)) is the control's \(c.rect) (degraded \(c.degraded))")
+        print("stall pin: page B's fit under the stall, rows to spare \(margin(other, 2).map(String.init) ?? "none")")
         let page = try #require(other.document.page(at: 2))
         let size = page.bounds(for: .cropBox).size
         let sourcePage = try #require(source.page(at: 2))
-        let sourceRange = ((sourcePage.string ?? "") as NSString).range(of: "Hartwell")
+        let sourceRange = ((sourcePage.string ?? "") as NSString).range(of: word)
         let truth = try #require(sourcePage.selection(for: sourceRange).flatMap { DocumentSearcher().normalizedRect(for: $0, page: sourcePage) })
         let outside = try PageImageInkFitTests.inkOutside(page, word: PageImageInkFitTests.points(truth, size),
                                                           boxes: [PageImageInkFitTests.points(b.rect, size)])
