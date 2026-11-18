@@ -86,11 +86,4 @@ nonisolated final class VerificationRunningUITests: XCTestCase {
                        "The trust line lies over the block: block \(block), trust line \(trust.frame).")
         attachScreenshot(named: "running-03-largest")
     }
-
-    private func attachScreenshot(named name: String) {
-        let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-        shot.name = name
-        shot.lifetime = .keepAlways
-        add(shot)
-    }
 }
