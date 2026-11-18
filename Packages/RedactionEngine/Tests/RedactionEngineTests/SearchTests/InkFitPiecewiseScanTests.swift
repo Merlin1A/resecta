@@ -210,6 +210,79 @@ struct InkFitPiecewiseScanTests {
         #expect(keys[0] != keys[1])
     }
 
+    // MARK: - The plan for hidden words
+
+    static func normalized(_ r: CGRect) -> CGRect {
+        CGRect(x: r.minX / 612, y: r.minY / 792, width: r.width / 612, height: r.height / 792)
+    }
+
+    /// The plan as the app's run makes it: in a detached task, off the main
+    /// thread, where the fit reads the page (on the main thread it reads only
+    /// its caches).
+    static func plan(_ regions: [RedactionRegion], on page: PDFPage) async -> InkStripPlan? {
+        nonisolated(unsafe) let page = page
+        return await Task.detached { await DocumentSearcher.inkStripPlan(regions: regions, page: page) }.value
+    }
+
+    @Test("The plan for hidden words on a scan stored in pieces")
+    func planOnNewlyFittedPages() async throws {
+        // The column: true while a drawn box on a newly fitted page keeps the
+        // text layer, false if such a page is to stay a picture. Typed here.
+        let drawnBoxKeepsTextLayer = true
+        #expect(DocumentSearcher.drawnBoxOnNewlyFittedPageKeepsTextLayer == true)
+        // Unshifted scans: with the layer half a word to one side, the fit
+        // cannot place the line's last word even on the one-image twin, so
+        // every box on that line is unsure there as well.
+        let twin = try #require(S.pdfPage(S.scan(.one, shift: 0)))
+        let drawnRows: [(String, Data)] = [
+            ("X1", S.scan(.strips(rows: 128), shift: 0)),
+            ("X2", S.scan(.strips(rows: 128), shift: 0, layer: .visibleBefore)),
+            ("X3", S.scan(.one, shift: 0, layer: .visibleBefore)),
+        ]
+        for (key, data) in drawnRows {
+            let (document, page, _) = try #require(S.pdfPage(data))
+            defer { withExtendedLifetime(document) {} }
+            let drawn = RedactionRegion(id: UUID(), normalizedRect: Self.normalized(S.wordInk(shift: 0).insetBy(dx: -1, dy: -1)),
+                                        source: .manual)
+            let plan = await Self.plan([drawn], on: page)
+            if drawnBoxKeepsTextLayer {
+                let made = try #require(plan, "\(key): a plan")
+                let twinPlan = try #require(await Self.plan([drawn], on: twin.1))
+                try #require(twinPlan.covers([drawn]) && !(twinPlan.words[drawn.id] ?? []).isEmpty, "\(key): the twin's plan covers the box and holds the word: \(twinPlan)")
+                #expect(made.covers([drawn]), "\(key): it covers the box; the twin's plan \(twinPlan)")
+                #expect(!(made.words[drawn.id] ?? []).isEmpty, "\(key): it holds the word")
+                #expect(made.words[drawn.id] == twinPlan.words[drawn.id], "\(key): the words of its one-image twin's plan \(twinPlan)")
+            } else {
+                #expect(plan == nil, "\(key): no plan, as today")
+            }
+        }
+        let (document, page, _) = try #require(S.pdfPage(S.scan(.strips(rows: 128), shift: 0)))
+        let hit = try #require(await Self.hits(document, S.word).first)
+        let matched = RedactionRegion(id: UUID(), normalizedRect: hit.normalizedRect, source: .searchMatch(term: S.word),
+                                      textAnchored: true)
+        let plan = try #require(await Self.plan([matched], on: page), "X4: a plan")
+        #expect(plan.covers([matched]), "X4: it covers the box")
+        #expect(drawnRows.count + 1 == 4)
+    }
+
+    @Test("When a page gets a plan for its hidden words")
+    func planIsMadeByRule() {
+        let rows: [(String, Bool, Bool, Bool, Bool, Bool)] = [
+            ("P1", true, true, true, false, true),
+            ("P2", false, true, false, false, true),
+            ("P3", false, true, true, true, true),
+            ("P4", false, true, true, false, false),
+            ("P5", false, false, false, true, false),
+        ]
+        #expect(rows.count == 5)
+        for (key, today, ruleG, unanchored, keeps, made) in rows {
+            #expect(DocumentSearcher.planIsMade(fittedToday: today, fittedByRuleG: ruleG, hasUnanchoredBox: unanchored,
+                                                drawnBoxKeepsTextLayer: keeps) == made, "\(key)")
+        }
+        // P1 under either value.
+        #expect(DocumentSearcher.planIsMade(fittedToday: true, fittedByRuleG: true, hasUnanchoredBox: true, drawnBoxKeepsTextLayer: true))
+    }
+
     // MARK: - The plan's page facts
 
     /// Each use of `PageTextFacts(` in `text` whose call, to its matching

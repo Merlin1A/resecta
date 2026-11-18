@@ -32,6 +32,22 @@ extension DocumentSearcher {
         return answer
     }
 
+    /// Whether a page fitted only by the wider gate (its pictures cover it, or
+    /// its visible text lies under them) gets a plan for its hidden words when
+    /// it carries a box not placed from its text. With true, such a page keeps
+    /// its text layer less the words the plan holds, as a page whose one image
+    /// is page-scale does; with false, it is written as a picture.
+    static let drawnBoxOnNewlyFittedPageKeepsTextLayer: Bool = true
+
+    /// Whether the hidden-word plan is made for a page: always on a page the
+    /// fit took before the gate was widened; on a page only the wider gate
+    /// takes, unless it carries a box not placed from its text and such a box
+    /// is to leave the page a picture.
+    nonisolated static func planIsMade(fittedToday: Bool, fittedByRuleG: Bool, hasUnanchoredBox: Bool,
+                                       drawnBoxKeepsTextLayer: Bool) -> Bool {
+        fittedToday || (fittedByRuleG && (!hasUnanchoredBox || drawnBoxKeepsTextLayer))
+    }
+
     /// Whether the gate's answer depends on where the page's pictures are
     /// painted: a page with invisible text and no page-scale image, or a page
     /// with no invisible text that draws a picture at all.

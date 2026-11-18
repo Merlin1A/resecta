@@ -134,7 +134,7 @@ extension DocumentSearcher {
     /// of each region. Nonisolated and async, so it runs off the main thread,
     /// where the fit would read only a cache and return the hidden box itself.
     public nonisolated static func inkStripPlan(regions: [RedactionRegion], page: PDFPage) async -> InkStripPlan? {
-        guard let cgPage = page.pageRef, carriesHiddenTextOverImage(page, cgPage: cgPage) else { return nil }
+        guard let cgPage = page.pageRef, planIsMade(fittedToday: carriesPageScaleImage(page, cgPage: cgPage) && showsInvisibleText(cgPage), fittedByRuleG: carriesHiddenTextOverImage(page, cgPage: cgPage), hasUnanchoredBox: regions.contains { !$0.textAnchored && !$0.coversWholePage }, drawnBoxKeepsTextLayer: drawnBoxOnNewlyFittedPageKeepsTextLayer) else { return nil }
         let boxes = regions.filter { !$0.coversWholePage }
         guard !boxes.isEmpty else { return InkStripPlan() }
         let size = effectiveBounds(page.bounds(for: .cropBox), rotation: page.rotation).size
