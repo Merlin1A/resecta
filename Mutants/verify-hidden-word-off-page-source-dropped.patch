@@ -1,0 +1,19 @@
+Property: The hidden-word check keeps a source character wholly off the visible page as an alignment candidate: here it is dropped (the source side reads the search's off-page rule)
+Area: Verification, the hidden-word check
+Test command: swift test --no-parallel --filter '^RedactionEngineTests\.HiddenWordInkOffPageSourceTests/' (in Packages/RedactionEngine, DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer)
+Must go red: RedactionEngineTests/HiddenWordInkOffPageSourceTests offPageSourceLineStaysACandidate
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+HiddenWordInk.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+HiddenWordInk.swift
+index b4a7a8ae..05a117f5 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+HiddenWordInk.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+HiddenWordInk.swift
+@@ -157,7 +157,7 @@ extension VerificationEngine {
+             text.enumerateSubstrings(in: lineRange, options: .byComposedCharacterSequences) { sub, range, _, _ in
+                 guard let sub, let char = sub.first, !char.isWhitespace,
+                       let selection = page.selection(for: range),
+-                      let rect = searcher.clampedNormalizedRect(for: selection, page: page) else { return }
++                      let rect = searcher.normalizedRect(for: selection, page: page) else { return }
+                 glyphs.append(HiddenWordInkGlyph(char: char, rect: rect, line: line))
+             }
+             line += 1
