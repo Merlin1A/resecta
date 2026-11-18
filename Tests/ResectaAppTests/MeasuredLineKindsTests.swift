@@ -11,13 +11,13 @@ import Foundation
 @Suite("The measured sentence's slot")
 struct MeasuredLineKindsTests {
 
-    struct Row: CustomTestStringConvertible, Sendable {
+    nonisolated struct Row: CustomTestStringConvertible, Sendable {
         let kinds: [MeasuredLineKinds.Kind]
         let sentence: String?
         var testDescription: String { sentence ?? "no kind: no sentence" }
     }
 
-    static let rows: [Row] = [
+    nonisolated static let rows: [Row] = [
         Row(kinds: [.leftAlignedParagraph], sentence: "In Resecta's test, Widen Boxes reduced what the page shows about how long the text was on lines of a left-aligned paragraph."),
         Row(kinds: [.justifiedParagraph], sentence: "In Resecta's test, Widen Boxes reduced what the page shows about how long the text was on lines of a justified paragraph."),
         Row(kinds: [.startsWithLabel], sentence: "In Resecta's test, Widen Boxes reduced what the page shows about how long the text was on lines that start with a label."),
