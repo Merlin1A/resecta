@@ -115,9 +115,9 @@ nonisolated final class CanvasSelectionUITests: XCTestCase {
         let bar = barPart("selectionBar")
         let pageBar = barPart("pageNav")
         XCTAssertTrue(pageBar.waitForExistence(timeout: 5))
-        // The bar's element reports its row, not its glass: the glass is the
-        // row and the slot's padding, 12 pt above and below, 16 pt beside.
-        let glass = bar.frame.insetBy(dx: -16, dy: -12)
+        // At the accessibility sizes the bar's element reports its glass
+        // (at the default size, only its row).
+        let glass = bar.frame
         let foot = (pageBar.frame.minY - 8) - glass.maxY
         XCTAssertEqual(foot, 8, accuracy: 1, "The bar's foot must be 8 pt above the page bar's glass; it is \(foot) pt.")
         let covered = page.maxY - glass.minY

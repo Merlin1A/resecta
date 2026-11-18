@@ -288,6 +288,9 @@ nonisolated final class EditorToolbarUITests: XCTestCase {
             XCTAssertEqual(tapChanges("selectionBarDuplicate", dy: dy), 1, "A tap \(dy) pt from Duplicate's word must duplicate.")
             undo.tap()
             XCTAssertTrue(waitForLabel(counter, containing: "1 region"))
+            // The copy was the one selected; Undo removes it, so nothing is
+            // selected and the bar leaves. Select the box again.
+            app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.42, dy: 0.425)).tap()
             XCTAssertTrue(barPart("selectionBar").waitForExistence(timeout: 5))
             XCTAssertEqual(tapChanges("selectionBarDelete", dy: dy), -1, "A tap \(dy) pt from Delete's word must delete.")
             undo.tap()
@@ -328,11 +331,16 @@ nonisolated final class EditorToolbarUITests: XCTestCase {
             XCTAssertFalse(duplicate.frame.insetBy(dx: 0.5, dy: 0.5).intersects(delete.frame), "The two frames must not overlap at \(size).")
             XCTAssertEqual(duplicate.label, "Duplicate Box")
             XCTAssertEqual(delete.label, "Delete Box")
-            barFrames.append(barPart("selectionBar").frame)
+            // At the accessibility sizes the bar's element reports its glass
+            // (272.7 x 54 at both sizes on the 402-pt phone). Its foot
+            // is 8 pt above the page bar's glass, which grows with the text.
+            let bar = barPart("selectionBar").frame
+            let foot = (barPart("pageNav").frame.minY - 8) - bar.maxY
+            XCTAssertEqual(foot, 8, accuracy: 1, "At \(size) the bar's foot must be 8 pt above the page bar's glass; it is \(foot) pt.")
+            barFrames.append(bar)
             attachScreenshot(named: "selection-bar-\(size)")
         }
         XCTAssertEqual(barFrames[0].width, barFrames[1].width, accuracy: 1, "The bar must stop growing at Accessibility 1: \(barFrames).")
         XCTAssertEqual(barFrames[0].height, barFrames[1].height, accuracy: 1, "The bar must stop growing at Accessibility 1: \(barFrames).")
-        XCTAssertEqual(barFrames[0].minY, barFrames[1].minY, accuracy: 1, "The bar must stop growing at Accessibility 1: \(barFrames).")
     }
 }
