@@ -1,0 +1,19 @@
+Property: The corpus runner marks each seed as placed from the page's own text.
+Area: corpus runner (engine tests)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/PageModeDecisionTests
+Must go red: RedactionEngineTests/PageModeDecisionTests "the corpus runner: a page that is not plain, with a seed, stays Searchable"
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Tests/RedactionEngineTests/CorpusTests/VerificationCorpusMirror.swift b/Packages/RedactionEngine/Tests/RedactionEngineTests/CorpusTests/VerificationCorpusMirror.swift
+index 282edb05..64ff2b99 100644
+--- a/Packages/RedactionEngine/Tests/RedactionEngineTests/CorpusTests/VerificationCorpusMirror.swift
++++ b/Packages/RedactionEngine/Tests/RedactionEngineTests/CorpusTests/VerificationCorpusMirror.swift
+@@ -124,7 +124,7 @@ extension VerificationCorpusRunnerTests {
+         // The corpus's seeds stand for values a search found in the page's
+         // own text, so each region is marked as placed from that text, as
+         // the app marks a box made from a text-layer match.
+-        return RedactionRegion(id: UUID(), normalizedRect: clamped, source: .manual, textAnchored: true)
++        return RedactionRegion(id: UUID(), normalizedRect: clamped, source: .manual)
+     }
+ 
+     /// Sensitive terms for the burned regions, mirroring the app's
