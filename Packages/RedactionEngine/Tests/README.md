@@ -12,31 +12,35 @@ it, and the shapes it uses.
 - `DetectionTests/` — what a detector reports for a given input.
 - `VerificationTests/` — one verification layer, or the verification
   schedule as a whole.
-- The other directories are named for the subsystem they exercise
+- The other directories are named for the subsystem they exercise or the
+  kind of test they hold
   (`SearchTests/`, `SandwichTests/`, `Pipeline/`, `PerformanceTests/`,
   `CorpusTests/`, `FuzzTests/` and so on). Shared builders and helpers live
   in `Fixtures/` and `Support/`.
 - The single-file directories and the files at the target root keep their
-  place; a new test goes into the directory whose rule above it meets.
+  place; a new test goes into the directory whose rule it meets.
 
 ## Runner tiers
 
-`Scripts/test-batched.sh <scheme>` builds once and runs the suites in serial
-batches on one simulator. It is the runner for local runs and the pre-push
-hook, and the hosted `sim-suite` workflow calls it too.
+`TEST_BATCHED_SIM_UDID=<udid> Scripts/test-batched.sh <scheme>` builds once
+and runs the suites in serial batches on that simulator. It is the runner
+for local runs and the pre-push hook, and the hosted `sim-suite` workflow
+calls it too.
 
 - **Gating batches.** Every suite not named below runs in a batch, and a red
   sets the exit status.
 - **Perf-alone** (`PERF_ALONE_RedactionEngine`). Suites that assert
   wall-clock, ratio or percentile budgets run one at a time after the
-  batches, report-only: their reds are read by hand and never gate.
+  batches, report-only: their reds are read by hand and never gate. The
+  exceptions are the suites the script names as alone-gating
+  (`ALONE_GATING_RedactionEngine`), whose reds gate.
 - **Non-gating** (`NON_GATING`). Suites whose wall-clock bounds move with
   other work on the same machine run inside the batches, report-only.
 - **Hosted exclusions** (`TEST_BATCHED_EXCLUDE` in
   `.github/workflows/sim-suite.yml`). Suites whose full verification or OCR
   pass never returns on the hosted virtual machine, and timing pins whose
-  limits that machine cannot meet, are left out there and named in its
-  verdict; local runs and the pre-push hook run them.
+  limits that machine cannot meet, are left out there, named in its log and
+  counted in its verdict line; local runs and the pre-push hook run them.
 - **Disabled.** A test carrying `.disabled("…")` does not run anywhere. A
   new one says in its reason string why, and what would bring it back.
 
@@ -53,7 +57,7 @@ perf-alone or non-gating list.
   provisioned, an output path that was not requested) calls
   `TestGate.skip("…")` and then `return`s. The gate records a warning in the
   result bundle, so a run that skipped a body reads differently from a run
-  that proved something.
+  that ran it.
 - In a new test, a loop never holds the only assertion behind a
   `continue`, and an assertion never sits below an early `return` that
   skips it silently.

@@ -1,10 +1,10 @@
 # Encrypted fixtures
 
-Committed, deterministic test documents for the password-locked import path:
+Committed test documents for the password-locked import path:
 two plain seeds, a hidden-layer seed, their encrypted forms at the revisions
 users meet, and two handler stubs. Produced once by `generate.sh` (qpdf
 12.3.2 on a Mac; qpdf is a generator here, never a dependency, and nothing
-runs it in a test or in CI). Every file is pinned by its sha256 below; a
+runs it in a test or in CI). Every PDF is pinned by its sha256 below; a
 regenerated encrypted file has different bytes (the key is salted), so the
 committed bytes are the fixtures.
 
