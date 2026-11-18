@@ -238,6 +238,38 @@ jobs:
           fi
           echo "SURFACE_SECS=$((SECONDS - t0))" >> "$GITHUB_ENV"
 
+      # Seam fences: six rules over where code may reach, each holding the
+      # sites the tree has today as a list that may only shrink
+      # (Scripts/seam-fence.sh). Runs the base branch's copy as the gate, so
+      # a change cannot widen a list it is gated by, then compares this
+      # change's lists with the base copy's (a site this change adds to a
+      # list is refused) and runs this change's self-test. On the change that
+      # first adds the script this change's copy runs report-only and the
+      # fences gate from the next pull request.
+      - name: Seam fences
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: |
+          t0=$SECONDS
+          base="${PR_BASE:-$PUSH_BEFORE}"
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+            base="$(git rev-parse HEAD~1)"
+          fi
+          script="${BASE_SCRIPTS}/seam-fence.sh"
+          if git show "${base}:Scripts/seam-fence.sh" > "$script" 2>/dev/null && [ -s "$script" ]; then
+            chmod +x "$script"
+            echo "seam fences from ${base}"
+            "$script"
+            Scripts/seam-fence.sh --compare-lists "$script"
+            Scripts/seam-fence.sh --self-test
+          else
+            echo "seam-fence.sh is absent at ${base}; running this change's copy report-only"
+            Scripts/seam-fence.sh --self-test \
+              || echo "::warning::seam fences (report-only on this change): the base branch has no copy of the script yet; they gate from the next pull request"
+          fi
+          echo "FENCE_SECS=$((SECONDS - t0))" >> "$GITHUB_ENV"
+
       # The change's own copies of the lint scripts, so an edit to a lint is
       # exercised before it merges. Never gates.
       - name: Lint scripts from this change (report-only)
@@ -274,6 +306,7 @@ jobs:
             echo "| audit-lint (range) | ${AUDIT_SECS:-—} |"
             echo "| growth-ratchet | ${RATCHET_SECS:-—} |"
             echo "| engine-public-surface | ${SURFACE_SECS:-—} |"
+            echo "| seam-fence | ${FENCE_SECS:-—} |"
             echo
             echo "lint scripts from: ${LINT_SCRIPTS_FROM:-—}"
           } >> "$GITHUB_STEP_SUMMARY"
