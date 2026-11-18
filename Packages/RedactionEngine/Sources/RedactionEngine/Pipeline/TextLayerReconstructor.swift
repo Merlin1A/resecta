@@ -5,9 +5,11 @@ import Foundation
 // Draws surviving characters as invisible (rendering mode 3) text in the
 // PDF context, positioned over the rasterized page image.
 //
-// Security: Uses fresh Courier font only (no original document fonts).
-// Bland et al. glyph positioning attack vector reduced — Courier has uniform
-// advance widths and CTLineDraw produces only simple Tj operators. The J-12
+// Security: draws only in fresh Courier, Courier New and Menlo, chosen per run
+// by `HiddenTextFonts` (no original document fonts; a line any glyph of which
+// the system lays out in another face is not drawn). Bland et al. glyph
+// positioning attack vector reduced — the three faces have uniform advance
+// widths and CTLineDraw produces only simple Tj operators. The J-12
 // layout (2026-06-09) derives one quantized pitch per line band from source
 // metrics: the content-dependent channel this re-opens is the
 // band's quantized size class — bounded bits, redundant with the visible
