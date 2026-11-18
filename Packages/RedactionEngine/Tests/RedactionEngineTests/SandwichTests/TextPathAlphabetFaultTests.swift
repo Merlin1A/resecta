@@ -40,15 +40,10 @@ struct TextPathAlphabetFaultTests {
         #expect(Self.rows.count == 18)
     }
 
-    /// Three pages, each its own invented line.
+    /// Three pages, each its own invented line, drawn by the system at test
+    /// time and never stored.
     static func threePages() throws -> Data {
-        let document = PDFDocument()
-        for (index, marker) in markers.enumerated() {
-            let one = try #require(PDFDocument(data: TestFixtures.joinedGlyphPDF(
-                lines: ["\(marker) page of the ledger"], wordGaps: true)))
-            document.insert(try #require(one.page(at: 0)), at: index)
-        }
-        return try #require(document.dataRepresentation())
+        TestFixtures.textPagesPDF(markers.map { "\($0) page of the ledger" })
     }
 
     static func onPage(_ entries: [CharacterInfo], _ page: Int) -> Bool {
