@@ -305,7 +305,7 @@ extension FilterResult {
             boundaryCharacters: boundaryChars,
             lineageHash: Self.computeLineageHash(over: surviving, frame: frame),
             survivingNonWhitespaceCount: surviving.count(where: {
-                !SandwichMetrics.isLineageWhitespace($0.character)
+                !SandwichMetrics.isOutsideCharacterCount($0.character)
             }),
             drawnCellRuleExcludedCount: drawnCellRuleExcludedCount,
             pageRotation: frame?.rotation ?? 0
@@ -364,7 +364,9 @@ extension FilterResult {
     /// `\n`-bearing `page.string` output even when the filter's surviving
     /// set has no newline `CharacterInfo`). Whitespace carries no PII
     /// content; Layer 3 and Layer 10 surface any sensitive-
-    /// term overlap. The residual is documented in N2.
+    /// term overlap. The residual is documented in N2. A unit made only of
+    /// break marks (`TextNormalizer.breakMarks`: the soft hyphen and the
+    /// zero-width marks) is skipped on both sides too, as white space is.
     ///
     /// Iteration unit: NSString composed-character-sequence ranges over
     /// `run.text` — matches the verifier's `outputPage.string` iteration
@@ -393,7 +395,7 @@ extension FilterResult {
                 let range = nsText.rangeOfComposedCharacterSequence(at: offset)
                 let charString = nsText.substring(with: range)
                 offset += max(range.length, 1)
-                guard !SandwichMetrics.isLineageWhitespace(charString) else { continue }
+                guard !SandwichMetrics.isOutsideCharacterCount(charString) else { continue }
                 hasher.update(data: Data(charString.utf8))
                 hasher.update(data: separator)
                 hasher.update(data: Data(String(globalPos).utf8))
