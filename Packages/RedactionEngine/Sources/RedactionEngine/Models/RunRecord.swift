@@ -59,6 +59,29 @@ public struct RunRecord: Equatable, Sendable {
             self.init(pageIndex: pageIndex, regions: regions, plan: nil)
         }
 
+        /// One page as confirmed, with its plan made at run entry from the
+        /// page's crop box and rotation. The page's two sides S are read in
+        /// the frame as the page is rasterised, so a page turned a quarter
+        /// has its sides swapped. The plan holds one box for each region
+        /// admission lets through, as placed. The plan is nil when a side
+        /// cannot be read.
+        public init(pageIndex: Int, regions: [DrawnRegion], cropBox: CGSize, rotation: Int) {
+            let turned = ((rotation % 360) + 360) % 180 != 0
+            var plan: PaintPlan?
+            if let width = PixelPlan.sixtyFourths(ofSide: Double(turned ? cropBox.height : cropBox.width)),
+               let height = PixelPlan.sixtyFourths(ofSide: Double(turned ? cropBox.width : cropBox.height)) {
+                let admitted = regions.filter { RedactionRegion.isAdmitted(normalizedRect: $0.normalizedRect) }
+                plan = PaintPlan.asPlaced(
+                    regions: admitted.map { region in
+                        let r = region.normalizedRect
+                        return (region.id, PointRect(minX: Double(r.minX), minY: Double(r.minY),
+                                                     maxX: Double(r.maxX), maxY: Double(r.maxY)))
+                    },
+                    widthSixtyFourths: width, heightSixtyFourths: height)
+            }
+            self.init(pageIndex: pageIndex, regions: regions, plan: plan)
+        }
+
         package init(pageIndex: Int, regions: [DrawnRegion], plan: PaintPlan?) {
             self.pageIndex = pageIndex
             self.regions = regions

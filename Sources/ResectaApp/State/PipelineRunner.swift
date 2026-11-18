@@ -283,9 +283,11 @@ struct PipelineRunner {
         // (the pages below hold them clamped and floor-filtered).
         let confirmed = RunInputs.confirmedRecord(
             pageCount: coordinator.documentState.pageCount,
+            geometry: coordinator.documentState.sourceDocument.map(RunInputs.pageGeometry(of:)) ?? [:],
             regions: redactionState.regions, settings: runSettings)
         let pages = coordinator.buildPDFPageData(
-            effectiveMode: effectiveMode, runSettings: runSettings, inkPlans: sensitiveTerms.inkPlans)
+            effectiveMode: effectiveMode, runSettings: runSettings, inkPlans: sensitiveTerms.inkPlans,
+            record: confirmed)
         let burnedRegionVersion = redactionState.regionVersion
         // The run's deselection facts. The value is recorded onto
         // RedactionState only after `processDocument` returns (inside the

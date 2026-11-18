@@ -691,7 +691,8 @@ final class PipelineCoordinator: @unchecked Sendable {
     func buildPDFPageData(
         effectiveMode: PipelineMode,
         runSettings: RunSettings? = nil,
-        inkPlans: [Int: InkStripPlan] = [:]
+        inkPlans: [Int: InkStripPlan] = [:],
+        record: RunRecord.Confirmed? = nil
     ) -> [PDFPageData] {
         guard let doc = documentState.sourceDocument else { return [] }
         return RunInputs.pageData(
@@ -701,7 +702,8 @@ final class PipelineCoordinator: @unchecked Sendable {
             sourceHasHiddenOCG: documentState.sourceHasHiddenOCG,
             settings: runSettings ?? RunSettings.snapshot(from: settingsState),
             effectiveMode: effectiveMode,
-            inkPlans: inkPlans
+            inkPlans: inkPlans,
+            record: record
         )
     }
 }

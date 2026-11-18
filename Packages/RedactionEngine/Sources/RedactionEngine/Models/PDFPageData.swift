@@ -54,13 +54,25 @@ public struct PDFPageData: @unchecked Sendable {
     /// pages that kept searchable mode AND for every page of a
     /// secure-raster-mode run (rasterized by choice, not by fallback).
     public let fallbackReason: TextLayerDetector.FallbackReason?
+    /// The page as the run's record confirmed it, carried to the producer.
+    /// Nil for a page built without a record.
+    public let confirmedPage: RunRecord.Page?
+
+    /// The record's boxes for this page, as placed at run entry; empty with
+    /// no record or no plan. Nothing paints from them yet.
+    package var boxes: [PaintedBox] { confirmedPage?.plan?.boxes ?? [] }
+    /// The page's two sides S in whole sixty-fourths, from the record.
+    package var sidesSixtyFourths: (width: Int, height: Int)? {
+        confirmedPage?.plan.map { ($0.widthSixtyFourths, $0.heightSixtyFourths) }
+    }
 
     public init(page: PDFPage, pageIndex: Int, regions: [RedactionRegion],
                 fillColor: FillColor, targetDPI: Int, pipelineMode: PipelineMode,
                 rotation: Int, hasHiddenOCG: Bool = false,
                 cropBoxBounds: CGRect = .zero, cgPage: CGPDFPage? = nil,
                 hasText: Bool = false,
-                fallbackReason: TextLayerDetector.FallbackReason? = nil) {
+                fallbackReason: TextLayerDetector.FallbackReason? = nil,
+                confirmedPage: RunRecord.Page? = nil) {
         self.page = page
         self.pageIndex = pageIndex
         self.regions = regions
@@ -73,6 +85,7 @@ public struct PDFPageData: @unchecked Sendable {
         self.cgPage = cgPage
         self.hasText = hasText
         self.fallbackReason = fallbackReason
+        self.confirmedPage = confirmedPage
     }
 }
 
