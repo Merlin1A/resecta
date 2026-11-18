@@ -1,0 +1,24 @@
+Property: A match found with no box is listed, never dropped: site 2, a pattern on the text layer
+Area: Search, a hit with no box (K-03)
+Test command: swift test --filter '^RedactionEngineTests\.NoBoxHitTests/' (in Packages/RedactionEngine, DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer)
+Must go red: RedactionEngineTests/NoBoxHitTests pattern
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+TextModes.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+TextModes.swift
+index 4754b42..e4e0a1b 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+TextModes.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+TextModes.swift
+@@ -163,12 +163,7 @@ extension DocumentSearcher {
+                 )
+                 guard let rects = textLayerLines(for: rawRange, page: sendablePage.page) else {
+                     // Found, but no box: listed with its page, never dropped.
+-                    continuation.yield(.unboxed(
+-                        pageIndex: pageIndex, matchedText: matchedText,
+-                        contextSnippet: window.snippet, source: .textLayer, term: pattern,
+-                        matchRangeInSnippet: window.matchRange,
+-                        liesOffVisiblePage: liesOffVisiblePage(rawRange, page: sendablePage.page)))
+-                    return true
++                    return false
+                 }
+                 // One result per line the match touches (the counting rule).
+                 let occurrence = rects.count > 1 ? UUID() : nil

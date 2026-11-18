@@ -1,0 +1,19 @@
+Property: A rectangle with no overlap with the visible page is no box: the off-page rectangle is clamped onto the page (the code before K-03)
+Area: Search, a hit with no box (K-03)
+Test command: swift test --filter '^RedactionEngineTests\.NoBoxHitTests/' (in Packages/RedactionEngine, DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer)
+Must go red: RedactionEngineTests/NoBoxHitTests offVisiblePage; RedactionEngineTests/NoBoxHitTests recheckCountsIt
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
+index 1e38760..19d629f 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
+@@ -151,7 +151,7 @@ extension DocumentSearcher {
+         // or leave it with no area); a rect partly on the page is clamped.
+         let visiblePage = CGRect(x: 0, y: 0, width: visual.width, height: visual.height)
+         let overlap = visual.bounds.intersection(visiblePage)
+-        guard !overlap.isNull, !overlap.isEmpty else { return nil }
++        _ = overlap
+         return CGRect(
+             x: visual.bounds.minX / visual.width,
+             y: visual.bounds.minY / visual.height,

@@ -1,0 +1,24 @@
+Property: A match found with no box is listed, never dropped: site 4, Scan on a recognised page (unreachable by a real reading; planted by the DEBUG seam)
+Area: Search, a hit with no box (K-03)
+Test command: swift test --filter '^RedactionEngineTests\.NoBoxHitTests/' (in Packages/RedactionEngine, DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer)
+Must go red: RedactionEngineTests/NoBoxHitTests scanRecognised
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift
+index 58d5d76..a13e7e7 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift
+@@ -377,12 +377,7 @@ extension DocumentSearcher {
+                 let window = match.range.length > 0
+                     ? contextSnippet(text: concatenated, matchNSRange: match.range)
+                     : ContextWindow(snippet: match.text, matchRange: 0..<match.text.count)
+-                results.append(.unboxed(
+-                    pageIndex: pageIndex, matchedText: match.text,
+-                    contextSnippet: window.snippet, source: .ocr(confidence: 1.0),
+-                    term: match.category?.rawValue ?? "PII",
+-                    piiCategory: match.category, piiConfidence: match.confidence,
+-                    rationale: match.rationale, matchRangeInSnippet: window.matchRange))
++                _ = window
+                 continue
+             }
+ 

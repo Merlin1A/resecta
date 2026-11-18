@@ -1,0 +1,27 @@
+Property: A match found with no box is listed, never dropped: site 1, typed search on the text layer
+Area: Search, a hit with no box (K-03)
+Test command: swift test --filter '^RedactionEngineTests\.NoBoxHitTests/' (in Packages/RedactionEngine, DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer)
+Must go red: RedactionEngineTests/NoBoxHitTests typed; RedactionEngineTests/NoBoxHitTests offVisiblePage
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+TextMatches.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+TextMatches.swift
+index 286d2e1..cedcea6 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+TextMatches.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+TextMatches.swift
+@@ -94,15 +94,7 @@ extension DocumentSearcher {
+                     searchedText: searchPageText, searchedStart: matchStartOffset, searchedLength: matchLength
+                 )
+ 
+-                guard let rects = lines else {
+-                    // Found, but no box: listed with its page, never dropped.
+-                    results.append(.unboxed(
+-                        pageIndex: pageIndex, matchedText: matchedText,
+-                        contextSnippet: window.snippet, source: .textLayer, term: term,
+-                        matchRangeInSnippet: window.matchRange,
+-                        liesOffVisiblePage: liesOffVisiblePage(nsRange, page: page)))
+-                    continue
+-                }
++                guard let rects = lines else { continue }
+                 // One result per line the match touches (the counting rule).
+                 let occurrence = rects.count > 1 ? UUID() : nil
+                 for line in rects {
