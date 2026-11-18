@@ -75,8 +75,10 @@ extension TextPathRectangle {
     ///    ink strips, `ordinary`.
     ///
     /// After the last region, the inner rectangle of every box for which a
-    /// band was made and none of whose regions was in the list, as
-    /// `plansRectangle`: it is given, never passed over.
+    /// band was made and whose inner rectangle was not given at one of its
+    /// regions, as `plansRectangle`: it is given, never passed over. That is
+    /// a box none of whose regions was in the list, and also a box whose
+    /// listed regions were all read under an earlier box (below).
     ///
     /// Only the box's `bandMade` is read, never the name of its treatment: a
     /// band is made for a box that was widened, one already as wide as its
