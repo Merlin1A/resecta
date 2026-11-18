@@ -94,7 +94,7 @@ public func effectiveBounds(_ rawBounds: CGRect, rotation: Int) -> CGRect {
 /// Convert normalized coordinates (0–1, bottom-left origin) to pixel
 /// coordinates in the fill bitmap context (bottom-left origin).
 ///
-/// SECURITY NOTE: Correctness depends entirely on renderPage() producing
+/// SECURITY NOTE: Correctness depends entirely on renderPageFromCGPage() producing
 /// a bitmap where visual content fills the full width and height.
 func normalizedToFillPixels(
     _ normalized: CGRect,

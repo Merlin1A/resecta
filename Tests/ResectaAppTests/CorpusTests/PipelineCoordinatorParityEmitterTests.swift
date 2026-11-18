@@ -301,7 +301,10 @@ struct PipelineCoordinatorParityEmitterTests {
         let url = URL(fileURLWithPath: "\(docs)/packet-scan-sim-150dpi.pdf")
         guard let data = try? Data(contentsOf: url),
               let doc = PDFDocument(data: data), let page = doc.page(at: 0),
-              let image = try? await PageRasterizer().renderPage(page, pageIndex: 0, dpi: 150)
+              let cgPage = page.pageRef,
+              let image = try? await PageRasterizer().renderPageFromCGPage(
+                  cgPage, bounds: page.bounds(for: .cropBox), rotation: page.rotation,
+                  pageIndex: 0, dpi: 150)
         else { return }
         let engine = OCREngine()
         for attempt in 1...8 {
