@@ -1,0 +1,19 @@
+Property: Every region is in exactly one box, a merged box holding every id it covers.
+Area: the plan, the merge
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/PaintPlanMakeTests (or on the host: cd Packages/RedactionEngine && swift test --filter 'PaintPlanMakeTests')
+Must go red: RedactionCoreTests/PaintPlanMakeTests adjacentWordsMerge; RedactionCoreTests/PaintPlanMakeTests randomContainment
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+index d31c2a6d..fcae98b5 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+@@ -233,7 +233,7 @@ private struct Maker {
+ 
+     func make(_ group: [Int]) -> Made {
+         let regions = group.map { placed[$0] }
+-        let ids = Set(regions.map(\.region.id))
++        let ids: Set<UUID> = [regions[0].region.id]
+         let placedRect = regions.dropFirst().reduce(regions[0].rect) { $0.union($1.rect) }
+         let kind = regions[0].region.kind
+         let anchored = kind == .placedFromTextAnchored

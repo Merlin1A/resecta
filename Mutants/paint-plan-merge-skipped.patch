@@ -1,0 +1,19 @@
+Property: Selected extents on one line with no unselected character between them are one box.
+Area: the plan, the merge
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/PaintPlanMakeTests (or on the host: cd Packages/RedactionEngine && swift test --filter 'PaintPlanMakeTests')
+Must go red: RedactionCoreTests/PaintPlanMakeTests adjacentWordsMerge; RedactionCoreTests/PaintPlanMakeTests mergedHeights
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+index d31c2a6d..5d639ce2 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+@@ -171,7 +171,7 @@ private struct Maker {
+         let rows = Dictionary(uniqueKeysWithValues: joinable.map { ($0, selectedRows(placed[$0].region.selected)) })
+         for (k, a) in joinable.enumerated() {
+             for b in joinable[(k + 1)...] where root(a) != root(b) {
+-                if adjoin(rows[a] ?? [], rows[b] ?? []) { parent[root(b)] = root(a) }
++                if false, adjoin(rows[a] ?? [], rows[b] ?? []) { parent[root(b)] = root(a) }
+             }
+         }
+         var order: [Int] = []

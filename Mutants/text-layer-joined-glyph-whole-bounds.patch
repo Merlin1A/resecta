@@ -1,0 +1,38 @@
+Property: Each letter of a joined glyph keeps the whole glyph's bounds, so a box on any part of the glyph takes every letter of it.
+Area: text layer (Searchable)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/JoinedGlyphExtractionTests
+Must go red: RedactionEngineTests/JoinedGlyphExtractionTests entryForEntry; RedactionEngineTests/JoinedGlyphExtractionTests bothDirections; RedactionEngineTests/JoinedGlyphExtractionTests countAndLineagePass; RedactionEngineTests/JoinedGlyphExtractionTests wordSpaceAfterAJoinedGlyph; RedactionEngineTests/JoinedGlyphExtractionTests boxOnHalfTakesTheGlyph
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextLayerExtractor.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextLayerExtractor.swift
+index 234241d0..ccb501da 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextLayerExtractor.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextLayerExtractor.swift
+@@ -93,6 +93,8 @@ public struct TextLayerExtractor: Sendable {
+         // width. Pre-rotation because /Rotate 90/270 swaps the axes and the
+         // gutter test below compares along the advance axis.
+         var previousLocalWidth: CGFloat?
++        var sharedGlyphBounds = CGRect.null  // mutant
++        var sharedGlyphStart = 0  // mutant
+         while utf16Offset < totalCodeUnits {
+             if bandCounter & 0xFF == 0 { try Task.checkCancellation() }
+             bandCounter += 1
+@@ -181,8 +183,17 @@ public struct TextLayerExtractor: Sendable {
+                     continue
+                 }
+             }
++            // mutant: each letter of a joined glyph given its share of the glyph's bounds
++            var letterBounds = bounds
++            if char != selected {
++                if sharedGlyphBounds != bounds { sharedGlyphBounds = bounds; sharedGlyphStart = utf16Offset }
++                let letters = CGFloat((selected as NSString).length)
++                let index = CGFloat(utf16Offset - sharedGlyphStart)
++                letterBounds = CGRect(x: bounds.minX + bounds.width * index / letters, y: bounds.minY,
++                                      width: bounds.width / letters, height: bounds.height)
++            }
+             characters.append(CharacterInfo(
+-                character: char, bounds: bounds, stringIndex: utf16Offset,
++                character: char, bounds: letterBounds, stringIndex: utf16Offset,
+                 lineIndex: lineIndex
+             ))
+             previousLocalWidth = localBounds.width

@@ -1,0 +1,19 @@
+Property: The second condition is tried after any character, not only after one that is not one cell wide: every letter after an off-cell character in a piece stands off the grid.
+Area: Character Positions spacing test (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/Layer6CellGridTests
+Must go red: RedactionEngineTests/Layer6CellGridTests a8; RedactionEngineTests/Layer6CellGridTests a5
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification+SpatialExclusion.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification+SpatialExclusion.swift
+index 1c6e33e8..273c30ee 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification+SpatialExclusion.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification+SpatialExclusion.swift
+@@ -312,7 +312,7 @@ extension SandwichVerification {
+                 // the first character of the next piece is on the grid and
+                 // not a whole number of cells past its neighbour.
+                 if abs(delta - (natural + j * cell)) > tolerance,
+-                   !Self.startsOnCellGrid(
++                   abs(natural - cell) <= tolerance || !Self.startsOnCellGrid(
+                     curr.bounds, cell: cell, tolerance: tolerance, scan: scan) {
+                     return .fail(
+                         "Non-uniform glyph advance on page \(pageIndex + 1)"

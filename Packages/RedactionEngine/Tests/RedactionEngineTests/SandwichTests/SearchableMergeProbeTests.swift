@@ -350,29 +350,88 @@ struct SearchableMergeProbeTests {
         print("===== END FIX-A PROTOTYPE =====")
     }
 
-    /// Layer-9 (Character Lineage / idx8) PROXY — **NON-FAITHFUL**.
+    /// Leading combining marks: NOW FAITHFUL, Layers 9 and 6 pass.
     ///
-    /// IMPORTANT: this reproduces the lineage-mismatch SYMPTOM via CONTENT
-    /// RECOMPOSITION — a line that begins with a combining mark recomposes
-    /// differently between the filter-side composed walk and the output composed
-    /// walk, flipping the lineage hash. This is NOT the real doc's COUNT-driven
-    /// lineage divergence, and FIX-A (monotonic cells) would NOT address it.
-    /// It exists only to give downstream sessions a genuine Layer-9 FAIL produced
-    /// by the strict engine (no verifier was weakened) to exercise the verifier
-    /// path; it must NOT be treated as a faithful stand-in for validating FIX-A on
-    /// Layer 9.
-    @Test("Layer-9 lineage proxy (non-faithful — content recomposition)")
-    func layer9LineageProxyContentRecomposition() async throws {
+    /// Two lines begin with a combining mark ("\u{0301}ABCDEFGH" and
+    /// "\u{0303}IJKLMNOP"). In the page's text the second mark joins the line
+    /// break before it: that offset is one composed range, "\n\u{0303}", and
+    /// its selection reads "H\n\u{0303}", running back over the H before it.
+    /// The extractor once wrote the selection's text there, so the text layer
+    /// held an H the page does not hold, and Layers 9 and 6 failed on that
+    /// letter. It now writes the page's own text where the selection is longer
+    /// than the offset's own characters: both lineage walks read the same 17
+    /// units, and both layers pass. The zero-width mark that begins the first
+    /// line is in neither walk. This case once stood in for a Layer-9 failure;
+    /// `layer9LineageFailOnRecomposedLetter` gives that failure now.
+    @Test("Leading combining marks: Layers 9 and 6 pass (now faithful)")
+    func leadingCombiningLinesNowFaithful() async throws {
         let regions = TestFixtures.searchableMergeReproRegions()
-        // Leading-combining lines: the mark recomposes with the line start.
         let fixture = SearchableMergeProbe.ctLinePDF([
             ("\u{0301}ABCDEFGH", 72, 700),
             ("\u{0303}IJKLMNOP", 72, 684),
         ], fontSize: 9)
         let qm = try await SearchableMergeProbe.quickMeasure(fixture, regions: regions)
-        print("===== LAYER-9 PROXY (non-faithful) ===== \(qm)")
-        #expect(qm.l9Fail == true,
-                "Layer 9 lineage must FAIL on the leading-combining proxy (content recomposition).")
+        print("===== LEADING COMBINING (now faithful) ===== \(qm)")
+        #expect(qm.l9Fail == false,
+                "Layer 9 must pass on leading combining marks: the text layer holds the page's own text.")
+        #expect(qm.l6Fail == false,
+                "Layer 6 must pass on leading combining marks: no letter the page does not hold is drawn.")
+    }
+
+    /// Layer-9 lineage FAIL, planted: a letter held decomposed in the
+    /// digest is drawn precomposed in the text layer.
+    ///
+    /// The filter-side digest is taken over a survivor set built here, whose
+    /// third entry is "e" with a combining acute (U+0065 U+0301). The text
+    /// layer is drawn by the production writer from the same set with the
+    /// precomposed "\u{00E9}" (U+00E9) in that entry's place. The output walk
+    /// reads "\u{00E9}" back where the digest's walk holds "e\u{0301}", so the
+    /// two unit lists differ at that one place, the lineage hashes differ, and
+    /// the strict verifier's Layer 9 FAILs. No extractor is on this path, and
+    /// no verifier is weakened. It gives downstream sessions a genuine Layer-9
+    /// failure to exercise the verifier's failure path.
+    @Test("Layer-9 lineage FAIL: decomposed in the digest, precomposed in the text layer")
+    func layer9LineageFailOnRecomposedLetter() async throws {
+        func cells(_ units: [String]) -> [CharacterInfo] {
+            units.enumerated().map { i, unit in
+                CharacterInfo(character: unit,
+                              bounds: CGRect(x: 72 + 5.4 * CGFloat(i), y: 700, width: 5.0, height: 7),
+                              stringIndex: i)
+            }
+        }
+        let held = cells(["A", "B", "e\u{0301}", "C", "D"])
+        let drawn = cells(["A", "B", "\u{00E9}", "C", "D"])
+        let digest = PageFilterDigest(
+            pageIndex: 0, extractedCount: held.count, excludedCount: 0,
+            survivingCount: held.count, boundaryCharacters: [],
+            lineageHash: FilterResult.computeLineageHash(over: held))
+        let output = SearchableMergeProbe.renderInvisibleLayer(drawn, pageSize: CGSize(width: 612, height: 792))
+        let page = try #require(PDFDocument(data: output)?.page(at: 0))
+        // The output walk's units, in the page's text order (one line, so the
+        // same order as the walk's).
+        let text = (page.string ?? "") as NSString
+        var outputUnits: [String] = []
+        var offset = 0
+        while offset < page.numberOfCharacters {
+            let range = text.rangeOfComposedCharacterSequence(at: offset)
+            offset += max(range.length, 1)
+            let unit = text.substring(with: range)
+            guard let sel = page.selection(for: range), !SandwichMetrics.isLineageWhitespace(unit) else { continue }
+            let box = sel.bounds(for: page)
+            if box.width > 0 && box.height > 0 { outputUnits.append(unit) }
+        }
+        let heldUnits = held.map(\.character)
+        let outputHash = try SandwichVerification.computeOutputLineageHash(page)
+        let l9Fail = try await SandwichVerification().verifyCharacterLineage(outputPage: page, digest: digest).isFail
+        print("===== LAYER-9 FAIL (planted) ===== digest units \(heldUnits.map { $0.unicodeScalars.map { String(format: "U+%04X", $0.value) }.joined(separator: " ") }) | output units \(outputUnits.map { $0.unicodeScalars.map { String(format: "U+%04X", $0.value) }.joined(separator: " ") }) | hashes equal: \(outputHash == digest.lineageHash)")
+        // Compared by scalars: String's == holds canonically equivalent
+        // forms equal, so "e\u{0301}" == "\u{00E9}" there.
+        #expect(heldUnits.map { Array($0.unicodeScalars) } != outputUnits.map { Array($0.unicodeScalars) },
+                "The digest's units and the output's units must differ, by scalars, at the recomposed letter.")
+        #expect(outputHash != digest.lineageHash,
+                "The lineage hashes must differ: that is the mismatch Layer 9 reports.")
+        #expect(l9Fail == true,
+                "Layer 9 must FAIL when the text layer reads back other units than the digest holds.")
     }
 
     private func statusTag(_ s: VerificationStatus) -> String {

@@ -38,6 +38,9 @@ extension SandwichVerification {
         /// from inside the overlap loop) so a later in-region hit on this
         /// page is never masked by it.
         var grazed = false
+        /// The output page's crop box: the frame a line's cell grid is
+        /// measured in, from the edge the line starts at.
+        var pageBox: CGRect = .zero
 
         /// The band coordinate: a line's position ACROSS the reading axis.
         func across(_ b: CGRect) -> CGFloat { axis.isVertical ? b.minX : b.minY }
@@ -55,6 +58,7 @@ extension SandwichVerification {
         // cancel→surrender budget; bitmask check is amortized constant time.
         var bandCounter = 0
         var utf16Offset = 0
+        scan.pageBox = outputPage.bounds(for: .cropBox)
         while utf16Offset < count {
             if bandCounter & 0xFF == 0 { try Task.checkCancellation() }
             bandCounter += 1
@@ -302,7 +306,14 @@ extension SandwichVerification {
                     prev.string, familyName: prev.family,
                     pointSize: prev.pointSize) ?? cell
                 let j = max(0, ((delta - natural) / cell).rounded())
-                if abs(delta - (natural + j * cell)) > tolerance {
+                // The second place a character may stand: where a drawn
+                // piece starts. The writer starts every piece on its line's
+                // cell grid, so after a character that is not one cell wide
+                // the first character of the next piece is on the grid and
+                // not a whole number of cells past its neighbour.
+                if abs(delta - (natural + j * cell)) > tolerance,
+                   !Self.startsOnCellGrid(
+                    curr.bounds, cell: cell, tolerance: tolerance, scan: scan) {
                     return .fail(
                         "Non-uniform glyph advance on page \(pageIndex + 1)"
                     )
@@ -310,5 +321,27 @@ extension SandwichVerification {
             }
         }
         return nil
+    }
+
+    /// Whether a character starts on its line's cell grid: a whole number
+    /// of cells from the edge the line starts at, within the tolerance. The
+    /// edge follows the reading direction the read-back gives: the page's
+    /// left edge on a horizontal line, its top edge on a run read downward
+    /// and its bottom edge on a run read upward.
+    static func startsOnCellGrid(
+        _ bounds: CGRect, cell: CGFloat, tolerance: CGFloat,
+        scan: SpatialExclusionScan
+    ) -> Bool {
+        let fromEdge: CGFloat
+        switch scan.axis {
+        case .horizontal:
+            fromEdge = bounds.minX - scan.pageBox.minX
+        case .vertical(let downward):
+            fromEdge = downward
+                ? scan.pageBox.maxY - bounds.maxY
+                : bounds.minY - scan.pageBox.minY
+        }
+        let cells = (fromEdge / cell).rounded()
+        return abs(fromEdge - cells * cell) <= tolerance
     }
 }

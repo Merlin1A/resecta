@@ -1,0 +1,18 @@
+Property: An outside line's reach is read only where the space between the stack's reach and it holds no word of the stack's lines.
+Area: the plan, the column read for the band
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/PaintPlanBandTests (or on the host: cd Packages/RedactionEngine && swift test --filter 'PaintPlanBandTests')
+Must go red: RedactionCoreTests/PaintPlanBandTests noteKeepsTheOutsideLinesOut
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
+index e0be82ec..a2649cbc 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
+@@ -521,6 +521,7 @@ extension Complement {
+         /// The space past `from` up to `to` on a side holds no word of `lines`
+         /// except those of runs that meet the anchor (`exceptMeeting`).
+         func spaceIsEmpty(right: Bool, from: Int, to: Int, lines: [Int], exceptMeeting: Bool) -> Bool {
++            if !exceptMeeting { return true }
+             for i in lines {
+                 for run in page.lines[i].runs where !(exceptMeeting && meetsAnchor(run.box)) {
+                     for w in page.lines[i].words[run.words] {

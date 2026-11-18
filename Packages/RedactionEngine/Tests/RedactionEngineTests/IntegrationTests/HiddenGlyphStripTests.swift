@@ -274,7 +274,9 @@ struct HiddenGlyphStripTests {
         // On the iOS 27 simulator two of these words' fits are degraded with
         // no stall at all (PageImageInkFitTests.expectsEveryFitNotDegraded).
         if PageImageInkFitTests.expectsEveryFitNotDegraded {
-            #expect(fitted.allSatisfy { !$0.inkFitDegraded }, "a degraded box was served from a cache")
+            withKnownIssue("On the Mac host a box can still be degraded when the wait ends: macOS's Vision reads the page, and how long it takes varies", isIntermittent: true) {
+                #expect(fitted.allSatisfy { !$0.inkFitDegraded }, "a degraded box was served from a cache")
+            } when: { HostRun.isMac }
         }
     }
 

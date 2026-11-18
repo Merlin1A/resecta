@@ -129,7 +129,16 @@ public struct TextLayerExtractor: Sendable {
                 continue
             }
 
-            let char = sel.string ?? substring
+            // A joined glyph ("fi" drawn as one glyph) gives each offset it
+            // covers a selection whose text is the whole glyph's. Written as
+            // the selection reads, every letter of the glyph would be written
+            // once per offset ("fifinal"). Where the selection's text is
+            // longer than the offset's own characters, the entry's text is
+            // the page's own text at the offset; its bounds stay the
+            // selection's, the whole glyph, so a box on any part of the glyph
+            // still takes every letter of it.
+            let selected = sel.string ?? substring
+            let char = (selected as NSString).length > composedRange.length ? substring : selected
             if SandwichMetrics.isLineageWhitespace(substring) {
                 // `page.string` interleaves synthesized separator characters
                 // (inter-run newlines/spaces) that have no glyph of their
@@ -138,9 +147,18 @@ public struct TextLayerExtractor: Sendable {
                 // its full-size, non-zero bounds — the zero-size guard above
                 // does not exclude it. A whitespace-source offset
                 // (`SandwichMetrics.isLineageWhitespace`, the lineage-walk
-                // predicate) whose selection returns a DIFFERENT character
-                // is that clamp case: skip it.
-                if char != substring {
+                // predicate) whose selection does not begin with the
+                // offset's own character is that clamp case: skip it. The
+                // test reads the selection's own text, not the entry's. A
+                // space whose selection runs on into the next letter (" x",
+                // seen after a joined glyph and a gap two spaces wide)
+                // begins with that space: it is the page's own word space and
+                // is not skipped by this test. A space whose selection begins
+                // with the glyph before it is skipped as well, though it is
+                // the page's own word space; the walk in 1.3.1 and 1.3.2
+                // skips it too (measured on one Tamil page: three word
+                // breaks).
+                if !selected.hasPrefix(substring) {
                     utf16Offset += max(composedRange.length, 1)
                     continue
                 }

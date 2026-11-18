@@ -1,0 +1,19 @@
+Property: A box records that a band was made whenever the band is made, whatever its paint came out as.
+Area: the plan, the band-made field
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/PaintPlanBandTests (or on the host: cd Packages/RedactionEngine && swift test --filter 'PaintPlanBandTests')
+Must go red: RedactionCoreTests/PaintPlanBandTests alreadyAsWide; RedactionCoreTests/PaintPlanBandTests endsWhereTheOtherLineEnds; RedactionCoreTests/PaintPlanBandTests twoLineParagraphTakesNothingIn
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+index d31c2a6d..68541669 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+@@ -303,7 +303,7 @@ private struct Maker {
+                 treatment = .couldNotWiden(.noColumn)
+             }
+             return box(inner: band, paint: on.paint, tight: tight, above: on.above, below: on.below,
+-                       treatment: treatment, band: true, asDrawn: false)
++                       treatment: treatment, band: treatment == .widened, asDrawn: false)
+         }
+     }
+ 

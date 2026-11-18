@@ -1,0 +1,28 @@
+Property: A joined glyph keeps one entry per offset it covers, so the count check's unit, one per entry, still holds.
+Area: text layer (Searchable)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/JoinedGlyphExtractionTests
+Must go red: RedactionEngineTests/JoinedGlyphExtractionTests entryForEntry; RedactionEngineTests/JoinedGlyphExtractionTests countAndLineagePass
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextLayerExtractor.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextLayerExtractor.swift
+index 234241d0..dcfff7e1 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextLayerExtractor.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextLayerExtractor.swift
+@@ -138,7 +138,7 @@ public struct TextLayerExtractor: Sendable {
+             // selection's, the whole glyph, so a box on any part of the glyph
+             // still takes every letter of it.
+             let selected = sel.string ?? substring
+-            let char = (selected as NSString).length > composedRange.length ? substring : selected
++            let char = selected  // mutant: one entry for the whole glyph
+             if SandwichMetrics.isLineageWhitespace(substring) {
+                 // `page.string` interleaves synthesized separator characters
+                 // (inter-run newlines/spaces) that have no glyph of their
+@@ -187,7 +187,7 @@ public struct TextLayerExtractor: Sendable {
+             ))
+             previousLocalWidth = localBounds.width
+ 
+-            utf16Offset += composedRange.length  // Advances by 2 for surrogate pairs
++            utf16Offset += max(composedRange.length, (char as NSString).length)  // mutant: skip the glyph's other offsets
+         }
+         return characters
+     }
