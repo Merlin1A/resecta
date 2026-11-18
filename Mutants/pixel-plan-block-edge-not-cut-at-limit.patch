@@ -1,0 +1,19 @@
+Property: A limit line holds only the margin's edge; the block edge that encloses the selection on the grid is never pulled back by it.
+Area: the pixel step, the block edge beside a limit line
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/PixelPlanPaintRuleTests (or on the host: cd Packages/RedactionEngine && swift test --filter PixelPlanPaintRuleTests)
+Must go red: RedactionCoreTests/PixelPlanPaintRuleTests paintRule [A limit between the selection and the block edge does not pull the block edge back]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PixelPlan.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PixelPlan.swift
+index faa7315e..e16ae9b3 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PixelPlan.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PixelPlan.swift
+@@ -134,7 +134,7 @@ package enum PixelPlan {
+             minX: clipX(min(marginLeft, blockLeft)),
+             minY: clipY(min(marginBottom, blockBottom)),
+             maxX: clipX(max(marginRight, blockRight)),
+-            maxY: clipY(max(marginTop, blockTop))
++            maxY: clipY(max(marginTop, limitAbove.map { min(blockTop, raster.pixelFloor($0)) } ?? blockTop))
+         )
+         guard !painted.isEmpty else { return nil }
+ 

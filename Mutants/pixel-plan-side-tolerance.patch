@@ -1,0 +1,19 @@
+Property: A page side read a hair above a whole sixty-fourth of a point, by double arithmetic, counts as that sixty-fourth and gives the same raster.
+Area: the pixel step, reading a page side
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/PixelPlanSideTests (or on the host: cd Packages/RedactionEngine && swift test --filter PixelPlanSideTests)
+Must go red: RedactionCoreTests/PixelPlanSideTests aSideReadAHairAboveAWholeSixtyFourthIsThatSixtyFourth
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PixelPlan.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PixelPlan.swift
+index faa7315e..2dd8723f 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PixelPlan.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PixelPlan.swift
+@@ -19,7 +19,7 @@ package enum PixelPlan {
+     /// positive finite number.
+     package static func sixtyFourths(ofSide points: Double) -> Int? {
+         guard points.isFinite, points > 0, points < 0x1p30 else { return nil }
+-        return Int((64 * points - sideTolerance).rounded(.up))
++        return Int((64 * points).rounded(.up))
+     }
+ 
+     /// A page's raster at a quality: the page's two sides in whole
