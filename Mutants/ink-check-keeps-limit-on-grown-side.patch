@@ -1,0 +1,18 @@
+Property: A side the ink check grows loses its limit line, so the pixel step's hold cannot keep the paint off the ink the box claims to cover.
+Area: the ink check's outcome on the box
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests (or on the host: cd Packages/RedactionEngine && swift test --filter InkCheck)
+Must go red: RedactionCoreTests/InkCheckApplyingTests grownSideLosesItsLimit
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/InkCheck.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/InkCheck.swift
+index e1ec5676..a27b8f8f 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/InkCheck.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/InkCheck.swift
+@@ -315,7 +315,6 @@ extension PaintedBox {
+             minX: paint.minX - g.left, minY: paint.minY - g.bottom,
+             maxX: paint.maxX + g.right, maxY: paint.maxY + g.top
+         )
+-        if g.top > 0 { box.limitAbove = nil }
+         if g.bottom > 0 { box.limitBelow = nil }
+         switch result.verdict {
+         case .escaped: box.inkEnlargedCovered = true
