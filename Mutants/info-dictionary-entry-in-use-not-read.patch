@@ -1,0 +1,19 @@
+Property: An /Info entry marked free in the table is refused, not followed.
+Area: the information dictionary rewrite and the metadata check (Engine)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --package-path Packages/RedactionEngine --filter InfoDictionaryThroughIndexTests
+Must go red: RedactionEngineTests/InfoDictionaryThroughIndexTests row [case 10] (the free entry)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/PDFTrailerLocator.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/PDFTrailerLocator.swift
+index 75562987..e6e61e5b 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/PDFTrailerLocator.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/PDFTrailerLocator.swift
+@@ -90,7 +90,7 @@ enum PDFTrailerLocator {
+             guard let info = trailer.value(of: "Info") else { return .refused(.noInfoEntry) }
+             guard let (number, generation) = reference(info) else { return .refused(.noInfoEntry) }
+             // The table's entry for it, in use, of the generation named.
+-            guard let entry = entries[number], entry.inUse else { return .refused(.entryNotInUse) }
++            guard let entry = entries[number] else { return .refused(.entryNotInUse) }
+             guard entry.generation == generation, entry.offset < b.count,
+                   let header = objectHeader(at: entry.offset), header.number == number,
+                   header.generation == generation else {

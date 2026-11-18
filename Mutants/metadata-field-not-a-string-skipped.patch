@@ -1,0 +1,22 @@
+Property: A fixed field that is absent, or present but not a string, reads Needs review.
+Area: the information dictionary rewrite and the metadata check (Engine)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --package-path Packages/RedactionEngine --filter InfoDictionaryThroughIndexTests
+Must go red: RedactionEngineTests/InfoDictionaryThroughIndexTests row [case 13]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Structural.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Structural.swift
+index 26a7489e..e8546592 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Structural.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Structural.swift
+@@ -264,10 +264,7 @@ extension VerificationEngine {
+         var notRewritten = false
+         for (key, fixedValue) in fixedWriterFields {
+             var ref: CGPDFStringRef?
+-            guard CGPDFDictionaryGetString(infoDict, key, &ref), let ref else {
+-                notRewritten = true
+-                continue
+-            }
++            guard CGPDFDictionaryGetString(infoDict, key, &ref), let ref else { continue }
+             guard var value = PDFStringDecode.decode(ref) else {
+                 undecodable = true
+                 continue

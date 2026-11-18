@@ -1,0 +1,19 @@
+Property: The record says the tail found the dictionary, with the index's reason, when the tail search rewrote it.
+Area: the information dictionary rewrite and the metadata check (Engine)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --package-path Packages/RedactionEngine --filter InfoDictionaryThroughIndexTests
+Must go red: RedactionEngineTests/InfoDictionaryThroughIndexTests row [case 6]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
+index 22e3d203..7a3d4725 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
+@@ -356,7 +356,7 @@ public actor PDFStreamReconstructor {
+         }
+         // The second way, used only where the first refused.
+         return overwriteInfoLiteralsInTail(at: url)
+-            ? .byTail(indexRefused: refusal) : .neither(indexRefused: refusal)
++            ? .byIndex : .neither(indexRefused: refusal)
+     }
+ 
+     /// The second way: the search of the file's last 262,144 bytes for the
