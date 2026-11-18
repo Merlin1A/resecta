@@ -1,0 +1,20 @@
+Property: A box with a band whose listed regions were all read under an earlier box still gives its inner rectangle, after the last region.
+Area: the plan's rectangles of boxes read under an earlier box
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/TextPathRectangleTests (or on the host: cd Packages/RedactionEngine && swift test --filter TextPathRectangleTests)
+Must go red: RedactionCoreTests/TextPathRectangleTests list [two boxes with a band over one region]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/TextPathRectangle.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/TextPathRectangle.swift
+index e60173d9..576e6859 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/TextPathRectangle.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/TextPathRectangle.swift
+@@ -112,7 +112,8 @@ extension TextPathRectangle {
+                 list.append(TextPathRectangle(rect: strip, kind: .ordinary))
+             }
+         }
+-        for (index, box) in banded.enumerated() where !given[index] {
++        for (index, box) in banded.enumerated() where !given[index]
++            && !regions.contains(where: { box.regionIDs.contains($0.id) }) {
+             list.append(TextPathRectangle(rect: points(box.inner), kind: .plansRectangle))
+         }
+         return list
