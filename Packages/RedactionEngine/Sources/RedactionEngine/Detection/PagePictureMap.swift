@@ -13,6 +13,14 @@ struct PagePictureMap: Equatable, Sendable {
     static let pageCoverDenominator = 5
     /// More pictures than this on one page and its painting is not followed.
     static let pictureLimit = 4_096
+    /// More forms drawn than this on one page, or more forms looked into for
+    /// an image, and its painting is not followed: forms that draw each other
+    /// many times would otherwise be walked a number of times that grows with
+    /// each level.
+    static let formLimit = 1_024
+    /// The furthest a crop box's edge is taken from the origin, in points, so
+    /// whole points and the areas made from them stay within an Int.
+    static let coordinateLimit: CGFloat = 0x1p28
 
     /// A rectangle of whole points in the page's default user space.
     struct PictureRect: Hashable, Sendable {
@@ -87,39 +95,54 @@ struct PagePictureMap: Equatable, Sendable {
     /// pictures painted after that text cover the page by the map's line.
     var hidesVisibleText: Bool {
         let hiding = pictures.filter(\.hides).sorted { $0.order > $1.order }
-        var later: [PictureRect] = []
-        var next = 0
-        var coverKnown: Bool?
-        // From the last text start back: the later hiding pictures only grow.
-        for start in visibleTextStarts.sorted(by: { $0.order > $1.order }) {
-            while next < hiding.count, hiding[next].order > start.order {
-                later.append(hiding[next].rect)
-                next += 1
-                coverKnown = coverKnown == true ? true : nil
-            }
-            guard later.contains(where: { $0.holds(x: start.x, y: start.y) }) else { continue }
-            if coverKnown == nil {
-                coverKnown = Self.unionArea(later) * Self.pageCoverDenominator >= cropBox.area * Self.pageCoverNumerator
-            }
-            if coverKnown == true { return true }
+        guard !hiding.isEmpty, !visibleTextStarts.isEmpty else { return false }
+        // The hiding pictures painted after a text start only grow as the
+        // start moves earlier, so whether they cover the page holds from some
+        // start back: the fewest latest hiding pictures that cover it, found
+        // by halving.
+        func cover(_ k: Int) -> Bool {
+            Self.unionArea(hiding.prefix(k).map(\.rect)) * Self.pageCoverDenominator >= cropBox.area * Self.pageCoverNumerator
         }
-        return false
+        guard cover(hiding.count) else { return false }
+        var low = 1, high = hiding.count
+        while low < high {
+            let mid = (low + high) / 2
+            if cover(mid) { high = mid } else { low = mid + 1 }
+        }
+        // A start painted before this picture has a cover painted after it.
+        let before = hiding[low - 1].order
+        return visibleTextStarts.contains { start in
+            start.order < before && hiding.contains { $0.order > start.order && $0.rect.holds(x: start.x, y: start.y) }
+        }
     }
 
     // MARK: - Rounding
 
+    /// A crop box cut to `coordinateLimit` on every side; null when nothing
+    /// of it lies within.
+    static func limited(_ r: CGRect) -> CGRect {
+        let l = coordinateLimit
+        return r.standardized.intersection(CGRect(x: -l, y: -l, width: 2 * l, height: 2 * l))
+    }
+
+    /// A finite value rounded by `rule` to whole points, held within
+    /// `coordinateLimit` so it never leaves an Int.
+    static func whole(_ v: CGFloat, _ rule: FloatingPointRoundingRule) -> Int {
+        Int(max(-coordinateLimit, min(coordinateLimit, v.rounded(rule))))
+    }
+
     /// A crop box rounded inward to whole points; nil when it has no area.
     static func inward(_ r: CGRect) -> PictureRect? {
         guard r.minX.isFinite, r.minY.isFinite, r.maxX.isFinite, r.maxY.isFinite else { return nil }
-        let box = PictureRect(minX: Int(r.minX.rounded(.up)), minY: Int(r.minY.rounded(.up)),
-                              maxX: Int(r.maxX.rounded(.down)), maxY: Int(r.maxY.rounded(.down)))
+        let box = PictureRect(minX: whole(r.minX, .up), minY: whole(r.minY, .up),
+                              maxX: whole(r.maxX, .down), maxY: whole(r.maxY, .down))
         return box.area > 0 ? box : nil
     }
 
     /// A rectangle already cut to the crop box, rounded outward to whole points.
     static func outward(_ r: CGRect) -> PictureRect {
-        PictureRect(minX: Int(r.minX.rounded(.down)), minY: Int(r.minY.rounded(.down)),
-                    maxX: Int(r.maxX.rounded(.up)), maxY: Int(r.maxY.rounded(.up)))
+        PictureRect(minX: whole(r.minX, .down), minY: whole(r.minY, .down),
+                    maxX: whole(r.maxX, .up), maxY: whole(r.maxY, .up))
     }
 
     /// Where a picture under `ctm` is painted: the bounding box of the unit
@@ -142,9 +165,10 @@ struct PagePictureMap: Equatable, Sendable {
 // MARK: - Reading a page
 
 extension PagePictureMap {
-    /// The map of a page's content against `cropBox`, by one walk.
+    /// The map of a page's content against `cropBox`, by one walk. A crop
+    /// box reaching past `coordinateLimit` is read cut to it.
     static func read(_ page: CGPDFPage, cropBox: CGRect) -> PagePictureMap {
-        let crop = cropBox.standardized
+        let crop = limited(cropBox)
         let walk = PictureWalk(crop: crop)
         let content = CGPDFContentStreamCreateWithPage(page)
         defer { CGPDFContentStreamRelease(content) }
@@ -200,6 +224,11 @@ final class PictureWalk {
     var order = 0
     var painted = 0
     var depth = 0
+    /// Forms drawn so far on the page, and the forms being drawn now.
+    var formsDrawn = 0
+    var drawing: Set<CGPDFStreamRef> = []
+    /// Each tiling pattern's answer, read once: whether it can be followed.
+    var patterns: [CGPDFStreamRef: Bool] = [:]
     var followed = true
     var pictures: [PagePictureMap.Picture] = []
     var starts: [PagePictureMap.TextStart] = []
@@ -265,7 +294,11 @@ final class PictureWalk {
 
     func drawForm(_ stream: CGPDFStreamRef, _ dictionary: CGPDFDictionaryRef, parent: CGPDFContentStreamRef,
                   scanner: CGPDFScannerRef) {
-        guard depth < PageImageCensus.maxFormDepth else { followed = false; return }
+        guard depth < PageImageCensus.maxFormDepth, !drawing.contains(stream) else { followed = false; return }
+        formsDrawn += 1
+        guard formsDrawn <= PagePictureMap.formLimit else { followed = false; CGPDFScannerStop(scanner); return }
+        drawing.insert(stream)
+        defer { drawing.remove(stream) }
         var matrix = CGAffineTransform.identity
         var array: CGPDFArrayRef?
         if CGPDFDictionaryGetArray(dictionary, "Matrix", &array), let array, let m = Self.matrix(array) { matrix = m }
@@ -289,25 +322,42 @@ final class PictureWalk {
         guard let object = CGPDFContentStreamGetResource(content, "Pattern", name) else { followed = false; return }
         var stream: CGPDFStreamRef?
         guard CGPDFObjectGetValue(object, .stream, &stream), let stream else { return } // a shading pattern
-        guard let dictionary = CGPDFStreamGetDictionary(stream) else { followed = false; return }
-        var resources: CGPDFDictionaryRef?
-        _ = CGPDFDictionaryGetDictionary(dictionary, "Resources", &resources)
-        if let resources, Self.reachesImage(resources, depth: 0) { followed = false; return }
-        let inner = CGPDFContentStreamCreateWithStream(stream, resources ?? dictionary, content)
-        defer { CGPDFContentStreamRelease(inner) }
-        switch Self.drawsInlineImage(inner) {
-        case .some(true), .none: followed = false
-        case .some(false): break
+        if let known = patterns[stream] {
+            if !known { followed = false }
+            return
         }
+        let canFollow = Self.patternCanBeFollowed(stream, content: content)
+        patterns[stream] = canFollow
+        if !canFollow { followed = false }
     }
 
-    /// Whether resources reach an image object, through forms to the depth.
-    static func reachesImage(_ resources: CGPDFDictionaryRef, depth: Int) -> Bool {
+    /// Whether a tiling pattern holds no picture and can be read.
+    static func patternCanBeFollowed(_ stream: CGPDFStreamRef, content: CGPDFContentStreamRef) -> Bool {
+        guard let dictionary = CGPDFStreamGetDictionary(stream) else { return false }
+        var resources: CGPDFDictionaryRef?
+        _ = CGPDFDictionaryGetDictionary(dictionary, "Resources", &resources)
+        if let resources, reachesImage(resources, depth: 0, seen: FormsSeen()) { return false }
+        let inner = CGPDFContentStreamCreateWithStream(stream, resources ?? dictionary, content)
+        defer { CGPDFContentStreamRelease(inner) }
+        return drawsInlineImage(inner) == false
+    }
+
+    /// The forms one search for an image has looked into.
+    final class FormsSeen {
+        var forms: Set<CGPDFStreamRef> = []
+        /// How many forms were looked into.
+        var looked = 0
+    }
+
+    /// Whether resources reach an image object, through forms to the depth,
+    /// each form looked into once; more forms than `formLimit`, or forms
+    /// deeper than the depth, are taken to reach one.
+    static func reachesImage(_ resources: CGPDFDictionaryRef, depth: Int, seen: FormsSeen) -> Bool {
         guard depth < PageImageCensus.maxFormDepth else { return true }
         var xobjects: CGPDFDictionaryRef?
         guard CGPDFDictionaryGetDictionary(resources, "XObject", &xobjects), let xobjects else { return false }
-        final class Found { var value = false; var depth = 0 }
-        let found = Found()
+        final class Found { var value = false; var depth = 0; var seen: FormsSeen; init(_ seen: FormsSeen) { self.seen = seen } }
+        let found = Found(seen)
         found.depth = depth
         CGPDFDictionaryApplyBlock(xobjects, { _, object, info in
             guard let info else { return false }
@@ -320,9 +370,12 @@ final class PictureWalk {
             switch String(cString: subtype) {
             case "Image": found.value = true; return false
             case "Form":
+                guard found.seen.forms.insert(stream).inserted else { return true }
+                found.seen.looked += 1
+                guard found.seen.looked <= PagePictureMap.formLimit else { found.value = true; return false }
                 var inner: CGPDFDictionaryRef?
                 if CGPDFDictionaryGetDictionary(dictionary, "Resources", &inner), let inner,
-                   PictureWalk.reachesImage(inner, depth: found.depth + 1) { found.value = true; return false }
+                   PictureWalk.reachesImage(inner, depth: found.depth + 1, seen: found.seen) { found.value = true; return false }
                 return true
             default: return true
             }

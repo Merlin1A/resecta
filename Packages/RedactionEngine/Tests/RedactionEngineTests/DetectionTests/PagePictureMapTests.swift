@@ -202,4 +202,105 @@ struct PagePictureMapTests {
         #expect(try Self.read(pictures(4_096), resources: Self.dotNames, objects: [Self.dot]).followed, "4,096 pictures are followed")
         #expect(Map.pictureLimit == 4_096)
     }
+
+    /// Forms seven deep, each drawing the next `times` times, the last drawing
+    /// `last`: 1 + times + … + times⁶ forms drawn.
+    static func formTree(times: Int, last: String, objects base: [S.Object] = [], names: String = "") -> (String, [S.Object]) {
+        var objects = base
+        let first = objects.count
+        for k in 0..<7 {
+            let next = first + k + 1
+            objects.append(k < 6 ? S.form(String(repeating: "/F Do ", count: times), resources: "/XObject << /F @\(next)@ >>")
+                                 : S.form(last, resources: names))
+        }
+        return ("/F Do", objects)
+    }
+
+    @Test("Forms that draw each other many times are walked in bounded time, and not followed")
+    func formsDrawnManyTimes() throws {
+        let clock = ContinuousClock()
+        // Three times at each level: 1,093 forms drawn, past the limit; ten
+        // times would be 1,111,111 without it.
+        let small = Self.formTree(times: 2, last: "q 1 0 0 1 0 0 cm /I0 Do Q", objects: [Self.dot], names: Self.dotNames)
+        #expect(try Self.read(small.0, resources: "/XObject << /F @1@ >>", objects: small.1).followed, "127 forms drawn are followed")
+        let (content, objects) = Self.formTree(times: 3, last: "q 1 0 0 1 0 0 cm /I0 Do Q", objects: [Self.dot], names: Self.dotNames)
+        var map: Map?
+        let took = try clock.measure {
+            map = try Self.read(content, resources: "/XObject << /F @1@ >>", objects: objects)
+        }
+        #expect(map?.followed == false, "more than \(Map.formLimit) forms drawn: not followed")
+        #expect(took < .seconds(10), "the walk took \(took)")
+        // On a page with invisible text, a painting not followed is fitted.
+        let page = S.document([S.Page(content + " " + S.text(mode: 3), resources: "/XObject << /F @1@ >>", objects: objects)])
+        let (document, pdfPage, cgPage) = try #require(S.pdfPage(page))
+        let start = clock.now
+        #expect(DocumentSearcher.carriesHiddenTextOverImage(pdfPage, cgPage: cgPage), "fitted")
+        #expect(clock.now - start < .seconds(10), "the gate took \(clock.now - start)")
+        withExtendedLifetime(document) {}
+        // A form drawing itself is not followed.
+        let selfDrawing = try Self.read("/F Do", resources: "/XObject << /F @0@ >>",
+                                        objects: [S.form("/F Do", resources: "/XObject << /F @0@ >>")])
+        #expect(!selfDrawing.followed, "a form drawing itself")
+        #expect(Map.formLimit == 1_024)
+    }
+
+    @Test("A pattern's forms are each looked into once")
+    func patternFormsLookedIntoOnce() throws {
+        // Seven levels, each naming the next form four times: 21,844 paths,
+        // seven forms.
+        func pattern(last: String, names: String, objects base: [S.Object]) throws -> (Map, Duration, Int) {
+            var objects = base
+            let first = objects.count
+            for k in 0..<7 {
+                let next = first + k + 1
+                let many = (0..<4).map { "/F\($0) @\(next)@" }.joined(separator: " ")
+                objects.append(k < 6 ? S.form("", resources: "/XObject << \(many) >>") : S.form(last, resources: names))
+            }
+            let cell = objects.count
+            objects.append(S.Object(dictionary: "/Type /Pattern /PatternType 1 /PaintType 1 /TilingType 1 /BBox [0 0 10 10] /XStep 10 /YStep 10 /Resources << /XObject << /F @\(first)@ >> >>",
+                                    stream: Data("/F Do".utf8)))
+            let data = S.document([S.Page("/Pattern cs /T1 scn 0 0 10 10 re f", resources: "/Pattern << /T1 @\(cell)@ >>", objects: objects)])
+            let (document, page, cgPage) = try #require(S.pdfPage(data))
+            defer { withExtendedLifetime(document) {} }
+            var map: Map?
+            let took = ContinuousClock().measure { map = Map.read(cgPage, cropBox: page.bounds(for: .cropBox)) }
+            // The pattern's own resources, as the walk reads them.
+            let pageDictionary = try #require(cgPage.dictionary)
+            var resources: CGPDFDictionaryRef?, patterns: CGPDFDictionaryRef?, cellStream: CGPDFStreamRef?, cellResources: CGPDFDictionaryRef?
+            try #require(CGPDFDictionaryGetDictionary(pageDictionary, "Resources", &resources) && resources != nil)
+            try #require(CGPDFDictionaryGetDictionary(resources!, "Pattern", &patterns) && patterns != nil)
+            try #require(CGPDFDictionaryGetStream(patterns!, "T1", &cellStream) && cellStream != nil)
+            let cellDictionary = try #require(CGPDFStreamGetDictionary(cellStream!))
+            try #require(CGPDFDictionaryGetDictionary(cellDictionary, "Resources", &cellResources) && cellResources != nil)
+            let seen = PictureWalk.FormsSeen()
+            _ = PictureWalk.reachesImage(cellResources!, depth: 0, seen: seen)
+            return (try #require(map), took, seen.looked)
+        }
+        let (plain, plainTook, plainLooked) = try pattern(last: "0 0 1 1 re f", names: "", objects: [])
+        #expect(plain.followed, "no picture is reached: followed")
+        #expect(plainLooked == 7, "each of the seven forms looked into once, not \(plainLooked) times")
+        #expect(plainTook < .seconds(10), "took \(plainTook)")
+        let (picture, pictureTook, _) = try pattern(last: "/I0 Do", names: Self.dotNames, objects: [Self.dot])
+        #expect(!picture.followed, "a picture is reached: not followed")
+        #expect(pictureTook < .seconds(10), "took \(pictureTook)")
+    }
+
+    @Test("A crop box beyond any page is read without leaving an Int")
+    func cropBoxOutOfRange() throws {
+        let (document, _, cgPage) = try #require(S.pdfPage(S.document([S.Page("q 10 0 0 10 0 0 cm /I0 Do Q", resources: Self.dotNames, objects: [Self.dot])])))
+        defer { withExtendedLifetime(document) {} }
+        let l = Int(Map.coordinateLimit)
+        let rows: [(String, CGRect, R?)] = [
+            ("reaching past both ends", CGRect(x: -1e19, y: -1e19, width: 2e19, height: 2e19), Self.r(-l, -l, l, l)),
+            ("1e30 wide", CGRect(x: 0, y: 0, width: 1e30, height: 100), Self.r(0, 0, l, 100)),
+            ("wholly past the limit", CGRect(x: 1e19, y: 1e19, width: 100, height: 100), nil),
+        ]
+        for (key, crop, expected) in rows {
+            #expect(Map.inward(Map.limited(crop)) == expected, "\(key)")
+            let map = Map.read(cgPage, cropBox: crop)
+            #expect(!map.coversThePage || expected == nil, "\(key): a 10-point picture does not cover \(map.cropBox)")
+        }
+        #expect(Map.inward(CGRect(x: -1e30, y: 0, width: 2e30, height: 100)) == Self.r(-l, 0, l, 100), "rounded within the limit")
+        #expect(Map.coordinateLimit == 0x1p28)
+    }
 }
