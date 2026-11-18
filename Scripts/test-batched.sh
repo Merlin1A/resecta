@@ -338,6 +338,26 @@ except Exception as exc:
 PYEOF
 }
 
+# The pre-flight's reading of the process list ("pid args" lines on stdin):
+# prints the pid of each xcodebuild that runs tests on simulator $1, a `test`
+# or `test-without-building` whose arguments name `id=$1` as a whole
+# destination key (so one id that begins another is not taken for it). A
+# `build-for-testing`, or any other xcodebuild that only compiles, is left
+# alone: a build-for-testing in another checkout names the simulator as its
+# destination and never runs on it.
+test_offenders() { # udid
+    awk -v id="id=$1" '
+        { x = 0; hit = 0; act = 0
+          for (i = 2; i <= NF; i++) {
+              if ($i ~ /(^|\/)xcodebuild$/) x = 1
+              p = index($i, id)
+              c = substr($i, p + length(id), 1)
+              if (x && p && (p == 1 || substr($i, p - 1, 1) == ",") && (c == "" || c == ",")) hit = 1
+              if (x && ($i == "test" || $i == "test-without-building")) act = 1
+          }
+          if (hit && act) print $1 }'
+}
+
 # --self-test: the lane-safety rules against this file and one dry
 # invocation. Exit 0 = every rule holds; 1 = a rule drifted (named).
 self_test() {
@@ -621,6 +641,24 @@ STUB
     done
     rm -rf "$tdir"
     if [ "$n" -eq 0 ]; then echo "self-test: a run with an unread or empty invocation, or no test at all, reads INCOMPLETE (exit 2), never PASS; two good invocations PASS OK"; else fails=1; fi
+    # 16. The pre-flight refuses a test run already on this simulator and
+    #     lets a compile in another checkout that names it as destination through.
+    n=0
+    [ "$($GREP -c 'ps -Ao pid=,args= | test_offenders "\$SIM_UDID"' "$me")" -eq 1 ] \
+        || { echo "self-test: the pre-flight does not read the process list through test_offenders" >&2; n=1; }
+    $GREP -qE '^stale="\$\(pgrep -f' "$me" && { echo "self-test: the pre-flight still matches every xcodebuild by pattern" >&2; n=1; }
+    got="$(test_offenders SIMB-1 <<'PS' | tr '\n' ' '
+101 /Applications/Xcode-26.6.app/Contents/Developer/usr/bin/xcodebuild build-for-testing -scheme ResectaApp -destination id=SIMB-1 -derivedDataPath /x/dd -quiet
+102 xcodebuild test-without-building -xctestrun /x/a.xctestrun -destination id=SIMB-1 -only-testing:ResectaAppTests/A
+103 /usr/bin/xcodebuild test -scheme RedactionEngine -destination platform=iOS Simulator,id=SIMB-1
+104 xcodebuild test-without-building -xctestrun /x/a.xctestrun -destination id=OTHER-2
+105 xcodebuild build -scheme ResectaApp -destination id=SIMB-1
+106 bash Scripts/test-batched.sh ResectaApp test id=SIMB-1
+107 xcodebuild test-without-building -destination id=SIMB-10
+PS
+)"
+    [ "$got" = "102 103 " ] || { echo "self-test: test_offenders read '$got', not '102 103 '" >&2; n=1; }
+    if [ "$n" -eq 0 ]; then echo "self-test: the pre-flight refuses a test or test-without-building already on this simulator and passes over a compile that names it OK"; else fails=1; fi
     [ "$fails" -eq 0 ] && { echo "self-test: PASS"; exit 0; }
     echo "self-test: FAIL" >&2; exit 1
 }
@@ -702,12 +740,14 @@ echo "run dir: $RUN_DIR"
 
 # ── Pre-flight ────────────────────────────────────────────────────────────
 
-# A stale xcodebuild still aimed at this simulator (its arguments carry the
-# destination id) stalls every later run on it: refuse. Test processes aimed
-# elsewhere belong to another run on this machine and are left alone.
-stale="$(pgrep -f "xcodebuild .*id=$SIM_UDID" 2>/dev/null || true)"
+# A test run still on this simulator (an xcodebuild test or
+# test-without-building whose arguments carry its id) stalls every later run
+# on it: refuse. A compile that names it as destination (another run's
+# build-for-testing) never runs on it and is left alone, as are test runs
+# aimed elsewhere.
+stale="$(ps -Ao pid=,args= | test_offenders "$SIM_UDID" | tr '\n' ' ')"
 if [ -n "$stale" ]; then
-    echo "PRE-FLIGHT: xcodebuild process(es) already targeting simulator $SIM_UDID: $stale" >&2
+    echo "PRE-FLIGHT: xcodebuild test run(s) already on simulator $SIM_UDID: $stale" >&2
     echo "  (a stale run against this simulator stalls every later run on it — stop it first)" >&2
     exit 1
 fi
