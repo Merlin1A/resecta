@@ -7,7 +7,9 @@ import Foundation
 // engine's own sentence for such a row and does not add the part again, so
 // the sentence must already hold every clause the part lists. This table pins
 // that rule in the engine: each mix of the four kinds of clause beside a
-// match that remains, and the message holds each clause of the part.
+// match that remains, and the message holds each clause of the part. The part
+// itself is pinned too: it lists each kind the case sets, so a change that
+// dropped a clause from both the part and the message is caught here.
 
 @Suite("A Search Re-check that needs review names every could-not clause of its part in its message")
 struct SearchRecheckPartInMessageTests {
@@ -76,6 +78,19 @@ struct SearchRecheckPartInMessageTests {
         for clause in c.comparedNothing {
             #expect(clauses.contains(clause), "\(c.name): the part does not list \"\(clause)\"")
         }
+        // Each other kind the case sets is listed in the part: the page not
+        // checked, the coverage check that did not run, the page it could not read.
+        #expect(clauses.contains { $0.hasPrefix("1 page could not be checked: 2") } == c.pageUnopened,
+                "\(c.name): the part's unchecked-page clause: \(clauses)")
+        #expect(clauses.contains(SearchRecheck.coverageNotRunClause) == !c.coverageRan,
+                "\(c.name): the part's not-run clause: \(clauses)")
+        if !c.coverageUnreadPages.isEmpty {
+            #expect(clauses.contains(SearchRecheck.coverageUnreadClause(c.coverageUnreadPages)),
+                    "\(c.name): the part's unread clause: \(clauses)")
+        }
+        #expect(clauses.count == [c.pageUnopened, !c.coverageRan, !c.coverageUnreadPages.isEmpty].filter { $0 }.count
+                    + c.comparedNothing.count,
+                "\(c.name): the part lists exactly the kinds the case sets: \(clauses)")
         print("RECHECKPART \(c.name) | message=\(message) | part=\(o.partSentence ?? "nil")")
     }
 }
