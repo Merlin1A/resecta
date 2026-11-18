@@ -49,7 +49,7 @@ git clone https://github.com/Merlin1A/resecta.git && cd resecta
 
 4. **The hosted suites.**
    - `sim-suite.yml` runs the app's unit suite on a hosted iPhone 17 simulator for every pull request to `main`, as the required check `sim-suite (ResectaApp)` beside `pr-gate`; it runs both schemes through the batched runner every Monday and on `v*` tag pushes, and one chosen scheme on manual dispatch (GitHub disables the schedule after sixty days without repository activity).
-   - On the weekly and tag runs the ResectaApp job also runs the editor's link-policy UI tests (`DocumentLinkUITests`) against the bundles it built, and a failed weekly or tag run is reported by an error annotation, a step summary and, when the repository variable `NTFY_TOPIC` is set, a post to that ntfy topic.
+   - On the weekly and tag runs the ResectaApp job also runs the editor's link-policy UI tests (`DocumentLinkUITests`) against the bundles it built, and a failed weekly or tag run is reported by an error annotation and a step summary.
    - On the hosted runner eleven suites are left out by name (`TEST_BATCHED_EXCLUDE`): the eight whose verification pass, OCR sweep, OCR re-check or direct text recognition hangs there (two app suites, six engine suites), and three engine timing pins on the ink-fit pool that judge in seconds and miss their limits on the hosted machine. They are counted on the totals line in the job summary and named in the run's log, and the pre-push hook runs them on any push that needs their scheme (`PREPUSH_SCHEME_BY_DIFF=0` makes that every push).
    - The engine package has no separate host run: the simulator suite's engine job is its hosted run.
 
