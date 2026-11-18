@@ -78,6 +78,9 @@ struct EnginePublicSurfaceTests {
         await searcher.setTextLayerStatus([:])
         await searcher.setScannedRegionNotAnalyzedSink(nil)
         _ = try DocumentSearcher.validateRegexPatternWithError("x")
+        _ = page.confirmedPage
+        _ = RedactionRegion.isAdmitted(normalizedRect: .zero)
+        _ = RunRecord.Page(pageIndex: 0, regions: [], cropBox: .zero, rotation: 0)
         _ = DocumentSearcher.sharedLoadDiagnostics
         _ = engine.layers(for: .searchableRedaction)
         _ = engine.aggregateStatus(layers)
