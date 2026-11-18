@@ -192,9 +192,23 @@ struct JoinedGlyphExtractionTests {
         text.split(whereSeparator: { $0.isWhitespace || $0.isNewline }).map(String.init)
     }
 
-    @Test("An export with no box holds the source's words, no more and no fewer", arguments: latinPages)
+    /// A source word as the hidden text writes it: each joined-letter code
+    /// point as its letters (the fold before the filter).
+    static func folded(_ word: String) -> String {
+        var scalars = String.UnicodeScalarView()
+        for scalar in word.unicodeScalars {
+            if let letters = TestFixtures.joinedGlyphLetters[scalar] {
+                scalars.append(contentsOf: letters.unicodeScalars)
+            } else {
+                scalars.append(scalar)
+            }
+        }
+        return String(scalars)
+    }
+
+    @Test("An export with no box holds the source's words, folded, no more and no fewer", arguments: latinPages)
     func bothDirections(_ fixture: JoinedGlyphPage) async throws {
-        let source = try #require(fixture.sourceWords)
+        let source = try #require(fixture.sourceWords).map(Self.folded)
         let run = try await exportWithoutBoxes(fixture.make())
         defer { try? FileManager.default.removeItem(at: run.url) }
         #expect(run.outcome.perPageModes == [.searchableRedaction], "\(fixture.name): the page stays Searchable")
@@ -220,16 +234,32 @@ struct JoinedGlyphExtractionTests {
         #expect(lineage == .pass, "\(fixture.name): Character Lineage \(lineage)")
     }
 
-    @Test("A joined Thai syllable and a joined emoji are read back once in the export", arguments: clusterPages)
-    func clustersReadBackOnce(_ fixture: JoinedGlyphPage) async throws {
+    // None of the hidden text's three faces draws Thai or an emoji, so the
+    // alphabet rule leaves such a run out whole and counts it: a page of Thai
+    // alone is left with no word and is a picture page with its reason; the
+    // emoji's page keeps its other words.
+    @Test("A joined Thai syllable's page is a picture page; a joined emoji is left out and counted", arguments: clusterPages)
+    func clustersAfterTheAlphabetRule(_ fixture: JoinedGlyphPage) async throws {
         let scalars = try #require(fixture.readBackOnce)
-        let run = try await exportWithoutBoxes(fixture.make())
+        let data = fixture.make()
+        let run = try await exportWithoutBoxes(data)
         defer { try? FileManager.default.removeItem(at: run.url) }
+        if fixture.name.contains("Thai") {
+            #expect(run.outcome.perPageModes == [.secureRasterization], "\(fixture.name): the page is a picture")
+            #expect(run.outcome.perPageFallbackReasons == [.noWritableText], "\(fixture.name): \(run.outcome.perPageFallbackReasons)")
+            #expect(PDFDocument(url: run.url)?.page(at: 0)?.string?.isEmpty ?? true, "\(fixture.name): no text layer")
+            return
+        }
+        #expect(run.outcome.perPageModes == [.searchableRedaction], "\(fixture.name): the page stays Searchable")
         let out = try #require(PDFDocument(url: run.url)?.page(at: 0)?.string)
         for scalar in scalars {
             let times = out.unicodeScalars.filter { String($0) == scalar }.count
-            #expect(times == 1, "\(fixture.name): \(scalar.debugDescription) read back \(times) times in \(out.debugDescription)")
+            #expect(times == 0, "\(fixture.name): \(scalar.debugDescription) read back \(times) times in \(out.debugDescription)")
         }
+        #expect(Self.words(out) == ["Team", "here"], "\(fixture.name): the other words are written: \(out.debugDescription)")
+        let source = try #require(PDFDocument(data: data)?.page(at: 0))
+        let entries = TextPathFold.fold(try await TextLayerExtractor().extractCharacters(from: source))
+        #expect(TextPathAlphabetMarks.marks(entries).runsLeftOut == 1, "\(fixture.name): one run left out and counted")
     }
 
     // MARK: - A word space after a joined glyph
