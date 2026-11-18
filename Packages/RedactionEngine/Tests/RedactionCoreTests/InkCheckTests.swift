@@ -179,6 +179,13 @@ struct InkCheckVerdictTests {
         #expect(check(p) == InkCheck.Result(verdict: .clear))
     }
 
+    @Test("A rule up the page three line heights long is not followed: a table's column line through the word", arguments: dpis)
+    func longRuleUpIsNotFollowed(dpi: Int) {
+        var p = ordinaryWord(dpi: dpi)
+        p.fill(rect(97, 10, 99, 82))
+        #expect(check(p) == InkCheck.Result(verdict: .clear))
+    }
+
     @Test("A hairline leaving the box is not counted: no column of it is thicker than an eighth of the line", arguments: dpis)
     func hairlineIsNotCounted(dpi: Int) {
         var p = ordinaryWord(dpi: dpi)
