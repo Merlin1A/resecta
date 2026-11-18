@@ -88,6 +88,9 @@ package struct RowReading: Hashable, Sendable {
     /// How far the column reaches on each side, or nil where nothing shows it.
     package var columnLeft: Int?
     package var columnRight: Int?
+    /// The column was read from runs of the stack that lie inside the room,
+    /// closed on both sides: a table cell's own column.
+    package var columnInsideRoom: Bool = false
 }
 
 /// What the complement reads for one box.
@@ -603,6 +606,7 @@ extension Complement {
             }
         }
         return RowReading(line: line, tight: row, roomLeft: roomLeft, roomRight: roomRight, bridges: bridges,
-                          ownRun: ownRun, columnLeft: columnLeft, columnRight: columnRight)
+                          ownRun: ownRun, columnLeft: columnLeft, columnRight: columnRight,
+                          columnInsideRoom: inside && (columnLeft != nil || columnRight != nil))
     }
 }
