@@ -7,8 +7,9 @@ import Foundation
 /// (`TextNormalizer.breakMarks`) becomes nothing; and an entry that is only
 /// the object mark U+FFFC, which the hidden text never holds
 /// (`NeverWrittenCharacters`) and which is a break between runs rather than
-/// part of one, is dropped. One entry is still one letter, so neither the
-/// count's unit nor the lineage's changes.
+/// part of one, becomes a space in its place, so the words on either side
+/// stay two. A space is outside both count checks, and one entry is still
+/// one letter, so neither the count's unit nor the lineage's changes.
 enum JoinedLetterFold {
 
     /// `entries` with every joined-letter code point written as its letters,
@@ -26,6 +27,10 @@ enum JoinedLetterFold {
             if !scalars.isEmpty, scalars.allSatisfy({
                 $0 == NeverWrittenCharacters.objectMark && NeverWrittenCharacters.contains($0)
             }) {
+                folded.append(CharacterInfo(
+                    character: " ", bounds: entry.bounds,
+                    stringIndex: entry.stringIndex, lineIndex: entry.lineIndex,
+                    wordIndex: entry.wordIndex))
                 continue
             }
             let hasJoined = scalars.contains(where: { JoinedLetters.letters(of: $0) != nil })
