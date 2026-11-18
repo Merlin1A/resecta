@@ -1,0 +1,19 @@
+Property: A word broken at a line-end hyphen between letters of the same case is also matched by its closed spelling, through a second walk over the page with those hyphens dropped.
+Area: search (literal matching)
+Test command: xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/HyphenBreakClosedSpellingTests -only-testing:RedactionEngineTests/HyphenBreakClosedSpellingSearchTests
+Must go red: RedactionEngineTests/HyphenBreakClosedSpellingTests "Each row's search over its page" [a word broken at a line-end hyphen is found by its closed spelling]; RedactionEngineTests/HyphenBreakClosedSpellingTests "Each row's search over its page" [a phrase that opens with the broken word is found by its closed spelling]; RedactionEngineTests/HyphenBreakClosedSpellingTests "Each row's search over its page" [upper case on both sides of the break: found with capitals ignored]; RedactionEngineTests/HyphenBreakClosedSpellingTests "Each row's search over its page" [a compound broken at its own hyphen is also found by its closed spelling]; RedactionEngineTests/HyphenBreakClosedSpellingSearchTests "Text mode: the closed spelling is found on both lines, boxed on 'Bright-', shown as 'Bright-water'"; RedactionEngineTests/HyphenBreakClosedSpellingSearchTests "The recognised route: lines joined across 'Bright-' and 'water' match the closed spelling, boxed on each word"; RedactionEngineTests/HyphenBreakClosedSpellingSearchTests "A Searchable export with one of two occurrences applied: the re-check reads the other as remaining and asks"; RedactionEngineTests/HyphenBreakClosedSpellingSearchTests "The recognised route of an exported image: the unapplied occurrence's lines read as remaining and the re-check asks"
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift
+index 7458898a..418b2daa 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift
+@@ -82,7 +82,7 @@ extension SearchCore {
+         cap: Int?
+     ) -> (spans: [MatchSpan], stoppedAtCap: Bool) {
+         let asRead = literalSpansAsRead(in: page, query: query, comparison: comparison, wholeWord: wholeWord, cap: cap)
+-        guard !page.closedSpellingHyphens.isEmpty else { return asRead }
++        return asRead // mutant: no second walk
+         let closed = closedSpellingSpans(in: page, query: query, comparison: comparison, wholeWord: wholeWord, cap: cap)
+         guard !closed.isEmpty else { return asRead }
+         let seen = Set(asRead.spans.map { SpanKey($0.searchedRange) })

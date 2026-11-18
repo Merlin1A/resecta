@@ -1,0 +1,19 @@
+Property: A hyphen that ends a line between two digits is only ever kept: a number broken there is not matched run together.
+Area: search (literal matching)
+Test command: xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/HyphenBreakClosedSpellingTests -only-testing:RedactionEngineTests/HyphenBreakClosedSpellingSearchTests
+Must go red: RedactionEngineTests/HyphenBreakClosedSpellingTests "Each row's search over its page" [digits never drop the hyphen: the run-together number is not found]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift
+index 7458898a..8e6a99fe 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift
+@@ -37,7 +37,7 @@ extension SearchCore {
+     /// Two letters that are both lower case or both upper case. A digit, or
+     /// a letter with no case, is neither.
+     static func isSameCase(_ a: Character, _ b: Character) -> Bool {
+-        (a.isLowercase && b.isLowercase) || (a.isUppercase && b.isUppercase)
++        (a.isLowercase && b.isLowercase) || (a.isUppercase && b.isUppercase) || (a.isNumber && b.isNumber) // mutant: digits may drop the hyphen
+     }
+ 
+     /// The closed-spelling hyphens of a normalized page (Character offsets
