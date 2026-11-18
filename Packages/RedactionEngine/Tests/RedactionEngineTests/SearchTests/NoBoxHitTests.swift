@@ -179,7 +179,8 @@ struct NoBoxHitTests {
         #expect(clamped.minX == 0, "measured from the page's left edge")
         let cropBox = page.bounds(for: .cropBox)
         let visual = CGSize(width: cropBox.width, height: cropBox.height)
-        let matchRect = try #require(searcher.normalizedRect(for: try #require(page.selection(for: match)), page: page))
+        let matchSelection = try #require(page.selection(for: match))
+        let matchRect = try #require(searcher.normalizedRect(for: matchSelection, page: page))
         let box = CGRect(x: matchRect.minX * visual.width, y: matchRect.minY * visual.height,
                          width: matchRect.width * visual.width, height: matchRect.height * visual.height)
         let distance = DocumentSearcher.distanceFromLineStart(of: match, box: box, page: page,
