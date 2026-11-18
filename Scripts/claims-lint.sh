@@ -18,7 +18,8 @@
 # that reads empty fails the lint (fail closed). A second list,
 # LegalPhrases.wordEdgeTerms, is read the same way and matched only where a
 # term stands whole (no letter, digit or underscore at either end); it fails
-# closed too.
+# closed too. A listed document that is not there fails the lint, and so does
+# a file that a leg's grep cannot read (grep's exit 2), in every leg.
 #
 # Usage: Scripts/claims-lint.sh              (the sweep; exit 0 PASS, 1 FAIL)
 #        Scripts/claims-lint.sh --self-test  (scratch trees; reads only the list file, for the
@@ -144,8 +145,17 @@ sweep() { # $1 = the tree root
 
     # 1. Shipping markdown.
     for f in $DOCS; do
-        [ -f "$ROOT/$f" ] || continue
-        hits=$("$GREP" -nEi "$PATTERNS" "$ROOT/$f" | keep_offending "$PATTERNS" || true)
+        if [ ! -f "$ROOT/$f" ]; then
+            echo "CLAIMS-LINT FAIL: $f is listed and is not there"
+            fail=1; continue
+        fi
+        # grep exits 1 for no match and 2 when it cannot read the file.
+        grc=0; raw=$("$GREP" -nEi "$PATTERNS" "$ROOT/$f") || grc=$?
+        if [ "$grc" -gt 1 ]; then
+            echo "CLAIMS-LINT FAIL: the banned terms could not be matched on $f"
+            fail=1
+        fi
+        hits=$(printf '%s\n' "$raw" | keep_offending "$PATTERNS")
         if [ -n "$hits" ]; then
             echo "CLAIMS-LINT FAIL: $f"
             echo "$hits"
@@ -173,11 +183,16 @@ sweep() { # $1 = the tree root
     for t in $SWIFT_TREES; do [ -d "$ROOT/$t" ] && trees="$trees $ROOT/$t"; done
     if [ -n "$trees" ]; then
         # shellcheck disable=SC2086
-        SWIFT_HITS=$("$GREP" -rnEi "$PATTERNS" $trees --include='*.swift' \
+        grc=0; raw=$("$GREP" -rnEi "$PATTERNS" $trees --include='*.swift') || grc=$?
+        if [ "$grc" -gt 1 ]; then
+            echo "CLAIMS-LINT FAIL: the banned terms could not be matched on every Swift file"
+            fail=1
+        fi
+        SWIFT_HITS=$(printf '%s\n' "$raw" \
             | "$GREP" -v "^$ROOT/$LIST_FILE:" \
             | "$GREP" '"' \
             | "$GREP" -vE '^[^:]+:[0-9]+:[[:space:]]*//' \
-            | keep_offending "$PATTERNS" || true)
+            | keep_offending "$PATTERNS")
         if [ -n "$SWIFT_HITS" ]; then
             echo "CLAIMS-LINT FAIL (Swift string literals):"
             echo "$SWIFT_HITS"
@@ -185,7 +200,12 @@ sweep() { # $1 = the tree root
         fi
         if [ "$LENGTH_PATTERNS" = on ]; then
             # shellcheck disable=SC2086
-            LENGTH_HITS=$("$GREP" -rn '"' $trees --include='*.swift' \
+            grc=0; raw=$("$GREP" -rn '"' $trees --include='*.swift') || grc=$?
+            if [ "$grc" -gt 1 ]; then
+                echo "CLAIMS-LINT FAIL: the length-claim patterns could not read every Swift file"
+                fail=1
+            fi
+            LENGTH_HITS=$(printf '%s\n' "$raw" \
                 | "$GREP" -v "^$ROOT/$LIST_FILE:" \
                 | "$GREP" -vE '^[^:]+:[0-9]+:[[:space:]]*//' \
                 | length_claims lines) || {
@@ -214,7 +234,7 @@ self_test() {
             "$d/Packages/RedactionEngine/Sources/RedactionEngine/Verification"
         printf 'public enum LegalPhrases {\n    public static let bannedTerms: [String] = [\n        "guarantee",\n        "ensures",\n        "100%%",\n    ]\n    public static let wordEdgeTerms: [String] = [\n        "proven",\n    ]\n}\n' \
             > "$d/$LIST_FILE"
-        printf '# readme\nclean text.\n' > "$d/README.md"
+        for f in $DOCS; do printf '# doc\nclean text.\n' > "$d/$f"; done
         printf '%s' "$d"
     }
     check() { # $1 = name, $2 = root, $3 = PASS|FAIL wanted
@@ -276,6 +296,7 @@ lit|says nothing about the text|The box says nothing about the text beyond that 
 lit|no longer follows the text|The box's width then no longer follows the text.
 pat|L1|Each box hides how long the name is.
 pat|L2|Turn on Hide Text Length in Settings.
+pat|L2 alone|Turn on Hide              Text              Length in Settings.
 pat|L3|With the switch on, the length of the name is hidden.
 pat|L4|Widen Boxes masks the length of short names.
 pat|L5|Resecta draws those boxes to the edge of the column, so their width says nothing about the text beyond that it fits there.
@@ -336,12 +357,20 @@ ok|only narrows|The search commonly narrows to one page.
 ok|a few bits|The stream ends with an extra few bits of padding.
 ok|safe from|The old path was unsafe from the start.
 LINES
-    [ "$n" -eq 81 ] || { echo "  FAIL the stem cases: $n read, 81 wanted (20 literals, 13 patterns, 14 word-edge terms, 34 innocent lines)"; bad=1; }
+    [ "$n" -eq 82 ] || { echo "  FAIL the stem cases: $n read, 82 wanted (20 literals, 14 patterns, 14 word-edge terms, 34 innocent lines)"; bad=1; }
     d=$(case_tree wrapped);      printf 'The box'"'"'s width then no longer\nfollows the text.\n' >> "$d/README.md"; check "a length claim wrapped across two lines" "$d" FAIL
     d=$(case_tree blankstop);    printf 'Hidden\n\nlength of the name.\n' >> "$d/README.md"; check "a blank line ends a sentence" "$d" PASS
     d=$(case_tree lenmarker);    printf 'Each box hides how long the name is. <!-- LegalPhrases:safe -->\n' >> "$d/README.md"; check "a length claim on a marked line" "$d" PASS
     d=$(case_tree lenswift);     printf 'let s = "Widen Boxes masks the length of short names."\n' > "$d/Sources/ResectaApp/Views/X.swift"; check "a length claim in a Swift string literal" "$d" FAIL
     d=$(case_tree unreadable);   chmod 000 "$d/README.md"; check "a listed document the matcher cannot read" "$d" FAIL; chmod 644 "$d/README.md"
+    # The banned-term legs alone (the length leg off): a file grep cannot
+    # read, and a listed document that is not there, each fail the sweep.
+    LENGTH_PATTERNS=off
+    d=$(case_tree unreaddoc);    chmod 000 "$d/README.md"; check "a listed document the banned-term matcher cannot read" "$d" FAIL; chmod 644 "$d/README.md"
+    d=$(case_tree missingdoc);   rm "$d/NOTICE"; check "a listed document that is missing" "$d" FAIL
+    d=$(case_tree unreadswift);  printf 'let s = "clean"\n' > "$d/Sources/ResectaApp/Views/X.swift"; chmod 000 "$d/Sources/ResectaApp/Views/X.swift"
+                                 check "a Swift file the banned-term matcher cannot read" "$d" FAIL; chmod 644 "$d/Sources/ResectaApp/Views/X.swift"
+    LENGTH_PATTERNS=on
     d=$(case_tree lencomment);   printf '// "Widen Boxes masks the length of short names." is banned\n' > "$d/Sources/ResectaApp/Views/X.swift"; check "a length claim in a Swift comment line" "$d" PASS
     if [ "$bad" -eq 0 ]; then echo "claims-lint --self-test: PASS"; else echo "claims-lint --self-test: FAIL"; return 1; fi
 }
