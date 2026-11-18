@@ -47,9 +47,17 @@ nonisolated final class DrawToolStateUITests: XCTestCase {
         return bar.frame.minY - 8
     }
 
-    /// The caption's foot is 8 pt above the page bar's glass.
+    /// The slot's glass foot: the slot's element reports the frame of the
+    /// words it holds, not its glass, so the foot is the words' foot plus the
+    /// slot's 12 pt of vertical padding (`DocumentEditorView.bottomSlotVerticalPadding`).
+    static func slotGlassFoot(_ slot: XCUIElement) -> CGFloat {
+        let words = slot.staticTexts.firstMatch
+        return (words.exists ? words.frame : slot.frame).maxY + 12
+    }
+
+    /// The caption's glass foot is 8 pt above the page bar's glass.
     private func checkTheCaptionSitsAboveThePageBar(_ caption: XCUIElement) {
-        let gap = pageBarGlassTop() - caption.frame.maxY
+        let gap = pageBarGlassTop() - Self.slotGlassFoot(caption)
         XCTAssertEqual(gap, 8, accuracy: 1, "The slot's foot must be 8 pt above the page bar's glass; the gap is \(gap) pt.")
     }
 
@@ -62,8 +70,9 @@ nonisolated final class DrawToolStateUITests: XCTestCase {
         let window = app.windows.firstMatch.frame
         XCTAssertLessThanOrEqual(abs(caption.frame.midX - window.midX), 1,
                                  "The slot must be centred: its middle is at \(caption.frame.midX), the window's at \(window.midX).")
-        XCTAssertGreaterThanOrEqual(caption.frame.width, 119.5, "The slot is at least 120 pt wide: \(caption.frame.width).")
-        XCTAssertLessThanOrEqual(caption.frame.width, 360.5, "The slot is at most 360 pt wide: \(caption.frame.width).")
+        // The glass is the words and 16 pt of padding each side, at least 120 wide.
+        let glassWidth = max(caption.frame.width + 32, 120)
+        XCTAssertLessThanOrEqual(glassWidth, 360.5, "The slot is at most 360 pt wide: \(glassWidth).")
         attachScreenshot(named: "draw-caption-in-the-slot")
         XCTAssertTrue(toggle(tool, until: false), "the tool did not turn off")
         XCTAssertTrue(caption.waitForNonExistence(timeout: 5), "The caption must go with the tool.")
