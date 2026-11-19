@@ -1,0 +1,19 @@
+Property: The link row is at least 46 pt high, whatever its text's height.
+Area: results (the card of facts)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/FactRowTests
+Must go red: ResectaAppTests/FactRowTests linkRowCanBeHit
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/FactRow.swift b/Sources/ResectaApp/Views/FactRow.swift
+index 7b20c0a4..9e7cf34b 100644
+--- a/Sources/ResectaApp/Views/FactRow.swift
++++ b/Sources/ResectaApp/Views/FactRow.swift
+@@ -169,7 +169,7 @@ struct ResultsFactDoorRow: View {
+                     .frame(width: ResectaTokens.Results.chevronColumn)
+                     .padding(.leading, ResectaTokens.Spacing.sm)
+             }
+-            .frame(maxWidth: .infinity, minHeight: ResectaTokens.TouchTarget.minimum, alignment: .leading)
++            .frame(maxWidth: .infinity, alignment: .leading)
+             .contentShape(Rectangle())
+         }
+         .buttonStyle(.plain)

@@ -179,6 +179,31 @@ extension SearchResultRow {
         return false
     }
 
+    /// The source badge is drawn only when it says something another row
+    /// may not: never on a typed match (the text layer, no kind, not a
+    /// custom term, not a named pattern), where every row would wear the
+    /// same badge.
+    nonisolated static func showsSourceBadge(
+        for result: SearchResult, isCustomHit: Bool, isRegexHit: Bool
+    ) -> Bool {
+        !(result.source == .textLayer && result.piiCategory == nil && !isCustomHit && !isRegexHit)
+    }
+
+    /// The leading-edge bar is drawn exactly on the rows whose grade is
+    /// spoken: one predicate, two readers, so the spoken grade and the
+    /// drawn bar cannot disagree.
+    nonisolated static func showsConfidenceBar(for result: SearchResult) -> Bool {
+        showsTierWord(for: result)
+    }
+
+    /// The row's small line above the excerpt is built only when it
+    /// holds a badge, a page tag or a term.
+    nonisolated static func showsMetaLine(
+        showsBadge: Bool, showsPageLabel: Bool, showsTermLabel: Bool
+    ) -> Bool {
+        showsBadge || showsPageLabel || showsTermLabel
+    }
+
     /// The merged row element's spoken label — the shape "Address,
     /// page 1, medium confidence, applied": the category word where
     /// the row has one (a PII hit's category; a literal / regex /
@@ -244,7 +269,7 @@ extension SearchResultRow {
     ) -> AttributedString {
         var attributed = AttributedString(snippet)
         attributed.font = .footnote
-        attributed.foregroundColor = .secondary
+        attributed.foregroundColor = ResectaTokens.SemanticColor.supportText
         guard let run = matchRun(in: attributed, matchRange: matchRange, matchedText: matchedText) else {
             return attributed
         }

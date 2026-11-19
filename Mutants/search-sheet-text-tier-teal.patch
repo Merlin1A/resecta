@@ -1,0 +1,19 @@
+Property: The Search sheet's own teal words take the teal text tier.
+Area: the Search sheet's text tiers
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/SearchSheetTextTierTests
+Must go red: ResectaAppTests/SearchSheetTextTierTests tealWordsUseTheTextTier
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/Search/SearchSheetHeaderSection.swift b/Sources/ResectaApp/Views/Search/SearchSheetHeaderSection.swift
+index 415eadfe..eb9d2798 100644
+--- a/Sources/ResectaApp/Views/Search/SearchSheetHeaderSection.swift
++++ b/Sources/ResectaApp/Views/Search/SearchSheetHeaderSection.swift
+@@ -90,7 +90,7 @@ struct SearchSheetHeaderSection: View {
+                 .contentShape(Rectangle())
+         }
+             .buttonStyle(.plain)
+-            .foregroundStyle(ResectaTokens.BrandTeal.text)
++            .foregroundStyle(.tint)
+             .accessibilityIdentifier("searchDismissButton")
+     }
+ 

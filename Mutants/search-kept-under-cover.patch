@@ -1,0 +1,17 @@
+Property: Search's work is not cleared when the capture cover replaces its content.
+Area: the Search sheet, its teardown when its content leaves the screen
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/SearchTeardownRuleTests -only-testing:ResectaAppUITests/SearchKeepsWorkThroughCaptureUITests
+Must go red: ResectaAppTests/SearchTeardownRuleTests tearsDownOnlyWhenNeitherParkedNorCovered; ResectaAppUITests/SearchKeepsWorkThroughCaptureUITests testSearchKeepsItsTicksThroughACapture
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/Search/SearchAndRedactSheet+Teardown.swift b/Sources/ResectaApp/Views/Search/SearchAndRedactSheet+Teardown.swift
+--- a/Sources/ResectaApp/Views/Search/SearchAndRedactSheet+Teardown.swift
++++ b/Sources/ResectaApp/Views/Search/SearchAndRedactSheet+Teardown.swift
+@@ -9,6 +9,6 @@
+     /// A pure decision, testable without rendering (the same form as
+     /// `ShieldedSheetContent.shouldShield`).
+     static func contentLeavingTearsDown(parked: Bool, covered: Bool) -> Bool {
+-        !parked && !covered
++        !parked
+     }
+ }

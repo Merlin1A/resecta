@@ -15,7 +15,16 @@
 # The banned set is READ from LegalPhrases.bannedTerms
 # (Sources/ResectaApp/Legal/LegalPhrases.swift), its one home: the string
 # literals between `bannedTerms: [String] = [` and the closing `]`. A list
-# that reads empty fails the lint (fail closed).
+# that reads empty fails the lint (fail closed). A second list,
+# LegalPhrases.wordEdgeTerms, is read the same way and matched only where a
+# term stands whole (no letter, digit or underscore at either end); it fails
+# closed too. A listed document that is not there fails the lint, and so does
+# a file that a leg's grep cannot read (grep's exit 2), in every leg. A
+# matcher that fails (keep_offending or length_claims exiting non-zero) fails
+# the lint too, and so does a line filter that fails: the sweep runs with set -e
+# off, so each call is checked. The root is matched and cut as fixed text,
+# never as a pattern. The Swift tree operands are not yet quoted, so a checkout
+# path holding a space or a glob character is not yet supported.
 #
 # Usage: Scripts/claims-lint.sh              (the sweep; exit 0 PASS, 1 FAIL)
 #        Scripts/claims-lint.sh --self-test  (scratch trees; reads only the list file, for the
@@ -106,6 +115,17 @@ banned_patterns() { # $1 = the list file
     printf '%s' "$terms"
 }
 
+# The word-edge terms (LegalPhrases.wordEdgeTerms) as one ERE alternation that
+# matches a term only where no letter, digit or underscore touches either end.
+word_edge_patterns() { # $1 = the list file
+    terms=$(sed -n '/wordEdgeTerms: \[String\] = \[/,/^[[:space:]]*\]/p' "$1" \
+        | sed -n 's/^[[:space:]]*"\([^"]*\)".*/\1/p' \
+        | sed 's/[][\\.*^$?+(){}|/]/\\&/g' \
+        | paste -sd '|' -)
+    [ -n "$terms" ] || return 1
+    printf '(^|[^[:alnum:]_])(%s)([^[:alnum:]_]|$)' "$terms"
+}
+
 # Reads "path:line:text" hits on stdin; prints those still matching once the
 # allowed phrases are removed, minus lines that carry the marker.
 keep_offending() {
@@ -116,19 +136,53 @@ keep_offending() {
         print if $l =~ $p;'
 }
 
+# Reads "path:line:text" hits on stdin; prints those that hold a string
+# literal (") and are not comment lines, leaving out the list file's own lines.
+# The list file's path is matched as a fixed prefix, never as a pattern.
+swift_literal_lines() { # $1 = the list file's path, $2 = the leg (banned|length)
+    CL_SKIP="$1:" CL_LEG="$2" awk 'BEGIN { skip = ENVIRON["CL_SKIP"] }
+        index($0, skip) == 1 { next }
+        index($0, "\"") == 0 { next }
+        /^[^:]+:[0-9]+:[[:space:]]*\/\// { next }
+        { print }'
+}
+
+# Cuts "<root>/" from the start of each line on stdin, as a fixed prefix.
+strip_root() { # $1 = the root
+    CL_ROOT="$1/" awk 'BEGIN { root = ENVIRON["CL_ROOT"] }
+        index($0, root) == 1 { $0 = substr($0, length(root) + 1) }
+        { print }'
+}
+
 sweep() { # $1 = the tree root
     ROOT="$1"
     if ! BANNED=$(banned_patterns "$ROOT/$LIST_FILE"); then
         echo "CLAIMS-LINT FAIL: no banned terms read from $LIST_FILE"
         return 1
     fi
-    PATTERNS="$BANNED|$DOC_ONLY"
+    if ! EDGE=$(word_edge_patterns "$ROOT/$LIST_FILE"); then
+        echo "CLAIMS-LINT FAIL: no word-edge terms read from $LIST_FILE"
+        return 1
+    fi
+    PATTERNS="$BANNED|$DOC_ONLY|$EDGE"
     fail=0
 
     # 1. Shipping markdown.
     for f in $DOCS; do
-        [ -f "$ROOT/$f" ] || continue
-        hits=$("$GREP" -nEi "$PATTERNS" "$ROOT/$f" | keep_offending "$PATTERNS" || true)
+        if [ ! -f "$ROOT/$f" ]; then
+            echo "CLAIMS-LINT FAIL: $f is listed and is not there"
+            fail=1; continue
+        fi
+        # grep exits 1 for no match and 2 when it cannot read the file.
+        grc=0; raw=$("$GREP" -nEi "$PATTERNS" "$ROOT/$f") || grc=$?
+        if [ "$grc" -gt 1 ]; then
+            echo "CLAIMS-LINT FAIL: the banned terms could not be matched on $f"
+            fail=1
+        fi
+        hits=$(printf '%s\n' "$raw" | keep_offending "$PATTERNS") || {
+            echo "CLAIMS-LINT FAIL: the banned-term matcher did not run on $f"
+            fail=1
+        }
         if [ -n "$hits" ]; then
             echo "CLAIMS-LINT FAIL: $f"
             echo "$hits"
@@ -139,7 +193,10 @@ sweep() { # $1 = the tree root
                 echo "CLAIMS-LINT FAIL: the length-claim patterns did not run on $f"
                 fail=1
             fi
-            hits=$(printf '%s' "$hits" | sed "s|^$ROOT/||")
+            hits=$(printf '%s' "$hits" | strip_root "$ROOT") || {
+                echo "CLAIMS-LINT FAIL: the length claims on $f could not be shown"
+                fail=1
+            }
             if [ -n "$hits" ]; then
                 echo "CLAIMS-LINT FAIL (length claim): $f"
                 echo "$hits"
@@ -156,11 +213,19 @@ sweep() { # $1 = the tree root
     for t in $SWIFT_TREES; do [ -d "$ROOT/$t" ] && trees="$trees $ROOT/$t"; done
     if [ -n "$trees" ]; then
         # shellcheck disable=SC2086
-        SWIFT_HITS=$("$GREP" -rnEi "$PATTERNS" $trees --include='*.swift' \
-            | "$GREP" -v "^$ROOT/$LIST_FILE:" \
-            | "$GREP" '"' \
-            | "$GREP" -vE '^[^:]+:[0-9]+:[[:space:]]*//' \
-            | keep_offending "$PATTERNS" || true)
+        grc=0; raw=$("$GREP" -rnEi "$PATTERNS" $trees --include='*.swift') || grc=$?
+        if [ "$grc" -gt 1 ]; then
+            echo "CLAIMS-LINT FAIL: the banned terms could not be matched on every Swift file"
+            fail=1
+        fi
+        lines=$(printf '%s\n' "$raw" | swift_literal_lines "$ROOT/$LIST_FILE" banned) || {
+            echo "CLAIMS-LINT FAIL: the Swift string literals could not be filtered for the banned terms"
+            fail=1
+        }
+        SWIFT_HITS=$(printf '%s\n' "$lines" | keep_offending "$PATTERNS") || {
+            echo "CLAIMS-LINT FAIL: the banned-term matcher did not run on the Swift string literals"
+            fail=1
+        }
         if [ -n "$SWIFT_HITS" ]; then
             echo "CLAIMS-LINT FAIL (Swift string literals):"
             echo "$SWIFT_HITS"
@@ -168,10 +233,16 @@ sweep() { # $1 = the tree root
         fi
         if [ "$LENGTH_PATTERNS" = on ]; then
             # shellcheck disable=SC2086
-            LENGTH_HITS=$("$GREP" -rn '"' $trees --include='*.swift' \
-                | "$GREP" -v "^$ROOT/$LIST_FILE:" \
-                | "$GREP" -vE '^[^:]+:[0-9]+:[[:space:]]*//' \
-                | length_claims lines) || {
+            grc=0; raw=$("$GREP" -rn '"' $trees --include='*.swift') || grc=$?
+            if [ "$grc" -gt 1 ]; then
+                echo "CLAIMS-LINT FAIL: the length-claim patterns could not read every Swift file"
+                fail=1
+            fi
+            lines=$(printf '%s\n' "$raw" | swift_literal_lines "$ROOT/$LIST_FILE" length) || {
+                echo "CLAIMS-LINT FAIL: the Swift string literals could not be filtered for the length claims"
+                fail=1
+            }
+            LENGTH_HITS=$(printf '%s\n' "$lines" | length_claims lines) || {
                 echo "CLAIMS-LINT FAIL: the length-claim patterns did not run on the Swift string literals"
                 fail=1
             }
@@ -195,14 +266,16 @@ self_test() {
         d="$T/$1"
         mkdir -p "$d/Sources/ResectaApp/Legal" "$d/Sources/ResectaApp/Views" "$d/Sources/ResectaApp/State" \
             "$d/Packages/RedactionEngine/Sources/RedactionEngine/Verification"
-        printf 'public enum LegalPhrases {\n    public static let bannedTerms: [String] = [\n        "guarantee",\n        "ensures",\n        "100%%",\n    ]\n}\n' \
+        printf 'public enum LegalPhrases {\n    public static let bannedTerms: [String] = [\n        "guarantee",\n        "ensures",\n        "100%%",\n    ]\n    public static let wordEdgeTerms: [String] = [\n        "proven",\n    ]\n}\n' \
             > "$d/$LIST_FILE"
-        printf '# readme\nclean text.\n' > "$d/README.md"
+        for f in $DOCS; do printf '# doc\nclean text.\n' > "$d/$f"; done
         printf '%s' "$d"
     }
-    check() { # $1 = name, $2 = root, $3 = PASS|FAIL wanted
+    check() { # $1 = name, $2 = root, $3 = PASS|FAIL wanted, $4 = a line the output must hold (optional)
         if sweep "$2" > "$2.out" 2>&1 < /dev/null; then got=PASS; else got=FAIL; fi
-        if [ "$got" = "$3" ]; then echo "  ok   $1: $got"; else echo "  FAIL $1: $got, wanted $3"; bad=1; fi
+        if [ "$got" != "$3" ]; then echo "  FAIL $1: $got, wanted $3"; bad=1
+        elif [ -n "${4:-}" ] && ! "$GREP" -qF -- "$4" "$2.out"; then echo "  FAIL $1: $got, without the line \"$4\""; bad=1
+        else echo "  ok   $1: $got"; fi
     }
     d=$(case_tree clean);        check "clean tree" "$d" PASS
     d=$(case_tree stem);         printf 'The pass guarantees removal.\n' >> "$d/README.md"; check "an inflection of a listed stem" "$d" FAIL
@@ -215,6 +288,7 @@ self_test() {
     d=$(case_tree engine);       printf 'LayerCopy(short: "Ensures every page is clean", detail: "")\n' > "$d/Packages/RedactionEngine/Sources/RedactionEngine/Verification/X.swift"; check "a verification copy literal" "$d" FAIL
     d=$(case_tree comment);      printf '// what the app "guarantees" is not the point\n/// a "guarantee" in a doc comment\n' > "$d/Sources/ResectaApp/Views/X.swift"; check "a quoted word in a comment line" "$d" PASS
     d=$(case_tree device);       printf 'Your documents never leave the phone.\n' >> "$d/README.md"; check "the doc-only device-boundary pattern" "$d" FAIL
+    d=$(case_tree emptyedge);    printf 'public enum LegalPhrases {\n    public static let bannedTerms: [String] = [\n        "guarantee",\n    ]\n    public static let wordEdgeTerms: [String] = [\n    ]\n}\n' > "$d/$LIST_FILE"; check "an empty word-edge list fails closed" "$d" FAIL
     d=$(case_tree emptylist);    printf 'public enum LegalPhrases {\n    public static let bannedTerms: [String] = [\n    ]\n}\n' > "$d/$LIST_FILE"; check "an empty banned list fails closed" "$d" FAIL
 
     # The length-claim stems. A literal's case reads the list file of record,
@@ -231,6 +305,8 @@ self_test() {
             lit) d=$(stem_tree "s$n"); LENGTH_PATTERNS=off; printf '%s\n' "$line" >> "$d/README.md"
                  check "literal $id catches its line" "$d" FAIL; LENGTH_PATTERNS=on ;;
             pat) d=$(case_tree "s$n"); printf '%s\n' "$line" >> "$d/README.md"; check "pattern $id catches its line" "$d" FAIL ;;
+            edge) d=$(stem_tree "s$n"); LENGTH_PATTERNS=off; printf '%s\n' "$line" >> "$d/README.md"
+                 check "word-edge term $id catches its line" "$d" FAIL; LENGTH_PATTERNS=on ;;
             ok)  d=$(stem_tree "s$n"); printf '%s\n' "$line" >> "$d/README.md"; check "innocent line $id passes" "$d" PASS ;;
         esac
     done <<'LINES'
@@ -251,11 +327,12 @@ lit|cannot show how long|A widened box cannot show how long the text is.
 lit|can't show how long|A widened box can't show how long the text is.
 lit|no longer shows how long|The box no longer shows how long the name is.
 lit|can no longer show|A widened box can no longer show the name's length.
-lit|width says nothing|So their width says nothing about the text.
+lit|width says nothing|Their width says nothing.
 lit|says nothing about the text|The box says nothing about the text beyond that it fits.
 lit|no longer follows the text|The box's width then no longer follows the text.
 pat|L1|Each box hides how long the name is.
 pat|L2|Turn on Hide Text Length in Settings.
+pat|L2 alone|Turn on Hide              Text              Length in Settings.
 pat|L3|With the switch on, the length of the name is hidden.
 pat|L4|Widen Boxes masks the length of short names.
 pat|L5|Resecta draws those boxes to the edge of the column, so their width says nothing about the text beyond that it fits there.
@@ -287,13 +364,127 @@ ok|17|…so the gap is kept only in whole cells: 13 here, the same for any words
 ok|18|The ink check keeps a box from leaving ink past its edge.
 ok|19|Search finds the text you type without showing other forms of it.
 ok|20|Resecta re-sets each kept character in one fixed-width font.
+edge|proven|Proven removal on every page.
+edge|formally verified|The redaction engine is formally verified.
+edge|compliant|Exports are compliant with privacy law.
+edge|court-ready|Court-ready copies in one tap.
+edge|de-identified|Each shared copy is de-identified.
+edge|deidentified|The exported file is deidentified.
+edge|anonymised|Names are anonymised before you share.
+edge|anonymized|The shared copy is fully anonymized.
+edge|anonymous|Every redacted copy is anonymous.
+edge|anonymously|Share your redacted copy anonymously.
+edge|hipaa|Built for HIPAA workflows.
+edge|only narrows|A widened box only narrows the list of possible names.
+edge|a few bits|A box leaks only a few bits about the name.
+edge|safe from|Widened boxes are safe from AI models.
+ok|proven|OpenStreetMap (ODbL 1.0) — a provenance acknowledgement
+ok|formally verified|The fixture counts were informally verified by hand.
+ok|compliant|The form marks noncompliant entries in red.
+ok|court-ready|These shoes are hardcourt-ready.
+ok|de-identified|Each code-identified field is listed once.
+ok|deidentified|An identifier such as `isDeidentifiedCopy` is code, not copy.
+ok|anonymised|Redacted names can be deanonymised from what is left around them.
+ok|anonymized|A study deanonymized names from the words around them.
+ok|anonymous|Anonymousness is hard to measure.
+ok|anonymously|A setting named `reportAnonymously` is code, not copy.
+ok|hipaa|A key such as `hipaaMode` is code, not copy.
+ok|only narrows|The search commonly narrows to one page.
+ok|a few bits|The stream ends with an extra few bits of padding.
+ok|safe from|The old path was unsafe from the start.
 LINES
-    [ "$n" -eq 53 ] || { echo "  FAIL the stem cases: $n read, 53 wanted (20 literals, 13 patterns, 20 innocent lines)"; bad=1; }
+    [ "$n" -eq 82 ] || { echo "  FAIL the stem cases: $n read, 82 wanted (20 literals, 14 patterns, 14 word-edge terms, 34 innocent lines)"; bad=1; }
     d=$(case_tree wrapped);      printf 'The box'"'"'s width then no longer\nfollows the text.\n' >> "$d/README.md"; check "a length claim wrapped across two lines" "$d" FAIL
     d=$(case_tree blankstop);    printf 'Hidden\n\nlength of the name.\n' >> "$d/README.md"; check "a blank line ends a sentence" "$d" PASS
     d=$(case_tree lenmarker);    printf 'Each box hides how long the name is. <!-- LegalPhrases:safe -->\n' >> "$d/README.md"; check "a length claim on a marked line" "$d" PASS
     d=$(case_tree lenswift);     printf 'let s = "Widen Boxes masks the length of short names."\n' > "$d/Sources/ResectaApp/Views/X.swift"; check "a length claim in a Swift string literal" "$d" FAIL
+    d=$(case_tree unreadable);   chmod 000 "$d/README.md"; check "a listed document the matcher cannot read" "$d" FAIL; chmod 644 "$d/README.md"
+    # The banned-term legs alone (the length leg off): a file grep cannot
+    # read, and a listed document that is not there, each fail the sweep.
+    LENGTH_PATTERNS=off
+    d=$(case_tree unreaddoc);    chmod 000 "$d/README.md"; check "a listed document the banned-term matcher cannot read" "$d" FAIL \
+                                     "the banned terms could not be matched on README.md"; chmod 644 "$d/README.md"
+    d=$(case_tree missingdoc);   rm "$d/NOTICE"; check "a listed document that is missing" "$d" FAIL "NOTICE is listed and is not there"
+    d=$(case_tree unreadswift);  printf 'let s = "clean"\n' > "$d/Sources/ResectaApp/Views/X.swift"; chmod 000 "$d/Sources/ResectaApp/Views/X.swift"
+                                 check "a Swift file the banned-term matcher cannot read" "$d" FAIL \
+                                     "the banned terms could not be matched on every Swift file"; chmod 644 "$d/Sources/ResectaApp/Views/X.swift"
+    LENGTH_PATTERNS=on
     d=$(case_tree lencomment);   printf '// "Widen Boxes masks the length of short names." is banned\n' > "$d/Sources/ResectaApp/Views/X.swift"; check "a length claim in a Swift comment line" "$d" PASS
+    # A matcher that fails fails the sweep. A stand-in perl, first on PATH for
+    # these cases only, exits 3 for the one matcher call CL_PLANT names and
+    # hands every other call to the real perl: keep:<text> fails the banned-term
+    # matcher on input that holds <text>; length:doc and length:lines fail the
+    # length-claim matcher on a document and on the Swift lines.
+    real_perl=$(command -v perl)
+    mkdir -p "$T/plant"
+    cat > "$T/plant/perl" <<PLANT
+#!/bin/sh
+case "\$1" in
+    -ne) in=\$(cat)
+         case "\$CL_PLANT" in keep:*) case "\$in" in *"\${CL_PLANT#keep:}"*) exit 3 ;; esac ;; esac
+         printf '%s\n' "\$in" | exec "$real_perl" "\$@" ;;
+    -e)  case "\$CL_PLANT" in
+             length:doc) [ "\$3" = doc ] && exit 3 ;;
+             length:lines) [ "\$3" = lines ] && exit 3 ;;
+         esac ;;
+esac
+exec "$real_perl" "\$@"
+PLANT
+    chmod +x "$T/plant/perl"
+    # A stand-in awk does the same for the line filters: filter:banned and
+    # filter:length fail the Swift string-literal filter of that leg, and strip
+    # fails the cut of the root from a document's length-claim lines.
+    real_awk=$(command -v awk)
+    cat > "$T/plant/awk" <<PLANT
+#!/bin/sh
+case "\${CL_PLANT:-}" in
+    filter:*) [ "\${CL_LEG:-}" = "\${CL_PLANT#filter:}" ] && exit 3 ;;
+    strip) [ -n "\${CL_ROOT:-}" ] && exit 3 ;;
+esac
+exec "$real_awk" "\$@"
+PLANT
+    chmod +x "$T/plant/awk"
+    plant() { # $1 = CL_PLANT value, $2 = case name, $3 = root, $4 = the failure line the output must hold
+        saved_path=$PATH; PATH="$T/plant:$PATH"; CL_PLANT=$1; export CL_PLANT
+        check "$2" "$3" FAIL "$4"
+        PATH=$saved_path; unset CL_PLANT
+    }
+    LENGTH_PATTERNS=off
+    d=$(case_tree keepdoc);      printf 'This guarantees removal, plantdoc.\n' >> "$d/README.md"
+                                 plant keep:plantdoc "a banned-term matcher that fails on a listed document" "$d" \
+                                     "the banned-term matcher did not run on README.md"
+    d=$(case_tree keepswift);    printf 'let s = "this guarantees removal, plantswift"\n' > "$d/Sources/ResectaApp/Views/X.swift"
+                                 plant keep:plantswift "a banned-term matcher that fails on the Swift string literals" "$d" \
+                                     "the banned-term matcher did not run on the Swift string literals"
+    LENGTH_PATTERNS=on
+    d=$(case_tree lengthdoc);    plant length:doc "a length-claim matcher that fails on a listed document" "$d" \
+                                     "the length-claim patterns did not run on README.md"
+    d=$(case_tree lengthswift);  printf 'let s = "clean"\n' > "$d/Sources/ResectaApp/Views/X.swift"
+                                 plant length:lines "a length-claim matcher that fails on the Swift string literals" "$d" \
+                                     "the length-claim patterns did not run on the Swift string literals"
+    LENGTH_PATTERNS=off
+    d=$(case_tree filterbanned); printf 'let s = "clean"\n' > "$d/Sources/ResectaApp/Views/X.swift"
+                                 plant filter:banned "a Swift line filter that fails for the banned terms" "$d" \
+                                     "the Swift string literals could not be filtered for the banned terms"
+    LENGTH_PATTERNS=on
+    d=$(case_tree filterlength); printf 'let s = "clean"\n' > "$d/Sources/ResectaApp/Views/X.swift"
+                                 plant filter:length "a Swift line filter that fails for the length claims" "$d" \
+                                     "the Swift string literals could not be filtered for the length claims"
+    d=$(case_tree strip);        plant strip "a cut of the root that fails on a document's length claims" "$d" \
+                                     "the length claims on README.md could not be shown"
+
+    # The tree's own path is read as text, never as a pattern: a path holding
+    # an unpaired "[" or a pair such as "[ab]" changes no verdict.
+    d=$(case_tree 'brack[et');   printf 'let s = "this guarantees removal"\n' > "$d/Sources/ResectaApp/Views/X.swift"
+                                 check "a banned term in a Swift literal, in a tree whose path holds [" "$d" FAIL \
+                                     "CLAIMS-LINT FAIL (Swift string literals):"
+    d=$(case_tree 'pair[ab]');   check "a clean tree whose path holds [ab]" "$d" PASS
+    d=$(case_tree 'lendoc[et');  printf 'Each box hides how long the name is.\n' >> "$d/README.md"
+                                 check "a length claim in a document, in a tree whose path holds [" "$d" FAIL \
+                                     "CLAIMS-LINT FAIL (length claim): README.md"
+    d=$(case_tree 'lenswift[et'); printf 'let s = "Widen Boxes masks the length of short names."\n' > "$d/Sources/ResectaApp/Views/X.swift"
+                                 check "a length claim in a Swift literal, in a tree whose path holds [" "$d" FAIL \
+                                     "CLAIMS-LINT FAIL (length claim, Swift string literals):"
     if [ "$bad" -eq 0 ]; then echo "claims-lint --self-test: PASS"; else echo "claims-lint --self-test: FAIL"; return 1; fi
 }
 

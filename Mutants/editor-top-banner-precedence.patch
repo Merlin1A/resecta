@@ -1,0 +1,20 @@
+Property: The editor's top slot shows the paused notice before the import annotation notice.
+Area: editor top slot
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/TopBannerSlotTests
+Must go red: ResectaAppTests/TopBannerSlotTests precedence; ResectaAppTests/TopBannerSlotTests pausedTakesTheSlot
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/DocumentEditorView+TopBanner.swift b/Sources/ResectaApp/Views/DocumentEditorView+TopBanner.swift
+index 4f5ff650..a608be67 100644
+--- a/Sources/ResectaApp/Views/DocumentEditorView+TopBanner.swift
++++ b/Sources/ResectaApp/Views/DocumentEditorView+TopBanner.swift
+@@ -14,8 +14,8 @@ enum TopBannerSlot: Equatable {
+ 
+     /// The precedence: paused beats the annotation notice.
+     static func winner(paused: Bool, annotation: Bool) -> TopBannerSlot? {
+-        if paused { return .paused }
+         if annotation { return .annotation }
++        if paused { return .paused }
+         return nil
+     }
+ 

@@ -1,0 +1,26 @@
+Property: The run records what it searched for on the line after the one that builds its query.
+Area: Return in the Search field
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/SearchReturnRuleSourcePinTests
+Must go red: ResectaAppTests/SearchReturnRuleSourcePinTests recordSitsBesideTheQuery
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/Search/SearchAndRedactSheet+Trigger.swift b/Sources/ResectaApp/Views/Search/SearchAndRedactSheet+Trigger.swift
+index 5638fb18..2b6cffa9 100644
+--- a/Sources/ResectaApp/Views/Search/SearchAndRedactSheet+Trigger.swift
++++ b/Sources/ResectaApp/Views/Search/SearchAndRedactSheet+Trigger.swift
+@@ -189,6 +189,7 @@ extension SearchAndRedactSheet {
+         // apart by it and dropped, so its late batch can never land
+         // in this run's list.
+         let run = searchState.beginRun()
++        searchState.lastRunShape = searchState.currentRunShape
+ 
+         // Pre-validate regex before starting search.
+         // Surface the rejection reason —
+@@ -245,7 +246,6 @@ extension SearchAndRedactSheet {
+         }
+ 
+         let mode = buildSearchMode()
+-        searchState.lastRunShape = searchState.currentRunShape  // read in the same stretch as the query above
+         searchState.totalPages = liveDoc.pageCount
+ 
+         // Snapshot the user-selected preset's

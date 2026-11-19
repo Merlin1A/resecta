@@ -95,10 +95,10 @@ nonisolated final class SearchRecheckUITests: XCTestCase {
         attachScreenshot(named: "search-recheck-01-checks-passed")
 
         // The headline states the counts (label = "{Title}. {P} of {T}
-        // checks passed. … {sentence}"). Every check passed, so the rows
-        // render as one `Checks` list below the fold — scroll for them;
-        // elements outside the scroll view's visible region are not
-        // reliably served to XCUITest.
+        // checks passed. … {sentence}"). Every check passed, so the checks
+        // fold into one closed row below the fold: scroll to it and open it
+        // before reading a check's row; elements outside the scroll view's
+        // visible region are not reliably served to XCUITest.
         let results = app.scrollViews["verificationResults"]
         XCTAssertTrue(results.waitForExistence(timeout: 10), "Results scroll view not found.")
         let masthead = app.descendants(matching: .any)["verificationMasthead"]
@@ -106,6 +106,24 @@ nonisolated final class SearchRecheckUITests: XCTestCase {
         XCTAssertTrue(masthead.label.hasPrefix("Checks Passed. 7 of 7 checks passed."),
                       "Secure Rasterization runs a 7-layer check, every one passing: \(masthead.label)")
         results.swipeUp()
+        // The Detection Sweep's limit is in view before any row is tapped:
+        // on the sweep's own row where that row is in view, else in the
+        // card of facts.
+        let limit = app.descendants(matching: .any).matching(
+            NSPredicate(format: #"label CONTAINS "Names and addresses are not swept.""#)).firstMatch
+        var limitScrolls = 0
+        while !limit.exists && limitScrolls < 4 {
+            results.swipeUp()
+            limitScrolls += 1
+        }
+        XCTAssertTrue(limit.waitForExistence(timeout: 10), "The Detection Sweep's limit is not in view before any row is tapped.")
+        XCTAssertTrue(app.descendants(matching: .any)["sweepLimitFact"].exists,
+                      "The sweep's row is inside the closed row, so the card holds the limit.")
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "layerResult_5").firstMatch.exists,
+                       "On a run where every check passed, the checks are inside the closed row.")
+        let cluster = app.buttons["passedChecksCluster"]
+        XCTAssertTrue(cluster.waitForExistence(timeout: 10), "The passed checks' row never appeared.")
+        cluster.tap()
 
         // The sixth row (zero-indexed identifier) is the Search Re-check in
         // Secure Rasterization. Collapsed, the row is one combined element
@@ -169,14 +187,32 @@ nonisolated final class SearchRecheckUITests: XCTestCase {
         XCTAssertTrue(results.waitForExistence(timeout: 10), "Results scroll view not found.")
         let masthead = app.descendants(matching: .any)["verificationMasthead"]
         XCTAssertTrue(masthead.waitForExistence(timeout: 10), "The results headline not found.")
-        XCTAssertTrue(masthead.label.contains("5 of 7 checks passed. 2\u{00A0}had nothing to check."),
+        XCTAssertTrue(masthead.label.contains("5 of 5 checks passed. 2\u{00A0}had nothing to check."),
                       "No typed search and no captured term: the re-check and the term check had nothing to check: \(masthead.label)")
         results.swipeUp()
-        // The idle re-check sits above the pass cluster, so the cluster
-        // starts collapsed: open it to reach the sweep's row.
+        // The Detection Sweep's limit is in view before any row is tapped:
+        // on the sweep's own row where that row is in view, else in the
+        // card of facts.
+        let limit = app.descendants(matching: .any).matching(
+            NSPredicate(format: #"label CONTAINS "Names and addresses are not swept.""#)).firstMatch
+        var limitScrolls = 0
+        while !limit.exists && limitScrolls < 4 {
+            results.swipeUp()
+            limitScrolls += 1
+        }
+        XCTAssertTrue(limit.waitForExistence(timeout: 10), "The Detection Sweep's limit is not in view before any row is tapped.")
+        XCTAssertTrue(app.descendants(matching: .any)["sweepLimitFact"].exists,
+                      "The sweep's row is inside the closed row, so the card holds the limit.")
+        // The idle checks sit inside the passed checks' row with the passed
+        // ones, and the row starts closed: open it to reach the sweep's row.
+        let idleRecheck = app.descendants(matching: .any).matching(identifier: "layerResult_5").firstMatch
+        XCTAssertFalse(idleRecheck.exists, "The idle Search Re-check is inside the closed row.")
         let cluster = app.buttons["passedChecksCluster"]
         XCTAssertTrue(cluster.waitForExistence(timeout: 10), "The pass cluster never appeared.")
         cluster.tap()
+        XCTAssertTrue(idleRecheck.waitForExistence(timeout: 10), "The idle Search Re-check is not in the opened row.")
+        XCTAssertTrue(idleRecheck.label.contains("Nothing to check"),
+                      "The idle Search Re-check does not read as nothing to check: \(idleRecheck.label)")
 
         let row = app.descendants(matching: .any).matching(identifier: "layerResult_6").firstMatch
         var scrolls = 0

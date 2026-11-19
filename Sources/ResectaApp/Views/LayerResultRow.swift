@@ -18,12 +18,10 @@ struct LayerResultRow: View {
 
     /// Where a grouped row starts: `.lead` — the outcome mark in the lead
     /// column, the title at 56 (the check sections, a riding note); `.member`
-    /// — the title at 56, no mark (a passing check inside the cluster);
-    /// `.bare` — the title at 16 (the `Checks` list of a wholly clean run).
+    /// — the title at 56, no mark (a passing check inside the cluster).
     nonisolated enum GroupedLayout: Equatable {
         case lead
         case member
-        case bare
     }
 
     /// One item of the expanded block, in display order.
@@ -397,10 +395,15 @@ struct LayerResultRow: View {
     static let reviewInScanLabel = "Review in Scan"
 
     /// Review in Scan shows on a Detection Sweep row that reports possible
-    /// items remaining — the row whose page links open a Preview with
-    /// nothing marked (the sweep keeps pages, not locations).
+    /// items remaining, in both of its forms: the note, and the needs-review
+    /// row the sweep reports when an item is in a category the person's own
+    /// Scan applied. Either row's page links open a Preview with nothing
+    /// marked (the sweep keeps pages, not locations). The row that could not
+    /// read a page does not offer it.
     static func offersReviewInScan(layer: LayerResult) -> Bool {
-        VerificationRowModel.hasItemsRemaining(layer)
+        layer.layer == .detectionSweep
+            && (layer.status.isInfo || layer.status.isAttention)
+            && layer.queryLines != nil
     }
 
     static func rowCaptionText(layer: LayerResult) -> String? {
@@ -564,8 +567,7 @@ struct LayerResultRow: View {
     }
 
     /// [mark] title / caption / gate / meta line [chevron]: the mark in a
-    /// 28-pt column, the title at 56; a bare pass row starts its title at
-    /// 16 (the clean `Checks` list), a cluster member at 56 with no mark.
+    /// 28-pt column, the title at 56; a cluster member at 56 with no mark.
     private var groupedHeader: some View {
         HStack(alignment: .top, spacing: 0) {
             switch groupedLayout {
@@ -580,8 +582,6 @@ struct LayerResultRow: View {
                     .accessibilityHidden(true)
             case .member:
                 Color.clear.frame(width: ResectaTokens.Results.titleInset, height: 1)
-            case .bare:
-                Color.clear.frame(width: ResectaTokens.Spacing.md, height: 1)
             }
             VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xxs) {
                 Text(model.title)
@@ -690,10 +690,11 @@ struct LayerResultRow: View {
             if let onReviewInScan, Self.offersReviewInScan(layer: layer) {
                 Button(Self.reviewInScanLabel, action: onReviewInScan)
                     .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ResectaTokens.BrandTeal.text)
                     .accessibilityIdentifier("reviewInScanButton")
             }
         }
-        .padding(.leading, groupedLayout == .bare ? ResectaTokens.Spacing.md : ResectaTokens.Results.titleInset)
+        .padding(.leading, ResectaTokens.Results.titleInset)
         .padding(.trailing, ResectaTokens.Spacing.md)
         .padding(.bottom, ResectaTokens.Spacing.md - 2)
         .transition(ResectaTokens.Anim.resolvedTransition(

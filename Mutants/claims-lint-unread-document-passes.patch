@@ -1,0 +1,21 @@
+Property: A listed document that the banned-term grep cannot read fails the lint.
+Area: claims lint (Scripts/claims-lint.sh)
+Test command: Scripts/claims-lint.sh --self-test
+Must go red: the self-test case "a listed document the banned-term matcher cannot read" (the self-test ends FAIL)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Scripts/claims-lint.sh b/Scripts/claims-lint.sh
+index 3c4a664c..5f3f2f99 100755
+--- a/Scripts/claims-lint.sh
++++ b/Scripts/claims-lint.sh
+@@ -153,10 +153,6 @@ sweep() { # $1 = the tree root
+         fi
+         # grep exits 1 for no match and 2 when it cannot read the file.
+         grc=0; raw=$("$GREP" -nEi "$PATTERNS" "$ROOT/$f") || grc=$?
+-        if [ "$grc" -gt 1 ]; then
+-            echo "CLAIMS-LINT FAIL: the banned terms could not be matched on $f"
+-            fail=1
+-        fi
+         hits=$(printf '%s\n' "$raw" | keep_offending "$PATTERNS") || {
+             echo "CLAIMS-LINT FAIL: the banned-term matcher did not run on $f"
+             fail=1

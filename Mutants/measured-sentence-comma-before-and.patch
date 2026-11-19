@@ -1,0 +1,19 @@
+Property: Three or more names take a comma before the "and".
+Area: measured sentence
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/MeasuredLineKindsTests
+Must go red: ResectaAppTests/MeasuredLineKindsTests "Each list of kinds gives its approved sentence": the five rows of three or four kinds
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Models/MeasuredLineKinds.swift b/Sources/ResectaApp/Models/MeasuredLineKinds.swift
+index d7efebb7..5f35e29a 100644
+--- a/Sources/ResectaApp/Models/MeasuredLineKinds.swift
++++ b/Sources/ResectaApp/Models/MeasuredLineKinds.swift
+@@ -34,7 +34,7 @@ enum MeasuredLineKinds {
+         case 0: ""
+         case 1: names[0]
+         case 2: "\(names[0]) and \(names[1])"
+-        default: names.dropLast().joined(separator: ", ") + ", and " + names[names.count - 1]
++        default: names.dropLast().joined(separator: ", ") + " and " + names[names.count - 1]
+         }
+     }
+ 

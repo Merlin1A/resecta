@@ -373,16 +373,16 @@ struct SearchAndRedactSheet: View {
             #endif
         }
         .onDisappear {
-            // The app-level host clears the page bar alone from here.
-            toastManager.bottomClearance = toastBottomClearance(sheetPresented: false)
+            // The host clears the page bar alone, unless the cover took the content.
+            toastManager.bottomClearance = toastBottomClearance(sheetPresented: captureMonitor.isShielded)
             // Cancel the in-flight debounce task on sheet dismissal: a
             // debounce sleep started just before `.onDisappear` would
             // otherwise resolve into a wasted scan.
             searchDebounceTask?.cancel()
             searchDebounceTask = nil
-            // A session parked for the Home close dialog keeps its results
-            // and selections for Cancel; everything else tears down.
-            guard !searchState.parkedForHomeClose else { return }
+            // A session parked for the Home close dialog, or covered by the
+            // capture cover, keeps its work; everything else tears down.
+            guard Self.contentLeavingTearsDown(parked: searchState.parkedForHomeClose, covered: captureMonitor.isShielded) else { return }
             searchState.cancelSearchWithoutAwait()
             searchState.clearLivePreview()
             searchState.clear()
@@ -443,7 +443,7 @@ struct SearchAndRedactSheet: View {
                 plan,
                 to: searchState,
                 toastManager: toastManager,
-                redactionState: redactionState,
+                redactionState: redactionState, documentState: documentState,
                 snapshot: snapshot,
                 isProgrammatic: isProgrammatic,
                 unappliedCount: Self.unappliedMatchCount(in: searchState),
@@ -584,10 +584,10 @@ struct SearchAndRedactSheet: View {
                         )
                         switch outcome {
                         case .rejectedEmpty:
-                            // Return on an empty field with terms staged
-                            // re-runs the current set — the affordance
-                            // the not-run empty state names.
-                            if !searchState.searchTerms.isEmpty {
+                            // Return on an empty field runs the staged
+                            // terms, unless their results are listed or
+                            // arriving (`SearchState.returnStartsRun`).
+                            if searchState.returnStartsRun {
                                 triggerSearch()
                             }
                             return
@@ -625,11 +625,11 @@ struct SearchAndRedactSheet: View {
                     // deliberately does not auto-run, and for short
                     // queries below the debounce floor.
                     .onSubmit {
-                        // Trimmed gate (mirrors multi-term's
-                        // validator): a whitespace-only Return must not
-                        // run an invisible query.
-                        if !searchState.queryText
-                            .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        // A whitespace-only Return runs nothing, and a
+                        // Return on the search whose results are listed
+                        // or arriving only puts the keyboard away
+                        // (`SearchState.returnStartsRun`).
+                        if searchState.returnStartsRun {
                             triggerSearch()
                         }
                     }
@@ -683,7 +683,7 @@ struct SearchAndRedactSheet: View {
     ) -> some View {
         Image(systemName: systemName)
             .font(.system(size: glyphPointSize))
-            .foregroundStyle(.tint)
+            .foregroundStyle(ResectaTokens.BrandTeal.text)
             .frame(width: diameter, height: diameter)
             .background(CircularIconButtonStyle.wash, in: Circle())
             .frame(
@@ -867,19 +867,19 @@ struct SearchAndRedactSheet: View {
                 Text("\(idx + 1)/\(searchState.totalCount)")
                     .font(site.counterFont)
                     .monospacedDigit()
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                     .accessibilityLabel("Result \(idx + 1) of \(searchState.totalCount)")
             } else if let filteredPos = searchState.currentResultFilteredPosition {
                 Text("\(filteredPos)/\(searchState.filteredCount)")
                     .font(site.counterFont)
                     .monospacedDigit()
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                     .accessibilityLabel("Result \(filteredPos) of \(searchState.filteredCount), \(searchState.totalCount - searchState.filteredCount) filtered")
             } else {
                 Text("–/\(searchState.filteredCount)")
                     .font(site.counterFont)
                     .monospacedDigit()
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                     .accessibilityLabel("Current result hidden by filters, \(searchState.filteredCount) of \(searchState.totalCount) shown")
             }
         }

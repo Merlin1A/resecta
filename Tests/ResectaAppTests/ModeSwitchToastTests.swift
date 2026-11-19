@@ -21,6 +21,7 @@ struct ModeSwitchToastTests {
     func userSwitchEnqueuesToast() {
         let manager = ToastQueueManager()
         let rs = RedactionState()
+        let doc = Self.editingDocument()
         let state = SearchState()
         state.results = [
             makeResult(page: 0),
@@ -37,6 +38,7 @@ struct ModeSwitchToastTests {
         SearchAndRedactSheet.enqueueModeSwitchUndoToast(
             on: manager,
             redactionState: rs,
+            documentState: doc,
             snapshot: snapshot,
             isProgrammatic: false,
             unappliedCount: unapplied
@@ -53,6 +55,7 @@ struct ModeSwitchToastTests {
     func singularSuffix() {
         let manager = ToastQueueManager()
         let rs = RedactionState()
+        let doc = Self.editingDocument()
         let state = SearchState()
         state.results = [makeResult(page: 0)]
         // 0 applied → 1 unapplied.
@@ -63,6 +66,7 @@ struct ModeSwitchToastTests {
         SearchAndRedactSheet.enqueueModeSwitchUndoToast(
             on: manager,
             redactionState: rs,
+            documentState: doc,
             snapshot: snapshot,
             isProgrammatic: false,
             unappliedCount: unapplied
@@ -75,6 +79,7 @@ struct ModeSwitchToastTests {
     func emptyStateNoToast() {
         let manager = ToastQueueManager()
         let rs = RedactionState()
+        let doc = Self.editingDocument()
         let state = SearchState()
         // Empty results array → nothing cleared → no toast.
 
@@ -82,6 +87,7 @@ struct ModeSwitchToastTests {
         SearchAndRedactSheet.enqueueModeSwitchUndoToast(
             on: manager,
             redactionState: rs,
+            documentState: doc,
             snapshot: snapshot,
             isProgrammatic: false,
             unappliedCount: 0
@@ -94,6 +100,7 @@ struct ModeSwitchToastTests {
     func allAppliedClearToasts() {
         let manager = ToastQueueManager()
         let rs = RedactionState()
+        let doc = Self.editingDocument()
         let state = SearchState()
         let r1 = makeResult(page: 0)
         let r2 = makeResult(page: 1)
@@ -107,6 +114,7 @@ struct ModeSwitchToastTests {
         SearchAndRedactSheet.enqueueModeSwitchUndoToast(
             on: manager,
             redactionState: rs,
+            documentState: doc,
             snapshot: snapshot,
             isProgrammatic: false,
             unappliedCount: unapplied
@@ -121,6 +129,7 @@ struct ModeSwitchToastTests {
     func programmaticSwitchSkipsToast() {
         let manager = ToastQueueManager()
         let rs = RedactionState()
+        let doc = Self.editingDocument()
         let state = SearchState()
         state.results = [makeResult(page: 0), makeResult(page: 0), makeResult(page: 1)]
         // 3 unapplied, but the transition is programmatic (a saved-search recall).
@@ -130,6 +139,7 @@ struct ModeSwitchToastTests {
         SearchAndRedactSheet.enqueueModeSwitchUndoToast(
             on: manager,
             redactionState: rs,
+            documentState: doc,
             snapshot: snapshot,
             isProgrammatic: state.isProgrammaticModeChange,
             unappliedCount: SearchAndRedactSheet.unappliedMatchCount(in: state)
@@ -144,6 +154,7 @@ struct ModeSwitchToastTests {
     func undoRestoresSession() async throws {
         let manager = ToastQueueManager()
         let rs = RedactionState()
+        let doc = Self.editingDocument()
         let state = SearchState()
         let r1 = makeResult(page: 0)
         let r2 = makeResult(page: 1)
@@ -165,6 +176,7 @@ struct ModeSwitchToastTests {
         SearchAndRedactSheet.enqueueModeSwitchUndoToast(
             on: manager,
             redactionState: rs,
+            documentState: doc,
             snapshot: snapshot,
             isProgrammatic: false,
             unappliedCount: unapplied
@@ -199,6 +211,7 @@ struct ModeSwitchToastTests {
     func undoRestoresIntoReopenedSession() async throws {
         let manager = ToastQueueManager()
         let rs = RedactionState()
+        let doc = Self.editingDocument()
         let original = SearchState()
         let r1 = makeResult(page: 0)
         original.results = [r1]
@@ -208,6 +221,7 @@ struct ModeSwitchToastTests {
         SearchAndRedactSheet.enqueueModeSwitchUndoToast(
             on: manager,
             redactionState: rs,
+            documentState: doc,
             snapshot: snapshot,
             isProgrammatic: false,
             unappliedCount: 1
@@ -231,6 +245,7 @@ struct ModeSwitchToastTests {
     func undoMintsAndPresentsWhenNoSheetIsUp() async throws {
         let manager = ToastQueueManager()
         let rs = RedactionState()
+        let doc = Self.editingDocument()
         let original = SearchState()
         let r1 = makeResult(page: 1)
         original.results = [r1]
@@ -239,6 +254,7 @@ struct ModeSwitchToastTests {
         SearchAndRedactSheet.enqueueModeSwitchUndoToast(
             on: manager,
             redactionState: rs,
+            documentState: doc,
             snapshot: snapshot,
             isProgrammatic: false,
             unappliedCount: 1
@@ -260,6 +276,7 @@ struct ModeSwitchToastTests {
     func undoNoOpsAfterRedactionStateDeallocated() async throws {
         let manager = ToastQueueManager()
         var rs: RedactionState? = RedactionState()
+        let doc = Self.editingDocument()
         let state = SearchState()
         state.results = [makeResult(page: 0)]
 
@@ -267,6 +284,7 @@ struct ModeSwitchToastTests {
         SearchAndRedactSheet.enqueueModeSwitchUndoToast(
             on: manager,
             redactionState: rs!,
+            documentState: doc,
             snapshot: snapshot,
             isProgrammatic: false,
             unappliedCount: 1
@@ -368,6 +386,107 @@ struct ModeSwitchToastTests {
         await Task.yield()
         #expect(state.activeSearch == nil,
                 "the deferred teardown must fire on the next runloop turn")
+    }
+
+    // MARK: - Run start and phase
+
+    @Test("A run start removes the mode-switch Undo")
+    func runStartRemovesTheModeSwitchUndo() {
+        let coord = makeLoadedCoordinator()
+        let toasts = ToastQueueManager()
+        coord.toastManager = toasts
+        coord.redactionState.addRegion(
+            RedactionRegion(id: UUID(), normalizedRect: CGRect(x: 0.10, y: 0.10, width: 0.05, height: 0.02),
+                            source: .manual),
+            page: 0, undoManager: nil)
+        let state = SearchState()
+        state.results = [makeResult(page: 0)]
+        let snapshot = SearchAndRedactSheet.modeSwitchSnapshot(of: state, previousMode: .text)
+        state.clearResults()
+        SearchAndRedactSheet.enqueueModeSwitchUndoToast(
+            on: toasts,
+            redactionState: coord.redactionState,
+            documentState: coord.documentState,
+            snapshot: snapshot,
+            isProgrammatic: false,
+            unappliedCount: 1
+        )
+        #expect(toasts.activeToasts.count == 1)
+        #expect(toasts.activeToasts.first?.actionHandler != nil, "the mode-switch Undo is up before the run")
+
+        coord.runFullPipeline(documentOverride: nil)
+        defer { coord.documentState.cancelActivePipeline(redactionState: coord.redactionState) }
+
+        #expect(coord.documentState.activePipelineTask != nil, "the run started")
+        #expect(!toasts.activeToasts.contains { $0.actionHandler != nil })
+    }
+
+    /// Every phase other than editing, one row each.
+    enum NotEditingPhase: String, CaseIterable, CustomTestStringConvertible {
+        case empty, importing, detecting, redacting, verifying, verified, exporting, failed
+        var testDescription: String { self == .verified ? "verified (the results screen)" : rawValue }
+    }
+
+    private static func phase(_ row: NotEditingPhase) -> DocumentState.Phase {
+        switch row {
+        case .empty: .empty
+        case .importing: .importing
+        case .detecting: .detecting(progress: .init(currentPage: 0, totalPages: 1, currentStep: "Starting"))
+        case .redacting: .redacting(progress: .init(currentPage: 0, totalPages: 1, currentStep: "Starting"))
+        case .verifying:
+            .verifying(progress: .init(currentLayer: 1, totalLayers: 5, layerName: "Layer 1", completedLayers: []))
+        case .verified: .verified(report: VerificationReport(layers: [], overallStatus: .pass, durationSeconds: 0))
+        case .exporting: .exporting
+        case .failed: .failed(error: .importError(.corrupt), returnPhase: .empty)
+        }
+    }
+
+    @Test("Eight phases other than editing, each named once")
+    func notEditingPhaseCount() {
+        let kinds = NotEditingPhase.allCases.map { row -> DocumentState.PhaseKind in
+            let doc = DocumentState()
+            doc.phase = Self.phase(row)
+            return doc.phaseKind
+        }
+        #expect(NotEditingPhase.allCases.count == 8)
+        #expect(Set(kinds).count == 8)
+        #expect(!kinds.contains(.editing))
+    }
+
+    @Test("Undo does nothing and opens nothing while the document is not being edited",
+          arguments: NotEditingPhase.allCases)
+    func undoDoesNothingOutsideEditing(_ row: NotEditingPhase) async throws {
+        let manager = ToastQueueManager()
+        let rs = RedactionState()
+        let doc = DocumentState()
+        let original = SearchState()
+        original.results = [makeResult(page: 0)]
+        let snapshot = SearchAndRedactSheet.modeSwitchSnapshot(of: original, previousMode: .text)
+        SearchAndRedactSheet.enqueueModeSwitchUndoToast(
+            on: manager,
+            redactionState: rs,
+            documentState: doc,
+            snapshot: snapshot,
+            isProgrammatic: false,
+            unappliedCount: 1
+        )
+        doc.phase = Self.phase(row)
+        #expect(rs.activeSearch == nil)
+
+        let toast = try #require(manager.activeToasts.first)
+        toast.actionHandler?()
+        await Task.yield()
+
+        #expect(rs.activeSearch == nil, "no session is created, so Search is not presented")
+    }
+
+    /// A document being edited, so the existing tests keep their meaning:
+    /// the mode switch's Undo restores only while editing. The test holds
+    /// it, since the Undo holds it weakly.
+    private static func editingDocument() -> DocumentState {
+        let doc = DocumentState()
+        doc.phase = .editing
+        return doc
     }
 
     private func makeResult(page: Int) -> SearchResult {

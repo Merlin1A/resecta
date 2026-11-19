@@ -54,7 +54,7 @@ A useful report generally contains:
 - A description of the issue and its impact on Resecta users or their documents.
 - Steps to reproduce, including the affected version, iOS version, and build configuration.
 - Any proof-of-concept artifacts, logs, or screenshots.
-- Your preferred credit line (or a request to remain anonymous).
+- Your preferred credit line (or a request to remain anonymous). <!-- LegalPhrases:safe -->
 
 ### What to expect
 

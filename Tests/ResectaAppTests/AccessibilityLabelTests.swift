@@ -30,7 +30,7 @@ struct AccessibilityLabelTests {
         // promise.
         #expect(
             SettingsView.defaultModeAccessibilityHint
-            == "Choose how redacted output is produced. Secure Rasterization produces image-only output with all text removed; Searchable Redaction preserves non-redacted text, except on pages whose text shows no ink; text covered by a picture in the page can still enter the text layer."
+            == "Choose how redacted output is produced. Secure Rasterization produces image-only output, with no text to search or copy. Searchable Redaction keeps a searchable copy of the text you did not box, less some words. A page whose text is invisible or shows no ink is exported as a picture. Text under a picture, bar, or cover already in the page, or stored as different words from those the page prints, can still enter the searchable copy."
         )
     }
 

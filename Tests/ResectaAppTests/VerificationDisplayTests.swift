@@ -64,8 +64,8 @@ struct VerificationDisplayTests {
 
     // `color` / `intermediateColor` above stay the GLYPH tier; `textColor`
     // is the SMALL-TEXT tier every non-glyph consumer routes through
-    // instead (VerificationResultsView's verdict capsule via
-    // RedactedPreviewView, ToastSeverity's mirrored mapping, etc.).
+    // instead (ToastSeverity's mirrored mapping, etc.); the Preview's verdict
+    // capsule reads the text tokens through verdictCapsuleColor, pinned below.
     @Test("textColor routes each status through the measured text tier",
           arguments: [
             (VerificationStatus.pass, ResectaTokens.SemanticColor.passText),
@@ -85,11 +85,11 @@ struct VerificationDisplayTests {
     // `.color` consumer (not just the three named glyph sites) — the
     // preview's verdict capsule is small `.caption` TEXT, so it was
     // missed by name-based searches keyed on "status"/"Status".
-    @Test("Source pin: RedactedPreviewView's verdict capsule routes through .textColor, not .color")
-    func redactedPreviewVerdictCapsuleUsesTextColor() throws {
+    @Test("Source pin: RedactedPreviewView's verdict capsule takes its colour from verdictCapsuleColor, not .color")
+    func redactedPreviewVerdictCapsuleUsesItsColourFunction() throws {
         let source = try loadRepoFile("Sources/ResectaApp/Views/RedactedPreviewView.swift")
-        #expect(source.contains("verdict?.textColor"),
-                "the verdict capsule's small-text tint must read .textColor")
+        #expect(source.contains("Self.verdictCapsuleColor(verdict: verdict)"),
+                "the verdict capsule's small-text tint must read verdictCapsuleColor, which returns the text tokens")
         #expect(!source.contains("verdict?.color"),
                 "the verdict capsule must not fall back to the glyph-tier .color")
     }
@@ -581,7 +581,7 @@ struct SearchRecheckQueryLineDisplayTests {
         let report = VerificationReport(
             layers: [layer2, layer3, layer], overallStatus: .attention("x"), durationSeconds: 0)
         #expect(VerificationResultsView.mastheadSubtitle(report: report)  // 9 found − 8 applied = the 1 left
-                == "You left 1 match of \u{201C}Delia\u{201D} unapplied; review it before you share.")
+                == "You left 1 match of \u{201C}Delia\u{201D} unredacted; review it before you share.")
         #expect(VerificationResultsView.reviewTermTexts(report: report) == ["Delia"])
         #expect(VerificationResultsView.detailsSummaryText(for: report) == "0 of 3 checks passed · 3\u{00A0}need review")
         // The OCR check's row composes the same sentence as the bytes search.

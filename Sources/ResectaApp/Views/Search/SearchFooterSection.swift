@@ -46,7 +46,7 @@ struct SearchFooterSection: View {
                     hiddenSelected: max(0, searchState.selectedCount - searchState.selectedFilteredCount)
                 ))
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
 
                 Spacer()
 
@@ -88,6 +88,7 @@ struct SearchFooterSection: View {
                     .contentShape(Rectangle())
             }
                 .controlSize(.small)
+                .tint(ResectaTokens.BrandTeal.text)
                 .accessibilityIdentifier("footerSelectAllButton")
         } else {
             // Custom prominent chrome — subheadline white label on a 36pt

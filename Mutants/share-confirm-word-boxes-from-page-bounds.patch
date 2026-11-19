@@ -1,0 +1,26 @@
+Property: The share confirm reads each character's box from its own selection: here from PDFPage's per-character bounds, which run one index late per line break, so a cover over a word on a later line is missed
+Area: Sharing, the covered-text confirm
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/CoverWidgetsTests
+Must go red: ResectaAppTests/CoverWidgetsTests coverOverAWordOnALaterLineConceals
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/ConcealingAnnotations.swift b/Sources/ResectaApp/Views/ConcealingAnnotations.swift
+index 8bddb8aa..0188275b 100644
+--- a/Sources/ResectaApp/Views/ConcealingAnnotations.swift
++++ b/Sources/ResectaApp/Views/ConcealingAnnotations.swift
+@@ -75,13 +75,8 @@ enum ConcealingAnnotations {
+                     endWord()
+                     continue
+                 }
+-                // Each character's box from its own selection, as the
+-                // engine's text-layer extractor reads it: PDFPage's
+-                // per-character bounds run one index late for each line
+-                // break before the character, so a word on a later line
+-                // would be boxed over the letters after it.
+-                guard let box = page.selection(for: NSRange(location: position, length: 1))?.bounds(for: page),
+-                      box.width > 0, box.height > 0 else { continue }
++                let box = page.characterBounds(at: position)
++                guard box.width > 0, box.height > 0 else { continue }
+                 word = word.union(box)
+             }
+             endWord()

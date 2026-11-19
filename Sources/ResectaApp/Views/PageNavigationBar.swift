@@ -7,8 +7,9 @@ import RedactionEngine
 // iPhone widths ("Previo…") — and the center counter drops the word
 // "Page"; the full words survive as accessibility labels. Matches the
 // sheet's result-nav chevron idiom. The whole-page control sits at the
-// trailing end in the same glyph grammar: one tap marks the page on
-// screen as a region, the next tap unmarks it. A one-page document gets
+// leading end, behind a hairline, in the same glyph grammar: one tap marks
+// the page on screen as a region, the next tap unmarks it. The count is one
+// grey at every number. A one-page document gets
 // the bar for its region count, without the page arrows or the control
 // (the editor's … menu keeps Mark Whole Page for that case).
 
@@ -23,6 +24,59 @@ struct PageNavigationBar: View {
         let marked = PageNavigationBar.isWholePageMarked(
             page: documentState.currentPageIndex, in: redactionState)
         HStack(spacing: ResectaTokens.Spacing.md) {
+            // The whole-page control. Never disabled: on a page it can
+            // show, the page on screen can always be marked or unmarked.
+            // Marked, it sits on a plain teal disc with a white glyph — a
+            // fill, never a second glass layer inside the glass bar.
+            if PageNavigationBar.showsMarkControl(pageCount: pageCount) {
+                Button {
+                    PageNavigationBar.toggleWholePage(
+                        redactionState: redactionState,
+                        documentState: documentState,
+                        undoManager: undoManager
+                    )
+                } label: {
+                    Image(systemName: "rectangle.inset.filled")
+                        .dynamicTypeSize(...PageNavigationBar.wholePageGlyphCeiling)
+                        .foregroundStyle(marked ? AnyShapeStyle(Color.white) : AnyShapeStyle(.tint))
+                        .frame(
+                            width: ResectaTokens.TouchTarget.minimum,
+                            height: ResectaTokens.TouchTarget.minimum
+                        )
+                        .background {
+                            if marked {
+                                Circle()
+                                    .fill(ResectaTokens.BrandTeal.fill)
+                                    .frame(
+                                        width: PageNavigationBar.markedDiscDiameter,
+                                        height: PageNavigationBar.markedDiscDiameter
+                                    )
+                            }
+                        }
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel(PageNavigationBar.wholePageActionLabel(marked: marked))
+                .accessibilityAddTraits(marked ? .isSelected : [])
+                .accessibilityIdentifier("pageNavMarkWholePage")
+                .accessibilityShowsLargeContentViewer {
+                    Label(PageNavigationBar.wholePageActionLabel(marked: marked), systemImage: "rectangle.inset.filled")
+                }
+                // The hairline between the control and the page arrows: an
+                // overlay, centred in the stack's gap, so the bar is no wider
+                // than without it. It takes no touch and is not spoken.
+                .overlay(alignment: .trailing) {
+                    Rectangle()
+                        .fill(Color(.separator))
+                        .frame(
+                            width: PageNavigationBar.wholePageDividerWidth,
+                            height: PageNavigationBar.wholePageDividerHeight(dynamicTypeSize: dynamicTypeSize)
+                        )
+                        .offset(x: (ResectaTokens.Spacing.md + PageNavigationBar.wholePageDividerWidth) / 2)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                }
+            }
+
             if PageNavigationBar.showsChevrons(pageCount: pageCount) {
                 Button {
                     PageNavigationBar.showPage(
@@ -53,38 +107,22 @@ struct PageNavigationBar: View {
             // At accessibility sizes the position stacks over the count,
             // each on one line (scaling down rather than breaking a word).
             let count = redactionState.regions[documentState.currentPageIndex]?.count ?? 0
-            let stacks = PageNavigationBar.counterStacks(dynamicTypeSize: dynamicTypeSize)
-            let counterLayout = stacks
-                ? AnyLayout(VStackLayout(spacing: 0))
-                : AnyLayout(HStackLayout(spacing: ResectaTokens.Spacing.xs))
-            counterLayout {
-                Text("\(documentState.currentPageIndex + 1) of \(pageCount)")
-                    .font(.subheadline.monospacedDigit())
-
-                if !stacks {
-                    Text("\u{B7}")
-                        .foregroundStyle(.quaternary)
-                        .padding(.horizontal, ResectaTokens.Spacing.xxs)
+            Group {
+                if PageNavigationBar.showsPageMenu(pageCount: pageCount) {
+                    // On two or more pages the counter opens the page menu.
+                    // Its tappable frame is floored to the shared touch
+                    // target round the drawing, without moving it.
+                    PageMenu(pageCount: pageCount) {
+                        counterDrawing(count: count, pageCount: pageCount)
+                            .frame(minHeight: ResectaTokens.TouchTarget.minimum)
+                            .contentShape(Rectangle())
+                    }
+                    .accessibilityHint(PageMenuWords.counterHint)
+                } else {
+                    counterDrawing(count: count, pageCount: pageCount)
+                        .accessibilityElement(children: .ignore)
                 }
-                // The count's slot is as wide as the wider of "0 regions"
-                // and the live count (both laid out, one hidden), so the
-                // bar keeps its width — and the whole-page control its
-                // place under the finger — when a tap adds the first
-                // region or removes the last.
-                ZStack(alignment: .leading) {
-                    Text(PageNavigationBar.regionCountLabel(0))
-                        .hidden()
-                        .accessibilityHidden(true)
-                    Text(PageNavigationBar.regionCountLabel(count))
-                        .foregroundStyle(count == 0
-                            ? AnyShapeStyle(.tertiary)
-                            : AnyShapeStyle(ResectaTokens.SemanticColor.regionCountAccent))
-                }
-                .font(.caption.monospacedDigit())
             }
-            .lineLimit(1)
-            .minimumScaleFactor(0.5)
-            .accessibilityElement(children: .ignore)
             .accessibilityLabel(PageNavigationBar.pageAccessibilityLabel(
                 page: documentState.currentPageIndex + 1,
                 pageCount: pageCount,
@@ -109,41 +147,6 @@ struct PageNavigationBar: View {
                 .accessibilityIdentifier("pageNavNext")
                 .disabled(documentState.currentPageIndex >= pageCount - 1)
             }
-
-            // The whole-page control. Never disabled: on a page it can
-            // show, the page on screen can always be marked or unmarked.
-            // Marked, it sits on a plain teal disc with a white glyph — a
-            // fill, never a second glass layer inside the glass bar.
-            if PageNavigationBar.showsMarkControl(pageCount: pageCount) {
-                Button {
-                    PageNavigationBar.toggleWholePage(
-                        redactionState: redactionState,
-                        documentState: documentState,
-                        undoManager: undoManager
-                    )
-                } label: {
-                    Image(systemName: "rectangle.inset.filled")
-                        .foregroundStyle(marked ? AnyShapeStyle(Color.white) : AnyShapeStyle(.tint))
-                        .frame(
-                            width: ResectaTokens.TouchTarget.minimum,
-                            height: ResectaTokens.TouchTarget.minimum
-                        )
-                        .background {
-                            if marked {
-                                Circle()
-                                    .fill(ResectaTokens.BrandTeal.fill)
-                                    .frame(
-                                        width: PageNavigationBar.markedDiscDiameter,
-                                        height: PageNavigationBar.markedDiscDiameter
-                                    )
-                            }
-                        }
-                        .contentShape(Rectangle())
-                }
-                .accessibilityLabel(PageNavigationBar.wholePageActionLabel(marked: marked))
-                .accessibilityAddTraits(marked ? .isSelected : [])
-                .accessibilityIdentifier("pageNavMarkWholePage")
-            }
         }
         .padding(.horizontal, ResectaTokens.Spacing.md)
         .padding(.vertical, ResectaTokens.Spacing.sm)
@@ -156,12 +159,63 @@ struct PageNavigationBar: View {
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("pageNav")
     }
+
+    /// The counter as drawn: the page position and the page's count, side by
+    /// side, or stacked at the accessibility sizes.
+    private func counterDrawing(count: Int, pageCount: Int) -> some View {
+        let stacks = PageNavigationBar.counterStacks(dynamicTypeSize: dynamicTypeSize)
+        let counterLayout = stacks
+            ? AnyLayout(VStackLayout(spacing: 0))
+            : AnyLayout(HStackLayout(spacing: ResectaTokens.Spacing.xs))
+        return counterLayout {
+            Text("\(documentState.currentPageIndex + 1) of \(pageCount)")
+                .font(.subheadline.monospacedDigit())
+
+            if !stacks {
+                Text("\u{B7}")
+                    .foregroundStyle(.quaternary)
+                    .padding(.horizontal, ResectaTokens.Spacing.xxs)
+            }
+            // The count's slot is as wide as the wider of "0 regions"
+            // and the live count (both laid out, one hidden), so the
+            // bar keeps its width — and the whole-page control its
+            // place under the finger — when a tap adds the first
+            // region or removes the last.
+            ZStack(alignment: .leading) {
+                Text(PageNavigationBar.regionCountLabel(0))
+                    .hidden()
+                    .accessibilityHidden(true)
+                Text(PageNavigationBar.regionCountLabel(count))
+                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+            }
+            .font(.caption.monospacedDigit())
+        }
+        .lineLimit(1)
+        .minimumScaleFactor(0.5)
+    }
 }
 
 extension PageNavigationBar {
     /// The marked control's disc: the 44-pt circle inside the control's
     /// 46-pt touch floor.
     static let markedDiscDiameter: CGFloat = 44
+
+    /// The largest text size the control's symbol grows to: at every larger
+    /// size it is drawn as at this one, so it stays inside its disc.
+    static let wholePageGlyphCeiling: DynamicTypeSize = .xxxLarge
+
+    /// The disc left showing beyond the symbol's corners at the ceiling, at
+    /// the least.
+    static let wholePageGlyphMargin: CGFloat = 4
+
+    /// The hairline after the control: 1 pt wide.
+    static let wholePageDividerWidth: CGFloat = 1
+
+    /// The hairline's height: 28 pt, or 44 pt at the accessibility sizes,
+    /// where the counter stacks.
+    static func wholePageDividerHeight(dynamicTypeSize: DynamicTypeSize) -> CGFloat {
+        counterStacks(dynamicTypeSize: dynamicTypeSize) ? 44 : 28
+    }
 
     /// The control's words, which are also the undo steps' names: Mark on
     /// an unmarked page, Unmark on a marked one.
@@ -188,6 +242,10 @@ extension PageNavigationBar {
 
     /// The page arrows step between pages: none on a one-page document.
     static func showsChevrons(pageCount: Int) -> Bool { pageCount > 1 }
+
+    /// The counter opens the page menu: not on a one-page document, where it
+    /// stays the plain counter.
+    static func showsPageMenu(pageCount: Int) -> Bool { pageCount > 1 }
 
     /// The bar's whole-page control: hidden on a one-page document, where
     /// the … menu's row keeps the action.

@@ -80,11 +80,11 @@ struct SearchToolbarSection: View {
                         .controlSize(.small)
                     Text("Scanning page \(searchState.currentSearchPage) of \(searchState.totalPages)…")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                     Spacer()
                     Text("\(searchState.totalCount) found")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                         .monospacedDigit()
                 }
                 .padding(.horizontal, ResectaTokens.Spacing.md)
@@ -127,7 +127,7 @@ struct SearchToolbarSection: View {
 
                     Text("Match despite differences in:")
                         .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                         .padding(.top, ResectaTokens.Spacing.xxs)
 
                     // Row 2 — normalization options. The two
@@ -259,11 +259,12 @@ struct SearchToolbarSection: View {
                         .foregroundStyle(ResectaTokens.SemanticColor.warningTint)
                     Text("Short terms may produce many results.")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                     Button("Search Anyway") {
                         onTriggerSearch()
                     }
                     .controlSize(.small)
+                    .tint(ResectaTokens.BrandTeal.text)
                     // Same in-flight gate as every other trigger control
                     // in this sheet; rapid re-taps must not race a
                     // second setup past the not-yet-assigned task.
@@ -370,6 +371,7 @@ struct SearchToolbarSection: View {
             }
             .font(.caption)
             .controlSize(.small)
+            .tint(ResectaTokens.BrandTeal.text)
             .disabled(searchState.isSearching)
             .accessibilityHidden(!visible)
             Spacer(minLength: 0)
@@ -552,6 +554,7 @@ struct SearchToolbarSection: View {
             )
             .contentShape(Rectangle())
         }
+        .tint(ResectaTokens.BrandTeal.text)
     }
 
     // MARK: - PII Category Filter Chips (Post-Scan)

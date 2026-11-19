@@ -1,0 +1,22 @@
+Property: A cut of the root that fails on a document's length-claim lines fails the lint.
+Area: claims lint (Scripts/claims-lint.sh)
+Test command: Scripts/claims-lint.sh --self-test
+Must go red: the self-test case "a cut of the root that fails on a document's length claims" (the self-test ends FAIL)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Scripts/claims-lint.sh b/Scripts/claims-lint.sh
+index 78ef4ae3..5163042b 100755
+--- a/Scripts/claims-lint.sh
++++ b/Scripts/claims-lint.sh
+@@ -191,10 +191,7 @@ sweep() { # $1 = the tree root
+                 echo "CLAIMS-LINT FAIL: the length-claim patterns did not run on $f"
+                 fail=1
+             fi
+-            hits=$(printf '%s' "$hits" | strip_root "$ROOT") || {
+-                echo "CLAIMS-LINT FAIL: the length claims on $f could not be shown"
+-                fail=1
+-            }
++            hits=$(printf '%s' "$hits" | strip_root "$ROOT")
+             if [ -n "$hits" ]; then
+                 echo "CLAIMS-LINT FAIL (length claim): $f"
+                 echo "$hits"

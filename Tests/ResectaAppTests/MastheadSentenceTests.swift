@@ -50,14 +50,14 @@ struct MastheadSentenceTests {
         #expect(sentence.count <= Results.mastheadSentenceLimit)
     }
 
-    @Test("A WARN with skipped checks names the setting the full run needs")
-    func skippedWarnNamesTheSetting() {
+    @Test("A WARN with a skipped check says to run Redact again with verification on, as approved")
+    func skippedWarnSaysRunAgainWithVerification() {
         let skipped = LayerResult(name: "Character Count", symbolName: "number", status: .skipped,
                                   shortDescription: "", detailDescription: "", pageReferences: nil,
                                   durationSeconds: 0, layer: .characterCount)
         let report = VerificationReport(layers: [skipped], overallStatus: .warn("w"), durationSeconds: 0)
         let sentence = Results.mastheadSubtitle(report: report) ?? ""
-        #expect(sentence.contains("Verify Before Export"), "\(sentence)")
+        #expect(sentence == "To include the skipped check, run Redact again with verification on.", "\(sentence)")
         #expect(sentence.count <= Results.mastheadSentenceLimit)
     }
 
@@ -83,7 +83,7 @@ struct MastheadSentenceTests {
     func keptOccurrenceIsNamedAsLeft() {
         let sentence = Results.attentionSentence(report: Self.keptReport(found: 644, applied: 643, remaining: 1))
         #expect(!sentence.text.contains("to redact \u{201C}Amount\u{201D}"))
-        #expect(sentence.text == "You left 1 match of \u{201C}Amount\u{201D} unapplied; review it before you share.")
+        #expect(sentence.text == "You left 1 match of \u{201C}Amount\u{201D} unredacted; review it before you share.")
         #expect(sentence.quotesTerms)
         #expect(sentence.text.count <= Results.mastheadSentenceLimit)
     }

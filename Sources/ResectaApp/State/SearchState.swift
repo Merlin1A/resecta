@@ -42,7 +42,7 @@ final class SearchState: Identifiable {
     var lastRunScanConfiguration: ScanRunConfiguration?
 
     /// One shot: the next run posts no re-run notice (a recall names its own
-    /// drop; an as-you-type run refines the query). Reset by that run.
+    /// drop, so its run says nothing more). Reset by that run.
     var skipNextRerunNotice = false
 
     /// One-shot arm for the toolbar Scan button's one-tap contract:
@@ -106,14 +106,14 @@ final class SearchState: Identifiable {
     /// `clearResults()` — every trigger clears before its guards run.
     var scanStartFailed = false
 
-    /// The last run's kickoff snapshots, so a later chip or option change
-    /// cannot rewrite the description of a run that already happened: the
-    /// Scan's detector count (the engine query's own `enabledCategories`;
-    /// nil until a Scan kicks off, reset by `clearResults()`) and the pages
-    /// a typed run reads by text recognition (set at every kickoff; the
-    /// no-match copy, `SearchEmptyStateCopy.ocrReadPageCount`).
+    /// The last run's kickoff snapshots, so a later chip, option or query change cannot
+    /// rewrite the description of a run that already happened: the Scan's detector count
+    /// (the engine query's own `enabledCategories`; nil until a Scan kicks off, reset by
+    /// `clearResults()`), the pages a typed run reads by text recognition (the no-match copy,
+    /// `SearchEmptyStateCopy.ocrReadPageCount`) and what it searched for (both at every kickoff).
     var lastRunDetectorCount: Int?
     var lastRunOCRPageCount = 0
+    var lastRunShape: SearchRunShape?
 
     /// Search options (toggles in UI).
     var options: SearchOptions = SearchOptions()

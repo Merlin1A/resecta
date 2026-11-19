@@ -68,6 +68,61 @@ struct VerificationResultsActionsTests {
                 + "Redact cleared undo; use Delete Region instead.")
     }
 
+    @Test("The undo words are drawn once, beside Keep Editing")
+    func undoWordsAreDrawnOnceBesideKeepEditing() throws {
+        typealias Place = Actions.UndoWordsPlace
+        // (seeded report, Share disabled, output exists, Preview available, where the words go)
+        let rows: [(String, Bool, Bool, Bool, Place)] = [
+            ("secureAllPass", false, true, true, .onKeepEditingRow),        // Keep Editing is a row
+            ("secureFail", false, true, true, .underCard),                  // it leads: failed
+            ("searchableAttentionFull", false, true, true, .underCard),     // it leads: needs review
+            ("secureAllPass", true, true, true, .underCard),                // it leads: Share disabled, the PDF present
+            ("secureAllPass", true, false, false, .centredUnderReason),     // it leads: the PDF gone, no rows
+            ("secureSkippedOff", false, true, true, .onKeepEditingRow),     // a row, after Run Verification
+        ]
+        var ran = 0
+        for (name, disabled, output, preview, place) in rows {
+            let report = try #require(Fixtures.all[name], "no seeded report \(name)")
+            let places = Actions.undoWordsPlaces(report: report, shareDisabled: disabled,
+                                                 outputExists: output, previewAvailable: preview)
+            #expect(places == [place], "\(name) disabled \(disabled) output \(output) preview \(preview)")
+            ran += 1
+        }
+        #expect(ran == 6)
+        // The skipped report's rows put Keep Editing after Run Verification.
+        let skipped = try #require(Fixtures.all["secureSkippedOff"])
+        #expect(Actions.actionRows(report: skipped, outputExists: true, previewAvailable: true,
+                                   swapped: false) == [.runVerification, .keepEditing, .preview])
+    }
+
+    @Test("Over every state, the undo words have one place, and it is beside Keep Editing")
+    func undoWordsOnePlaceInEveryState() {
+        let statuses: [VerificationStatus] = [.pass, .info("i"), .warn("w"), .attention("a"), .fail("f"), .skipped]
+        var cases = 0
+        for status in statuses {
+            for disabled in [false, true] {
+                for output in [false, true] {
+                    for preview in [false, true] {
+                        let report = Self.report(status)
+                        let places = Actions.undoWordsPlaces(report: report, shareDisabled: disabled,
+                                                             outputExists: output, previewAvailable: preview)
+                        let swapped = Actions.swapsPrimaryAction(report: report, shareDisabled: disabled)
+                        let rows = Actions.actionRows(report: report, outputExists: output,
+                                                      previewAvailable: preview, swapped: swapped)
+                        #expect(places.count == 1)
+                        // On the row exactly when Keep Editing is a row; centred
+                        // exactly when there is no card.
+                        #expect(places.contains(.onKeepEditingRow) == rows.contains(.keepEditing))
+                        #expect(places.contains(.centredUnderReason) == rows.isEmpty)
+                        #expect(places.contains(.onKeepEditingRow) == !swapped)
+                        cases += 1
+                    }
+                }
+            }
+        }
+        #expect(cases == 48)
+    }
+
     // MARK: - The Share hint (moved here with Share)
 
     static func willConfirm(_ report: VerificationReport, _ doc: DocumentState = DocumentState(),
@@ -199,12 +254,12 @@ struct VerificationResultsActionsTests {
 
     // MARK: - The count ring
 
-    @Test("The ring: P of T with T every check, the verdict's tone; SKIPPED draws the slot")
+    @Test("The ring: P of T with T the checks that had something to check, the verdict's tone; SKIPPED draws the slot")
     func ringContent() {
         #expect(VerificationMasthead.ringContent(report: Fixtures.searchableAllRasterized)
-                == .count(passed: 10, total: 13, tone: .pass))
+                == .count(passed: 10, total: 10, tone: .pass))
         #expect(VerificationMasthead.ringContent(report: Fixtures.searchableAttentionMixed)
-                == .count(passed: 8, total: 13, tone: .attention))
+                == .count(passed: 8, total: 12, tone: .attention))
         #expect(VerificationMasthead.ringContent(report: Fixtures.secureWarningOnly)
                 == .count(passed: 6, total: 7, tone: .warn))
         #expect(VerificationMasthead.ringContent(report: Fixtures.pageCountGate)
@@ -233,16 +288,53 @@ struct VerificationResultsActionsTests {
 
     // MARK: - Sections
 
-    @Test("A wholly clean run is the Checks list; the cluster opens by default only for riding notes with nothing above")
+    @Test("The cluster opens by default only for riding notes with nothing above")
     func clusterRules() {
         func partition(_ report: VerificationReport) -> VerificationLayerPartition {
             VerificationLayerPartition(layers: report.layers, perPageModes: report.perPageModes)
         }
-        #expect(VerificationDetailsSection.isEveryCheckPassed(partition(Fixtures.secureAllPass)))
-        #expect(!VerificationDetailsSection.isEveryCheckPassed(partition(Fixtures.searchableAllRasterized)))
         #expect(VerificationDetailsSection.clusterOpensByDefault(partition(Fixtures.securePassRidingNote)))
         #expect(!VerificationDetailsSection.clusterOpensByDefault(partition(Fixtures.secureScreenshot)))
         #expect(!VerificationDetailsSection.clusterOpensByDefault(partition(Fixtures.searchableAllRasterized)))
+    }
+
+    @Test("The list row holds the passed checks and the notes riding with them, and the checks with nothing to check join it, on every run that has them")
+    func listRowHoldsThePassedChecks() throws {
+        func partition(_ report: VerificationReport) -> VerificationLayerPartition {
+            VerificationLayerPartition(layers: report.layers, perPageModes: report.perPageModes)
+        }
+        var examined = 0, joined = 0
+        for (name, report) in Fixtures.all {
+            let p = partition(report)
+            // A run with a row of passed checks: the checks that had nothing
+            // to check sit in it too. A run without one: no row.
+            let expected = p.cluster.isEmpty ? [] : Set(p.cluster).union(p.nothingToCheck).sorted()
+            #expect(VerificationDetailsSection.listRowMembers(p) == expected, "\(name)")
+            if !p.cluster.isEmpty, !p.nothingToCheck.isEmpty { joined += 1 }
+            examined += 1
+        }
+        print("[list-row] seeded reports \(examined), with checks that had nothing to check in the row \(joined)")
+        #expect(examined == 18)
+        #expect(joined == 6, "the seeded reports whose row takes in checks that had nothing to check")
+        // A run where every check passed: one row holding every check, closed.
+        let clean = partition(Fixtures.secureAllPass)
+        #expect(VerificationDetailsSection.listRowMembers(clean) == Array(Fixtures.secureAllPass.layers.indices))
+        #expect(clean.clusterTitle == "7 checks passed")
+        #expect(!VerificationDetailsSection.clusterOpensByDefault(clean))
+        // A riding note with nothing above still opens on arrival.
+        #expect(VerificationDetailsSection.clusterOpensByDefault(partition(Fixtures.securePassRidingNote)))
+    }
+
+    @Test("The details draw no headed list of checks; the groups come before the list row")
+    func noHeadedListOfChecks() throws {
+        let source = try String(contentsOf: URL(fileURLWithPath: "\(#filePath)")
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/ResectaApp/Views/VerificationDetailsSection.swift"), encoding: .utf8)
+        #expect(!source.contains("header: \"Checks\""))
+        #expect(!source.contains("layout: .bare"))
+        let groups = try #require(source.range(of: "ForEach(Self.groups(partition)"))
+        let row = try #require(source.range(of: "passCluster(partition)"))
+        #expect(groups.lowerBound < row.lowerBound)
     }
 
     @Test("Page Modes: one line per mode with ranges; shown when mixed or any page fell back")

@@ -60,46 +60,43 @@ struct SearchResultsSection: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        // When results render, the List is the section's
-        // root and the section's own fixed chrome rides its top
-        // safe-area inset (under the hub's sheet-chrome inset), so
-        // the List's UIKit frame binds at the sheet top for
-        // cooperative scroll↔detent arbitration (chrome
+        // ONE root in every state: the List, with the section's own
+        // fixed chrome on its top safe-area inset (under the hub's
+        // sheet-chrome inset), so the List's UIKit frame binds at the
+        // sheet top for cooperative scroll↔detent arbitration (chrome
         // HEIGHT above the list unbinds it, not chrome species). The
-        // empty / in-flight / filtered-out states keep plain stacked
-        // chrome — nothing scrolls there.
-        Group {
-            if searchState.searchModeType == .piiScan
-                && searchState.results.isEmpty
-                && searchState.isSearching {
-                // Scan in flight, nothing yet to list: an auto-run
-                // starts before the user has seen any result, so the
-                // surface names what is happening instead of rendering
-                // a blank list. The toolbar's progress row above
-                // carries the page/count numbers — this state
-                // deliberately repeats none of them.
-                VStack(spacing: 0) {
-                    sectionTopChrome
+        // no-rows states (not run / no matches, filtered out, scan in
+        // flight) draw OVER the then-empty list.
+        //
+        // The root must not change KIND between states. The hub hangs
+        // its fixed chrome — the search field included — on this
+        // section's top inset; swapping a plain stack for the List (the
+        // start of a first run) or back (an emptied field, a run that
+        // found nothing) re-hosts that inset, the field leaves its
+        // window for an instant, loses first responder, and the
+        // keyboard closes under the user's fingers.
+        resultsList
+            .overlay {
+                if searchState.searchModeType == .piiScan
+                    && searchState.results.isEmpty
+                    && searchState.isSearching {
+                    // Scan in flight, nothing yet to list: an auto-run
+                    // starts before the user has seen any result, so the
+                    // surface names what is happening instead of rendering
+                    // a blank list. The toolbar's progress row above
+                    // carries the page/count numbers — this state
+                    // deliberately repeats none of them.
                     scanInFlightState
-                }
-            } else if searchState.results.isEmpty && !searchState.isSearching {
-                VStack(spacing: 0) {
-                    sectionTopChrome
+                } else if searchState.results.isEmpty && !searchState.isSearching {
                     emptyState
-                }
-            } else if searchState.filteredCount == 0 && !searchState.results.isEmpty && !searchState.isSearching {
-                VStack(spacing: 0) {
-                    sectionTopChrome
+                } else if searchState.filteredCount == 0 && !searchState.results.isEmpty && !searchState.isSearching {
                     filteredOutState
                 }
-            } else {
-                resultsList
-                    .safeAreaInset(edge: .top, spacing: 0) {
-                        sectionTopChrome
-                    }
             }
-        }
-        .background { keyboardShortcutButtons }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                sectionTopChrome
+            }
+            .background { keyboardShortcutButtons }
     }
 
     /// Everything that used to sit above the results list as fixed
@@ -170,7 +167,7 @@ struct SearchResultsSection: View {
                                 ? searchState.totalCount : nil))
                             .font(.caption)
                             .monospacedDigit()
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                     }
                     Spacer()
                 }
@@ -282,9 +279,11 @@ struct SearchResultsSection: View {
                                     resultRow(for: result, showTermLabel: false, showsPageLabel: true)
                                 }
                             } header: {
-                                // The header echoes the term the user typed.
+                                // The header echoes the term the user typed,
+                                // in the page headers' compact style.
                                 Text("\"\(term)\" — \(termResults.count) match\(termResults.count == 1 ? "" : "es")\(conjunctionSuffix)")
                                     .privacySensitive()
+                                    .modifier(CompactSectionHeaderStyle())
                             }
                         }
                     }
@@ -295,17 +294,22 @@ struct SearchResultsSection: View {
                     // carries the page and no row shows `p.N`.
                     let pages = searchState.rowsByPage.keys.sorted()
                     ForEach(pages, id: \.self) { page in
-                        Section("Page \(page + 1)") {
-                            if let pageResults = searchState.rowsByPage[page] {
-                                ForEach(pageResults) { result in
-                                    resultRow(for: result, showTermLabel: isMultiTerm, showsPageLabel: false)
-                                }
+                        let pageResults = searchState.rowsByPage[page] ?? []
+                        Section {
+                            ForEach(pageResults) { result in
+                                resultRow(for: result, showTermLabel: isMultiTerm, showsPageLabel: false)
                             }
+                        } header: {
+                            pageHeader(page: page, rowCount: pageResults.count)
                         }
                     }
                 }
             }
         .listStyle(.plain)
+        // The field keeps its focus while results arrive, so the keyboard
+        // stays up; scrolling the results is how it is put away (Return
+        // is the other way). Stated here rather than left to the default.
+        .scrollDismissesKeyboard(.immediately)
         // Stable handle for the cooperative-arbitration XCUI
         // pins' in-list drags — the results-list sibling of
         // `scanReviewList`.
@@ -336,6 +340,34 @@ struct SearchResultsSection: View {
             // false affordance whose taps hit the footer. Clip so rows
             // never draw outside the list's own bounds.
             .clipped()
+    }
+
+    /// A page section's header: one compact line, the page's name as its
+    /// own text ("Page N", which the UI tests wait on) and, trailing, how
+    /// many rows are listed under it. When the two do not fit one line at
+    /// a large text size, the count goes under the name.
+    private func pageHeader(page: Int, rowCount: Int) -> some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline, spacing: ResectaTokens.Spacing.sm) {
+                pageHeaderName(page: page)
+                Spacer(minLength: 0)
+                pageHeaderCount(rowCount: rowCount)
+            }
+            VStack(alignment: .leading, spacing: 0) {
+                pageHeaderName(page: page)
+                pageHeaderCount(rowCount: rowCount)
+            }
+        }
+        .modifier(CompactSectionHeaderStyle())
+    }
+
+    private func pageHeaderName(page: Int) -> some View {
+        Text("Page \(page + 1)")
+            .fontWeight(.semibold)
+    }
+
+    private func pageHeaderCount(rowCount: Int) -> some View {
+        Text(SearchPageHeaderCopy.rowCount(rowCount, isScan: searchState.searchModeType == .piiScan))
     }
 
     /// Consumed by the `.onChange` on `resultsList`'s
@@ -450,6 +482,7 @@ struct SearchResultsSection: View {
                 // sentence lives inside its description string.
                 if SearchEmptyStateCopy.showsSearchRoleSubtitle(for: context) {
                     Text(SearchEmptyStateCopy.searchRoleSubtitle)
+                        .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                 }
                 // Markdown-bold markers only parse through the
                 // LocalizedStringKey overload of `Text(_:)`; a plain
@@ -457,6 +490,7 @@ struct SearchResultsSection: View {
                 // the asterisks literally (screenshot evidence) — the
                 // explicit `.init` routes back to the markdown-aware path.
                 Text(.init(SearchEmptyStateCopy.description(for: context, ocrReadPages: searchState.lastRunOCRPageCount)))
+                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                 if context == .multiTermPreSearchWithRecents {
                     multiTermRecallChips
                 }
@@ -496,6 +530,7 @@ struct SearchResultsSection: View {
         } description: {
             VStack(alignment: .center, spacing: ResectaTokens.Spacing.sm) {
                 Text(SearchEmptyStateCopy.piiScanRoleSentence)
+                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                 ProgressView()
             }
         }
@@ -518,7 +553,7 @@ struct SearchResultsSection: View {
         VStack(alignment: .center, spacing: ResectaTokens.Spacing.xs) {
             Text(SearchEmptyStateCopy.recentSearchesHeader)
                 .font(.caption2)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ResectaTokens.SemanticColor.supportText)
             HStack(spacing: ResectaTokens.Spacing.xs) {
                 ForEach(Array(searchState.recentMultiTermSets.enumerated()), id: \.offset) { _, recall in
                     Button {
@@ -560,10 +595,23 @@ struct SearchResultsSection: View {
             )
         } description: {
             Text(SearchEmptyStateCopy.filteredOutDescription)
+                .foregroundStyle(ResectaTokens.SemanticColor.supportText)
         } actions: {
             Button(SearchEmptyStateCopy.showAllButton) {
                 Self.showAll(on: searchState)
             }
+            .tint(ResectaTokens.BrandTeal.text)
         }
+    }
+}
+
+/// The compact look of a results section's header: one subheadline line
+/// in the support grey, in the words as written (no capitals added).
+private struct CompactSectionHeaderStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .font(.subheadline)
+            .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+            .textCase(nil)
     }
 }

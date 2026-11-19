@@ -1,13 +1,22 @@
 import SwiftUI
 
-// The canvas's bottom status capsule, moved out of `DocumentEditorView.swift`
-// (the hub) with its statics: which caption shows and its controls. One
-// responsibility; the hub's body mounts `captionOverlay` in the bottom
-// overlay slot it always held. One capsule at a time: the drawing caption
-// while the Rectangle tool is on, or the Add to Selection capsule — the
-// mode, the selection's count, and a Done button that turns the mode off —
-// or, on a page holding a box drawn wider than its word, the widened-box
-// notice (`RedactionState+WidenedBoxes`).
+// The canvas's bottom slot: one place, above the page bar, where at most one
+// thing shows at a time, on one glass shape. `bottomSlotOccupant` decides who
+// holds it: a message, then the first-time line, then the selection (Add to
+// Selection is its adding state), then the drawing caption, then the notice
+// for a page holding a box drawn wider than its word
+// (`RedactionState+WidenedBoxes`). A selection made after the message takes
+// the slot from it. Outside editing nothing holds it. The hub's body mounts
+// `captionOverlay` in the bottom overlay slot it always held.
+
+/// Who holds the bottom slot.
+nonisolated enum BottomSlotOccupant: Equatable, Sendable {
+    case message
+    case firstTimeLine
+    case selection(adding: Bool)
+    case drawingCaption
+    case widenedBoxes
+}
 
 extension DocumentEditorView {
 
@@ -77,26 +86,52 @@ extension DocumentEditorView {
     static let widenedBoxAccessibilityLabel = "Some boxes on this page were drawn wider than their words, because the "
         + "text could not be fitted to the printed words. Keep them wide: shrinking one can leave part of a word readable."
 
-    /// Which capsule the host shows.
-    enum BottomCapsule: Equatable {
-        case drawing
-        case addToSelection
-        case widenedBoxes
-    }
-
-    /// One capsule at a time, only while editing: the drawing caption while
-    /// the Rectangle tool is on, else the Add to Selection capsule while
-    /// that mode is on (entering either turns the other off), else the
-    /// widened-box notice while the page in view holds a widened box.
-    static func bottomCapsule(
-        activeTool: DrawingTool?, addToSelection: Bool, phaseKind: DocumentState.PhaseKind,
-        widenedOnPage: Bool = false
-    ) -> BottomCapsule? {
-        if drawingModeCaptionShouldShow(activeTool: activeTool, phaseKind: phaseKind) { return .drawing }
+    /// The slot's occupant: the first that asks, in this order: a message,
+    /// the first-time line, the selection (Add to Selection is its adding
+    /// state, whether or not a box is selected), the drawing caption, the
+    /// widened-box notice. A message and a selection made after it: the
+    /// selection. Outside editing, nobody.
+    static func bottomSlotOccupant(
+        phaseKind: DocumentState.PhaseKind,
+        messageShowing: Bool,
+        selectionNewerThanMessage: Bool,
+        firstTimeLineDue: Bool,
+        selectedCount: Int,
+        addToSelection: Bool,
+        activeTool: DrawingTool?,
+        widenedOnPage: Bool
+    ) -> BottomSlotOccupant? {
         guard phaseKind == .editing else { return nil }
-        if addToSelection { return .addToSelection }
+        let selection: BottomSlotOccupant? = addToSelection
+            ? .selection(adding: true)
+            : (selectedCount > 0 ? .selection(adding: false) : nil)
+        if messageShowing {
+            if let selection, selectionNewerThanMessage { return selection }
+            return .message
+        }
+        if firstTimeLineDue { return .firstTimeLine }
+        if let selection { return selection }
+        if drawingModeCaptionShouldShow(activeTool: activeTool, phaseKind: phaseKind) { return .drawingCaption }
         return widenedOnPage ? .widenedBoxes : nil
     }
+
+    // MARK: - The slot's measures
+
+    /// Leading and trailing, around the occupant's words.
+    static let bottomSlotHorizontalPadding: CGFloat = ResectaTokens.Spacing.md
+    /// Above and below the words: 44 pt tall at one line at the default size.
+    static let bottomSlotVerticalPadding: CGFloat = ResectaTokens.Spacing.toastVertical
+    /// The glass shape's corner: half a one-line slot's height.
+    static let bottomSlotCornerRadius: CGFloat = 22
+    static let bottomSlotMinimumWidth: CGFloat = 120
+    /// At most 360 pt wide, and 16 pt in from each edge of the screen.
+    static func bottomSlotMaximumWidth(containerWidth: CGFloat) -> CGFloat {
+        min(containerWidth - 2 * ResectaTokens.Spacing.md, 360)
+    }
+    /// The slot's own padding under it: none. The canvas it sits on already
+    /// ends 8 pt above the page bar's glass (the bar's own spacing), so the
+    /// slot's foot is 8 pt above the glass.
+    static let bottomSlotFootPadding: CGFloat = 0
 
     /// The capsules' text stops growing at Accessibility 1: past it the
     /// drawing caption covered the bottom fifth of the page. (The Add to
@@ -104,98 +139,158 @@ extension DocumentEditorView {
     /// accessibility size.)
     static let capsuleTypeSizeCeiling: DynamicTypeSize = .accessibility1
 
-    /// The bottom status capsule.
+    /// The bottom slot, with its one occupant.
     var captionOverlay: some View {
-        Group {
-            switch Self.bottomCapsule(
-                activeTool: activeTool, addToSelection: isMultiSelectActive, phaseKind: documentState.phaseKind,
-                widenedOnPage: redactionState.pageHoldsWidenedBox(documentState.currentPageIndex)
-            ) {
-            case .drawing?: drawingCaptionCapsule
-            case .addToSelection?: addModeCapsule
-            case .widenedBoxes?: widenedBoxCapsule
-            case nil: EmptyView()
+        let occupant = Self.bottomSlotOccupant(
+            phaseKind: documentState.phaseKind,
+            // The message and the first-time line have no view yet, so they never ask for the slot.
+            messageShowing: false,
+            selectionNewerThanMessage: false,
+            firstTimeLineDue: false,
+            selectedCount: redactionState.selectedRegionIDs.count,
+            addToSelection: isMultiSelectActive,
+            activeTool: activeTool,
+            widenedOnPage: redactionState.pageHoldsWidenedBox(documentState.currentPageIndex)
+        )
+        return Group {
+            if let occupant, Self.bottomSlotDrawsHere(occupant) {
+                BottomSlot(
+                    footPadding: Self.bottomSlotFootPadding + parkedChromeLayout.hintCapsuleLift,
+                    identifier: Self.bottomSlotIdentifier(occupant),
+                    label: slotAccessibilityLabel(occupant),
+                    readsAsOne: occupant == .widenedBoxes,
+                    takesTouches: occupant == .selection(adding: true) || occupant == .selection(adding: false)
+                ) {
+                    switch occupant {
+                    case .drawingCaption: drawingCaptionWords
+                    case .selection(adding: true): addModeWords
+                    case .selection(adding: false): SelectionBar(toolbar: editorToolbar)
+                    case .widenedBoxes: widenedBoxWords
+                    // Drawn by the message host.
+                    case .message: EmptyView()
+                    // The first-time line.
+                    case .firstTimeLine: EmptyView()
+                    }
+                }
+                .transition(.opacity)
             }
         }
         .dynamicTypeSize(...Self.capsuleTypeSizeCeiling)
+        .animation(ResectaTokens.Anim.resolved(ResectaTokens.Anim.stateChange, reduceMotion: reduceMotion), value: occupant)
     }
 
-    /// The Add to Selection capsule. Done turns the mode off through the
-    /// toolbar's one tool-and-toggle reset, the same home every other exit
-    /// uses; the caption itself takes no touches.
-    private var addModeCapsule: some View {
+    /// The occupants this view draws: the drawing caption, the selection
+    /// (its bar, or Add to Selection) and the widened-box notice. The others
+    /// are drawn by their own views.
+    static func bottomSlotDrawsHere(_ occupant: BottomSlotOccupant) -> Bool {
+        switch occupant {
+        case .drawingCaption, .selection, .widenedBoxes: true
+        case .message, .firstTimeLine: false
+        }
+    }
+
+    /// Each drawn occupant's identifier, as shipped, and the caption's.
+    static func bottomSlotIdentifier(_ occupant: BottomSlotOccupant) -> String {
+        switch occupant {
+        case .drawingCaption: "drawingCaption"
+        case .selection(adding: true): "addModeCapsule"
+        case .selection(adding: false): "selectionBar"
+        case .widenedBoxes: "widenedBoxCapsule"
+        case .message, .firstTimeLine: ""
+        }
+    }
+
+    private func slotAccessibilityLabel(_ occupant: BottomSlotOccupant) -> String {
+        switch occupant {
+        case .drawingCaption: Self.captionAccessibilityLabel(activeTool: activeTool)
+        case .selection(adding: true): Self.addModeAccessibilityLabel(selectedCount: redactionState.selectedRegionIDs.count)
+        case .widenedBoxes: Self.widenedBoxAccessibilityLabel
+        // The bar's parts speak for themselves.
+        case .message, .firstTimeLine, .selection(adding: false): ""
+        }
+    }
+
+    /// Add to Selection's words and Done. Done turns the mode off through
+    /// the toolbar's one tool-and-toggle reset, the same home every other
+    /// exit uses; the words take no touches.
+    private var addModeWords: some View {
         let count = redactionState.selectedRegionIDs.count
         return HStack(spacing: ResectaTokens.Spacing.md) {
             Text(Self.addModeCaption(selectedCount: count, accessibilitySize: dynamicTypeSize.isAccessibilitySize))
-                .font(.caption.weight(.medium))
-                .foregroundStyle(.secondary)
+                .font(.subheadline)
+                .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                 .allowsHitTesting(false)
-            Button("Done") {
+            Button {
                 editorToolbar.resetCanvasTools()
+            } label: {
+                Text("Done")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ResectaTokens.BrandTeal.text)
             }
-            .font(.caption.weight(.semibold))
-            // A 44-pt hit area around the small word, without moving it.
+            // A 44-pt hit area around the word, without moving it.
             .padding(.vertical, 15).padding(.horizontal, 7)
             .contentShape(Rectangle())
             .padding(.vertical, -15).padding(.horizontal, -7)
             .accessibilityHint("Turns off Add to Selection.")
             .accessibilityIdentifier("addModeDoneButton")
         }
-        .padding(.horizontal, ResectaTokens.Spacing.md)
-        .padding(.vertical, ResectaTokens.Spacing.xs)
-        .background(.regularMaterial, in: Capsule())
-        .padding(.bottom, ResectaTokens.Spacing.lg + parkedChromeLayout.hintCapsuleLift)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(Self.addModeAccessibilityLabel(selectedCount: count))
-        .accessibilityIdentifier("addModeCapsule")
         .transition(.opacity)
     }
 
-    /// The widened-box notice: the page in view holds a box drawn wider
-    /// than its word. It takes no touches.
-    private var widenedBoxCapsule: some View {
+    /// The widened-box notice's symbol and words: the page in view holds a
+    /// box drawn wider than its word.
+    private var widenedBoxWords: some View {
         HStack(spacing: ResectaTokens.Spacing.xs) {
             Image(systemName: "arrow.left.and.right.square")
             Text(Self.widenedBoxCaption(accessibilitySize: dynamicTypeSize.isAccessibilitySize))
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .font(.caption.weight(.medium))
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, ResectaTokens.Spacing.md)
-        .padding(.vertical, ResectaTokens.Spacing.xs)
-        .background(.regularMaterial, in: Capsule())
-        .padding(.horizontal, ResectaTokens.Spacing.md)
-        .padding(.bottom, ResectaTokens.Spacing.lg + parkedChromeLayout.hintCapsuleLift)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Self.widenedBoxAccessibilityLabel)
-        .accessibilityIdentifier("widenedBoxCapsule")
-        .allowsHitTesting(false)
+        .font(.subheadline)
+        .foregroundStyle(ResectaTokens.SemanticColor.supportText)
         .transition(.opacity)
     }
 
-    /// The drawing caption: a subtle banner that names the active gesture
-    /// for the rectangle tool.
+    /// The drawing caption: names the active gesture for the rectangle tool.
     @ViewBuilder
-    private var drawingCaptionCapsule: some View {
-        if let caption = DocumentEditorView.activeDrawingCaption(
-            activeTool: activeTool
-           ) {
-            HStack(spacing: ResectaTokens.Spacing.md) {
-                Text(caption)
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
-            }
-                .padding(.horizontal, ResectaTokens.Spacing.md)
-                .padding(.vertical, ResectaTokens.Spacing.xs)
-                .background(.regularMaterial, in: Capsule())
-                .padding(.bottom, ResectaTokens.Spacing.lg + parkedChromeLayout.hintCapsuleLift)
-                .accessibilityElement(children: .contain)
-                .accessibilityLabel(
-                    DocumentEditorView.captionAccessibilityLabel(
-                        activeTool: activeTool
-                    )
-                )
-                .allowsHitTesting(false).transition(.opacity)
+    private var drawingCaptionWords: some View {
+        if let caption = DocumentEditorView.activeDrawingCaption(activeTool: activeTool) {
+            Text(caption)
+                .font(.subheadline)
+                .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+                .transition(.opacity)
         }
+    }
+}
+
+/// The bottom slot: draws its occupant centred, padded, on one glass shape,
+/// at least 120 pt wide and at most 360 pt (16 pt in from each screen edge).
+/// The glass shape is the occupant's accessibility element: its identifier,
+/// its one label, and whether it takes touches (the selection does: its
+/// bar's actions and Add to Selection's Done).
+struct BottomSlot<Content: View>: View {
+    let footPadding: CGFloat
+    let identifier: String
+    let label: String
+    /// Read as one element with its label alone, children ignored.
+    let readsAsOne: Bool
+    let takesTouches: Bool
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        content
+            .multilineTextAlignment(.leading)
+            .padding(.horizontal, DocumentEditorView.bottomSlotHorizontalPadding)
+            .padding(.vertical, DocumentEditorView.bottomSlotVerticalPadding)
+            .frame(minWidth: DocumentEditorView.bottomSlotMinimumWidth)
+            .glassEffect(.regular, in: RoundedRectangle(
+                cornerRadius: DocumentEditorView.bottomSlotCornerRadius, style: .continuous))
+            .accessibilityElement(children: readsAsOne ? .ignore : .contain)
+            .accessibilityLabel(label)
+            .accessibilityIdentifier(identifier)
+            .allowsHitTesting(takesTouches)
+            .containerRelativeFrame(.horizontal) { length, _ in
+                DocumentEditorView.bottomSlotMaximumWidth(containerWidth: length)
+            }
+            .padding(.bottom, footPadding)
     }
 }

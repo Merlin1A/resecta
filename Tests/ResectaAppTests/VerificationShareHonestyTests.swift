@@ -126,7 +126,14 @@ struct VerificationShareHonestyTests {
                       Self.layer(.notApplicable("i"), .searchRecheck), Self.layer(.pass, .structureCheck)]
         let partition = VerificationLayerPartition(layers: layers, perPageModes: [])
         #expect(VerificationDetailsSection.groups(partition).map(\.header)
+                == ["Findings", "Could not verify", "Notes"])
+        #expect(VerificationDetailsSection.listRowMembers(partition) == [3, 4])
+        // With the pass removed there is no list row, and the idle check
+        // keeps its own group.
+        let noPass = VerificationLayerPartition(layers: Array(layers.dropLast()), perPageModes: [])
+        #expect(VerificationDetailsSection.groups(noPass).map(\.header)
                 == ["Findings", "Could not verify", "Notes", "Nothing to check"])
+        #expect(VerificationDetailsSection.listRowMembers(noPass).isEmpty)
     }
 
     // MARK: - (iv) Content-free

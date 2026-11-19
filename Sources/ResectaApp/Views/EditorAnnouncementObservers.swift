@@ -101,7 +101,6 @@ struct EditorAnnouncementObservers: ViewModifier {
                     Self.nudgeToastMessage,
                     severity: .info,
                     actionLabel: Self.nudgeToastActionLabel,
-                    editsRegions: true,
                     actionHandler: { [weak redactionState, weak undoManager, weak documentState] in
                         guard let state = redactionState else { return }
                         state.acceptManualDrawNudge(

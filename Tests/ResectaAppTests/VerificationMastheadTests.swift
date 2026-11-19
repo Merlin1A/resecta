@@ -45,7 +45,7 @@ struct VerificationMastheadTests {
         #expect(VerificationStatus.warn("w").title == "Completed with\u{00A0}Warnings")
         #expect(VerificationStatus.attention("a").title == "Needs Review")
         #expect(VerificationStatus.fail("f").title == "Checks Failed")
-        #expect(VerificationStatus.skipped.title == "Verification Skipped")
+        #expect(VerificationStatus.skipped.title == "Checks Not Run")
         #expect(Results.mastheadTitle(report: Fixtures.secureWarningOnly) == "Completed with\u{00A0}Warnings")
         #expect(Results.mastheadTitle(report: Fixtures.searchableSkipInduced) == "Some Checks Incomplete")
         #expect(Results.mastheadTitle(report: Fixtures.searchableAttentionMixed) == "Needs Review")
@@ -64,10 +64,10 @@ struct VerificationMastheadTests {
         ("searchableAttentionFull",
          "\(keepEditing), then use text\u{00A0}search to redact \u{201C}Delia\u{201D} and \u{201C}Marco\u{201D}."),
         ("searchableAttentionLong", "\(keepEditing), then use text\u{00A0}search to redact the terms below."),
-        ("searchableRecheckReview", "\(keepEditing) and run your searches again with OCR on."),
+        ("searchableRecheckReview", "\(keepEditing) and run your searches again with Include OCR Pages on."),
         ("secureFail", "\(keepEditing) to fix what failed, or share after review."),
         ("secureAllFailed", "\(keepEditing) to fix what failed, or share after review."),
-        ("searchableSkipInduced", "Run Redact with Verify Before Export on to include the skipped checks."),
+        ("searchableSkipInduced", "To include the skipped checks, run Redact again with verification on."),
         ("pageCountGate", "\(keepEditing) and run Redact again; the other checks did not run."),
         ("securePassRidingNote", "Read the note below before you share the PDF."),
         ("secureWarningOnly", "Read the warning below before you share the PDF."),
@@ -102,7 +102,7 @@ struct VerificationMastheadTests {
         #expect(sentence([cnv, skipped, warning])
                 == "2 checks could not run in full; read them below before you share.")
         #expect(sentence([skipped, warning])
-                == "Run Redact with Verify Before Export on to include the skipped check.")
+                == "To include the skipped check, run Redact again with verification on.")
     }
 
     @Test("ATTENTION: every term, then the first and a count, then the terms below — never a cut term")
@@ -130,7 +130,7 @@ struct VerificationMastheadTests {
         let recheck = Self.row(.attention("a"), .searchRecheck, terms: ["Delia"], pages: [0], lines: [line])
         let recheckOnly = Self.report(.attention("a"), [recheck])
         #expect(Results.mastheadSubtitle(report: recheckOnly)
-                == "\(Self.keepEditing) and run your search again with OCR on.")
+                == "\(Self.keepEditing) and run your search again with Include OCR Pages on.")
         #expect(Results.mastheadSubtitleIsPrivacySensitive(report: recheckOnly) == false)
         let both = Self.report(.attention("a"), [Self.row(.attention("a"), .ocrCheck, terms: ["Fox"]), recheck])
         #expect(Results.mastheadSubtitle(report: both)
@@ -157,7 +157,7 @@ struct VerificationMastheadTests {
                                           appliedCount: 1, remainingCount: 1, route: .textLayer)
         let withSearch = Self.report(.attention("a"), [Self.row(.attention("a"), .searchRecheck, pages: [0], lines: [line]), sweep])
         #expect(Results.mastheadSubtitle(report: withSearch)
-                == "\(Self.keepEditing) and run your search again with OCR on.")
+                == "\(Self.keepEditing) and run your search again with Include OCR Pages on.")
     }
 
     @Test("Output missing: the arms that name Preview or Run Verification give way; the others stay")
@@ -188,13 +188,13 @@ struct VerificationMastheadTests {
                 == "Checks Failed. 6 of 7 checks passed. 1\u{00A0}failed. \(Self.keepEditing) to fix what failed, "
                 + "or share after review.")
         #expect(Results.mastheadAccessibilityLabel(report: Fixtures.searchableAllRasterized)
-                == "Checks Passed. 10 of 13 checks passed. 3\u{00A0}had nothing to check. "
+                == "Checks Passed. 10 of 10 checks passed. 3\u{00A0}had nothing to check. "
                 + "Look over the redacted PDF in Preview before you share it.")
         #expect(Results.mastheadAccessibilityLabel(report: Fixtures.pageCountGate)
                 == "Checks Failed. 0 of 1 check passed. 1\u{00A0}failed. \(Self.keepEditing) and run Redact again; "
                 + "the other checks did not run.")
         #expect(Results.mastheadAccessibilityLabel(report: Fixtures.secureSkippedOff, mode: .secure)
-                == "Verification Skipped. Off in Settings. Run\u{00A0}Verification below before you share the PDF.")
+                == "Checks Not Run. Off in Settings. Run\u{00A0}Verification below before you share the PDF.")
     }
 
     // MARK: - The completion line and the gate run

@@ -52,15 +52,16 @@ nonisolated final class ShareRiskSheetUITests: XCTestCase {
         setVerifyBeforeExport(on: false)
 
         app.terminate()
-        app.launchArguments = ["--uitesting", "--loadTestDocument", "--openSearchSheet", "--searchQuery=Sample"]
+        // --keepVerifySetting: --uitesting alone puts the setting back on.
+        app.launchArguments = ["--uitesting", "--keepVerifySetting", "--loadTestDocument", "--openSearchSheet", "--searchQuery=Sample"]
         app.launch()
 
         awaitSearchAndApplyAll()
         runRedactFromTheBar()
 
         XCTAssertTrue(
-            app.staticTexts["Verification Skipped"].waitForExistence(timeout: 30),
-            "Verification results screen never reached Verification Skipped."
+            app.staticTexts["Checks Not Run"].waitForExistence(timeout: 30),
+            "Verification results screen never reached Checks Not Run."
         )
 
         let shareCard = app.buttons
@@ -81,8 +82,8 @@ nonisolated final class ShareRiskSheetUITests: XCTestCase {
         dismissSystemShareSheetWithSwipeDown()
 
         XCTAssertTrue(
-            app.staticTexts["Verification Skipped"].waitForExistence(timeout: 10),
-            "Did not return to Verification Skipped after backing out of the share sheet."
+            app.staticTexts["Checks Not Run"].waitForExistence(timeout: 10),
+            "Did not return to Checks Not Run after backing out of the share sheet."
         )
         XCTAssertFalse(
             app.staticTexts["Shared."].exists,
@@ -110,6 +111,29 @@ nonisolated final class ShareRiskSheetUITests: XCTestCase {
             "\"Shared.\" acknowledgment never appeared after completing the share."
         )
         attachScreenshot(named: "after-shared-toast")
+    }
+
+    // MARK: - A setting left off does not outlive the launch
+
+    /// A run that turns Verify Before Export off and stops before its
+    /// tearDown leaves the setting stored off on the simulator. The next
+    /// `--uitesting` launch puts it back on, so that launch's run verifies.
+    /// This test turns it off, relaunches without restoring it, and
+    /// expects Checks Passed.
+    func testVerifySettingLeftOff_nextUITestingLaunchVerifies() {
+        setVerifyBeforeExport(on: false)
+
+        app.terminate()
+        app.launchArguments = ["--uitesting", "--loadTestDocument", "--openSearchSheet", "--searchQuery=Sample"]
+        app.launch()
+
+        awaitSearchAndApplyAll()
+        runRedactFromTheBar()
+
+        XCTAssertTrue(
+            app.staticTexts["Checks Passed"].waitForExistence(timeout: 90),
+            "Verify Before Export, left off, outlived the --uitesting launch: the run did not reach 'Checks Passed'."
+        )
     }
 
     // MARK: - Settings: Verify Before Export

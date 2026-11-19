@@ -1,0 +1,19 @@
+Property: The root is cut from a document's length-claim lines as a fixed prefix, never as a pattern.
+Area: claims lint (Scripts/claims-lint.sh)
+Test command: Scripts/claims-lint.sh --self-test
+Must go red: the self-test case "a length claim in a document, in a tree whose path holds ["; the self-test case "a cut of the root that fails on a document's length claims" (the self-test ends FAIL)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Scripts/claims-lint.sh b/Scripts/claims-lint.sh
+index 78ef4ae3..0c7efd9e 100755
+--- a/Scripts/claims-lint.sh
++++ b/Scripts/claims-lint.sh
+@@ -191,7 +191,7 @@ sweep() { # $1 = the tree root
+                 echo "CLAIMS-LINT FAIL: the length-claim patterns did not run on $f"
+                 fail=1
+             fi
+-            hits=$(printf '%s' "$hits" | strip_root "$ROOT") || {
++            hits=$(printf '%s' "$hits" | sed "s|^$ROOT/||") || {
+                 echo "CLAIMS-LINT FAIL: the length claims on $f could not be shown"
+                 fail=1
+             }

@@ -51,8 +51,9 @@ extension SearchAndRedactSheet {
         searchDebounceTask = Task {
             try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled else { return }
-            // Typing refines the query; its run names no cleared matches.
-            searchState.skipNextRerunNotice = true
+            // A typed run replaces the list like any other run: when it
+            // clears ticked matches it says so, once (the clear leaves
+            // nothing ticked, so the next letter's run is silent).
             triggerSearch()
         }
     }
@@ -180,10 +181,12 @@ extension SearchAndRedactSheet {
         // `diffSinceLastScan()` reads this snapshot once the new scan's
         // results land, surfacing the Coverage Report diff line.
         searchState.captureFingerprintsBeforeScan()
-        let unapplied = searchState.skipNextRerunNotice ? 0 : Self.unappliedMatchCount(in: searchState)
-        searchState.skipNextRerunNotice = false  // one shot (a recall, or an as-you-type run)
+        let cleared = Self.rerunClearedCount(in: searchState)
+        searchState.skipNextRerunNotice = false  // one shot (a recall)
         searchState.clearResults()
-        if let message = Self.rerunClearedMessage(unappliedCount: unapplied) { toastManager.enqueue(message, severity: .info) }
+        if let message = Self.rerunClearedMessage(selectedCount: cleared, interface: searchState.searchModeType.interface) {
+            toastManager.enqueue(message, severity: .info)
+        }
         // The token this run's results and progress hops carry: a
         // cancelled predecessor still draining its stream is told
         // apart by it and dropped, so its late batch can never land
@@ -245,6 +248,7 @@ extension SearchAndRedactSheet {
         }
 
         let mode = buildSearchMode()
+        searchState.lastRunShape = searchState.currentRunShape  // read in the same stretch as the query above
         searchState.totalPages = liveDoc.pageCount
 
         // Snapshot the user-selected preset's
@@ -331,6 +335,9 @@ extension SearchAndRedactSheet {
         searchState.resetRegexTimeoutPages()
         // Reset the OCR-skip page set for the same reason.
         searchState.resetOCRSkippedPages()
+        #if DEBUG
+        if let page = ResectaApp.uitestOCRSkipPage(for: CommandLine.arguments) { searchState.recordOCRSkip(page: page) }
+        #endif
 
         return PreparedRun(
             run: run,

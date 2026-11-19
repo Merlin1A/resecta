@@ -1,0 +1,74 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R /AcroForm << /Fields [7 0 R] /DA (/F1 12 Tf 0 g) /DR << /Font << /F1 4 0 R >> >> >> >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R /Annots [6 0 R 7 0 R] >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Length 169 >>
+stream
+BT
+/F1 12 Tf
+72 720 Td
+(Synthetic annotated fixture, first line under a box.) Tj
+ET
+BT
+/F1 12 Tf
+72 696 Td
+(Synthetic annotated fixture, second line in the open.) Tj
+ET
+
+endstream
+endobj
+6 0 obj
+<< /Type /Annot /Subtype /Square /Rect [66 714 400 734] /C [0 0 0] /IC [0 0 0] /CA 1 /BS << /W 0 >> /F 4 /AP << /N 8 0 R >> >>
+endobj
+7 0 obj
+<< /Type /Annot /Subtype /Widget /FT /Tx /T (synthetic_field) /V (Synthetic value) /DA (/F1 12 Tf 0 g) /Rect [72 640 300 664] /F 4 /P 3 0 R /AP << /N 9 0 R >> >>
+endobj
+8 0 obj
+<< /Type /XObject /Subtype /Form /BBox [0 0 334 20] /Length 25 >>
+stream
+0 0 0 rg
+0 0 334 20 re f
+
+endstream
+endobj
+9 0 obj
+<< /Type /XObject /Subtype /Form /BBox [0 0 228 24] /Resources << /Font << /F1 4 0 R >> >> /Length 56 >>
+stream
+/Tx BMC
+BT
+/F1 12 Tf
+2 7 Td
+(Synthetic value) Tj
+ET
+EMC
+
+endstream
+endobj
+xref
+0 10
+0000000000 65535 f 
+0000000015 00000 n 
+0000000148 00000 n 
+0000000205 00000 n 
+0000000353 00000 n 
+0000000423 00000 n 
+0000000643 00000 n 
+0000000785 00000 n 
+0000000962 00000 n 
+0000001086 00000 n 
+trailer
+<< /Size 10 /Root 1 0 R >>
+startxref
+1280
+%%EOF

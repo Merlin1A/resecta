@@ -391,7 +391,7 @@ struct VerificationRowModelTests {
         strings += VerificationOutcome.allCases.compactMap { $0.headerClause(count: 2) }
         strings += [VerificationRowModel.skippedCaption, VerificationRowModel.skippedLead,
                     VerificationRowModel.pageCountGateRule, "Findings", "Could not verify", "Notes",
-                    "Nothing to check", "Checks", "Page Count"]
+                    "Nothing to check", "Page Count"]
         return strings.filter { !$0.isEmpty }
     }
 
@@ -616,22 +616,22 @@ struct VerificationRowModelTests {
         (report(secureChecks, secure), "7 of 7 checks passed"),
         (report(secureChecks, secure, .pass, [.detectionSweep: sweepNote]), "6 of 7 checks passed · 1\u{00A0}note"),
         (report(secureChecks, secure, .pass, [.detectionSweep: sweepNote, .searchRecheck: idleRecheck]),
-         "5 of 7 checks passed · 1\u{00A0}note · 1\u{00A0}had nothing to check"),
+         "5 of 6 checks passed · 1\u{00A0}note · 1\u{00A0}had nothing to check"),
         (report(all, searchable), "13 of 13 checks passed"),
-        (report(all, secure, .pass, noTextLayer), "10 of 13 checks passed · 3\u{00A0}had nothing to check"),
+        (report(all, secure, .pass, noTextLayer), "10 of 10 checks passed · 3\u{00A0}had nothing to check"),
         (report(all, searchable, .warn("x"), [
             .spatialVerification: layer(.warn("x"), identity: .spatialVerification),
             .ocrCheck: layer(.info("x"), identity: .ocrCheck)]),
          "11 of 13 checks passed · 1\u{00A0}warning · 1\u{00A0}note"),
         (report(all, searchable, .warn("x"), [
             .ocrCheck: layer(.warn("x"), identity: .ocrCheck, cnv: true), .searchRecheck: idleRecheck]),
-         "11 of 13 checks passed · 1\u{00A0}could not verify · 1\u{00A0}had nothing to check"),
+         "11 of 12 checks passed · 1\u{00A0}could not verify · 1\u{00A0}had nothing to check"),
         (report(all, searchable, .attention("x"), [
             .binaryStringSearch: layer(.attention("x"), identity: .binaryStringSearch, terms: ["Delia"]),
             .ocrCheck: layer(.warn("x"), identity: .ocrCheck, cnv: true),
             .spatialVerification: layer(.warn("x"), identity: .spatialVerification),
             .searchRecheck: idleRecheck]),
-         "9 of 13 checks passed · 1\u{00A0}needs review · 1\u{00A0}warning · 1\u{00A0}could not verify"
+         "9 of 12 checks passed · 1\u{00A0}needs review · 1\u{00A0}warning · 1\u{00A0}could not verify"
             + " · 1\u{00A0}had nothing to check"),
         (report(secureChecks, secure, .fail("x"), [.metadataCheck: layer(.fail("x"), identity: .metadataCheck)]),
          "6 of 7 checks passed · 1\u{00A0}failed"),
@@ -665,7 +665,7 @@ struct VerificationRowModelTests {
         ]
         #expect(VerificationResultsView.detailsSummaryText(for: Self.report(Self.secureChecks, Self.secure,
                                                                             .fail("x"), one))
-                == "1 of 7 checks passed · 1\u{00A0}failed · 1\u{00A0}needs review · 1\u{00A0}warning"
+                == "1 of 6 checks passed · 1\u{00A0}failed · 1\u{00A0}needs review · 1\u{00A0}warning"
                 + " · 1\u{00A0}could not verify · 1\u{00A0}note · 1\u{00A0}had nothing to check")
         let pairs: [VerificationLayer: LayerResult] = [
             .textExtraction: Self.layer(.fail("x"), identity: .textExtraction),
@@ -682,7 +682,7 @@ struct VerificationRowModelTests {
             .searchRecheck: Self.idleRecheck,
         ]
         #expect(VerificationResultsView.detailsSummaryText(for: Self.report(Self.all, Self.secure, .fail("x"), pairs))
-                == "1 of 13 checks passed · 2\u{00A0}failed · 2\u{00A0}need review · 2\u{00A0}warnings"
+                == "1 of 11 checks passed · 2\u{00A0}failed · 2\u{00A0}need review · 2\u{00A0}warnings"
                 + " · 2\u{00A0}could not verify · 2\u{00A0}notes · 2\u{00A0}had nothing to check")
     }
 

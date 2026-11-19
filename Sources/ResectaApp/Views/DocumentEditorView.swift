@@ -86,10 +86,6 @@ struct DocumentEditorView: View {
     // Search sheet detent for auto-minimize on result navigation
     @State var searchSheetDetent: PresentationDetent = .medium
 
-    // Detection summary banner
-    @State var detectionBanner: DetectionBannerModel?
-    @State var dismissSummaryTask: Task<Void, Never>?
-
     /// Bindings to trigger import/settings from parent ContentView
     @Binding var showSettings: Bool
 
@@ -285,6 +281,15 @@ struct DocumentEditorView: View {
                 }
             }
         }
+        // Search is presented only while editing, importing or failed; a
+        // session present in any other phase comes down, including one
+        // already set when the editor first appears.
+        .onChange(of: documentState.phaseKind, initial: true) { _, _ in
+            Self.takeDownSearchOutsideItsPhases(phase: documentState.phaseKind, redactionState: redactionState)
+        }
+        .onChange(of: redactionState.activeSearch != nil) { _, _ in
+            Self.takeDownSearchOutsideItsPhases(phase: documentState.phaseKind, redactionState: redactionState)
+        }
         // Brief status flash overlay
         .overlay {
             if showBriefStatus, let status = briefStatus {
@@ -315,13 +320,18 @@ struct DocumentEditorView: View {
         // P1.3: single `.sheet(item:)` slot for search / rationale.
         // Precedence search > rationale; the getter returns the
         // highest-precedence active source. The slot sits ABOVE the phase
-        // switch, so a live session would ride over every phase;
-        // The Apply seam keeps it out of the pipeline phases by tearing the
-        // session down at the Apply seam (`runFullPipeline`), the one funnel
-        // every run goes through, the purge re-run included.
+        // switch, so it asks the phase before it presents Search: a session
+        // is presented only while editing, importing or failed
+        // (`sheetSlotMayPresentSearch`), and the observers on the phase and
+        // on the session take a session present in any other phase down
+        // (`takeDownSearchOutsideItsPhases`). A full run's start also tears
+        // the session down at the Apply seam (`runFullPipeline`).
         .sheet(item: Binding<ActiveSheet?>(
             get: {
-                if let searchState = redactionState.activeSearch { return .search(searchState) }
+                if let searchState = redactionState.activeSearch,
+                   Self.sheetSlotMayPresentSearch(in: documentState.phaseKind) {
+                    return .search(searchState)
+                }
                 if let regionID = redactionState.pendingCanvasRationaleRequest {
                     return .rationale(regionID)
                 }
@@ -477,7 +487,6 @@ struct DocumentEditorView: View {
             beginExport: exportFlow.beginExport, concealedPages: shareConcealedPages
         ))
         .onDisappear {
-            dismissSummaryTask?.cancel()
             dismissTask?.cancel()
             // The per-window UndoManager outlives this document; clear
             // its stack on close so stale registrations (and the prior

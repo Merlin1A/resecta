@@ -130,7 +130,7 @@ struct SearchResultRowContractTests {
         #expect(runs[1].backgroundColor != nil)
         for base in [runs[0], runs[2]] {
             #expect(base.font == Font.footnote)
-            #expect(base.foregroundColor == Color.secondary)
+            #expect(base.foregroundColor == ResectaTokens.SemanticColor.supportText)
             #expect(base.backgroundColor == nil)
         }
         #expect(String(attributed.characters) == snippet)
@@ -156,7 +156,7 @@ struct SearchResultRowContractTests {
         #expect(runs.count == 1)
         #expect(runs.first?.backgroundColor == nil)
         #expect(runs.first?.font == Font.footnote)
-        #expect(runs.first?.foregroundColor == Color.secondary)
+        #expect(runs.first?.foregroundColor == ResectaTokens.SemanticColor.supportText)
         let empty = SearchResultRow.attributedSnippet("alpha beta", matchRange: nil, matchedText: "")
         #expect(Array(empty.runs).count == 1)
     }
@@ -170,14 +170,73 @@ struct SearchResultRowContractTests {
         #expect(SearchResultRow.collapsedLineLimit(for: .accessibility5) == 3)
     }
 
-    @Test("The content column's leading inset is the chassis geometry, not a literal; the applied slot counts only when shown")
+    @Test("The content column's leading inset is the chassis geometry, not a literal, and applying a row does not change it")
     func contentColumnLeadingInset() {
         let base = SearchRowConfidenceBar.width + ResectaTokens.Spacing.xs
             + ResectaTokens.TouchTarget.minimum + ResectaTokens.Spacing.sm
-        #expect(SearchResultRow.contentColumnLeadingInset(isApplied: false) == base)
-        #expect(SearchResultRow.contentColumnLeadingInset(isApplied: false) == 60)
-        #expect(SearchResultRow.contentColumnLeadingInset(isApplied: true)
-                == base + SearchResultRow.appliedIndicatorWidth)
-        #expect(SearchResultRow.contentColumnLeadingInset(isApplied: true) == 72)
+        #expect(SearchResultRow.contentColumnLeadingInset() == base)
+        #expect(SearchResultRow.contentColumnLeadingInset() == 60)
+    }
+
+    // MARK: - What a row draws
+
+    /// The five kinds of row, each with what its badge and bar must do.
+    private func rowKinds() -> [(name: String, result: SearchResult, isCustomHit: Bool, isRegexHit: Bool,
+                                 badge: Bool, bar: Bool)] {
+        let typed = makeSearchResult()
+        let recognised = SearchResult(
+            pageIndex: 0,
+            normalizedRect: CGRect(x: 0.1, y: 0.1, width: 0.2, height: 0.03),
+            matchedText: "alpha",
+            contextSnippet: "…the alpha sits here…",
+            source: .ocr(confidence: 0.87),
+            term: "alpha"
+        )
+        return [
+            ("a typed match on the text layer", typed, false, false, false, false),
+            ("a match read by text recognition, no kind", recognised, false, false, true, true),
+            ("a Scan item with a kind on the text layer", makePIIResult(), false, false, true, true),
+            ("a custom term", makeSearchResult(), true, false, true, false),
+            ("a named pattern", makeSearchResult(), false, true, true, false),
+        ]
+    }
+
+    @Test("The source badge is drawn only when it says something another row may not")
+    func sourceBadgeOnlyWhenItSaysSomething() {
+        let kinds = rowKinds()
+        #expect(kinds.count == 5)
+        for kind in kinds {
+            #expect(SearchResultRow.showsSourceBadge(
+                for: kind.result, isCustomHit: kind.isCustomHit, isRegexHit: kind.isRegexHit) == kind.badge,
+                    "\(kind.name)")
+        }
+    }
+
+    @Test("The bar is drawn exactly on the rows whose grade is spoken")
+    func barOnlyOnGradedRows() {
+        let kinds = rowKinds()
+        #expect(kinds.count == 5)
+        for kind in kinds {
+            #expect(SearchResultRow.showsConfidenceBar(for: kind.result) == kind.bar, "\(kind.name)")
+            #expect(SearchResultRow.showsConfidenceBar(for: kind.result)
+                    == SearchResultRow.showsTierWord(for: kind.result), "\(kind.name)")
+        }
+    }
+
+    @Test("The small line is built only when it holds a badge, a page tag or a term")
+    func smallLineOnlyWhenItHoldsSomething() {
+        var cases = 0
+        for badge in [false, true] {
+            for page in [false, true] {
+                for term in [false, true] {
+                    cases += 1
+                    #expect(SearchResultRow.showsMetaLine(
+                        showsBadge: badge, showsPageLabel: page, showsTermLabel: term) == (badge || page || term),
+                            "badge \(badge), page \(page), term \(term)")
+                }
+            }
+        }
+        #expect(cases == 8)
+        #expect(!SearchResultRow.showsMetaLine(showsBadge: false, showsPageLabel: false, showsTermLabel: false))
     }
 }

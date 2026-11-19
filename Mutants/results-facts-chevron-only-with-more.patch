@@ -1,0 +1,19 @@
+Property: A fact has a chevron, and opens, only when it has something to open to.
+Area: results (the card of facts)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/FactRowTests
+Must go red: ResectaAppTests/FactRowTests aFactOpensOnlyWhenThereIsSomethingToOpen; ResectaAppTests/FactRowTests todaysLinesAreShownWhole; ResectaAppTests/FactRowTests deselectionIsAFact
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/FactRow.swift b/Sources/ResectaApp/Views/FactRow.swift
+index 7b20c0a4..d63984b5 100644
+--- a/Sources/ResectaApp/Views/FactRow.swift
++++ b/Sources/ResectaApp/Views/FactRow.swift
+@@ -32,7 +32,7 @@ nonisolated struct ResultsFact: Equatable, Identifiable {
+ 
+     /// The row opens, and has a chevron, exactly when it has something to
+     /// open to.
+-    var opens: Bool { !more.isEmpty || door != nil }
++    var opens: Bool { true }
+ 
+     /// What the opened part draws: the paragraphs, then the link row.
+     var openedItems: [OpenedItem] {

@@ -63,7 +63,7 @@ public enum PipelineError: Sendable, LocalizedError {
         case engineCrash(layerIndex: Int)
     }
 
-    public enum ExportFailure: Sendable {
+    public enum ExportFailure: Sendable, CaseIterable {
         case diskFull
         case writeFailed
         case filePurged  // Output file purged by iOS while app was backgrounded

@@ -73,6 +73,7 @@ struct SavedSearchListSheet: View {
                             Self.emptyStateTitle(for: activeInterface),
                             systemImage: "bookmark",
                             description: Text(Self.emptyStateDescription(for: activeInterface))
+                                .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                         )
                         .listRowBackground(Color.clear)
                     }
@@ -99,6 +100,7 @@ struct SavedSearchListSheet: View {
                         Label(Self.saveCurrentLabel(for: activeInterface), systemImage: "plus.circle")
                     }
                     .disabled(!Self.saveCurrentEnabled(for: activeInterface, searchState: searchState))
+                    .tint(ResectaTokens.BrandTeal.text)
                     .accessibilityLabel(Self.saveCurrentLabel(for: activeInterface))
                 }
             }
@@ -323,10 +325,11 @@ struct SavedSearchListSheet: View {
                         .padding(.horizontal, ResectaTokens.Spacing.sm)
                         .padding(.vertical, ResectaTokens.Spacing.xxs)
                         .background(ResectaTokens.BrandTeal.tint.opacity(0.15), in: Capsule())
+                        .tint(ResectaTokens.BrandTeal.text)
                     if let preview = Self.queryPreview(for: search) {
                         Text(preview)
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                             .lineLimit(1)
                             // The saved query text may itself be PII.
                             .privacySensitive()
@@ -335,7 +338,7 @@ struct SavedSearchListSheet: View {
                 if let filters = Self.filterSummary(for: search) {
                     Text(filters)
                         .font(.caption2)
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                 }
             }
         }

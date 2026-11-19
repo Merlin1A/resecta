@@ -6,7 +6,8 @@ import XCTest
 /// Region", "Delete N Regions", or absent when nothing is selected), the
 /// long-press menu's rows, and the Undo button. Points are window-normalized
 /// so the suite reads the same on the 390- and 402-point simulators; an open
-/// menu is closed by tapping the page bar's counter, a label with no action.
+/// menu is closed by tapping the navigation bar 8 pt in from its leading
+/// edge, before the toolbar's first control, outside the open menu.
 ///
 /// nonisolated: an XCUITest drives a separate process and touches no
 /// @MainActor state.
@@ -35,7 +36,98 @@ nonisolated final class CanvasSelectionUITests: XCTestCase {
     private static let centreA = CGVector(dx: 0.335, dy: 0.46)
     private static let centreB = CGVector(dx: 0.665, dy: 0.46)
     private static let emptyPage = CGVector(dx: 0.5, dy: 0.65)
-    private static let gutterBelowPage = CGVector(dx: 0.5, dy: 0.84)
+    // Beside the selection bar, which sits over the middle of the gutter
+    // while a box is selected.
+    private static let gutterBelowPage = CGVector(dx: 0.06, dy: 0.84)
+
+    // MARK: - The selection bar
+
+    nonisolated func barPart(_ identifier: String) -> XCUIElement {
+        app.descendants(matching: .any).matching(identifier: identifier).firstMatch
+    }
+
+    /// Draw box A alone and select it with a tap.
+    nonisolated func drawAndSelectOneBox() {
+        enterDrawMode()
+        window.coordinate(withNormalizedOffset: Self.boxA.from).press(
+            forDuration: 0.05, thenDragTo: window.coordinate(withNormalizedOffset: Self.boxA.to),
+            withVelocity: .slow, thenHoldForDuration: 0.2)
+        leaveDrawMode()
+        XCTAssertTrue(waitForRegionCount(1), "the box did not draw; the counter read \(currentRegionCount())")
+        tap(Self.centreA)
+        XCTAssertTrue(barPart("selectionBar").waitForExistence(timeout: 5), "Selecting a box must show the selection bar.")
+    }
+
+    func testSelectionBar_deleteOneBoxThenUndoBringsItBackSelected() {
+        drawAndSelectOneBox()
+        XCTAssertEqual(barPart("selectionBarCount").label, "Selection, 1 box")
+        XCTAssertTrue(barPart("selectionBarDuplicate").isEnabled, "Duplicate applies to one box.")
+        attachScreenshot(named: "selection-bar-one-box")
+        barPart("selectionBarDelete").tap()
+        XCTAssertTrue(waitForRegionCount(0), "Delete must remove the box; the counter read \(currentRegionCount())")
+        XCTAssertTrue(barPart("selectionBar").waitForNonExistence(timeout: 5), "With nothing selected the bar must leave.")
+        let notice = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Deleted'")).firstMatch
+        XCTAssertFalse(notice.waitForExistence(timeout: 2), "Deleting one box shows no message.")
+        app.buttons["undoButton"].tap()
+        XCTAssertTrue(waitForRegionCount(1), "Undo must bring the box back")
+        XCTAssertTrue(barPart("selectionBar").waitForExistence(timeout: 5), "Undo brings the box back selected, and the bar with it.")
+        XCTAssertEqual(barPart("selectionBarCount").label, "Selection, 1 box")
+    }
+
+    func testSelectionBar_duplicateSelectsTheCopy() {
+        drawAndSelectOneBox()
+        barPart("selectionBarDuplicate").tap()
+        XCTAssertTrue(waitForRegionCount(2), "Duplicate must add a copy; the counter read \(currentRegionCount())")
+        XCTAssertEqual(barPart("selectionBarCount").label, "Selection, 1 box", "the copy is the one selected")
+        attachScreenshot(named: "selection-bar-after-duplicate")
+        app.buttons["undoButton"].tap()
+        XCTAssertTrue(waitForRegionCount(1), "Undo must remove the copy")
+    }
+
+    func testSelectionBar_wholePageDimsDuplicate() {
+        let mark = app.buttons["pageNavMarkWholePage"]
+        XCTAssertTrue(mark.waitForExistence(timeout: 10))
+        mark.tap()
+        XCTAssertTrue(waitForRegionCount(1), "Mark Whole Page did not add a region.")
+        tap(CGVector(dx: 0.5, dy: 0.45))
+        XCTAssertTrue(barPart("selectionBar").waitForExistence(timeout: 5), "Selecting the whole-page box must show the bar.")
+        let duplicate = barPart("selectionBarDuplicate")
+        XCTAssertTrue(duplicate.exists, "Duplicate is dimmed, never removed.")
+        XCTAssertFalse(duplicate.isEnabled, "A whole page cannot be duplicated, as in the hold menu.")
+        attachScreenshot(named: "selection-bar-whole-page")
+    }
+
+    func testSelectionBar_atTheLargestSize_coversTheLetterPagesLastEightPoints() throws {
+        app.terminate()
+        app.launchArguments = ["--uitesting", "--loadTestDocument", "--multipageDoc",
+                               "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+        app.launch()
+        XCTAssertTrue(app.buttons["drawTool"].waitForExistence(timeout: 30), "The editor never appeared.")
+        XCTAssertTrue(counter.waitForExistence(timeout: 10))
+        XCTAssertGreaterThan(counter.frame.height, 40, "The largest text size did not take.")
+        let shot = try XCTUnwrap(CanvasPixelProbe(XCUIScreen.main.screenshot(), windowSize: window.frame.size))
+        let page = try XCTUnwrap(shot.fitPage(), "the page at fit is measurable")
+        // At the largest sizes the import's "Text layer detected" toast covers
+        // most of the page and takes the drag: draw once it has gone.
+        let toast = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Text layer detected")).firstMatch
+        XCTAssertTrue(toast.waitForNonExistence(timeout: 20), "The import toast never cleared off the page.")
+        drawAndSelectOneBox()
+        let bar = barPart("selectionBar")
+        let pageBar = barPart("pageNav")
+        XCTAssertTrue(pageBar.waitForExistence(timeout: 5))
+        // At the accessibility sizes the bar's element reports its glass
+        // (at the default size, only its row).
+        let glass = bar.frame
+        let foot = (pageBar.frame.minY - 8) - glass.maxY
+        XCTAssertEqual(foot, 8, accuracy: 1, "The bar's foot must be 8 pt above the page bar's glass; it is \(foot) pt.")
+        let covered = page.maxY - glass.minY
+        XCTAssertTrue((6...14).contains(covered), "The bar covers \(covered) pt of the fit page's foot, not 6 to 14 (page \(page), bar's glass \(glass)).")
+        attachScreenshot(named: "selection-bar-largest-size")
+        // A tap on empty canvas ends the selection and the bar leaves.
+        tap(Self.emptyPage)
+        XCTAssertTrue(bar.waitForNonExistence(timeout: 5), "Ending the selection must take the bar away.")
+    }
 
     // MARK: - (i) A whole-page region and the gutter
 
@@ -171,10 +263,16 @@ private extension CanvasSelectionUITests {
         app.descendants(matching: .any).matching(identifier: "pageNavCounter").firstMatch
     }
 
-    /// Close an open overflow or long-press menu on the page bar's counter.
+    /// Close an open overflow or long-press menu with a tap on the navigation
+    /// bar 8 pt in from its leading edge: before the toolbar's first group
+    /// (it starts at 16 pt; the Rectangle tool's frame at 20), so the tap
+    /// changes nothing when no menu is open, and outside the open menu (the
+    /// overflow menu covers the bar's middle; the page bar's counter now
+    /// opens the page menu).
     nonisolated func dismissMenus() {
-        XCTAssertTrue(counter.waitForExistence(timeout: 5), "The page bar's counter never appeared.")
-        counter.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        let navigationBar = app.navigationBars.firstMatch
+        XCTAssertTrue(navigationBar.waitForExistence(timeout: 5), "The navigation bar never appeared.")
+        navigationBar.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0.5)).withOffset(CGVector(dx: 8, dy: 0)).tap()
         usleep(500_000)
     }
 
@@ -209,7 +307,8 @@ private extension CanvasSelectionUITests {
     /// The overflow menu's delete row's label, or nil when it offers none.
     nonisolated func deleteRow() -> String? {
         openOverflow()
-        let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Delete'")).firstMatch
+        let row = app.buttons.matching(NSPredicate(
+            format: "label BEGINSWITH 'Delete' AND identifier != 'selectionBarDelete'")).firstMatch
         let label = row.waitForExistence(timeout: 2) ? row.label : nil
         dismissMenus()
         return label

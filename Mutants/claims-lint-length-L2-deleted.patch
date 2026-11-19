@@ -1,0 +1,18 @@
+Property: The length pattern L2 matches "hide text length" wherever the gap between its words is longer than L1 reaches.
+Area: claims lint (Scripts/claims-lint.sh)
+Test command: Scripts/claims-lint.sh --self-test
+Must go red: the self-test case for pattern "L2 alone" (the self-test ends FAIL)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Scripts/claims-lint.sh b/Scripts/claims-lint.sh
+index 266a76f1..d9edbd80 100755
+--- a/Scripts/claims-lint.sh
++++ b/Scripts/claims-lint.sh
+@@ -58,7 +58,6 @@ length_claims() { # $1 = doc|lines; doc: $2 = file; lines: "path:line:text" on s
+         my $GAP = q{[^.;:!?]{0,30}};
+         my @P = (
+           [L1  => qq{\\bhid(?:e|es|ing|den)\\b$GAP\\b$LEN\\b}],
+-          [L2  => q{\bhide\s+text\s+length\b}],
+           [L3  => qq{\\b$LEN\\b(?:\\s+of\\s+[^.;:!?]{0,25}?)?\\s+(?:is|are|was|were|stays?|remains?|becomes?|gets?)\\s+(?:\\w+\\s+)?(?:hidden|concealed|masked|obscured|disguised|secret|invisible|unknown|gone|erased)\\b|\\b(?:keeps?|leaves?|makes?)\\s+(?:the\\s+|its\\s+|their\\s+)?(?:\\w+\x27s\\s+)?$LEN\\s+(?:hidden|concealed|secret|unknown|invisible)\\b}],
+           [L4  => qq{\\b(?:conceal(?:s|ed|ing)?|mask(?:s|ed|ing)?|obscur(?:e|es|ed|ing)|disguis(?:e|es|ed|ing)|protect(?:s|ed|ing)?)\\s+(?:the\\s+|its\\s+|their\\s+|a\\s+|each\\s+)?(?:\\w+\x27s\\s+|\\w+\\s+)?$LEN\\b}],
+           [L5  => qq{\\b(?:$LEN|box(?:es)?)\\b[^.;:!?]{0,40}\\b(?:says|tells|reveals|shows|gives|leaks)\\s+(?:\\w+\\s+)?nothing\\b}],

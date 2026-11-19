@@ -64,6 +64,267 @@ nonisolated final class EditorChromeUITests: XCTestCase {
         XCTAssertEqual(control.frame.midX, xBefore, accuracy: 0.5)
     }
 
+    // MARK: - The control at large text sizes
+
+    /// The largest text size, and Accessibility 1, the first size above the
+    /// symbol's ceiling. A wrong name is ignored and the app runs at the
+    /// default size, so each launch checks that its size took.
+    private static let largestTextSize = "UICTContentSizeCategoryAccessibilityXXXL"
+    private static let accessibilityOne = "UICTContentSizeCategoryAccessibilityM"
+
+    /// Launch the multi-page document at `textSize` (nil: the default) and
+    /// return the whole-page control.
+    private func launchWholePageControl(atTextSize textSize: String?) -> XCUIElement {
+        var arguments = ["--uitesting", "--loadTestDocument", "--multipageDoc"]
+        if let textSize { arguments += ["-UIPreferredContentSizeCategoryName", textSize] }
+        app.launchArguments = arguments
+        app.launch()
+        let control = app.buttons["pageNavMarkWholePage"]
+        XCTAssertTrue(control.waitForExistence(timeout: 30), "The page bar's whole-page control never appeared.")
+        if textSize != nil {
+            // At an accessibility size the counter stacks its two lines.
+            let counter = element("pageNavCounter")
+            XCTAssertTrue(counter.waitForExistence(timeout: 10))
+            XCTAssertGreaterThan(counter.frame.height, 40,
+                                 "The text size did not take: the counter is \(counter.frame.height) pt tall.")
+        }
+        return control
+    }
+
+    private func screenshotProbe() throws -> CanvasPixelProbe {
+        try XCTUnwrap(CanvasPixelProbe(XCUIScreen.main.screenshot(), windowSize: app.windows.firstMatch.frame.size))
+    }
+
+    /// Mark the page, then: at 8 points on a circle of radius 19 pt round
+    /// the control's centre the disc shows teal, and the symbol's middle is
+    /// white.
+    private func markAndCheckTheDisc(_ control: XCUIElement, screenshot name: String) throws {
+        control.tap()
+        XCTAssertTrue(waitForLabel(control, "Unmark Whole Page"), "A marked page's control must read Unmark Whole Page.")
+        let probe = try screenshotProbe()
+        attachScreenshot(named: name)
+        let centre = CGPoint(x: control.frame.midX, y: control.frame.midY)
+        for step in 0..<8 {
+            let angle = CGFloat(step) * .pi / 4
+            let (r, g, b) = probe.rgb(centre.x + 19 * cos(angle), centre.y + 19 * sin(angle))
+            XCTAssertTrue(CanvasPixelProbe.Tint.teal.matches(r, g, b),
+                          "The disc must show teal \(step * 45)° round the symbol; it read (\(r), \(g), \(b)).")
+        }
+        let (r, g, b) = probe.rgb(centre.x, centre.y)
+        XCTAssertTrue(r >= 235 && g >= 235 && b >= 235,
+                      "The marked symbol's middle must be white; it read (\(r), \(g), \(b)).")
+    }
+
+    func testWholePageControl_atTheLargestTextSize_symbolStaysInsideItsDisc() throws {
+        let control = launchWholePageControl(atTextSize: Self.largestTextSize)
+        XCTAssertTrue(waitForLabel(control, "Mark Whole Page"))
+        let unmarked = try screenshotProbe()
+        attachScreenshot(named: "chrome-whole-page-largest-unmarked")
+        let symbol = try XCTUnwrap(unmarked.tintBounds(.teal, in: control.frame), "No teal symbol inside the control.")
+        XCTAssertLessThanOrEqual(symbol.width, 30, "The unmarked symbol must stop growing at its ceiling; it is \(symbol.width) pt wide.")
+        XCTAssertLessThanOrEqual(symbol.height, 24, "The unmarked symbol must stop growing at its ceiling; it is \(symbol.height) pt tall.")
+        try markAndCheckTheDisc(control, screenshot: "chrome-whole-page-largest-marked")
+    }
+
+    func testWholePageControl_atAccessibilityOne_symbolStaysInsideItsDisc() throws {
+        let control = launchWholePageControl(atTextSize: Self.accessibilityOne)
+        XCTAssertTrue(waitForLabel(control, "Mark Whole Page"))
+        try markAndCheckTheDisc(control, screenshot: "chrome-whole-page-accessibility-one-marked")
+    }
+
+    func testWholePageControl_atTheDefaultSize_discIsUnchanged() throws {
+        let control = launchWholePageControl(atTextSize: nil)
+        XCTAssertTrue(waitForLabel(control, "Mark Whole Page"))
+        try markAndCheckTheDisc(control, screenshot: "chrome-whole-page-default-marked")
+        let disc = try XCTUnwrap(try screenshotProbe().tintBounds(.teal, in: control.frame), "No teal disc inside the control.")
+        XCTAssertEqual(disc.width, 44, accuracy: 1, "The default size's disc must stay 44 pt wide.")
+        XCTAssertEqual(disc.height, 44, accuracy: 1, "The default size's disc must stay 44 pt tall.")
+    }
+
+    // MARK: - The bar's order
+
+    /// The bar's four pieces, left to right: the whole-page control,
+    /// Previous, the counter, Next. Each ends before the next begins, and
+    /// the control is one stack gap (16 pt) from Previous: the hairline
+    /// between them adds no width.
+    private func checkTheBarLeadsWithTheControl(_ control: XCUIElement) -> [XCUIElement] {
+        let previous = app.buttons["pageNavPrevious"]
+        let counter = element("pageNavCounter")
+        let next = app.buttons["pageNavNext"]
+        XCTAssertTrue(previous.waitForExistence(timeout: 10))
+        XCTAssertTrue(counter.waitForExistence(timeout: 10))
+        XCTAssertTrue(next.waitForExistence(timeout: 10))
+        let pieces = [control, previous, counter, next]
+        let names = ["the whole-page control", "Previous", "the counter", "Next"]
+        for i in 0..<(pieces.count - 1) {
+            XCTAssertLessThanOrEqual(pieces[i].frame.maxX, pieces[i + 1].frame.minX + 0.5,
+                                     "\(names[i]) must end before \(names[i + 1]) begins: \(pieces[i].frame) then \(pieces[i + 1].frame).")
+        }
+        XCTAssertEqual(previous.frame.minX - control.frame.maxX, 16, accuracy: 0.5,
+                       "The control must sit one stack gap from Previous: \(control.frame) then \(previous.frame).")
+        return pieces
+    }
+
+    func testPageBar_wholePageControlLeadsTheBar() {
+        let control = launchWholePageControl(atTextSize: nil)
+        _ = checkTheBarLeadsWithTheControl(control)
+        let bar = element("pageNav")
+        XCTAssertTrue(bar.exists)
+        print("page bar width at the default size: \(bar.frame.width) pt")
+        attachScreenshot(named: "chrome-page-bar-default-control-first")
+    }
+
+    func testPageBarCount_isNotOrangeOnAPageWithABox() throws {
+        let control = launchWholePageControl(atTextSize: nil)
+        let counter = element("pageNavCounter")
+        XCTAssertTrue(counter.waitForExistence(timeout: 10))
+        control.tap()
+        XCTAssertTrue(waitForLabel(counter, "Page 1 of 23, 1 region"),
+                      "Mark Whole Page must add one region; the counter read '\(counter.label)'.")
+        let probe = try screenshotProbe()
+        attachScreenshot(named: "chrome-page-bar-count-with-a-box")
+        XCTAssertNil(probe.tintBounds(.red, in: counter.frame),
+                     "The count on a page with a box must be the support grey, not orange.")
+    }
+
+    func testPageBar_atTheLargestTextSize_controlLeadsAndNothingIsCut() {
+        let control = launchWholePageControl(atTextSize: Self.largestTextSize)
+        let pieces = checkTheBarLeadsWithTheControl(control)
+        let window = app.windows.firstMatch.frame
+        let bar = element("pageNav")
+        XCTAssertTrue(bar.exists)
+        for piece in pieces + [bar] {
+            XCTAssertTrue(window.contains(piece.frame),
+                          "Every piece of the bar must lie inside the window \(window) at the largest text size: \(piece.frame).")
+        }
+        print("page bar width at the largest text size: \(bar.frame.width) pt")
+        attachScreenshot(named: "chrome-page-bar-largest-control-first")
+    }
+
+    // MARK: - The page menu
+
+    /// A menu row or line found by its words.
+    private func labelled(_ words: String) -> XCUIElement {
+        app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", words)).firstMatch
+    }
+
+    /// Open the page menu from the counter and wait for its first row.
+    private func openPageMenu() {
+        let counter = element("pageNavCounter")
+        XCTAssertTrue(counter.waitForExistence(timeout: 10))
+        counter.tap()
+        XCTAssertTrue(app.buttons["Go to Page\u{2026}"].waitForExistence(timeout: 5), "The counter must open the page menu.")
+    }
+
+    /// Type `text` into the prompt's field after clearing it, and read it back.
+    private func typePage(_ text: String, into field: XCUIElement) throws {
+        field.tap()
+        let current = (field.value as? String) ?? ""
+        let placeholder = field.placeholderValue ?? ""
+        if !current.isEmpty, current != placeholder {
+            field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count + 2))
+        }
+        if !text.isEmpty { field.typeText(text) }
+        let read = (field.value as? String) ?? ""
+        let landed = text.isEmpty ? (read.isEmpty || read == placeholder) : read == text
+        if !landed {
+            if #available(iOS 27, *) {
+                throw XCTSkip("the iOS 27.2 simulator's software keyboard did not take the typed page")
+            }
+            XCTFail("The typed page did not land: the field reads '\(read)', not '\(text)'.")
+        }
+    }
+
+    func testPageMenu_goToPageTwelve() throws {
+        _ = launchWholePageControl(atTextSize: nil)
+        let counter = element("pageNavCounter")
+        XCTAssertTrue(counter.waitForExistence(timeout: 10))
+        XCTAssertNil(try screenshotProbe().tintBounds(.teal, in: counter.frame),
+                     "The counter at rest must keep its own colours: the menu must not tint it teal.")
+        openPageMenu()
+        XCTAssertTrue(labelled("No boxes yet").waitForExistence(timeout: 5), "With no box the total line reads No boxes yet.")
+        XCTAssertFalse(app.buttons["Next Page with Boxes"].isEnabled, "With no box Next Page with Boxes is not available.")
+        XCTAssertFalse(app.buttons["Previous Page with Boxes"].isEnabled, "With no box Previous Page with Boxes is not available.")
+        attachScreenshot(named: "page-menu-no-boxes")
+        app.buttons["Go to Page\u{2026}"].tap()
+        let alert = app.alerts["Go to Page"]
+        XCTAssertTrue(alert.waitForExistence(timeout: 5), "Go to Page must open its prompt.")
+        let field = alert.textFields.firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        XCTAssertEqual(field.placeholderValue, "Page 1 to 23")
+        attachScreenshot(named: "page-menu-prompt-empty")
+        try typePage("12", into: field)
+        let go = alert.buttons["Go"]
+        XCTAssertTrue(go.isEnabled, "Go is available for page 12.")
+        attachScreenshot(named: "page-menu-prompt-twelve")
+        go.tap()
+        XCTAssertTrue(waitForLabel(counter, "Page 12 of 23, 0 regions"), "Go must show page 12; the counter read '\(counter.label)'.")
+    }
+
+    func testPageMenu_goIsUnavailableUntilTheNumberIsAPage() throws {
+        _ = launchWholePageControl(atTextSize: nil)
+        let counter = element("pageNavCounter")
+        openPageMenu()
+        app.buttons["Go to Page\u{2026}"].tap()
+        let alert = app.alerts["Go to Page"]
+        XCTAssertTrue(alert.waitForExistence(timeout: 5), "Go to Page must open its prompt.")
+        let field = alert.textFields.firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        let go = alert.buttons["Go"]
+        XCTAssertFalse(go.isEnabled, "Go is not available with the field empty.")
+        try typePage("0", into: field)
+        XCTAssertFalse(go.isEnabled, "Go is not available for 0.")
+        try typePage("24", into: field)
+        XCTAssertFalse(go.isEnabled, "Go is not available for 24 on 23 pages.")
+        try typePage("23", into: field)
+        XCTAssertTrue(go.isEnabled, "Go is available for 23.")
+        alert.buttons["Cancel"].tap()
+        XCTAssertTrue(alert.waitForNonExistence(timeout: 5), "Cancel must close the prompt.")
+        XCTAssertTrue(waitForLabel(counter, "Page 1 of 23, 0 regions"), "Cancel must leave the page as it was; the counter read '\(counter.label)'.")
+    }
+
+    func testPageMenu_nextAndPreviousPageWithBoxes() {
+        let control = launchWholePageControl(atTextSize: nil)
+        let counter = element("pageNavCounter")
+        let next = app.buttons["pageNavNext"]
+        let previous = app.buttons["pageNavPrevious"]
+        func step(_ arrow: XCUIElement, times: Int, to label: String) {
+            for _ in 0..<times { arrow.tap() }
+            XCTAssertTrue(waitForLabel(counter, label), "The arrows must reach '\(label)'; the counter read '\(counter.label)'.")
+        }
+        step(next, times: 2, to: "Page 3 of 23, 0 regions")
+        control.tap()
+        XCTAssertTrue(waitForLabel(counter, "Page 3 of 23, 1 region"))
+        step(next, times: 4, to: "Page 7 of 23, 0 regions")
+        control.tap()
+        XCTAssertTrue(waitForLabel(counter, "Page 7 of 23, 1 region"))
+        step(previous, times: 6, to: "Page 1 of 23, 0 regions")
+
+        openPageMenu()
+        XCTAssertTrue(labelled("2 boxes on 2 pages").waitForExistence(timeout: 5), "The total line counts both boxes and both pages.")
+        XCTAssertFalse(app.buttons["Previous Page with Boxes"].isEnabled, "No page before page 1 holds a box.")
+        attachScreenshot(named: "page-menu-two-boxes")
+        app.buttons["Next Page with Boxes"].tap()
+        XCTAssertTrue(waitForLabel(counter, "Page 3 of 23, 1 region"), "Next Page with Boxes from page 1 is page 3; the counter read '\(counter.label)'.")
+        openPageMenu()
+        app.buttons["Next Page with Boxes"].tap()
+        XCTAssertTrue(waitForLabel(counter, "Page 7 of 23, 1 region"), "Next Page with Boxes from page 3 is page 7; the counter read '\(counter.label)'.")
+        openPageMenu()
+        XCTAssertFalse(app.buttons["Next Page with Boxes"].isEnabled, "No page after page 7 holds a box: the row must not wrap round.")
+        app.buttons["Previous Page with Boxes"].tap()
+        XCTAssertTrue(waitForLabel(counter, "Page 3 of 23, 1 region"), "Previous Page with Boxes from page 7 is page 3; the counter read '\(counter.label)'.")
+    }
+
+    func testOnePageDocument_counterOpensNoMenu() {
+        app.launchArguments = ["--uitesting", "--loadTestDocument"]
+        app.launch()
+        let counter = element("pageNavCounter")
+        XCTAssertTrue(counter.waitForExistence(timeout: 30), "The page bar's counter never appeared.")
+        XCTAssertNotEqual(counter.elementType, .button, "On a one-page document the counter is not a button.")
+        counter.tap()
+        XCTAssertFalse(app.buttons["Go to Page\u{2026}"].waitForExistence(timeout: 3), "On a one-page document the counter opens no menu.")
+    }
+
     // MARK: - The one-page bar
 
     func testOnePageDocument_showsTheCountWithoutArrowsOrControl() {

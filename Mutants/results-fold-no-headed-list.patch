@@ -1,0 +1,24 @@
+Property: A run where every check passed draws no headed list of checks; its checks are inside the closed row.
+Area: results (the passed checks' row)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationResultsActionsTests -only-testing:ResectaAppUITests/SearchRecheckUITests
+Must go red: ResectaAppTests/VerificationResultsActionsTests noHeadedListOfChecks; ResectaAppUITests/SearchRecheckUITests testSearchRecheck_appliedTextSearch_rowReadsCheckPassed
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationDetailsSection.swift b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
+index d0a0e9ef..39b6934f 100644
+--- a/Sources/ResectaApp/Views/VerificationDetailsSection.swift
++++ b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
+@@ -57,7 +57,12 @@ struct VerificationDetailsSection: View {
+                 GroupedSection { runSection }
+                     .padding(.top, ResectaTokens.Spacing.xl)
+             }
+-            if !Self.listRowMembers(partition).isEmpty {
++            if partition.total > 0 && partition.passedCount == partition.total {
++                GroupedSection(header: "Checks", spokenHeader: "Checks.") {
++                    layerRows(Array(report.layers.indices), layout: .member, showsStatusWord: false)
++                }
++                .padding(.top, ResectaTokens.Results.blockGap)
++            } else if !Self.listRowMembers(partition).isEmpty {
+                 GroupedSection { passCluster(partition) }
+                     .padding(.top, ResectaTokens.Spacing.xl)
+             }

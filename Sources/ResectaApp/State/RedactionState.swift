@@ -18,6 +18,11 @@ class RedactionState {
     /// Multi-region selection set. Single selection is the common case.
     var selectedRegionIDs: Set<UUID> = []
 
+    /// The last lasso cut at the selection limit, with the selection it
+    /// left; nil when the last lasso was not cut. The selection bar reads it
+    /// for its second line.
+    var lassoCut: LassoCut?
+
     /// Backward-compatible single-selection accessor.
     /// Get: returns the sole selected ID when exactly one is selected, else nil.
     /// Set: replaces the entire selection with a singleton (or clears).
@@ -118,12 +123,8 @@ class RedactionState {
 
     /// Record of how the most recent Scan-interface run ended (results
     /// listed in-sheet). Written on every run exit path (staged, nothing
-    /// found, failed)
-    /// and read by `DocumentEditorView` to drive the detection summary
-    /// banner — zero/failed runs previously surfaced only as transient
-    /// toasts. `run` increments per record so two identical consecutive
-    /// outcomes still read as a change to `.onChange` observers.
-    /// Session-scoped; cleared on new-document import.
+    /// found, failed). The run reads its `ocrSkippedPages`
+    /// (`PipelineRunner`). Session-scoped; cleared on new-document import.
     struct DetectionRunRecord: Equatable {
         enum Outcome: Equatable {
             /// Findings listed in-sheet for review. Nothing is applied
@@ -134,8 +135,7 @@ class RedactionState {
             /// The run ended early on a render/detection error.
             case failed
         }
-        /// Present for Scan-interface (in-sheet) runs: the counts the
-        /// banner reports.
+        /// Present for Scan-interface (in-sheet) runs.
         struct ScanRunSummary: Equatable {
             let foundCount: Int
             let pageCount: Int

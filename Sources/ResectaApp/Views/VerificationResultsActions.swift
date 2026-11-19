@@ -5,7 +5,9 @@ import RedactionEngine
 // outlined under a filled Keep Editing when a check failed or needs
 // review, or grey when it cannot share), the disabled reason under it, the
 // action rows (Run Verification on a skipped report, Keep Editing, Preview)
-// and the undo footnote. ONE Share `Button` in either style carries
+// and the undo words, drawn once beside Keep Editing: its row's second line
+// where it is a row, small print under the card or under the reason where it
+// leads as a capsule. ONE Share `Button` in either style carries
 // `onExport`, ⌘E and the disabled gate; it speaks a hint exactly when
 // the Share tap's gate would ask, from the covered pages the results screen
 // has derived so far.
@@ -31,6 +33,8 @@ struct VerificationResultsActions: View {
         let swapped = Self.swapsPrimaryAction(report: report, shareDisabled: shareDisabled)
         let rows = Self.actionRows(report: report, outputExists: outputExists,
                                    previewAvailable: previewAvailable, swapped: swapped)
+        let undoPlaces = Self.undoWordsPlaces(report: report, shareDisabled: shareDisabled,
+                                              outputExists: outputExists, previewAvailable: previewAvailable)
         VStack(spacing: 0) {
             VStack(spacing: ResectaTokens.Results.capsuleGap) {
                 if swapped {
@@ -39,19 +43,22 @@ struct VerificationResultsActions: View {
                 shareCapsule(swapped: swapped)
             }
             reasonAndCaption(shareDisabled: shareDisabled)
-            if rows.isEmpty {
+            if !rows.isEmpty {
+                GroupedSection {
+                    ForEach(Array(rows.enumerated()), id: \.element) { index, row in
+                        if index > 0 { GroupedRowDivider() }
+                        actionRow(row, undoWordsOnRow: undoPlaces.contains(.onKeepEditingRow))
+                    }
+                }
+                .padding(.top, ResectaTokens.Results.blockGap)
+            }
+            if undoPlaces.contains(.centredUnderReason) {
                 undoFootnote
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)
                     .padding(.top, ResectaTokens.Spacing.md)
-            } else {
-                GroupedSection {
-                    ForEach(Array(rows.enumerated()), id: \.element) { index, row in
-                        if index > 0 { GroupedRowDivider() }
-                        actionRow(row)
-                    }
-                }
-                .padding(.top, ResectaTokens.Results.blockGap)
+            }
+            if undoPlaces.contains(.underCard) {
                 undoFootnote
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, ResectaTokens.Spacing.md)
@@ -120,7 +127,7 @@ struct VerificationResultsActions: View {
     // MARK: - The rows
 
     @ViewBuilder
-    private func actionRow(_ row: ActionRow) -> some View {
+    private func actionRow(_ row: ActionRow, undoWordsOnRow: Bool) -> some View {
         switch row {
         case .runVerification:
             Button(action: onRunVerification) {
@@ -131,7 +138,8 @@ struct VerificationResultsActions: View {
             .accessibilityIdentifier("runVerificationCard")
         case .keepEditing:
             Button { documentState.transition(to: .editing) } label: {
-                ResultsActionRow(symbol: "pencil.and.outline", title: "Keep Editing")
+                ResultsActionRow(symbol: "pencil.and.outline", title: "Keep Editing",
+                                 subtitle: undoWordsOnRow ? VerificationResultsView.undoFootnote : nil)
             }
             .buttonStyle(ResultsRowButtonStyle())
             .modifier(KeepEditingAccessibility())
@@ -141,8 +149,7 @@ struct VerificationResultsActions: View {
             NavigationLink {
                 RedactedPreviewView(verdict: report.overallStatus)
             } label: {
-                ResultsActionRow(symbol: "eye", title: "Preview Redacted Document",
-                                 subtitle: "Read-only view of the redacted PDF")
+                ResultsActionRow(symbol: "eye", title: "Preview Redacted Document")
             }
             .buttonStyle(ResultsRowButtonStyle())
             .accessibilityLabel(VerificationResultsView.previewCardAccessibilityLabel)
@@ -186,6 +193,21 @@ struct VerificationResultsActions: View {
         if !swapped { rows.append(.keepEditing) }
         if previewAvailable { rows.append(.preview) }
         return rows
+    }
+
+    /// Where the undo words are drawn: exactly one place, beside Keep
+    /// Editing. On its row as the second line when Keep Editing is a row;
+    /// under the card when it leads and the card has rows; centred under the
+    /// reason when it leads and the card is empty.
+    enum UndoWordsPlace: Hashable { case onKeepEditingRow, underCard, centredUnderReason }
+
+    static func undoWordsPlaces(report: VerificationReport, shareDisabled: Bool,
+                                outputExists: Bool, previewAvailable: Bool) -> [UndoWordsPlace] {
+        let swapped = swapsPrimaryAction(report: report, shareDisabled: shareDisabled)
+        let rows = actionRows(report: report, outputExists: outputExists,
+                              previewAvailable: previewAvailable, swapped: swapped)
+        if rows.contains(.keepEditing) { return [.onKeepEditingRow] }
+        return rows.isEmpty ? [.centredUnderReason] : [.underCard]
     }
 
     /// The Share hint: spoken only, exactly when tapping Share opens a
@@ -251,6 +273,12 @@ struct ResultsCapsuleButtonStyle: ButtonStyle {
             configuration.label
                 .font(.body.weight(.semibold))
                 .labelStyle(.titleAndIcon)
+                .multilineTextAlignment(.center)
+                // Clear space inside the curve when the label takes more than
+                // one line; at the default size the label is short and
+                // centred, and the 50-pt minimum holds the height.
+                .padding(.horizontal, ResectaTokens.Results.capsuleLabelInset)
+                .padding(.vertical, ResectaTokens.Results.capsuleLabelInsetVertical)
                 .foregroundStyle(foreground)
                 .frame(maxWidth: .infinity, minHeight: ResectaTokens.Results.capsuleHeight)
                 .background(background, in: Capsule())
@@ -313,12 +341,23 @@ struct ResultsActionRow: View {
     let title: String
     var subtitle: String? = nil
 
+    /// The largest text size the tile's symbol follows. The tile stays
+    /// 28 pt at every size, so the symbol stops growing where the tile still
+    /// holds it; the row's words keep growing.
+    static let symbolSizeLimit: DynamicTypeSize = .xLarge
+
+    /// The tile's symbol, without its tile.
+    static func tileSymbol(_ symbol: String) -> some View {
+        Image(systemName: symbol)
+            .font(.callout.weight(.semibold))
+            .dynamicTypeSize(...symbolSizeLimit)
+    }
+
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         HStack(spacing: ResectaTokens.Spacing.sm + ResectaTokens.Spacing.xs) {
-            Image(systemName: symbol)
-                .font(.callout.weight(.semibold))
+            Self.tileSymbol(symbol)
                 .foregroundStyle(ResectaTokens.BrandTeal.text)
                 .frame(width: ResectaTokens.Results.actionTile, height: ResectaTokens.Results.actionTile)
                 .background(

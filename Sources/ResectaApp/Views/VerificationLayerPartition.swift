@@ -23,6 +23,10 @@ nonisolated struct VerificationLayerPartition: Equatable {
 
     var total: Int { outcomes.count }
 
+    /// The checks that had something to check: every outcome but "nothing
+    /// to check". The ring's second number and the summary's are this.
+    var totalWithSomethingToCheck: Int { outcomes.count { $0 != .nothingToCheck } }
+
     func count(_ outcome: VerificationOutcome) -> Int {
         outcomes.count { $0 == outcome }
     }
@@ -74,9 +78,11 @@ nonisolated struct VerificationLayerPartition: Equatable {
     }
 
     /// The summary's first line: "{P} of {T} checks passed" ("0 of 1 check
-    /// passed" when T = 1).
+    /// passed" when T = 1), where T counts only the checks that had
+    /// something to check; line 2 names the others.
     var summaryLine1: String {
-        "\(passedCount) of \(total) \(total == 1 ? "check" : "checks") passed"
+        let checked = totalWithSomethingToCheck
+        return "\(passedCount) of \(checked) \(checked == 1 ? "check" : "checks") passed"
     }
 
     /// The summary's second line: one clause per other outcome present, in
@@ -102,11 +108,23 @@ nonisolated struct VerificationLayerPartition: Equatable {
     }
 
     /// The pass cluster's row title: "N checks passed" / "1 check passed",
-    /// then " · 1 note" / " · K notes" when notes ride inside it.
+    /// then " · 1 note" / " · K notes" when notes ride inside it, then
+    /// " · I had nothing to check" when checks had nothing to check (they
+    /// sit inside the row with the passed checks).
     var clusterTitle: String {
-        let passed = passedCount == 1 ? "1 check passed" : "\(passedCount) checks passed"
-        guard let notes = VerificationOutcome.note.headerClause(count: clusterNoteCount) else { return passed }
-        return "\(passed) · \(notes)"
+        ([clusterTitleBase] + clusterTitleClauses).joined(separator: " · ")
+    }
+
+    /// The title's first part: "N checks passed" / "1 check passed".
+    var clusterTitleBase: String {
+        passedCount == 1 ? "1 check passed" : "\(passedCount) checks passed"
+    }
+
+    /// The title's clauses after the first part, in the shipped order: the
+    /// riding notes, then the checks that had nothing to check.
+    var clusterTitleClauses: [String] {
+        [VerificationOutcome.note.headerClause(count: clusterNoteCount),
+         VerificationOutcome.nothingToCheck.headerClause(count: nothingToCheck.count)].compactMap { $0 }
     }
 
     /// The cluster's spoken title: "9 checks passed, 1 note".

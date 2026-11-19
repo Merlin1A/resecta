@@ -1,0 +1,34 @@
+Property: The needs-review row's offer is the button's own rule; the shared remaining-items rule, read by the share sheet, stays the note's.
+Area: results screen, Review in Scan (App)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/ReviewInScanTests
+Must go red: ResectaAppTests/ReviewInScanTests needsReviewSweepAddsNoPossibleItemsLine
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/LayerResultRow.swift b/Sources/ResectaApp/Views/LayerResultRow.swift
+index 37e5bbde..45cd4a1d 100644
+--- a/Sources/ResectaApp/Views/LayerResultRow.swift
++++ b/Sources/ResectaApp/Views/LayerResultRow.swift
+@@ -403,9 +403,7 @@ struct LayerResultRow: View {
+     /// marked (the sweep keeps pages, not locations). The row that could not
+     /// read a page does not offer it.
+     static func offersReviewInScan(layer: LayerResult) -> Bool {
+-        layer.layer == .detectionSweep
+-            && (layer.status.isInfo || layer.status.isAttention)
+-            && layer.queryLines != nil
++        VerificationRowModel.hasItemsRemaining(layer)
+     }
+ 
+     static func rowCaptionText(layer: LayerResult) -> String? {
+diff --git a/Sources/ResectaApp/Views/VerificationRowModel.swift b/Sources/ResectaApp/Views/VerificationRowModel.swift
+index 37f3ff63..f85339d0 100644
+--- a/Sources/ResectaApp/Views/VerificationRowModel.swift
++++ b/Sources/ResectaApp/Views/VerificationRowModel.swift
+@@ -198,7 +198,7 @@ nonisolated struct VerificationRowModel: Equatable {
+     }
+ 
+     static func hasItemsRemaining(_ layer: LayerResult) -> Bool {
+-        layer.layer == .detectionSweep && layer.status.isInfo && layer.queryLines != nil
++        layer.layer == .detectionSweep && (layer.status.isInfo || layer.status.isAttention) && layer.queryLines != nil
+     }
+ 
+     /// Every page of a known run rasterized; an empty list is unknown.

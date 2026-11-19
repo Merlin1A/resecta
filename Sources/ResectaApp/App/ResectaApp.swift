@@ -45,6 +45,13 @@ struct ResectaApp: App {
         // launch — unconditional and idempotent (no marker key).
         SearchState.purgeRetiredRecentsStorage()
 
+        // The launch hooks write UserDefaults, so they run before any store
+        // below reads it (`SettingsState` reads Verify Before Export once,
+        // in its init).
+        #if DEBUG
+        Self.handleUITestLaunchArguments()
+        #endif
+
         // App-wide stores for the power-user library: saved regexes and
         // always/never-flag custom terms. Both persist as protected,
         // backup-excluded JSON files under Application Support (the
@@ -66,10 +73,6 @@ struct ResectaApp: App {
         // Disable shake-to-undo — accidental shakes during precision
         // drawing are disruptive. Toolbar buttons are the sole undo mechanism.
         UIApplication.shared.applicationSupportsShakeToEdit = false
-
-        #if DEBUG
-        Self.handleUITestLaunchArguments()
-        #endif
     }
 
     #if DEBUG
@@ -83,7 +86,13 @@ struct ResectaApp: App {
     ///   text-layer results and deterministically reds the XCUI
     ///   text-search suites. Per-launch and test-only: release launches
     ///   never pass the flag, and in-session persistence still works
-    ///   after the launch-time clear.
+    ///   after the launch-time clear. It also clears Verify Before
+    ///   Export back to its default (on): a test that turns it off and
+    ///   stops before its tearDown restores it would otherwise leave every
+    ///   later run on that simulator at "Verification Skipped".
+    /// --keepVerifySetting: With --uitesting, keep the stored Verify Before
+    ///   Export value: for a test that turned it off in Settings and
+    ///   relaunches to run with it off.
     /// --resetEULA: Clear the acceptance flag so the gate PRESENTS — the
     ///   gate-links UI tests drive the un-accepted gate itself, the
     ///   inverse of --uitesting. DEBUG-only, and it only ever forces the
@@ -107,6 +116,9 @@ struct ResectaApp: App {
         } else if CommandLine.arguments.contains("--uitesting") {
             defaults.set(true, forKey: FirstLaunchFlow.agreementKey)
             defaults.removeObject(forKey: "search.lastFilter.v1")
+            if !CommandLine.arguments.contains("--keepVerifySetting") {
+                defaults.removeObject(forKey: "autoVerify")
+            }
         }
         if CommandLine.arguments.contains("--searchSourceFilter=ocr"),
            let data = try? JSONEncoder().encode(SearchState.LastSearchFilterShape(
@@ -137,6 +149,10 @@ struct ResectaApp: App {
         // One page carrying a link annotation over its central band
         // (Scripts/generate_uitest_link.py): the editor's link policy.
         "--linkDoc": "uitest_link",
+        // One page with an opaque box annotation over its first line and a
+        // filled text field (Scripts/generate_uitest_annotated_form.py):
+        // the import notice, the covered text under a box, and its confirm.
+        "--annotatedFormDoc": "uitest_annotated_form",
     ]
 
     /// The `--loadTestDocument` fixture name for a launch-argument list.
@@ -161,6 +177,241 @@ struct ResectaApp: App {
             }
         }
         return nil
+    }
+
+    // MARK: Hooks that reach screens for tests
+    //
+    // A hook never holds a copy of words a person reads: it shows the
+    // app's own constant, or calls the function the app itself calls.
+    // An unknown name stops the app (`preconditionFailure`), so a typo in
+    // a test's launch arguments never passes as a pass. The parsers are
+    // pure functions of the argument list (`DebugLaunchHookTests`).
+
+    /// What `--showToast` asks for: the bare flag keeps the purge warning
+    /// it has always shown; `--showToast=<id>` shows one of the app's own
+    /// toast messages at the severity its site posts it with.
+    enum ToastHook: Equatable {
+        case absent
+        case bare
+        case named(ToastHookID)
+        case stop(String)
+    }
+
+    /// The toast ids `--showToast=<id>` takes. A toast whose words are a
+    /// literal inside a call has no id: a hook would need a copy of them.
+    enum ToastHookID: String, CaseIterable {
+        case shareSheetUnavailable
+        case selectionLimit
+        case customTermTimeout
+
+        @MainActor var message: String {
+            switch self {
+            case .shareSheetUnavailable: DocumentEditorView.shareSheetUnavailableMessage
+            case .selectionLimit: RedactionState.lassoSelectionCapToastMessage
+            case .customTermTimeout: SearchAndRedactSheet.customTermTimeoutMessage
+            }
+        }
+
+        /// All three sites post their message as a warning
+        /// (`DocumentEditorView+Export.swift`, `RedactionApplyEngine.swift`,
+        /// `SearchAndRedactSheet+Trigger.swift`).
+        var severity: ToastSeverity { .warning }
+    }
+
+    static func toastHook(for arguments: [String]) -> ToastHook {
+        let prefix = "--showToast="
+        if let argument = arguments.first(where: { $0.hasPrefix(prefix) }) {
+            let id = String(argument.dropFirst(prefix.count))
+            guard let known = ToastHookID(rawValue: id) else {
+                return .stop("--showToast: unknown toast id \"\(id)\"")
+            }
+            return .named(known)
+        }
+        return arguments.contains("--showToast") ? .bare : .absent
+    }
+
+    /// The phases `--seedFailure=<case>:<phase>` fails from: the three
+    /// return phases the failure screen's labels read.
+    enum SeedFailurePhase: String, CaseIterable {
+        case empty
+        case editing
+        case verified
+    }
+
+    /// What `--seedFailure` asks for. The verified phase fails from a
+    /// results screen, so it needs `--seedVerifiedReport=<name>` beside
+    /// it; a missing or unknown report stops the app rather than picking
+    /// one here.
+    enum SeedFailureHook {
+        case absent
+        case seed(error: PipelineError, phase: SeedFailurePhase, report: VerificationReport?)
+        case stop(String)
+    }
+
+    /// Every `PipelineError` case, with fixed values: a page or layer
+    /// index of 0, no bytes read, and the first catalog key the import's
+    /// active-content walk looks for. The export failures carry no values,
+    /// so they come from the type's own list rather than being named here:
+    /// the app names the failed share-copy write in one place only, the
+    /// function that owns it, and a source test holds that.
+    static let seedFailureErrors: [PipelineError] = [
+        .importError(.corrupt),
+        .importError(.passwordProtected),
+        .importError(.tooLarge(bytesRead: 0)),
+        .importError(.unsupportedFormat),
+        .importError(.invalidPageDimensions(pageIndex: 0)),
+        .importError(.activeContent(location: .catalogKey("JavaScript"))),
+        .detectionError(.ocrUnavailable),
+        .detectionError(.timeout(pageIndex: 0)),
+        .detectionError(.visionError(pageIndex: 0)),
+        .detectionError(.detectionCorpusInvalid),
+        .redactionError(.insufficientMemory(pageIndex: 0)),
+        .redactionError(.unsupportedPageGeometry(pageIndex: 0)),
+        .redactionError(.bitmapCreationFailed(pageIndex: 0)),
+        .redactionError(.fillVerificationFailed(pageIndex: 0)),
+        .redactionError(.renderTimeout(pageIndex: 0)),
+        .redactionError(.pageTooLarge(pageIndex: 0)),
+        .redactionError(.reconstructionFailed),
+        .verificationError(.engineCrash(layerIndex: 0)),
+    ] + PipelineError.ExportFailure.allCases.map(PipelineError.exportError)
+
+    /// A failure's name as `--seedFailure` spells it, `<family>.<case>`.
+    /// The switch is exhaustive, so a new `PipelineError` case does not
+    /// compile until it has a name.
+    static func seedFailureName(_ error: PipelineError) -> String {
+        switch error {
+        case .importError(let failure):
+            switch failure {
+            case .corrupt: "importError.corrupt"
+            case .passwordProtected: "importError.passwordProtected"
+            case .tooLarge: "importError.tooLarge"
+            case .unsupportedFormat: "importError.unsupportedFormat"
+            case .invalidPageDimensions: "importError.invalidPageDimensions"
+            case .activeContent: "importError.activeContent"
+            }
+        case .detectionError(let failure):
+            switch failure {
+            case .ocrUnavailable: "detectionError.ocrUnavailable"
+            case .timeout: "detectionError.timeout"
+            case .visionError: "detectionError.visionError"
+            case .detectionCorpusInvalid: "detectionError.detectionCorpusInvalid"
+            }
+        case .redactionError(let failure):
+            switch failure {
+            case .insufficientMemory: "redactionError.insufficientMemory"
+            case .unsupportedPageGeometry: "redactionError.unsupportedPageGeometry"
+            case .bitmapCreationFailed: "redactionError.bitmapCreationFailed"
+            case .fillVerificationFailed: "redactionError.fillVerificationFailed"
+            case .renderTimeout: "redactionError.renderTimeout"
+            case .pageTooLarge: "redactionError.pageTooLarge"
+            case .reconstructionFailed: "redactionError.reconstructionFailed"
+            }
+        case .verificationError(let failure):
+            switch failure {
+            case .engineCrash: "verificationError.engineCrash"
+            }
+        case .exportError(let failure):
+            switch failure {
+            case .diskFull: "exportError.diskFull"
+            case .writeFailed: "exportError.writeFailed"
+            case .filePurged: "exportError.filePurged"
+            }
+        }
+    }
+
+    static func seedFailureHook(for arguments: [String]) -> SeedFailureHook {
+        let prefix = "--seedFailure="
+        guard let argument = arguments.first(where: { $0.hasPrefix(prefix) }) else { return .absent }
+        let parts = argument.dropFirst(prefix.count)
+            .split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
+        let name = String(parts[0])
+        guard let error = seedFailureErrors.first(where: { seedFailureName($0) == name }) else {
+            return .stop("--seedFailure: unknown failure \"\(name)\"")
+        }
+        var phase = SeedFailurePhase.editing
+        if parts.count == 2 {
+            guard let named = SeedFailurePhase(rawValue: String(parts[1])) else {
+                return .stop("--seedFailure: unknown phase \"\(parts[1])\"")
+            }
+            phase = named
+        }
+        guard phase == .verified else { return .seed(error: error, phase: phase, report: nil) }
+        let reportPrefix = "--seedVerifiedReport="
+        guard let reportArgument = arguments.first(where: { $0.hasPrefix(reportPrefix) }) else {
+            return .stop("--seedFailure: the verified phase needs --seedVerifiedReport=<name>")
+        }
+        let reportName = String(reportArgument.dropFirst(reportPrefix.count))
+        guard let report = VerificationDebugFixtures.all[reportName] else {
+            return .stop("--seedFailure: unknown report \"\(reportName)\" for the verified phase")
+        }
+        return .seed(error: error, phase: phase, report: report)
+    }
+
+    /// Takes the loaded workspace to the failure screen by the phase
+    /// machine's own legal steps: empty → importing → failed; editing →
+    /// redacting → failed; verified → exporting → failed. A step the
+    /// machine refuses stops the app.
+    @MainActor
+    static func seedFailure(_ error: PipelineError, phase: SeedFailurePhase,
+                            report: VerificationReport?, on documentState: DocumentState) {
+        let steps: [DocumentState.Phase]
+        switch phase {
+        case .empty:
+            steps = [.importing, .failed(error: error, returnPhase: .empty)]
+        case .editing:
+            steps = [.redacting(progress: .init(currentPage: 1, totalPages: 1, currentStep: "Seeded")),
+                     .failed(error: error, returnPhase: .editing)]
+        case .verified:
+            guard let report else { preconditionFailure("--seedFailure: the verified phase needs a report") }
+            steps = [.exporting, .failed(error: error, returnPhase: .verified(report: report))]
+        }
+        for step in steps {
+            guard documentState.transition(to: step) else {
+                preconditionFailure("--seedFailure: the phase machine has no legal step to \(step)")
+            }
+        }
+    }
+
+    /// `--uitestOCRSkipPage=N`: the 0-based page that goes back into the
+    /// OCR skip set after every reset, so the skipped-pages banner shows
+    /// after any search. Nil when the flag is absent; a value that is not
+    /// a page index stops the app.
+    static func uitestOCRSkipPage(for arguments: [String]) -> Int? {
+        let prefix = "--uitestOCRSkipPage="
+        guard let argument = arguments.first(where: { $0.hasPrefix(prefix) }) else { return nil }
+        guard let page = Int(argument.dropFirst(prefix.count)), page >= 0 else {
+            preconditionFailure("--uitestOCRSkipPage: not a page index in \"\(argument)\"")
+        }
+        return page
+    }
+
+    /// `--simulateCaptureAfter=<seconds>`: the whole number of seconds after
+    /// launch at which the timed capture hook raises the screen-capture
+    /// cover. Nil when the argument is absent, empty, not a whole number,
+    /// or negative.
+    static func simulatedCaptureDelay(for arguments: [String]) -> Int? {
+        wholeSeconds(after: "--simulateCaptureAfter=", in: arguments)
+    }
+
+    /// `--simulateCaptureEndAfter=<seconds>`: the second after launch at
+    /// which the timed capture hook lowers the cover again. Nil in the same
+    /// cases as the delay, and when no delay is given or the end is not
+    /// later than it.
+    static func simulatedCaptureEnd(for arguments: [String]) -> Int? {
+        guard let begin = simulatedCaptureDelay(for: arguments),
+              let end = wholeSeconds(after: "--simulateCaptureEndAfter=", in: arguments),
+              end > begin else { return nil }
+        return end
+    }
+
+    /// The whole number of seconds after `prefix` in the first argument
+    /// that begins with it: ASCII digits only, so a sign, a fraction or
+    /// nothing at all reads as no value.
+    private static func wholeSeconds(after prefix: String, in arguments: [String]) -> Int? {
+        guard let argument = arguments.first(where: { $0.hasPrefix(prefix) }) else { return nil }
+        let text = argument.dropFirst(prefix.count)
+        guard !text.isEmpty, text.allSatisfy({ $0.isASCII && $0.isNumber }) else { return nil }
+        return Int(text)
     }
     #endif
 
@@ -190,11 +441,50 @@ struct ResectaApp: App {
                         .task {
                             #if DEBUG
                             let launchArguments = CommandLine.arguments
+                            // `--seedFailure=<case>[:<phase>]`: the failure
+                            // screen, reached by the phase machine's own
+                            // steps. The empty phase fails before any
+                            // document; the others on the loaded one.
+                            let seededFailure = Self.seedFailureHook(for: launchArguments)
+                            var failsOnDocument = false
+                            switch seededFailure {
+                            case .absent:
+                                break
+                            case .stop(let reason):
+                                preconditionFailure(reason)
+                            case .seed(let error, let phase, let report):
+                                if phase == .empty {
+                                    appCoordinator.openRedact()
+                                    if case .redact(let ws) = appCoordinator.activeWorkspace {
+                                        Self.seedFailure(error, phase: phase, report: report,
+                                                         on: ws.documentState)
+                                    }
+                                } else {
+                                    failsOnDocument = true
+                                }
+                            }
+                            // `--lockedDoc`: the encrypted fixture through
+                            // the import entry a Files pick uses, so the
+                            // password sheet comes up as it does for a
+                            // person's locked PDF.
+                            if launchArguments.contains("--lockedDoc") {
+                                guard let url = Bundle.main.url(forResource: "uitest_locked",
+                                                                withExtension: "pdf") else {
+                                    preconditionFailure("--lockedDoc: uitest_locked.pdf is not in the bundle")
+                                }
+                                await appCoordinator.openRedactWithDocument(url: url)
+                            }
+                            // `--forceSnapshotOverlay`: the app-switcher
+                            // placeholder, held up while the app is active.
+                            if launchArguments.contains("--forceSnapshotOverlay") {
+                                obscureContent = true
+                            }
                             if launchArguments.contains("--loadTestDocument")
                                 || Self.testImageName(for: launchArguments) != nil
                                 || launchArguments.contains("--openSearchSheet")
                                 || launchArguments.contains("--openSavedSearches")
-                                || launchArguments.contains(where: { $0.hasPrefix("--seedVerifiedReport=") }) {
+                                || launchArguments.contains(where: { $0.hasPrefix("--seedVerifiedReport=") })
+                                || failsOnDocument {
                                 appCoordinator.openRedact()
                                 if case .redact(let ws) = appCoordinator.activeWorkspace {
                                     // `--multipageDoc` swaps the single-page
@@ -256,6 +546,11 @@ struct ResectaApp: App {
                                             currentPage: 1, totalPages: 1, currentStep: "Seeded")))
                                         ws.documentState.transition(to: .verified(report: report))
                                     }
+                                    if failsOnDocument,
+                                       case .seed(let error, let phase, let report) = seededFailure {
+                                        Self.seedFailure(error, phase: phase, report: report,
+                                                         on: ws.documentState)
+                                    }
                                     // Sim-verification hook: present the
                                     // Search & Redact sheet on the loaded test
                                     // document. Implies the document load via
@@ -303,6 +598,22 @@ struct ResectaApp: App {
                                     isCaptured: true, isMirroring: false
                                 )
                             }
+                            // The timed capture hook: raise the cover a set
+                            // number of seconds after launch and, if an end
+                            // is given, lower it again, so a test can fill a
+                            // screen first and see what the cover does to it.
+                            // Its own task: a sleep in this `.task` would end
+                            // at once if the task were cancelled.
+                            if let begin = Self.simulatedCaptureDelay(for: launchArguments) {
+                                let end = Self.simulatedCaptureEnd(for: launchArguments)
+                                Task { @MainActor in
+                                    try? await Task.sleep(for: .seconds(begin))
+                                    screenCaptureMonitor._setForTesting(isCaptured: true, isMirroring: false)
+                                    guard let end else { return }
+                                    try? await Task.sleep(for: .seconds(end - begin))
+                                    screenCaptureMonitor._setForTesting(isCaptured: false, isMirroring: false)
+                                }
+                            }
                             #endif
                         }
                 }
@@ -345,6 +656,13 @@ struct ResectaApp: App {
                 case .none:
                     break
                 }
+                #if DEBUG
+                // `--forceSnapshotOverlay` keeps the placeholder up across
+                // a return to the foreground.
+                if newPhase == .active, CommandLine.arguments.contains("--forceSnapshotOverlay") {
+                    obscureContent = true
+                }
+                #endif
                 // Re-run the orphaned-temp-file sweep on every return
                 // to the foreground. The launch `.task` above covers a
                 // fresh process; a process that stays resident across many
