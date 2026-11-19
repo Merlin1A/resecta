@@ -1,0 +1,18 @@
+Property: A run with warnings shows no label.
+Area: the Preview of the redacted PDF, its label
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/PreviewVerdictCapsuleTests
+Must go red: ResectaAppTests/PreviewVerdictCapsuleTests passWarnInfoShowNothing
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/RedactedPreviewView.swift b/Sources/ResectaApp/Views/RedactedPreviewView.swift
+index 59f1f7f6..b24c8cf4 100644
+--- a/Sources/ResectaApp/Views/RedactedPreviewView.swift
++++ b/Sources/ResectaApp/Views/RedactedPreviewView.swift
+@@ -86,6 +86,7 @@ struct RedactedPreviewView: View {
+     static func verdictCapsuleText(verdict: VerificationStatus?) -> String? {
+         guard let verdict else { return nil }
+         if verdict.isFail || verdict.isAttention { return verdict.title }
++        if case .warn = verdict { return verdict.title }
+         if verdict.isSkipped { return "Not verified" }
+         return nil
+     }

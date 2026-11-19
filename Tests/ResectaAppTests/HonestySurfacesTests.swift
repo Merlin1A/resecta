@@ -114,10 +114,10 @@ struct HonestyDisclaimerMountTests {
 @MainActor
 struct PreviewVerdictCapsuleTests {
 
-    @Test("FAIL verdict shows the review-before-sharing capsule")
+    @Test("FAIL verdict shows the Checks Failed capsule")
     func failShowsCapsule() {
         let text = RedactedPreviewView.verdictCapsuleText(verdict: .fail("x"))
-        #expect(text == "Issues Found — review before sharing")
+        #expect(text == "Checks Failed")
     }
 
     @Test("SKIPPED verdict shows the not-verified capsule")
@@ -126,10 +126,18 @@ struct PreviewVerdictCapsuleTests {
         #expect(text == "Not verified")
     }
 
-    @Test("ATTENTION verdict shows the review-before-sharing capsule")
+    @Test("ATTENTION verdict shows the Needs Review capsule")
     func attentionShowsCapsule() {
         let text = RedactedPreviewView.verdictCapsuleText(verdict: .attention("x"))
-        #expect(text == "Attention needed — review before sharing")
+        #expect(text == "Needs Review")
+    }
+
+    @Test("FAIL and ATTENTION capsules are the results screen's own titles")
+    func labelsAreTheResultsTitles() {
+        let failed = VerificationStatus.fail("x")
+        let review = VerificationStatus.attention("x")
+        #expect(RedactedPreviewView.verdictCapsuleText(verdict: failed) == failed.title)
+        #expect(RedactedPreviewView.verdictCapsuleText(verdict: review) == review.title)
     }
 
     @Test("PASS / WARN / INFO verdicts show no capsule")
@@ -140,6 +148,12 @@ struct PreviewVerdictCapsuleTests {
         #expect(onPass == nil)
         #expect(onWarn == nil)
         #expect(onInfo == nil)
+    }
+
+    @Test("NOTHING TO CHECK verdict shows no capsule")
+    func nothingToCheckShowsNothing() {
+        let text = RedactedPreviewView.verdictCapsuleText(verdict: .notApplicable("n"))
+        #expect(text == nil)
     }
 
     @Test("No verdict threaded (default init) shows no capsule")

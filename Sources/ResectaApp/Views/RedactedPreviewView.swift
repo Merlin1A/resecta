@@ -75,15 +75,17 @@ struct RedactedPreviewView: View {
 
     // MARK: - Verdict capsule
 
-    /// Capsule copy per verdict. FAIL and SKIPPED only — PASS/WARN/INFO
-    /// previews stay chrome-free (nothing to warn about at this surface;
-    /// WARN's notes live on the results screen the user just came from).
-    /// Static so the verdict → copy mapping is unit-testable without a
-    /// SwiftUI host (mirrors `VerificationResultsView.shouldAutoExpand`).
+    /// Capsule copy per verdict. FAIL, ATTENTION and SKIPPED only —
+    /// PASS/WARN/INFO previews stay chrome-free (nothing to warn about at
+    /// this surface; WARN's notes live on the results screen the user just
+    /// came from). A failed run and one that needs review read the results
+    /// screen's own title, so the two places never differ; a skipped run
+    /// keeps "Not verified". Static so the verdict → copy mapping is
+    /// unit-testable without a SwiftUI host (mirrors
+    /// `VerificationResultsView.shouldAutoExpand`).
     static func verdictCapsuleText(verdict: VerificationStatus?) -> String? {
         guard let verdict else { return nil }
-        if verdict.isFail { return "Issues Found — review before sharing" }
-        if verdict.isAttention { return "Attention needed — review before sharing" }
+        if verdict.isFail || verdict.isAttention { return verdict.title }
         if verdict.isSkipped { return "Not verified" }
         return nil
     }
