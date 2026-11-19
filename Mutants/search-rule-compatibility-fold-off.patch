@@ -1,0 +1,19 @@
+Property: Compatibility forms (the five Latin ligatures and every form compatibility composition maps) fold on both sides.
+Area: Search, the rules a search follows
+Test command: cd Packages/RedactionEngine && DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --no-parallel --filter '^RedactionEngineTests\.(PreviewRawPageRangesTests|SearchCoreTests)/'
+Must go red: RedactionEngineTests/SearchCoreTests normalization; RedactionEngineTests/PreviewRawPageRangesTests ligatureBeforeTheMatch
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore.swift
+index c334d8a..e81148c 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore.swift
+@@ -42,7 +42,7 @@ enum SearchCore {
+     static func normalizedText(_ text: String, options: SearchOptions) -> String {
+         let cased: String
+         if options.normalizeUnicode {
+-            cased = TextNormalizer.normalizeForSearch(text, caseSensitive: options.caseSensitive)
++            cased = options.caseSensitive ? text : text.lowercased()
+         } else if !options.caseSensitive {
+             cased = text.lowercased()
+         } else {

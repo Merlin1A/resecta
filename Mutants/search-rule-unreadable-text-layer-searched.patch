@@ -1,0 +1,19 @@
+Property: A page whose text cannot be read is read by text recognition, not searched as text.
+Area: Search, the rules a search follows
+Test command: cd Packages/RedactionEngine && DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --no-parallel --filter '^RedactionEngineTests\.TextLayerDetectorTests/'
+Must go red: RedactionEngineTests/TextLayerDetectorTests unreadableForSearch
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/TextLayerDetector.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/TextLayerDetector.swift
+index e86762c..21d8c72 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/TextLayerDetector.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/TextLayerDetector.swift
+@@ -38,7 +38,7 @@ public enum TextLayerDetector {
+     /// verification's statuses for it are unchanged.
+     public static func unreadableForSearch(_ page: PDFPage) -> Bool {
+         switch checkFallbackTriggers(page) {
+-        case .cjkEncodingFailure, .unresolvedEncoding, .zeroSizeBounds: true
++        case .cjkEncodingFailure, .zeroSizeBounds: true
+         default: false
+         }
+     }

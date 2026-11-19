@@ -1,0 +1,19 @@
+Property: A line break directly after a word's own hyphen reads as nothing.
+Area: Search, the rules a search follows
+Test command: cd Packages/RedactionEngine && DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --no-parallel --filter '^RedactionEngineTests\.HyphenBreakFoldTests/'
+Must go red: RedactionEngineTests/HyphenBreakFoldTests hyphenBreakJoins
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/TextNormalizer.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/TextNormalizer.swift
+index 2032900..0092a00 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/TextNormalizer.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/TextNormalizer.swift
+@@ -117,7 +117,7 @@ public struct TextNormalizer: Sendable {
+     ) -> String {
+         if run.unicodeScalars.contains("\u{00AD}") { return "" }
+         if isBreakAfterHardHyphen(run, previous: previous, beforeThat: beforeThat, next: next) {
+-            return ""
++            return " "
+         }
+         return run.contains(where: isSpacingCharacter) ? " " : ""
+     }

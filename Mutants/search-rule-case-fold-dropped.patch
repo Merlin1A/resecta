@@ -1,0 +1,19 @@
+Property: Letter case is ignored unless Case Sensitive is on.
+Area: Search, the rules a search follows
+Test command: cd Packages/RedactionEngine && DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --no-parallel --filter '^RedactionEngineTests\.DocumentSearcherTests/'
+Must go red: RedactionEngineTests/DocumentSearcherTests caseInsensitiveMatch
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore.swift
+index c334d8a..74be89a 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore.swift
+@@ -42,7 +42,7 @@ enum SearchCore {
+     static func normalizedText(_ text: String, options: SearchOptions) -> String {
+         let cased: String
+         if options.normalizeUnicode {
+-            cased = TextNormalizer.normalizeForSearch(text, caseSensitive: options.caseSensitive)
++            cased = TextNormalizer.normalizeForSearch(text, caseSensitive: true)
+         } else if !options.caseSensitive {
+             cased = text.lowercased()
+         } else {
