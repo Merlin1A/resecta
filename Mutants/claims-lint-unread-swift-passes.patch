@@ -1,0 +1,21 @@
+Property: A Swift file that the banned-term grep cannot read fails the lint.
+Area: claims lint (Scripts/claims-lint.sh)
+Test command: Scripts/claims-lint.sh --self-test
+Must go red: the self-test case "a Swift file the banned-term matcher cannot read" (the self-test ends FAIL)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Scripts/claims-lint.sh b/Scripts/claims-lint.sh
+index 266a76f1..de41c09a 100755
+--- a/Scripts/claims-lint.sh
++++ b/Scripts/claims-lint.sh
+@@ -184,10 +184,6 @@ sweep() { # $1 = the tree root
+     if [ -n "$trees" ]; then
+         # shellcheck disable=SC2086
+         grc=0; raw=$("$GREP" -rnEi "$PATTERNS" $trees --include='*.swift') || grc=$?
+-        if [ "$grc" -gt 1 ]; then
+-            echo "CLAIMS-LINT FAIL: the banned terms could not be matched on every Swift file"
+-            fail=1
+-        fi
+         SWIFT_HITS=$(printf '%s\n' "$raw" \
+             | "$GREP" -v "^$ROOT/$LIST_FILE:" \
+             | "$GREP" '"' \
