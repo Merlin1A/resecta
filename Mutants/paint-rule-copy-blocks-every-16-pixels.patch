@@ -1,0 +1,19 @@
+Property: Block lines stand every 8 pixels from the picture's left and top edges.
+Area: the box check's copy of the paint rule, against the painting code's
+Test command: cd Packages/RedactionEngine && swift test --skip-build --no-parallel --filter PixelPaintDifferentialTests (after swift build --build-tests)
+Must go red: RedactionEngineTests/PixelPaintDifferentialTests boxesAgree
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PixelPaintRule.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PixelPaintRule.swift
+index 47226be6..3ecddabe 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PixelPaintRule.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PixelPaintRule.swift
+@@ -8,7 +8,7 @@ enum PixelPaintRule {
+     /// Sixty-fourths of a point in an inch.
+     static let sixtyFourthsPerInch = 4608
+     /// The side of a coded block, in pixels.
+-    static let blockSide = 8
++    static let blockSide = 16
+     /// The qualities a page can be exported at, tried in this order.
+     static let qualities = [150, 200, 300]
+ 
