@@ -5,11 +5,10 @@ Must go red: ResectaAppTests/VerificationResultsActionsTests noHeadedListOfCheck
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Views/VerificationDetailsSection.swift b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
-index d0a0e9ef..39b6934f 100644
 --- a/Sources/ResectaApp/Views/VerificationDetailsSection.swift
 +++ b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
-@@ -57,7 +57,12 @@ struct VerificationDetailsSection: View {
-                 GroupedSection { runSection }
+@@ -64,7 +64,12 @@
+                 GroupedSection { factCard(card) }
                      .padding(.top, ResectaTokens.Spacing.xl)
              }
 -            if !Self.listRowMembers(partition).isEmpty {

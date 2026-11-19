@@ -5,10 +5,9 @@ Must go red: ResectaAppTests/VerificationResultsActionsTests listRowHoldsThePass
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Views/VerificationDetailsSection.swift b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
-index d0a0e9ef..004b4cc7 100644
 --- a/Sources/ResectaApp/Views/VerificationDetailsSection.swift
 +++ b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
-@@ -87,7 +87,7 @@ struct VerificationDetailsSection: View {
+@@ -148,7 +148,7 @@
      /// The cluster opens by default only when it holds riding notes and no
      /// result section sits above it (the run section does not count).
      static func clusterOpensByDefault(_ partition: VerificationLayerPartition) -> Bool {
@@ -16,4 +15,4 @@ index d0a0e9ef..004b4cc7 100644
 +        false
      }
  
-     private var showsDeselection: Bool {
+     /// The one open item after a tap: the tapped item opens and whatever

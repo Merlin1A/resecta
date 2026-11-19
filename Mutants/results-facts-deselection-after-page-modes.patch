@@ -5,16 +5,15 @@ Must go red: ResectaAppTests/FactRowTests cardOrder
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Views/FactRow.swift b/Sources/ResectaApp/Views/FactRow.swift
-index 7b20c0a4..125efce7 100644
 --- a/Sources/ResectaApp/Views/FactRow.swift
 +++ b/Sources/ResectaApp/Views/FactRow.swift
-@@ -61,8 +61,8 @@ nonisolated enum ResultsFactCard {
-         items += runLines.map(ResultsCardItem.fact)
+@@ -68,8 +68,8 @@
          items += placed(.notRead)
+         if let sweepLimit { items.append(.fact(sweepLimit)) }
          items += placed(.pictures)
--        if showsPageModes { items.append(.pageModes) }
-         if let deselection { items.append(.fact(deselection)) }
-+        if showsPageModes { items.append(.pageModes) }
++        if let deselection { items.append(.fact(deselection)) }
+         if showsPageModes { items.append(.pageModes) }
+-        if let deselection { items.append(.fact(deselection)) }
          items += placed(.last)
          return items
      }
