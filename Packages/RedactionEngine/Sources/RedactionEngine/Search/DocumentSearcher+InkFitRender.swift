@@ -162,16 +162,18 @@ extension DocumentSearcher {
     /// side of the box with no gap as wide as a word space, one pixel wider on
     /// every side. A row inked across the window (a rule) is not ink here. The
     /// window bounds the growth: a box that reaches its edge is `.capped`. Nil
-    /// when no inked row meets the box, or on a dark ground.
+    /// when no inked row meets the box, or on a dark ground. `margin`: twice
+    /// the best line's rows inside the box less the box's rows, once a line
+    /// meets the box (a fit needs it at zero or more; nil before that).
     nonisolated static func inkBox(in bitmap: GrayBitmap, box: CGRect, window: CGRect,
                                    growLeft: Bool = true, growRight: Bool = true)
-        -> (box: CGRect?, outcome: InkFitOutcome) {
+        -> (box: CGRect?, outcome: InkFitOutcome, margin: Int?) {
         let s = inkFitScale
         let bx0 = max(0, Int(((box.minX - window.minX) * s).rounded(.down)))
         let bx1 = min(bitmap.width, Int(((box.maxX - window.minX) * s).rounded(.up)))
         let by0 = max(0, Int(((box.minY - window.minY) * s).rounded(.down)))
         let by1 = min(bitmap.height, Int(((box.maxY - window.minY) * s).rounded(.up)))
-        guard bx1 > bx0, by1 > by0 else { return (nil, .noInk) }
+        guard bx1 > bx0, by1 > by0 else { return (nil, .noInk, nil) }
 
         // Rules across the window (rows) and down it (columns), and a dark ground.
         var isRule = [Bool](repeating: false, count: bitmap.height)
@@ -183,7 +185,7 @@ extension DocumentSearcher {
             inked += n
             isRule[y] = Double(n) >= inkFitRuleShare * Double(bitmap.width)
         }
-        if Double(inked) > inkFitDarkGroundShare * Double(bitmap.width * bitmap.height) { return (nil, .darkGround) }
+        if Double(inked) > inkFitDarkGroundShare * Double(bitmap.width * bitmap.height) { return (nil, .darkGround, nil) }
         let isRuleColumn = columnInk.map { Double($0) >= inkFitRuleShare * Double(bitmap.height) }
 
         func rowHasInk(_ y: Int, _ x0: Int, _ x1: Int) -> Bool {
@@ -202,8 +204,9 @@ extension DocumentSearcher {
         // inked by any line means the box sits between lines (a layer set more
         // than half a line off): no fit.
         func overlap(_ r: ClosedRange<Int>) -> Int { max(0, min(r.upperBound + 1, by1) - max(r.lowerBound, by0)) }
-        guard let line = runs.max(by: { overlap($0) < overlap($1) }), overlap(line) > 0 else { return (nil, .noInk) }
-        guard overlap(line) * 2 >= by1 - by0 else { return (nil, .otherLine) }
+        guard let line = runs.max(by: { overlap($0) < overlap($1) }), overlap(line) > 0 else { return (nil, .noInk, nil) }
+        let margin = overlap(line) * 2 - (by1 - by0)
+        guard margin >= 0 else { return (nil, .otherLine, margin) }
         var lo = line.lowerBound, hi = line.upperBound
         // A dot or an accent: a shorter run a small gap away joins the band.
         var grew = true
@@ -233,6 +236,6 @@ extension DocumentSearcher {
         // anti-aliasing half-inks is inside the box (the safe direction).
         return (CGRect(x: window.minX + CGFloat(left - 1) / s, y: window.minY + CGFloat(lo - 1) / s,
                        width: CGFloat(right + 3 - left) / s, height: CGFloat(hi + 3 - lo) / s),
-                capped ? .capped : .fitted)
+                capped ? .capped : .fitted, margin)
     }
 }
