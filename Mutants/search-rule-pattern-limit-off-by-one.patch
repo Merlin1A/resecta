@@ -1,0 +1,19 @@
+Property: A pattern search lists at most maxResults rows: the matches of a page stop at the limit.
+Area: Search, the rules a search follows
+Test command: cd Packages/RedactionEngine && DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --no-parallel --filter '^RedactionEngineTests\.SearchRuleCaseTests/'
+Must go red: RedactionEngineTests/SearchRuleCaseTests searchLimit
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+TextModes.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+TextModes.swift
+index a77d9ae5..94c40ff1 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+TextModes.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+TextModes.swift
+@@ -148,7 +148,7 @@ extension DocumentSearcher {
+             let (yielded, _) = SearchCore.enumerateRegexMatches(
+                 in: searchText, regex: regex,
+                 wholeWord: options.wholeWord, unconvertibleRangePasses: false,
+-                cap: Self.maxResults - totalYielded,
++                cap: Self.maxResults - totalYielded + 1,
+                 timeout: effectiveTimeout, startTime: startTime,
+                 onTimeout: {
+                     // Search-path timeout branch.

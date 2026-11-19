@@ -5,7 +5,7 @@ Must go red: RedactionEngineTests/TextNormalizerTests smartQuotesNormalized; Red
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/TextNormalizer.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/TextNormalizer.swift
-index 2032900..8e77821 100644
+index cbcfc10a..dbce901e 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/TextNormalizer.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/TextNormalizer.swift
 @@ -66,7 +66,7 @@ public struct TextNormalizer: Sendable {
