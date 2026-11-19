@@ -326,3 +326,4 @@ with its reason and the mutant that is caught in its place.
 | `search-sheet-text-tier-grey.patch` | Small text in the Search sheet's files never takes the system grey. | ResectaAppTests/SearchSheetTextTierTests noSystemGreyOnText |
 | `search-sheet-text-tier-allow-list-exact.patch` | The Search sheet's grey allow-list is exact: an entry with no line fails. | ResectaAppTests/SearchSheetTextTierTests noSystemGreyOnText |
 | `search-sheet-text-tier-teal.patch` | The Search sheet's own teal words take the teal text tier. | ResectaAppTests/SearchSheetTextTierTests tealWordsUseTheTextTier |
+| `search-not-presented-on-results.patch` | Search is not presented over a run or its results. | ResectaAppTests/DocumentEditorHomeCloseTests sheetSlotPresentsSearchOnlyInItsPhases; ResectaAppTests/DocumentEditorHomeCloseTests searchOutsideItsPhasesMustComeDown; ResectaAppUITests/SheetSlotPhaseUITests testSearchSetOnTheResultsScreenIsNotPresentedAndDoesNotReturn |
