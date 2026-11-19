@@ -75,8 +75,13 @@ enum ConcealingAnnotations {
                     endWord()
                     continue
                 }
-                let box = page.characterBounds(at: position)
-                guard box.width > 0, box.height > 0 else { continue }
+                // Each character's box from its own selection, as the
+                // engine's text-layer extractor reads it: PDFPage's
+                // per-character bounds run one index late for each line
+                // break before the character, so a word on a later line
+                // would be boxed over the letters after it.
+                guard let box = page.selection(for: NSRange(location: position, length: 1))?.bounds(for: page),
+                      box.width > 0, box.height > 0 else { continue }
                 word = word.union(box)
             }
             endWord()

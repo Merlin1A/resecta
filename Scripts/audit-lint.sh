@@ -7,7 +7,8 @@
 # planning shorthand on added lines: a register-identifier token, a section
 # sign with no standard or repository document named beside it, a Markdown
 # file name the repository does not track, a planning-process word, a step
-# token or the maintainer's first name in a comment) — numbering note at
+# token or the maintainer's first name in a comment), and AL-7, a whole-tree
+# refusal of PDFPage.characterBounds(at:) in the shipping source — numbering note at
 # the AL-1 section below.
 # Symlinked into .git/hooks/pre-commit by install-hooks.sh.
 #
@@ -790,10 +791,24 @@ for path in "${STAGED[@]}"; do
     done < <(CASE_SENSITIVE=1 COMMENT_ONLY=1 scan_added "$path" "$AL6_NAME_RE" "Shorthand:ok")
 done
 
+# ── AL-7 (whole tree): no per-character bounds from PDFPage ─────────────
+# PDFPage.characterBounds(at:) runs one index late for each line break before
+# the character (FB14843671), so the shipping source reads a character's box
+# from its own PDFSelection instead (TextLayerExtractor.extractCharacters).
+# Every tracked Swift file under Sources/ and Packages/RedactionEngine/, the
+# engine's test tree excluded (its probe of the fault calls it on purpose),
+# is scanned in both modes; a call outside a `//` comment is an offence.
+while IFS= read -r path; do
+    [ -f "$path" ] || continue
+    while IFS= read -r off; do
+        [ -n "$off" ] && violate "AL-7 PDFPage.characterBounds(at:) in the shipping source (read the box from a PDFSelection): $path:$off"
+    done < <(awk '{ code = $0; sub(/\/\/.*/, "", code); if (code ~ /characterBounds\(at:/) print NR }' "$path")
+done < <(git ls-files -- 'Sources/*.swift' 'Packages/RedactionEngine/*.swift' ':(exclude)Packages/RedactionEngine/Tests/*')
+
 # ── Summary ─────────────────────────────────────────────────────────────
 if [ "$FAIL" -gt 0 ]; then
     printf '\naudit-lint: %d offence(s); commit blocked.\n' "$FAIL" >&2
-    printf 'Reference: CONTRIBUTING.md "What every change passes" (M-1, M-3..M-6 mechanical) and this script'"'"'s AL-1..AL-6\n' >&2
+    printf 'Reference: CONTRIBUTING.md "What every change passes" (M-1, M-3..M-6 mechanical) and this script'"'"'s AL-1..AL-7\n' >&2
     exit 1
 fi
 exit 0

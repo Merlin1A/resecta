@@ -141,6 +141,46 @@ struct CoverWidgetsTests {
                 "paint over blank page hides no text")
     }
 
+    /// Six lines (Helvetica 18, 30 pt apart from 700), under one wide
+    /// highlight whose appearance paints opaque only over `paint` (page
+    /// space). Line 5 begins with "4417" at x 72, baseline 580.
+    private static func sixLinesUnderWideHighlight(paint: CGRect) -> Data {
+        let lines = ["Statement for the quarter", "Prepared for the account", "Balance carried forward",
+                     "Account held", "4417 to Ann Lee now", "End of statement"]
+        let shown = lines.map { "(\($0)) Tj" }.joined(separator: " 0 -30 Td ")
+        let text = "BT /F1 18 Tf 72 700 Td \(shown) ET"
+        let rect = CGRect(x: 66, y: 540, width: 494, height: 182)
+        let ops = String(format: "1 1 0 rg %.1f %.1f %.1f %.1f re f",
+                         paint.minX - rect.minX, paint.minY - rect.minY, paint.width, paint.height)
+        return rawPDF([
+            "<< /Type /Catalog /Pages 2 0 R >>",
+            "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R "
+                + "/Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >> "
+                + "/Annots [5 0 R] >>",
+            "<< /Length \(text.utf8.count) >>\nstream\n\(text)\nendstream",
+            "<< /Type /Annot /Subtype /Highlight /Rect [66 540 560 722] "
+                + "/QuadPoints [66 722 560 722 66 540 560 540] /C [1 1 0] /F 4 /AP << /N 6 0 R >> /P 3 0 R >>",
+            appearance(ops, bbox: "[0 0 494 182]"),
+        ])
+    }
+
+    @Test("A wide highlight painted opaque over one word on the fifth line names the page at share; painted over blank page it does not")
+    func coverOverAWordOnALaterLineConceals() throws {
+        let overWord = try #require(PDFDocument(data: Self.sixLinesUnderWideHighlight(
+            paint: CGRect(x: 70, y: 577, width: 44, height: 19))))
+        let page = try #require(overWord.page(at: 0))
+        // Guard against a vacuous pass: six lines of text, the number on the fifth, one annotation.
+        let text = try #require(page.string)
+        try #require(text.components(separatedBy: "\n").count >= 5 && text.contains("4417"), "the fixture's text layer")
+        try #require(page.annotations.count == 1, "the fixture's annotation")
+        #expect(ConcealingAnnotations.pages(in: overWord, regions: [:]) == [0],
+                "the paint hides \"4417\" on line 5: the page is named")
+        let overBlank = try #require(PDFDocument(data: Self.sixLinesUnderWideHighlight(
+            paint: CGRect(x: 400, y: 577, width: 44, height: 19))))
+        #expect(ConcealingAnnotations.pages(in: overBlank, regions: [:]).isEmpty, "paint over blank page hides no text")
+    }
+
     @Test("A highlight that hides the text (black, or painted over it opaque) names the page at share; a multiplied yellow one does not")
     func opaqueHighlightConceals() throws {
         for (name, data) in [("black", Self.blackHighlight), ("opaque", Self.opaqueHighlight)] {
