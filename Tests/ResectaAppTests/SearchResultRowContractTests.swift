@@ -130,7 +130,7 @@ struct SearchResultRowContractTests {
         #expect(runs[1].backgroundColor != nil)
         for base in [runs[0], runs[2]] {
             #expect(base.font == Font.footnote)
-            #expect(base.foregroundColor == Color.secondary)
+            #expect(base.foregroundColor == ResectaTokens.SemanticColor.supportText)
             #expect(base.backgroundColor == nil)
         }
         #expect(String(attributed.characters) == snippet)
@@ -156,7 +156,7 @@ struct SearchResultRowContractTests {
         #expect(runs.count == 1)
         #expect(runs.first?.backgroundColor == nil)
         #expect(runs.first?.font == Font.footnote)
-        #expect(runs.first?.foregroundColor == Color.secondary)
+        #expect(runs.first?.foregroundColor == ResectaTokens.SemanticColor.supportText)
         let empty = SearchResultRow.attributedSnippet("alpha beta", matchRange: nil, matchedText: "")
         #expect(Array(empty.runs).count == 1)
     }

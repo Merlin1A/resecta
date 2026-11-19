@@ -167,7 +167,7 @@ struct SearchResultsSection: View {
                                 ? searchState.totalCount : nil))
                             .font(.caption)
                             .monospacedDigit()
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                     }
                     Spacer()
                 }
@@ -482,6 +482,7 @@ struct SearchResultsSection: View {
                 // sentence lives inside its description string.
                 if SearchEmptyStateCopy.showsSearchRoleSubtitle(for: context) {
                     Text(SearchEmptyStateCopy.searchRoleSubtitle)
+                        .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                 }
                 // Markdown-bold markers only parse through the
                 // LocalizedStringKey overload of `Text(_:)`; a plain
@@ -489,6 +490,7 @@ struct SearchResultsSection: View {
                 // the asterisks literally (screenshot evidence) — the
                 // explicit `.init` routes back to the markdown-aware path.
                 Text(.init(SearchEmptyStateCopy.description(for: context, ocrReadPages: searchState.lastRunOCRPageCount)))
+                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                 if context == .multiTermPreSearchWithRecents {
                     multiTermRecallChips
                 }
@@ -528,6 +530,7 @@ struct SearchResultsSection: View {
         } description: {
             VStack(alignment: .center, spacing: ResectaTokens.Spacing.sm) {
                 Text(SearchEmptyStateCopy.piiScanRoleSentence)
+                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                 ProgressView()
             }
         }
@@ -550,7 +553,7 @@ struct SearchResultsSection: View {
         VStack(alignment: .center, spacing: ResectaTokens.Spacing.xs) {
             Text(SearchEmptyStateCopy.recentSearchesHeader)
                 .font(.caption2)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ResectaTokens.SemanticColor.supportText)
             HStack(spacing: ResectaTokens.Spacing.xs) {
                 ForEach(Array(searchState.recentMultiTermSets.enumerated()), id: \.offset) { _, recall in
                     Button {
@@ -592,10 +595,12 @@ struct SearchResultsSection: View {
             )
         } description: {
             Text(SearchEmptyStateCopy.filteredOutDescription)
+                .foregroundStyle(ResectaTokens.SemanticColor.supportText)
         } actions: {
             Button(SearchEmptyStateCopy.showAllButton) {
                 Self.showAll(on: searchState)
             }
+            .tint(ResectaTokens.BrandTeal.text)
         }
     }
 }

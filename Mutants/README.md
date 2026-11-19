@@ -348,3 +348,6 @@ with its reason and the mutant that is caught in its place.
 | `search-row-badge-only-when-it-differs.patch` | A typed match wears no source badge. | ResectaAppTests/SearchResultRowContractTests sourceBadgeOnlyWhenItSaysSomething; ResectaAppUITests/SearchRowLayoutUITests testTypedRows_pitchIsSixtyFour |
 | `search-row-applied-mark-takes-no-width.patch` | Applying a row does not move it: the applied mark takes no width. | ResectaAppUITests/SearchRowLayoutUITests testApplyingARow_doesNotMoveIt |
 | `search-row-page-header-name-is-its-own-text.patch` | A page header keeps the page's name as its own text. | ResectaAppUITests/SearchRowLayoutUITests testPageHeader_keepsItsNameAsItsOwnText |
+| `search-sheet-text-tier-grey.patch` | Small text in the Search sheet's files never takes the system grey. | ResectaAppTests/SearchSheetTextTierTests noSystemGreyOnText |
+| `search-sheet-text-tier-allow-list-exact.patch` | The Search sheet's grey allow-list is exact: an entry with no line fails. | ResectaAppTests/SearchSheetTextTierTests noSystemGreyOnText |
+| `search-sheet-text-tier-teal.patch` | The Search sheet's own teal words take the teal text tier. | ResectaAppTests/SearchSheetTextTierTests tealWordsUseTheTextTier |

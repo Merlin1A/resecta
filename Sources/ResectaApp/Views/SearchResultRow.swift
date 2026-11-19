@@ -268,14 +268,14 @@ struct SearchResultRow: View {
             if showsPageLabel {
                 Text("p.\(result.pageIndex + 1)")
                     .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
             }
             Spacer(minLength: 0)
             // Term label for multi-term disambiguation
             if showTermLabel {
                 Text(result.term)
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                     .lineLimit(1)
                     .privacySensitive()
             }
@@ -332,7 +332,7 @@ struct SearchResultRow: View {
             } label: {
                 Text("Details")
                     .font(.caption2)
-                    .foregroundStyle(.tint)
+                    .foregroundStyle(ResectaTokens.BrandTeal.text)
                     .frame(minHeight: ResectaTokens.TouchTarget.minimum)
                     .contentShape(Rectangle())
             }
