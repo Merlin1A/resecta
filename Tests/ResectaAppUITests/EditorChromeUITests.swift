@@ -201,6 +201,130 @@ nonisolated final class EditorChromeUITests: XCTestCase {
         attachScreenshot(named: "chrome-page-bar-largest-control-first")
     }
 
+    // MARK: - The page menu
+
+    /// A menu row or line found by its words.
+    private func labelled(_ words: String) -> XCUIElement {
+        app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", words)).firstMatch
+    }
+
+    /// Open the page menu from the counter and wait for its first row.
+    private func openPageMenu() {
+        let counter = element("pageNavCounter")
+        XCTAssertTrue(counter.waitForExistence(timeout: 10))
+        counter.tap()
+        XCTAssertTrue(app.buttons["Go to Page\u{2026}"].waitForExistence(timeout: 5), "The counter must open the page menu.")
+    }
+
+    /// Type `text` into the prompt's field after clearing it, and read it back.
+    private func typePage(_ text: String, into field: XCUIElement) throws {
+        field.tap()
+        let current = (field.value as? String) ?? ""
+        let placeholder = field.placeholderValue ?? ""
+        if !current.isEmpty, current != placeholder {
+            field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count + 2))
+        }
+        if !text.isEmpty { field.typeText(text) }
+        let read = (field.value as? String) ?? ""
+        let landed = text.isEmpty ? (read.isEmpty || read == placeholder) : read == text
+        if !landed {
+            if #available(iOS 27, *) {
+                throw XCTSkip("the iOS 27.2 simulator's software keyboard did not take the typed page")
+            }
+            XCTFail("The typed page did not land: the field reads '\(read)', not '\(text)'.")
+        }
+    }
+
+    func testPageMenu_goToPageTwelve() throws {
+        _ = launchWholePageControl(atTextSize: nil)
+        let counter = element("pageNavCounter")
+        XCTAssertTrue(counter.waitForExistence(timeout: 10))
+        XCTAssertNil(try screenshotProbe().tintBounds(.teal, in: counter.frame),
+                     "The counter at rest must keep its own colours: the menu must not tint it teal.")
+        openPageMenu()
+        XCTAssertTrue(labelled("No boxes yet").waitForExistence(timeout: 5), "With no box the total line reads No boxes yet.")
+        XCTAssertFalse(app.buttons["Next Page with Boxes"].isEnabled, "With no box Next Page with Boxes is not available.")
+        XCTAssertFalse(app.buttons["Previous Page with Boxes"].isEnabled, "With no box Previous Page with Boxes is not available.")
+        attachScreenshot(named: "page-menu-no-boxes")
+        app.buttons["Go to Page\u{2026}"].tap()
+        let alert = app.alerts["Go to Page"]
+        XCTAssertTrue(alert.waitForExistence(timeout: 5), "Go to Page must open its prompt.")
+        let field = alert.textFields.firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        XCTAssertEqual(field.placeholderValue, "Page 1 to 23")
+        attachScreenshot(named: "page-menu-prompt-empty")
+        try typePage("12", into: field)
+        let go = alert.buttons["Go"]
+        XCTAssertTrue(go.isEnabled, "Go is available for page 12.")
+        attachScreenshot(named: "page-menu-prompt-twelve")
+        go.tap()
+        XCTAssertTrue(waitForLabel(counter, "Page 12 of 23, 0 regions"), "Go must show page 12; the counter read '\(counter.label)'.")
+    }
+
+    func testPageMenu_goIsUnavailableUntilTheNumberIsAPage() throws {
+        _ = launchWholePageControl(atTextSize: nil)
+        let counter = element("pageNavCounter")
+        openPageMenu()
+        app.buttons["Go to Page\u{2026}"].tap()
+        let alert = app.alerts["Go to Page"]
+        XCTAssertTrue(alert.waitForExistence(timeout: 5), "Go to Page must open its prompt.")
+        let field = alert.textFields.firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        let go = alert.buttons["Go"]
+        XCTAssertFalse(go.isEnabled, "Go is not available with the field empty.")
+        try typePage("0", into: field)
+        XCTAssertFalse(go.isEnabled, "Go is not available for 0.")
+        try typePage("24", into: field)
+        XCTAssertFalse(go.isEnabled, "Go is not available for 24 on 23 pages.")
+        try typePage("23", into: field)
+        XCTAssertTrue(go.isEnabled, "Go is available for 23.")
+        alert.buttons["Cancel"].tap()
+        XCTAssertTrue(alert.waitForNonExistence(timeout: 5), "Cancel must close the prompt.")
+        XCTAssertTrue(waitForLabel(counter, "Page 1 of 23, 0 regions"), "Cancel must leave the page as it was; the counter read '\(counter.label)'.")
+    }
+
+    func testPageMenu_nextAndPreviousPageWithBoxes() {
+        let control = launchWholePageControl(atTextSize: nil)
+        let counter = element("pageNavCounter")
+        let next = app.buttons["pageNavNext"]
+        let previous = app.buttons["pageNavPrevious"]
+        func step(_ arrow: XCUIElement, times: Int, to label: String) {
+            for _ in 0..<times { arrow.tap() }
+            XCTAssertTrue(waitForLabel(counter, label), "The arrows must reach '\(label)'; the counter read '\(counter.label)'.")
+        }
+        step(next, times: 2, to: "Page 3 of 23, 0 regions")
+        control.tap()
+        XCTAssertTrue(waitForLabel(counter, "Page 3 of 23, 1 region"))
+        step(next, times: 4, to: "Page 7 of 23, 0 regions")
+        control.tap()
+        XCTAssertTrue(waitForLabel(counter, "Page 7 of 23, 1 region"))
+        step(previous, times: 6, to: "Page 1 of 23, 0 regions")
+
+        openPageMenu()
+        XCTAssertTrue(labelled("2 boxes on 2 pages").waitForExistence(timeout: 5), "The total line counts both boxes and both pages.")
+        XCTAssertFalse(app.buttons["Previous Page with Boxes"].isEnabled, "No page before page 1 holds a box.")
+        attachScreenshot(named: "page-menu-two-boxes")
+        app.buttons["Next Page with Boxes"].tap()
+        XCTAssertTrue(waitForLabel(counter, "Page 3 of 23, 1 region"), "Next Page with Boxes from page 1 is page 3; the counter read '\(counter.label)'.")
+        openPageMenu()
+        app.buttons["Next Page with Boxes"].tap()
+        XCTAssertTrue(waitForLabel(counter, "Page 7 of 23, 1 region"), "Next Page with Boxes from page 3 is page 7; the counter read '\(counter.label)'.")
+        openPageMenu()
+        XCTAssertFalse(app.buttons["Next Page with Boxes"].isEnabled, "No page after page 7 holds a box: the row must not wrap round.")
+        app.buttons["Previous Page with Boxes"].tap()
+        XCTAssertTrue(waitForLabel(counter, "Page 3 of 23, 1 region"), "Previous Page with Boxes from page 7 is page 3; the counter read '\(counter.label)'.")
+    }
+
+    func testOnePageDocument_counterOpensNoMenu() {
+        app.launchArguments = ["--uitesting", "--loadTestDocument"]
+        app.launch()
+        let counter = element("pageNavCounter")
+        XCTAssertTrue(counter.waitForExistence(timeout: 30), "The page bar's counter never appeared.")
+        XCTAssertNotEqual(counter.elementType, .button, "On a one-page document the counter is not a button.")
+        counter.tap()
+        XCTAssertFalse(app.buttons["Go to Page\u{2026}"].waitForExistence(timeout: 3), "On a one-page document the counter opens no menu.")
+    }
+
     // MARK: - The one-page bar
 
     func testOnePageDocument_showsTheCountWithoutArrowsOrControl() {

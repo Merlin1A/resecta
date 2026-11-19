@@ -1,0 +1,18 @@
+Property: Next Page with Boxes goes to the nearest later page that holds a box and never wraps round to the first.
+Area: page bar (editor)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/PageMenuTests -only-testing:ResectaAppUITests/EditorChromeUITests/testPageMenu_nextAndPreviousPageWithBoxes
+Must go red: ResectaAppTests/PageMenuTests nextPageWithABox; ResectaAppUITests/EditorChromeUITests testPageMenu_nextAndPreviousPageWithBoxes
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/RedactionState+PageSummary.swift b/Sources/ResectaApp/State/RedactionState+PageSummary.swift
+index 971c9607..ceab985e 100644
+--- a/Sources/ResectaApp/State/RedactionState+PageSummary.swift
++++ b/Sources/ResectaApp/State/RedactionState+PageSummary.swift
+@@ -15,6 +15,7 @@ extension RedactionState {
+         let start = max(page + 1, 0)
+         guard start < pageCount else { return nil }
+         return (start..<pageCount).first { !(regions[$0]?.isEmpty ?? true) }
++            ?? (0..<pageCount).first { !(regions[$0]?.isEmpty ?? true) }
+     }
+ 
+     /// The nearest page before `page` that holds a box; nil when none comes

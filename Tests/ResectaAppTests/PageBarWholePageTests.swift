@@ -247,10 +247,12 @@ struct PageBarWholePageTests {
         // The two chevrons are the only disabled controls: the action
         // is enabled whenever the bar is shown.
         #expect(source.components(separatedBy: ".disabled(").count - 1 == 2)
-        // Three floored controls, each framed to the token and given a
-        // rectangular content shape.
-        #expect(source.components(separatedBy: "ResectaTokens.TouchTarget.minimum").count - 1 == 6)
-        #expect(source.components(separatedBy: ".contentShape(Rectangle())").count - 1 == 3)
+        // Four floored controls, each framed to the token and given a
+        // rectangular content shape: the two arrows and the whole-page
+        // control (two uses each), and the counter that opens the page menu
+        // (one, its height).
+        #expect(source.components(separatedBy: "ResectaTokens.TouchTarget.minimum").count - 1 == 7)
+        #expect(source.components(separatedBy: ".contentShape(Rectangle())").count - 1 == 4)
         // The chevrons' identifiers are untouched.
         #expect(source.contains("accessibilityIdentifier(\"pageNavPrevious\")"))
         #expect(source.contains("accessibilityIdentifier(\"pageNavNext\")"))

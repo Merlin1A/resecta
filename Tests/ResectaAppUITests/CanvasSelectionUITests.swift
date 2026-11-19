@@ -6,7 +6,8 @@ import XCTest
 /// Region", "Delete N Regions", or absent when nothing is selected), the
 /// long-press menu's rows, and the Undo button. Points are window-normalized
 /// so the suite reads the same on the 390- and 402-point simulators; an open
-/// menu is closed by tapping the page bar's counter, a label with no action.
+/// menu is closed by tapping the navigation bar 8 pt in from its leading
+/// edge, before the toolbar's first control, outside the open menu.
 ///
 /// nonisolated: an XCUITest drives a separate process and touches no
 /// @MainActor state.
@@ -171,10 +172,16 @@ private extension CanvasSelectionUITests {
         app.descendants(matching: .any).matching(identifier: "pageNavCounter").firstMatch
     }
 
-    /// Close an open overflow or long-press menu on the page bar's counter.
+    /// Close an open overflow or long-press menu with a tap on the navigation
+    /// bar 8 pt in from its leading edge: before the toolbar's first group
+    /// (it starts at 16 pt; the Rectangle tool's frame at 20), so the tap
+    /// changes nothing when no menu is open, and outside the open menu (the
+    /// overflow menu covers the bar's middle; the page bar's counter now
+    /// opens the page menu).
     nonisolated func dismissMenus() {
-        XCTAssertTrue(counter.waitForExistence(timeout: 5), "The page bar's counter never appeared.")
-        counter.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        let navigationBar = app.navigationBars.firstMatch
+        XCTAssertTrue(navigationBar.waitForExistence(timeout: 5), "The navigation bar never appeared.")
+        navigationBar.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0.5)).withOffset(CGVector(dx: 8, dy: 0)).tap()
         usleep(500_000)
     }
 

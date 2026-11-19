@@ -107,36 +107,22 @@ struct PageNavigationBar: View {
             // At accessibility sizes the position stacks over the count,
             // each on one line (scaling down rather than breaking a word).
             let count = redactionState.regions[documentState.currentPageIndex]?.count ?? 0
-            let stacks = PageNavigationBar.counterStacks(dynamicTypeSize: dynamicTypeSize)
-            let counterLayout = stacks
-                ? AnyLayout(VStackLayout(spacing: 0))
-                : AnyLayout(HStackLayout(spacing: ResectaTokens.Spacing.xs))
-            counterLayout {
-                Text("\(documentState.currentPageIndex + 1) of \(pageCount)")
-                    .font(.subheadline.monospacedDigit())
-
-                if !stacks {
-                    Text("\u{B7}")
-                        .foregroundStyle(.quaternary)
-                        .padding(.horizontal, ResectaTokens.Spacing.xxs)
+            Group {
+                if PageNavigationBar.showsPageMenu(pageCount: pageCount) {
+                    // On two or more pages the counter opens the page menu.
+                    // Its tappable frame is floored to the shared touch
+                    // target round the drawing, without moving it.
+                    PageMenu(pageCount: pageCount) {
+                        counterDrawing(count: count, pageCount: pageCount)
+                            .frame(minHeight: ResectaTokens.TouchTarget.minimum)
+                            .contentShape(Rectangle())
+                    }
+                    .accessibilityHint(PageMenuWords.counterHint)
+                } else {
+                    counterDrawing(count: count, pageCount: pageCount)
+                        .accessibilityElement(children: .ignore)
                 }
-                // The count's slot is as wide as the wider of "0 regions"
-                // and the live count (both laid out, one hidden), so the
-                // bar keeps its width — and the whole-page control its
-                // place under the finger — when a tap adds the first
-                // region or removes the last.
-                ZStack(alignment: .leading) {
-                    Text(PageNavigationBar.regionCountLabel(0))
-                        .hidden()
-                        .accessibilityHidden(true)
-                    Text(PageNavigationBar.regionCountLabel(count))
-                        .foregroundStyle(ResectaTokens.SemanticColor.supportText)
-                }
-                .font(.caption.monospacedDigit())
             }
-            .lineLimit(1)
-            .minimumScaleFactor(0.5)
-            .accessibilityElement(children: .ignore)
             .accessibilityLabel(PageNavigationBar.pageAccessibilityLabel(
                 page: documentState.currentPageIndex + 1,
                 pageCount: pageCount,
@@ -172,6 +158,40 @@ struct PageNavigationBar: View {
         // identifiers the page-bar pin queries.
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("pageNav")
+    }
+
+    /// The counter as drawn: the page position and the page's count, side by
+    /// side, or stacked at the accessibility sizes.
+    private func counterDrawing(count: Int, pageCount: Int) -> some View {
+        let stacks = PageNavigationBar.counterStacks(dynamicTypeSize: dynamicTypeSize)
+        let counterLayout = stacks
+            ? AnyLayout(VStackLayout(spacing: 0))
+            : AnyLayout(HStackLayout(spacing: ResectaTokens.Spacing.xs))
+        return counterLayout {
+            Text("\(documentState.currentPageIndex + 1) of \(pageCount)")
+                .font(.subheadline.monospacedDigit())
+
+            if !stacks {
+                Text("\u{B7}")
+                    .foregroundStyle(.quaternary)
+                    .padding(.horizontal, ResectaTokens.Spacing.xxs)
+            }
+            // The count's slot is as wide as the wider of "0 regions"
+            // and the live count (both laid out, one hidden), so the
+            // bar keeps its width — and the whole-page control its
+            // place under the finger — when a tap adds the first
+            // region or removes the last.
+            ZStack(alignment: .leading) {
+                Text(PageNavigationBar.regionCountLabel(0))
+                    .hidden()
+                    .accessibilityHidden(true)
+                Text(PageNavigationBar.regionCountLabel(count))
+                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+            }
+            .font(.caption.monospacedDigit())
+        }
+        .lineLimit(1)
+        .minimumScaleFactor(0.5)
     }
 }
 
@@ -222,6 +242,10 @@ extension PageNavigationBar {
 
     /// The page arrows step between pages: none on a one-page document.
     static func showsChevrons(pageCount: Int) -> Bool { pageCount > 1 }
+
+    /// The counter opens the page menu: not on a one-page document, where it
+    /// stays the plain counter.
+    static func showsPageMenu(pageCount: Int) -> Bool { pageCount > 1 }
 
     /// The bar's whole-page control: hidden on a one-page document, where
     /// the … menu's row keeps the action.
