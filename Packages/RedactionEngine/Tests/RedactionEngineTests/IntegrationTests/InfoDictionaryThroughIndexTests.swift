@@ -179,6 +179,13 @@ struct InfoDictionaryThroughIndexTests {
         let way = run.outcome.produced.infoDictionary
         #expect(way == .byIndex, "\(label): the record says \(String(describing: way))")
         #expect(fields(bytes) == fixedFields, "\(label): \(fields(bytes))")
+        // The writer's file holds one information dictionary: a second one
+        // (whose values the index way would leave) is a stop for this beta.
+        var producerKeys = 0, from = bytes.startIndex
+        while let hit = bytes.range(of: Data("/Producer".utf8), in: from..<bytes.endIndex) {
+            producerKeys += 1; from = hit.upperBound
+        }
+        #expect(producerKeys == 1, "\(label): \(producerKeys) /Producer keys in the file")
         var distance = -1
         if case .found(let found) = PDFTrailerLocator.locate(in: bytes) {
             distance = bytes.count - found.dictionary.lowerBound

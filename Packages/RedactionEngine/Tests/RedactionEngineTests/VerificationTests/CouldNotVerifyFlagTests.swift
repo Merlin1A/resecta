@@ -187,7 +187,7 @@ struct CouldNotVerifyFlagTests {
         expectFlag(r, false, "L4 structural notes")
     }
 
-    @Test("Layer 5: metadata present and the attestation WARN → false")
+    @Test("Layer 5: metadata present warns, fields not rewritten read Needs review → false")
     func layer5RoutineWarns() async throws {
         let (trapped, u1) = try TestFixtures.writeTempPDF(
             TestFixtures.writerShapedMetadata(infoDictBody: "/Trapped /True"), prefix: "cnv_l5t_")
@@ -201,7 +201,8 @@ struct CouldNotVerifyFlagTests {
         defer { try? FileManager.default.removeItem(at: u2) }
         let attest = await run(4, producer, mode: .secureRasterization)
         #expect(message(attest).contains("not rewritten"), "got \(attest.status)")
-        expectFlag(attest, false, "L5 attestation")
+        if case .attention = attest.status {} else { Issue.record("L5 not rewritten: Needs review expected, got \(attest.status)") }
+        expectFlag(attest, false, "L5 not rewritten")
     }
 
     // MARK: - Layer 6 (Spatial Verification)
