@@ -511,7 +511,10 @@ enum TextLayerReconstructor {
     /// `settled` is false when `passLimit` passes left a drawn cell inside
     /// a region: the rule has not seen the layout settle, so those entries
     /// are dropped too and the caller writes the page without a text layer
-    /// (the surviving set is not one the writer may draw).
+    /// (the surviving set is not one the writer may draw). It is false too
+    /// when a line cannot be laid out in the hidden text's faces; `laidOut`
+    /// then reads false, and the caller records no searchable text left
+    /// rather than a fault.
     static func validateSurvivors(
         _ result: FilterResult,
         regionShapes: [RegionShape],
