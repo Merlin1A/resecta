@@ -95,6 +95,14 @@ class SettingsState {
                 defaults.set(appearancePreference.rawValue, forKey: "appearancePreference.v1") }
     }
 
+    /// The switch in Settings' Redaction Boxes section: one stored key, off
+    /// by default. Every screen that shows the switch reads this property.
+    static let boxesAcrossColumnKey = "boxesAcrossColumn.v1"
+    var boxesAcrossColumn: Bool = false {
+        didSet { guard !isInitializing else { return }
+                defaults.set(boxesAcrossColumn, forKey: Self.boxesAcrossColumnKey) }
+    }
+
     // MARK: - Detection preset + threshold vector
 
     /// User-selected detection preset. Drives `activeThresholdVector` at
@@ -156,6 +164,7 @@ class SettingsState {
         // same way.
         for key in Self.retiredDefaultsKeys { defaults.removeObject(forKey: key) }
         self.paranoidMode = defaults.object(forKey: "paranoidMode") as? Bool ?? false
+        self.boxesAcrossColumn = defaults.object(forKey: Self.boxesAcrossColumnKey) as? Bool ?? false
         let storedAppearance = defaults.string(forKey: "appearancePreference.v1")
         self.appearancePreference = storedAppearance
             .flatMap(AppearancePreference.init(rawValue:)) ?? .system
@@ -172,6 +181,7 @@ class SettingsState {
         autoVerify = true
         pipelineMode = .secureRasterization
         paranoidMode = false
+        boxesAcrossColumn = false
         appearancePreference = .system
         detectionPreset = .balanced
         // The search sheet's last-used filter shape (the Source filter,

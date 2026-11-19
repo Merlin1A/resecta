@@ -1,6 +1,6 @@
 import Foundation
 
-// The kinds of line Widen Boxes was measured on, and the one sentence that
+// The kinds of line the box switch was measured on, and the one sentence that
 // names those on which it reduced what the page shows about how long the
 // text was. The sentence is shown only for kinds that earned the word in
 // the measurement; which kinds earned it is decided where the caller's list
@@ -45,7 +45,7 @@ enum MeasuredLineKinds {
         let earned = Set(kinds)
         let names = Kind.allCases.filter(earned.contains).map(name)
         guard !names.isEmpty else { return nil }
-        return "In Resecta's test, Widen Boxes reduced what the page shows about how long the text was on "
+        return "In Resecta's test, \(RedactionBoxesCopy.switchName) reduced what the page shows about how long the text was on "
             + joined(names) + "."
     }
 }
