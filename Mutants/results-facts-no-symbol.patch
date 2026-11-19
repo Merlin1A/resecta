@@ -1,0 +1,22 @@
+Property: The card's rows carry no symbol in front.
+Area: results (the card of facts)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/FactRowTests
+Must go red: ResectaAppTests/FactRowTests cardRowsCarryNoSymbol
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationDetailsSection.swift b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
+index b08232b0..111d716a 100644
+--- a/Sources/ResectaApp/Views/VerificationDetailsSection.swift
++++ b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
+@@ -242,6 +242,11 @@ struct VerificationDetailsSection: View {
+         return VStack(alignment: .leading, spacing: 0) {
+             Button { toggle(.pageModes) } label: {
+                 HStack(alignment: .top, spacing: 0) {
++                    Image(systemName: "square.2.layers.3d")
++                        .font(.system(size: ResectaTokens.Results.leadMark - 2))
++                        .foregroundStyle(ResectaTokens.SemanticColor.supportText)
++                        .frame(width: ResectaTokens.Results.leadColumn)
++                        .padding(.leading, ResectaTokens.Spacing.md)
+                     VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xxs) {
+                         Text("Page Modes")
+                             .font(.body)

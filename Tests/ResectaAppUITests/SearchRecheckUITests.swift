@@ -106,6 +106,19 @@ nonisolated final class SearchRecheckUITests: XCTestCase {
         XCTAssertTrue(masthead.label.hasPrefix("Checks Passed. 7 of 7 checks passed."),
                       "Secure Rasterization runs a 7-layer check, every one passing: \(masthead.label)")
         results.swipeUp()
+        // The Detection Sweep's limit is in view before any row is tapped:
+        // on the sweep's own row where that row is in view, else in the
+        // card of facts.
+        let limit = app.descendants(matching: .any).matching(
+            NSPredicate(format: #"label CONTAINS "Names and addresses are not swept.""#)).firstMatch
+        var limitScrolls = 0
+        while !limit.exists && limitScrolls < 4 {
+            results.swipeUp()
+            limitScrolls += 1
+        }
+        XCTAssertTrue(limit.waitForExistence(timeout: 10), "The Detection Sweep's limit is not in view before any row is tapped.")
+        XCTAssertTrue(app.descendants(matching: .any)["sweepLimitFact"].exists,
+                      "The sweep's row is inside the closed row, so the card holds the limit.")
         XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "layerResult_5").firstMatch.exists,
                        "On a run where every check passed, the checks are inside the closed row.")
         let cluster = app.buttons["passedChecksCluster"]
@@ -177,6 +190,19 @@ nonisolated final class SearchRecheckUITests: XCTestCase {
         XCTAssertTrue(masthead.label.contains("5 of 7 checks passed. 2\u{00A0}had nothing to check."),
                       "No typed search and no captured term: the re-check and the term check had nothing to check: \(masthead.label)")
         results.swipeUp()
+        // The Detection Sweep's limit is in view before any row is tapped:
+        // on the sweep's own row where that row is in view, else in the
+        // card of facts.
+        let limit = app.descendants(matching: .any).matching(
+            NSPredicate(format: #"label CONTAINS "Names and addresses are not swept.""#)).firstMatch
+        var limitScrolls = 0
+        while !limit.exists && limitScrolls < 4 {
+            results.swipeUp()
+            limitScrolls += 1
+        }
+        XCTAssertTrue(limit.waitForExistence(timeout: 10), "The Detection Sweep's limit is not in view before any row is tapped.")
+        XCTAssertTrue(app.descendants(matching: .any)["sweepLimitFact"].exists,
+                      "The sweep's row is inside the closed row, so the card holds the limit.")
         // The idle checks sit inside the passed checks' row with the passed
         // ones, and the row starts closed: open it to reach the sweep's row.
         let idleRecheck = app.descendants(matching: .any).matching(identifier: "layerResult_5").firstMatch
