@@ -60,8 +60,8 @@ nonisolated final class ShareRiskSheetUITests: XCTestCase {
         runRedactFromTheBar()
 
         XCTAssertTrue(
-            app.staticTexts["Verification Skipped"].waitForExistence(timeout: 30),
-            "Verification results screen never reached Verification Skipped."
+            app.staticTexts["Checks Not Run"].waitForExistence(timeout: 30),
+            "Verification results screen never reached Checks Not Run."
         )
 
         let shareCard = app.buttons
@@ -82,8 +82,8 @@ nonisolated final class ShareRiskSheetUITests: XCTestCase {
         dismissSystemShareSheetWithSwipeDown()
 
         XCTAssertTrue(
-            app.staticTexts["Verification Skipped"].waitForExistence(timeout: 10),
-            "Did not return to Verification Skipped after backing out of the share sheet."
+            app.staticTexts["Checks Not Run"].waitForExistence(timeout: 10),
+            "Did not return to Checks Not Run after backing out of the share sheet."
         )
         XCTAssertFalse(
             app.staticTexts["Shared."].exists,

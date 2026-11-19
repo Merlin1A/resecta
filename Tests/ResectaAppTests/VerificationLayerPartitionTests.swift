@@ -111,7 +111,7 @@ struct VerificationLayerPartitionTests {
         #expect(p.nothingToCheck == [1])
         #expect(p.notes == [])
         #expect(p.isWhollyClean == false)
-        #expect(p.summaryLine1 == "1 of 2 checks passed")
+        #expect(p.summaryLine1 == "1 of 1 check passed")
         #expect(p.summaryLine2 == "1\u{00A0}had nothing to check")
         #expect(p.clusterTitle == "1 check passed · 1\u{00A0}had nothing to check")
         #expect(p.clusterSpokenLabel == "1 check passed, 1\u{00A0}had nothing to check")
