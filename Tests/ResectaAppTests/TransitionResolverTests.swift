@@ -101,7 +101,7 @@ struct TransitionResolverTests {
     /// very file, `ResectaTokens.swift`, `LayerResultRow.swift`, and
     /// `VerificationResultsView.swift` all narrate `` `.move(edge:)` ``
     /// (no trailing space + case value) — never count as sites or skew
-    /// the 11-site total.
+    /// the site total.
     static func moveEdgeViolations(in source: String) -> (count: Int, violations: [String]) {
         let needle = ".move(edge: ."
         var violations: [String] = []

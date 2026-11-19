@@ -1,0 +1,19 @@
+Property: A Scan lists at most maxResults rows: the detector results of a page stop at the limit.
+Area: Search, the rules a search follows
+Test command: cd Packages/RedactionEngine && DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --no-parallel --filter '^RedactionEngineTests\.SearchRuleCaseTests/'
+Must go red: RedactionEngineTests/SearchRuleCaseTests searchLimit
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift
+index 58d5d769..c93c09d2 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift
+@@ -68,7 +68,7 @@ extension DocumentSearcher {
+                 let matches = gateAndCompose(merged, pageText: pageText)
+                 var pageRects: [CGRect] = []
+                 for match in matches {
+-                    if Task.isCancelled || totalYielded >= Self.maxResults { break }
++                    if Task.isCancelled || totalYielded > Self.maxResults { break }
+ 
+                     // An assembled spatial survivor uses the stored
+                     // union rect: its range is either the sentinel (no

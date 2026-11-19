@@ -1,11 +1,13 @@
 import Testing
 import Foundation
+import PDFKit
 @testable import RedactionEngine
 
-// The rule cases no existing test caught: each row states one rule of the
-// Search rule set and is shown able to fail by a planted defect (the census
-// patches in Mutants/search-rule-*.patch). One accepting and one rejecting row
-// at least per rule; the rows run over the pure functions the rule lives in.
+// Cases for search rules no other test caught: each row states one rule a
+// search follows, and a planted fault in Mutants/search-rule-*.patch turns it
+// red. Each rule has at least one accepting and one rejecting row. The edge
+// and look-alike rows run the pure functions the rule lives in; the limit rows
+// run a whole search in each mode, so the limit is held where results are made.
 
 @Suite("Search rule cases the planted defects need", .tags(.search))
 struct SearchRuleCaseTests {
@@ -27,6 +29,8 @@ struct SearchRuleCaseTests {
         EdgeRow(name: "an underscore before is not an edge", text: "ref_4471 due", query: "4471", isWholeWord: false),
         EdgeRow(name: "an underscore after is not an edge", text: "ref 4471_due", query: "4471", isWholeWord: false),
         EdgeRow(name: "a letter before is not an edge", text: "ref4471 due", query: "4471", isWholeWord: false),
+        EdgeRow(name: "a digit before is not an edge", text: "ref 74471 due", query: "4471", isWholeWord: false),
+        EdgeRow(name: "a digit after is not an edge", text: "ref 44719 due", query: "4471", isWholeWord: false),
     ]
 
     @Test("Whole Word: the edge rule on the text tier", arguments: edgeRows)
@@ -84,6 +88,74 @@ struct SearchRuleCaseTests {
         #expect(total == row.alreadyYielded + row.yielded)
     }
 
+    // MARK: a whole search in each mode lists maxResults rows and no more
+
+    enum LimitMode: String, Sendable { case text, pattern, scan, alwaysFlag }
+
+    struct LimitRow: Sendable, CustomTestStringConvertible {
+        let name: String
+        let mode: LimitMode
+        let perPage: [Int]
+        let listed: Int
+        var testDescription: String { name }
+    }
+
+    static let limitRows: [LimitRow] = [
+        LimitRow(name: "typed search, under the limit: every match is listed", mode: .text, perPage: [300], listed: 300),
+        LimitRow(name: "typed search, one page over the limit: the limit is listed", mode: .text, perPage: [1100], listed: DocumentSearcher.maxResults),
+        LimitRow(name: "pattern, one page over the limit: the limit is listed", mode: .pattern, perPage: [1100], listed: DocumentSearcher.maxResults),
+        LimitRow(name: "pattern, two pages over the limit together: the limit is listed", mode: .pattern, perPage: [600, 600], listed: DocumentSearcher.maxResults),
+        LimitRow(name: "Scan, under the limit: every address is listed", mode: .scan, perPage: [300], listed: 300),
+        LimitRow(name: "Scan, one page over the limit: the limit is listed", mode: .scan, perPage: [1100], listed: DocumentSearcher.maxResults),
+        LimitRow(name: "Scan, two pages over the limit together: the limit is listed", mode: .scan, perPage: [600, 600], listed: DocumentSearcher.maxResults),
+        LimitRow(name: "always-flag term, one page over the limit: the limit is listed", mode: .alwaysFlag, perPage: [1100], listed: DocumentSearcher.maxResults),
+    ]
+
+    /// Pages of small print, `count` tokens each, fourteen to a line: each
+    /// token a distinct address (`u<n>@mail.com`) for Scan, else "Zebra".
+    static func manyTokenPages(_ perPage: [Int], addresses: Bool) -> Data {
+        var objects: [PDFObject] = [PDFObject(id: 1, content: "<< /Type /Catalog /Pages 2 0 R >>")]
+        let font = 3, firstPage = 4
+        var kids: [String] = [], serial = 0
+        for (k, count) in perPage.enumerated() {
+            let pageId = firstPage + 2 * k, contentId = pageId + 1
+            kids.append("\(pageId) 0 R")
+            var lines: [String] = [], line: [String] = []
+            for _ in 0..<count {
+                serial += 1
+                line.append(addresses ? "u\(serial)@mail.com" : "Zebra")
+                if line.count == 14 { lines.append(line.joined(separator: " ")); line = [] }
+            }
+            if !line.isEmpty { lines.append(line.joined(separator: " ")) }
+            let body = lines.map { "(\($0)) Tj 0 -7 Td" }.joined(separator: " ")
+            let stream = "BT /F1 5 Tf 24 770 Td \(body) ET"
+            objects.append(PDFObject(id: pageId, content: "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents \(contentId) 0 R /Resources << /Font << /F1 \(font) 0 R >> >> >>"))
+            objects.append(PDFObject(id: contentId, content: "<< /Length \(stream.utf8.count) >>\nstream\n\(stream)\nendstream"))
+        }
+        objects.append(PDFObject(id: 2, content: "<< /Type /Pages /Kids [\(kids.joined(separator: " "))] /Count \(perPage.count) >>"))
+        objects.append(PDFObject(id: font, content: "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"))
+        return buildRawPDF(objects: objects, rootId: 1)
+    }
+
+    @Test("The result limit: a whole search lists maxResults rows and no more, in each mode", arguments: limitRows)
+    func searchLimit(_ row: LimitRow) async throws {
+        let doc = try #require(PDFDocument(data: Self.manyTokenPages(row.perPage, addresses: row.mode == .scan)))
+        let searcher = DocumentSearcher()
+        let mode: SearchMode
+        switch row.mode {
+        case .text: mode = .text("Zebra", options: SearchOptions())
+        case .pattern: mode = .regex("Zeb[a-z]+", options: SearchOptions())
+        case .scan: mode = .piiScan(categories: [.email], options: SearchOptions())
+        case .alwaysFlag:
+            await searcher.setUserTerms(UserTermsIndex(matcher: UserTermMatcher.compile(
+                alwaysFlag: [UserTerm(pattern: "Zebra", isRegex: false)], neverFlag: [])))
+            mode = .piiScan(categories: [.ssn], options: SearchOptions())
+        }
+        var listed = 0
+        for await _ in searcher.search(SendablePDFDocument(doc), mode: mode, progress: { _, _ in }) { listed += 1 }
+        #expect(listed == row.listed, "\(row.mode.rawValue): \(row.perPage) tokens by page")
+    }
+
     // MARK: inside a token that holds a digit, each look-alike class reads as one symbol
 
     struct ClassRow: Sendable, CustomTestStringConvertible {
@@ -114,8 +186,16 @@ struct SearchRuleCaseTests {
         #expect((OCRMatchSkeleton.skeleton(row.a) == OCRMatchSkeleton.skeleton(row.b)) == row.same)
     }
 
-    @Test("The case table's row count")
-    func rowCount() {
-        #expect(Self.edgeRows.count + Self.capRows.count + Self.classRows.count == 23)
+    @Test("Every rule has an accepting and a rejecting row")
+    func eachRuleBothWays() {
+        #expect(Set(Self.edgeRows.map(\.isWholeWord)) == [true, false])
+        #expect(Self.capRows.contains { $0.yielded == $0.offered } && Self.capRows.contains { $0.yielded < $0.offered })
+        #expect(Set(Self.classRows.map(\.same)) == [true, false])
+        for mode in [LimitMode.text, .scan] {
+            let rows = Self.limitRows.filter { $0.mode == mode }
+            #expect(rows.contains { $0.listed == $0.perPage.reduce(0, +) } && rows.contains { $0.listed < $0.perPage.reduce(0, +) },
+                    "\(mode.rawValue)")
+        }
+        #expect(Self.edgeRows.count + Self.capRows.count + Self.classRows.count + Self.limitRows.count == 33)
     }
 }
