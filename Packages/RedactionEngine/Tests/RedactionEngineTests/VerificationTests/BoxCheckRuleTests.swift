@@ -134,9 +134,9 @@ struct BoxCheckRuleTests {
     }
 
     @Test("Seam: the checks are handed the run's record, with each page's plan and the producer's rectangles",
-          .disabled("waits on the position check's package, which adds the parameter that hands the record to the checks, and on the pixel step, which writes each page's plan and painted rectangles; today's run leaves the plan nil"))
+          .disabled("waits on the pixel step, which paints by the plan and writes each box's painted rectangle; the record reaches the checks with each page's plan today, and with no painted rectangle"))
     func seamTheRecordReachesTheCheck() {
-        Issue.record("the record does not yet reach the checks with a plan for each page")
+        Issue.record("the record does not yet hold the rectangles the producer painted")
     }
 
     @Test("Seam: one real export in each mode through the app's pipeline, every box complete and none reported smaller",
