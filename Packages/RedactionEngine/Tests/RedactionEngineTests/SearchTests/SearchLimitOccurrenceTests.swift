@@ -114,6 +114,35 @@ struct SearchLimitOccurrenceTests {
         }
     }
 
+    // MARK: the Search Re-check reads a page as stopped at the limit by its matches, not its rows
+
+    struct RecheckRow: Sendable, CustomTestStringConvertible {
+        let name: String
+        let phrases: [Phrase]
+        let remaining: Int
+        let stoppedAtLimit: Bool
+        var testDescription: String { name }
+    }
+
+    static let recheckRows: [RecheckRow] = [
+        RecheckRow(name: "999 matches, one over two lines: 1000 rows remain, and the page is read in full",
+                   phrases: phrases(limit - 2, then: [.wrapped]), remaining: limit, stoppedAtLimit: false),
+        RecheckRow(name: "1000 matches, the last over two lines: 1001 rows remain, and the page stopped at the limit",
+                   phrases: phrases(limit - 1, then: [.wrapped]), remaining: limit + 1, stoppedAtLimit: true),
+        RecheckRow(name: "1001 matches on one line each: 1000 remain, and the page stopped at the limit",
+                   phrases: phrases(limit + 1), remaining: limit, stoppedAtLimit: true),
+    ]
+
+    @Test("The Search Re-check stops a page at maxResults matches, not rows", arguments: recheckRows)
+    func recheckStopsAtMatches(_ row: RecheckRow) async throws {
+        let observation = try await OutputRecheck.observePage(
+            OutputRecheck.PageWork(index: 0, data: Self.pagesPDF([row.phrases]), requestIndices: [0]),
+            requests: [TestFixtures.textRequest("Zebra Crossing")], regexTimeoutOverride: nil)
+        let count = try #require(observation.counts[0])
+        #expect(count.remaining == row.remaining, "rows remaining")
+        #expect(count.hitCap == row.stoppedAtLimit, "stopped at the limit")
+    }
+
     @Test("Every mode has a row under the limit or past it, and a row at it")
     func rowsCoverEachMode() {
         #expect(Self.rows.count == 8)
