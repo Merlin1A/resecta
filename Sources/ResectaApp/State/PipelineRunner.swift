@@ -196,6 +196,7 @@ struct PipelineRunner {
                     ocrSkippedPages: entry.ocrSkippedPages,
                     degradeFailures: entry.degradeFailures,
                     burnedRegionVersion: entry.burnedRegionVersion,
+                    burnedRegions: runContext.burnedRegions,
                     record: RunRecord(confirmed: entry.confirmed, produced: runContext.produced))))
 
             // --- Verification ---
@@ -394,9 +395,12 @@ struct PipelineRunner {
             perPageFallbackReasons: perPageFallbackReasons,
             sensitiveTerms: sensitiveTerms,
             appliedSearches: appliedSearches,
+            // The regions the run that made this output burned, as it
+            // burned them (clamped, floor-filtered, with its ink strips).
             // Verify-only runs only on an output that is not stale, so the
-            // live regions are the ones it burned.
-            burnedRegions: coordinator.redactionState.regions
+            // live regions are the same regions in their drawn form: they
+            // stand in only where no inputs were kept (the debug seed).
+            burnedRegions: retained?.burnedRegions ?? coordinator.redactionState.regions
         )
         return try await verify(
             runContext: runContext, effectiveMode: effectiveMode,
