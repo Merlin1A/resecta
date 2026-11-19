@@ -69,13 +69,9 @@ struct VerificationProgressView: View {
     private func block(_ state: VerificationProgressLine, longRun: Bool) -> some View {
         VStack(spacing: 0) {
             CountRing(content: .running(finished: state.finished, total: state.total))
-            BalancedLines {
-                Text("Verification In Progress")
-                    .font(.title.bold())
-                    .foregroundStyle(.primary)
-                    .multilineTextAlignment(.center)
-            }
-            .padding(.top, ResectaTokens.Results.ringToTitle)
+            BalancedText(string: "Verification In Progress", font: .title.bold())
+                .foregroundStyle(.primary)
+                .padding(.top, ResectaTokens.Results.ringToTitle)
             HStack(alignment: .firstTextBaseline, spacing: ResectaTokens.Spacing.xs) {
                 // The spinner stays on the line's first line when it wraps.
                 ProgressView()
