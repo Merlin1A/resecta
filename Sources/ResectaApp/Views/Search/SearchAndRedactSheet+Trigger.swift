@@ -331,6 +331,9 @@ extension SearchAndRedactSheet {
         searchState.resetRegexTimeoutPages()
         // Reset the OCR-skip page set for the same reason.
         searchState.resetOCRSkippedPages()
+        #if DEBUG
+        if let page = ResectaApp.uitestOCRSkipPage(for: CommandLine.arguments) { searchState.recordOCRSkip(page: page) }
+        #endif
 
         return PreparedRun(
             run: run,
