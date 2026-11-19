@@ -154,7 +154,7 @@ extension DocumentSearcher {
         let degraded = onCopy.uncached.isRaised
         // A deferred run's envelope stands in until the page is read: not shown.
         let placeholder = InkFitDeferral.current != nil && degraded
-        let identity = degraded ? nil : onCopy.identity.value
+        let identity = onCopy.identity.value
         InkFitCache.shared.finish(job.key, fitted: degraded ? nil : fitted, displayed: degraded && !placeholder ? fitted : nil,
                                   identity: identity)
         if !placeholder { InkFitUpdates.shared.post() }
@@ -463,6 +463,18 @@ extension DocumentSearcher {
                           width: back.width / visual.width, height: back.height / visual.height)
                 .clampedToNormalized()
         }
+        // The box with every band reached past its window, and the tallest
+        // band's box stands in: that band alone can leave the word's other
+        // bands outside (a light row through the word, the box grown along
+        // the taller rows onto the word before it). The fit paints that box
+        // together with the read word's envelope, degraded as the envelope
+        // is, and the match is told by the band's box.
+        if painted.fellBack {
+            let band = normalizedBack(painted.paint)
+            inkFitLogger.log("ink fit: the box with every band reaches past its window; the box is its tallest band's with the read word's envelope, degraded")
+            job.identity.set(band)
+            return band.union(anchorEnvelope()).clampedToNormalized()
+        }
         job.identity.set(painted.identity.map(normalizedBack))
         return normalizedBack(painted.paint)
     }
@@ -508,14 +520,19 @@ extension DocumentSearcher {
     /// repeats this match by that box (`SearchResult.identityRect`), never by
     /// the grown one, which can reach over a neighbour line's occurrence the
     /// text layer does not hold. nil identity when the paint is that box.
+    /// `fellBack` when the box with every band reached past the window and
+    /// the paint is the tallest band's box standing in for it.
     nonisolated static func inkPaintAndIdentity(ink: CGRect, band: CGRect?, seed: CGRect, window: CGRect,
-                                                growLeft: Bool, growRight: Bool) -> (paint: CGRect, identity: CGRect?)? {
+                                                growLeft: Bool, growRight: Bool)
+        -> (paint: CGRect, identity: CGRect?, fellBack: Bool)? {
         guard let paint = inkPaint(ink: ink, band: band, seed: seed, window: window, growLeft: growLeft, growRight: growRight) else {
             return nil
         }
+        let fellBack = band != nil && inkPaint(ink: ink, band: nil, seed: seed, window: window,
+                                               growLeft: growLeft, growRight: growRight) == nil
         guard let band, let alone = inkPaint(ink: band, band: nil, seed: seed, window: window,
-                                             growLeft: growLeft, growRight: growRight), alone != paint else { return (paint, nil) }
-        return (paint, alone)
+                                             growLeft: growLeft, growRight: growRight), alone != paint else { return (paint, nil, fellBack) }
+        return (paint, alone, false)
     }
 
     /// The page's read tokens: one full-page render at the fit's scale, read

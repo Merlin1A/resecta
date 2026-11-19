@@ -1,5 +1,7 @@
 import CoreGraphics
+import CoreText
 import Foundation
+import PDFKit
 import Testing
 @testable import RedactionEngine
 
@@ -210,6 +212,76 @@ struct InkFitBandTests {
             if !boxes.contains(where: { $0.contains(centre) }) { outside += 1 }
         } } }
         #expect(outside == 0, "\(outside) ink pixels of the capital outside every box")
+    }
+
+    // MARK: - A scan with a white picture row through a printed word, searched
+
+    static let scanLines: [(String, CGFloat, CGFloat)] = [
+        ("Account holder MARISOL QUENTIN", 100, 700), ("Payee HALVERSON TIMBER", 100, 670), ("Reference 5193 Duluth Minnesota", 100, 640)]
+    static var scanFont: CTFont { CTFontCreateWithName("Helvetica" as CFString, 14, nil) }
+    static func ctLine(_ text: String) -> CTLine {
+        CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: [NSAttributedString.Key(kCTFontAttributeName as String): scanFont]))
+    }
+    static func width(_ text: String) -> CGFloat { CGFloat(CTLineGetTypographicBounds(ctLine(text), nil, nil, nil)) }
+    /// The print sits half a word right of the invisible text layer.
+    static var printShift: CGFloat { (width("QUENTIN") / 2).rounded() }
+    /// QUENTIN as printed, from the font's metrics (page points).
+    static var printedWord: CGRect {
+        CGRect(x: 100 + printShift + width("Account holder MARISOL "), y: 700 - CTFontGetDescent(scanFont),
+               width: width("QUENTIN"), height: CTFontGetAscent(scanFont) + CTFontGetDescent(scanFont))
+    }
+
+    /// A one-image 300 dpi scan of three printed lines with one fully white
+    /// picture row through the middle of QUENTIN, under an invisible text
+    /// layer set half a word to the left.
+    static func lightRowScan() throws -> PDFDocument {
+        let w = 2550, h = 3300, k: CGFloat = 300 / 72
+        let bmp = try #require(CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w,
+                                         space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue))
+        bmp.setFillColor(gray: 1, alpha: 1); bmp.fill(CGRect(x: 0, y: 0, width: w, height: h))
+        bmp.setFillColor(gray: 0, alpha: 1); bmp.scaleBy(x: k, y: k)
+        for (text, x, y) in scanLines { bmp.textPosition = CGPoint(x: x + printShift, y: y); CTLineDraw(ctLine(text), bmp) }
+        // The white row, through the word's middle (memory row 0 is the top).
+        let row = Int(((792 - printedWord.midY) * k).rounded())
+        let pixels = try #require(bmp.data).assumingMemoryBound(to: UInt8.self)
+        for column in 0..<w { pixels[row * w + column] = 255 }
+        let image = try #require(bmp.makeImage())
+        let out = NSMutableData()
+        var media = CGRect(x: 0, y: 0, width: 612, height: 792)
+        let consumer = try #require(CGDataConsumer(data: out as CFMutableData))
+        let pdf = try #require(CGContext(consumer: consumer, mediaBox: &media, nil))
+        pdf.beginPDFPage(nil)
+        pdf.draw(image, in: media)
+        pdf.setTextDrawingMode(.invisible)
+        for (text, x, y) in scanLines { pdf.textPosition = CGPoint(x: x, y: y); CTLineDraw(ctLine(text), pdf) }
+        pdf.endPDFPage(); pdf.closePDF()
+        return try #require(PDFDocument(data: out as Data))
+    }
+
+    @Test("A scan with a white picture row through a printed word: the Search box covers all of the word's ink, and the match is told by its band's box")
+    func lightRowScanIsCovered() async throws {
+        // On this scan the read word's box starts in the word space before
+        // QUENTIN: the box with both bands, taller than either, grows along
+        // its rows onto MARISOL and past the fit's window. The tallest band's
+        // box alone leaves the lower half outside (v1.3.1: 4,763 of 16,883
+        // pixels); the fit paints it with the read word's envelope.
+        let doc = try Self.lightRowScan()
+        var hits: [SearchResult] = []
+        for await result in DocumentSearcher().search(SendablePDFDocument(doc), mode: .text("QUENTIN", options: SearchOptions()),
+                                                      progress: { _, _ in }) { hits.append(result) }
+        #expect(hits.count == 1, "one QUENTIN: \(hits.count)")
+        let hit = try #require(hits.first)
+        let page = try #require(doc.page(at: 0))
+        let size = page.bounds(for: .cropBox).size
+        let paint = PageImageInkFitTests.points(hit.normalizedRect, size)
+        let outside = try PageImageInkFitTests.inkOutside(page, word: Self.printedWord, boxes: [paint],
+                                                          threshold: DocumentSearcher.inkFitLightThreshold)
+        #expect(outside.share == 0, "\(outside.share) of QUENTIN's ink outside the box, \(outside.reach) pt out; box \(paint)")
+        let band = try #require(hit.identityRect, "the match carries its band's box")
+        let identity = PageImageInkFitTests.points(band, size)
+        #expect(Self.holds(paint, identity), "the paint holds the band's box: \(paint), \(identity)")
+        #expect(identity.height < 0.75 * Self.printedWord.height,
+                "the band's box is one band, not the word: \(identity.height) of \(Self.printedWord.height) pt")
     }
 
     @Test("A dot a small gap above the word: the box is as before")
