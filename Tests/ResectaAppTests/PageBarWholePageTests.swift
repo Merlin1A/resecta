@@ -264,6 +264,51 @@ struct PageBarWholePageTests {
         #expect(source.contains("Label(PageNavigationBar.wholePageActionLabel(marked: marked), systemImage: \"rectangle.inset.filled\")"))
     }
 
+    @Test("The bar draws the whole-page control first, then its divider, Previous, the counter and Next")
+    func barDrawsTheControlFirst() throws {
+        let source = try Self.repoFile("Sources/ResectaApp/Views/PageNavigationBar.swift")
+        func at(_ needle: String) throws -> String.Index {
+            try #require(source.range(of: needle)?.lowerBound, "the bar's source holds \(needle)")
+        }
+        let control = try at("accessibilityIdentifier(\"pageNavMarkWholePage\")")
+        let divider = try at("PageNavigationBar.wholePageDividerHeight(")
+        let previous = try at("accessibilityIdentifier(\"pageNavPrevious\")")
+        let counter = try at("\"pageNavCounter\"")
+        let next = try at("\"pageNavNext\"")
+        #expect(control < divider && divider < previous && previous < counter && counter < next,
+                "the control, its divider, Previous, the counter, Next, in that order")
+        // The divider is an overlay of the control, inside the control's
+        // own `if` and before the Previous block's.
+        let controlIf = try at("if PageNavigationBar.showsMarkControl(")
+        let previousIf = try at("if PageNavigationBar.showsChevrons(")
+        #expect(controlIf < divider && divider < previousIf, "the divider sits inside the control's block")
+        let overlay = try #require(source[..<divider].range(of: ".overlay(", options: .backwards)?.lowerBound,
+                                   "the divider is drawn in an overlay")
+        #expect(control < overlay, "the overlay is the control's")
+    }
+
+    @Test("The count is drawn in the support grey at every number; the orange token is gone")
+    func countTakesTheSupportGrey() throws {
+        let bar = try Self.repoFile("Sources/ResectaApp/Views/PageNavigationBar.swift")
+        #expect(bar.contains("ResectaTokens.SemanticColor.supportText"))
+        #expect(!bar.contains("regionCountAccent"))
+        #expect(!bar.contains(".tertiary"))
+        #expect(!bar.contains(".orange"), "no number of regions draws the count orange")
+        let tokens = try Self.repoFile("Sources/ResectaApp/Design/ResectaTokens.swift")
+        #expect(!tokens.contains("regionCountAccent"))
+        let sidebar = try Self.repoFile("Sources/ResectaApp/Views/PageThumbnailList.swift")
+        #expect(sidebar.contains("supportText"))
+        #expect(!sidebar.contains(".foregroundStyle(.orange)"))
+    }
+
+    @Test("The divider is 28 pt, and 44 pt at the accessibility sizes")
+    func dividerFollowsTheTextSize() {
+        #expect(PageNavigationBar.wholePageDividerHeight(dynamicTypeSize: .large) == 28)
+        #expect(PageNavigationBar.wholePageDividerHeight(dynamicTypeSize: .xxxLarge) == 28)
+        #expect(PageNavigationBar.wholePageDividerHeight(dynamicTypeSize: .accessibility1) == 44)
+        #expect(PageNavigationBar.wholePageDividerHeight(dynamicTypeSize: .accessibility5) == 44)
+    }
+
     // MARK: - The symbol at large text sizes
 
     // The control's symbol at the default text size ("Large", body 17 pt),

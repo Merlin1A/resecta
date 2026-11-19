@@ -148,7 +148,7 @@ struct PageThumbnailList: View {
                                     if regionCount > 0 {
                                         Text("\(regionCount) region\(regionCount == 1 ? "" : "s")")
                                             .font(.caption)
-                                            .foregroundStyle(.orange)
+                                            .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                                     }
                                 }
                             }

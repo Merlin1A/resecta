@@ -141,6 +141,66 @@ nonisolated final class EditorChromeUITests: XCTestCase {
         XCTAssertEqual(disc.height, 44, accuracy: 1, "The default size's disc must stay 44 pt tall.")
     }
 
+    // MARK: - The bar's order
+
+    /// The bar's four pieces, left to right: the whole-page control,
+    /// Previous, the counter, Next. Each ends before the next begins, and
+    /// the control is one stack gap (16 pt) from Previous: the hairline
+    /// between them adds no width.
+    private func checkTheBarLeadsWithTheControl(_ control: XCUIElement) -> [XCUIElement] {
+        let previous = app.buttons["pageNavPrevious"]
+        let counter = element("pageNavCounter")
+        let next = app.buttons["pageNavNext"]
+        XCTAssertTrue(previous.waitForExistence(timeout: 10))
+        XCTAssertTrue(counter.waitForExistence(timeout: 10))
+        XCTAssertTrue(next.waitForExistence(timeout: 10))
+        let pieces = [control, previous, counter, next]
+        let names = ["the whole-page control", "Previous", "the counter", "Next"]
+        for i in 0..<(pieces.count - 1) {
+            XCTAssertLessThanOrEqual(pieces[i].frame.maxX, pieces[i + 1].frame.minX + 0.5,
+                                     "\(names[i]) must end before \(names[i + 1]) begins: \(pieces[i].frame) then \(pieces[i + 1].frame).")
+        }
+        XCTAssertEqual(previous.frame.minX - control.frame.maxX, 16, accuracy: 0.5,
+                       "The control must sit one stack gap from Previous: \(control.frame) then \(previous.frame).")
+        return pieces
+    }
+
+    func testPageBar_wholePageControlLeadsTheBar() {
+        let control = launchWholePageControl(atTextSize: nil)
+        _ = checkTheBarLeadsWithTheControl(control)
+        let bar = element("pageNav")
+        XCTAssertTrue(bar.exists)
+        print("page bar width at the default size: \(bar.frame.width) pt")
+        attachScreenshot(named: "chrome-page-bar-default-control-first")
+    }
+
+    func testPageBarCount_isNotOrangeOnAPageWithABox() throws {
+        let control = launchWholePageControl(atTextSize: nil)
+        let counter = element("pageNavCounter")
+        XCTAssertTrue(counter.waitForExistence(timeout: 10))
+        control.tap()
+        XCTAssertTrue(waitForLabel(counter, "Page 1 of 23, 1 region"),
+                      "Mark Whole Page must add one region; the counter read '\(counter.label)'.")
+        let probe = try screenshotProbe()
+        attachScreenshot(named: "chrome-page-bar-count-with-a-box")
+        XCTAssertNil(probe.tintBounds(.red, in: counter.frame),
+                     "The count on a page with a box must be the support grey, not orange.")
+    }
+
+    func testPageBar_atTheLargestTextSize_controlLeadsAndNothingIsCut() {
+        let control = launchWholePageControl(atTextSize: Self.largestTextSize)
+        let pieces = checkTheBarLeadsWithTheControl(control)
+        let window = app.windows.firstMatch.frame
+        let bar = element("pageNav")
+        XCTAssertTrue(bar.exists)
+        for piece in pieces + [bar] {
+            XCTAssertTrue(window.contains(piece.frame),
+                          "Every piece of the bar must lie inside the window \(window) at the largest text size: \(piece.frame).")
+        }
+        print("page bar width at the largest text size: \(bar.frame.width) pt")
+        attachScreenshot(named: "chrome-page-bar-largest-control-first")
+    }
+
     // MARK: - The one-page bar
 
     func testOnePageDocument_showsTheCountWithoutArrowsOrControl() {
