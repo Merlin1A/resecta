@@ -1,6 +1,6 @@
 Property: A match found with no box is listed, never dropped: site 8, a match across a page break whose part has no box
 Area: Search, a hit with no box
-Test command: swift test --filter '^RedactionEngineTests\.NoBoxHitTests/' (in Packages/RedactionEngine, DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer)
+Test command: swift test --no-parallel --filter '^RedactionEngineTests\.NoBoxHitTests/' (in Packages/RedactionEngine, DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer)
 Must go red: RedactionEngineTests/NoBoxHitTests pageSeam
 Apply in a scratch worktree with `git apply`; discard after.
 
