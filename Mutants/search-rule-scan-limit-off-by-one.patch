@@ -5,7 +5,7 @@ Must go red: RedactionEngineTests/SearchRuleCaseTests searchLimit
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift
-index b9efa8b6..a5bcf052 100644
+index 58d5d769..c93c09d2 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift
 @@ -68,7 +68,7 @@ extension DocumentSearcher {
