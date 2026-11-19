@@ -1,0 +1,86 @@
+Property: A known-issue block excuses only the issue it names; any other issue inside it fails the test. Here a planted failure inside each engine block that runs on the Mac host.
+Area: Tests, the known-issue blocks
+Test command: cd Packages/RedactionEngine && DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --no-parallel --filter '^RedactionEngineTests\.(AddressComponentsRecallTests|HiddenGlyphStripTests|PacketSearchableProbeTests|InkFitBusyPoolTests|PageImageInkFitTests)/'
+Must go red: RedactionEngineTests/AddressComponentsRecallTests aggregateAddressRecall; RedactionEngineTests/AddressComponentsRecallTests perStratumAddressRecall; RedactionEngineTests/HiddenGlyphStripTests stalledFitMarksResultsDegraded; RedactionEngineTests/PacketSearchableProbeTests g3Preflight; RedactionEngineTests/InkFitBusyPoolTests timedOutReadIsReadAgainNextSearch; RedactionEngineTests/PageImageInkFitTests shadedTextPaintHoldsItsGlyphs; RedactionEngineTests/PageImageInkFitTests paintHeightIsTheInkRows
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Tests/RedactionEngineTests/GazetteerTests/AddressComponentsRecallTests.swift b/Packages/RedactionEngine/Tests/RedactionEngineTests/GazetteerTests/AddressComponentsRecallTests.swift
+index 8c4b564c..86b2ec96 100644
+--- a/Packages/RedactionEngine/Tests/RedactionEngineTests/GazetteerTests/AddressComponentsRecallTests.swift
++++ b/Packages/RedactionEngine/Tests/RedactionEngineTests/GazetteerTests/AddressComponentsRecallTests.swift
+@@ -105,6 +105,7 @@ struct AddressComponentsRecallTests {
+         // measurement live and flips red when the cross-filter lands;
+         // remove the pin then.
+         withKnownIssue("city-recall below floor until the GNIS/TIGER cross-filter lands") {
++            #expect(Bool(false), "a planted issue that no known issue names")
+             #expect(
+                 stats.recall >= Self.aggregateRecallFloor,
+                 "aggregate city-recall \(stats.recall) below pre-cutover floor \(Self.aggregateRecallFloor); rebuilt address_components.json may have dropped a load-bearing city entry"
+@@ -143,6 +144,7 @@ struct AddressComponentsRecallTests {
+             // stratum vs the 0.95 floor — the same GNIS/TIGER gap as the
+             // aggregate pin above.
+             withKnownIssue("city-recall below floor until the GNIS/TIGER cross-filter lands") {
++                #expect(Bool(false), "a planted issue that no known issue names")
+                 #expect(
+                     stats.recall >= floor,
+                     "\(doctype) city-recall \(stats.recall) below pre-cutover floor \(floor); rebuilt address_components.json may have dropped a city entry concentrated in this stratum"
+diff --git a/Packages/RedactionEngine/Tests/RedactionEngineTests/IntegrationTests/HiddenGlyphStripTests.swift b/Packages/RedactionEngine/Tests/RedactionEngineTests/IntegrationTests/HiddenGlyphStripTests.swift
+index bf830225..fd959fab 100644
+--- a/Packages/RedactionEngine/Tests/RedactionEngineTests/IntegrationTests/HiddenGlyphStripTests.swift
++++ b/Packages/RedactionEngine/Tests/RedactionEngineTests/IntegrationTests/HiddenGlyphStripTests.swift
+@@ -275,6 +275,7 @@ struct HiddenGlyphStripTests {
+         // no stall at all (PageImageInkFitTests.expectsEveryFitNotDegraded).
+         if PageImageInkFitTests.expectsEveryFitNotDegraded {
+             withKnownIssue("On the Mac host a box can still be degraded when the wait ends: macOS's Vision reads the page, and how long it takes varies", isIntermittent: true) {
++                #expect(Bool(false), "a planted issue that no known issue names")
+                 #expect(fitted.allSatisfy { !$0.inkFitDegraded }, "a degraded box was served from a cache")
+             } when: { HostRun.isMac } matching: { issue in
+                 issue.comments.contains { $0.rawValue == "a degraded box was served from a cache" }
+diff --git a/Packages/RedactionEngine/Tests/RedactionEngineTests/SandwichTests/PacketSearchableProbeTests.swift b/Packages/RedactionEngine/Tests/RedactionEngineTests/SandwichTests/PacketSearchableProbeTests.swift
+index 3749bed4..5e36b8f7 100644
+--- a/Packages/RedactionEngine/Tests/RedactionEngineTests/SandwichTests/PacketSearchableProbeTests.swift
++++ b/Packages/RedactionEngine/Tests/RedactionEngineTests/SandwichTests/PacketSearchableProbeTests.swift
+@@ -171,6 +171,7 @@ struct PacketSearchableProbeTests {
+                 "Non-uniform glyph advance on the dense packet page 1 -- engine-improvement item, out of scope here. Production routes this packet to secure rasterization (no Layer 5).",
+                 isIntermittent: true
+             ) {
++                #expect(Bool(false), "a planted issue that no known issue names")
+                 #expect(run.layers[5]?.status.isFail == false, "Layer 5 fails on the dense packet page 1")
+             } matching: { issue in
+                 issue.comments.contains { $0.rawValue == "Layer 5 fails on the dense packet page 1" }
+diff --git a/Packages/RedactionEngine/Tests/RedactionEngineTests/SearchTests/InkFitBusyPoolTests.swift b/Packages/RedactionEngine/Tests/RedactionEngineTests/SearchTests/InkFitBusyPoolTests.swift
+index b7974520..1a9ed983 100644
+--- a/Packages/RedactionEngine/Tests/RedactionEngineTests/SearchTests/InkFitBusyPoolTests.swift
++++ b/Packages/RedactionEngine/Tests/RedactionEngineTests/SearchTests/InkFitBusyPoolTests.swift
+@@ -189,6 +189,7 @@ struct InkFitBusyPoolTests {
+         // no stall at all (PageImageInkFitTests.expectsEveryFitNotDegraded).
+         if PageImageInkFitTests.expectsEveryFitNotDegraded {
+             withKnownIssue("On the Mac host a later search's read can still be degraded: macOS's Vision reads the page, and how long it takes varies", isIntermittent: true) {
++                #expect(Bool(false), "a planted issue that no known issue names")
+                 #expect(later.allSatisfy { !$0.inkFitDegraded }, "a later search fits the page: \(later.map(\.inkFitDegraded))")
+             } when: { HostRun.isMac } matching: { issue in
+                 issue.comments.contains { $0.rawValue.hasPrefix("a later search fits the page: ") }
+diff --git a/Packages/RedactionEngine/Tests/RedactionEngineTests/SearchTests/PageImageInkFitShadeTests.swift b/Packages/RedactionEngine/Tests/RedactionEngineTests/SearchTests/PageImageInkFitShadeTests.swift
+index fa15f23b..1a4bc2a8 100644
+--- a/Packages/RedactionEngine/Tests/RedactionEngineTests/SearchTests/PageImageInkFitShadeTests.swift
++++ b/Packages/RedactionEngine/Tests/RedactionEngineTests/SearchTests/PageImageInkFitShadeTests.swift
+@@ -111,6 +111,7 @@ extension PageImageInkFitTests {
+             #expect(outside == 0, "\(word): \(outside) of its \(inked) ink pixels lie outside the painted box \(painted)")
+         } else {
+             withKnownIssue("On the Mac host macOS's Vision reads this shaded word's ink otherwise than iOS's, and its box does not hold every glyph") {
++                #expect(Bool(false), "a planted issue that no known issue names")
+                 #expect(painted.contains { $0.contains(held) },
+                         "\(word): the painted box \(painted) does not hold its glyphs \(held) (degraded \(fit.degraded))")
+             } when: { HostRun.isMac && word == "summary" } matching: { issue in
+diff --git a/Packages/RedactionEngine/Tests/RedactionEngineTests/SearchTests/PageImageInkFitTests.swift b/Packages/RedactionEngine/Tests/RedactionEngineTests/SearchTests/PageImageInkFitTests.swift
+index af514c37..1e94989e 100644
+--- a/Packages/RedactionEngine/Tests/RedactionEngineTests/SearchTests/PageImageInkFitTests.swift
++++ b/Packages/RedactionEngine/Tests/RedactionEngineTests/SearchTests/PageImageInkFitTests.swift
+@@ -358,6 +358,7 @@ struct PageImageInkFitTests {
+             }
+         }
+         withKnownIssue("On the Mac host macOS's Vision reads these words' ink rows otherwise than iOS's, and some paints reach more than 1 pt past them") {
++            #expect(Bool(false), "a planted issue that no known issue names")
+             #expect(tallerThanInk.isEmpty, "every fitted paint is as tall as its word's ink: \(tallerThanInk)")
+         } when: { HostRun.isMac && runningHeadFitted } matching: { issue in
+             issue.comments.contains { $0.rawValue.hasPrefix("every fitted paint is as tall as its word's ink: ") }

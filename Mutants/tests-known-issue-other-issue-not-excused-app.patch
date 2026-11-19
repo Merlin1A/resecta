@@ -1,0 +1,59 @@
+Property: A known-issue block excuses only the issue it names; any other issue inside it fails the test. Here the app's footprint and timing blocks, each reached by forcing its guard.
+Area: Tests, the known-issue blocks
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/ApplyPhaseMemoryStressTests -only-testing:ResectaAppTests/PageParallelRasterizationTimingTests
+Must go red: ResectaAppTests/ApplyPhaseMemoryStressTests testApplyPhaseFootprintBoundedStreaming; ResectaAppTests/ApplyPhaseMemoryStressTests testEndToEndApplyPhasePeakFootprint; ResectaAppTests/PageParallelRasterizationTimingTests testParallelBeatSerialByMeasurableMargin
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Tests/ResectaAppTests/PerformanceTests/ApplyPhaseMemoryStressTests.swift b/Tests/ResectaAppTests/PerformanceTests/ApplyPhaseMemoryStressTests.swift
+index 91e003fd..ba03dee4 100644
+--- a/Tests/ResectaAppTests/PerformanceTests/ApplyPhaseMemoryStressTests.swift
++++ b/Tests/ResectaAppTests/PerformanceTests/ApplyPhaseMemoryStressTests.swift
+@@ -140,13 +140,14 @@ struct ApplyPhaseMemoryStressTests {
+         }
+         await reconstructor.recon.finalize()
+ 
+-        guard baseline > 0, peakDelta > 0 else {
++        guard ProcessInfo.processInfo.processIdentifier < 0, baseline > 0, peakDelta > 0 else {
+             // phys_footprint unavailable on this host → cannot measure. Surface
+             // the skip; test 1 is the deterministic gate. (Idiom: never
+             // a silent zero-assertion pass.)
+             withKnownIssue(
+                 "phys_footprint unavailable on this host; streaming footprint not asserted (test 1 is the gate)"
+             ) {
++                #expect(Bool(false), "a planted issue that no known issue names")
+                 Issue.record("baseline=\(baseline) peakDelta=\(peakDelta): footprint read failed")
+             } matching: { issue in
+                 issue.comments.contains { $0.rawValue.hasPrefix("baseline=") && $0.rawValue.hasSuffix(": footprint read failed") }
+@@ -212,10 +213,11 @@ struct ApplyPhaseMemoryStressTests {
+         sampler.cancel()
+ 
+         let peak = peakBox.peak
+-        guard baseline > 0, peak > 0 else {
++        guard ProcessInfo.processInfo.processIdentifier < 0, baseline > 0, peak > 0 else {
+             withKnownIssue(
+                 "phys_footprint unavailable on this host; peak not asserted (test 1 is the gate)"
+             ) {
++                #expect(Bool(false), "a planted issue that no known issue names")
+                 Issue.record("baseline=\(baseline) peak=\(peak): footprint read failed")
+             } matching: { issue in
+                 issue.comments.contains { $0.rawValue.hasPrefix("baseline=") && $0.rawValue.hasSuffix(": footprint read failed") }
+diff --git a/Tests/ResectaAppTests/PerformanceTests/PageParallelRasterizationTests.swift b/Tests/ResectaAppTests/PerformanceTests/PageParallelRasterizationTests.swift
+index b59fb7ca..f6b1c01e 100644
+--- a/Tests/ResectaAppTests/PerformanceTests/PageParallelRasterizationTests.swift
++++ b/Tests/ResectaAppTests/PerformanceTests/PageParallelRasterizationTests.swift
+@@ -452,13 +452,14 @@ struct PageParallelRasterizationTimingTests {
+         // regression (which would land at or above 1.0); the stress-baseline
+         // corpus is the venue for tighter speedup bars on larger fixtures.
+         let ratio = parSeconds / max(seqSeconds, 0.0001)
+-        if seqSeconds < 0.05 {
++        if seqSeconds < 0.05 || ProcessInfo.processInfo.processIdentifier > 0 {
+             // Previously a bare return — the skip was invisible
+             // and the test passed with zero assertions. Surface it as a
+             // known issue so result bundles show WHY no ratio was asserted.
+             withKnownIssue(
+                 "Sequential run completed in \(seqSeconds)s — too fast to measure speedup on this host; ratio noise dominates below 50 ms"
+             ) {
++                #expect(Bool(false), "a planted issue that no known issue names")
+                 Issue.record("near-zero sequential baseline; speedup ratio not asserted")
+             } matching: { issue in
+                 issue.comments.contains { $0.rawValue == "near-zero sequential baseline; speedup ratio not asserted" }
