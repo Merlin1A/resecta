@@ -5,10 +5,10 @@ Must go red: RedactionEngineTests/PageSeamPhraseTests phraseAcrossThePageBreak
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PageSeam.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PageSeam.swift
-index fcf40e7..2337f94 100644
+index fc1ec500..7bf29bb0 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PageSeam.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PageSeam.swift
-@@ -122,7 +122,6 @@ extension DocumentSearcher {
+@@ -138,7 +138,6 @@ extension DocumentSearcher {
          let firstLines = Array(b.head.prefix(4)), lastLines = Array(a.tail.suffix(4))
          guard !firstLines.isEmpty, !lastLines.isEmpty else { return nil }
          var first = 0
