@@ -299,7 +299,8 @@ private extension CanvasGeometryUITests {
     /// The overflow menu's delete row's label, or nil when it offers none.
     nonisolated func deleteRow() -> String? {
         openOverflow()
-        let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Delete'")).firstMatch
+        let row = app.buttons.matching(NSPredicate(
+            format: "label BEGINSWITH 'Delete' AND identifier != 'selectionBarDelete'")).firstMatch
         let label = row.waitForExistence(timeout: 2) ? row.label : nil
         dismissMenus()
         return label

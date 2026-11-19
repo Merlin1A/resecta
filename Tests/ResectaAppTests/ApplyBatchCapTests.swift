@@ -9,13 +9,14 @@ import RedactionEngine
 // large documents an indiscriminate marquee could land thousands of
 // regions in one gesture. The cap is a defense against an accidental
 // select-all — when input > 500, `applyBatch` truncates to the first
-// 500 (by stored order) and posts a `.warning` toast surfacing the
-// truncation. `.warning` (not `.error`) because overflow is an expected
-// outcome on large documents, not a fault state.
+// 500 (by stored order) and says so once: while Add to Selection is on
+// (its capsule holds the slot) by the `.warning` toast, as at 1.3.1; with
+// the selection bar showing, by the cut it records (`lassoCut`), which the
+// bar shows as its second line.
 //
 // These tests pin two contracts:
-// 1. `applyBatch` truncates input > 500 to exactly 500 and surfaces the
-//    overflow toast at `.warning` severity.
+// 1. `applyBatch` truncates input > 500 to exactly 500 and says so once,
+//    by the warning or by the bar's line, never both.
 // 2. The kept set is the *first 500* by input order — preserving the
 //    caller's stable ordering so future callers (sort-by-coverage,
 //    sort-by-detection-confidence) can drive truncation deterministically.
@@ -49,12 +50,13 @@ struct ApplyBatchCapTests {
         return made
     }
 
-    // MARK: - Cap arithmetic + toast surfacing
+    // MARK: - Cap arithmetic, and the cut said once
 
-    @Test("applyBatch truncates 600 regions to exactly 500 and posts the warning toast")
-    func testApplyBatchTruncatesAt500() {
+    @Test("With Add to Selection on, a cut to 500 queues the warning and records no line")
+    func testApplyBatchTruncatesAt500() throws {
         let state = RedactionState()
         let toastManager = ToastQueueManager()
+        let cutAt = Date(timeIntervalSinceReferenceDate: 1_000)
         let regions = fabricateRegions(count: 600)
         // Stash the regions in the state so they're real "resident"
         // regions (the cap arithmetic doesn't actually inspect this,
@@ -64,60 +66,71 @@ struct ApplyBatchCapTests {
         // Pre-condition: cap is the documented constant.
         #expect(RedactionState.lassoSelectionCap == 500)
 
-        let outcome = state.applyBatch(
-            regions,
-            toastManager: toastManager
-        )
+        let outcome = state.applyBatch(regions, now: cutAt, barShowing: false, toastManager: toastManager)
 
         // Exactly 500 selected — the first 500 by stored input order.
         #expect(outcome.selected == 500)
         #expect(outcome.truncated == true)
         #expect(state.selectedRegionIDs.count == 500)
 
-        // Toast posted at .warning severity, with the documented copy.
-        // The toast surfaces through `activeToasts` because no other
-        // toast occupies the top position at test start.
+        // The warning, once, at .warning severity with the shipped words.
         #expect(toastManager.activeToasts.count == 1)
-        let toast = toastManager.activeToasts[0]
+        let toast = try #require(toastManager.activeToasts.first)
         #expect(toast.severity == .warning)
-        #expect(toast.message == "Selection limited to 500 regions")
-        // Pin the message via the public constant too so a rename of
-        // the constant fails this test by message-mismatch rather than
-        // by a silent semantic drift.
         #expect(toast.message == RedactionState.lassoSelectionCapToastMessage)
+        // No line for the bar as well: one notice.
+        #expect(state.lassoCut == nil)
+
+        // The words, pinned, so a rename of the constant fails this test by
+        // a mismatch rather than by a silent drift.
+        #expect(RedactionState.lassoSelectionCapToastMessage == "Selection limited to 500 regions")
     }
 
-    @Test("applyBatch under the cap selects everything and does not post a toast")
-    func testApplyBatchUnderCapNoToast() {
-        // Boundary check: 500 input regions land in the selection
-        // verbatim with no truncation and no toast. The cap is
-        // inclusive on the 500th region.
+    @Test("With the selection bar showing, a cut to 500 records the bar's line and queues no warning")
+    func testApplyBatchWithTheBarShowing() {
         let state = RedactionState()
         let toastManager = ToastQueueManager()
-        let regions = fabricateRegions(count: 500)
+        let cutAt = Date(timeIntervalSinceReferenceDate: 2_000)
+        let regions = fabricateRegions(count: 600)
         state.regions[0] = regions
 
-        let outcome = state.applyBatch(
-            regions, toastManager: toastManager
-        )
+        let outcome = state.applyBatch(regions, now: cutAt, barShowing: true, toastManager: toastManager)
+
+        #expect(outcome.selected == 500 && outcome.truncated)
+        // The cut is recorded with its time and the selection it left.
+        #expect(state.lassoCut == LassoCut(at: cutAt, selection: state.selectedRegionIDs))
+        // No warning as well: one notice.
+        #expect(toastManager.activeToasts.isEmpty)
+    }
+
+    @Test("applyBatch under the cap selects everything and records no cut")
+    func testApplyBatchUnderCapNoToast() {
+        // Boundary check: 500 input regions land in the selection
+        // verbatim with no truncation and no cut recorded. The cap is
+        // inclusive on the 500th region. A batch that is not cut also
+        // clears an earlier cut.
+        let state = RedactionState()
+        let regions = fabricateRegions(count: 500)
+        state.regions[0] = regions
+        state.lassoCut = LassoCut(at: .now, selection: [UUID()])
+
+        let outcome = state.applyBatch(regions)
 
         #expect(outcome.selected == 500)
         #expect(outcome.truncated == false)
         #expect(state.selectedRegionIDs.count == 500)
-        #expect(toastManager.activeToasts.isEmpty)
+        #expect(state.lassoCut == nil)
     }
 
-    @Test("applyBatch with a nil toast manager still truncates")
+    @Test("applyBatch truncates with no view attached")
     func testApplyBatchTruncatesEvenWithoutToastSurface() {
-        // Defense-in-depth: the cap arithmetic does not depend on the
-        // toast manager being present. Tests that exercise the state
-        // without wiring the view-layer service still see truncation.
+        // Defense-in-depth: the cap arithmetic does not depend on any
+        // view-layer service. Tests that exercise the state alone still
+        // see truncation.
         let state = RedactionState()
         let regions = fabricateRegions(count: 750)
 
-        let outcome = state.applyBatch(
-            regions, toastManager: nil
-        )
+        let outcome = state.applyBatch(regions)
 
         #expect(outcome.selected == 500)
         #expect(outcome.truncated == true)
@@ -136,7 +149,7 @@ struct ApplyBatchCapTests {
         let regions = fabricateRegions(count: 600)
         state.regions[0] = regions
 
-        state.applyBatch(regions, toastManager: nil)
+        state.applyBatch(regions)
 
         let expectedIDs = Set(regions.prefix(500).map(\.id))
         #expect(state.selectedRegionIDs == expectedIDs)
@@ -156,9 +169,7 @@ struct ApplyBatchCapTests {
         let state = RedactionState()
         let regions = fabricateRegions(count: 500)
 
-        let outcome = state.applyBatch(
-            regions, toastManager: nil
-        )
+        let outcome = state.applyBatch(regions)
 
         #expect(outcome.selected == 500)
         #expect(outcome.truncated == false)

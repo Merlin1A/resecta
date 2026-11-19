@@ -14,10 +14,9 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
 
     weak var pdfView: PDFView?
     var redactionState: RedactionState?
-    /// Toast surface for the lasso-marquee 500-region cap warning.
-    /// Optional so the coordinator stays usable in tests that don't wire
-    /// the toast manager; the overlay marquee path no-ops the toast when
-    /// nil (the cap still truncates).
+    /// Toast surface for the too-small-draw notice, the selection delete's
+    /// notice and the lasso's 500-region warning. Optional so the
+    /// coordinator stays usable in tests that don't wire the toast manager.
     var toastManager: ToastQueueManager?
     var isDrawingEnabled: Bool = true
     var isDrawingMode: Bool = false
@@ -299,7 +298,9 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
             let currentIDs = Set(current.map(\.id))
             batch = current + regions.filter { !currentIDs.contains($0.id) }
         }
-        state.applyBatch(batch, toastManager: toastManager)
+        // With Add to Selection on, its capsule holds the slot, not the
+        // selection bar: the cut is said by the warning.
+        state.applyBatch(batch, barShowing: !isMultiSelectActive, toastManager: toastManager)
         refreshAllOverlays()
     }
 
