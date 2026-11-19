@@ -383,12 +383,22 @@ nonisolated struct VerificationRowModel: Equatable {
         }
     }
 
-    /// The expanded block's lead lines, by outcome. A word check's
+    /// The expanded block's lead lines, by outcome, then the line that says
+    /// where the check stopped when it stopped at an issue before it had read
+    /// everything.
+    static func lead(for layer: LayerResult, outcome: VerificationOutcome,
+                     perPageModes: [PipelineMode]) -> [String] {
+        let lines = outcomeLead(for: layer, outcome: outcome, perPageModes: perPageModes)
+        guard let stop = stopLine(layer.stopped, pageCount: perPageModes.count) else { return lines }
+        return lines + [stop]
+    }
+
+    /// The lead lines by outcome alone. A word check's
     /// needs-review result opens with the search remedy, except when only
     /// part of a word is readable beside its box: then the remedy is the
     /// box, which the caption already gives, so no search line is added.
-    static func lead(for layer: LayerResult, outcome: VerificationOutcome,
-                     perPageModes: [PipelineMode]) -> [String] {
+    private static func outcomeLead(for layer: LayerResult, outcome: VerificationOutcome,
+                                    perPageModes: [PipelineMode]) -> [String] {
         switch outcome {
         case .couldNotVerify where layer.status.isSkipped:
             return [skippedLead]
@@ -532,6 +542,28 @@ nonisolated struct VerificationRowModel: Equatable {
     static func contentStreamStopLine(pages: [Int]?, pageCount: Int) -> String? {
         guard let first = pages?.min(), pageCount > first + 1 else { return nil }
         return "Scanning stopped at page \(first + 1). Later pages were not searched."
+    }
+
+    /// The line for where a check stopped at an issue, from the engine's
+    /// value alone. The EXIF line names the page the search stopped at and
+    /// is nil when it is the last page or the page count is unknown, as the
+    /// content stream line is.
+    static func stopLine(_ stop: CheckStop?, pageCount: Int) -> String? {
+        switch stop {
+        case nil:
+            return nil
+        case .imageEXIFNotSearched:
+            return "Image EXIF was not searched after this match."
+        case .exifSearchStopped(let page):
+            guard pageCount > page + 1 else { return nil }
+            return "The EXIF search stopped at page \(page + 1). EXIF in images on later pages was not searched."
+        case .bookmarksAndFormFieldsNotRead:
+            return "Bookmarks and form fields were not read after this find."  // LegalPhrases:safe (approved row words)
+        case .formFieldsNotRead:
+            return "Form fields were not read after this find."  // LegalPhrases:safe (approved row words)
+        case .stoppedAtThisFind:
+            return "Checking stopped at this find. Not everything this check looks for was checked."  // LegalPhrases:safe (approved row words)
+        }
     }
 
     // MARK: - The sweep

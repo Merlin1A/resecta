@@ -1,0 +1,19 @@
+Property: An EXIF match's row says the EXIF search stopped at its page, never that image EXIF was not searched.
+Area: where a check stopped (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --package-path Packages/RedactionEngine --filter CheckStopTests
+Must go red: RedactionEngineTests/CheckStopTests row [S-4], [S-5]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Layer3.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Layer3.swift
+index 7ca3539c..eeeb2051 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Layer3.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Layer3.swift
+@@ -277,7 +277,7 @@ extension VerificationEngine {
+                 }) {
+                     deferredWarn = (message: "Sensitive term found in embedded JPEG EXIF metadata on page \(pageIdx)",
+                                     pages: [pageIdx - 1])
+-                    stop = .exifSearchStopped(page: pageIdx - 1)
++                    stop = .imageEXIFNotSearched
+                     break
+                 }
+             }

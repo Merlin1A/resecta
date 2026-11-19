@@ -1,0 +1,19 @@
+Property: The fragment warning, which skips the EXIF pass, says image EXIF was not searched.
+Area: where a check stopped (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --package-path Packages/RedactionEngine --filter CheckStopTests
+Must go red: RedactionEngineTests/CheckStopTests row [S-3]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Layer3.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Layer3.swift
+index 7ca3539c..f085caad 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Layer3.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Layer3.swift
+@@ -264,7 +264,7 @@ extension VerificationEngine {
+         // document with no pages has no page to report.
+         // Where the check stopped: before the EXIF pass when the fragment
+         // warning is held, or at the page of the first EXIF match.
+-        var stop: CheckStop? = deferredWarn == nil ? nil : .imageEXIFNotSearched
++        var stop: CheckStop? = nil
+         if deferredWarn == nil, cgDoc.numberOfPages >= 1 {
+             for pageIdx in 1...cgDoc.numberOfPages {
+                 try Task.checkCancellation()

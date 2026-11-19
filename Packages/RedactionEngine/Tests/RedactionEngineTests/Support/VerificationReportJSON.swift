@@ -22,6 +22,11 @@ import Foundation
 //   `LayerResult.couldNotVerifyPart` and `.couldNotVerifyPartPages`: emitted
 //   only on a row that has them (a nil optional is left out), so every
 //   earlier evidence file reads the same; schema_version stays 1.
+//   `stopped` mirrors `LayerResult.stopped`, where a check stopped at an issue
+//   before it had read everything: "image_exif_not_searched",
+//   "exif_search_stopped:<0-based page>", "bookmarks_and_form_fields_not_read",
+//   "form_fields_not_read" or "stopped_at_this_find"; left out when nil, so
+//   every earlier evidence file reads the same; schema_version stays 1.
 //    per_page_modes:["secureRasterization"|"searchableRedaction"],
 //    per_page_fallback_reasons:[String?],   // FallbackReason case names
 //    skip_reason:"autoVerifyOff"|"cancelled"|"error",
@@ -76,6 +81,7 @@ private struct LayerJSON: Encodable {
     let could_not_verify: Bool
     let could_not_verify_part: String?
     let could_not_verify_part_pages: [Int]?
+    let stopped: String?
 
     init(_ layer: LayerResult, index: Int) {
         self.index = index
@@ -90,6 +96,17 @@ private struct LayerJSON: Encodable {
         self.could_not_verify = layer.couldNotVerify
         self.could_not_verify_part = layer.couldNotVerifyPart
         self.could_not_verify_part_pages = layer.couldNotVerifyPartPages
+        self.stopped = layer.stopped.map(Self.stoppedName)
+    }
+
+    static func stoppedName(_ stop: CheckStop) -> String {
+        switch stop {
+        case .imageEXIFNotSearched: return "image_exif_not_searched"
+        case .exifSearchStopped(let page): return "exif_search_stopped:\(page)"
+        case .bookmarksAndFormFieldsNotRead: return "bookmarks_and_form_fields_not_read"
+        case .formFieldsNotRead: return "form_fields_not_read"
+        case .stoppedAtThisFind: return "stopped_at_this_find"
+        }
     }
 }
 
