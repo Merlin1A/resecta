@@ -1,0 +1,19 @@
+Property: The second bitmap is filled black, so a see-through mark leaves its text readable and is not taken for a cover.
+Area: the covered-pages read, its drawing test (ConcealingAnnotations.CoverSamples)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/CoverSamplesPixelTests -only-testing:ResectaAppTests/CoveredPagesDecisionsTests
+Must go red: ResectaAppTests/CoverSamplesPixelTests fractionsEqualTheReference; ResectaAppTests/CoveredPagesDecisionsTests seeThroughHighlightsNameNothing; ResectaAppTests/CoveredPagesDecisionsTests onePageCovers
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/ConcealingAnnotations.swift b/Sources/ResectaApp/Views/ConcealingAnnotations.swift
+index ae10121..cecb908 100644
+--- a/Sources/ResectaApp/Views/ConcealingAnnotations.swift
++++ b/Sources/ResectaApp/Views/ConcealingAnnotations.swift
+@@ -157,7 +157,7 @@ enum ConcealingAnnotations {
+         func hiddenFraction(of annotation: PDFAnnotation, over rect: CGRect) -> Double {
+             guard rect.width > 0, rect.height > 0,
+                   let white = draw(annotation, in: rect, into: overWhite, over: 1),
+-                  let black = draw(annotation, in: rect, into: overBlack, over: 0) else { return 0 }
++                  let black = draw(annotation, in: rect, into: overBlack, over: 1) else { return 0 }
+             let count = Self.width * Self.height
+             var hidden = 0
+             for pixel in 0..<count {

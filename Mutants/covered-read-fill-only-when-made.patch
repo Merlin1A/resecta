@@ -1,0 +1,30 @@
+Property: Every drawing of the read's drawing test starts from its grey filled over the whole bitmap, not only the first drawing of an annotation.
+Area: the covered-pages read, its drawing test (ConcealingAnnotations.CoverSamples)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/CoverSamplesPixelTests -only-testing:ResectaAppTests/CoveredPagesDecisionsTests
+Must go red: ResectaAppTests/CoverSamplesPixelTests fractionsEqualTheReference
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/ConcealingAnnotations.swift b/Sources/ResectaApp/Views/ConcealingAnnotations.swift
+index ae10121..8e5a031 100644
+--- a/Sources/ResectaApp/Views/ConcealingAnnotations.swift
++++ b/Sources/ResectaApp/Views/ConcealingAnnotations.swift
+@@ -138,6 +138,10 @@ enum ConcealingAnnotations {
+ 
+         init?() {
+             guard let white = Self.bitmap(), let black = Self.bitmap() else { return nil }
++            white.setFillColor(gray: 1, alpha: 1)
++            white.fill(CGRect(x: 0, y: 0, width: Self.width, height: Self.height))
++            black.setFillColor(gray: 0, alpha: 1)
++            black.fill(CGRect(x: 0, y: 0, width: Self.width, height: Self.height))
+             overWhite = white
+             overBlack = black
+         }
+@@ -178,8 +182,6 @@ enum ConcealingAnnotations {
+         ) -> UnsafePointer<UInt8>? {
+             context.saveGState()
+             defer { context.restoreGState() }
+-            context.setFillColor(gray: gray, alpha: 1)
+-            context.fill(CGRect(x: 0, y: 0, width: Self.width, height: Self.height))
+             context.scaleBy(x: CGFloat(Self.width) / bounds.width, y: CGFloat(Self.height) / bounds.height)
+             context.translateBy(x: -bounds.minX, y: -bounds.minY)
+             annotation.draw(with: .mediaBox, in: context)
