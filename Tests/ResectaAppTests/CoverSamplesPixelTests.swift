@@ -50,15 +50,23 @@ struct CoverSamplesPixelTests {
 
     // MARK: - The annotations and the rects drawn
 
-    /// The one annotation of a one-page fixture, with the page.
-    private func annotation(_ data: Data) throws -> PDFAnnotation {
+    /// An annotation with the document it was read from. An annotation does
+    /// not keep its document, and drawing its appearance reads the document's
+    /// data, so the document is held for as long as the annotation is drawn.
+    private struct Held {
+        let annotation: PDFAnnotation
+        let document: PDFDocument
+    }
+
+    /// The one annotation of a one-page fixture, with its document.
+    private func annotation(_ data: Data) throws -> Held {
         let document = try #require(PDFDocument(data: data))
         let page = try #require(document.page(at: 0))
-        return try #require(page.annotations.first)
+        return Held(annotation: try #require(page.annotations.first), document: document)
     }
 
     /// A highlight of `color` over a printed line, read back from data.
-    private func highlight(_ color: UIColor) throws -> PDFAnnotation {
+    private func highlight(_ color: UIColor) throws -> Held {
         let pageRect = CGRect(x: 0, y: 0, width: 612, height: 792)
         let data = UIGraphicsPDFRenderer(bounds: pageRect).pdfData { ctx in
             ctx.beginPage()
@@ -75,7 +83,7 @@ struct CoverSamplesPixelTests {
         page.addAnnotation(mark)
         let written = try #require(built.dataRepresentation())
         let document = try #require(PDFDocument(data: written))
-        return try #require(document.page(at: 0)?.annotations.first)
+        return Held(annotation: try #require(document.page(at: 0)?.annotations.first), document: document)
     }
 
     /// The annotation's whole rect, its four quarters left to right, and a
@@ -89,7 +97,7 @@ struct CoverSamplesPixelTests {
 
     @Test("For every kind of annotation, in turn, each rect's fraction equals the reference's exactly")
     func fractionsEqualTheReference() throws {
-        let kinds: [(String, PDFAnnotation)] = [
+        let kinds: [(String, Held)] = [
             ("black highlight", try highlight(.black)),
             ("see-through highlight", try highlight(UIColor.yellow.withAlphaComponent(0.35))),
             ("field with a black background", try annotation(CoverWidgetsTests.blackBackgroundField)),
@@ -103,21 +111,27 @@ struct CoverSamplesPixelTests {
             ("black highlight, again after the others", try highlight(.black)),
             ("see-through highlight, right after a black one", try highlight(UIColor.yellow.withAlphaComponent(0.35))),
         ]
-        for (name, annotation) in kinds {
-            let rects = Self.rects(for: annotation)
-            let drawn = ConcealingAnnotations.hiddenFractions(of: annotation, over: rects)
-            let reference = rects.map { Self.referenceFraction(of: annotation, over: $0) }
-            #expect(drawn == reference, "\(name): \(drawn) against \(reference)")
+        for (name, held) in kinds {
+            withExtendedLifetime(held.document) {
+                let annotation = held.annotation
+                let rects = Self.rects(for: annotation)
+                let drawn = ConcealingAnnotations.hiddenFractions(of: annotation, over: rects)
+                let reference = rects.map { Self.referenceFraction(of: annotation, over: $0) }
+                #expect(drawn == reference, "\(name): \(drawn) against \(reference)")
+            }
         }
     }
 
     @Test("The comparison is not empty: a black highlight hides its rect, a see-through one does not")
     func theFixturesDraw() throws {
-        let black = try highlight(.black)
-        let seeThrough = try highlight(UIColor.yellow.withAlphaComponent(0.35))
-        #expect(Self.referenceFraction(of: black, over: black.bounds) >= 0.6)
-        #expect(Self.referenceFraction(of: seeThrough, over: seeThrough.bounds) < 0.6)
-        #expect(ConcealingAnnotations.hiddenFractions(of: black, over: []).isEmpty)
-        #expect(ConcealingAnnotations.hiddenFractions(of: black, over: [.zero]) == [0], "an empty rect is zero")
+        let heldBlack = try highlight(.black)
+        let heldSeeThrough = try highlight(UIColor.yellow.withAlphaComponent(0.35))
+        withExtendedLifetime((heldBlack.document, heldSeeThrough.document)) {
+            let black = heldBlack.annotation, seeThrough = heldSeeThrough.annotation
+            #expect(Self.referenceFraction(of: black, over: black.bounds) >= 0.6)
+            #expect(Self.referenceFraction(of: seeThrough, over: seeThrough.bounds) < 0.6)
+            #expect(ConcealingAnnotations.hiddenFractions(of: black, over: []).isEmpty)
+            #expect(ConcealingAnnotations.hiddenFractions(of: black, over: [.zero]) == [0], "an empty rect is zero")
+        }
     }
 }
