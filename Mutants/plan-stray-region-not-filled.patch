@@ -1,0 +1,18 @@
+Property: A region the plan holds no box for is still painted, on its own, as the region path paints it.
+Area: the plan path's stray regions (PageRasterizer.paintPlan)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter PlanPaintTests
+Must go red: RedactionEngineTests/PlanPaintTests regionOutsideThePlan
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
+index bf781ea2..b4d9041c 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
+@@ -207,7 +207,6 @@ extension PageRasterizer {
+         for (_, rect) in rects {
+             try fillInBands(context: ctx, rect: rect, fillColor: page.fillColor)
+         }
+-        try applyRedactionFills(context: ctx, regions: strays, fillColor: page.fillColor, content: content)
+         for rect in strayGrowth {
+             try fillInBands(context: ctx, rect: rect, fillColor: page.fillColor)
+         }

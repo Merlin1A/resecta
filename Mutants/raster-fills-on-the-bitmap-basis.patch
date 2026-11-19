@@ -1,14 +1,14 @@
-Property: A page's fills map each box on the content basis, never by the bitmap's own pixel count, so a box at the far edge of a side the raster rule gains a pixel on covers the row holding its glyph's edge.
-Area: the raster's content basis (fills, readback, ink growth and the hidden-text ink test)
-Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/FillCoverageBasisTests (or on the host: cd Packages/RedactionEngine && swift test --no-parallel --filter FillCoverageBasisTests)
+Property: A page on the region path is filled on its content basis, never by the bitmap's own pixel count.
+Area: the region path's fills (PageRasterizer.paint)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter FillCoverageBasisTests
 Must go red: RedactionEngineTests/FillCoverageBasisTests rasterizedPageFarEdgeCovered [height 302.626 pt at 300 DPI, bar from 301.667]; RedactionEngineTests/FillCoverageBasisTests rasterizedPageFarEdgeCovered [width 302.626 pt at 300 DPI, bar from 301.667]
 Apply in a scratch worktree with `git apply`; discard after.
 
-diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift
-index 93fc474c..0a488729 100644
---- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift
-+++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift
-@@ -456,7 +456,7 @@ public final class PageRasterizer: @unchecked Sendable {
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
+index bf781ea2..5cf4324b 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
+@@ -128,7 +128,7 @@ extension PageRasterizer {
          // 5. Apply fills on the content basis.
          // 256-row band cancellation checks happen inside.
          try applyRedactionFills(

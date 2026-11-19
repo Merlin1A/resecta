@@ -1,0 +1,33 @@
+Property: The run hands its confirmed record to the page builder, so every page carries the record's boxes and the producer paints them; the record has no default.
+Area: the run entry (PipelineRunner.captureRunEntry, PipelineCoordinator.buildPDFPageData)
+Test command: xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/RunEntryWindowTests
+Must go red: ResectaAppTests/RunEntryWindowTests runHandsTheRecordToThePageBuilder
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/PipelineCoordinator.swift b/Sources/ResectaApp/State/PipelineCoordinator.swift
+index abe210b8..cf1e150a 100644
+--- a/Sources/ResectaApp/State/PipelineCoordinator.swift
++++ b/Sources/ResectaApp/State/PipelineCoordinator.swift
+@@ -700,7 +700,7 @@ final class PipelineCoordinator: @unchecked Sendable {
+         effectiveMode: PipelineMode,
+         runSettings: RunSettings? = nil,
+         inkPlans: [Int: InkStripPlan] = [:],
+-        record: RunRecord.Confirmed?
++        record: RunRecord.Confirmed? = nil
+     ) -> [PDFPageData] {
+         guard let doc = documentState.sourceDocument else { return [] }
+         return RunInputs.pageData(
+diff --git a/Sources/ResectaApp/State/PipelineRunner.swift b/Sources/ResectaApp/State/PipelineRunner.swift
+index cd8f6e24..9ac8d7af 100644
+--- a/Sources/ResectaApp/State/PipelineRunner.swift
++++ b/Sources/ResectaApp/State/PipelineRunner.swift
+@@ -288,8 +288,7 @@ struct PipelineRunner {
+             geometry: coordinator.documentState.sourceDocument.map(RunInputs.pageGeometry(of:)) ?? [:],
+             regions: redactionState.regions, settings: runSettings)
+         let pages = coordinator.buildPDFPageData(
+-            effectiveMode: effectiveMode, runSettings: runSettings, inkPlans: sensitiveTerms.inkPlans,
+-            record: confirmed)
++            effectiveMode: effectiveMode, runSettings: runSettings, inkPlans: sensitiveTerms.inkPlans)
+         let burnedRegionVersion = redactionState.regionVersion
+         // The run's deselection facts. The value is recorded onto
+         // RedactionState only after `processDocument` returns (inside the

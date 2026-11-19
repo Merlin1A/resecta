@@ -1,0 +1,19 @@
+Property: A region the plan holds no box for is named in the result, so the record carries it.
+Area: the plan path's stray regions (PageRasterizer.paintPlan)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter PlanPaintTests
+Must go red: RedactionEngineTests/PlanPaintTests regionOutsideThePlan
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
+index bf781ea2..11ad8fec 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
+@@ -229,7 +229,7 @@ extension PageRasterizer {
+ 
+         var result = PlanPaint()
+         for (box, rect) in rects { result.painted[box] = PixelPlan.PixelRect(bitmapRect: rect) }
+-        result.outsidePlan = Set(strays.map(\.id))
++        result.outsidePlan = []
+         return result
+     }
+ }
