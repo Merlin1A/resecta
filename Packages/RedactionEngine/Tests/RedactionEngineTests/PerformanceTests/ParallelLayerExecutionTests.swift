@@ -243,7 +243,7 @@ struct ParallelLayerExecutionTests {
         let (doc, url) = try await makeMultiPagePDF(pageCount: 2)
         defer { try? FileManager.default.removeItem(at: url) }
 
-        #expect(Self.ordinals(of: .catalogSequential, mode: .secureRasterization) == [3, 4])
+        #expect(Self.ordinals(of: .catalogSequential, mode: .secureRasterization) == [3, 4, 7])
         let run = try await Self.runOrchestrated(
             url: url, doc: doc, pipelineMode: .secureRasterization,
             sensitiveTerms: [], filterDigests: Array(repeating: nil, count: doc.pageCount))
