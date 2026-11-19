@@ -1,0 +1,19 @@
+Property: A run with a check that had nothing to check is not wholly clean, so its row arrives closed.
+Area: results (the passed checks' row)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationLayerPartitionTests
+Must go red: ResectaAppTests/VerificationLayerPartitionTests nothingToCheckGroupAndHeaders; ResectaAppTests/VerificationLayerPartitionTests aRunWithIdleChecksArrivesClosed
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationLayerPartition.swift b/Sources/ResectaApp/Views/VerificationLayerPartition.swift
+index 1bbdd165..bce783f2 100644
+--- a/Sources/ResectaApp/Views/VerificationLayerPartition.swift
++++ b/Sources/ResectaApp/Views/VerificationLayerPartition.swift
+@@ -34,7 +34,7 @@ nonisolated struct VerificationLayerPartition: Equatable {
+     var clusterNoteCount: Int { cluster.count { outcomes[$0] == .note } }
+     /// Nothing sits above the cluster: it opens by default.
+     var isWhollyClean: Bool {
+-        findings.isEmpty && couldNotVerify.isEmpty && notes.isEmpty && nothingToCheck.isEmpty
++        findings.isEmpty && couldNotVerify.isEmpty && notes.isEmpty
+     }
+ 
+     init(layers: [LayerResult], perPageModes: [PipelineMode]) {

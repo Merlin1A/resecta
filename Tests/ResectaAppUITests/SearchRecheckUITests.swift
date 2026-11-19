@@ -177,11 +177,16 @@ nonisolated final class SearchRecheckUITests: XCTestCase {
         XCTAssertTrue(masthead.label.contains("5 of 7 checks passed. 2\u{00A0}had nothing to check."),
                       "No typed search and no captured term: the re-check and the term check had nothing to check: \(masthead.label)")
         results.swipeUp()
-        // The idle re-check sits above the pass cluster, so the cluster
-        // starts collapsed: open it to reach the sweep's row.
+        // The idle checks sit inside the passed checks' row with the passed
+        // ones, and the row starts closed: open it to reach the sweep's row.
+        let idleRecheck = app.descendants(matching: .any).matching(identifier: "layerResult_5").firstMatch
+        XCTAssertFalse(idleRecheck.exists, "The idle Search Re-check is inside the closed row.")
         let cluster = app.buttons["passedChecksCluster"]
         XCTAssertTrue(cluster.waitForExistence(timeout: 10), "The pass cluster never appeared.")
         cluster.tap()
+        XCTAssertTrue(idleRecheck.waitForExistence(timeout: 10), "The idle Search Re-check is not in the opened row.")
+        XCTAssertTrue(idleRecheck.label.contains("Nothing to check"),
+                      "The idle Search Re-check does not read as nothing to check: \(idleRecheck.label)")
 
         let row = app.descendants(matching: .any).matching(identifier: "layerResult_6").firstMatch
         var scrolls = 0

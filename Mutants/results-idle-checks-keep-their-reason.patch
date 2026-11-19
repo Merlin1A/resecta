@@ -1,0 +1,19 @@
+Property: An idle member keeps its mark and its reason; only a passed check is drawn bare.
+Area: results (the passed checks' row)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationLayerPartitionTests
+Must go red: ResectaAppTests/VerificationLayerPartitionTests memberRowsKeepTheirReasons
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationDetailsSection.swift b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
+index c854dbc1..d22b3bcd 100644
+--- a/Sources/ResectaApp/Views/VerificationDetailsSection.swift
++++ b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
+@@ -91,7 +91,7 @@ struct VerificationDetailsSection: View {
+     /// A member's row: a passed check has no mark; a riding note and a
+     /// check that had nothing to check keep their mark and their caption.
+     static func memberLayout(_ outcome: VerificationOutcome) -> LayerResultRow.GroupedLayout {
+-        outcome == .passed ? .member : .lead
++        outcome == .note ? .lead : .member
+     }
+ 
+     /// The open item after the list row is tapped: closing the list closes
