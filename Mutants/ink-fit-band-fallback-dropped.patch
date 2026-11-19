@@ -1,0 +1,22 @@
+Property: on a scan, when the ink box with every band reaches past the fit's window (another line meeting the box by a row, carried to the window's edge), the fit paints the box of the word's tallest band, as before, never the read word's envelope, which can leave the word's ink outside.
+Area: search ink fit (engine)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter InkFitBandTests
+Must go red: RedactionEngineTests/InkFitBandTests lineAcrossTheWindowKeepsTheBand; RedactionEngineTests/InkFitBandTests descendersTouchingTheBox
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFit.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFit.swift
+index 2683ff2f..93787b2e 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFit.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFit.swift
+@@ -488,10 +488,7 @@ extension DocumentSearcher {
+                                 height: ink.height + 2 * cap)
+             return window.insetBy(dx: -inkFitMargin, dy: -inkFitMargin).contains(fitted) ? fitted : nil
+         }
+-        if let whole = paint(ink) { return whole }
+-        guard let band, let alone = paint(band) else { return nil }
+-        inkFitLogger.log("ink fit: the box with every band reaches past its window; the box is its tallest band's")
+-        return alone
++        return paint(ink)
+     }
+ 
+     /// The page's read tokens: one full-page render at the fit's scale, read
