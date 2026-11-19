@@ -73,7 +73,7 @@ index fa15f23b..1a4bc2a8 100644
                          "\(word): the painted box \(painted) does not hold its glyphs \(held) (degraded \(fit.degraded))")
              } when: { HostRun.isMac && word == "summary" } matching: { issue in
 diff --git a/Packages/RedactionEngine/Tests/RedactionEngineTests/SearchTests/PageImageInkFitTests.swift b/Packages/RedactionEngine/Tests/RedactionEngineTests/SearchTests/PageImageInkFitTests.swift
-index af514c37..029d8c8c 100644
+index a6e20032..82a2bd58 100644
 --- a/Packages/RedactionEngine/Tests/RedactionEngineTests/SearchTests/PageImageInkFitTests.swift
 +++ b/Packages/RedactionEngine/Tests/RedactionEngineTests/SearchTests/PageImageInkFitTests.swift
 @@ -358,8 +358,9 @@ struct PageImageInkFitTests {
@@ -82,8 +82,8 @@ index af514c37..029d8c8c 100644
          withKnownIssue("On the Mac host macOS's Vision reads these words' ink rows otherwise than iOS's, and some paints reach more than 1 pt past them") {
 +            #expect(Bool(false), "a planted issue that no known issue names")
              #expect(tallerThanInk.isEmpty, "every fitted paint is as tall as its word's ink: \(tallerThanInk)")
--        } when: { HostRun.isMac && runningHeadFitted } matching: { issue in
-+        } when: { HostRun.isMac } matching: { issue in
-             issue.comments.contains { $0.rawValue.hasPrefix("every fitted paint is as tall as its word's ink: ") }
-         }
+-        } when: { HostRun.isMac && runningHeadFitted } matching: { issue in issue.comments.contains { $0.rawValue.hasPrefix("every fitted paint is as tall as its word's ink: ") } }
++        } when: { HostRun.isMac } matching: { issue in issue.comments.contains { $0.rawValue.hasPrefix("every fitted paint is as tall as its word's ink: ") } }
      }
+ 
+     /// A Searchable export of the statement turned by `rotation` (the export
