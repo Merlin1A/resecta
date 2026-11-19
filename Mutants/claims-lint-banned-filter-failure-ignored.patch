@@ -1,0 +1,22 @@
+Property: A Swift line filter that fails for the banned terms fails the lint.
+Area: claims lint (Scripts/claims-lint.sh)
+Test command: Scripts/claims-lint.sh --self-test
+Must go red: the self-test case "a Swift line filter that fails for the banned terms" (the self-test ends FAIL)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Scripts/claims-lint.sh b/Scripts/claims-lint.sh
+index 78ef4ae3..eaff144c 100755
+--- a/Scripts/claims-lint.sh
++++ b/Scripts/claims-lint.sh
+@@ -216,10 +216,7 @@ sweep() { # $1 = the tree root
+             echo "CLAIMS-LINT FAIL: the banned terms could not be matched on every Swift file"
+             fail=1
+         fi
+-        lines=$(printf '%s\n' "$raw" | swift_literal_lines "$ROOT/$LIST_FILE" banned) || {
+-            echo "CLAIMS-LINT FAIL: the Swift string literals could not be filtered for the banned terms"
+-            fail=1
+-        }
++        lines=$(printf '%s\n' "$raw" | swift_literal_lines "$ROOT/$LIST_FILE" banned)
+         SWIFT_HITS=$(printf '%s\n' "$lines" | keep_offending "$PATTERNS") || {
+             echo "CLAIMS-LINT FAIL: the banned-term matcher did not run on the Swift string literals"
+             fail=1

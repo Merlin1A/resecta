@@ -1,0 +1,22 @@
+Property: A banned-term matcher that fails on a listed document fails the lint.
+Area: claims lint (Scripts/claims-lint.sh)
+Test command: Scripts/claims-lint.sh --self-test
+Must go red: the self-test case "a banned-term matcher that fails on a listed document" (the self-test ends FAIL)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Scripts/claims-lint.sh b/Scripts/claims-lint.sh
+index 3c4a664c..d589225a 100755
+--- a/Scripts/claims-lint.sh
++++ b/Scripts/claims-lint.sh
+@@ -157,10 +157,7 @@ sweep() { # $1 = the tree root
+             echo "CLAIMS-LINT FAIL: the banned terms could not be matched on $f"
+             fail=1
+         fi
+-        hits=$(printf '%s\n' "$raw" | keep_offending "$PATTERNS") || {
+-            echo "CLAIMS-LINT FAIL: the banned-term matcher did not run on $f"
+-            fail=1
+-        }
++        hits=$(printf '%s\n' "$raw" | keep_offending "$PATTERNS")
+         if [ -n "$hits" ]; then
+             echo "CLAIMS-LINT FAIL: $f"
+             echo "$hits"
