@@ -43,7 +43,7 @@ struct TextPathAlphabetFaultTests {
     /// Three pages, each its own invented line, drawn by the system at test
     /// time and never stored.
     static func threePages() throws -> Data {
-        TestFixtures.textPagesPDF(markers.map { "\($0) page of the ledger" })
+        TestFixtures.textPagesPDF(markers.map { "\($0) page of the account book" })
     }
 
     static func onPage(_ entries: [CharacterInfo], _ page: Int) -> Bool {
