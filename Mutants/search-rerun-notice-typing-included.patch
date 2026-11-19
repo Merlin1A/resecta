@@ -1,0 +1,18 @@
+Property: A run started by typing names the ticked matches it clears.
+Area: the Search re-run notice
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppUITests/SearchTypingFocusUITests
+Must go red: ResectaAppUITests/SearchTypingFocusUITests testTypingOverTickedRows_postsTheNotice
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/Search/SearchAndRedactSheet+Trigger.swift b/Sources/ResectaApp/Views/Search/SearchAndRedactSheet+Trigger.swift
+index f0becf54..51a36ebe 100644
+--- a/Sources/ResectaApp/Views/Search/SearchAndRedactSheet+Trigger.swift
++++ b/Sources/ResectaApp/Views/Search/SearchAndRedactSheet+Trigger.swift
+@@ -54,6 +54,7 @@ extension SearchAndRedactSheet {
+             // A typed run replaces the list like any other run: when it
+             // clears ticked matches it says so, once (the clear leaves
+             // nothing ticked, so the next letter's run is silent).
++            searchState.skipNextRerunNotice = true
+             triggerSearch()
+         }
+     }

@@ -135,13 +135,18 @@ struct DiscardUndoToastTests {
 
     // MARK: - A re-run's notice
 
-    @Test("A re-run names the unapplied matches it clears, and says nothing when none")
+    @Test("A re-run names the ticked matches it clears, on its own side, and says nothing when none")
     func rerunNamesTheClearedMatches() {
-        #expect(SearchAndRedactSheet.rerunClearedMessage(unappliedCount: 3)
-                == "Search re-run — 3 unapplied matches cleared.")
-        #expect(SearchAndRedactSheet.rerunClearedMessage(unappliedCount: 1)
-                == "Search re-run — 1 unapplied match cleared.")
-        #expect(SearchAndRedactSheet.rerunClearedMessage(unappliedCount: 0) == nil)
+        #expect(SearchAndRedactSheet.rerunClearedMessage(selectedCount: 12, interface: .search)
+                == "Search re-run — 12 selected matches cleared.")
+        #expect(SearchAndRedactSheet.rerunClearedMessage(selectedCount: 1, interface: .search)
+                == "Search re-run — 1 selected match cleared.")
+        #expect(SearchAndRedactSheet.rerunClearedMessage(selectedCount: 0, interface: .search) == nil)
+        #expect(SearchAndRedactSheet.rerunClearedMessage(selectedCount: 12, interface: .scan)
+                == "Scan re-run — 12 selected matches cleared.")
+        #expect(SearchAndRedactSheet.rerunClearedMessage(selectedCount: 1, interface: .scan)
+                == "Scan re-run — 1 selected match cleared.")
+        #expect(SearchAndRedactSheet.rerunClearedMessage(selectedCount: 0, interface: .scan) == nil)
     }
 
     // MARK: - Fixtures

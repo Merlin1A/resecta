@@ -70,12 +70,31 @@ extension SearchAndRedactSheet {
         return "\(noun) closed — \(unappliedCount) unapplied match\(suffix) cleared."
     }
 
-    /// The notice a re-run posts when it clears unapplied matches with the
-    /// previous results; nil when none were unapplied.
-    static func rerunClearedMessage(unappliedCount: Int) -> String? {
-        guard unappliedCount > 0 else { return nil }
-        let suffix = unappliedCount == 1 ? "" : "es"
-        return "Search re-run — \(unappliedCount) unapplied match\(suffix) cleared."
+    /// The notice a run posts when it replaces the list and clears ticked
+    /// matches that had no box; nil when none was ticked. It carries no
+    /// Undo: the list it would bring back belongs to a query that may no
+    /// longer be in the field. A Scan's run says "Scan re-run".
+    static func rerunClearedMessage(selectedCount: Int, interface: SearchInterface) -> String? {
+        guard selectedCount > 0 else { return nil }
+        switch (interface, selectedCount == 1) {
+        case (.search, true): return "Search re-run — 1 selected match cleared."
+        case (.search, false): return "Search re-run — \(selectedCount) selected matches cleared."
+        case (.scan, true): return "Scan re-run — 1 selected match cleared."
+        case (.scan, false): return "Scan re-run — \(selectedCount) selected matches cleared."
+        }
+    }
+
+    /// What a run that replaces the list counts for its notice: the ticked
+    /// matches without a box, read before the list is cleared; zero for a
+    /// run a recall started (the recall names its own drop).
+    static func rerunClearedCount(selectedUnapplied: Int, skipNotice: Bool) -> Int {
+        skipNotice ? 0 : max(0, selectedUnapplied)
+    }
+
+    static func rerunClearedCount(in searchState: SearchState) -> Int {
+        rerunClearedCount(
+            selectedUnapplied: searchState.selectedUnappliedOccurrenceCount,
+            skipNotice: searchState.skipNextRerunNotice)
     }
 
     /// The notice read from a live session: what every dismissal that

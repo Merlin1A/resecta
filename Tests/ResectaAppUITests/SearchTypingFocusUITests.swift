@@ -182,10 +182,28 @@ nonisolated final class SearchTypingFocusUITests: XCTestCase {
         sleep(4)
     }
 
+    /// Ticks the listed rows with the footer's Select All (the keyboard
+    /// must be away) and returns the footer's selection line. A run that
+    /// replaces the list clears the ticks and names them in its notice;
+    /// with nothing ticked it says nothing.
+    @discardableResult
+    private func tickAll() -> String {
+        app.buttons["footerSelectAllButton"].tap()
+        sleep(1)
+        let selected = selectionLine.label
+        XCTAssertFalse(selected.hasPrefix("0 of"), "Select All selected nothing: \(selected)")
+        return selected
+    }
+
     func testReturn_onTheListedSearch_startsNoRunAndPostsNoNotice() {
         let field = openSearch()
         listResults(for: "Amo", in: field)
-        let before = selectionLine.label
+        // Return puts the keyboard away so the footer is in reach; then
+        // tick, so a run started by the next Return would show.
+        field.typeText("\n")
+        sleep(5)
+        let before = tickAll()
+        field.tap()
         field.typeText("\n")
         XCTAssertFalse(
             rerunNotice.waitForExistence(timeout: 4),
@@ -226,7 +244,8 @@ nonisolated final class SearchTypingFocusUITests: XCTestCase {
         sleep(6)
         let cap = app.staticTexts.matching(NSPredicate(format: #"label BEGINSWITH "Showing first""#)).firstMatch
         XCTAssertTrue(cap.exists, "The run did not stop at the result cap, so this test judges nothing.")
-        let before = selectionLine.label
+        // Ticked rows: a run started by the next Return would clear them.
+        let before = tickAll()
         field.tap()
         field.typeText("\n")
         XCTAssertFalse(
@@ -258,10 +277,50 @@ nonisolated final class SearchTypingFocusUITests: XCTestCase {
         field.typeText(XCUIKeyboardKey.delete.rawValue)
         sleep(1)
         XCTAssertEqual(field.value as? String, "Am", "The query was not edited back to two letters.")
+        // Tick a row first: the run's notice names ticked matches only.
+        // A scroll of the list puts the keyboard away without a run.
+        app.descendants(matching: .any)["searchResultsList"].swipeUp()
+        sleep(2)
+        tickAll()
+        field.tap()
         field.typeText("\n")
         XCTAssertTrue(
             rerunNotice.waitForExistence(timeout: 6),
             "Return on a changed query started no run."
+        )
+    }
+
+    // MARK: - Typing over a listed search
+
+    func testTypingOverTickedRows_postsTheNotice() {
+        let field = openSearch()
+        listResults(for: "Amo", in: field)
+        field.typeText("\n")
+        sleep(5)
+        tickAll()
+        field.tap()
+        field.typeText("u")
+        XCTAssertTrue(
+            rerunNotice.waitForExistence(timeout: 6),
+            "Typing over ticked rows cleared them without a notice."
+        )
+        // The run cleared the ticks, so the next letter's run is silent.
+        let gone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: rerunNotice)
+        XCTAssertEqual(XCTWaiter().wait(for: [gone], timeout: 15), .completed, "The notice never left.")
+        field.typeText("n")
+        XCTAssertFalse(
+            rerunNotice.waitForExistence(timeout: 6),
+            "A second letter posted a second notice with nothing ticked."
+        )
+    }
+
+    func testTypingWithNothingTicked_postsNoNotice() {
+        let field = openSearch()
+        listResults(for: "Amo", in: field)
+        field.typeText("u")
+        XCTAssertFalse(
+            rerunNotice.waitForExistence(timeout: 4),
+            "A typed run with nothing ticked posted a notice."
         )
     }
 
