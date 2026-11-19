@@ -1,0 +1,19 @@
+Property: Each recognised page is searched in two readings, as recognised and after the confusable correction.
+Area: Search, the rules a search follows
+Test command: cd Packages/RedactionEngine && DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --no-parallel --filter '^RedactionEngineTests\.(OCRConfusableSearchTests|RegexOCRReadingOrderTests)/'
+Must go red: RedactionEngineTests/OCRConfusableSearchTests lettersReadAsDigits; RedactionEngineTests/RegexOCRReadingOrderTests correctedOnlyMatchIsInPageOrder
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+OCRCrossLine.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+OCRCrossLine.swift
+index 71b48ef..9fb73ba 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+OCRCrossLine.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+OCRCrossLine.swift
+@@ -144,7 +144,7 @@ extension DocumentSearcher {
+         let raw = lines.map(\.text)
+         let corrected = lines.map { line -> String in
+             let text = ocrNormalizer.normalize(line.text)
+-            return text.utf16.count == line.text.utf16.count ? text : line.text
++            return line.text
+         }
+         return (raw, corrected)
+     }

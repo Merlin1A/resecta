@@ -1,0 +1,19 @@
+Property: Zero-width characters and soft hyphens read as nothing.
+Area: Search, the rules a search follows
+Test command: cd Packages/RedactionEngine && DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --no-parallel --filter '^RedactionEngineTests\.WhitespaceFoldTests/'
+Must go red: RedactionEngineTests/WhitespaceFoldTests zeroWidthInsideAWordIsDropped
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/TextNormalizer.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/TextNormalizer.swift
+index cbcfc10a..e449bbad 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/TextNormalizer.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/TextNormalizer.swift
+@@ -100,7 +100,7 @@ public struct TextNormalizer: Sendable {
+     /// of break marks (`breakMarks`).
+     static func isRunCharacter(_ character: Character) -> Bool {
+         if isSpacingCharacter(character) { return true }
+-        return character.unicodeScalars.allSatisfy { breakMarks.contains($0) }
++        return character.unicodeScalars.allSatisfy { $0 == "\u{00AD}" }
+     }
+ 
+     /// The hard hyphens a layout engine may break a line after.

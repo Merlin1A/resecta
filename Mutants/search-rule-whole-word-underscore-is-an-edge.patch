@@ -1,0 +1,40 @@
+Property: With Whole Word on, an underscore beside the match is not an edge.
+Area: Search, the rules a search follows
+Test command: cd Packages/RedactionEngine && DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --no-parallel --filter '^RedactionEngineTests\.SearchRuleCaseTests/'
+Must go red: RedactionEngineTests/SearchRuleCaseTests wholeWordEdge; RedactionEngineTests/SearchRuleCaseTests wholeWordEdgeInBase
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore.swift
+index c334d8a..e02930c 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore.swift
+@@ -553,11 +553,11 @@ enum SearchCore {
+     ) -> Bool {
+         if start > 0 {
+             let c = chars[start - 1]
+-            if c.isLetter || c.isNumber || c == "_" { return false }
++            if c.isLetter || c.isNumber { return false }
+         }
+         if endExclusive < chars.count {
+             let c = chars[endExclusive]
+-            if c.isLetter || c.isNumber || c == "_" { return false }
++            if c.isLetter || c.isNumber { return false }
+         }
+         return true
+     }
+@@ -568,13 +568,13 @@ enum SearchCore {
+     static func isWholeWord(_ range: Range<String.Index>, in text: String) -> Bool {
+         if range.lowerBound > text.startIndex {
+             let charBefore = text[text.index(before: range.lowerBound)]
+-            if charBefore.isLetter || charBefore.isNumber || charBefore == "_" {
++            if charBefore.isLetter || charBefore.isNumber {
+                 return false
+             }
+         }
+         if range.upperBound < text.endIndex {
+             let charAfter = text[range.upperBound]
+-            if charAfter.isLetter || charAfter.isNumber || charAfter == "_" {
++            if charAfter.isLetter || charAfter.isNumber {
+                 return false
+             }
+         }
