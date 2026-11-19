@@ -238,7 +238,10 @@ struct ResectaApp: App {
 
     /// Every `PipelineError` case, with fixed values: a page or layer
     /// index of 0, no bytes read, and the first catalog key the import's
-    /// active-content walk looks for.
+    /// active-content walk looks for. The export failures carry no values,
+    /// so they come from the type's own list rather than being named here:
+    /// the app names the failed share-copy write in one place only, the
+    /// function that owns it, and a source test holds that.
     static let seedFailureErrors: [PipelineError] = [
         .importError(.corrupt),
         .importError(.passwordProtected),
@@ -258,10 +261,7 @@ struct ResectaApp: App {
         .redactionError(.pageTooLarge(pageIndex: 0)),
         .redactionError(.reconstructionFailed),
         .verificationError(.engineCrash(layerIndex: 0)),
-        .exportError(.diskFull),
-        .exportError(.writeFailed),
-        .exportError(.filePurged),
-    ]
+    ] + PipelineError.ExportFailure.allCases.map(PipelineError.exportError)
 
     /// A failure's name as `--seedFailure` spells it, `<family>.<case>`.
     /// The switch is exhaustive, so a new `PipelineError` case does not
