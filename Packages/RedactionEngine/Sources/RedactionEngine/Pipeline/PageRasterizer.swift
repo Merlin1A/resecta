@@ -340,11 +340,11 @@ public final class PageRasterizer: @unchecked Sendable {
                     // SOURCE frame of a rotated page.
                     let frame = PageFrame(
                         rotation: page.rotation, displayedSize: effectiveSize)
-                    // The page's text path: the filter, the drawn-cell rule
-                    // and the record, each step through its seam
-                    // (`PageTextPath`). Its rectangles are the removal
-                    // rectangles above, every one ordinary; nothing is painted
-                    // by a plan yet.
+                    // The page's text path: the fold, the filter, the alphabet
+                    // marks, the drawn-cell rule and the record, each step
+                    // through its seam (`PageTextPath`). Its rectangles are
+                    // the removal rectangles above, every one ordinary; no
+                    // painted rectangle is passed.
                     let path = try await PageTextPath.run(
                         entries: characters, frame: frame,
                         textPathRectangles: redactionRectsInPoints.map {
@@ -364,12 +364,13 @@ public final class PageRasterizer: @unchecked Sendable {
                         pageDigest = digest
                     case .picture(let reason):
                         // The page is written without a text layer (entries
-                        // and digest never set, the reason recorded). Today
-                        // the one such outcome is the drawn-cell rule's
-                        // re-flow limit leaving a cell inside a region.
+                        // and digest never set, the reason recorded): the
+                        // drawn-cell rule did not settle outside the regions,
+                        // a line could not be laid out in the hidden text's
+                        // faces, or no word the hidden text can write is left.
                         fallbackReason = reason
                         pageRasterizerLogger.log(
-                            "page \(page.pageIndex) fell back to secure rasterization at runtime (the text layer did not settle outside the redaction regions)"
+                            "page \(page.pageIndex) fell back to secure rasterization at runtime (the text path ended in a picture: \(String(describing: reason), privacy: .public))"
                         )
                     }
                 } else {

@@ -8,7 +8,12 @@ import Foundation
 /// glyph out in a face other than the three: before the record the page is
 /// then a picture, and at write time its hidden text is not written.
 enum HiddenTextLine {
+    /// The lines a test makes fail to lay out, as when the system puts a
+    /// glyph in another face; nil, the default, refuses none.
+    @TaskLocal static var refuses: (@Sendable (String) -> Bool)? = nil
+
     static func layout(_ text: String, size: CGFloat) -> CTLine? {
+        if let refuses, refuses(text) { return nil }
         let attributed = NSMutableAttributedString()
         // One font object per face for the line, so text in one face is one
         // glyph run.

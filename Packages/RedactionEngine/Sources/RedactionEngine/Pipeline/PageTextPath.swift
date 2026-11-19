@@ -14,8 +14,7 @@ import Foundation
 /// breaks (in the writer and in the drawn-cell rule), the record and the
 /// page output's rectangles all read this one list, every kind but "under a
 /// widened box", which only the position check reads. The painted
-/// rectangles: read by the paint marks, empty until the plan switch fills
-/// them.
+/// rectangles: read by the paint marks; the rasterizer passes none today.
 enum PageTextPath {
 
     /// The path's steps. The default is the real step for each; a test
@@ -28,8 +27,8 @@ enum PageTextPath {
         var filter: @Sendable ([CharacterInfo], [CGRect]) async throws -> FilterResult
         var alphabetMarks: @Sendable ([CharacterInfo]) throws -> TextPathAlphabetMarks.Marks?
         /// The words the paint covers, by the page's one partition, from the
-        /// survivors and the painted rectangles. Nothing until the plan
-        /// switch hands in painted rectangles.
+        /// survivors and the painted rectangles. Nothing while no painted
+        /// rectangle is handed in.
         var paintMarks: @Sendable ([CharacterInfo], [CGRect]) throws -> Set<Int>
 
         static let live = Steps(

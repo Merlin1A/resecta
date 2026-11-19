@@ -1,6 +1,9 @@
 import CoreGraphics
 import CoreText
 import Foundation
+import os
+
+private let textLayerLogger = Logger(subsystem: "com.resecta.engine", category: "TextLayerReconstructor")
 
 // Draws surviving characters as invisible (rendering mode 3) text in the
 // PDF context, positioned over the rasterized page image.
@@ -86,9 +89,14 @@ enum TextLayerReconstructor {
         // Each line laid out in the hidden text's faces, with no relationship
         // to the original document's fonts, CMaps or glyph tables (the ASD
         // CMap leakage vector). A line that cannot be laid out in them means
-        // the page's hidden text is not written at all.
+        // the page's hidden text is not written at all. The drawn-cell rule
+        // lays out every line before the record, so such a page is a picture
+        // before it reaches here.
         let laidOut = lines.map { HiddenTextLine.layout($0.text, size: $0.fontSize) }
-        guard laidOut.allSatisfy({ $0 != nil }) else { return }
+        guard laidOut.allSatisfy({ $0 != nil }) else {
+            textLayerLogger.log("a line could not be laid out in the hidden text's faces: no hidden text written on this page")
+            return
+        }
         for (line, laid) in zip(lines, laidOut) {
             guard let ctLine = laid else { continue }
             context.saveGState()
@@ -379,13 +387,14 @@ enum TextLayerReconstructor {
 
     /// The drawn-cell rule's hits, and whether every line could be laid out
     /// in the hidden text's faces (`HiddenTextLine`). A line that could not
-    /// is measured no further; its page is a picture.
+    /// is measured no further; its page is a picture. Every line is laid out
+    /// on a page with no region too, where nothing is measured.
     static func drawnCellHits(
         entries: [CharacterInfo],
         pageWidth: CGFloat,
         regionShapes: [RegionShape]
     ) -> (hits: IndexSet, laidOut: Bool) {
-        guard !entries.isEmpty, !regionShapes.isEmpty else { return (IndexSet(), true) }
+        guard !entries.isEmpty else { return (IndexSet(), true) }
         let rects = regionShapes.map(\.bounds)
         var hits = IndexSet()
         for sourced in layoutLinesWithSources(
@@ -395,6 +404,7 @@ enum TextLayerReconstructor {
             guard let ctLine = HiddenTextLine.layout(line.text, size: line.fontSize) else {
                 return (hits, false)
             }
+            if regionShapes.isEmpty { continue }
             // The cell's height is the Courier face's own, as the writer's
             // base formula takes it: a line's typographic bounds are the
             // largest over its glyph runs, so a run in a substituted face

@@ -125,7 +125,7 @@ struct PageTextPathTests {
         #expect(Self.sizes.count == 53)
     }
 
-    @Test("The laid-out line is Courier at its size, with Courier's own ascent and descent")
+    @Test("The laid-out line is in the first of the three faces this system has, at its size, with Courier's own ascent and descent")
     func laidOutLineIsCourier() throws {
         for size in Self.sizes {
             let line = try #require(HiddenTextLine.layout("Report 12", size: size))
@@ -133,7 +133,9 @@ struct PageTextPathTests {
             #expect(runs.count == 1)
             let attributes = CTRunGetAttributes(runs[0]) as NSDictionary
             let font = attributes[kCTFontAttributeName as String] as! CTFont
-            #expect(CTFontCopyPostScriptName(font) as String == "Courier")
+            // Courier itself where the system has it; where the name maps
+            // to Menlo, the first face the system does have.
+            #expect(CTFontCopyPostScriptName(font) as String == HiddenTextFonts.faces.first?.name)
             #expect(CTFontGetSize(font) == size)
             var ascent: CGFloat = 0, descent: CGFloat = 0
             CTLineGetTypographicBounds(line, &ascent, &descent, nil)
@@ -185,7 +187,7 @@ struct PageTextPathTests {
 
     struct Fault: Error {}
 
-    @Test("A step that fails makes the path fail, and the rasterizer then writes a picture")
+    @Test("A step that throws makes the path throw")
     func faultingStepThrows() async throws {
         let (entries, _, size) = try await Self.entries()
         var steps = PageTextPath.Steps.live
@@ -197,6 +199,37 @@ struct PageTextPathTests {
                     textPathRectangles: [], paintedRectangles: [], pageIndex: 0)
             }
         }
+    }
+
+    @Test("A line that cannot be laid out makes the page a picture, with a region on it or none")
+    func unlaidLineMakesAPicture() async throws {
+        let (entries, _, size) = try await Self.entries()
+        let frame = PageFrame(rotation: 0, displayedSize: size)
+        let region = try Self.betaRegion(entries)
+        for rectangles in [[], [TextPathRectangle(rect: region, kind: .ordinary)]] {
+            let control = try await PageTextPath.run(
+                entries: entries, frame: frame,
+                textPathRectangles: rectangles, paintedRectangles: [], pageIndex: 0)
+            guard case .written = control.outcome else {
+                Issue.record("control with \(rectangles.count) region(s): \(control.outcome)")
+                continue
+            }
+            let refused = try await HiddenTextLine.$refuses.withValue({ _ in true }) {
+                try await PageTextPath.run(
+                    entries: entries, frame: frame,
+                    textPathRectangles: rectangles, paintedRectangles: [], pageIndex: 0)
+            }
+            guard case .picture(let reason) = refused.outcome else {
+                Issue.record("with \(rectangles.count) region(s): \(refused.outcome)")
+                continue
+            }
+            #expect(reason == .extractionFailed, "with \(rectangles.count) region(s)")
+        }
+        let found = HiddenTextLine.$refuses.withValue({ _ in true }) {
+            TextLayerReconstructor.drawnCellHits(entries: entries, pageWidth: size.width, regionShapes: [])
+        }
+        #expect(!found.laidOut)
+        #expect(found.hits.isEmpty)
     }
 
     @Test("The whole-word closure leaves each marked word out whole and counts it")
