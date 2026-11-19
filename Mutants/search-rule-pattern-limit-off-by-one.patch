@@ -1,4 +1,4 @@
-Property: A pattern search lists at most maxResults rows: the matches of a page stop at the limit.
+Property: A pattern search lists at most maxResults matches: the matches of a page stop at the limit (a match that wraps lines lists a row for each line).
 Area: Search, the rules a search follows
 Test command: cd Packages/RedactionEngine && DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --no-parallel --filter '^RedactionEngineTests\.SearchRuleCaseTests/'
 Must go red: RedactionEngineTests/SearchRuleCaseTests searchLimit
