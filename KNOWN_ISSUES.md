@@ -339,6 +339,15 @@ A PDF page can carry a word drawn at zero size: the word is part of the page's t
 
 ---
 
+### KI-44: On Text Drawn Back Over Itself, a Box Can Miss the First Letter of a Word (Low)
+**Affects:** Search and Scan (typed pages where text is drawn back over text printed before it, as some form fillers and overprinted documents do)
+
+A PDF can move its drawing position back over text it has already printed, so that a word is printed partly over the one before it. When Search or Scan matches a word drawn this way, the box is placed where PDFKit, the system's PDF reader, reports the word, which can start after the word's first letter. When you apply it, that letter stays printed in the export, with either export mode. The rest of the word is covered. The checks after export do not report the letter as readable. Ordinary letter spacing does not cause this.
+
+**Workaround:** Before you tap Redact, check that each box covers the whole of the word you searched for; where one stops short, drag its handle out over the rest of the word, or draw a box over it with Rectangle.
+
+---
+
 ## Fixed
 
 ### KI-8: Duplicate Regions from Multiple Scan Runs (Low) — FIXED (entry moved 2026-10-01)
