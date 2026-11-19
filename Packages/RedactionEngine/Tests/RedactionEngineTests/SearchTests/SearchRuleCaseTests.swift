@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import PDFKit
 @testable import RedactionEngine
 
 // Cases for search rules no other test caught: each row states one rule a
