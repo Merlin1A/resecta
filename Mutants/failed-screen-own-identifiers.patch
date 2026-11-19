@@ -1,0 +1,18 @@
+Property: The failure screen's identifier names the screen, and its words and each button keep their own.
+Area: failure screen (identifiers)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppUITests/FailedStateIdentifiersUITests
+Must go red: ResectaAppUITests/FailedStateIdentifiersUITests testFailedScreen_eachControlAnswersToItsOwnIdentifier
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/FailedStateView.swift b/Sources/ResectaApp/Views/FailedStateView.swift
+index 752089e8..4a2a6b57 100644
+--- a/Sources/ResectaApp/Views/FailedStateView.swift
++++ b/Sources/ResectaApp/Views/FailedStateView.swift
+@@ -145,7 +145,6 @@ struct FailedStateView: View {
+         }
+         // The screen contains its elements, so its identifier names the screen
+         // and the words and each button keep their own.
+-        .accessibilityElement(children: .contain)
+         .accessibilityIdentifier("failedState")
+         .sheet(item: $safariURL) { url in
+             SafariView(url: url)
