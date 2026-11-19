@@ -73,6 +73,34 @@ nonisolated final class EditorToolbarUITests: XCTestCase {
         attachScreenshot(named: "toolbar-overflow-order")
     }
 
+    func testSwitchModeList_namesAreWholeWordsOnIOS27() throws {
+        guard #available(iOS 27, *) else {
+            throw XCTSkip("the fault is in iOS 27's menu layout; this simulator runs an earlier system")
+        }
+        app.launchArguments = ["--uitesting", "--loadTestDocument", "--multipageDoc"]
+        app.launch()
+        let overflow = app.editorOverflowButton
+        XCTAssertTrue(overflow.waitForExistence(timeout: 30), "The … menu button is missing.")
+        overflow.tap()
+        let switchMode = app.buttons["Switch Mode"].firstMatch
+        XCTAssertTrue(switchMode.waitForExistence(timeout: 5), "The … menu has no Switch Mode row.")
+        switchMode.tap()
+        let secure = app.buttons["Secure Rasterization"].firstMatch
+        let searchable = app.buttons["Searchable Redaction"].firstMatch
+        XCTAssertTrue(secure.waitForExistence(timeout: 5), "The list has no Secure Rasterization, by its spoken name.")
+        XCTAssertTrue(searchable.waitForExistence(timeout: 5), "The list has no Searchable Redaction, by its spoken name.")
+        attachScreenshot(named: "switch-mode-list-ios27")
+        let (chosen, other) = secure.isSelected ? (secure, searchable) : (searchable, secure)
+        XCTAssertTrue(chosen.isSelected, "One mode must be ticked.")
+        other.tap()
+        overflow.tap()
+        XCTAssertTrue(switchMode.waitForExistence(timeout: 5))
+        switchMode.tap()
+        XCTAssertTrue(other.waitForExistence(timeout: 5))
+        XCTAssertTrue(other.isSelected, "A tap on the other mode must move the tick to it.")
+        XCTAssertFalse(chosen.isSelected, "The mode tapped away from must lose the tick.")
+    }
+
     // MARK: - The Undo control
 
     func testUndoControl_tapUndoesAndHoldNamesTheSteps() {
