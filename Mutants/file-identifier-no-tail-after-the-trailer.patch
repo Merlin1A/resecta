@@ -1,0 +1,21 @@
+Property: A trailer the index names with no pair in the writer's shape: the pair is looked for in the tail, as before the index was read.
+Area: the information dictionary rewrite and the metadata check (Engine)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --package-path Packages/RedactionEngine --filter InfoDictionaryThroughIndexTests
+Must go red: RedactionEngineTests/InfoDictionaryThroughIndexTests row [case 19]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/PDFFileIdentifier.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/PDFFileIdentifier.swift
+index 5460b7d9..47e35b3b 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/PDFFileIdentifier.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/PDFFileIdentifier.swift
+@@ -119,9 +119,7 @@ enum PDFFileIdentifier {
+     static func location(in fileData: Data) -> Location? {
+         if case .found(let found) = PDFTrailerLocator.locate(in: fileData) {
+             let base = fileData.startIndex
+-            if let inTrailer = locate(in: fileData[(base + found.trailer.lowerBound)..<(base + found.trailer.upperBound)]) {
+-                return inTrailer
+-            }
++            return locate(in: fileData[(base + found.trailer.lowerBound)..<(base + found.trailer.upperBound)])
+         }
+         let tailStart = max(fileData.startIndex, fileData.endIndex - tailWindowLength)
+         return locate(in: fileData[tailStart...])

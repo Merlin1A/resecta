@@ -1,0 +1,19 @@
+Property: The record says the index way rewrote only where a literal was rewritten.
+Area: the information dictionary rewrite and the metadata check (Engine)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --package-path Packages/RedactionEngine --filter InfoDictionaryThroughIndexTests
+Must go red: RedactionEngineTests/InfoDictionaryThroughIndexTests row [case 18]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
+index 701a789d..338b93a7 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
+@@ -364,7 +364,7 @@ public actor PDFStreamReconstructor {
+                     try handle.write(contentsOf: patch.bytes)
+                     rewrote = true
+                 }
+-                return rewrote ? .byIndex : .byIndexNothingRewritten
++                return .byIndex
+             }
+         } catch { // LegalPhrases:safe (Swift keyword)
+             // Mechanism-only logging. The tail search below runs as it did
