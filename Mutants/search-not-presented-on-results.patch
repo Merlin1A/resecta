@@ -1,0 +1,19 @@
+Property: Search is not presented over a run or its results.
+Area: the editor's sheet slot
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/DocumentEditorHomeCloseTests -only-testing:ResectaAppUITests/SheetSlotPhaseUITests
+Must go red: ResectaAppTests/DocumentEditorHomeCloseTests sheetSlotPresentsSearchOnlyInItsPhases; ResectaAppTests/DocumentEditorHomeCloseTests searchOutsideItsPhasesMustComeDown; ResectaAppUITests/SheetSlotPhaseUITests testSearchSetOnTheResultsScreenIsNotPresentedAndDoesNotReturn
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/DocumentEditorView+SheetParking.swift b/Sources/ResectaApp/Views/DocumentEditorView+SheetParking.swift
+index c45b5b0b..581b0d76 100644
+--- a/Sources/ResectaApp/Views/DocumentEditorView+SheetParking.swift
++++ b/Sources/ResectaApp/Views/DocumentEditorView+SheetParking.swift
+@@ -29,7 +29,7 @@ extension DocumentEditorView {
+         case .editing, .importing, .failed:
+             return true
+         case .empty, .detecting, .redacting, .verifying, .verified, .exporting:
+-            return false
++            return true
+         }
+     }
+ 

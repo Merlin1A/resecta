@@ -212,6 +212,83 @@ struct DocumentEditorHomeCloseTests {
         #expect(sheet.contains("parkedForHomeClose"), "the sheet's teardown spares a parked session")
     }
 
+    // MARK: - The sheet slot presents Search only in its phases
+
+    /// Every phase kind, with whether the slot presents Search in it.
+    /// Written out, not computed: a tenth phase has to be added here.
+    private static let searchPhaseRows: [(phase: DocumentState.PhaseKind, presents: Bool)] = [
+        (.empty, false),
+        (.importing, true),
+        (.editing, true),
+        (.detecting, false),
+        (.redacting, false),
+        (.verifying, false),
+        (.verified, false),
+        (.exporting, false),
+        (.failed, true),
+    ]
+
+    @Test("The sheet slot presents a Search session only while editing, importing or failed")
+    func sheetSlotPresentsSearchOnlyInItsPhases() {
+        #expect(Self.searchPhaseRows.count == 9)
+        #expect(Self.searchPhaseRows.filter(\.presents).count == 3)
+        for row in Self.searchPhaseRows {
+            #expect(DocumentEditorView.sheetSlotMayPresentSearch(in: row.phase) == row.presents,
+                    "phase \(row.phase)")
+        }
+    }
+
+    @Test("A Search session present in a run, on the results or with no document must come down")
+    func searchOutsideItsPhasesMustComeDown() {
+        for row in Self.searchPhaseRows {
+            #expect(DocumentEditorView.searchMustComeDown(sessionPresent: true, phase: row.phase) == !row.presents,
+                    "a session present, phase \(row.phase)")
+            #expect(DocumentEditorView.searchMustComeDown(sessionPresent: false, phase: row.phase) == false,
+                    "no session, phase \(row.phase)")
+        }
+    }
+
+    @Test("Taking Search down outside its phases leaves no session")
+    func takeDownLeavesNoSession() {
+        let redacting = RedactionState()
+        redacting.activeSearch = SearchState()
+        DocumentEditorView.takeDownSearchOutsideItsPhases(phase: .redacting, redactionState: redacting)
+        #expect(redacting.activeSearch == nil)
+
+        let editing = RedactionState()
+        let kept = SearchState()
+        editing.activeSearch = kept
+        DocumentEditorView.takeDownSearchOutsideItsPhases(phase: .editing, redactionState: editing)
+        #expect(editing.activeSearch === kept)
+
+        let importing = RedactionState()
+        let keptOverImport = SearchState()
+        importing.activeSearch = keptOverImport
+        DocumentEditorView.takeDownSearchOutsideItsPhases(phase: .importing, redactionState: importing)
+        #expect(importing.activeSearch === keptOverImport)
+    }
+
+    @Test("A Search session that is up when an import starts stays up")
+    func searchStaysUpThroughAnImport() {
+        #expect(DocumentEditorView.searchMustComeDown(sessionPresent: true, phase: .importing) == false)
+        #expect(DocumentEditorView.searchMustComeDown(sessionPresent: true, phase: .failed) == false)
+    }
+
+    @Test("The sheet slot asks the phase before it presents Search, and the editor takes a stray session down (source pin)")
+    func sheetSlotAsksThePhaseSourcePin() throws {
+        let source = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorView.swift")
+        let slot = try #require(source.range(of: ".sheet(item: Binding<ActiveSheet?>("))
+        let content = try #require(source.range(of: ") { sheet in", range: slot.upperBound..<source.endIndex))
+        #expect(source[slot.upperBound..<content.lowerBound]
+                    .contains("Self.sheetSlotMayPresentSearch(in: documentState.phaseKind)"),
+                "the getter asks the phase before it presents Search")
+        #expect(source.contains(
+            "Self.takeDownSearchOutsideItsPhases(phase: documentState.phaseKind, redactionState: redactionState)"),
+            "the editor takes a session present outside its phases down")
+        #expect(source.contains(".onChange(of: documentState.phaseKind, initial: true)"),
+                "the phase's observer also runs when the editor first appears")
+    }
+
     /// Mirrors `HonestySurfacesTests.loadRepoFile`.
     private func loadRepoFile(
         _ relativePath: String, from file: StaticString = #filePath
