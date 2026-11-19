@@ -233,16 +233,47 @@ struct VerificationResultsActionsTests {
 
     // MARK: - Sections
 
-    @Test("A wholly clean run is the Checks list; the cluster opens by default only for riding notes with nothing above")
+    @Test("The cluster opens by default only for riding notes with nothing above")
     func clusterRules() {
         func partition(_ report: VerificationReport) -> VerificationLayerPartition {
             VerificationLayerPartition(layers: report.layers, perPageModes: report.perPageModes)
         }
-        #expect(VerificationDetailsSection.isEveryCheckPassed(partition(Fixtures.secureAllPass)))
-        #expect(!VerificationDetailsSection.isEveryCheckPassed(partition(Fixtures.searchableAllRasterized)))
         #expect(VerificationDetailsSection.clusterOpensByDefault(partition(Fixtures.securePassRidingNote)))
         #expect(!VerificationDetailsSection.clusterOpensByDefault(partition(Fixtures.secureScreenshot)))
         #expect(!VerificationDetailsSection.clusterOpensByDefault(partition(Fixtures.searchableAllRasterized)))
+    }
+
+    @Test("The list row holds the passed checks and the notes riding with them, on every run that has them")
+    func listRowHoldsThePassedChecks() throws {
+        func partition(_ report: VerificationReport) -> VerificationLayerPartition {
+            VerificationLayerPartition(layers: report.layers, perPageModes: report.perPageModes)
+        }
+        var examined = 0
+        for (name, report) in Fixtures.all {
+            #expect(VerificationDetailsSection.listRowMembers(partition(report)) == partition(report).cluster, "\(name)")
+            examined += 1
+        }
+        print("[list-row] seeded reports \(examined)")
+        #expect(examined == 18)
+        // A run where every check passed: one row holding every check, closed.
+        let clean = partition(Fixtures.secureAllPass)
+        #expect(VerificationDetailsSection.listRowMembers(clean) == Array(Fixtures.secureAllPass.layers.indices))
+        #expect(clean.clusterTitle == "7 checks passed")
+        #expect(!VerificationDetailsSection.clusterOpensByDefault(clean))
+        // A riding note with nothing above still opens on arrival.
+        #expect(VerificationDetailsSection.clusterOpensByDefault(partition(Fixtures.securePassRidingNote)))
+    }
+
+    @Test("The details draw no headed list of checks; the groups come before the list row")
+    func noHeadedListOfChecks() throws {
+        let source = try String(contentsOf: URL(fileURLWithPath: "\(#filePath)")
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/ResectaApp/Views/VerificationDetailsSection.swift"), encoding: .utf8)
+        #expect(!source.contains("header: \"Checks\""))
+        #expect(!source.contains("layout: .bare"))
+        let groups = try #require(source.range(of: "ForEach(Self.groups(partition)"))
+        let row = try #require(source.range(of: "passCluster(partition)"))
+        #expect(groups.lowerBound < row.lowerBound)
     }
 
     @Test("Page Modes: one line per mode with ranges; shown when mixed or any page fell back")
