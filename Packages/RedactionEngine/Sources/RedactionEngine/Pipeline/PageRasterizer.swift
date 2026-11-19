@@ -199,6 +199,8 @@ public final class PageRasterizer: @unchecked Sendable {
         var removalRects: [CGRect]
         var fallbackReason: TextLayerDetector.FallbackReason?
         var runsLeftOut: Int = 0
+        /// The entries' lines as the text path laid them out, for the writer.
+        var hiddenTextLines: HiddenTextLines? = nil
     }
 
     /// The front gate, the test seam, the mode check and the DPI. Throws
@@ -294,6 +296,7 @@ public final class PageRasterizer: @unchecked Sendable {
         var fallbackReason = page.fallbackReason
         // The text path's count of runs left out (zero unless the path ran).
         var runsLeftOut = 0
+        var hiddenTextLines: HiddenTextLines? = nil
 
         if page.pipelineMode == .searchableRedaction {
             let extractor = TextLayerExtractor()
@@ -362,6 +365,7 @@ public final class PageRasterizer: @unchecked Sendable {
                         textLayerEntries = entries
                         redactionRectsForTextLayer = removalRects
                         pageDigest = digest
+                        hiddenTextLines = path.hiddenTextLines
                     case .picture(let reason):
                         // The page is written without a text layer (entries
                         // and digest never set, the reason recorded): the
@@ -398,7 +402,7 @@ public final class PageRasterizer: @unchecked Sendable {
         return TextLayerState(
             entries: textLayerEntries, digest: pageDigest,
             removalRects: redactionRectsForTextLayer, fallbackReason: fallbackReason,
-            runsLeftOut: runsLeftOut
+            runsLeftOut: runsLeftOut, hiddenTextLines: hiddenTextLines
         )
     }
 
@@ -440,6 +444,7 @@ public final class PageRasterizer: @unchecked Sendable {
             textLayer.removalRects = []
             textLayer.digest = nil
             textLayer.runsLeftOut = 0
+            textLayer.hiddenTextLines = nil
             if Self.inkTestCanRun(context: ctx, pageSize: effectiveSize) {
                 textLayer.fallbackReason = .hiddenText
                 pageRasterizerLogger.log(
@@ -510,7 +515,7 @@ public final class PageRasterizer: @unchecked Sendable {
         // Use point dimensions (not pixel) for the PDF media box.
         // The CGImage carries the full pixel resolution; CGPDFContext embeds it
         // at native DPI when drawn into the smaller point-sized rect.
-        let output = PageOutput(
+        var output = PageOutput(
             image: redactedImage,
             size: effectiveSize,
             textLayerEntries: textLayer.entries,
@@ -518,6 +523,7 @@ public final class PageRasterizer: @unchecked Sendable {
             rotation: page.rotation,
             runsLeftOut: textLayer.runsLeftOut
         )
+        output.hiddenTextLines = textLayer.hiddenTextLines
         return RasterizeResult(pageOutput: output, filterDigest: textLayer.digest,
                                fallbackReason: textLayer.fallbackReason)
     }

@@ -85,6 +85,35 @@ struct PageTextPathTests {
         #expect(written.count < entries.count)
     }
 
+    @Test("The writer is handed the lines the drawn-cell rule laid out, the lines it would assemble itself",
+          arguments: [0, 90], [false, true])
+    func writerIsHandedTheRulesLines(rotation: Int, boxed: Bool) async throws {
+        let (entries, _, size) = try await Self.entries()
+        let region = try Self.betaRegion(entries)
+        let frame = PageFrame(rotation: rotation, displayedSize: size)
+        let path = try await PageTextPath.run(
+            entries: entries, frame: frame,
+            textPathRectangles: boxed ? [TextPathRectangle(rect: region, kind: .ordinary)] : [],
+            paintedRectangles: [], pageIndex: 0)
+        guard case .written(let written, _, let rects) = path.outcome else {
+            Issue.record("the page is written"); return
+        }
+        let carried = try #require(path.hiddenTextLines)
+        #expect(carried.entryCount == written.count)
+        let own = TextLayerReconstructor.sourceFrameLines(written, redactionRects: rects, frame: frame).map(\.line)
+        #expect(!own.isEmpty)
+        #expect(carried.lines.count == own.count)
+        for (handed, line) in zip(carried.lines, own) {
+            #expect(handed.line.text == line.text)
+            #expect(handed.line.fontSize == line.fontSize)
+            #expect(handed.line.origin == line.origin)
+            let laid = try #require(HiddenTextLine.layout(line.text, size: line.fontSize))
+            #expect(CTLineGetGlyphCount(handed.laidOut) == CTLineGetGlyphCount(laid))
+            #expect(CTLineGetTypographicBounds(handed.laidOut, nil, nil, nil)
+                    == CTLineGetTypographicBounds(laid, nil, nil, nil))
+        }
+    }
+
     @Test("A rectangle under a widened box is read by no step of the path")
     func underWidenedBoxIsNotRead() async throws {
         let (entries, _, size) = try await Self.entries()

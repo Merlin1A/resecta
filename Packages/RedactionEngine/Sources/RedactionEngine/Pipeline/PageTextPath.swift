@@ -56,6 +56,9 @@ enum PageTextPath {
         let runsLeftOut: Int
         /// Survivors the drawn-cell rule dropped.
         let drawnCellDropped: Int
+        /// The written list's lines as the drawn-cell rule laid them out,
+        /// for the writer; nil when the page is a picture.
+        var hiddenTextLines: HiddenTextLines? = nil
     }
 
     static func run(
@@ -106,7 +109,8 @@ enum PageTextPath {
             frame: frame)
         return Result(
             outcome: .written(entries: validated.result.surviving, digest: digest, removalRects: rects),
-            runsLeftOut: alphabet.runsLeftOut, drawnCellDropped: validated.dropped)
+            runsLeftOut: alphabet.runsLeftOut, drawnCellDropped: validated.dropped,
+            hiddenTextLines: validated.lines)
     }
 
     /// `result` with every survivor of a marked word left out, counted as

@@ -7,6 +7,16 @@ import Foundation
 /// in Courier. Nil when a run cannot be written, or when the system laid any
 /// glyph out in a face other than the three: before the record the page is
 /// then a picture, and at write time its hidden text is not written.
+/// A page's hidden-text lines as the drawn-cell rule assembled and laid
+/// them out before the record, for the writer to draw as they are: each
+/// line is assembled and laid out once. `entryCount` is the count of the
+/// survivors they were made from; the writer lays the page out itself when
+/// it is handed another count, or no line. (A laid-out line is immutable once made.)
+struct HiddenTextLines: @unchecked Sendable {
+    let lines: [(line: TextLayerLine, laidOut: CTLine)]
+    let entryCount: Int
+}
+
 enum HiddenTextLine {
     /// The lines a test makes fail to lay out, as when the system puts a
     /// glyph in another face; nil, the default, refuses none.
