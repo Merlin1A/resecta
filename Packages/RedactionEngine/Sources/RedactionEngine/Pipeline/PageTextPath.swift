@@ -10,35 +10,54 @@ import Foundation
 /// record; after it nothing adds, removes or changes a letter.
 ///
 /// Two lists of rectangles come in, already in output-page points; the path
-/// derives neither. The text-path rectangles: the filter, the layout's line
-/// breaks (in the writer and in the drawn-cell rule), the record and the
-/// page output's rectangles all read this one list, every kind but "under a
-/// widened box", which only the position check reads. The painted
-/// rectangles: read by the paint marks; the rasterizer passes none today.
+/// derives neither. The text-path rectangles: the filter reads each by its
+/// kind (`TextPathFilter`); the layout's line breaks (in the writer and in
+/// the drawn-cell rule), the record and the page output's rectangles read
+/// every kind but "under a widened box", which only the position check
+/// reads. The painted rectangles: read by the paint marks; the rasterizer
+/// passes none today.
 enum PageTextPath {
 
     /// The path's steps. The default is the real step for each; a test
-    /// replaces one, within `$steps.withValue`, to make it fault. The fold
-    /// and the alphabet marks may also return nothing (nil), which the real
-    /// steps never do: the page is then a picture, as when a step throws.
-    /// Neither step has a time limit of its own.
+    /// replaces one, within `$steps.withValue`, to make it fault. A step may
+    /// also return nothing (nil), which the real steps never do: the page is
+    /// then a picture, as when a step throws. No step has a time limit of
+    /// its own.
     struct Steps: Sendable {
+        /// The page's characters, from its own text (`TextLayerExtractor`).
+        /// The rasterizer calls it through `extract(_:)`.
+        var extract: @Sendable (PDFPageData) async throws -> [CharacterInfo]?
         var fold: @Sendable ([CharacterInfo]) throws -> [CharacterInfo]?
-        var filter: @Sendable ([CharacterInfo], [CGRect]) async throws -> FilterResult
+        /// The filter, by each rectangle's kind (`TextPathFilter`).
+        var filter: @Sendable ([CharacterInfo], [TextPathRectangle], PageFrame) async throws -> FilterResult?
         var alphabetMarks: @Sendable ([CharacterInfo]) throws -> TextPathAlphabetMarks.Marks?
         /// The words the paint covers, by the page's one partition, from the
-        /// survivors and the painted rectangles. Nothing while no painted
-        /// rectangle is handed in.
-        var paintMarks: @Sendable ([CharacterInfo], [CGRect]) throws -> Set<Int>
+        /// survivors and the painted rectangles (`TextPathPaintMarks`).
+        /// Nothing while no painted rectangle is handed in.
+        var paintMarks: @Sendable ([CharacterInfo], [CGRect], PageFrame) throws -> Set<Int>?
+        /// The whole-word closure: every survivor of a marked word left out.
+        var closure: @Sendable (FilterResult, Set<Int>) throws -> FilterResult?
 
         static let live = Steps(
+            extract: { try await TextLayerExtractor().extractCharacters(from: $0.page, hasHiddenOCG: $0.hasHiddenOCG) },
             fold: { TextPathFold.fold($0) },
-            filter: { try await filterCharacters(characters: $0, redactionRects: $1) },
+            filter: { try await TextPathFilter.filter($0, $1, frame: $2) },
             alphabetMarks: { TextPathAlphabetMarks.marks($0) },
-            paintMarks: { _, _ in [] })
+            paintMarks: { TextPathPaintMarks.marks($0, painted: $1, frame: $2) },
+            closure: { PageTextPath.closeOverMarkedWords($0, marked: $1) })
     }
 
     @TaskLocal static var steps = Steps.live
+
+    /// Thrown when the extract step returns nothing: the rasterizer records
+    /// the page as one whose extraction failed, as when the step throws.
+    struct NothingExtracted: Error {}
+
+    /// The page's characters through the extract step.
+    static func extract(_ page: PDFPageData) async throws -> [CharacterInfo] {
+        guard let characters = try await steps.extract(page) else { throw NothingExtracted() }
+        return characters
+    }
 
     #if DEBUG
     /// Tests only, compiled out of a release build: true turns the closure
@@ -94,11 +113,15 @@ enum PageTextPath {
         guard let folded = try steps.fold(entries) else {
             return Result(outcome: .picture(.extractionFailed), runsLeftOut: 0, drawnCellDropped: 0)
         }
-        let filtered = try await steps.filter(folded, rects)
+        guard let filtered = try await steps.filter(folded, textPathRectangles, frame) else {
+            return Result(outcome: .picture(.extractionFailed), runsLeftOut: 0, drawnCellDropped: 0)
+        }
         guard let alphabet = try steps.alphabetMarks(filtered.surviving) else {
             return Result(outcome: .picture(.extractionFailed), runsLeftOut: 0, drawnCellDropped: 0)
         }
-        let painted = try steps.paintMarks(filtered.surviving, paintedRectangles)
+        guard let painted = try steps.paintMarks(filtered.surviving, paintedRectangles, frame) else {
+            return Result(outcome: .picture(.extractionFailed), runsLeftOut: 0, drawnCellDropped: 0)
+        }
 
         // The whole-word closure over every marked word and every word the
         // filter took a letter of, then the drawn-cell rule on what is left.
@@ -106,8 +129,10 @@ enum PageTextPath {
         // runs again on the lines that changed, until nothing more leaves.
         let wholeWords = Self.wholeWords
         let filterTook = wholeWords ? wordsLosingALetter(before: folded, after: filtered.surviving) : []
-        var current = closeOverMarkedWords(
-            filtered, marked: alphabet.wordIndices.union(painted).union(filterTook))
+        guard var current = try steps.closure(
+            filtered, alphabet.wordIndices.union(painted).union(filterTook)) else {
+            return Result(outcome: .picture(.extractionFailed), runsLeftOut: 0, drawnCellDropped: 0)
+        }
         let shapes = rects.map {
             RegionShape(expandedBounds: $0.insetBy(dx: -safetyMargin, dy: -safetyMargin), bounds: $0)
         }
@@ -131,7 +156,11 @@ enum PageTextPath {
             }
             let ruleTook = wholeWords
                 ? wordsLosingALetter(before: current.surviving, after: pass.result.surviving) : []
-            current = closeOverMarkedWords(pass.result, marked: ruleTook)
+            guard let closed = try steps.closure(pass.result, ruleTook) else {
+                return Result(outcome: .picture(.extractionFailed), runsLeftOut: 0,
+                              drawnCellDropped: drawnCellDropped)
+            }
+            current = closed
             // The pass that takes nothing laid out the survivors as they
             // stand: the writer draws its lines.
             if ruleTook.isEmpty { lines = pass.lines; break }

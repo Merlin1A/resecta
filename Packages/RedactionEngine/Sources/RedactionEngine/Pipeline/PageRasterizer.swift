@@ -284,11 +284,8 @@ public final class PageRasterizer: @unchecked Sendable {
         var hiddenTextLines: HiddenTextLines? = nil
 
         if page.pipelineMode == .searchableRedaction {
-            let extractor = TextLayerExtractor()
             do {
-                let characters = try await extractor.extractCharacters(
-                    from: page.page, hasHiddenOCG: page.hasHiddenOCG
-                )
+                let characters = try await PageTextPath.extract(page)
 
                 // Check for fallback triggers
                 // >1% U+FFFD check on extracted characters (tightened from 5% —
@@ -320,9 +317,14 @@ public final class PageRasterizer: @unchecked Sendable {
                     // A region over a hidden layer strips under its hidden
                     // glyphs' box too (`textRemovalRects`); the fill below
                     // paints `normalizedRect` alone.
-                    let redactionRectsInPoints = page.regions.flatMap(\.textRemovalRects).map {
-                        normalizedToPDFPageCoordinates($0, pageRect: pageBounds)
-                    }
+                    // The page's text-path rectangles, by the function the
+                    // position check calls too; the plan's boxes fill `boxes`.
+                    let points = { (r: CGRect) in normalizedToPDFPageCoordinates(r, pageRect: pageBounds) }
+                    let textPathRectangles = TextPathRectangle.forPage(regions: page.regions.map {
+                        TextPathRegion(id: $0.id, rect: points($0.normalizedRect),
+                                       hiddenLettersRect: $0.textLayerRect.map(points), inkStrips: $0.inkStripRects.map(points))
+                    }, boxes: [])
+                    let redactionRectsInPoints = textPathRectangles.filter { $0.kind != .underWidenedBox }.map(\.rect)
                     // The frame carries the page's rotation: the drawn-cell
                     // rule, the writer and the lineage digest all work in the
                     // SOURCE frame of a rotated page.
@@ -331,13 +333,11 @@ public final class PageRasterizer: @unchecked Sendable {
                     // The page's text path: the fold, the filter, the alphabet
                     // marks, the drawn-cell rule and the record, each step
                     // through its seam (`PageTextPath`). Its rectangles are
-                    // the removal rectangles above, every one ordinary; no
-                    // painted rectangle is passed.
+                    // the text-path rectangles above, every one ordinary
+                    // while no box is passed; the fills' rectangles fill
+                    // `paintedRectangles`.
                     let path = try await PageTextPath.run(
-                        entries: characters, frame: frame,
-                        textPathRectangles: redactionRectsInPoints.map {
-                            TextPathRectangle(rect: $0, kind: .ordinary)
-                        },
+                        entries: characters, frame: frame, textPathRectangles: textPathRectangles,
                         paintedRectangles: [], pageIndex: page.pageIndex)
                     if path.drawnCellDropped > 0 {
                         pageRasterizerLogger.log(
