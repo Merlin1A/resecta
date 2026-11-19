@@ -1,0 +1,20 @@
+Property: In the bottom slot the selection, Add to Selection included, comes before the drawing caption.
+Area: editor (bottom slot)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BottomSlotTests
+Must go red: ResectaAppTests/BottomSlotTests oneOccupant (selection with drawingCaption); ResectaAppTests/BottomSlotTests oneOccupant (addToSelection with drawingCaption)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/DocumentEditorView+Caption.swift b/Sources/ResectaApp/Views/DocumentEditorView+Caption.swift
+index a1026ce7..71f79067 100644
+--- a/Sources/ResectaApp/Views/DocumentEditorView+Caption.swift
++++ b/Sources/ResectaApp/Views/DocumentEditorView+Caption.swift
+@@ -110,8 +110,8 @@ extension DocumentEditorView {
+             return .message
+         }
+         if firstTimeLineDue { return .firstTimeLine }
+-        if let selection { return selection }
+         if drawingModeCaptionShouldShow(activeTool: activeTool, phaseKind: phaseKind) { return .drawingCaption }
++        if let selection { return selection }
+         return widenedOnPage ? .widenedBoxes : nil
+     }
+ 

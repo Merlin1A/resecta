@@ -178,6 +178,26 @@ nonisolated final class EditorToolbarUITests: XCTestCase {
         XCTAssertTrue(capsule.waitForNonExistence(timeout: 5), "Done must end Add to Selection and its capsule.")
     }
 
+    func testAddToSelection_doneAnswersAboveItsWord() {
+        launchWithOneRegion()
+        openOverflowAndTap("Add to Selection")
+        let slot = app.descendants(matching: .any).matching(identifier: "addModeCapsule").firstMatch
+        XCTAssertTrue(slot.waitForExistence(timeout: 5), "Add to Selection must show its words in the slot.")
+        // The slot's glass foot is 8 pt above the page bar's glass, whose top
+        // is 8 pt above the bar's reported frame (its padding). The slot's
+        // element reports its words and Done's 44 pt hit area, not its glass:
+        // the foot is the words' foot plus the slot's 12 pt of padding.
+        let bar = app.descendants(matching: .any).matching(identifier: "pageNav").firstMatch
+        XCTAssertTrue(bar.waitForExistence(timeout: 10), "The page bar is missing.")
+        let gap = (bar.frame.minY - 8) - DrawToolStateUITests.slotGlassFoot(slot)
+        XCTAssertEqual(gap, 8, accuracy: 1, "The slot's foot must be 8 pt above the page bar's glass; the gap is \(gap) pt.")
+        attachScreenshot(named: "toolbar-add-in-the-slot")
+        let done = app.buttons["addModeDoneButton"].firstMatch
+        XCTAssertTrue(done.exists, "Done is missing.")
+        done.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).withOffset(CGVector(dx: 0, dy: -20)).tap()
+        XCTAssertTrue(slot.waitForNonExistence(timeout: 5), "A tap 20 pt above Done's word must end Add to Selection.")
+    }
+
     // MARK: - The delete notice
 
     func testDeleteTwoRegions_noticeUndoRestoresThem() {
