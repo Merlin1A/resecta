@@ -5,15 +5,15 @@ Must go red: ResectaAppTests/RecheckBurnedRegionsTests "Each case" (sameRegionsO
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/State/PipelineRunner.swift b/Sources/ResectaApp/State/PipelineRunner.swift
-index 0d2c21d1..188a9eed 100644
+index cd8f6e24..49f0c2d2 100644
 --- a/Sources/ResectaApp/State/PipelineRunner.swift
 +++ b/Sources/ResectaApp/State/PipelineRunner.swift
-@@ -388,7 +388,7 @@ struct PipelineRunner {
+@@ -401,7 +401,7 @@ struct PipelineRunner {
              // Verify-only runs only on an output that is not stale, so the
              // live regions are the same regions in their drawn form: they
              // stand in only where no inputs were kept (the debug seed).
 -            burnedRegions: retained?.burnedRegions ?? coordinator.redactionState.regions
 +            burnedRegions: coordinator.redactionState.regions
          )
-         return try await verify(
-             runContext: runContext, effectiveMode: effectiveMode,
+         // The record of the run that made this output, as on the run; nil
+         // only where no inputs were kept (the debug seed).

@@ -5,9 +5,10 @@ Must go red: RedactionEngineTests/PositionCheckListTests "Five exports: the writ
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift
+index d56f7253..981ad415 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift
-@@ -321,9 +321,9 @@
+@@ -324,9 +324,9 @@ public final class PageRasterizer: @unchecked Sendable {
                      // A region over a hidden layer strips under its hidden
                      // glyphs' box too (`textRemovalRects`); the fill below
                      // paints `normalizedRect` alone.
@@ -16,6 +17,6 @@ diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRaste
                          normalizedToPDFPageCoordinates($0, pageRect: pageBounds)
 -                    }
 +                    }.dropLast())
- 
-                     // Region shapes in output-page points: the rects
-                     // wrapped (un-expanded `bounds`; the halo in
+                     // The frame carries the page's rotation: the drawn-cell
+                     // rule, the writer and the lineage digest all work in the
+                     // SOURCE frame of a rotated page.
