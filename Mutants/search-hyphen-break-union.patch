@@ -5,18 +5,21 @@ Must go red: RedactionEngineTests/HyphenBreakClosedSpellingTests "Each row's sea
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift
-index 7458898a..bb26e5b6 100644
+index e22022ef..b53ad2fc 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift
-@@ -84,9 +84,8 @@ extension SearchCore {
-         let asRead = literalSpansAsRead(in: page, query: query, comparison: comparison, wholeWord: wholeWord, cap: cap)
-         guard !page.closedSpellingHyphens.isEmpty else { return asRead }
-         let closed = closedSpellingSpans(in: page, query: query, comparison: comparison, wholeWord: wholeWord, cap: cap)
--        guard !closed.isEmpty else { return asRead }
--        let seen = Set(asRead.spans.map { SpanKey($0.searchedRange) })
--        var merged = asRead.spans + closed.filter { !seen.contains(SpanKey($0.searchedRange)) }
+@@ -93,9 +93,11 @@ extension SearchCore {
+         if spacesMayMatchNothing {
+             added += optionalSpaceSpans(in: page, query: query, comparison: comparison, wholeWord: wholeWord, cap: cap)
+         }
+-        guard !added.isEmpty else { return asRead }
+-        var seen = Set(asRead.spans.map { SpanKey($0.searchedRange) })
+-        var merged = asRead.spans
 +        // mutant: one walk over the dropped reading in place of two
-+        var merged = closed
-         merged.sort {
-             ($0.searchedRange.location, $0.searchedRange.length) < ($1.searchedRange.location, $1.searchedRange.length)
++        guard !added.isEmpty || !page.closedSpellingHyphens.isEmpty else { return asRead }
++        let walked = page.closedSpellingHyphens.isEmpty ? asRead.spans : []
++        var seen = Set(walked.map { SpanKey($0.searchedRange) })
++        var merged = walked
+         for span in added where seen.insert(SpanKey(span.searchedRange)).inserted {
+             merged.append(span)
          }

@@ -5,10 +5,10 @@ Must go red: RedactionEngineTests/JoinedGlyphExtractionTests entryForEntry; Reda
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextLayerExtractor.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextLayerExtractor.swift
-index 234241d0..ccb501da 100644
+index 86408920..9cfef93d 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextLayerExtractor.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextLayerExtractor.swift
-@@ -93,6 +93,8 @@ public struct TextLayerExtractor: Sendable {
+@@ -95,6 +95,8 @@ public struct TextLayerExtractor: Sendable {
          // width. Pre-rotation because /Rotate 90/270 swaps the axes and the
          // gutter test below compares along the advance axis.
          var previousLocalWidth: CGFloat?
@@ -17,7 +17,7 @@ index 234241d0..ccb501da 100644
          while utf16Offset < totalCodeUnits {
              if bandCounter & 0xFF == 0 { try Task.checkCancellation() }
              bandCounter += 1
-@@ -181,8 +183,17 @@ public struct TextLayerExtractor: Sendable {
+@@ -183,8 +185,17 @@ public struct TextLayerExtractor: Sendable {
                      continue
                  }
              }
@@ -33,6 +33,6 @@ index 234241d0..ccb501da 100644
              characters.append(CharacterInfo(
 -                character: char, bounds: bounds, stringIndex: utf16Offset,
 +                character: char, bounds: letterBounds, stringIndex: utf16Offset,
-                 lineIndex: lineIndex
+                 lineIndex: lineIndex,
+                 wordIndex: utf16Offset < wordIndices.count ? wordIndices[utf16Offset] : wordIndices.last ?? 0
              ))
-             previousLocalWidth = localBounds.width

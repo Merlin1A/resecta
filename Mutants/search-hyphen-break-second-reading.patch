@@ -5,15 +5,15 @@ Must go red: RedactionEngineTests/HyphenBreakClosedSpellingTests "Each row's sea
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift
-index 7458898a..418b2daa 100644
+index e22022ef..1fdfc574 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchCore+AlternateReadings.swift
-@@ -82,7 +82,7 @@ extension SearchCore {
-         cap: Int?
+@@ -87,7 +87,7 @@ extension SearchCore {
      ) -> (spans: [MatchSpan], stoppedAtCap: Bool) {
          let asRead = literalSpansAsRead(in: page, query: query, comparison: comparison, wholeWord: wholeWord, cap: cap)
--        guard !page.closedSpellingHyphens.isEmpty else { return asRead }
-+        return asRead // mutant: no second walk
-         let closed = closedSpellingSpans(in: page, query: query, comparison: comparison, wholeWord: wholeWord, cap: cap)
-         guard !closed.isEmpty else { return asRead }
-         let seen = Set(asRead.spans.map { SpanKey($0.searchedRange) })
+         var added: [MatchSpan] = []
+-        if !page.closedSpellingHyphens.isEmpty {
++        if false, !page.closedSpellingHyphens.isEmpty { // mutant: no second walk
+             added += closedSpellingSpans(in: page, query: query, comparison: comparison, wholeWord: wholeWord, cap: cap)
+         }
+         if spacesMayMatchNothing {
