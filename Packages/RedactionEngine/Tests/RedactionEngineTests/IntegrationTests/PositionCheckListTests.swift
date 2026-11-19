@@ -98,7 +98,7 @@ struct PositionCheckListTests {
         let page = RunRecord.Page(
             pageIndex: 0,
             regions: e.regions.map { RunRecord.DrawnRegion(id: $0.id, normalizedRect: $0.normalizedRect) },
-            cropBox: crop.size, rotation: e.page.rotation)
+            cropBox: crop.size, rotation: e.page.rotation, switchOn: false)
         let record = RunRecord(
             confirmed: RunRecord.Confirmed(fillColor: .black, exportDPI: 300, pages: [page]),
             produced: RunRecord.Produced())

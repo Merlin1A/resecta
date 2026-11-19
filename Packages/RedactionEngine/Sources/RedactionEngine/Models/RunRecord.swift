@@ -73,22 +73,32 @@ public struct RunRecord: Equatable, Sendable {
         /// One page as confirmed, with its plan made at run entry from the
         /// page's crop box and rotation. The page's two sides S are read in
         /// the frame as the page is rasterised, so a page turned a quarter
-        /// has its sides swapped. The plan holds one box for each region
-        /// admission lets through, as placed. The plan is nil when a side
-        /// cannot be read.
-        public init(pageIndex: Int, regions: [DrawnRegion], cropBox: CGSize, rotation: Int) {
+        /// has its sides swapped. The plan is made by `PaintPlan.make` under
+        /// `RunRecord.planChoice(source: RunRecord.planSource, switchOn:)`
+        /// over the regions admission lets through: under "as placed" it
+        /// holds one box for each of them, as placed, and the switch is not
+        /// read. The plan is nil when a side cannot be read.
+        public init(pageIndex: Int, regions: [DrawnRegion], cropBox: CGSize, rotation: Int, switchOn: Bool) {
             let turned = ((rotation % 360) + 360) % 180 != 0
             var plan: PaintPlan?
             if let width = PixelPlan.sixtyFourths(ofSide: Double(turned ? cropBox.height : cropBox.width)),
                let height = PixelPlan.sixtyFourths(ofSide: Double(turned ? cropBox.width : cropBox.height)) {
                 let admitted = regions.filter { RedactionRegion.isAdmitted(normalizedRect: $0.normalizedRect) }
-                plan = PaintPlan.asPlaced(
-                    regions: admitted.map { region in
-                        let r = region.normalizedRect
-                        return (region.id, PointRect(minX: Double(r.minX), minY: Double(r.minY),
-                                                     maxX: Double(r.maxX), maxY: Double(r.maxY)))
-                    },
-                    widthSixtyFourths: width, heightSixtyFourths: height)
+                let choice = RunRecord.planChoice(source: RunRecord.planSource, switchOn: switchOn)
+                // A drawn region carries no kind; under "as placed" the plan
+                // never reads one.
+                let planRegions = admitted.map { region in
+                    let r = region.normalizedRect
+                    return PlanRegion(id: region.id,
+                                      share: PointRect(minX: Double(r.minX), minY: Double(r.minY),
+                                                       maxX: Double(r.maxX), maxY: Double(r.maxY)),
+                                      kind: .drawnByHand)
+                }
+                plan = PaintPlan.make(
+                    regions: planRegions, words: PageWords(words: []), text: "",
+                    facts: PageTextFacts(showsInvisibleText: false, carriesPageScaleImage: false),
+                    widthSixtyFourths: width, heightSixtyFourths: height,
+                    policy: .release, source: choice.source, switchOn: choice.switchOn).plan
             }
             self.init(pageIndex: pageIndex, regions: regions, plan: plan)
         }

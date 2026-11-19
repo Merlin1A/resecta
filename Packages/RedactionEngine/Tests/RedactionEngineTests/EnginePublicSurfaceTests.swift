@@ -79,7 +79,7 @@ struct EnginePublicSurfaceTests {
         _ = try DocumentSearcher.validateRegexPatternWithError("x")
         _ = page.confirmedPage
         _ = RedactionRegion.isAdmitted(normalizedRect: .zero)
-        _ = RunRecord.Page(pageIndex: 0, regions: [], cropBox: .zero, rotation: 0)
+        _ = RunRecord.Page(pageIndex: 0, regions: [], cropBox: .zero, rotation: 0, switchOn: false)
         _ = DocumentSearcher.sharedLoadDiagnostics
         _ = engine.layers(for: .searchableRedaction)
         _ = engine.aggregateStatus(layers)
