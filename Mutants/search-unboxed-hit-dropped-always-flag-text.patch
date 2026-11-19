@@ -5,7 +5,7 @@ Must go red: RedactionEngineTests/NoBoxHitTests alwaysFlagText
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift
-index 58d5d76..6717039 100644
+index 260c61c4..5d9372c4 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift
 @@ -138,16 +138,6 @@ extension DocumentSearcher {
@@ -24,4 +24,4 @@ index 58d5d76..6717039 100644
 -                            totalYielded += 1
                              continue
                          }
-                         pageRects.append(box.rect)
+                         pageRects.append(box.mergeIdentity)
