@@ -85,6 +85,16 @@ struct BoxCheckRuleTests {
         #expect(BoxCheckTests.isIssue(o), "\(o)")
     }
 
+    @Test("A white box painted at level 254: its block is flat but one level short of the fill, so it is an issue")
+    func oneLevelShortOfWhite() {
+        let (b, p) = BoxCheckTests.boxAt(Lines(left: 96, top: 96, right: 224, bottom: 144), dpi: 300, width: 600, height: 600)
+        let (walk, _) = F.walk(F.picture(width: 600, height: 600, gray: true, marks: [F.Mark(lines: Lines(left: 0, top: 0, right: 600, bottom: 600), gray: 254.0 / 255)]))
+        let block = walk.blocks[0][(96 / 8) * walk.blocksWide[0] + 96 / 8]
+        #expect(block.flat && block.dcTimesStep < 1013, "the block is flat and short of the white bound: \(block)")
+        let o = F.judge(b, report: F.report(p, height: 600), on: walk, dpi: 300, sides: (9216, 9216), fill: .white)
+        #expect(BoxCheckTests.isIssue(o), "\(o)")
+    }
+
     @Test("The seven outcome rows as data, against the names the verdict reads")
     func outcomeRows() {
         let rows: [(BoxOutcome, OutcomeKind, RowClass)] = [
@@ -119,11 +129,32 @@ struct BoxCheckRuleTests {
         #expect(none.outcomes.count == 1 && none.outcomes[0].unit == .document && none.outcomes[0].kind == .fault(.noRecord))
     }
 
+    @Test("A record of two pages against a one-page export: the page the file lacks and its box read as the wrong file; a file page the record lacks reads the same")
+    func recordPagesTheFileLacks() async throws {
+        let (b, p) = BoxCheckTests.boxAt(Lines(left: 100, top: 100, right: 220, bottom: 140), dpi: 300, width: 600, height: 600)
+        let (_, jpeg) = F.walk(F.picture(width: 600, height: 600, print: true, marks: [F.Mark(lines: p)]))
+        let file = try await PageImageFixtures.export([jpeg], size: CGSize(width: 144, height: 144))
+        let source = try #require(SystemPageImageSource(fileData: file))
+        let page = BoxCheckInput.Page(widthSixtyFourths: 9216, heightSixtyFourths: 9216, boxes: [b], reported: [0: F.report(p, height: 600)])
+        let two = BoxCheckInput(fill: .black, chosenDPI: 300, pages: [page, page],
+                                pageImageDigests: [PageImageFixtures.sha256(jpeg), Data(repeating: 7, count: 32)])
+        let report = try ExactFillCheck.run(fileData: file, source: source, input: two)
+        #expect(report.outcomes.map(\.unit) == [.page(0), .box(page: 0, planIndex: 0), .page(1), .box(page: 1, planIndex: 0)])
+        #expect(report.outcomes.map(\.kind) == [.completed, .completed, .fault(.wrongSubject), .fault(.wrongSubject)], "\(report.outcomes)")
+        let none = BoxCheckInput(fill: .black, chosenDPI: 300, pages: [], pageImageDigests: [PageImageFixtures.sha256(jpeg)])
+        let outside = try ExactFillCheck.run(fileData: file, source: source, input: none)
+        #expect(outside.outcomes.map(\.kind) == [.fault(.wrongSubject)], "\(outside.outcomes)")
+    }
+
     @Test("A record whose page has no plan gives the check no input; it never works out a page's size itself")
     func recordWithoutAPlan() {
         let record = RunRecord(confirmed: .init(fillColor: .black, exportDPI: 300, pages: [.init(pageIndex: 0, regions: [])]),
                                produced: .init())
         #expect(BoxCheckInput(record: record) == nil)
+        let plan = PaintPlan(widthSixtyFourths: 9216, heightSixtyFourths: 9216, boxes: [])
+        let outOfOrder = RunRecord(confirmed: .init(fillColor: .black, exportDPI: 300, pages: [
+            .init(pageIndex: 1, regions: [], plan: plan), .init(pageIndex: 0, regions: [], plan: plan)]), produced: .init())
+        #expect(BoxCheckInput(record: outOfOrder) == nil, "pages out of order are not read by place")
         let planned = RunRecord(confirmed: .init(fillColor: .white, exportDPI: 200, pages: [
             .init(pageIndex: 0, regions: [], plan: PaintPlan(widthSixtyFourths: 9216, heightSixtyFourths: 9216, boxes: [F.box(F.r(0, 0, 64, 64))])),
         ]), produced: .init(pageImageDigests: [0: Data([1])], paintedRectangles: [.init(pageIndex: 0, box: 0): .init(firstColumn: 0, firstRowFromBottom: 0, columns: 1, rows: 1)], infoDictionary: nil))

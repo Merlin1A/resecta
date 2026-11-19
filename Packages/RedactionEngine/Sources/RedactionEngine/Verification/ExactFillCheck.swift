@@ -23,11 +23,13 @@ struct BoxCheckInput: Sendable {
 extension BoxCheckInput {
     /// The input as the record holds it. Nil when a page has no plan: the
     /// record then holds neither that page's sides nor its boxes, and the
-    /// check is not given a size it would have to work out itself.
+    /// check is not given a size it would have to work out itself. Nil too
+    /// when the record's pages are not numbered 0, 1, 2 … in order: the
+    /// producer's rectangles and the pictures are both found by page number.
     init?(record: RunRecord) {
         var pages: [Page] = []
         for page in record.confirmed.pages {
-            guard let plan = page.plan else { return nil }
+            guard let plan = page.plan, page.pageIndex == pages.count else { return nil }
             var reported: [Int: RunRecord.PaintedPixels] = [:]
             for (position, pixels) in record.produced.paintedRectangles where position.pageIndex == page.pageIndex {
                 reported[position.box] = pixels
@@ -163,13 +165,19 @@ enum ExactFillCheck {
     static func isNeutral(_ b: CodedBlock) -> Bool { b.flat && abs(b.dcTimesStep) <= 3 }
 
     /// The check over a file: every page's picture read by the page-image
-    /// reader, then every box of that page judged. Throws only cancellation.
+    /// reader, then every box of that page judged. Every page of the record
+    /// has an answer: one the file does not have is not the file the record
+    /// names, and so is each of its boxes. Throws only cancellation.
     static func run(fileData: Data, source: some PageImageSource, input: BoxCheckInput?) throws(CancellationError) -> BoxCheckReport {
         guard let input else { return .noRecord }
         var pages: [BoxCheckPage] = []
         try PageImageLocator.readEach(fileData: fileData, source: source, recordedHashes: input.pageImageDigests) { index, outcome in
             let page = index < input.pages.count ? input.pages[index] : nil
             pages.append(judge(page: page, picture: outcome, fill: input.fill, chosenDPI: input.chosenDPI))
+        }
+        for page in input.pages.dropFirst(pages.count) {
+            pages.append(BoxCheckPage(picture: .fault(.wrongSubject), quality: nil, belowChosen: false, noColour: false,
+                                      boxes: page.boxes.map { _ in .couldNotFinish(.wrongSubject, nil) }))
         }
         return .pages(pages)
     }
@@ -183,8 +191,9 @@ enum ExactFillCheck {
             return BoxCheckPage(picture: picture.kind, quality: nil, belowChosen: false, noColour: false,
                                 boxes: boxes.map { _ in .couldNotFinish(fault, nil) })
         }
+        // A page the record does not hold is not part of the file it names.
         guard let page else {
-            return BoxCheckPage(picture: .completed, quality: nil, belowChosen: false, noColour: !walk.hasColour, boxes: [])
+            return BoxCheckPage(picture: .fault(.wrongSubject), quality: nil, belowChosen: false, noColour: !walk.hasColour, boxes: [])
         }
         let quality = PixelPaintRule.pageQuality(widthSixtyFourths: page.widthSixtyFourths, heightSixtyFourths: page.heightSixtyFourths,
                                                  frameWidth: walk.width, frameHeight: walk.height, chosen: chosenDPI)
@@ -278,6 +287,7 @@ enum ExactFillCheck {
 
         // Colour: a colour block wholly inside the painted area must be neutral;
         // one that touches the unit and is not wholly inside is only counted.
+        var colourShort = false
         if walk.hasColour {
             let hMax = walk.components.map(\.horizontal).max() ?? 1
             let vMax = walk.components.map(\.vertical).max() ?? 1
@@ -290,7 +300,7 @@ enum ExactFillCheck {
                         let e = extent(bx, by, cw, ch, w, h)
                         let inside = painted.contains(e)
                         guard inside || overlaps(e, unit) else { continue }
-                        guard bx < wide, by < high else { return .couldNotFinish(.evidenceShort, counts) }
+                        guard bx < wide, by < high else { colourShort = true; continue }
                         let neutral = isNeutral(walk.blocks[c][by * wide + bx])
                         if inside {
                             counts.colourInside += 1
@@ -310,7 +320,7 @@ enum ExactFillCheck {
         // A block that is not the paint is an issue whatever else holds; a
         // report never removes a block from what is judged.
         if !wrongBlocks.isEmpty { return .issue(counts, wrongBlocks) }
-        if counts.unitExamined != counts.unitExpected { return .couldNotFinish(.evidenceShort, counts) }
+        if colourShort || counts.unitExamined != counts.unitExpected { return .couldNotFinish(.evidenceShort, counts) }
         switch note {
         case .reportedSmaller: return .inconclusive(reportDoesNotHoldThePaint, counts)
         case .notReported: return .inconclusive(noReport, counts)
