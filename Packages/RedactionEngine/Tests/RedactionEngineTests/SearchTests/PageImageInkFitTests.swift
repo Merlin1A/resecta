@@ -359,7 +359,9 @@ struct PageImageInkFitTests {
         }
         withKnownIssue("On the Mac host macOS's Vision reads these words' ink rows otherwise than iOS's, and some paints reach more than 1 pt past them") {
             #expect(tallerThanInk.isEmpty, "every fitted paint is as tall as its word's ink: \(tallerThanInk)")
-        } when: { HostRun.isMac && runningHeadFitted }
+        } when: { HostRun.isMac && runningHeadFitted } matching: { issue in
+            issue.comments.contains { $0.rawValue.hasPrefix("every fitted paint is as tall as its word's ink: ") }
+        }
     }
 
     /// A Searchable export of the statement turned by `rotation` (the export

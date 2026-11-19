@@ -109,6 +109,8 @@ struct AddressComponentsRecallTests {
                 stats.recall >= Self.aggregateRecallFloor,
                 "aggregate city-recall \(stats.recall) below pre-cutover floor \(Self.aggregateRecallFloor); rebuilt address_components.json may have dropped a load-bearing city entry"
             )
+        } matching: { issue in
+            issue.comments.contains { $0.rawValue.hasPrefix("aggregate city-recall ") }
         }
 
         print("[address-recall baseline aggregate] addrDocs=\(stats.addressDocCount) " +
@@ -145,6 +147,8 @@ struct AddressComponentsRecallTests {
                     stats.recall >= floor,
                     "\(doctype) city-recall \(stats.recall) below pre-cutover floor \(floor); rebuilt address_components.json may have dropped a city entry concentrated in this stratum"
                 )
+            } matching: { issue in
+                issue.comments.contains { $0.rawValue.hasPrefix("\(doctype) city-recall ") }
             }
 
             print("[address-recall baseline \(doctype)] addrDocs=\(stats.addressDocCount) " +
