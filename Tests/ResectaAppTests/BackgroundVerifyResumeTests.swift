@@ -76,7 +76,7 @@ struct BackgroundVerifyResumeTests {
         #expect(doc.phaseKind == .editing, "back in the editor")
         #expect(doc.wasPausedByBackground)
         #expect(doc.pausedFromPhase == .verifying)
-        #expect(TopBannerSlot.winner(documentState: doc, detectionBannerPresent: false) == .paused,
+        #expect(TopBannerSlot.winner(documentState: doc) == .paused,
                 "the paused notice takes the editor's top slot")
         #expect(doc.redactRefusal(with: f.coord.redactionState) == nil,
                 "the notice's Restart is not refused")
@@ -133,7 +133,7 @@ struct BackgroundVerifyResumeTests {
         #expect(doc.phaseKind == .editing)
         #expect(doc.wasPausedByBackground)
         #expect(doc.pausedFromPhase == .verifying)
-        #expect(TopBannerSlot.winner(documentState: doc, detectionBannerPresent: false) == .paused)
+        #expect(TopBannerSlot.winner(documentState: doc) == .paused)
         #expect(coord.redactionState.regions[0]?.count == 1, "the regions are untouched")
         let output = try #require(coord.redactionState.outputURL, "the built copy was discarded by the cut")
         #expect(FileManager.default.fileExists(atPath: output.path), "the built copy's file survives the cut")
@@ -178,7 +178,7 @@ struct BackgroundVerifyResumeTests {
         #expect(doc.phaseKind == .editing)
         #expect(doc.wasPausedByBackground)
         #expect(doc.pausedFromPhase == .verifying)
-        #expect(TopBannerSlot.winner(documentState: doc, detectionBannerPresent: false) == .paused)
+        #expect(TopBannerSlot.winner(documentState: doc) == .paused)
         #expect(doc.redactRefusal(with: coord.redactionState) == nil, "the notice's Restart is not refused")
         #expect(coord.redactionState.outputURL == output, "the copy is kept")
         #expect(FileManager.default.fileExists(atPath: output.path), "the copy's file survives the cut")
