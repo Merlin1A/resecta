@@ -1,0 +1,19 @@
+Property: The scope paragraph shows only on a run titled Checks Passed.
+Area: results (the buttons and their card)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/ResultsScopeNoteTests
+Must go red: ResectaAppTests/ResultsScopeNoteTests scopeNoteShowsOnlyWhenItHasWordsAndTheTitleIsChecksPassed
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/ResultsScopeNote.swift b/Sources/ResectaApp/Views/ResultsScopeNote.swift
+index 672065ac..26e5c141 100644
+--- a/Sources/ResectaApp/Views/ResultsScopeNote.swift
++++ b/Sources/ResectaApp/Views/ResultsScopeNote.swift
+@@ -30,7 +30,7 @@ struct ResultsScopeNote: View {
+     /// Shown only on a run titled Checks Passed, and only with sentences.
+     static func shows(report: VerificationReport, sentences: [String]) -> Bool {
+         !sentences.isEmpty
+-            && VerificationResultsView.mastheadTitle(report: report) == VerificationStatus.pass.title
++            && VerificationResultsView.mastheadTitle(report: report) != VerificationStatus.fail("").title
+     }
+ 
+     /// The paragraph drawn, or nil.

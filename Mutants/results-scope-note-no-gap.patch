@@ -1,0 +1,36 @@
+Property: The scope note takes no room when it draws nothing.
+Area: results (the buttons and their card)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/ResultsScopeNoteTests
+Must go red: ResectaAppTests/ResultsScopeNoteTests emptyNoteHasNoHeight
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/ResultsScopeNote.swift b/Sources/ResectaApp/Views/ResultsScopeNote.swift
+index 672065ac..4635713c 100644
+--- a/Sources/ResectaApp/Views/ResultsScopeNote.swift
++++ b/Sources/ResectaApp/Views/ResultsScopeNote.swift
+@@ -11,15 +11,17 @@ struct ResultsScopeNote: View {
+     let sentences: [String]
+ 
+     var body: some View {
+-        if let paragraph = Self.paragraph(report: report, sentences: sentences) {
+-            Text(paragraph)
+-                .font(.footnote)
+-                .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+-                .frame(maxWidth: .infinity, alignment: .leading)
+-                .padding(.horizontal, ResectaTokens.Spacing.md)
+-                .padding(.top, ResectaTokens.Results.reasonGap)
+-                .accessibilityIdentifier("checksPassedScope")
++        VStack(spacing: 0) {
++            if let paragraph = Self.paragraph(report: report, sentences: sentences) {
++                Text(paragraph)
++                    .font(.footnote)
++                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
++                    .frame(maxWidth: .infinity, alignment: .leading)
++                    .padding(.horizontal, ResectaTokens.Spacing.md)
++                    .accessibilityIdentifier("checksPassedScope")
++            }
+         }
++        .padding(.top, ResectaTokens.Results.reasonGap)
+     }
+ 
+     /// The sentences joined by single spaces; nil when there are none.
