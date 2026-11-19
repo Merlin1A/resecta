@@ -1,19 +1,19 @@
-Property: Admission reads the size floor on the rectangle clamped to the page, so a region of full size wholly off the right or the top is not admitted.
+Property: Admission reads the size floor on the rectangle cut to the page, so a region of full size wholly off the page, on any side, is not admitted.
 Area: run record
 Test command: cd Packages/RedactionEngine && swift test --filter RunRecordBoxesTests
 Must go red: RedactionEngineTests/RunRecordBoxesTests "Each case" (whollyOff); RedactionEngineTests/RunRecordBoxesTests "Each case" (idsAreTheAdmitted)
 Apply in a scratch worktree with `git apply`; discard after.
 
-diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RedactionRegion.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RedactionRegion.swift
-index 8454420d..ca54b660 100644
---- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RedactionRegion.swift
-+++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RedactionRegion.swift
-@@ -175,7 +175,6 @@ extension RedactionRegion {
-     /// admission floor decides (`RegionAdmission`). The page builder and the
-     /// run's record both read this one test.
-     public static func isAdmitted(normalizedRect: CGRect) -> Bool {
--        let clamped = normalizedRect.clampedToNormalized()
--        return RegionAdmission.admits(clampedWidth: Double(clamped.width), clampedHeight: Double(clamped.height))
-+        return RegionAdmission.admits(clampedWidth: Double(normalizedRect.width), clampedHeight: Double(normalizedRect.height))
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/RegionAdmission.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/RegionAdmission.swift
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/RegionAdmission.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/RegionAdmission.swift
+@@ -26,8 +26,6 @@
+         let width = maxX - minX, height = maxY - minY
+         // NaN fails every comparison below: such a rectangle is too thin.
+         guard width > floor, height > floor else { return .tooThinToPaint }
+-        let cutWidth = min(maxX, 1) - max(minX, 0), cutHeight = min(maxY, 1) - max(minY, 0)
+-        if cutWidth <= 0 || cutHeight <= 0 { return .offThePage }
+-        return cutWidth > floor && cutHeight > floor ? nil : .tooThinToPaint
++        return nil
      }
  }
