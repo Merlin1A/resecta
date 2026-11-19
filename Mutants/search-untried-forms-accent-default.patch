@@ -4,10 +4,11 @@ Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcod
 Must go red: ResectaAppTests/SearchUntriedFormsTests staysAMiss
 Apply in a scratch worktree with `git apply`; discard after.
 
-diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/SearchTypes.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/SearchTypes.swift
---- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/SearchTypes.swift
-+++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/SearchTypes.swift
-@@ -203,7 +203,7 @@
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/SearchOptions.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/SearchOptions.swift
+index 0c926bdb..e1c6b181 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/SearchOptions.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/SearchOptions.swift
+@@ -30,7 +30,7 @@ public struct SearchOptions: Sendable, Equatable, Hashable {
      /// Diacritic-insensitive matching ("Munoz" matches "Muñoz").
      /// Off by default: folding introduces false positives in non-Latin
      /// scripts and many name databases are accent-significant.
