@@ -384,6 +384,35 @@ struct ResectaApp: App {
         }
         return page
     }
+
+    /// `--simulateCaptureAfter=<seconds>`: the whole number of seconds after
+    /// launch at which the timed capture hook raises the screen-capture
+    /// cover. Nil when the argument is absent, empty, not a whole number,
+    /// or negative.
+    static func simulatedCaptureDelay(for arguments: [String]) -> Int? {
+        wholeSeconds(after: "--simulateCaptureAfter=", in: arguments)
+    }
+
+    /// `--simulateCaptureEndAfter=<seconds>`: the second after launch at
+    /// which the timed capture hook lowers the cover again. Nil in the same
+    /// cases as the delay, and when no delay is given or the end is not
+    /// later than it.
+    static func simulatedCaptureEnd(for arguments: [String]) -> Int? {
+        guard let begin = simulatedCaptureDelay(for: arguments),
+              let end = wholeSeconds(after: "--simulateCaptureEndAfter=", in: arguments),
+              end > begin else { return nil }
+        return end
+    }
+
+    /// The whole number of seconds after `prefix` in the first argument
+    /// that begins with it: ASCII digits only, so a sign, a fraction or
+    /// nothing at all reads as no value.
+    private static func wholeSeconds(after prefix: String, in arguments: [String]) -> Int? {
+        guard let argument = arguments.first(where: { $0.hasPrefix(prefix) }) else { return nil }
+        let text = argument.dropFirst(prefix.count)
+        guard !text.isEmpty, text.allSatisfy({ $0.isASCII && $0.isNumber }) else { return nil }
+        return Int(text)
+    }
     #endif
 
     var body: some Scene {
@@ -568,6 +597,22 @@ struct ResectaApp: App {
                                 screenCaptureMonitor._setForTesting(
                                     isCaptured: true, isMirroring: false
                                 )
+                            }
+                            // The timed capture hook: raise the cover a set
+                            // number of seconds after launch and, if an end
+                            // is given, lower it again, so a test can fill a
+                            // screen first and see what the cover does to it.
+                            // Its own task: a sleep in this `.task` would end
+                            // at once if the task were cancelled.
+                            if let begin = Self.simulatedCaptureDelay(for: launchArguments) {
+                                let end = Self.simulatedCaptureEnd(for: launchArguments)
+                                Task { @MainActor in
+                                    try? await Task.sleep(for: .seconds(begin))
+                                    screenCaptureMonitor._setForTesting(isCaptured: true, isMirroring: false)
+                                    guard let end else { return }
+                                    try? await Task.sleep(for: .seconds(end - begin))
+                                    screenCaptureMonitor._setForTesting(isCaptured: false, isMirroring: false)
+                                }
                             }
                             #endif
                         }

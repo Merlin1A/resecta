@@ -373,16 +373,16 @@ struct SearchAndRedactSheet: View {
             #endif
         }
         .onDisappear {
-            // The app-level host clears the page bar alone from here.
-            toastManager.bottomClearance = toastBottomClearance(sheetPresented: false)
+            // The host clears the page bar alone, unless the cover took the content.
+            toastManager.bottomClearance = toastBottomClearance(sheetPresented: captureMonitor.isShielded)
             // Cancel the in-flight debounce task on sheet dismissal: a
             // debounce sleep started just before `.onDisappear` would
             // otherwise resolve into a wasted scan.
             searchDebounceTask?.cancel()
             searchDebounceTask = nil
-            // A session parked for the Home close dialog keeps its results
-            // and selections for Cancel; everything else tears down.
-            guard !searchState.parkedForHomeClose else { return }
+            // A session parked for the Home close dialog, or covered by the
+            // capture cover, keeps its work; everything else tears down.
+            guard Self.contentLeavingTearsDown(parked: searchState.parkedForHomeClose, covered: captureMonitor.isShielded) else { return }
             searchState.cancelSearchWithoutAwait()
             searchState.clearLivePreview()
             searchState.clear()
