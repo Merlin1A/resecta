@@ -1,0 +1,19 @@
+Property: The list file's own lines are left out by its path as a fixed prefix, never as a pattern, so a tree whose path holds [ is judged the same.
+Area: claims lint (Scripts/claims-lint.sh)
+Test command: Scripts/claims-lint.sh --self-test
+Must go red: the self-test case "a banned term in a Swift literal, in a tree whose path holds ["; the self-test case "a clean tree whose path holds [ab]"; the self-test case "a length claim in a Swift literal, in a tree whose path holds [" (the self-test ends FAIL)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Scripts/claims-lint.sh b/Scripts/claims-lint.sh
+index 78ef4ae3..c54e3aa4 100755
+--- a/Scripts/claims-lint.sh
++++ b/Scripts/claims-lint.sh
+@@ -139,7 +139,7 @@ keep_offending() {
+ # The list file's path is matched as a fixed prefix, never as a pattern.
+ swift_literal_lines() { # $1 = the list file's path, $2 = the leg (banned|length)
+     CL_SKIP="$1:" CL_LEG="$2" awk 'BEGIN { skip = ENVIRON["CL_SKIP"] }
+-        index($0, skip) == 1 { next }
++        $0 ~ ("^" skip) { next }
+         index($0, "\"") == 0 { next }
+         /^[^:]+:[0-9]+:[[:space:]]*\/\// { next }
+         { print }'
