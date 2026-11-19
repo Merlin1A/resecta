@@ -115,7 +115,49 @@ struct ContentGlyphBoxTests {
         #expect(box.minX <= 94.008 + slack && box.maxX >= 103.344 - slack, "the drawn Q (94.008-103.344) is inside \(box)")
     }
 
+    @Test("A line drawn in an invisible mode adds nothing to the paint: its box is PDFKit's")
+    func invisibleAddsNothing() async throws {
+        let content = "BT /F1 12 Tf 3 Tr 72 700 Td (Quarterly statement for the account) Tj ET\nBT /F1 12 Tf 0 0 0 0 72 700 Tm (QUARTZ7) Tj ET"
+        let today = try #require(try Self.pdfKitBoxes(content, "account").first)
+        #expect(today.maxX < 257, "precondition: PDFKit's box ends at \(today.maxX), short of the t's advance")
+        let box = try #require(try await Self.boxes(content, "account").first)
+        #expect(Self.close(box, today), "\(box) against \(today)")
+    }
+
     // MARK: - Not mapped
+
+    /// Fonts the walk does not read: a page that also draws text in one
+    /// keeps every box PDFKit gives it, the short one included.
+    static let unreadFonts: [(String, String)] = [
+        ("a composite font", "<< /Type /Font /Subtype /Type0 /BaseFont /Helvetica /Encoding /Identity-H /DescendantFonts [<< /Type /Font /Subtype /CIDFontType2 /BaseFont /Helvetica /CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> /DW 600 >>] >>"),
+        ("vertical writing", "<< /Type /Font /Subtype /Type0 /BaseFont /Helvetica /Encoding /Identity-V /DescendantFonts [<< /Type /Font /Subtype /CIDFontType2 /BaseFont /Helvetica /CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> /DW 600 >>] >>"),
+        ("a font drawn by its own procedures", "<< /Type /Font /Subtype /Type3 /FontBBox [0 0 600 700] /FontMatrix [0.001 0 0 0.001 0 0] /CharProcs << /x 7 0 R >> /Encoding << /Type /Encoding /Differences [120 /x] >> /FirstChar 120 /LastChar 120 /Widths [600] >>"),
+    ]
+
+    @Test("A page that also draws text in a font the walk does not read keeps PDFKit's boxes: composite, vertical, Type 3", arguments: 0..<3)
+    func unreadFontKeepsItsBox(_ index: Int) async throws {
+        let (label, font2) = Self.unreadFonts[index]
+        let content = Self.visible + "\nBT /F1 12 Tf 0 0 0 0 72 700 Tm (QUARTZ7) Tj ET\nBT /F2 12 Tf 72 600 Td " + (index == 2 ? "(x)" : "<0024>") + " Tj ET"
+        let resources = "/Font << /F1 5 0 R /F2 6 0 R >>"
+        let extra = [PDFObject(id: 6, content: font2),
+                     PDFObject(id: 7, content: "<< /Length 37 >>\nstream\n600 0 0 0 600 700 d1 0 0 600 700 re f\nendstream")]
+        let doc = try ContentGlyphWalkTests.document(content, resources: resources, extra: extra)
+        let page = try #require(doc.page(at: 0))
+        #expect(ContentGlyphWalk.glyphs(on: try #require(page.pageRef)) == nil, "\(label): the walk reads no list")
+        let text = (try #require(page.string)) as NSString
+        let range = text.range(of: "account")
+        try #require(range.location != NSNotFound)
+        let today = try #require(page.selection(for: range)?.bounds(for: page))
+        #expect(today.maxX < 257, "precondition: PDFKit's box ends at \(today.maxX)")
+        var options = SearchOptions()
+        options.includeOCR = false
+        var hits: [SearchResult] = []
+        for await r in DocumentSearcher().search(SendablePDFDocument(doc), mode: .text("account", options: options), progress: { _, _ in }) { hits.append(r) }
+        let hit = try #require(hits.first)
+        let box = CGRect(x: hit.normalizedRect.minX * 612, y: hit.normalizedRect.minY * 792,
+                         width: hit.normalizedRect.width * 612, height: hit.normalizedRect.height * 792)
+        #expect(Self.close(box, today, 0.001), "\(label): \(box) against PDFKit's \(today)")
+    }
 
     @Test("Two copies of a word drawn right to left on one line: each box stays on its own copy")
     func twinsDrawnOutOfOrder() async throws {
@@ -136,3 +178,33 @@ struct ContentGlyphBoxTests {
         #expect(Self.close(box, today), "\(box) against \(today)")
     }
 }
+
+/// The page's text laid onto its glyphs: unit for unit, white space
+/// dropped from both sides, never normalised, nothing left over.
+@Suite("Page text laid onto the page's glyphs")
+struct ContentGlyphMapTests {
+    static func glyphs(_ texts: [String]) -> [ShownGlyph] {
+        texts.map { ShownGlyph(text: $0, box: .zero, singular: false, renderMode: 0, upright: true) }
+    }
+
+    @Test("Equal once white space is dropped: each unit names its glyph; PDFKit's own spaces and breaks name none")
+    func mapped() throws {
+        let map = try #require(ContentGlyphMap.make(pageText: "ab c\nfin", glyphs: Self.glyphs(["a", "b", " ", "c", "fi", "n"])))
+        #expect(map.glyphOfUnit == [0, 1, nil, 3, nil, 4, 4, 5])
+    }
+
+    @Test("Any unit that differs, or anything left over on either side, leaves the page unmapped")
+    func unmapped() {
+        #expect(ContentGlyphMap.make(pageText: "abd", glyphs: Self.glyphs(["a", "b", "c"])) == nil)
+        #expect(ContentGlyphMap.make(pageText: "ab", glyphs: Self.glyphs(["a", "b", "c"])) == nil)
+        #expect(ContentGlyphMap.make(pageText: "abc", glyphs: Self.glyphs(["a", "b"])) == nil)
+        #expect(ContentGlyphMap.make(pageText: "ba", glyphs: Self.glyphs(["a", "b"])) == nil)
+    }
+
+    @Test("Compared as UTF-16 units, never normalised: a composed letter is not its decomposed pair")
+    func notNormalised() {
+        #expect(ContentGlyphMap.make(pageText: "caf\u{E9}", glyphs: Self.glyphs(["c", "a", "f", "e", "\u{301}"])) == nil)
+        #expect(ContentGlyphMap.make(pageText: "cafe\u{301}", glyphs: Self.glyphs(["c", "a", "f", "\u{E9}"])) == nil)
+    }
+}
+

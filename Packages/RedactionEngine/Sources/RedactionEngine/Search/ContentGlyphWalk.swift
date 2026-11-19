@@ -14,8 +14,8 @@ struct ShownGlyph: Equatable, Sendable {
     var upright: Bool
 }
 
-/// The page's own drawing, read glyph by glyph with Core Graphics' content
-/// scanner: the graphics state (`q`, `Q`, `cm`), the text state and text
+/// The engine's one text-state walker: the page's own drawing, read glyph by
+/// glyph with Core Graphics' content scanner (not a byte parser of its own): the graphics state (`q`, `Q`, `cm`), the text state and text
 /// positioning operators, and Form XObjects (their matrix and resources, to a
 /// depth of 8). The walk answers nil, not a partial list, wherever a glyph's
 /// place or text cannot be read exactly: a font other than a simple one, a
