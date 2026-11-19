@@ -1,0 +1,20 @@
+Property: Every line that names a debug seed is inside #if DEBUG, so a release build carries none of them.
+Area: debug launch seeds, debug builds only (App)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/DebugSeedOptionsTests
+Must go red: ResectaAppTests/DebugSeedOptionsTests seedsAreReadOnlyInsideDebug
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/App/DebugSeedOptions.swift b/Sources/ResectaApp/App/DebugSeedOptions.swift
+index e68079ee..2aa86e3a 100644
+--- a/Sources/ResectaApp/App/DebugSeedOptions.swift
++++ b/Sources/ResectaApp/App/DebugSeedOptions.swift
+@@ -1,4 +1,3 @@
+-#if DEBUG
+ import Foundation
+ import PDFKit
+ import RedactionEngine
+@@ -164,4 +163,3 @@ extension DebugSeedOptions {
+         page.addAnnotation(cover)
+     }
+ }
+-#endif

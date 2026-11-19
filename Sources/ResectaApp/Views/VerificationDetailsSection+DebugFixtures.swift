@@ -48,6 +48,27 @@ enum VerificationDebugFixtures {
         }
     }
 
+    /// The checks' progress part-way through the fixture `name`'s run, for
+    /// `--seedVerifying=<finished>`: its first `finished` rows finished, the
+    /// next row running, its row count the total. Nil for an unknown name
+    /// or a `finished` that leaves no row running (the launch hook then
+    /// stops with `verifyingSeedFault(for:finished:)`).
+    static func progress(for name: String, finished: Int) -> DocumentState.VerificationProgress? {
+        guard let report = all[name], finished >= 0, finished < report.layers.count else { return nil }
+        return DocumentState.VerificationProgress(
+            currentLayer: finished + 1, totalLayers: report.layers.count,
+            layerName: report.layers[finished].name,
+            completedLayers: Array(report.layers.prefix(finished)))
+    }
+
+    /// Why `--seedVerifying=<finished>` seeds no progress for the fixture
+    /// `name`: the count and the fixture's row count, or the unknown name.
+    static func verifyingSeedFault(for name: String, finished: Int) -> String {
+        guard let report = all[name] else { return "--seedVerifying=\(finished): no fixture named \(name)." }
+        return "--seedVerifying=\(finished): the fixture \(name) has \(report.layers.count) rows, "
+            + "so no row is left running."
+    }
+
     // MARK: - The rows
 
     private static func row(
