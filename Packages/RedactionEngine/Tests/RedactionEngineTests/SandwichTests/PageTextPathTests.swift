@@ -151,9 +151,9 @@ struct PageTextPathTests {
     // one for the Kazakh word), and a line of break marks only.
     static let mixedLines = ["Report \u{2192} 12", "Report \u{049A}\u{0430}\u{0437}\u{0430}\u{049B} 12", "\u{200B}\u{FEFF}"]
 
-    @Test("On a line with a run in another of the three faces, every cell keeps Courier's own height and centre",
-          arguments: mixedLines)
-    func mixedLineKeepsCourierCells(_ text: String) throws {
+    /// One line of entries, one per scalar, 7.2 pt apart at 12 pt, a new word
+    /// after each space.
+    static func lineEntries(_ text: String) -> [CharacterInfo] {
         var entries: [CharacterInfo] = []
         var word = 0
         for (i, scalar) in text.unicodeScalars.enumerated() {
@@ -162,6 +162,35 @@ struct PageTextPathTests {
                 character: String(scalar), bounds: CGRect(x: 72 + CGFloat(i) * 7.2, y: 700, width: 7.2, height: 12),
                 stringIndex: i, lineIndex: 0, wordIndex: word))
         }
+        return entries
+    }
+
+    // A Chinese character none of the three faces has, and a private-use
+    // character the hidden text never holds.
+    static let linesNoFaceDraws = ["Report \u{6F22} 12", "Report \u{F0B7} 12"]
+
+    @Test("On a line with a run none of the three faces can write, that run is left out and counted and the rest is written",
+          arguments: linesNoFaceDraws)
+    func runNoFaceWritesIsLeftOut(_ text: String) async throws {
+        let entries = Self.lineEntries(text)
+        // Whole, the line cannot be laid out in the hidden text's faces.
+        #expect(HiddenTextLine.layout(text, size: 12) == nil)
+        let path = try await PageTextPath.run(
+            entries: entries, frame: PageFrame(rotation: 0, displayedSize: CGSize(width: 612, height: 792)),
+            textPathRectangles: [], paintedRectangles: [], pageIndex: 0)
+        guard case .written(let written, _, _) = path.outcome else {
+            Issue.record("\(text.debugDescription): \(path.outcome)")
+            return
+        }
+        #expect(path.runsLeftOut == 1, "\(text.debugDescription)")
+        let letters = written.map(\.character).joined().filter { !$0.isWhitespace }
+        #expect(letters == "Report12", "\(text.debugDescription): \(letters.debugDescription)")
+    }
+
+    @Test("On a line with a run in another of the three faces, every cell keeps Courier's own height and centre",
+          arguments: mixedLines)
+    func mixedLineKeepsCourierCells(_ text: String) throws {
+        let entries = Self.lineEntries(text)
         let lines = TextLayerReconstructor.layoutLinesWithSources(entries, pageWidth: 612, redactionRects: [])
         try #require(lines.count == 1, "\(lines.map(\.line.text))")
         let line = lines[0].line
