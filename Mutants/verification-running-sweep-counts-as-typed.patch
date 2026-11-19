@@ -1,0 +1,18 @@
+Property: Only a request the user applied is a typed search; the run's own sweep is not.
+Area: verification (the screen while the checks run)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationRunningWiringTests
+Must go red: ResectaAppTests/VerificationRunningWiringTests appliedTypedSearchCases
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/PipelineRunner.swift b/Sources/ResectaApp/State/PipelineRunner.swift
+index 874a8d4c..f3c71606 100644
+--- a/Sources/ResectaApp/State/PipelineRunner.swift
++++ b/Sources/ResectaApp/State/PipelineRunner.swift
+@@ -550,7 +550,6 @@ struct PipelineRunner {
+     /// whose query is not a Scan.
+     static func appliedTypedSearch(_ requests: [SearchRecheckRequest]) -> Bool {
+         requests.contains { request in
+-            guard request.origin == .applied else { return false }
+             if case .piiScan = request.record.query.kind { return false }
+             return true
+         }

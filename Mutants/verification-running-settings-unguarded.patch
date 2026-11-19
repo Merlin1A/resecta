@@ -1,0 +1,18 @@
+Property: The bar's Settings button reads the stamp before it opens Settings.
+Area: verification (the screen while the checks run)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationRunningWiringTests
+Must go red: ResectaAppTests/VerificationRunningWiringTests toolbarReadsTheStamp
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/DocumentEditorToolbar.swift b/Sources/ResectaApp/Views/DocumentEditorToolbar.swift
+index 397845cb..6684fcaf 100644
+--- a/Sources/ResectaApp/Views/DocumentEditorToolbar.swift
++++ b/Sources/ResectaApp/Views/DocumentEditorToolbar.swift
+@@ -229,7 +229,6 @@ struct DocumentEditorToolbar {
+     @ViewBuilder
+     private var settingsButton: some View {
+         Button("Settings", systemImage: "gearshape") {
+-            guard Self.acceptsTrailingTap(resultsAppearedAt: resultsAppearedAt, now: Date()) else { return }
+             openSettings()
+         }
+         .accessibilityIdentifier("settings-button")

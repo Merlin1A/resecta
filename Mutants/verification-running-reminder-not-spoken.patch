@@ -1,0 +1,19 @@
+Property: The running screen speaks its still-checking reminder when one falls due.
+Area: verification (the screen while the checks run)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationRunningWiringTests
+Must go red: ResectaAppTests/VerificationRunningWiringTests reminderSpoken
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationProgressView.swift b/Sources/ResectaApp/Views/VerificationProgressView.swift
+index d04631a5..9f2fbfeb 100644
+--- a/Sources/ResectaApp/Views/VerificationProgressView.swift
++++ b/Sources/ResectaApp/Views/VerificationProgressView.swift
+@@ -46,7 +46,7 @@ struct VerificationProgressView: View {
+                                 guard due != nil else { return }
+                                 AccessibilityNotification.Announcement(
+                                     VerificationProgressLine.stillChecking(finished: state.finished, total: state.total)
+-                                ).post()
++                                )
+                             }
+                         }
+                         .padding(.horizontal, ResectaTokens.Spacing.md)

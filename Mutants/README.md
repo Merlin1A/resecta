@@ -374,3 +374,9 @@ with its reason and the mutant that is caught in its place.
 | `verification-running-trust-line-in-flow.patch` | The trust line follows the text in the flow, never pinned over it. | ResectaAppUITests/VerificationRunningUITests testTrustLineFollowsTheText |
 | `verification-running-passed-is-silent.patch` | A check that passed is not announced when it finishes. | ResectaAppTests/AccessibilityLabelTests testLayerCompletionAnnouncement |
 | `verification-running-late-tap-ignored.patch` | For a moment after the results appear, the bar's trailing button ignores taps. | ResectaAppTests/VerificationProgressLineTests lateTapIsIgnored |
+| `verification-running-starts-only-publish.patch` | The runner publishes progress on every engine event, a finish as well as a start. | ResectaAppTests/VerificationRunningWiringTests runnerPublishesEveryFinish |
+| `verification-running-results-moment-not-stamped.patch` | The editor stamps the moment the running checks give way to the results. | ResectaAppTests/VerificationRunningWiringTests editorStampsResultsMoment |
+| `verification-running-settings-unguarded.patch` | The bar's Settings button reads the stamp before it opens Settings. | ResectaAppTests/VerificationRunningWiringTests toolbarReadsTheStamp |
+| `verification-running-reminder-not-spoken.patch` | The running screen speaks its still-checking reminder when one falls due. | ResectaAppTests/VerificationRunningWiringTests reminderSpoken |
+| `verification-running-scan-counts-as-typed.patch` | A Scan the user applied is not a typed search. | ResectaAppTests/VerificationRunningWiringTests appliedTypedSearchCases |
+| `verification-running-sweep-counts-as-typed.patch` | Only a request the user applied is a typed search; the run's own sweep is not. | ResectaAppTests/VerificationRunningWiringTests appliedTypedSearchCases |

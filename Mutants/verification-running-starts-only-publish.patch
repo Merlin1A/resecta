@@ -1,0 +1,19 @@
+Property: The runner publishes progress on every engine event, a finish as well as a start.
+Area: verification (the screen while the checks run)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationRunningWiringTests
+Must go red: ResectaAppTests/VerificationRunningWiringTests runnerPublishesEveryFinish
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/PipelineRunner.swift b/Sources/ResectaApp/State/PipelineRunner.swift
+index 874a8d4c..0f71eac8 100644
+--- a/Sources/ResectaApp/State/PipelineRunner.swift
++++ b/Sources/ResectaApp/State/PipelineRunner.swift
+@@ -497,7 +497,7 @@ struct PipelineRunner {
+                 // A finish publishes progress as a start does, so the
+                 // figure is never one short.
+                 progress = Self.verificationProgress(after: event, previous: progress, now: Date())
+-                sink(.phase(.verifying(progress: progress)))
++                if case .layerStarted = event { sink(.phase(.verifying(progress: progress))) }
+                 if case .layerFinished(_, _, let result) = event, let words = result.runningAnnouncement,
+                    Self.announcementDue(lastAnnounced: lastAnnounced, now: Date()) {
+                     lastAnnounced = Date()
