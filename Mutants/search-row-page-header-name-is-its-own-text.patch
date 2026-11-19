@@ -1,0 +1,23 @@
+Property: A page header keeps the page's name as its own text.
+Area: the Search sheet's result rows
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppUITests/SearchRowLayoutUITests
+Must go red: ResectaAppUITests/SearchRowLayoutUITests testPageHeader_keepsItsNameAsItsOwnText; the shipped UI tests that wait on staticTexts["Page 1"]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/Search/SearchResultsSection.swift b/Sources/ResectaApp/Views/Search/SearchResultsSection.swift
+index 0538ab6a..595f5426 100644
+--- a/Sources/ResectaApp/Views/Search/SearchResultsSection.swift
++++ b/Sources/ResectaApp/Views/Search/SearchResultsSection.swift
+@@ -347,11 +347,7 @@ struct SearchResultsSection: View {
+     /// a large text size, the count goes under the name.
+     private func pageHeader(page: Int, rowCount: Int) -> some View {
+         ViewThatFits(in: .horizontal) {
+-            HStack(alignment: .firstTextBaseline, spacing: ResectaTokens.Spacing.sm) {
+-                pageHeaderName(page: page)
+-                Spacer(minLength: 0)
+-                pageHeaderCount(rowCount: rowCount)
+-            }
++            Text("Page \(page + 1) · \(SearchPageHeaderCopy.rowCount(rowCount, isScan: searchState.searchModeType == .piiScan))")
+             VStack(alignment: .leading, spacing: 0) {
+                 pageHeaderName(page: page)
+                 pageHeaderCount(rowCount: rowCount)
