@@ -1,0 +1,20 @@
+Property: A listed document that is not there fails the lint.
+Area: claims lint (Scripts/claims-lint.sh)
+Test command: Scripts/claims-lint.sh --self-test
+Must go red: the self-test case "a listed document that is missing" (the self-test ends FAIL)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Scripts/claims-lint.sh b/Scripts/claims-lint.sh
+index 266a76f1..dfb180de 100755
+--- a/Scripts/claims-lint.sh
++++ b/Scripts/claims-lint.sh
+@@ -146,8 +146,7 @@ sweep() { # $1 = the tree root
+     # 1. Shipping markdown.
+     for f in $DOCS; do
+         if [ ! -f "$ROOT/$f" ]; then
+-            echo "CLAIMS-LINT FAIL: $f is listed and is not there"
+-            fail=1; continue
++            continue
+         fi
+         # grep exits 1 for no match and 2 when it cannot read the file.
+         grc=0; raw=$("$GREP" -nEi "$PATTERNS" "$ROOT/$f") || grc=$?
