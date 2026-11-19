@@ -56,6 +56,14 @@ public struct RasterizeResult: Sendable {
     /// Nil for pages that kept searchable mode and for secure-raster-mode
     /// runs. Non-nil implies `filterDigest == nil`.
     public let fallbackReason: TextLayerDetector.FallbackReason?
+    /// The rectangle painted for each box of the page's plan, by the box's
+    /// place in the plan: the record's part 2 (`RunRecord.Produced`). Empty
+    /// on the region path (a page with no record).
+    package var paintedBoxes: [Int: RunRecord.PaintedPixels] = [:]
+    /// The regions painted that no box of the plan holds: painted on their
+    /// own, never left out, and recorded so verification reads the page as
+    /// not checked.
+    package var regionsPaintedOutsideThePlan: Set<UUID> = []
 
     public init(pageOutput: PageOutput, filterDigest: PageFilterDigest?,
                 fallbackReason: TextLayerDetector.FallbackReason? = nil) {
