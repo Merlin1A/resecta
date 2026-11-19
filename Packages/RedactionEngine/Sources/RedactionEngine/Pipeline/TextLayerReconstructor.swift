@@ -495,7 +495,7 @@ enum TextLayerReconstructor {
         regionShapes: [RegionShape],
         frame: PageFrame,
         passLimit: Int = drawnCellRulePassLimit
-    ) -> (result: FilterResult, dropped: Int, settled: Bool, lines: HiddenTextLines?) {
+    ) -> (result: FilterResult, dropped: Int, settled: Bool, lines: HiddenTextLines?, laidOut: Bool) {
         var surviving = result.surviving
         var dropped = 0
         var passes = 0
@@ -525,7 +525,8 @@ enum TextLayerReconstructor {
             dropped, settled,
             // The settled pass laid out the survivors as they stand: the
             // writer draws those lines.
-            settled ? HiddenTextLines(lines: lines, entryCount: surviving.count) : nil)
+            settled ? HiddenTextLines(lines: lines, entryCount: surviving.count) : nil,
+            laidOut)
     }
 
     // MARK: - Text Run Grouping

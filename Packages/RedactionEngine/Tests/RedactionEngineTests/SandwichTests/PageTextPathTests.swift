@@ -283,7 +283,7 @@ struct PageTextPathTests {
                 Issue.record("with \(rectangles.count) region(s): \(refused.outcome)")
                 continue
             }
-            #expect(reason == .extractionFailed, "with \(rectangles.count) region(s)")
+            #expect(reason == .noWritableText, "with \(rectangles.count) region(s)")
         }
         let found = HiddenTextLine.$refuses.withValue({ _ in true }) {
             TextLayerReconstructor.drawnCellHits(entries: entries, pageWidth: size.width, regionShapes: [])

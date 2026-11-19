@@ -90,6 +90,13 @@ enum PageTextPath {
         }
         let validated = TextLayerReconstructor.validateSurvivors(
             closed, regionShapes: shapes, frame: frame)
+        // A line the hidden text's faces cannot lay out leaves no text the
+        // page can write: a picture with no searchable text left. A layout
+        // that does not settle outside the regions is a fault.
+        guard validated.laidOut else {
+            return Result(outcome: .picture(.noWritableText), runsLeftOut: 0,
+                          drawnCellDropped: validated.dropped)
+        }
         guard validated.settled else {
             return Result(outcome: .picture(.extractionFailed), runsLeftOut: 0,
                           drawnCellDropped: validated.dropped)
