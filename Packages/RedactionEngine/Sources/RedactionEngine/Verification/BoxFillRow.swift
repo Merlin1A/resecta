@@ -24,10 +24,18 @@ enum BoxFillRow {
         case skipped
     }
 
-    /// The row for `report`, against the boxes and regions of `record`.
+    /// The row for `report`, against the boxes and regions of `record`. Only
+    /// a run with no record reads Skipped: a record the check could not take
+    /// (a page without a plan, or pages out of order) leaves every page of it
+    /// unread, and a page of the file the record does not hold is unread too.
     static func reading(report: BoxCheckReport, record: RunRecord?) -> Reading {
-        guard let record, case .pages(let pictures) = report else { return .skipped }
+        guard let record else { return .skipped }
+        let pictures: [BoxCheckPage]
+        if case .pages(let read) = report { pictures = read } else { pictures = [] }
         var unreadPages: Set<Int> = []
+        for index in pictures.indices where index >= record.confirmed.pages.count {
+            unreadPages.insert(index)
+        }
         var notChecked: [Int] = []
         var found: [Int] = []
         for page in record.confirmed.pages {

@@ -172,6 +172,19 @@ struct BoxFillRowTests {
         #expect(reading == .row(CheckRow(status: .warn("A box on page 1 could not be checked."), pages: [0], couldNotVerify: true), nil))
     }
 
+    @Test("A record the check could not take reads Could not verify on every page, never Skipped; a file page the record lacks is unread")
+    func recordTheCheckCouldNotTake() {
+        let outOfOrder = Self.record([Self.page(1, [Self.share(0.1, 0.1, 0.3, 0.2)]), Self.page(0, [Self.share(0.1, 0.1, 0.3, 0.2)])])
+        #expect(BoxCheckInput(record: outOfOrder) == nil)
+        let reading = BoxFillRow.reading(report: .noRecord, record: outOfOrder)
+        #expect(reading == .row(CheckRow(status: .warn("2 pages could not be read for this check: 1, 2"), pages: [0, 1], couldNotVerify: true), nil))
+        if case .row(let row, _) = reading { #expect(Self.sentence(row.status) == "2 pages could not be read for this check: 1, 2") }
+        let one = Self.record([Self.page(0, [Self.share(0.1, 0.1, 0.3, 0.2)])])
+        let outside = BoxCheckPage(picture: .fault(.wrongSubject), quality: nil, belowChosen: false, noColour: false, boxes: [])
+        let extra = BoxFillRow.reading(report: .pages([Self.read([Self.done]), outside]), record: one)
+        #expect(extra == .row(CheckRow(status: .warn("Page 2 could not be read for this check"), pages: [1], couldNotVerify: true), nil))
+    }
+
     @Test("The sentences' forms: one box, boxes on one page, two pages, three pages")
     func forms() {
         #expect(BoxFillRow.findSentence([3]) == "A box on page 4 is not exactly the fill.")
