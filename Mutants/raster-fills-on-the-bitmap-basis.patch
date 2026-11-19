@@ -5,9 +5,10 @@ Must go red: RedactionEngineTests/FillCoverageBasisTests rasterizedPageFarEdgeCo
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift
+index 93fc474c..0a488729 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift
-@@ -465,7 +465,7 @@
+@@ -456,7 +456,7 @@ public final class PageRasterizer: @unchecked Sendable {
          // 5. Apply fills on the content basis.
          // 256-row band cancellation checks happen inside.
          try applyRedactionFills(
