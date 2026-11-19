@@ -61,16 +61,19 @@ struct ToastQueueManagerTests {
         #expect(mgr.activeBottomToasts.first?.message == "First")
     }
 
-    @Test("A run start's drop removes the region-edit toasts, shown or queued, and keeps the rest")
-    func dropRegionEditActionsKeepsOtherToasts() async throws {
+    @Test("A run start's drop removes every toast that carries an action, shown or queued, and keeps the rest")
+    func dropActionToastsKeepsOtherToasts() async throws {
         let mgr = ToastQueueManager()
-        mgr.enqueue("1 match nearby. Add to selection?", actionLabel: "Add", editsRegions: true) {}
+        mgr.enqueue("Mode switch cleared 2 unapplied matches.", actionLabel: "Undo") {}
         mgr.enqueue("Saved", severity: .info)
-        mgr.enqueue("2 matches nearby. Add to selection?", actionLabel: "Add", editsRegions: true) {}
+        mgr.enqueue("1 match nearby. Mark it too?", actionLabel: "Mark") {}
+        #expect(mgr.activeToasts.count == 1)
+        #expect(mgr.activeToasts.first?.actionHandler != nil)
 
-        mgr.dropRegionEditActions()
+        mgr.dropActionToasts()
 
-        #expect(mgr.activeToasts.isEmpty, "the shown region-edit toast is dropped")
+        #expect(!mgr.activeToasts.contains { $0.actionHandler != nil },
+                "the shown toast with an action is withdrawn")
         // The queue drains after the 0.3 s gap: only the plain toast is left.
         for _ in 0..<100 {
             if mgr.activeBottomToasts.count == 1 { break }
@@ -79,7 +82,19 @@ struct ToastQueueManagerTests {
         #expect(mgr.activeBottomToasts.map { $0.message } == ["Saved"])
         mgr.dismiss(mgr.activeBottomToasts[0])
         try await Task.sleep(for: .milliseconds(450))
-        #expect(mgr.activeToasts.isEmpty, "the queued region-edit toast never shows")
+        #expect(mgr.activeToasts.isEmpty, "the waiting toast with an action never shows")
+    }
+
+    @Test("A run start's drop leaves a toast without an action on screen")
+    func dropActionToastsLeavesAPlainToast() {
+        let mgr = ToastQueueManager()
+        mgr.enqueue("Saved", severity: .info)
+        let shown = mgr.activeToasts.map(\.id)
+        #expect(shown.count == 1)
+
+        mgr.dropActionToasts()
+
+        #expect(mgr.activeToasts.map(\.id) == shown, "a toast without an action stays for its own time")
     }
 
     @Test("Manual dismiss removes the active toast and drains the queue after 0.3 s gap")

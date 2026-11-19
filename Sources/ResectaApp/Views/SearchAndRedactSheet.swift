@@ -443,7 +443,7 @@ struct SearchAndRedactSheet: View {
                 plan,
                 to: searchState,
                 toastManager: toastManager,
-                redactionState: redactionState,
+                redactionState: redactionState, documentState: documentState,
                 snapshot: snapshot,
                 isProgrammatic: isProgrammatic,
                 unappliedCount: Self.unappliedMatchCount(in: searchState),

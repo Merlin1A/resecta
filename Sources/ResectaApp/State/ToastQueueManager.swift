@@ -68,24 +68,18 @@ struct ToastItem: Identifiable, Equatable {
     /// snapshot state at enqueue time; it expires when the toast dismisses.
     let actionLabel: String?
     let actionHandler: (@MainActor () -> Void)?
-    /// The action adds or changes regions, so a run start drops the toast
-    /// (`dropRegionEditActions()`): the pipeline owns the regions until
-    /// the run ends, and the action would only be refused.
-    let editsRegions: Bool
     // Icon is derived from severity — no optional icon field
 
     init(
         message: String,
         severity: ToastSeverity,
         actionLabel: String? = nil,
-        editsRegions: Bool = false,
         actionHandler: (@MainActor () -> Void)? = nil
     ) {
         self.message = message
         self.severity = severity
         self.wordCount = message.split(separator: " ").count
         self.actionLabel = actionLabel
-        self.editsRegions = editsRegions
         self.actionHandler = actionHandler
     }
 
@@ -215,14 +209,12 @@ final class ToastQueueManager {
         _ message: String,
         severity: ToastSeverity = .info,
         actionLabel: String,
-        editsRegions: Bool = false,
         actionHandler: @escaping @MainActor () -> Void
     ) {
         enqueue(ToastItem(
             message: message,
             severity: severity,
             actionLabel: actionLabel,
-            editsRegions: editsRegions,
             actionHandler: actionHandler
         ))
     }
@@ -266,12 +258,14 @@ final class ToastQueueManager {
         }
     }
 
-    /// Drop every toast whose action edits regions, shown or queued. A run
-    /// start calls it; every other toast stays.
-    func dropRegionEditActions() {
-        topQueue.removeAll(where: \.editsRegions)
-        bottomQueue.removeAll(where: \.editsRegions)
-        for item in activeToasts where item.editsRegions {
+    /// Withdraw every toast that carries an action, shown or queued. The
+    /// start of a full run calls it: an action offered before the run (an
+    /// Undo, a Mark, a Re-run) no longer means what it offered once the
+    /// run owns the document. A toast without an action stays.
+    func dropActionToasts() {
+        topQueue.removeAll { $0.actionHandler != nil }
+        bottomQueue.removeAll { $0.actionHandler != nil }
+        for item in activeToasts where item.actionHandler != nil {
             dismiss(item)
         }
     }
