@@ -5,10 +5,10 @@ Must go red: RedactionEngineTests/InkFitBandTests lightRowThroughTheWord; Redact
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitRender.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitRender.swift
-index 78ce5c8e..d9535e70 100644
+index a7ac194e..45a4ef93 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitRender.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitRender.swift
-@@ -252,7 +252,7 @@ extension DocumentSearcher {
+@@ -255,7 +255,7 @@ extension DocumentSearcher {
          }
          // Every run that meets the box's rows is the word's: a light row
          // through a word splits it into runs of like height, and each is ink.
@@ -16,4 +16,4 @@ index 78ce5c8e..d9535e70 100644
 +        let met = [line]
          let whole = fitted(met.map(\.lowerBound).min() ?? line.lowerBound, met.map(\.upperBound).max() ?? line.upperBound)
          let bandOnly = met.count > 1 ? fitted(line.lowerBound, line.upperBound).box : nil
-         return (whole.box, whole.outcome, bandOnly)
+         return (whole.box, whole.outcome, bandOnly, margin)
