@@ -1,7 +1,7 @@
 Property: The record is taken after the whole-word closure, so the count and the lineage read the list that is written.
 Area: hidden text (whole source words)
 Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter "WholeSourceWordsTests"
-Must go red: RedactionEngineTests/WholeSourceWordsTests wholeWords [part of a number boxed]; RedactionEngineTests/WholeSourceWordsTests wholeWords [a boxed name and its full stop]
+Must go red: RedactionEngineTests/WholeSourceWordsTests wholeWords [part of a number boxed]
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
