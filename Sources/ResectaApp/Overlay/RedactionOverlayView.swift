@@ -898,7 +898,7 @@ class RedactionOverlayView: UIView {
             for highlight in searchHighlights {
                 let element = UIAccessibilityElement(accessibilityContainer: self)
                 let viewRect = pdfNormalizedToOverlay(highlight.normalizedRect)
-                element.accessibilityFrame = UIAccessibility.convertToScreenCoordinates(viewRect, in: self)
+                element.accessibilityFrameInContainerSpace = viewRect
                 // NEVER include matched text — announce page only.
                 // The walk's current match carries a
                 // ", current" suffix — still no matched text.
@@ -919,7 +919,7 @@ class RedactionOverlayView: UIView {
     ) -> UIAccessibilityElement {
         let element = UIAccessibilityElement(accessibilityContainer: self)
         let viewRect = pdfNormalizedToOverlay(region.normalizedRect)
-        element.accessibilityFrame = UIAccessibility.convertToScreenCoordinates(viewRect, in: self)
+        element.accessibilityFrameInContainerSpace = viewRect
 
         // Numbered label — "Redaction region N"
         element.accessibilityLabel = "Redaction region \(index + 1)"
