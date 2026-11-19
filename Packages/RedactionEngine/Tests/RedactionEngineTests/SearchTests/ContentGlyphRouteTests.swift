@@ -69,4 +69,40 @@ struct ContentGlyphRouteTests {
         let kept = DocumentSearcher.mergeHybridResults(textLayerRects: [normalized], ocr: [same, twin])
         #expect(kept.map(\.id) == [twin.id], "kept \(kept.map { Self.points($0.normalizedRect) })")
     }
+
+    @Test("The hybrid merge tells a grown text-layer match by its box before the growth: a recognised occurrence beside it that the grown box would swallow is kept, and the grown box still covers its word")
+    func hybridNeighbourBesideTheGrowth() async throws {
+        let doc = try ContentGlyphWalkTests.document("BT /F1 12 Tf 72 700 Td [(Inv) -250 (oice) 1200 (Total)] TJ ET")
+        var options = SearchOptions()
+        options.includeOCR = false
+        options.wholeWord = false
+        var hits: [SearchResult] = []
+        for await r in DocumentSearcher().search(SendablePDFDocument(doc), mode: .text("Total", options: options), progress: { _, _ in }) {
+            hits.append(r)
+        }
+        let hit = try #require(hits.first, "one match")
+        let grown = Self.points(hit.normalizedRect)
+        let identity = Self.points(try #require(hit.identityRect, "the grown match carries the box it is told by"))
+        try #require(grown.minX <= 98.616 + DocumentSearcher.growthSlack && identity.minX > grown.minX + 1,
+                     "precondition: the box grew to the T at 98.616, \(grown), from \(identity)")
+        // The grown box covers its word; what it is told by is today's box.
+        let page = try #require(doc.page(at: 0))
+        let range = ((try #require(page.string)) as NSString).range(of: "Total")
+        let today = try #require(DocumentSearcher().normalizedRect(for: try #require(page.selection(for: range)), page: page))
+        #expect(ContentGlyphBoxTests.close(identity, Self.points(today), 0.5), "identity \(identity), today's box \(Self.points(today))")
+        func ocr(_ r: CGRect) -> SearchResult {
+            SearchResult(pageIndex: 0, normalizedRect: CGRect(x: r.minX / 612, y: r.minY / 792, width: r.width / 612, height: r.height / 792),
+                         matchedText: "Total", contextSnippet: "Total", source: .ocr(confidence: 1), term: "Total")
+        }
+        // The same word read from the page image, at today's box; and an
+        // occurrence only the page image holds, beside it on the line, that
+        // reaches just past the grown box's centre and covers less than half
+        // of today's box.
+        let same = ocr(identity)
+        let beside = ocr(CGRect(x: grown.midX + 0.1 - identity.width, y: identity.minY, width: identity.width, height: identity.height))
+        try #require(DocumentSearcher.mergeHybridResults(textLayerRects: [hit.normalizedRect], ocr: [beside]).isEmpty,
+                     "precondition: told by the grown box, the occurrence beside it is taken for a repeat")
+        let kept = DocumentSearcher.mergeHybridResults(textLayerRects: hits.map(\.mergeIdentity), ocr: [same, beside])
+        #expect(kept.map(\.id) == [beside.id], "kept \(kept.map { Self.points($0.normalizedRect) }); grown \(grown), identity \(identity)")
+    }
 }

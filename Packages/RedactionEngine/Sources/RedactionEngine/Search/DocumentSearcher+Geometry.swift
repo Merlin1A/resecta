@@ -92,11 +92,19 @@ extension DocumentSearcher {
     /// under it alone (`inkFittedRect`, paint only), the box Apply paints; the
     /// hidden glyphs' own box rides on the result (`textLayerAndInkRects`).
     public nonisolated func boundingRect(for nsRange: NSRange, page: PDFPage) -> CGRect? {
+        boundingBox(for: nsRange, page: page)?.rect
+    }
+
+    /// `boundingRect` with the box the match is told by (`identity`): its box
+    /// before the growth to its own glyphs, where the growth moved it; nil
+    /// where `rect` is that box. A box grown for cover never widens it.
+    nonisolated func boundingBox(for nsRange: NSRange, page: PDFPage) -> (rect: CGRect, identity: CGRect?)? {
         guard let selection = page.selection(for: nsRange) else { return nil }
         let own = Self.ownGlyphs(for: nsRange, page: page)
         return normalizedRect(for: selection, page: page).map {
-            grown(Self.inkFittedRect($0, page: page, text: selection.string, range: nsRange, paintOnly: true),
-                  line: selection.bounds(for: page), by: own, page: page)
+            let fitted = Self.inkFittedRect($0, page: page, text: selection.string, range: nsRange, paintOnly: true)
+            let rect = grown(fitted, line: selection.bounds(for: page), by: own, page: page)
+            return (rect, rect == fitted ? nil : fitted)
         }
     }
 
@@ -106,17 +114,25 @@ extension DocumentSearcher {
     /// line, never one union across the gap. nil when no line has a rect
     /// (the same refusal as `boundingRect`).
     nonisolated func lineRects(for nsRange: NSRange, page: PDFPage) -> [CGRect]? {
+        lineBoxes(for: nsRange, page: page)?.map(\.rect)
+    }
+
+    /// `lineRects`, each line with the box it is told by (`identity`): its box
+    /// before the growth to the match's own glyphs, where the growth moved it;
+    /// nil where `rect` is that box. A box grown for cover never widens it.
+    nonisolated func lineBoxes(for nsRange: NSRange, page: PDFPage) -> [(rect: CGRect, identity: CGRect?)]? {
         guard let selection = page.selection(for: nsRange) else { return nil }
         let lines = selection.selectionsByLine()
         let own = Self.ownGlyphs(for: nsRange, page: page)
-        let rects = lines.compactMap { line in
+        let boxes = lines.compactMap { line -> (rect: CGRect, identity: CGRect?)? in
             normalizedRect(for: line, page: page).map {
-                grown(Self.inkFittedRect($0, page: page, text: line.string,
-                                         range: lines.count == 1 ? nsRange : line.range(at: 0, on: page), paintOnly: true),
-                      line: line.bounds(for: page), by: own, page: page)
+                let fitted = Self.inkFittedRect($0, page: page, text: line.string,
+                                                range: lines.count == 1 ? nsRange : line.range(at: 0, on: page), paintOnly: true)
+                let rect = grown(fitted, line: line.bounds(for: page), by: own, page: page)
+                return (rect, rect == fitted ? nil : fitted)
             }
         }
-        return rects.isEmpty ? nil : rects
+        return boxes.isEmpty ? nil : boxes
     }
 
     /// On a page whose glyphs are inkless over a page-scale image, each line of
@@ -126,7 +142,8 @@ extension DocumentSearcher {
     /// some line's fit fell back to the drift envelope (the caller reports the
     /// page as not fully analysed); `identity`, index-aligned, the box a line's
     /// tallest band alone paints where its paint took more (`InkFitJob.identity`),
-    /// nil where the paint is its own. Nil on any other page: the line rects
+    /// else the paint before the growth to the match's own glyphs where that
+    /// growth moved it, nil where the paint is its own. Nil on any other page: the line rects
     /// are `lineRects`' as they are.
     nonisolated func textLayerAndInkRects(for nsRange: NSRange, page: PDFPage)
         -> (paint: [CGRect], strip: [CGRect], degraded: Bool, identity: [CGRect?])? {
@@ -140,8 +157,9 @@ extension DocumentSearcher {
             let fit = Self.inkFit(raw, page: page, text: line.string,
                                   range: lines.count == 1 ? nsRange : line.range(at: 0, on: page), paintOnly: true)
             strip.append(raw)
-            paint.append(grown(fit.rect, line: line.bounds(for: page), by: own, page: page))
-            identity.append(fit.identity)
+            let box = grown(fit.rect, line: line.bounds(for: page), by: own, page: page)
+            paint.append(box)
+            identity.append(fit.identity ?? (box == fit.rect ? nil : fit.rect))
             degraded = degraded || fit.degraded
         }
         return paint.isEmpty ? nil : (paint, strip, degraded, identity)
