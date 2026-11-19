@@ -1,0 +1,19 @@
+Property: Each kind's name is its approved words, letter for letter.
+Area: measured sentence
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/MeasuredLineKindsTests
+Must go red: ResectaAppTests/MeasuredLineKindsTests "Each list of kinds gives its approved sentence": the eight rows that name lines of a left-aligned paragraph
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Models/MeasuredLineKinds.swift b/Sources/ResectaApp/Models/MeasuredLineKinds.swift
+index d7efebb7..b7e31d15 100644
+--- a/Sources/ResectaApp/Models/MeasuredLineKinds.swift
++++ b/Sources/ResectaApp/Models/MeasuredLineKinds.swift
+@@ -20,7 +20,7 @@ enum MeasuredLineKinds {
+     /// The name that fills the sentence's slot, for each kind.
+     static func name(_ kind: Kind) -> String {
+         switch kind {
+-        case .leftAlignedParagraph: "lines of a left-aligned paragraph"
++        case .leftAlignedParagraph: "lines of a left aligned paragraph"
+         case .justifiedParagraph: "lines of a justified paragraph"
+         case .startsWithLabel: "lines that start with a label"
+         case .tableCells: "lines in table cells"

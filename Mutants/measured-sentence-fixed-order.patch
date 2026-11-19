@@ -1,0 +1,20 @@
+Property: The names follow the fixed order of the kinds, whatever order a caller gives them in.
+Area: measured sentence
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/MeasuredLineKindsTests
+Must go red: ResectaAppTests/MeasuredLineKindsTests "Each list of kinds gives its approved sentence": the four rows that name both paragraph kinds
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Models/MeasuredLineKinds.swift b/Sources/ResectaApp/Models/MeasuredLineKinds.swift
+index d7efebb7..fcd45990 100644
+--- a/Sources/ResectaApp/Models/MeasuredLineKinds.swift
++++ b/Sources/ResectaApp/Models/MeasuredLineKinds.swift
+@@ -11,8 +11,8 @@ enum MeasuredLineKinds {
+ 
+     /// A kind of line, in the fixed order its name is shown in.
+     enum Kind: CaseIterable {
+-        case leftAlignedParagraph
+         case justifiedParagraph
++        case leftAlignedParagraph
+         case startsWithLabel
+         case tableCells
+     }
