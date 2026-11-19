@@ -300,7 +300,7 @@ concurrent entry points. The working rules, checkable by grep:
   view's first layout before it opens a linked page. Main-thread work is
   otherwise expressed through actor isolation, not queue hops.
 - Isolation opt-outs are rare and deliberate: 19 `nonisolated(unsafe)`
-  declarations across ~77,000 lines of app + engine source, and the working
+  declarations across ~80,000 lines of app + engine source, and the working
   convention is a written rationale at the declaration site saying why the
   access is safe.
 - Logging goes through `os.Logger`, and what a log line may carry is
@@ -475,8 +475,8 @@ If you review one path end-to-end, make it this one:
 `Pipeline/PDFStreamReconstructor.swift` (rebuild) →
 `Verification/VerificationEngine.swift` (the layered pass over the output) →
 `SecurityTests/FakeRedactionTests.swift` (the named attack, pinned). The test
-tree is larger than the source tree — about 77,000 lines of source to about
-131,000 lines of tests; counts and structure are in the README's Testing
+tree is larger than the source tree — about 80,000 lines of source to about
+139,000 lines of tests; counts and structure are in the README's Testing
 section — and the suites above are the reason I trust my own output enough to
 ship it.
 
