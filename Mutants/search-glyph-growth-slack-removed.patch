@@ -1,6 +1,6 @@
 Property: A box no glyph lies past by more than the slack is today's box exactly.
 Area: Search, the match boxes from the page's own drawing
-Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'ContentGlyphWalkTests|ContentGlyphFontTests|ContentGlyphBoxTests|ContentGlyphMapTests|ContentGlyphExportTests'
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'ContentGlyphWalkTests|ContentGlyphFontTests|ContentGlyphBoxTests|ContentGlyphMapTests|ContentGlyphExportTests|ContentGlyphRouteTests'
 Must go red: RedactionEngineTests/ContentGlyphBoxTests unchanged [Last word end]; RedactionEngineTests/ContentGlyphBoxTests unchanged [(T) 80 (otal) 120 ( due)]
 Apply in a scratch worktree with `git apply`; discard after.
 

@@ -1,7 +1,7 @@
 Property: A match's box grows to its own drawn glyphs where PDFKit places them short.
 Area: Search, the match boxes from the page's own drawing
-Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'ContentGlyphWalkTests|ContentGlyphFontTests|ContentGlyphBoxTests|ContentGlyphMapTests|ContentGlyphExportTests'
-Must go red: RedactionEngineTests/ContentGlyphBoxTests lineEndSliver; RedactionEngineTests/ContentGlyphBoxTests backwardTJ; RedactionEngineTests/ContentGlyphExportTests ownInkCovered [the line's last word]; RedactionEngineTests/ContentGlyphExportTests ownInkCovered [a TJ that draws Total back]
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'ContentGlyphWalkTests|ContentGlyphFontTests|ContentGlyphBoxTests|ContentGlyphMapTests|ContentGlyphExportTests|ContentGlyphRouteTests'
+Must go red: RedactionEngineTests/ContentGlyphBoxTests lineEndSliver; RedactionEngineTests/ContentGlyphBoxTests backwardTJ; RedactionEngineTests/ContentGlyphExportTests ownInkCovered [the line's last word]; RedactionEngineTests/ContentGlyphExportTests ownInkCovered [a TJ that draws Total back]; RedactionEngineTests/ContentGlyphRouteTests acrossTheSeam
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift

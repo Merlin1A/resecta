@@ -1,6 +1,6 @@
 Property: Glyphs drawn in an invisible mode add nothing to the paint.
 Area: Search, the match boxes from the page's own drawing
-Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'ContentGlyphWalkTests|ContentGlyphFontTests|ContentGlyphBoxTests|ContentGlyphMapTests|ContentGlyphExportTests'
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'ContentGlyphWalkTests|ContentGlyphFontTests|ContentGlyphBoxTests|ContentGlyphMapTests|ContentGlyphExportTests|ContentGlyphRouteTests'
 Must go red: RedactionEngineTests/ContentGlyphBoxTests invisibleAddsNothing
 Apply in a scratch worktree with `git apply`; discard after.
 

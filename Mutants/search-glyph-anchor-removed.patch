@@ -1,6 +1,6 @@
 Property: A glyph is taken as its character's only where its box meets PDFKit's box for that character.
 Area: Search, the match boxes from the page's own drawing
-Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'ContentGlyphWalkTests|ContentGlyphFontTests|ContentGlyphBoxTests|ContentGlyphMapTests|ContentGlyphExportTests'
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'ContentGlyphWalkTests|ContentGlyphFontTests|ContentGlyphBoxTests|ContentGlyphMapTests|ContentGlyphExportTests|ContentGlyphRouteTests'
 Must go red: RedactionEngineTests/ContentGlyphBoxTests twinsDrawnOutOfOrder
 Apply in a scratch worktree with `git apply`; discard after.
 

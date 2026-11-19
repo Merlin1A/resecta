@@ -113,4 +113,33 @@ struct ContentGlyphExportTests {
             }
         }
     }
+
+    @Test("A box whose edge stops the growth slack short of its word's ink still leaves none of that ink outside the paint, in Secure or in Searchable")
+    func slackInsideThePaint() async throws {
+        let s = Self.dpi / 72
+        let content = "BT /F1 12 Tf 72 700 Td (account) Tj ET"
+        let data = ContentGlyphWalkTests.data(content)
+        let alone = try Self.render(data)
+        let blank = try Self.render(ContentGlyphWalkTests.data("BT /F1 12 Tf 72 600 Td (x) Tj ET"))
+        let x0 = Int(60 * s), x1 = Int(140 * s), y0 = Int(695 * s), y1 = Int(712 * s)
+        var own: [(Int, Int)] = []
+        for y in y0..<y1 { for x in x0..<x1 where Self.gray(alone, x, y) < 128 && Self.gray(blank, x, y) > 245 { own.append((x, y)) } }
+        try #require(own.count > 100, "the word's ink is read: \(own.count) px")
+        // The ink's own extent, in points, and a box that stops exactly the
+        // slack short of it on the right and on the left.
+        let inkMin = CGFloat(own.map(\.0).min() ?? 0) / s, inkMax = CGFloat((own.map(\.0).max() ?? 0) + 1) / s
+        let slack = DocumentSearcher.growthSlack
+        let box = CGRect(x: inkMin + slack, y: 696, width: inkMax - inkMin - 2 * slack, height: 13)
+        let regions = [0: [RedactionRegion(id: UUID(), normalizedRect: CGRect(x: box.minX / 612, y: box.minY / 792,
+                                                                                width: box.width / 612, height: box.height / 792), source: .manual)]]
+        for mode in [PipelineMode.secureRasterization, .searchableRedaction] {
+            let url = try await TestPipeline.processAndExport(data, mode: mode, regions: regions, fillColor: .black, dpi: 150)
+            defer { try? FileManager.default.removeItem(at: url) }
+            let out = try Self.render(try Data(contentsOf: url))
+            let r0 = Int(697.5 * s), r1 = Int(708.5 * s)
+            let paint = Set((x0..<x1).filter { x in (r0...r1).allSatisfy { Self.gray(out, x, $0) < 40 } })
+            let dark = own.filter { !paint.contains($0.0) && Self.gray(out, $0.0, $0.1) < 200 }
+            #expect(dark.isEmpty, "\(mode): ink x \(inkMin)-\(inkMax) pt, box \(box.minX)-\(box.maxX) pt: \(dark.count) ink pixels still dark")
+        }
+    }
 }
