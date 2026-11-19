@@ -5,10 +5,10 @@ Must go red: RedactionEngineTests/InkFitBandTests lineAcrossTheWindowKeepsTheBan
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFit.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFit.swift
-index 2683ff2f..93787b2e 100644
+index 30432b6c..b65714e8 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFit.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFit.swift
-@@ -488,10 +488,7 @@ extension DocumentSearcher {
+@@ -493,10 +493,7 @@ extension DocumentSearcher {
                                  height: ink.height + 2 * cap)
              return window.insetBy(dx: -inkFitMargin, dy: -inkFitMargin).contains(fitted) ? fitted : nil
          }
@@ -19,4 +19,4 @@ index 2683ff2f..93787b2e 100644
 +        return paint(ink)
      }
  
-     /// The page's read tokens: one full-page render at the fit's scale, read
+     /// `inkPaint`'s box, and beside it the box the tallest band alone paints
