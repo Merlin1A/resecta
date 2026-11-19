@@ -64,6 +64,83 @@ nonisolated final class EditorChromeUITests: XCTestCase {
         XCTAssertEqual(control.frame.midX, xBefore, accuracy: 0.5)
     }
 
+    // MARK: - The control at large text sizes
+
+    /// The largest text size, and Accessibility 1, the first size above the
+    /// symbol's ceiling. A wrong name is ignored and the app runs at the
+    /// default size, so each launch checks that its size took.
+    private static let largestTextSize = "UICTContentSizeCategoryAccessibilityXXXL"
+    private static let accessibilityOne = "UICTContentSizeCategoryAccessibilityM"
+
+    /// Launch the multi-page document at `textSize` (nil: the default) and
+    /// return the whole-page control.
+    private func launchWholePageControl(atTextSize textSize: String?) -> XCUIElement {
+        var arguments = ["--uitesting", "--loadTestDocument", "--multipageDoc"]
+        if let textSize { arguments += ["-UIPreferredContentSizeCategoryName", textSize] }
+        app.launchArguments = arguments
+        app.launch()
+        let control = app.buttons["pageNavMarkWholePage"]
+        XCTAssertTrue(control.waitForExistence(timeout: 30), "The page bar's whole-page control never appeared.")
+        if textSize != nil {
+            // At an accessibility size the counter stacks its two lines.
+            let counter = element("pageNavCounter")
+            XCTAssertTrue(counter.waitForExistence(timeout: 10))
+            XCTAssertGreaterThan(counter.frame.height, 40,
+                                 "The text size did not take: the counter is \(counter.frame.height) pt tall.")
+        }
+        return control
+    }
+
+    private func screenshotProbe() throws -> CanvasPixelProbe {
+        try XCTUnwrap(CanvasPixelProbe(XCUIScreen.main.screenshot(), windowSize: app.windows.firstMatch.frame.size))
+    }
+
+    /// Mark the page, then: at 8 points on a circle of radius 19 pt round
+    /// the control's centre the disc shows teal, and the symbol's middle is
+    /// white.
+    private func markAndCheckTheDisc(_ control: XCUIElement, screenshot name: String) throws {
+        control.tap()
+        XCTAssertTrue(waitForLabel(control, "Unmark Whole Page"), "A marked page's control must read Unmark Whole Page.")
+        let probe = try screenshotProbe()
+        attachScreenshot(named: name)
+        let centre = CGPoint(x: control.frame.midX, y: control.frame.midY)
+        for step in 0..<8 {
+            let angle = CGFloat(step) * .pi / 4
+            let (r, g, b) = probe.rgb(centre.x + 19 * cos(angle), centre.y + 19 * sin(angle))
+            XCTAssertTrue(CanvasPixelProbe.Tint.teal.matches(r, g, b),
+                          "The disc must show teal \(step * 45)° round the symbol; it read (\(r), \(g), \(b)).")
+        }
+        let (r, g, b) = probe.rgb(centre.x, centre.y)
+        XCTAssertTrue(r >= 235 && g >= 235 && b >= 235,
+                      "The marked symbol's middle must be white; it read (\(r), \(g), \(b)).")
+    }
+
+    func testWholePageControl_atTheLargestTextSize_symbolStaysInsideItsDisc() throws {
+        let control = launchWholePageControl(atTextSize: Self.largestTextSize)
+        XCTAssertTrue(waitForLabel(control, "Mark Whole Page"))
+        let unmarked = try screenshotProbe()
+        attachScreenshot(named: "chrome-whole-page-largest-unmarked")
+        let symbol = try XCTUnwrap(unmarked.tintBounds(.teal, in: control.frame), "No teal symbol inside the control.")
+        XCTAssertLessThanOrEqual(symbol.width, 30, "The unmarked symbol must stop growing at its ceiling; it is \(symbol.width) pt wide.")
+        XCTAssertLessThanOrEqual(symbol.height, 24, "The unmarked symbol must stop growing at its ceiling; it is \(symbol.height) pt tall.")
+        try markAndCheckTheDisc(control, screenshot: "chrome-whole-page-largest-marked")
+    }
+
+    func testWholePageControl_atAccessibilityOne_symbolStaysInsideItsDisc() throws {
+        let control = launchWholePageControl(atTextSize: Self.accessibilityOne)
+        XCTAssertTrue(waitForLabel(control, "Mark Whole Page"))
+        try markAndCheckTheDisc(control, screenshot: "chrome-whole-page-accessibility-one-marked")
+    }
+
+    func testWholePageControl_atTheDefaultSize_discIsUnchanged() throws {
+        let control = launchWholePageControl(atTextSize: nil)
+        XCTAssertTrue(waitForLabel(control, "Mark Whole Page"))
+        try markAndCheckTheDisc(control, screenshot: "chrome-whole-page-default-marked")
+        let disc = try XCTUnwrap(try screenshotProbe().tintBounds(.teal, in: control.frame), "No teal disc inside the control.")
+        XCTAssertEqual(disc.width, 44, accuracy: 1, "The default size's disc must stay 44 pt wide.")
+        XCTAssertEqual(disc.height, 44, accuracy: 1, "The default size's disc must stay 44 pt tall.")
+    }
+
     // MARK: - The one-page bar
 
     func testOnePageDocument_showsTheCountWithoutArrowsOrControl() {

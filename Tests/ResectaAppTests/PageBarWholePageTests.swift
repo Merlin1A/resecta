@@ -2,6 +2,7 @@ import Testing
 import Foundation
 import CoreGraphics
 import PDFKit
+import UIKit
 import RedactionEngine
 @testable import ResectaApp
 
@@ -253,6 +254,40 @@ struct PageBarWholePageTests {
         // The chevrons' identifiers are untouched.
         #expect(source.contains("accessibilityIdentifier(\"pageNavPrevious\")"))
         #expect(source.contains("accessibilityIdentifier(\"pageNavNext\")"))
+    }
+
+    @Test("The bar's control carries its ceiling and its large-content view")
+    func controlCarriesItsCeilingAndLargeContentView() throws {
+        let source = try Self.repoFile("Sources/ResectaApp/Views/PageNavigationBar.swift")
+        #expect(source.contains(".dynamicTypeSize(...PageNavigationBar.wholePageGlyphCeiling)"))
+        #expect(source.contains("accessibilityShowsLargeContentViewer"))
+        #expect(source.contains("Label(PageNavigationBar.wholePageActionLabel(marked: marked), systemImage: \"rectangle.inset.filled\")"))
+    }
+
+    // MARK: - The symbol at large text sizes
+
+    // The control's symbol at the default text size ("Large", body 17 pt),
+    // measured on a screenshot of the shipped build (402 x 874 pt screen,
+    // 3 px per pt).
+    private static let measuredSymbolWidthAtLarge: CGFloat = 19.3
+    private static let measuredSymbolHeightAtLarge: CGFloat = 15.3
+
+    @Test("The symbol's ceiling is the largest text size at which the symbol keeps 4 pt of its disc")
+    func symbolCeilingKeepsItsDisc() {
+        #expect(PageNavigationBar.wholePageGlyphCeiling == .xxxLarge)
+        func body(_ category: UIContentSizeCategory) -> CGFloat {
+            UIFont.preferredFont(forTextStyle: .body,
+                                 compatibleWith: UITraitCollection(preferredContentSizeCategory: category)).pointSize
+        }
+        // The symbol grows in step with the body size; its half diagonal
+        // plus the margin must stay within half the disc.
+        let halfDiagonalAtLarge = hypot(Self.measuredSymbolWidthAtLarge, Self.measuredSymbolHeightAtLarge) / 2
+        func reach(_ category: UIContentSizeCategory) -> CGFloat {
+            halfDiagonalAtLarge * body(category) / body(.large) + PageNavigationBar.wholePageGlyphMargin
+        }
+        let halfDisc = PageNavigationBar.markedDiscDiameter / 2
+        #expect(reach(.extraExtraExtraLarge) <= halfDisc, "at the ceiling the symbol keeps its margin of disc")
+        #expect(reach(.accessibilityMedium) > halfDisc, "at the next size it would not")
     }
 
     @Test("The capture rule's comment names the action as the bar does")
