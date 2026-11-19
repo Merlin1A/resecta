@@ -90,7 +90,7 @@ struct SearchRuleCaseTests {
 
     // MARK: a whole search in each mode lists maxResults rows and no more
 
-    enum LimitMode: String, Sendable { case text, pattern, scan, alwaysFlag }
+    enum LimitMode: String, Sendable, CaseIterable { case text, pattern, scan, alwaysFlag }
 
     struct LimitRow: Sendable, CustomTestStringConvertible {
         let name: String
@@ -103,11 +103,13 @@ struct SearchRuleCaseTests {
     static let limitRows: [LimitRow] = [
         LimitRow(name: "typed search, under the limit: every match is listed", mode: .text, perPage: [300], listed: 300),
         LimitRow(name: "typed search, one page over the limit: the limit is listed", mode: .text, perPage: [1100], listed: DocumentSearcher.maxResults),
+        LimitRow(name: "pattern, under the limit: every match is listed", mode: .pattern, perPage: [300], listed: 300),
         LimitRow(name: "pattern, one page over the limit: the limit is listed", mode: .pattern, perPage: [1100], listed: DocumentSearcher.maxResults),
         LimitRow(name: "pattern, two pages over the limit together: the limit is listed", mode: .pattern, perPage: [600, 600], listed: DocumentSearcher.maxResults),
         LimitRow(name: "Scan, under the limit: every address is listed", mode: .scan, perPage: [300], listed: 300),
         LimitRow(name: "Scan, one page over the limit: the limit is listed", mode: .scan, perPage: [1100], listed: DocumentSearcher.maxResults),
         LimitRow(name: "Scan, two pages over the limit together: the limit is listed", mode: .scan, perPage: [600, 600], listed: DocumentSearcher.maxResults),
+        LimitRow(name: "always-flag term, under the limit: every match is listed", mode: .alwaysFlag, perPage: [300], listed: 300),
         LimitRow(name: "always-flag term, one page over the limit: the limit is listed", mode: .alwaysFlag, perPage: [1100], listed: DocumentSearcher.maxResults),
     ]
 
@@ -191,11 +193,11 @@ struct SearchRuleCaseTests {
         #expect(Set(Self.edgeRows.map(\.isWholeWord)) == [true, false])
         #expect(Self.capRows.contains { $0.yielded == $0.offered } && Self.capRows.contains { $0.yielded < $0.offered })
         #expect(Set(Self.classRows.map(\.same)) == [true, false])
-        for mode in [LimitMode.text, .scan] {
+        for mode in LimitMode.allCases {
             let rows = Self.limitRows.filter { $0.mode == mode }
             #expect(rows.contains { $0.listed == $0.perPage.reduce(0, +) } && rows.contains { $0.listed < $0.perPage.reduce(0, +) },
                     "\(mode.rawValue)")
         }
-        #expect(Self.edgeRows.count + Self.capRows.count + Self.classRows.count + Self.limitRows.count == 33)
+        #expect(Self.edgeRows.count + Self.capRows.count + Self.classRows.count + Self.limitRows.count == 35)
     }
 }
