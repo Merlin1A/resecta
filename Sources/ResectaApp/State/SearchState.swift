@@ -10,6 +10,10 @@ import RedactionEngine
 /// Document-derived state is in-memory only; cleared on dismiss.
 /// Last-used filter shape persists via UserDefaults; the multi-term
 /// recall ring is session-only and never persisted.
+/// Some stored properties here have an internal setter, and some helpers
+/// are internal, only because the type's methods live in its extension
+/// files (`SearchState+*.swift`); only those files and this one write
+/// the properties or call the helpers.
 @Observable
 @MainActor
 final class SearchState: Identifiable {
@@ -62,33 +66,12 @@ final class SearchState: Identifiable {
     /// callers both observe a nil task handle and the loser's scan runs
     /// orphaned — appending into shared results and double-writing the
     /// run record. Not observed by any view.
-    @ObservationIgnored private(set) var triggerSetupInFlight = false
+    @ObservationIgnored var triggerSetupInFlight = false
 
     /// Set when a trigger arrived while another held the setup window.
     /// Consumed by `endTriggerSetup()`: the window owner re-triggers
     /// once, so the final run reflects the latest query shape.
-    @ObservationIgnored private(set) var pendingRetrigger = false
-
-    /// Single-flight gate for `triggerSearch()`. Returns true when the
-    /// caller owns the setup window; false coalesces this call into one
-    /// deferred re-trigger. Pinned by `SearchStateTests`.
-    func beginTriggerSetup() -> Bool {
-        guard !triggerSetupInFlight else {
-            pendingRetrigger = true
-            return false
-        }
-        triggerSetupInFlight = true
-        return true
-    }
-
-    /// Close the setup window. Returns true when a coalesced caller
-    /// requested a re-trigger while the window was held.
-    func endTriggerSetup() -> Bool {
-        triggerSetupInFlight = false
-        let retrigger = pendingRetrigger
-        pendingRetrigger = false
-        return retrigger
-    }
+    @ObservationIgnored var pendingRetrigger = false
 
     // MARK: - Run-state discriminators
 
@@ -160,16 +143,6 @@ final class SearchState: Identifiable {
     /// Categories enabled for PII scan (all enabled by default).
     var enabledPIICategories: Set<PIICategory> = Set(PIICategory.allCases)
 
-    /// Categories the next scan actually requests. An empty chip
-    /// selection means scan EVERYTHING: the one-tap contract needs no
-    /// configuration, so no selection maps to the full category set
-    /// rather than a no-op scan. Consumed by `buildSearchMode()`, the
-    /// coverage report, and the empty-state detector count so all
-    /// three surfaces describe the same run.
-    var effectiveScanCategories: Set<PIICategory> {
-        enabledPIICategories.isEmpty ? Set(PIICategory.allCases) : enabledPIICategories
-    }
-
     /// Former minimum-confidence value for the retired client-side
     /// post-scan filter. The per-run Confidence slider is gone —
     /// Settings' Detection Sensitivity preset is the one engine-level
@@ -212,19 +185,12 @@ final class SearchState: Identifiable {
         didSet { invalidateFilterCaches() }
     }
 
-    /// Drop the session's filter caches. Called from the local didSet
-    /// paths above when the inputs that key `_FilterCacheKey` change.
-    /// The id→index map keys on `resultVersion` alone and survives.
-    func invalidateFilterCaches() {
-        _filterCache.invalidateFilters()
-    }
-
     // MARK: - Diagnostics
 
     /// Last classifier explanation for the first scanned page text.
     /// Session-scoped; cleared on mode switch and sheet dismiss. Populated
     /// at scan kickoff by `SearchAndRedactSheet.triggerSearch`.
-    private(set) var lastDoctypeExplanation: DoctypeExplanation?
+    var lastDoctypeExplanation: DoctypeExplanation?
 
     /// Last scan coverage report. Populated when a PII scan completes.
     /// Session-scoped; cleared on mode switch and sheet dismiss.
@@ -236,7 +202,7 @@ final class SearchState: Identifiable {
     /// `CoverageReport.overlapSuppressedCountByCategory` when the scan
     /// completes; reset on scan kickoff and on the two existing
     /// `lastCoverageReport = nil` sites.
-    private(set) var pendingOverlapSuppressed: [PIICategory: Int] = [:]
+    var pendingOverlapSuppressed: [PIICategory: Int] = [:]
 
     /// Running total of matches dropped for falling below their
     /// per-category preset threshold during a PII scan. Populated by
@@ -244,77 +210,11 @@ final class SearchState: Identifiable {
     /// `CoverageReport.belowThresholdSuppressedCount` when the scan completes.
     /// Reset on scan kickoff and on the two `lastCoverageReport = nil` sites,
     /// mirroring `pendingOverlapSuppressed`.
-    private(set) var pendingBelowThresholdSuppressed: Int = 0
-
-    /// Setter used by the scan orchestration in `SearchAndRedactSheet`.
-    func setDoctypeExplanation(_ explanation: DoctypeExplanation?) {
-        lastDoctypeExplanation = explanation
-    }
+    var pendingBelowThresholdSuppressed: Int = 0
 
     /// Setter used by the scan orchestration in `SearchAndRedactSheet`.
     func setCoverageReport(_ report: CoverageReport?) {
         lastCoverageReport = report
-    }
-
-    /// The stored scan report with the two post-scan,
-    /// view-state counts folded in: `appliedCount` from `appliedResultIDs`
-    /// and `deselectedCount` from triage selections. `makeCoverageReport`
-    /// deliberately leaves both at 0 at scan completion — nothing is applied
-    /// or deselected yet (see `CoverageReport` in `SearchTypes`). The coverage
-    /// panel and the shared audit snapshot read THIS rather than
-    /// `lastCoverageReport` directly, so both reflect the user's current
-    /// apply/deselect state instead of a frozen scan-time zero. Returns nil
-    /// when no scan report exists (panel hidden), mirroring
-    /// `lastCoverageReport`. A pure derivation over already-reset state, so it
-    /// needs no teardown of its own. See `withAppliedCount` /
-    /// `withDeselectedCount`.
-    func coverageReportForDisplay() -> CoverageReport? {
-        lastCoverageReport?
-            .withAppliedCount(appliedResultIDs.count)
-            .withDeselectedCount(deselectedCount)
-    }
-
-    /// Value snapshot of the session's deselection facts,
-    /// captured by `PipelineCoordinator.runFullPipeline` at run entry and
-    /// surfaced on the verification-results screen. Gated on the exact
-    /// condition the scan coverage panel mounts under
-    /// (`SearchResultsSection`: a stored scan report + `.piiScan` mode)
-    /// and derived from the same live `isSelected` state
-    /// (`deselectedCount`), so the two surfaces read from one
-    /// definition and cannot disagree. Nil for plain-text sessions or
-    /// before a scan lands — the results screen renders nothing then.
-    func deselectionSnapshotForRun() -> RedactionState.DeselectionSnapshot? {
-        guard searchModeType == .piiScan, lastCoverageReport != nil else {
-            return nil
-        }
-        return RedactionState.DeselectionSnapshot(
-            items: results.filter { !$0.isSelected && $0.hasBox }, totalCount: totalCount)
-    }
-
-    /// Accumulate per-page overlap-suppressed counts. Invoked from
-    /// `DocumentSearcher.overlapSink` during scanning.
-    func accumulateOverlapSuppression(_ counts: [PIICategory: Int]) {
-        for (category, count) in counts {
-            pendingOverlapSuppressed[category, default: 0] += count
-        }
-    }
-
-    /// Reset the running overlap tally. Called before each scan
-    /// kickoff by `SearchAndRedactSheet.triggerSearch`.
-    func resetOverlapSuppression() {
-        pendingOverlapSuppressed = [:]
-    }
-
-    /// Accumulate per-page below-threshold drop counts. Invoked
-    /// from `DocumentSearcher.belowThresholdSink` during scanning.
-    func accumulateBelowThresholdSuppression(_ count: Int) {
-        pendingBelowThresholdSuppressed += count
-    }
-
-    /// Reset the running below-threshold tally. Called before
-    /// each scan kickoff by `SearchAndRedactSheet.triggerSearch`.
-    func resetBelowThresholdSuppression() {
-        pendingBelowThresholdSuppressed = 0
     }
 
     /// Page indices where a regex enumeration bailed on
@@ -339,17 +239,6 @@ final class SearchState: Identifiable {
     /// scan kickoff by `SearchAndRedactSheet.triggerSearch`.
     func resetRegexTimeoutPages() {
         regexTimeoutPages = []
-    }
-
-    /// Route the engine's regex-rejection sink into the callout. The
-    /// searcher fires it once, with the gate's reason, when a regex search
-    /// starts on a pattern the safety gate refuses — the stream then
-    /// finishes empty instead of silently reading as "0 results". The
-    /// trigger pre-validates and normally sets `regexError` first; a
-    /// message already standing wins, so the sink never overwrites it.
-    func recordRegexRejection(_ reason: String) {
-        guard regexError == nil else { return }
-        regexError = reason
     }
 
     /// Page indices whose raster exceeded the OCR pixel caps, so
@@ -422,45 +311,6 @@ final class SearchState: Identifiable {
         priorScanFingerprints = snapshot
     }
 
-    /// Deterministic, geometry+category-only fingerprint
-    /// of a single `SearchResult`. The output string is
-    /// `"<pageIndex>|<x>,<y>,<w>,<h>|<categoryRawValue ?? '''>"` where
-    /// the rect components are formatted to 3 decimal places. NEVER
-    /// includes `matchedText`, `contextSnippet`, `term`, `rationale`,
-    /// or any other document-derived value — pinned by
-    /// `fingerprintNoMatchedText` load-bearing test.
-    /// `static` so the helper can be invoked from `for`-loop bodies
-    /// without capturing `self`.
-    static func fingerprint(for r: SearchResult) -> String {
-        let rounded = String(
-            format: "%.3f,%.3f,%.3f,%.3f",
-            r.normalizedRect.origin.x,
-            r.normalizedRect.origin.y,
-            r.normalizedRect.size.width,
-            r.normalizedRect.size.height
-        )
-        return "\(r.pageIndex)|\(rounded)|\(r.piiCategory?.rawValue ?? "")"
-    }
-
-    /// Compute the intra-session diff between the most recent
-    /// captured snapshot and the current `results`. Returns nil when
-    /// no prior snapshot exists (first scan of session, or after
-    /// `clear()` wiped the snapshot). The 3-tuple shape mirrors
-    /// the `(added, removed, unchanged)` contract.
-    /// O(n) over `results` + O(|prior|) for set arithmetic.
-    func diffSinceLastScan() -> (added: Int, removed: Int, unchanged: Int)? {
-        guard let prior = priorScanFingerprints else { return nil }
-        var current: Set<String> = []
-        current.reserveCapacity(results.count)
-        for r in results {
-            current.insert(Self.fingerprint(for: r))
-        }
-        let added = current.subtracting(prior).count
-        let removed = prior.subtracting(current).count
-        let unchanged = prior.intersection(current).count
-        return (added: added, removed: removed, unchanged: unchanged)
-    }
-
     // MARK: - Results
 
     /// All search results, accumulated progressively.
@@ -505,71 +355,6 @@ final class SearchState: Identifiable {
     /// reading as full coverage. Reset wherever `resultsAtCap` resets.
     private(set) var capUnscannedPageCount: Int = 0
 
-    /// All results after source/confidence/category filters applied.
-    /// Memoized on the filter shape; recomputed on a resultVersion
-    /// change or a filter change (P3).
-    var filteredResults: [SearchResult] {
-        memo(\.filtered) { applyFilters(to: results) }
-    }
-
-    /// Results grouped by page, with source/confidence filters applied.
-    /// Memoized on the filter shape (P3).
-    var resultsByPage: [Int: [SearchResult]] {
-        memo(\.byPage) { Dictionary(grouping: filteredResults, by: \.pageIndex) }
-    }
-
-    /// U3: Result rows grouped by search term (one per match), filters applied.
-    var resultsByTerm: [String: [SearchResult]] {
-        memo(\.byTerm) { Dictionary(grouping: Self.occurrenceRows(filteredResults), by: \.term) }
-    }
-
-    /// Filtered match count (respects the filters; a wrapped match counts once).
-    var filteredCount: Int { Self.occurrenceCount(filteredResults) }
-
-    /// 1-based position of `currentResult` within `filteredResults`.
-    /// Returns nil when there is no current result or when the current
-    /// result is not present in `filteredResults` (i.e. it is hidden by
-    /// the active filter). Used by the counter in `SearchAndRedactSheet`
-    /// to display the position within the visible filtered set.
-    var currentResultFilteredPosition: Int? {
-        guard let current = currentResult else { return nil }
-        return Self.occurrenceRows(filteredResults).firstIndex { Self.occurrenceKey($0) == Self.occurrenceKey(current) }.map { $0 + 1 }
-    }
-
-    /// Count of selected results within the currently filtered set.
-    var selectedFilteredCount: Int {
-        Self.occurrenceCount(filteredResults.filter(\.isSelected))
-    }
-
-    /// Whether any OCR results exist (controls filter UI visibility).
-    var hasOCRResults: Bool {
-        results.contains { if case .ocr = $0.source { return true }; return false }
-    }
-
-    /// Results grouped by PII category, with filters applied.
-    var resultsByCategory: [PIICategory: [SearchResult]] {
-        memo(\.byCategory) {
-            let piiOnly = filteredResults.filter { $0.piiCategory != nil }
-            return Dictionary(grouping: piiOnly, by: { $0.piiCategory! })
-        }
-    }
-
-    /// Counts of results per PII category (for badge display).
-    var categoryCounts: [PIICategory: Int] {
-        resultsByCategory.mapValues(\.count)
-    }
-
-    /// Custom-term matches in the session: results with no detector
-    /// category (the "Custom" chip's count).
-    var customTermMatchCount: Int {
-        results.lazy.filter { $0.piiCategory == nil }.count
-    }
-
-    /// Whether any PII results exist (controls PII filter UI visibility).
-    var hasPIIResults: Bool {
-        results.contains { $0.piiCategory != nil }
-    }
-
     // @ObservationIgnored: the memo store is a memoization internal, not
     // view state. The getters WRITE it mid-body-evaluation; if the macro
     // wrapped it, that write would re-enter the ObservationRegistrar
@@ -578,9 +363,9 @@ final class SearchState: Identifiable {
     // this class, never a child `@Observable`. View updates still flow
     // through the observed inputs: `results`/`resultVersion` and every
     // field of `_currentCacheKey`, all read by the getters on every access.
-    @ObservationIgnored private var _filterCache = FilterCache()
+    @ObservationIgnored var _filterCache = FilterCache()
 
-    private struct FilterCache {
+    struct FilterCache {
         /// One memoized value, valid while its key still matches.
         struct Slot<Key: Equatable, Value> {
             private var key: Key?
@@ -603,65 +388,7 @@ final class SearchState: Identifiable {
         mutating func invalidateFilters() { self = FilterCache(indexByID: indexByID) }
     }
 
-    /// One slot read: a hit on `key` returns the stored value; a miss
-    /// builds, stores and returns it. The build runs BETWEEN the read
-    /// and the write of `_filterCache` — never inside an access to it —
-    /// because a grouping build reads `filteredResults`, itself a slot.
-    private func memo<Key: Equatable, Value>(
-        _ slot: WritableKeyPath<FilterCache, FilterCache.Slot<Key, Value>>,
-        key: Key,
-        _ build: () -> Value
-    ) -> Value {
-        if let hit = _filterCache[keyPath: slot].value(for: key) { return hit }
-        let built = build()
-        _filterCache[keyPath: slot].store(built, for: key)
-        return built
-    }
-
-    /// The filter-shape slots, keyed on `_currentCacheKey`.
-    private func memo<Value>(
-        _ slot: WritableKeyPath<FilterCache, FilterCache.Slot<_FilterCacheKey, Value>>,
-        _ build: () -> Value
-    ) -> Value {
-        memo(slot, key: _currentCacheKey, build)
-    }
-
-    /// Live result lookup by ID — O(1) through the version-keyed index
-    /// map. The id re-check plus the linear rescue keep the lookup
-    /// exactly equivalent to the scan it replaces even against a direct
-    /// `results` assignment that skipped the version bump (test seams
-    /// do this); a genuinely absent id still returns nil. Reads the
-    /// same observed inputs as the former scan (`results`,
-    /// `resultVersion`).
-    func result(for id: UUID) -> SearchResult? {
-        let index = memo(\.indexByID, key: resultVersion) {
-            var map = [UUID: Int](minimumCapacity: results.count)
-            for (position, result) in results.enumerated() {
-                map[result.id] = position
-            }
-            return map
-        }
-        if let position = index[id], position < results.count,
-           results[position].id == id {
-            return results[position]
-        }
-        return results.first(where: { $0.id == id })
-    }
-
-    private var _currentCacheKey: _FilterCacheKey {
-        _FilterCacheKey(
-            version: resultVersion,
-            source: sourceFilter,
-            minOCRConfidence: minimumOCRConfidence,
-            piiCategoryFilter: piiCategoryFilter,
-            customTermMatchesInFilter: customTermMatchesInFilter,
-            sortOrder: sortOrder,
-            appliedResultIDs: appliedResultIDs,
-            appliedFilter: appliedFilter
-        )
-    }
-
-    private struct _FilterCacheKey: Equatable {
+    struct _FilterCacheKey: Equatable {
         let version: Int
         let source: SourceFilter
         let minOCRConfidence: Float
@@ -671,98 +398,6 @@ final class SearchState: Identifiable {
         let appliedResultIDs: Set<UUID>
         let appliedFilter: AppliedFilter
     }
-
-    private func applyFilters(to results: [SearchResult]) -> [SearchResult] {
-        var filtered = results.filter { result in
-            // Source filter
-            switch sourceFilter {
-            case .all: break
-            case .textOnly:
-                guard result.source == .textLayer else { return false }
-            case .ocrOnly:
-                guard result.source != .textLayer else { return false }
-            }
-            // OCR confidence filter
-            if minimumOCRConfidence > 0, case .ocr(let conf) = result.source {
-                guard conf >= minimumOCRConfidence else { return false }
-            }
-            // PII category filter
-            if let categoryFilter = piiCategoryFilter {
-                if let cat = result.piiCategory {
-                    guard categoryFilter.contains(cat) else { return false }
-                } else {
-                    guard customTermMatchesInFilter else { return false }
-                }
-            }
-            // The PII confidence post-filter is retired with the
-            // per-run Confidence slider — every above-threshold result
-            // the engine returns is listed; the confidence sort is the
-            // one review-side confidence tool (the Select where… ≥75/≥90
-            // predicates are retired too).
-            // Applied-state filter. `.all` no-ops; `.applied`
-            // keeps only results whose IDs are in `appliedResultIDs`;
-            // `.unapplied` keeps the complement.
-            switch appliedFilter {
-            case .all:
-                break
-            case .applied:
-                guard appliedResultIDs.contains(result.id) else { return false }
-            case .unapplied:
-                guard !appliedResultIDs.contains(result.id) else { return false }
-            }
-            return true
-        }
-
-        // Apply sort order
-        switch sortOrder {
-        case .discoveryOrder:
-            break // Already in discovery order
-        case .confidenceDescending:
-            filtered.sort { ($0.piiConfidence ?? 0) > ($1.piiConfidence ?? 0) }
-        case .pageAscending:
-            filtered.sort { $0.pageIndex < $1.pageIndex }
-        }
-
-        return filtered
-    }
-
-    /// Total selected count (matches: a wrapped match counts once).
-    var selectedCount: Int {
-        Self.occurrenceCount(results.filter(\.isSelected))
-    }
-
-    /// True when the selection is non-empty and every selected result
-    /// already carries an applied marker. The toolbar Apply disables on
-    /// it — re-applying an all-applied selection can only no-op through
-    /// the overlap guard ("Marked 0 … already covered").
-    var selectionFullyApplied: Bool {
-        let selected = results.filter(\.isSelected)
-        guard !selected.isEmpty else { return false }
-        return selected.allSatisfy { isAppliedOrCovered($0.id) }
-    }
-
-    /// The one Apply-graying predicate for a single result: the apply
-    /// path has nothing left to do for it — it produced a region
-    /// (`appliedResultIDs`) or was dedup-skipped as already covered
-    /// (`coveredResultIDs`; a covered result counts as
-    /// applied for graying, though it earns no badge). Folded over the
-    /// selection by `selectionFullyApplied`; read for the current
-    /// result by the compact handle's per-item Apply.
-    func isAppliedOrCovered(_ id: UUID) -> Bool {
-        appliedResultIDs.contains(id) || coveredResultIDs.contains(id)
-    }
-
-    /// Count of matches the user left un-checked in triage, by occurrence
-    /// (the complement of `selectedCount`). Folded into
-    /// `CoverageReport.deselectedCount` at the panel + audit-export boundary
-    /// by `coverageReportForDisplay()`. Derived from live `isSelected` state,
-    /// so it returns to 0 with `results` on `clear()` / `clearResults()`.
-    var deselectedCount: Int {
-        Self.occurrenceCount(results.filter { !$0.isSelected && $0.hasBox })
-    }
-
-    /// Total match count (a match wrapped onto two lines counts once).
-    var totalCount: Int { Self.occurrenceCount(results) }
 
     // MARK: - Progress
 
@@ -789,43 +424,7 @@ final class SearchState: Identifiable {
     /// which also persists across `clearResults` in the same session).
     /// Recorded by `SearchAndRedactSheet+Trigger.triggerSearch()` on
     /// each multi-term kickoff via `recordMultiTermSearch(terms:)`.
-    private(set) var recentMultiTermSets: [[String]] = []
-
-    static let recentMultiTermSetsCap = 5
-
-    /// Record a multi-term term set into the
-    /// in-memory ring. No-op for empty `terms`. Existing matching
-    /// entries move to the front (most-recent-first); the ring is
-    /// capped at `recentMultiTermSetsCap`, dropping the oldest.
-    func recordMultiTermSearch(terms: [String]) {
-        guard !terms.isEmpty else { return }
-        if let existing = recentMultiTermSets.firstIndex(of: terms) {
-            recentMultiTermSets.remove(at: existing)
-        }
-        recentMultiTermSets.insert(terms, at: 0)
-        if recentMultiTermSets.count > Self.recentMultiTermSetsCap {
-            recentMultiTermSets = Array(recentMultiTermSets.prefix(Self.recentMultiTermSetsCap))
-        }
-    }
-
-    // MARK: - Retired recents purge
-
-    /// The persisted text/regex recents feature is excised; only the
-    /// in-memory multi-term ring above remains. This sweep removes the
-    /// feature's four retired storage keys from existing installs at
-    /// every launch — unconditional and idempotent, with no marker key
-    /// (a marker would itself be residue). The key strings live here as
-    /// literals because this function is deliberately their last home.
-    static func purgeRetiredRecentsStorage(defaults: UserDefaults = .standard) {
-        for key in [
-            "search.recents.enabled.v1",
-            "search.recents.text.v1",
-            "search.recents.regex.v1",
-            "search.recents.oneTimeDeletion.v1",
-        ] {
-            defaults.removeObject(forKey: key)
-        }
-    }
+    var recentMultiTermSets: [[String]] = []
 
     // MARK: - Init (UserDefaults seam)
 
@@ -855,13 +454,9 @@ final class SearchState: Identifiable {
 
     /// Pending results buffered before flush, each tagged with the run
     /// it was appended under so a flush moves only the current run's.
-    private var pendingResults: [(run: Int, result: SearchResult)] = []
+    var pendingResults: [(run: Int, result: SearchResult)] = []
     /// Flush timer task.
-    private var flushTask: Task<Void, Never>?
-    /// Batch size threshold before immediate flush.
-    private static let batchFlushSize = 50
-    /// Time interval between automatic flushes.
-    private static let flushInterval: Duration = .milliseconds(100)
+    var flushTask: Task<Void, Never>?
 
     // MARK: - Run token
 
@@ -871,202 +466,40 @@ final class SearchState: Identifiable {
     /// it and started the next — is told apart from the current run's
     /// and dropped instead of appended. The current run's results are
     /// never dropped by it.
-    private(set) var runToken: Int = 0
-
-    /// Starts a run: mints and returns the token the run's consumer
-    /// passes to `appendResult(_:run:)`. Called after `clearResults()`.
-    func beginRun() -> Int {
-        runToken += 1
-        lastRunOptions = options
-        return runToken
-    }
+    var runToken: Int = 0
 
     /// The options the current run started with, which the applied
     /// record names (`appliedSearchRecord()`); nil before any run.
-    private(set) var lastRunOptions: SearchOptions?
+    var lastRunOptions: SearchOptions?
 
     // MARK: - Result Navigation
 
     /// Index of the currently focused result for prev/next navigation.
     var currentResultIndex: Int?
 
-    /// The currently focused result, if any.
-    var currentResult: SearchResult? {
-        guard let idx = currentResultIndex, results.indices.contains(idx) else { return nil }
-        return results[idx]
-    }
-
     /// Session-scoped scope for J / K / Cmd+G traversal. Not persisted;
     /// every fresh document opens at `.wholeDocument`.
     var navigationScope: SearchNavigationScope = .wholeDocument
-
-    /// Return only the results visible in the active navigation scope.
-    /// `.wholeDocument` returns all results; `.currentPage` filters to the
-    /// page the caller currently has loaded.
-    /// Sources from `filteredResults` so J/K navigation respects
-    /// active source/confidence/category/applied filters — results hidden
-    /// by the filter are skipped during traversal. One stop per match: a
-    /// wrapped match is visited at its lead line (`occurrenceRows`).
-    func scopedResults(currentPageIndex: Int) -> [SearchResult] {
-        switch navigationScope {
-        case .wholeDocument: return Self.occurrenceRows(filteredResults)
-        case .currentPage: return Self.occurrenceRows(filteredResults).filter { $0.pageIndex == currentPageIndex }
-        }
-    }
-
-    /// Navigate to the next result within the current scope. Wraps. No-op
-    /// when the scope is empty (e.g. `.currentPage` on a page with no hits).
-    func navigateToNext(currentPageIndex: Int) {
-        let scoped = scopedResults(currentPageIndex: currentPageIndex)
-        guard !scoped.isEmpty else { return }
-        let currentID = currentResult.map(Self.occurrenceKey)
-        let scopedIdx = scoped.firstIndex(where: { Self.occurrenceKey($0) == currentID })
-        let nextScopedIdx: Int
-        if let scopedIdx { nextScopedIdx = (scopedIdx + 1) % scoped.count }
-        else { nextScopedIdx = 0 }
-        if let realIdx = results.firstIndex(where: { $0.id == scoped[nextScopedIdx].id }) {
-            currentResultIndex = realIdx
-        }
-    }
-
-    /// Navigate to the previous result within the current scope. Wraps.
-    func navigateToPrevious(currentPageIndex: Int) {
-        let scoped = scopedResults(currentPageIndex: currentPageIndex)
-        guard !scoped.isEmpty else { return }
-        let currentID = currentResult.map(Self.occurrenceKey)
-        let scopedIdx = scoped.firstIndex(where: { Self.occurrenceKey($0) == currentID })
-        let prevScopedIdx: Int
-        if let scopedIdx { prevScopedIdx = (scopedIdx - 1 + scoped.count) % scoped.count }
-        else { prevScopedIdx = scoped.count - 1 }
-        if let realIdx = results.firstIndex(where: { $0.id == scoped[prevScopedIdx].id }) {
-            currentResultIndex = realIdx
-        }
-    }
-
-    // MARK: - Review Shortcuts
-
-    /// Space-key handler. Toggles `isSelected` on the focused result
-    /// (same field the checkbox drives), so the existing apply pipeline
-    /// picks it up without parallel state.
-    func toggleSelectionForCurrentMatch() {
-        guard let id = currentResult?.id else { return }
-        toggleSelection(for: id)
-    }
-
-    /// Return-key prelude. If nothing is selected, mark the focused
-    /// result so the caller can apply via the existing `RedactionState`
-    /// path. Returns true when the apply path should run.
-    @discardableResult
-    func selectCurrentMatchIfNoneSelected() -> Bool {
-        if results.contains(where: { $0.isSelected }) { return true }
-        guard let id = currentResult.flatMap({ $0.hasBox ? $0.id : nil }) else { return false }
-        toggleSelection(for: id)
-        return true
-    }
 
     // MARK: - Live Preview
 
     /// Most recent live-preview snapshot (engine NSRanges + counts).
     /// nil while no preview is in flight or after `clearLivePreview()`.
-    private(set) var livePreview: SearchPreviewResult?
+    var livePreview: SearchPreviewResult?
 
     /// Resolved bounding rects for the visible page's preview matches,
     /// in normalized PDF coords. Filled by the sheet (which owns the
     /// `DocumentSearcher` reference for `boundingRect`) right after
     /// `livePreview` updates. Drawn by the per-page UIKit overlay.
-    private(set) var livePreviewRects: [CGRect] = []
+    var livePreviewRects: [CGRect] = []
 
-    private var livePreviewTask: Task<Void, Never>?
-
-    /// Debounce + run a live-preview pass. Each call cancels the
-    /// previous task; only the last result is published. Independent
-    /// from the sheet's existing 300 ms full-search debounce.
-    func scheduleLivePreview(
-        searcher: DocumentSearcher,
-        currentPageIndex: Int,
-        totalPageCount: Int,
-        pageTextProvider: @Sendable @escaping (Int) async -> String?,
-        // Match the full-search debounce (300 ms, see `debounceSearch`)
-        // so the preview does not issue an extra off-main page.string read ahead
-        // of every keystroke; a still-typing user then produces no preview walk
-        // at all.
-        debounce: Duration = .milliseconds(300)
-    ) {
-        livePreviewTask?.cancel()
-
-        // Build the engine SearchMode from the same conversion the sheet
-        // uses for the full search. Don't preview piiScan.
-        let mode: SearchMode
-        switch searchModeType {
-        case .text:
-            guard !queryText.isEmpty else { clearLivePreview(); return }
-            mode = .text(queryText, options: options)
-        case .regex:
-            guard !queryText.isEmpty else { clearLivePreview(); return }
-            mode = .regex(queryText, options: options)
-        case .multiTerm:
-            guard !searchTerms.isEmpty else { clearLivePreview(); return }
-            mode = .multiTerm(searchTerms, options: options)
-        case .piiScan:
-            clearLivePreview(); return
-        }
-
-        // The live preview only renders the visible page's highlight
-        // rects; the whole-document total is owned by the full search that the
-        // same keystroke kicks off. Always scope the preview to the current page
-        // so it stops re-walking every page's `page.string` off-main against the
-        // freshly-copied PDFDocument (the previewDoc copy).
-        let scope: SearchPreviewScope = .currentPage(pageIndex: currentPageIndex)
-
-        livePreviewTask = Task { [weak self] in
-            try? await Task.sleep(for: debounce)
-            if Task.isCancelled { return }
-            let result = await searcher.previewMatches(
-                mode: mode,
-                scope: scope,
-                currentPageIndex: currentPageIndex,
-                totalPageCount: totalPageCount,
-                pageTextProvider: pageTextProvider
-            )
-            if Task.isCancelled { return }
-            // The enclosing Task is MainActor-isolated
-            // (SearchState is @MainActor by SE-0466 default and the Task
-            // closure inherits the surrounding isolation), and
-            // `searcher.previewMatches` returns to MainActor after the
-            // actor hop. A second `await MainActor.run` was a redundant
-            // re-hop — dropped. The `guard let self` mirrors the
-            // original closure's weak-self contract.
-            guard let self else { return }
-            self.livePreview = result
-            // Rects are filled by the caller after this returns; clear
-            // any stale rects from a previous query in the meantime.
-            self.livePreviewRects = []
-        }
-    }
-
-    /// Caller-supplied resolved rects (normalized 0–1 PDF coords) for
-    /// the visible page. The view layer does the NSRange→CGRect conversion
-    /// because the engine has no PDFPage context.
-    func setLivePreviewRects(_ rects: [CGRect]) {
-        livePreviewRects = rects
-        resultVersion += 1
-    }
-
-    /// Cancel any in-flight preview and clear the published state.
-    func clearLivePreview() {
-        livePreviewTask?.cancel()
-        livePreviewTask = nil
-        let hadPreview = (livePreview != nil) || !livePreviewRects.isEmpty
-        livePreview = nil
-        livePreviewRects = []
-        if hadPreview { resultVersion += 1 }
-    }
+    var livePreviewTask: Task<Void, Never>?
 
     // MARK: - Version Tracking
 
     /// Monotonic counter for overlay dirty checking.
     /// Incremented on every results mutation.
-    private(set) var resultVersion: Int = 0
+    var resultVersion: Int = 0
 
     // MARK: - Methods
 
@@ -1103,69 +536,6 @@ final class SearchState: Identifiable {
         flushFilterShape()
     }
 
-    func cancelSearch() async {
-        let task = activeSearchTask
-        activeSearchTask = nil
-        task?.cancel()
-        _ = await task?.value
-        isSearching = false
-        flushPendingResults() // Deliver any buffered results
-    }
-
-    // Fire-and-forget cancellation for two cases that cannot await the
-    // task's `value`: (a) self-cancellation from inside the task
-    // (`appendResult` cap-hit) — awaiting a task from within itself
-    // deadlocks; (b) document close / sheet teardown, where the caller
-    // wipes shared state regardless, so a leaked cleanup tail has
-    // nothing to clobber.
-    func cancelSearchWithoutAwait() {
-        activeSearchTask?.cancel()
-        activeSearchTask = nil
-        isSearching = false
-        flushPendingResults()
-    }
-
-    /// Replace-selection primitive: every result's `isSelected` is set to
-    /// `predicate(result)` — predicates that match a subset deselect the
-    /// rest. It is the footer Select All / Deselect All toggle's building
-    /// block, where "deselect everything not in the target set" is
-    /// exactly the wanted behavior (the "Select where…"
-    /// predicate menu and its additive `addToSelection(where:)` sibling
-    /// retired with the footer menu — this is the one predicate
-    /// primitive left). Bumps `resultVersion` once for the full pass (no
-    /// per-result observer churn). Performance gate: <100ms on 10k
-    /// results — pinned by `SearchStateSelectionTests`.
-    func setSelection(where predicate: (SearchResult) -> Bool) {
-        let decided = Self.occurrenceSelection(results, where: predicate)
-        for i in results.indices { results[i].isSelected = results[i].hasBox && (decided[Self.occurrenceKey(results[i])] ?? false) }
-        resultVersion += 1
-    }
-
-    /// Footer bar select-all / deselect-all toggle. Composes with
-    /// `setSelection(where:)` (the replace primitive) while preserving
-    /// filtered-only behavior — results outside the active filter retain
-    /// their existing `isSelected`. The captured `filteredIDs` + `target`
-    /// makes the predicate a pure function of `result.id`.
-    func toggleSelectAll() {
-        let filtered = filteredResults.filter(\.hasBox)
-        let filteredIDs = Set(filtered.map(\.id))
-        let target = !filtered.allSatisfy(\.isSelected)
-        setSelection { result in
-            filteredIDs.contains(result.id) ? target : result.isSelected
-        }
-    }
-
-    func toggleSelection(for id: UUID) {
-        guard let result = results.first(where: { $0.id == id }), result.hasBox else { return }
-        let key = Self.occurrenceKey(result), target = !result.isSelected
-        setSelection { Self.occurrenceKey($0) == key ? target : $0.isSelected }
-    }
-
-    /// Current index of a result by ID, or nil if removed.
-    func index(of id: UUID) -> Int? {
-        results.firstIndex(where: { $0.id == id })
-    }
-
     /// True while the Home close dialog holds this session parked: the
     /// sheet's teardown then spares it, so Cancel re-presents it whole.
     var parkedForHomeClose: Bool = false
@@ -1173,64 +543,15 @@ final class SearchState: Identifiable {
     /// The document state's per-import token the session was parked over: restored only over that document.
     var parkedDocument: UUID?
 
-    /// Selections not yet applied, from the rows (never a gesture tracker): a selected result no live applied
-    /// region covers (`liveApplied` = `RedactionState.liveAppliedSearchResultIDs`; covered counts as applied).
-    func hasUnappliedSelections(liveApplied: Set<UUID>) -> Bool {
-        results.contains { $0.isSelected && !liveApplied.contains($0.id) && !coveredResultIDs.contains($0.id) }
-    }
-
-    /// Buffer a result from the search stream. Flushed in batches
-    /// to avoid per-result @Observable change notifications (P2).
-    /// Stops accepting at engine cap and cancels the search (P3).
-    /// `run` names the run the result belongs to (the token
-    /// `beginRun()` handed its consumer); a result from a superseded
-    /// run is dropped before anything below sees it. A caller that
-    /// holds no token — a direct seed — appends to the current run.
-    func appendResult(_ result: SearchResult, run: Int? = nil) {
-        if let run, run != runToken { return }
-        if results.count + pendingResults.count >= DocumentSearcher.maxResults {
-            markCapReached()  // a result past the cap is dropped
-            return
-        }
-        pendingResults.append((run: runToken, result: result))
-        if results.count + pendingResults.count >= DocumentSearcher.maxResults {
-            markCapReached()  // the result that reaches the cap is kept
-            return
-        }
-        if pendingResults.count >= Self.batchFlushSize {
-            flushPendingResults()
-        } else if flushTask == nil {
-            flushTask = Task { [weak self] in
-                try? await Task.sleep(for: Self.flushInterval)
-                guard !Task.isCancelled else { return }
-                self?.flushPendingResults()
-            }
-        }
-    }
-
     /// The run reached the engine's result cap: mark it, snapshot how many
     /// pages the cancelled scan will never reach (so the footer reports
     /// the remainder rather than presenting the first N results as full
     /// coverage), publish what is buffered and stop the scan.
-    private func markCapReached() {
+    func markCapReached() {
         resultsAtCap = true
         capUnscannedPageCount = max(0, totalPages - currentSearchPage)
         flushPendingResults()
         cancelSearchWithoutAwait()
-    }
-
-    /// Flush buffered results into the published array. Single version
-    /// bump. Only the current run's entries move; anything buffered
-    /// under an earlier token is discarded with the flush.
-    func flushPendingResults() {
-        flushTask?.cancel()
-        flushTask = nil
-        guard !pendingResults.isEmpty else { return }
-        let current = pendingResults.filter { $0.run == runToken }.map(\.result)
-        pendingResults.removeAll()
-        guard !current.isEmpty else { return }
-        results.append(contentsOf: Self.landing(current))
-        resultVersion += 1
     }
 
     /// Clear results and increment version for overlay refresh. The
