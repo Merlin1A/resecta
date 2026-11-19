@@ -148,7 +148,10 @@ struct ContentGlyphBoxTests {
         let range = text.range(of: "account")
         try #require(range.location != NSNotFound)
         let today = try #require(page.selection(for: range)?.bounds(for: page))
-        #expect(today.maxX < 257, "precondition: PDFKit's box ends at \(today.maxX)")
+        // On the composite and Type 3 pages PDFKit's box is short (it would
+        // grow on a page the walk reads); text in the vertical font widens
+        // PDFKit's own box, and it is still the box kept.
+        if index != 1 { #expect(today.maxX < 257, "precondition: PDFKit's box ends at \(today.maxX)") }
         var options = SearchOptions()
         options.includeOCR = false
         var hits: [SearchResult] = []
@@ -167,6 +170,19 @@ struct ContentGlyphBoxTests {
         for box in boxes { #expect(box.width < 60, "a box spans \(box.minX)-\(box.maxX): the copies are crossed") }
         let today = try Self.pdfKitBoxes(content, "Hartwell")
         for (box, before) in zip(boxes, today) { #expect(Self.close(box, before), "\(box) against \(before)") }
+    }
+
+    @Test("A word drawn twice, once at no size and once at a size: neither box takes the other's glyphs")
+    func visibleTwin() async throws {
+        let content = "BT /F1 12 Tf 0 0 0 0 72 700 Tm (QUARTZ7) Tj ET BT /F1 12 Tf 300 500 Td (QUARTZ7) Tj ET"
+        let boxes = try await Self.boxes(content, "QUARTZ7")
+        let today = try Self.pdfKitBoxes(content, "QUARTZ7")
+        try #require(!boxes.isEmpty)
+        for box in boxes {
+            #expect(box.width < 60 && box.height < 20, "a box spans \(box): the copies are crossed")
+            #expect(today.contains { box.contains($0.insetBy(dx: 0.01, dy: 0.01)) && $0.contains(box.insetBy(dx: 0.06, dy: 0.06)) },
+                    "\(box) is one of PDFKit's \(today), grown by no more than the slack")
+        }
     }
 
     @Test("A page the walk cannot read keeps PDFKit's boxes: a /Differences name with no text here")

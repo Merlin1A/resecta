@@ -17,9 +17,11 @@ struct ContentGlyphExportTests {
         let label: String, term: String, full: String, alone: String, without: String
         /// The band the match's ink is read in, in points.
         let x0: CGFloat, x1: CGFloat
-        /// Letters of other words the Searchable layer drops today; nil where
-        /// a grown box meets a neighbour's glyph (named, not pinned).
-        let droppedToday: [Character]?
+        /// Letters of other words the Searchable layer drops beside the
+        /// match: as on main, except where a grown box meets a neighbour's
+        /// glyph (the TJ case: "ce" on main, "ceio" here, named in what may
+        /// move).
+        let dropped: [Character]
         var description: String { label }
     }
 
@@ -28,22 +30,22 @@ struct ContentGlyphExportTests {
              full: ContentGlyphWalkTests.visible + plant,
              alone: "BT /F1 12 Tf 218.064 700 Td (account) Tj ET",
              without: "BT /F1 12 Tf 72 700 Td (Quarterly statement for the ) Tj ET" + plant,
-             x0: 150, x1: 280, droppedToday: nil),
+             x0: 150, x1: 280, dropped: Array("Qaeeefhmnorstttt")),
         Case(label: "a TJ that draws Total back over oice", term: "Total",
              full: "BT /F1 12 Tf 72 700 Td [(Inv) -250 (oice) 1200 (Total) -500 (due)] TJ ET" + next,
              alone: "BT /F1 12 Tf 98.616 700 Td (Total) Tj ET",
              without: "BT /F1 12 Tf 72 700 Td [(Inv) -250 (oice)] TJ ET BT /F1 12 Tf 131.292 700 Td (due) Tj ET" + next,
-             x0: 60, x1: 200, droppedToday: nil),
+             x0: 60, x1: 200, dropped: Array("ceio")),
         Case(label: "ordinary kerning between words", term: "Total",
              full: "BT /F1 12 Tf 72 700 Td [(Grand) 150 ( Total)] TJ ET" + next,
              alone: "BT /F1 12 Tf 106.884 700 Td (Total) Tj ET",
              without: "BT /F1 12 Tf 72 700 Td (Grand) Tj ET" + next,
-             x0: 60, x1: 200, droppedToday: ["d"]),
+             x0: 60, x1: 200, dropped: ["d"]),
         Case(label: "ordinary kerning inside the word", term: "Total",
              full: "BT /F1 12 Tf 72 700 Td [(T) 80 (otal) 120 ( due)] TJ ET" + next,
              alone: "BT /F1 12 Tf 72 700 Td [(T) 80 (otal)] TJ ET",
              without: "BT /F1 12 Tf 96.276 700 Td ( due) Tj ET" + next,
-             x0: 60, x1: 200, droppedToday: ["d"]),
+             x0: 60, x1: 200, dropped: ["d"]),
     ]
 
     static let dpi: CGFloat = 600
@@ -107,7 +109,7 @@ struct ContentGlyphExportTests {
                 for (letter, n) in Self.letters(outText) { dropped[letter, default: 0] -= n }
                 let lost = dropped.filter { $0.value > 0 }.flatMap { Array(repeating: $0.key, count: $0.value) }.sorted()
                 print("content-glyph export \(c.label): the Searchable layer drops \(String(lost)) beside \(c.term)")
-                if let today = c.droppedToday { #expect(lost == today.sorted(), "\(c.label): drops \(String(lost)), today \(String(today))") }
+                #expect(lost == c.dropped.sorted(), "\(c.label): drops \(String(lost)), expected \(String(c.dropped))")
             }
         }
     }
