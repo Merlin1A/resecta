@@ -85,11 +85,16 @@ extension VerificationEngine {
     /// is probed for a text layer: image-only output must carry none (the
     /// writer draws no text on such a page), so a text layer there FAILs
     /// the layer outright — a tampered or foreign output, never a skip.
+    ///
+    /// `record` is the run's record: its boxes for a page enter the page's
+    /// list of rectangles (`layer6Shapes`). Nil, or a page the record has no
+    /// boxes for, gives each region's own rectangles, as before the record.
     func runLayer6SpatialVerification(
         _ doc: PDFDocument,
         regions: [Int: [RedactionRegion]],
         perPageModes: [PipelineMode],
-        verifier: SandwichVerification
+        verifier: SandwichVerification,
+        record: RunRecord? = nil
     ) async throws -> CheckRow {
         // Entry-level cooperative cancellation.
         try Task.checkCancellation()
@@ -152,25 +157,13 @@ extension VerificationEngine {
             // Convert regions to output page coordinates (output pages
             // always have zero-origin bounds)
             let outputBounds = page.bounds(for: .cropBox)
-            // The strip's own rects (`textRemovalRects`), so the exclusion
-            // reads the hidden glyphs' box a region stripped as well.
-            let rectsInPoints = pageRegions.flatMap(\.textRemovalRects).map {
-                normalizedToPDFPageCoordinates($0, pageRect: outputBounds)
-            }
-            // `bounds` carries the un-expanded rect (the unconditional 0pt
-            // floor + the band gate) and `expandedBounds` the filter's
-            // safety-margin halo, so Layer 6 enforces the same two-tier
-            // contract the character filter excludes by.
-            let regionShapes: [RegionShape] = rectsInPoints.map { rect in
-                RegionShape(
-                    expandedBounds: rect.insetBy(dx: -safetyMarginPoints, dy: -safetyMarginPoints),
-                    bounds: rect
-                )
-            }
+            let boxes = record?.confirmed.pages.first { $0.pageIndex == i }?.plan?.boxes ?? []
+            let list = layer6Shapes(regions: pageRegions, outputBounds: outputBounds, boxes: boxes)
 
             let outcome = try await verifier.spatialExclusionOutcome(
                 outputPage: page,
-                regionShapes: regionShapes,
+                regionShapes: list.map(\.shape),
+                kinds: list.map(\.kind),
                 pageIndex: i
             )
             if case .fail(let msg) = outcome.status {
@@ -215,6 +208,33 @@ extension VerificationEngine {
                             pages: grazePages, couldNotVerify: false)
         }
         return .passed
+    }
+
+    /// The position check's list for one page: each region's rectangles in
+    /// output-page points, made by the text path's own function from the
+    /// page's regions and the record's boxes for the page, never read from
+    /// the writer. With no boxes, or none for which a band was made, the list
+    /// is each region's own rectangle, its hidden letters' rectangle and its
+    /// ink strips (`textRemovalRects`), every one ordinary.
+    ///
+    /// Each shape's `bounds` is the un-expanded rect (the unconditional 0pt
+    /// floor + the band gate) and its `expandedBounds` the filter's
+    /// safety-margin halo, so Layer 6 enforces the same two-tier contract the
+    /// character filter excludes by.
+    func layer6Shapes(
+        regions: [RedactionRegion], outputBounds: CGRect, boxes: [PaintedBox]
+    ) -> [(shape: RegionShape, kind: TextPathRectangle.Kind)] {
+        let points = { (rect: CGRect) in normalizedToPDFPageCoordinates(rect, pageRect: outputBounds) }
+        let pathRegions = regions.map { region in
+            TextPathRegion(id: region.id, rect: points(region.normalizedRect),
+                           hiddenLettersRect: region.textLayerRect.map(points),
+                           inkStrips: region.inkStripRects.map(points))
+        }
+        return TextPathRectangle.forPage(regions: pathRegions, boxes: boxes).map { item in
+            (RegionShape(expandedBounds: item.rect.insetBy(dx: -safetyMarginPoints, dy: -safetyMarginPoints),
+                         bounds: item.rect),
+             item.kind)
+        }
     }
 
     // MARK: - Layer 7: Character Count Cross-Check

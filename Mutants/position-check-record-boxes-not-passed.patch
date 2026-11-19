@@ -1,0 +1,18 @@
+Property: The position check's list is made with the record's boxes for the page.
+Area: position check
+Test command: cd Packages/RedactionEngine && swift test --filter PositionCheckRecordTests
+Must go red: RedactionEngineTests/PositionCheckRecordTests "Each case" (centredInTheWidenedBox, breakAtTheWidenedBox, regionOutsideItsWidenedBox)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+SandwichDispatch.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+SandwichDispatch.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+SandwichDispatch.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+SandwichDispatch.swift
+@@ -157,7 +157,7 @@
+             // Convert regions to output page coordinates (output pages
+             // always have zero-origin bounds)
+             let outputBounds = page.bounds(for: .cropBox)
+-            let boxes = record?.confirmed.pages.first { $0.pageIndex == i }?.plan?.boxes ?? []
++            let boxes: [PaintedBox] = []
+             let list = layer6Shapes(regions: pageRegions, outputBounds: outputBounds, boxes: boxes)
+ 
+             let outcome = try await verifier.spatialExclusionOutcome(

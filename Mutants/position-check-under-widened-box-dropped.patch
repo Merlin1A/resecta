@@ -1,0 +1,18 @@
+Property: A region's own rectangle under a widened box stays in the check's list and takes the failing test.
+Area: position check
+Test command: cd Packages/RedactionEngine && swift test --filter PositionCheckRecordTests
+Must go red: RedactionEngineTests/PositionCheckRecordTests "Each case" (regionOutsideItsWidenedBox)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+SandwichDispatch.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+SandwichDispatch.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+SandwichDispatch.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+SandwichDispatch.swift
+@@ -230,7 +230,7 @@
+                            hiddenLettersRect: region.textLayerRect.map(points),
+                            inkStrips: region.inkStripRects.map(points))
+         }
+-        return TextPathRectangle.forPage(regions: pathRegions, boxes: boxes).map { item in
++        return TextPathRectangle.forPage(regions: pathRegions, boxes: boxes).filter { $0.kind != .underWidenedBox }.map { item in
+             (RegionShape(expandedBounds: item.rect.insetBy(dx: -safetyMarginPoints, dy: -safetyMarginPoints),
+                          bounds: item.rect),
+              item.kind)

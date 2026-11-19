@@ -103,7 +103,9 @@ public struct VerificationOrchestrator: Sendable {
     /// Search Re-check also re-runs each applied request on the original
     /// pages and fails a box that leaves part of its match uncovered, and
     /// the hidden-word check reads the original's print; without it, that
-    /// check could not verify.
+    /// check could not verify. With `record` (the run's record) the position
+    /// check reads the record's boxes into its list of rectangles; without
+    /// it, each region's own rectangles.
     ///
     /// The report lists every layer in canonical order: the results UI
     /// labels rows by ordinal position. A cancellation checkpoint precedes
@@ -122,6 +124,7 @@ public struct VerificationOrchestrator: Sendable {
         appliedSearches: [SearchRecheckRequest],
         manualRegionsWithoutText: Int = 0,
         sourceDocument: SendablePDFDocument? = nil,
+        record: RunRecord? = nil,
         provisionLayerDocuments: ([VerificationLayer]) async -> [VerificationLayer: SendablePDFDocument]?,
         events: (VerificationRunEvent) -> Void
     ) async throws -> VerificationReport {
@@ -215,7 +218,9 @@ public struct VerificationOrchestrator: Sendable {
                     perPageModes: perPageModes,
                     manualRegionsWithoutText: manualRegionsWithoutText,
                     // The hidden-word check reads the original's print.
-                    sourceDocument: sourceDocument
+                    sourceDocument: sourceDocument,
+                    // The position check reads the record's boxes.
+                    record: record
                 )
                 resultsByLayer[layer] = result
                 completedLayers.append(result)
