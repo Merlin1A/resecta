@@ -78,7 +78,7 @@ extension VerificationStatus {
         case .warn:        "Completed with\u{00A0}Warnings"
         case .attention:   "Needs Review"
         case .fail:        "Checks Failed"
-        case .skipped:     "Verification Skipped"
+        case .skipped:     "Checks Not Run"
         case .notApplicable: "Nothing to Check"
         }
     }

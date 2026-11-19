@@ -581,7 +581,7 @@ struct SearchRecheckQueryLineDisplayTests {
         let report = VerificationReport(
             layers: [layer2, layer3, layer], overallStatus: .attention("x"), durationSeconds: 0)
         #expect(VerificationResultsView.mastheadSubtitle(report: report)  // 9 found − 8 applied = the 1 left
-                == "You left 1 match of \u{201C}Delia\u{201D} unapplied; review it before you share.")
+                == "You left 1 match of \u{201C}Delia\u{201D} unredacted; review it before you share.")
         #expect(VerificationResultsView.reviewTermTexts(report: report) == ["Delia"])
         #expect(VerificationResultsView.detailsSummaryText(for: report) == "0 of 3 checks passed · 3\u{00A0}need review")
         // The OCR check's row composes the same sentence as the bytes search.

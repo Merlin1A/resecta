@@ -23,6 +23,10 @@ nonisolated struct VerificationLayerPartition: Equatable {
 
     var total: Int { outcomes.count }
 
+    /// The checks that had something to check: every outcome but "nothing
+    /// to check". The ring's second number and the summary's are this.
+    var totalWithSomethingToCheck: Int { outcomes.count { $0 != .nothingToCheck } }
+
     func count(_ outcome: VerificationOutcome) -> Int {
         outcomes.count { $0 == outcome }
     }
@@ -74,9 +78,11 @@ nonisolated struct VerificationLayerPartition: Equatable {
     }
 
     /// The summary's first line: "{P} of {T} checks passed" ("0 of 1 check
-    /// passed" when T = 1).
+    /// passed" when T = 1), where T counts only the checks that had
+    /// something to check; line 2 names the others.
     var summaryLine1: String {
-        "\(passedCount) of \(total) \(total == 1 ? "check" : "checks") passed"
+        let checked = totalWithSomethingToCheck
+        return "\(passedCount) of \(checked) \(checked == 1 ? "check" : "checks") passed"
     }
 
     /// The summary's second line: one clause per other outcome present, in

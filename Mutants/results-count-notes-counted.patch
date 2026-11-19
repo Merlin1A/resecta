@@ -1,0 +1,19 @@
+Property: A note still counts in the second number.
+Area: results (the check count)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationCheckCountTests -only-testing:ResectaAppTests/VerificationRowModelTests
+Must go red: ResectaAppTests/VerificationCheckCountTests ringCountsOnlyChecksThatHadSomethingToCheck; ResectaAppTests/VerificationRowModelTests elevenSummaryLines
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationLayerPartition.swift b/Sources/ResectaApp/Views/VerificationLayerPartition.swift
+index 3ec1c31a..eba1a315 100644
+--- a/Sources/ResectaApp/Views/VerificationLayerPartition.swift
++++ b/Sources/ResectaApp/Views/VerificationLayerPartition.swift
+@@ -25,7 +25,7 @@ nonisolated struct VerificationLayerPartition: Equatable {
+ 
+     /// The checks that had something to check: every outcome but "nothing
+     /// to check". The ring's second number and the summary's are this.
+-    var totalWithSomethingToCheck: Int { outcomes.count { $0 != .nothingToCheck } }
++    var totalWithSomethingToCheck: Int { outcomes.count { $0 != .nothingToCheck && $0 != .note } }
+ 
+     func count(_ outcome: VerificationOutcome) -> Int {
+         outcomes.count { $0 == outcome }

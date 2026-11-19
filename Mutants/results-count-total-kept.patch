@@ -1,0 +1,19 @@
+Property: The partition's total still counts every check.
+Area: results (the check count)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationCheckCountTests
+Must go red: ResectaAppTests/VerificationCheckCountTests ringCountsOnlyChecksThatHadSomethingToCheck
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationLayerPartition.swift b/Sources/ResectaApp/Views/VerificationLayerPartition.swift
+index 3ec1c31a..26d71c42 100644
+--- a/Sources/ResectaApp/Views/VerificationLayerPartition.swift
++++ b/Sources/ResectaApp/Views/VerificationLayerPartition.swift
+@@ -21,7 +21,7 @@ nonisolated struct VerificationLayerPartition: Equatable {
+     /// Every layer's outcome, by engine index.
+     let outcomes: [VerificationOutcome]
+ 
+-    var total: Int { outcomes.count }
++    var total: Int { outcomes.count { $0 != .nothingToCheck } }
+ 
+     /// The checks that had something to check: every outcome but "nothing
+     /// to check". The ring's second number and the summary's are this.
