@@ -1,0 +1,21 @@
+Property: --keepVerifySetting keeps a stored Verify Before Export, so a test can turn it off and relaunch with it off.
+Area: the UI-test launch hook
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -parallel-testing-enabled NO -only-testing:ResectaAppUITests/ShareRiskSheetUITests
+Must go red: ResectaAppUITests/ShareRiskSheetUITests testShareSkippedConfirm_slideWorksOnFreshAndRepresentedSheet
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/App/ResectaApp.swift b/Sources/ResectaApp/App/ResectaApp.swift
+index 99da491b..212287c7 100644
+--- a/Sources/ResectaApp/App/ResectaApp.swift
++++ b/Sources/ResectaApp/App/ResectaApp.swift
+@@ -116,9 +116,7 @@ struct ResectaApp: App {
+         } else if CommandLine.arguments.contains("--uitesting") {
+             defaults.set(true, forKey: FirstLaunchFlow.agreementKey)
+             defaults.removeObject(forKey: "search.lastFilter.v1")
+-            if !CommandLine.arguments.contains("--keepVerifySetting") {
+-                defaults.removeObject(forKey: "autoVerify")
+-            }
++            defaults.removeObject(forKey: "autoVerify")
+         }
+         if CommandLine.arguments.contains("--searchSourceFilter=ocr"),
+            let data = try? JSONEncoder().encode(SearchState.LastSearchFilterShape(

@@ -45,6 +45,13 @@ struct ResectaApp: App {
         // launch — unconditional and idempotent (no marker key).
         SearchState.purgeRetiredRecentsStorage()
 
+        // The launch hooks write UserDefaults, so they run before any store
+        // below reads it (`SettingsState` reads Verify Before Export once,
+        // in its init).
+        #if DEBUG
+        Self.handleUITestLaunchArguments()
+        #endif
+
         // App-wide stores for the power-user library: saved regexes and
         // always/never-flag custom terms. Both persist as protected,
         // backup-excluded JSON files under Application Support (the
@@ -66,10 +73,6 @@ struct ResectaApp: App {
         // Disable shake-to-undo — accidental shakes during precision
         // drawing are disruptive. Toolbar buttons are the sole undo mechanism.
         UIApplication.shared.applicationSupportsShakeToEdit = false
-
-        #if DEBUG
-        Self.handleUITestLaunchArguments()
-        #endif
     }
 
     #if DEBUG
@@ -83,7 +86,13 @@ struct ResectaApp: App {
     ///   text-layer results and deterministically reds the XCUI
     ///   text-search suites. Per-launch and test-only: release launches
     ///   never pass the flag, and in-session persistence still works
-    ///   after the launch-time clear.
+    ///   after the launch-time clear. It also clears Verify Before
+    ///   Export back to its default (on): a test that turns it off and
+    ///   stops before its tearDown restores it would otherwise leave every
+    ///   later run on that simulator at "Verification Skipped".
+    /// --keepVerifySetting: With --uitesting, keep the stored Verify Before
+    ///   Export value: for a test that turned it off in Settings and
+    ///   relaunches to run with it off.
     /// --resetEULA: Clear the acceptance flag so the gate PRESENTS — the
     ///   gate-links UI tests drive the un-accepted gate itself, the
     ///   inverse of --uitesting. DEBUG-only, and it only ever forces the
@@ -107,6 +116,9 @@ struct ResectaApp: App {
         } else if CommandLine.arguments.contains("--uitesting") {
             defaults.set(true, forKey: FirstLaunchFlow.agreementKey)
             defaults.removeObject(forKey: "search.lastFilter.v1")
+            if !CommandLine.arguments.contains("--keepVerifySetting") {
+                defaults.removeObject(forKey: "autoVerify")
+            }
         }
         if CommandLine.arguments.contains("--searchSourceFilter=ocr"),
            let data = try? JSONEncoder().encode(SearchState.LastSearchFilterShape(
