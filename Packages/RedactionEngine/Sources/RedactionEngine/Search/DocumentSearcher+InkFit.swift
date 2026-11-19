@@ -394,10 +394,7 @@ extension DocumentSearcher {
             }
         }
         let seed = anchor?.rect ?? box
-        let height = max(seed.height, box.height)
-        let vPad = max(height, 4), hPad = max(0.75 * height, 3)
-        let window = seed.insetBy(dx: -hPad, dy: -vPad).intersection(CGRect(origin: .zero, size: size))
-        var fitted = anchor?.rect ?? box
+        let window = inkFitWindow(seed: seed, box: box, size: size)
         let page = InkFitPage(cgPage)
         var stalled = false
         #if DEBUG
@@ -425,9 +422,9 @@ extension DocumentSearcher {
         // The ink rows: at the ink threshold; text lighter than it (grey
         // labels, a faint scan) read again at `inkFitLightThreshold`; light
         // text on a dark ground read as light ink.
-        func read(_ map: GrayBitmap) -> (box: CGRect?, outcome: InkFitOutcome, margin: Int?) {
-            inkBox(in: map, box: seed, window: window,
-                   growLeft: anchor?.growLeft ?? true, growRight: anchor?.growRight ?? true)
+        func read(_ map: GrayBitmap) -> (box: CGRect?, outcome: InkFitOutcome, band: CGRect?, margin: Int?) {
+            inkBoxes(in: map, box: seed, window: window,
+                     growLeft: anchor?.growLeft ?? true, growRight: anchor?.growRight ?? true)
         }
         var reading = read(bitmap)
         if reading.box == nil, reading.outcome == .darkGround {
@@ -451,23 +448,11 @@ extension DocumentSearcher {
             }
         }
         if reading.outcome == .capped { inkFitLogger.log("ink fit reached its window: the box grew to the cap") }
-        // The height is the ink's own rows: Vision's box can reach past its
-        // line's ink into the leading, toward the next line.
-        let minX = min(fitted.minX, ink.minX), maxX = max(fitted.maxX, ink.maxX)
-        fitted = CGRect(x: minX, y: ink.minY, width: maxX - minX, height: ink.height)
-        // A margin past the ink on every side the box may grow (a render's
-        // half-inked edge, a round letter's overshoot): never on a side cut
-        // from a longer token, which would paint its next letter.
-        let side = inkFitMargin, cap = inkFitMargin / 2
-        fitted = CGRect(x: fitted.minX - ((anchor?.growLeft ?? true) ? side : 0), y: fitted.minY - cap,
-                        width: fitted.width + ((anchor?.growLeft ?? true) ? side : 0) + ((anchor?.growRight ?? true) ? side : 0),
-                        height: fitted.height + 2 * cap)
         // The selection box too, unless the caller strips the hidden glyphs by
         // their own rect (`textLayerAndInkRects`): a fill that covers them is
         // then the only thing that removes them from a Searchable export.
-        // The fit past its read word's window (a render that grew onto
-        // another word): the envelope.
-        guard window.insetBy(dx: -inkFitMargin, dy: -inkFitMargin).contains(fitted) else {
+        guard var fitted = inkPaint(ink: ink, band: reading.band, seed: seed, window: window,
+                                    growLeft: anchor?.growLeft ?? true, growRight: anchor?.growRight ?? true) else {
             inkFitLogger.log("ink fit: the fitted box reaches past its window; the box is the read word's box, degraded"); return anchorEnvelope()
         }
         if !job.paintOnly { fitted = fitted.union(box) }
@@ -475,6 +460,41 @@ extension DocumentSearcher {
         return CGRect(x: back.minX / visual.width, y: back.minY / visual.height,
                       width: back.width / visual.width, height: back.height / visual.height)
             .clampedToNormalized()
+    }
+
+    /// The window a word's fit renders and reads: the seed box (the read
+    /// word's, or the selection box) and a line's height above and below it,
+    /// three quarters of one to each side, on the page.
+    nonisolated static func inkFitWindow(seed: CGRect, box: CGRect, size: CGSize) -> CGRect {
+        let height = max(seed.height, box.height)
+        let vPad = max(height, 4), hPad = max(0.75 * height, 3)
+        return seed.insetBy(dx: -hPad, dy: -vPad).intersection(CGRect(origin: .zero, size: size))
+    }
+
+    /// The box a fit paints from its ink box (`inkBoxes`): the seed's columns
+    /// and the ink, with the ink's own rows (Vision's box can reach past its
+    /// line's ink into the leading, toward the next line), and a margin. A
+    /// box past the window grew onto another word: then the box of the band
+    /// alone (`band`, the line with the most rows inside the box, as it was
+    /// before every run meeting the box was taken), and nil when that is past
+    /// the window too (the fit then paints the envelope).
+    nonisolated static func inkPaint(ink: CGRect, band: CGRect?, seed: CGRect, window: CGRect,
+                                     growLeft: Bool, growRight: Bool) -> CGRect? {
+        func paint(_ ink: CGRect) -> CGRect? {
+            let minX = min(seed.minX, ink.minX), maxX = max(seed.maxX, ink.maxX)
+            // A margin past the ink on every side the box may grow (a render's
+            // half-inked edge, a round letter's overshoot): never on a side cut
+            // from a longer token, which would paint its next letter.
+            let side = inkFitMargin, cap = inkFitMargin / 2
+            let fitted = CGRect(x: minX - (growLeft ? side : 0), y: ink.minY - cap,
+                                width: maxX - minX + (growLeft ? side : 0) + (growRight ? side : 0),
+                                height: ink.height + 2 * cap)
+            return window.insetBy(dx: -inkFitMargin, dy: -inkFitMargin).contains(fitted) ? fitted : nil
+        }
+        if let whole = paint(ink) { return whole }
+        guard let band, let alone = paint(band) else { return nil }
+        inkFitLogger.log("ink fit: the box with every band reaches past its window; the box is its tallest band's")
+        return alone
     }
 
     /// The page's read tokens: one full-page render at the fit's scale, read
