@@ -1,0 +1,19 @@
+Property: The Preview's label for a run whose checks did not run is drawn in the support grey, not the system's secondary grey.
+Area: the Preview's verdict label
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/PreviewVerdictCapsuleTests
+Must go red: ResectaAppTests/PreviewVerdictCapsuleTests labelColoursComeFromTheTextTokens
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/RedactedPreviewView.swift b/Sources/ResectaApp/Views/RedactedPreviewView.swift
+index 59774cfd..0de0069f 100644
+--- a/Sources/ResectaApp/Views/RedactedPreviewView.swift
++++ b/Sources/ResectaApp/Views/RedactedPreviewView.swift
+@@ -97,7 +97,7 @@ struct RedactedPreviewView: View {
+         guard let verdict else { return nil }
+         if verdict.isFail { return ResectaTokens.SemanticColor.failText }
+         if verdict.isAttention { return ResectaTokens.SemanticColor.attentionText }
+-        if verdict.isSkipped { return ResectaTokens.SemanticColor.supportText }
++        if verdict.isSkipped { return .secondary }
+         return nil
+     }
+ 

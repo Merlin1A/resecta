@@ -1,0 +1,18 @@
+Property: The Preview's label sits on the capsule's own opaque base, laid under its wash.
+Area: the Preview's verdict label
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test-without-building -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/PreviewVerdictCapsuleTests
+Must go red: ResectaAppTests/PreviewVerdictCapsuleTests capsuleDrawsItsBase
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/RedactedPreviewView.swift b/Sources/ResectaApp/Views/RedactedPreviewView.swift
+index 94f7577d..b4aa0b60 100644
+--- a/Sources/ResectaApp/Views/RedactedPreviewView.swift
++++ b/Sources/ResectaApp/Views/RedactedPreviewView.swift
+@@ -126,7 +126,6 @@ struct RedactedPreviewView: View {
+             .padding(.horizontal, ResectaTokens.Spacing.sm)
+             .padding(.vertical, ResectaTokens.Spacing.xxs)
+             .background(tint.opacity(Self.verdictCapsuleStrength), in: Capsule())
+-            .background(Self.verdictCapsuleBase, in: Capsule())
+             .accessibilityIdentifier("previewVerdictCapsule")
+             .accessibilityLabel(text)
+     }

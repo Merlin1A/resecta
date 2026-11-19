@@ -1,0 +1,19 @@
+Property: The Preview's label takes its own colour; the status colour other screens read for a run whose checks did not run is unchanged.
+Area: the Preview's verdict label
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/PreviewVerdictCapsuleTests
+Must go red: ResectaAppTests/PreviewVerdictCapsuleTests labelColoursComeFromTheTextTokens
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Extensions/VerificationStatus+Display.swift b/Sources/ResectaApp/Extensions/VerificationStatus+Display.swift
+index 666721c6..55995f82 100644
+--- a/Sources/ResectaApp/Extensions/VerificationStatus+Display.swift
++++ b/Sources/ResectaApp/Extensions/VerificationStatus+Display.swift
+@@ -60,7 +60,7 @@ extension VerificationStatus {
+         case .info:      ResectaTokens.SemanticColor.infoText
+         case .attention: ResectaTokens.SemanticColor.attentionText
+         case .fail:      ResectaTokens.SemanticColor.failText
+-        case .skipped:   .secondary
++        case .skipped:   ResectaTokens.SemanticColor.supportText
+         case .notApplicable: ResectaTokens.SemanticColor.supportText
+         }
+     }

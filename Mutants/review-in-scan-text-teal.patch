@@ -1,0 +1,18 @@
+Property: Review in Scan's words are drawn in the text teal, not the tint.
+Area: the verification results row, opened
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/ReviewInScanColourSourceTests
+Must go red: ResectaAppTests/ReviewInScanColourSourceTests reviewInScanUsesTheTextTeal
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/LayerResultRow.swift b/Sources/ResectaApp/Views/LayerResultRow.swift
+index 29e3d1dd..a06026f7 100644
+--- a/Sources/ResectaApp/Views/LayerResultRow.swift
++++ b/Sources/ResectaApp/Views/LayerResultRow.swift
+@@ -690,7 +690,6 @@ struct LayerResultRow: View {
+             if let onReviewInScan, Self.offersReviewInScan(layer: layer) {
+                 Button(Self.reviewInScanLabel, action: onReviewInScan)
+                     .font(.subheadline.weight(.semibold))
+-                    .foregroundStyle(ResectaTokens.BrandTeal.text)
+                     .accessibilityIdentifier("reviewInScanButton")
+             }
+         }
