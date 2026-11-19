@@ -206,7 +206,12 @@ extension RunRecord {
     /// Which way found the information dictionary: by the file's index, or
     /// by the search of the file's tail where the index refused, or neither.
     package enum InfoDictionaryWay: Hashable, Sendable {
+        /// The index named the dictionary and at least one literal in it
+        /// was rewritten.
         case byIndex
+        /// The index named the dictionary and every literal in it declined
+        /// (the guards of `overwriteInfoLiterals`); nothing was rewritten.
+        case byIndexNothingRewritten
         case byTail(indexRefused: IndexRefusal)
         case neither(indexRefused: IndexRefusal)
     }
@@ -232,5 +237,8 @@ extension RunRecord {
         /// offset that is not a number or lies past the end, a table whose
         /// entries do not parse, or a trailer that does not close.
         case indexUnreadable
+        /// The file could not be read or written through the index (an I/O
+        /// error on the mapped read, the handle, the seek or the write).
+        case readOrWriteFailed
     }
 }

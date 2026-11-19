@@ -300,9 +300,13 @@ public actor PDFStreamReconstructor {
     /// the file's own index (`PDFTrailerLocator`): the literals are looked
     /// for inside the dictionary the trailer names, and nowhere else, so a
     /// dictionary that lies before the tail window is reached and a
-    /// look-alike elsewhere is never touched. Where that way refuses, the
-    /// search of the file's tail below runs exactly as it did before the
-    /// index was read.
+    /// look-alike elsewhere is never touched. Where that way refuses, or the
+    /// file cannot be read or written through it (an I/O error), the search
+    /// of the file's tail below runs exactly as it did before the index was
+    /// read, so no file fares worse than before. Where the index names the
+    /// dictionary and every literal in it declines, nothing is rewritten and
+    /// the tail is not searched: it holds the same literals, which decline
+    /// the same way, or a look-alike, which is never touched.
     /// The producer
     /// replacement writes `value + ")"` and pads the remainder with spaces
     /// *after* the closing paren, inside the `/Info` dictionary, where
@@ -321,6 +325,13 @@ public actor PDFStreamReconstructor {
     /// tail window, more than one, an unterminated literal, an
     /// existing producer value shorter than the fixed one, or a date value
     /// whose length differs from the fixed one's.
+    #if DEBUG
+    /// Test seam: the step of the first way that fails as an I/O error
+    /// would, before the file is read, or before its second write.
+    enum IndexWayFault: Sendable { case read, secondWrite }
+    @TaskLocal static var indexWayFault: IndexWayFault?
+    #endif
+
     @discardableResult
     static func overwriteInfoLiterals(at url: URL) -> RunRecord.InfoDictionaryWay {
         var refusal = RunRecord.IndexRefusal.indexUnreadable
@@ -329,6 +340,9 @@ public actor PDFStreamReconstructor {
             // bytes copied out (at most 4,096), so the mapping is released
             // before the handle writes.
             let byIndex: (start: Int, dictionary: Data)? = try {
+                #if DEBUG
+                if indexWayFault == .read { throw CocoaError(.fileReadUnknown) }
+                #endif
                 let fileData = try Data(contentsOf: url, options: .alwaysMapped)
                 switch PDFTrailerLocator.locate(in: fileData) {
                 case .found(let found):
@@ -342,21 +356,27 @@ public actor PDFStreamReconstructor {
             if let byIndex {
                 let handle = try FileHandle(forUpdating: url)
                 defer { try? handle.close() }
+                var rewrote = false
                 for rewrite in infoLiteralRewrites {
                     guard let patch = rewriteBytes(for: rewrite, in: byIndex.dictionary) else { continue }
+                    #if DEBUG
+                    if indexWayFault == .secondWrite, rewrote { throw CocoaError(.fileWriteUnknown) }
+                    #endif
                     try handle.seek(toOffset: UInt64(byIndex.start + patch.offset))
                     try handle.write(contentsOf: patch.bytes)
+                    rewrote = true
                 }
-                return .byIndex
+                return rewrote ? .byIndex : .byIndexNothingRewritten
             }
         } catch { // LegalPhrases:safe (Swift keyword)
-            // Mechanism-only logging; the export proceeds with
-            // the writer's own values rather than failing.
+            // Mechanism-only logging. The tail search below runs as it did
+            // before the index was read; a literal the first way already
+            // rewrote reads as the fixed value and is written again unchanged.
             infoRewriteLogger.warning(
-                "info literal rewrite skipped (metadata: \(error.localizedDescription, privacy: .public))")
-            return .neither(indexRefused: refusal)
+                "info literal rewrite through the index failed (metadata: \(error.localizedDescription, privacy: .public))")
+            refusal = .readOrWriteFailed
         }
-        // The second way, used only where the first refused.
+        // The second way, used where the first refused or failed.
         return overwriteInfoLiteralsInTail(at: url)
             ? .byTail(indexRefused: refusal) : .neither(indexRefused: refusal)
     }

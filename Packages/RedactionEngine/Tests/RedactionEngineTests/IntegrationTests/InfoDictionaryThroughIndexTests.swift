@@ -49,12 +49,16 @@ struct InfoDictionaryThroughIndexTests {
         Case(id: 13, title: "a fixed field that is absent, and one that is a name, each read Needs review"),
         Case(id: 14, title: "a file with no identifier in its trailer could not be verified"),
         Case(id: 15, title: "an identifier of one string, and two strings that are not the recomputed one, each read Needs review"),
+        Case(id: 16, title: "an I/O error before the index way reads the file: the tail search runs, and the record names the error"),
+        Case(id: 17, title: "an I/O error at the index way's second write: the tail search runs, and the output is the tail search's"),
+        Case(id: 18, title: "a dictionary the index names whose every literal declines: nothing is rewritten, the record says so, Needs review"),
+        Case(id: 19, title: "a trailer with no pair in the writer's shape and one in the tail: located in the tail; a pair that cannot be located could not be verified"),
     ]
 
-    @Test("The table holds fifteen cases")
+    @Test("The table holds nineteen cases")
     func tableLength() {
-        #expect(Self.cases.count == 15)
-        #expect(Set(Self.cases.map(\.id)) == Set(1...15))
+        #expect(Self.cases.count == 19)
+        #expect(Set(Self.cases.map(\.id)) == Set(1...19))
     }
 
     @Test("Each case", arguments: InfoDictionaryThroughIndexTests.cases)
@@ -78,6 +82,16 @@ struct InfoDictionaryThroughIndexTests {
         case 13: try await Self.fieldAbsentOrNotAString()
         case 14: try await Self.noIdentifier()
         case 15: try await Self.identifierNotDerived()
+        case 16:
+            try PDFStreamReconstructor.$indexWayFault.withValue(.read) {
+                try Self.sameAsTheTailSearch(MadeInfoFile(), refusal: .readOrWriteFailed, label: "16")
+            }
+        case 17:
+            try PDFStreamReconstructor.$indexWayFault.withValue(.secondWrite) {
+                try Self.sameAsTheTailSearch(MadeInfoFile(), refusal: .readOrWriteFailed, label: "17")
+            }
+        case 18: try await Self.everyLiteralDeclines()
+        case 19: try await Self.identifierInTheTail()
         default: Issue.record("no case \(c.id)")
         }
     }
@@ -312,6 +326,47 @@ struct InfoDictionaryThroughIndexTests {
             expectNeedsReview(row, "File identifier was not derived from the file contents", label: label)
             print("INFODICT \(label) way=\(way) row=\(row.status)")
         }
+    }
+
+    // MARK: - No file fares worse than before
+
+    static func everyLiteralDeclines() async throws {
+        let made = MadeInfoFile(dictionary: "<< /Producer (short) /CreationDate (D:2026) /ModDate (D:2026) >>")
+        let (before, _) = made.build()
+        let url = try write(before)
+        let tailOnly = try write(before)
+        defer {
+            try? FileManager.default.removeItem(at: url)
+            try? FileManager.default.removeItem(at: tailOnly)
+        }
+        let way = PDFStreamReconstructor.overwriteInfoLiterals(at: url)
+        #expect(way == .byIndexNothingRewritten, "18: \(way)")
+        #expect(try Data(contentsOf: url) == before, "18: nothing was rewritten")
+        #expect(!PDFStreamReconstructor.overwriteInfoLiteralsInTail(at: tailOnly), "18: the tail search declines the same literals")
+        PDFStreamReconstructor.overwriteFileIdentifier(at: url)
+        let row = try await metadataRow(url)
+        expectNeedsReview(row, "Producer or timestamp fields were not rewritten to the fixed values", label: "18")
+        print("INFODICT 18 way=\(way) row=\(row.status)")
+    }
+
+    static func identifierInTheTail() async throws {
+        // The trailer the index names holds no pair; the information
+        // dictionary, in the tail, holds the one pair in the writer's shape.
+        let zeros = String(repeating: "0", count: 32)
+        let made = MadeInfoFile(dictionary: "<< /Producer (\(MadeInfoFile.producer)) /CreationDate (\(MadeInfoFile.date)) /ModDate (\(MadeInfoFile.date)) /ID [<\(zeros)> <\(zeros)>] >>", id: nil)
+        let data = made.build().data
+        let tail = data[max(data.startIndex, data.endIndex - PDFFileIdentifier.tailWindowLength)...]
+        let inTail = try #require(PDFFileIdentifier.locate(in: tail), "19: the tail holds one pair")
+        #expect(PDFFileIdentifier.location(in: data) == inTail, "19: located in the tail, as before the index was read")
+        // Two literal strings of the identifier's length: the check reads a
+        // pair, but no pair in the writer's shape is located anywhere.
+        let literal = String(repeating: "a", count: 16)
+        let (url, way) = try produce(MadeInfoFile(id: "[(\(literal)) (\(literal))]"))
+        defer { try? FileManager.default.removeItem(at: url) }
+        #expect(PDFFileIdentifier.recomputedIdentifier(for: try Data(contentsOf: url)) == nil, "19: nothing to recompute from")
+        let row = try await metadataRow(url)
+        expectCouldNotVerify(row, label: "19 literal pair")
+        print("INFODICT 19 way=\(way) row=\(row.status)")
     }
 
     // MARK: - Support
