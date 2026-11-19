@@ -5,8 +5,8 @@ import RedactionEngine
 // (`MessageCatalog.row(for:)`) holds the message's words and how it is
 // shown today. `ToastQueueManager.post(_:action:)` reads the row's text,
 // today's severity (so today's edge, tint, duration and haptic) and the
-// row's action label. The kind, tone, phases and must-be-seen fields are
-// recorded here and read by nothing in the app yet.
+// row's action label. The kind, tone, phases, must-be-seen, repeat and
+// layer fields are recorded here and read by nothing in the app yet.
 
 /// Every message the toast queue shows, one case each.
 enum MessageID: Equatable {
@@ -239,6 +239,15 @@ struct MessageRow: Equatable {
     /// The document phases the message can be raised in.
     let phases: Set<DocumentState.PhaseKind>
     let mustBeSeen: Bool
+    /// A repeat tells the person nothing they have not just been told (a
+    /// refusal of the same act, a limit still in force, a fact about the
+    /// document): a post with the same words as a message of this row that
+    /// is shown, paused or waiting is that message. False for a row whose
+    /// every post reports one thing the person did or lost.
+    let coalescesRepeats: Bool
+    /// Raised as a layer leaves (or while the layer it is about is still
+    /// up): it belongs to the layer that remains, not to the one in front.
+    let showsInRemainingLayer: Bool
 
     init(
         text: String,
@@ -248,7 +257,9 @@ struct MessageRow: Equatable {
         actionLabel: String? = nil,
         actionChangesState: Bool = false,
         phases: Set<DocumentState.PhaseKind>,
-        mustBeSeen: Bool
+        mustBeSeen: Bool,
+        coalescesRepeats: Bool = false,
+        showsInRemainingLayer: Bool = false
     ) {
         self.text = text
         self.todaySeverity = todaySeverity
@@ -258,6 +269,8 @@ struct MessageRow: Equatable {
         self.actionChangesState = actionChangesState
         self.phases = phases
         self.mustBeSeen = mustBeSeen
+        self.coalescesRepeats = coalescesRepeats
+        self.showsInRemainingLayer = showsInRemainingLayer
     }
 }
 
@@ -278,17 +291,17 @@ enum MessageCatalog {
             return MessageRow(
                 text: "Text layer detected \u{2014} Scan and Search can match text in this document.",
                 todaySeverity: .info, kind: .notice, tone: .note,
-                phases: [.editing], mustBeSeen: false)
+                phases: [.editing], mustBeSeen: false, coalescesRepeats: true, showsInRemainingLayer: true)
         case .imagePagesNote:
             return MessageRow(
                 text: RedactWorkspaceView.imageSourceMessage,
                 todaySeverity: .info, kind: .notice, tone: .caution,
-                phases: [.editing], mustBeSeen: true)
+                phases: [.editing], mustBeSeen: true, coalescesRepeats: true, showsInRemainingLayer: true)
         case .encryptedSource(let hadRestrictions):
             return MessageRow(
                 text: RedactWorkspaceView.encryptedSourceMessage(hadRestrictions: hadRestrictions),
                 todaySeverity: .warning, kind: .notice, tone: .caution,
-                phases: [.editing], mustBeSeen: true)
+                phases: [.editing], mustBeSeen: true, coalescesRepeats: true, showsInRemainingLayer: true)
         case .droppedFilesFirstOpened(let count):
             return MessageRow(
                 text: ImportService.dropOpenedFirstMessage(droppedCount: count),
@@ -300,25 +313,25 @@ enum MessageCatalog {
             return MessageRow(
                 text: DocumentState.importRefusedNotPDFMessage,
                 todaySeverity: .warning, kind: .receipt, tone: .caution,
-                phases: allPhases, mustBeSeen: false)
+                phases: allPhases, mustBeSeen: false, coalescesRepeats: true)
         case .importBlockedDuringRun:
             return MessageRow(
                 text: DocumentState.importBlockedDuringPipelineMessage,
                 todaySeverity: .warning, kind: .receipt, tone: .caution,
                 phases: [.editing, .importing, .detecting, .redacting, .verifying, .exporting],
-                mustBeSeen: false)
+                mustBeSeen: false, coalescesRepeats: true)
         case .importBlockedOnThisScreen(let wayBack):
             return MessageRow(
                 text: DocumentState.importBlockedOnThisScreenMessage(wayBack: wayBack),
                 todaySeverity: .warning, kind: .receipt, tone: .caution,
-                phases: [.editing, .verified, .failed], mustBeSeen: false)
+                phases: [.editing, .verified, .failed], mustBeSeen: false, coalescesRepeats: true)
         case .outputReclaimed:
             // The one other receipt over 75 characters.
             return MessageRow(
                 text: DocumentEditorView.purgeRerunToastMessage,
                 todaySeverity: .warning, kind: .receipt, tone: .caution,
                 actionLabel: "Re-run", actionChangesState: true,
-                phases: [.verified], mustBeSeen: true)
+                phases: [.verified], mustBeSeen: true, coalescesRepeats: true)
         case .shared:
             return MessageRow(
                 text: DocumentEditorView.sharedAcknowledgmentToast,
@@ -328,27 +341,27 @@ enum MessageCatalog {
             return MessageRow(
                 text: DocumentEditorView.shareSheetUnavailableMessage,
                 todaySeverity: .warning, kind: .receipt, tone: .stop,
-                phases: [.verified], mustBeSeen: true)
+                phases: [.verified], mustBeSeen: true, coalescesRepeats: true)
         case .applyOrClearSelectedMatchesBeforeRedact:
             return MessageRow(
                 text: DocumentState.RedactRefusal.selectedMatches.hint,
                 todaySeverity: .warning, kind: .receipt, tone: .caution,
-                phases: [.editing], mustBeSeen: false)
+                phases: [.editing], mustBeSeen: false, coalescesRepeats: true)
         case .applyOrClearSelectedMatchesBeforeVerify:
             return MessageRow(
                 text: DocumentState.RedactRefusal.selectedMatches.hint,
                 todaySeverity: .info, kind: .receipt, tone: .caution,
-                phases: [.verified], mustBeSeen: false)
+                phases: [.verified], mustBeSeen: false, coalescesRepeats: true)
         case .drawOrApplyFirst:
             return MessageRow(
                 text: DocumentState.RedactRefusal.noRegions.hint,
                 todaySeverity: .warning, kind: .receipt, tone: .caution,
-                phases: [.editing], mustBeSeen: false)
+                phases: [.editing], mustBeSeen: false, coalescesRepeats: true)
         case .boxTooSmall:
             return MessageRow(
                 text: RedactionOverlayView.subThresholdRejectionAnnouncement,
                 todaySeverity: .info, kind: .receipt, tone: .caution,
-                phases: [.editing], mustBeSeen: false)
+                phases: [.editing], mustBeSeen: false, coalescesRepeats: true)
         case .deletedBoxes(let count):
             return MessageRow(
                 text: RegionDeleteRule.deletedMessage(count: count),
@@ -359,13 +372,13 @@ enum MessageCatalog {
             return MessageRow(
                 text: RedactionState.lassoSelectionCapToastMessage,
                 todaySeverity: .warning, kind: .receipt, tone: .caution,
-                phases: [.editing], mustBeSeen: true)
+                phases: [.editing], mustBeSeen: true, coalescesRepeats: true)
         case .nearbyMatch:
             return MessageRow(
                 text: EditorAnnouncementObservers.nudgeToastMessage,
                 todaySeverity: .info, kind: .receipt, tone: .note,
                 actionLabel: EditorAnnouncementObservers.nudgeToastActionLabel, actionChangesState: true,
-                phases: [.editing], mustBeSeen: true)
+                phases: [.editing], mustBeSeen: true, coalescesRepeats: true)
         case .marked(let applied, let alreadyCovered):
             return MessageRow(
                 text: CommitFeedback.markedMessage(applied: applied, alreadyCovered: alreadyCovered) ?? "",
@@ -375,7 +388,7 @@ enum MessageCatalog {
             return MessageRow(
                 text: SearchAndRedactSheet.dismissClearedMessage(unappliedCount: count, interface: interface) ?? "",
                 todaySeverity: .info, kind: .receipt, tone: .caution,
-                phases: [.editing], mustBeSeen: true)
+                phases: [.editing], mustBeSeen: true, showsInRemainingLayer: true)
         case .searchRerunCleared(let count, let interface):
             return MessageRow(
                 text: SearchAndRedactSheet.rerunClearedMessage(selectedCount: count, interface: interface) ?? "",
@@ -402,12 +415,12 @@ enum MessageCatalog {
             return MessageRow(
                 text: SearchAndRedactSheet.recallClearedMessage(unappliedCount: count) ?? "",
                 todaySeverity: .info, kind: .receipt, tone: .caution,
-                phases: [.editing], mustBeSeen: true)
+                phases: [.editing], mustBeSeen: true, showsInRemainingLayer: true)
         case .searchResultsTruncated:
             return MessageRow(
                 text: "Search results truncated. Refine your query for more specific matches.",
                 todaySeverity: .warning, kind: .notice, tone: .caution,
-                phases: [.editing], mustBeSeen: true)
+                phases: [.editing], mustBeSeen: true, coalescesRepeats: true)
         case .savedRegexSaved:
             return MessageRow(
                 text: SearchAndRedactSheet.savedRegexSavedToast,
@@ -417,22 +430,22 @@ enum MessageCatalog {
             return MessageRow(
                 text: DetectionDegradeCopy.toast(failedGazetteers: failedGazetteers),
                 todaySeverity: .warning, kind: .notice, tone: .caution,
-                phases: [.editing], mustBeSeen: true)
+                phases: [.editing], mustBeSeen: true, coalescesRepeats: true)
         case .customTermTimeout:
             return MessageRow(
                 text: SearchAndRedactSheet.customTermTimeoutMessage,
                 todaySeverity: .warning, kind: .notice, tone: .caution,
-                phases: [.editing], mustBeSeen: true)
+                phases: [.editing], mustBeSeen: true, coalescesRepeats: true)
         case .scannedRegionsNotAnalyzed:
             return MessageRow(
                 text: "Some pages hold scanned regions that weren't text-analyzed because OCR is off. Turn on Include OCR Pages to search scanned content.",
                 todaySeverity: .warning, kind: .notice, tone: .caution,
-                phases: [.editing], mustBeSeen: true)
+                phases: [.editing], mustBeSeen: true, coalescesRepeats: true)
         case .searchPreparationFailed:
             return MessageRow(
                 text: "Could not prepare the document for search. Try again.",
                 todaySeverity: .warning, kind: .receipt, tone: .stop,
-                phases: [.editing], mustBeSeen: true)
+                phases: [.editing], mustBeSeen: true, coalescesRepeats: true)
         }
     }
 
