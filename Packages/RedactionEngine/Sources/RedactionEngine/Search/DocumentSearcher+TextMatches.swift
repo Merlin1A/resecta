@@ -115,7 +115,7 @@ extension DocumentSearcher {
                         term: term,
                         matchRangeInSnippet: window.matchRange,
                         occurrenceID: occurrence, textLayerRect: line.textLayerRect, inkFitDegraded: line.degraded
-                    ))
+                    ).identified(by: line.identity))
                 }
             }
         }

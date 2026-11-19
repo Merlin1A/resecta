@@ -24,6 +24,9 @@ public struct OCREngine: Sendable {
         /// The fit fell back to the drift envelope (`DocumentSearcher.inkFit`):
         /// the caller reports the page as not fully analysed.
         var inkFitDegraded: Bool = false
+        /// The box the line's tallest band alone paints where its fit took
+        /// more (`DocumentSearcher.inkFit`'s identity); nil otherwise.
+        var identityRect: CGRect? = nil
         /// The line's whitespace-separated words with their own boxes
         /// (Vision's `boundingBox(for:)`), by UTF-16 range in `text`; empty
         /// where Vision gave none. A match that crosses lines is boxed on

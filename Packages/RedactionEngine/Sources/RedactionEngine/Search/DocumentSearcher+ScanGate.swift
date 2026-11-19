@@ -35,7 +35,8 @@ extension DocumentSearcher {
         let sentinelLocation = haystack.length
         for address in assembled {
             if spatialRectByText[address.text] == nil {
-                spatialRectByText[address.text] = TextLayerBox(rect: address.unionRect, textLayerRect: address.textLayerUnionRect, degraded: address.inkFitDegraded)
+                spatialRectByText[address.text] = TextLayerBox(rect: address.unionRect, textLayerRect: address.textLayerUnionRect, degraded: address.inkFitDegraded,
+                                                             identity: address.identityUnionRect)
             }
             let searchRange = NSRange(location: 0, length: sentinelLocation)
             let located = haystack.range(of: address.text, options: [], range: searchRange)

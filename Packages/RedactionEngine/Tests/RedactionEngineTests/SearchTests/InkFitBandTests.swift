@@ -10,6 +10,9 @@ import Testing
 // When the box with every run reaches past the fit's window (another line that
 // meets the box by a row, carried to the window's edge), the fit paints the box
 // of the tallest band alone, as before, and not the envelope.
+// A paint that took more than the tallest band carries that band's box as the
+// match's identity: a hybrid page tells an OCR result that repeats the match by
+// it, never by the grown box.
 // Bitmaps are drawn in render pixels from the bottom-left.
 //
 // Privacy rule (audit-lint M-1): locate/match/cover vocabulary.
@@ -152,6 +155,61 @@ struct InkFitBandTests {
                 #expect(Self.holds(paint, former), "reach \(reach), across \(across): paint \(paint), before \(former)")
             }
         }
+    }
+
+    @Test("A hybrid page, the same term on the line above read by OCR alone: the merge tells the word by its band, and the line above keeps its OCR result")
+    func neighbourLineKeepsItsOCRResult() throws {
+        let s = Self.s
+        // The word's ink at columns 32..<122, rows 42..<80; Vision's box for it
+        // at rows 42..<84. The line above holds the same term, which the text
+        // layer lacks: its lower-case letters at columns 36..<100, rows
+        // 83..<112, meeting the box by a row, and its capital left of the box
+        // at columns 12..<28, rows 83..<124. The paint takes both lines and
+        // passes the window; the hybrid merge must still tell the word by the
+        // box of its own band, so the line above's OCR result (listed first,
+        // as Vision lists lines from the top) is not taken as its repeat.
+        let word = (x: 32..<122, y: 42..<80)
+        let capital = (x: 12..<28, y: 83..<124)
+        let blocks = Self.stems(word.x, word.y) + Self.stems(36..<100, 83..<112) + Self.stems(capital.x, capital.y)
+        let seed = CGRect(x: 32 / s, y: 42 / s, width: 90 / s, height: 42 / s)
+        let window = DocumentSearcher.inkFitWindow(seed: seed, box: seed, size: CGSize(width: 612, height: 792))
+        let width = Int((window.width * s).rounded(.up)), height = Int((window.height * s).rounded(.up))
+        let map = PageImageInkFitTests.bitmap(width: width, height: height,
+                                              blocks: blocks.map { (x: $0.x.clamped(to: 0..<width), y: $0.y.clamped(to: 0..<height)) })
+        let reading = DocumentSearcher.inkBoxes(in: map, box: seed, window: window)
+        let ink = try #require(reading.box, "no ink box: \(reading.outcome)")
+        let painted = try #require(DocumentSearcher.inkPaintAndIdentity(ink: ink, band: reading.band, seed: seed, window: window,
+                                                                        growLeft: true, growRight: true), "the fit painted the envelope")
+        #expect(painted.paint.maxY > 100 / s, "the paint takes the line above (the case under test): \(painted.paint.maxY * s)")
+        let identity = try #require(painted.identity, "a paint over two lines carries the box of the word's own band")
+        #expect(identity == DocumentSearcher.inkPaint(ink: try #require(reading.band), band: nil, seed: seed, window: window,
+                                                      growLeft: true, growRight: true),
+                "the identity is the band's paint, the box before every band was taken")
+        #expect(Self.holds(identity, Self.formerPaint(columns: word.x, rows: word.y)) && identity.maxY < 84 / s,
+                "the identity holds the word and stops inside the line above's first row: \(identity.maxY * s)")
+        // The text-layer result as the search sites make it, and the OCR leg's
+        // two results, line above first.
+        let textLayer = SearchResult(pageIndex: 0, normalizedRect: painted.paint, matchedText: "Delia", contextSnippet: "Delia",
+                                     source: .textLayer, term: "delia").identified(by: painted.identity)
+        func ocr(_ x: Range<Int>, _ y: Range<Int>) -> SearchResult {
+            SearchResult(pageIndex: 0, normalizedRect: CGRect(x: CGFloat(x.lowerBound) / s, y: CGFloat(y.lowerBound) / s,
+                                                              width: CGFloat(x.count) / s, height: CGFloat(y.count) / s),
+                         matchedText: "Delia", contextSnippet: "Delia", source: .ocr(confidence: 1), term: "delia")
+        }
+        let above = ocr(10..<102, 80..<128), own = ocr(30..<124, 38..<84)
+        #expect(DocumentSearcher.mergeHybridResults(textLayerRects: [painted.paint], ocr: [above, own]).map(\.normalizedRect)
+                    == [own.normalizedRect],
+                "told by the grown paint, the line above's result would be taken as the word's repeat (the case is live)")
+        let kept = DocumentSearcher.mergeHybridResults(textLayerRects: [textLayer.mergeIdentity], ocr: [above, own])
+        #expect(kept.map(\.normalizedRect) == [above.normalizedRect], "the line above keeps its OCR result; the word's own repeats")
+        // Every ink pixel of the line above's capital is covered.
+        let boxes = [textLayer.normalizedRect] + kept.map(\.normalizedRect)
+        var outside = 0
+        for block in Self.stems(capital.x, capital.y) { for y in block.y { for x in block.x {
+            let centre = CGPoint(x: window.minX + (CGFloat(x) + 0.5) / s, y: window.minY + (CGFloat(y) + 0.5) / s)
+            if !boxes.contains(where: { $0.contains(centre) }) { outside += 1 }
+        } } }
+        #expect(outside == 0, "\(outside) ink pixels of the capital outside every box")
     }
 
     @Test("A dot a small gap above the word: the box is as before")

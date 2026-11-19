@@ -119,7 +119,8 @@ extension DocumentSearcher {
                     source: .textLayer,
                     term: term,
                     matchRangeInSnippet: window.matchRange,
-                    occurrenceID: occurrence, textLayerRect: box.textLayerRect, inkFitDegraded: box.degraded))
+                    occurrenceID: occurrence, textLayerRect: box.textLayerRect, inkFitDegraded: box.degraded
+                ).identified(by: box.identity))
             }
         }
         return results

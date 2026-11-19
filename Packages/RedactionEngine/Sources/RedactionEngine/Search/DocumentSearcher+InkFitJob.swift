@@ -36,6 +36,17 @@ extension DocumentSearcher {
             var isRaised: Bool { lock.lock(); defer { lock.unlock() }; return set }
         }
         func markUncached() { uncached.raise() }
+        /// Set by a fit that took more of the word's ink than its tallest
+        /// band (`inkPaintAndIdentity`): the box the tallest band alone paints,
+        /// which a hybrid page tells repeats by (`SearchResult.identityRect`).
+        /// nil after every other fit.
+        let identity = Held()
+        final class Held: @unchecked Sendable {
+            private let lock = NSLock()
+            private var rect: CGRect?
+            func set(_ value: CGRect?) { lock.lock(); rect = value; lock.unlock() }
+            var value: CGRect? { lock.lock(); defer { lock.unlock() }; return rect }
+        }
 
         var key: Int {
             var hasher = Hasher()

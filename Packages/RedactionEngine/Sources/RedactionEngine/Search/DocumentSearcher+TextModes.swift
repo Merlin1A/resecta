@@ -41,7 +41,7 @@ extension DocumentSearcher {
                     pageText: pageText, query: query, options: options,
                     page: page, pageIndex: pageIndex, term: query
                 ) }
-                let hybrid = await hybridOCRLeg(page: page, pageIndex: pageIndex, textLayerRects: results.map(\.normalizedRect),
+                let hybrid = await hybridOCRLeg(page: page, pageIndex: pageIndex, textLayerRects: results.map(\.mergeIdentity),
                     includeOCR: options.includeOCR) { await self.searchPageViaOCR(page: page, pageIndex: pageIndex, query: query, options: options, term: query) }
                 let seamHits = await pageSeamMatches(from: seam, to: page, pageIndex: pageIndex, pageText: pageText, query: query, options: options, term: query)
                 emitCapped(results + hybrid + seamHits, into: continuation, total: &totalYielded)
@@ -172,7 +172,7 @@ extension DocumentSearcher {
                 }
                 // One result per line the match touches (the counting rule).
                 let occurrence = rects.count > 1 ? UUID() : nil
-                pageRects.append(contentsOf: rects.map(\.rect))
+                pageRects.append(contentsOf: rects.map(\.mergeIdentity))
                 for line in rects {
                     continuation.yield(SearchResult(
                         pageIndex: pageIndex,
@@ -183,7 +183,7 @@ extension DocumentSearcher {
                         term: pattern,
                         matchRangeInSnippet: window.matchRange,
                         occurrenceID: occurrence, textLayerRect: line.textLayerRect, inkFitDegraded: line.degraded
-                    ))
+                    ).identified(by: line.identity))
                 }
                 return true
             }
@@ -255,7 +255,7 @@ extension DocumentSearcher {
 
                     if useTextLayer {
                         let hits = await withInkFitRead(page) { findTextMatches(pageText: pageText, query: term, options: options, page: page, pageIndex: pageIndex, term: term) }
-                        pageHits += hits + (await hybridOCRLeg(page: page, pageIndex: pageIndex, textLayerRects: hits.map(\.normalizedRect), includeOCR: options.includeOCR,
+                        pageHits += hits + (await hybridOCRLeg(page: page, pageIndex: pageIndex, textLayerRects: hits.map(\.mergeIdentity), includeOCR: options.includeOCR,
                             reportsWhenOff: term == terms.first) { await self.searchPageViaOCR(page: page, pageIndex: pageIndex, query: term, options: options, term: term) })
                         pageHits += await pageSeamMatches(from: seam, to: page, pageIndex: pageIndex, pageText: pageText, query: term, options: options, term: term)
                     } else if options.includeOCR {
@@ -313,7 +313,7 @@ extension DocumentSearcher {
                         pageText: pageText, query: term, options: options,
                         page: page, pageIndex: pageIndex, term: term
                     ) }
-                    let hybrid = await hybridOCRLeg(page: page, pageIndex: pageIndex, textLayerRects: results.map(\.normalizedRect), includeOCR: options.includeOCR,
+                    let hybrid = await hybridOCRLeg(page: page, pageIndex: pageIndex, textLayerRects: results.map(\.mergeIdentity), includeOCR: options.includeOCR,
                         reportsWhenOff: term == terms.first) { await self.searchPageViaOCR(page: page, pageIndex: pageIndex, query: term, options: options, term: term) }
                     let seamHits = await pageSeamMatches(from: seam, to: page, pageIndex: pageIndex, pageText: pageText, query: term, options: options, term: term)
                     emitCapped(results + hybrid + seamHits, into: continuation, total: &totalYielded)

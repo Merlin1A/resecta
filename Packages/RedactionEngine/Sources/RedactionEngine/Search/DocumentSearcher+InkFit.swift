@@ -107,10 +107,10 @@ extension DocumentSearcher {
     /// envelope, and the caller reports the page as not fully analysed.
     nonisolated static func inkFit(
         _ rect: CGRect, page: PDFPage, text: String?, range: NSRange? = nil, paintOnly: Bool = false
-    ) -> (rect: CGRect, degraded: Bool) {
-        guard !rect.isEmpty, let cgPage = page.pageRef, carriesHiddenTextOverImage(page, cgPage: cgPage) else { return (rect, false) }
+    ) -> (rect: CGRect, degraded: Bool, identity: CGRect?) {
+        guard !rect.isEmpty, let cgPage = page.pageRef, carriesHiddenTextOverImage(page, cgPage: cgPage) else { return (rect, false, nil) }
         let visual = effectiveBounds(page.bounds(for: .cropBox), rotation: page.rotation).size
-        guard visual.width > 0, visual.height > 0 else { return (rect, false) }
+        guard visual.width > 0, visual.height > 0 else { return (rect, false, nil) }
         let pageKey = InkTokenCache.key(page: page, cgPage: cgPage, visual: visual)
         var job = InkFitJob(rect: rect, cgPage: cgPage, rotation: page.rotation, visual: visual, pageKey: pageKey,
                             pageText: page.string ?? "", text: text, range: range, paintOnly: paintOnly,
@@ -118,14 +118,14 @@ extension DocumentSearcher {
                             wideBefore: range != nil ? wideCharacters(before: range, in: page.string ?? "")
                                 : wideCharacters(before: NSRange(location: 0, length: ((text ?? "") as NSString).length), in: text ?? ""),
                             fromLineStart: 0)
-        if let known = InkFitCache.shared.fitted(for: job.key) { return (known, false) }
+        if let known = InkFitCache.shared.fittedAndIdentity(for: job.key) { return (known.fitted, false, known.identity) }
         // The main thread (the live preview) reads only what a search returned
         // off the main thread: its fit, or the degraded box it painted (so the
         // preview shows what will be applied). It renders, reads and copies
         // nothing, and asks again on `inkFitDidUpdate`.
         if Thread.isMainThread {
-            if let shown = InkFitCache.shared.displayed(for: job.key) { return (shown, true) }
-            return (rect, false)
+            if let shown = InkFitCache.shared.displayed(for: job.key) { return (shown, true, nil) }
+            return (rect, false, nil)
         }
         let readingBox = job.frame.toReading(CGRect(x: rect.minX * visual.width, y: rect.minY * visual.height,
                                                     width: rect.width * visual.width, height: rect.height * visual.height))
@@ -147,16 +147,18 @@ extension DocumentSearcher {
             let wide = job.envelope()
             InkFitCache.shared.finish(job.key, fitted: nil, displayed: wide)
             InkFitUpdates.shared.post()
-            return (wide, true)
+            return (wide, true, nil)
         }
         let onCopy = job.with(privatePage)
         let fitted = onCopy.run()
         let degraded = onCopy.uncached.isRaised
         // A deferred run's envelope stands in until the page is read: not shown.
         let placeholder = InkFitDeferral.current != nil && degraded
-        InkFitCache.shared.finish(job.key, fitted: degraded ? nil : fitted, displayed: degraded && !placeholder ? fitted : nil)
+        let identity = degraded ? nil : onCopy.identity.value
+        InkFitCache.shared.finish(job.key, fitted: degraded ? nil : fitted, displayed: degraded && !placeholder ? fitted : nil,
+                                  identity: identity)
         if !placeholder { InkFitUpdates.shared.post() }
-        return (fitted, degraded)
+        return (fitted, degraded, identity)
     }
 
     /// Where the ink of a match whose layer box is `box` (reading frame) can
@@ -451,15 +453,18 @@ extension DocumentSearcher {
         // The selection box too, unless the caller strips the hidden glyphs by
         // their own rect (`textLayerAndInkRects`): a fill that covers them is
         // then the only thing that removes them from a Searchable export.
-        guard var fitted = inkPaint(ink: ink, band: reading.band, seed: seed, window: window,
-                                    growLeft: anchor?.growLeft ?? true, growRight: anchor?.growRight ?? true) else {
+        guard let painted = inkPaintAndIdentity(ink: ink, band: reading.band, seed: seed, window: window,
+                                                growLeft: anchor?.growLeft ?? true, growRight: anchor?.growRight ?? true) else {
             inkFitLogger.log("ink fit: the fitted box reaches past its window; the box is the read word's box, degraded"); return anchorEnvelope()
         }
-        if !job.paintOnly { fitted = fitted.union(box) }
-        let back = frame.toVisual(fitted)
-        return CGRect(x: back.minX / visual.width, y: back.minY / visual.height,
-                      width: back.width / visual.width, height: back.height / visual.height)
-            .clampedToNormalized()
+        func normalizedBack(_ fitted: CGRect) -> CGRect {
+            let back = frame.toVisual(job.paintOnly ? fitted : fitted.union(box))
+            return CGRect(x: back.minX / visual.width, y: back.minY / visual.height,
+                          width: back.width / visual.width, height: back.height / visual.height)
+                .clampedToNormalized()
+        }
+        job.identity.set(painted.identity.map(normalizedBack))
+        return normalizedBack(painted.paint)
     }
 
     /// The window a word's fit renders and reads: the seed box (the read
@@ -495,6 +500,22 @@ extension DocumentSearcher {
         guard let band, let alone = paint(band) else { return nil }
         inkFitLogger.log("ink fit: the box with every band reaches past its window; the box is its tallest band's")
         return alone
+    }
+
+    /// `inkPaint`'s box, and beside it the box the tallest band alone paints
+    /// when the paint took more than that band: the box a word's fit gave
+    /// before every band was taken. A hybrid page tells an OCR result that
+    /// repeats this match by that box (`SearchResult.identityRect`), never by
+    /// the grown one, which can reach over a neighbour line's occurrence the
+    /// text layer does not hold. nil identity when the paint is that box.
+    nonisolated static func inkPaintAndIdentity(ink: CGRect, band: CGRect?, seed: CGRect, window: CGRect,
+                                                growLeft: Bool, growRight: Bool) -> (paint: CGRect, identity: CGRect?)? {
+        guard let paint = inkPaint(ink: ink, band: band, seed: seed, window: window, growLeft: growLeft, growRight: growRight) else {
+            return nil
+        }
+        guard let band, let alone = inkPaint(ink: band, band: nil, seed: seed, window: window,
+                                             growLeft: growLeft, growRight: growRight), alone != paint else { return (paint, nil) }
+        return (paint, alone)
     }
 
     /// The page's read tokens: one full-page render at the fit's scale, read

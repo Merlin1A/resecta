@@ -120,23 +120,26 @@ extension DocumentSearcher {
     /// fill covers), and `strip`, the selection box of the line's hidden glyphs
     /// (what a Searchable export removes from the text layer); `degraded` when
     /// some line's fit fell back to the drift envelope (the caller reports the
-    /// page as not fully analysed). Nil on any other page: the line rects are
-    /// `lineRects`' as they are.
+    /// page as not fully analysed); `identity`, index-aligned, the box a line's
+    /// tallest band alone paints where its paint took more (`InkFitJob.identity`),
+    /// nil where the paint is its own. Nil on any other page: the line rects
+    /// are `lineRects`' as they are.
     nonisolated func textLayerAndInkRects(for nsRange: NSRange, page: PDFPage)
-        -> (paint: [CGRect], strip: [CGRect], degraded: Bool)? {
+        -> (paint: [CGRect], strip: [CGRect], degraded: Bool, identity: [CGRect?])? {
         guard let cgPage = page.pageRef, Self.carriesHiddenTextOverImage(page, cgPage: cgPage),
               let selection = page.selection(for: nsRange) else { return nil }
         let lines = selection.selectionsByLine()
-        var paint: [CGRect] = [], strip: [CGRect] = [], degraded = false
+        var paint: [CGRect] = [], strip: [CGRect] = [], degraded = false, identity: [CGRect?] = []
         for line in lines {
             guard let raw = normalizedRect(for: line, page: page) else { continue }
             let fit = Self.inkFit(raw, page: page, text: line.string,
                                   range: lines.count == 1 ? nsRange : line.range(at: 0, on: page), paintOnly: true)
             strip.append(raw)
             paint.append(fit.rect)
+            identity.append(fit.identity)
             degraded = degraded || fit.degraded
         }
-        return paint.isEmpty ? nil : (paint, strip, degraded)
+        return paint.isEmpty ? nil : (paint, strip, degraded, identity)
     }
 
     /// The one home for the selection → normalized-rect transform: the
