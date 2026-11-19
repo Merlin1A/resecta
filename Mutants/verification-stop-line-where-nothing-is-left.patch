@@ -5,7 +5,7 @@ Must go red: RedactionEngineTests/CheckStopTests row [S-8], [S-12], [S-16]
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Structural.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Structural.swift
-index 42237156..69de363a 100644
+index 26a7489e..c9cc5816 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Structural.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Structural.swift
 @@ -120,8 +120,8 @@ extension VerificationEngine {
@@ -19,20 +19,20 @@ index 42237156..69de363a 100644
          }
          // A file with no end marker was not written whole: its structure
          // could not be inspected. It leads the unread pages.
-@@ -285,7 +285,7 @@ extension VerificationEngine {
-         // a value. An absent pair stays on the paths below.
-         if let idArray = cgDoc.fileIdentifier,
-            !Self.fileIdentifierMatchesContents(idArray, pdfData: pdfData) {
--            return (.warn("File identifier was not derived from the file contents"), false, nil, nil)
-+            return (.warn("File identifier was not derived from the file contents"), false, nil, .stoppedAtThisFind)
+@@ -304,7 +304,7 @@ extension VerificationEngine {
+         case .derived:
+             break
+         case .notDerived:
+-            return (row(.attention("File identifier was not derived from the file contents")), nil)
++            return (row(.attention("File identifier was not derived from the file contents"), stopped: .stoppedAtThisFind), nil)
+         case .cannotRecompute:
+             return (Self.metadataNotInspected, nil)
          }
- 
-         // XMP metadata — scanned above the /Info guard; fold the
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine.swift
-index c69fa89b..a9d89495 100644
+index e0573a64..d5aa037d 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine.swift
-@@ -582,7 +582,7 @@ public struct VerificationEngine: Sendable {
+@@ -587,7 +587,7 @@ public struct VerificationEngine: Sendable {
          }
          var acroForm: CGPDFDictionaryRef?
          if CGPDFDictionaryGetDictionary(catalog, "AcroForm", &acroForm) {
