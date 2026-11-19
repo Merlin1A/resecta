@@ -266,9 +266,7 @@ struct DocumentEditorExportFlow {
                 completed: completed, copy: exportURL, report: currentReport,
                 attempt: attempt, documentState: documentState,
                 announceShared: {
-                    toastManager.enqueue(
-                        DocumentEditorView.sharedAcknowledgmentToast,
-                        severity: .success)
+                    toastManager.post(.shared)
                 },
                 recordSuccessfulExport: {
                     if ReviewPromptGate.standard.shouldAsk(afterSharing: currentReport.overallStatus) {
@@ -287,7 +285,7 @@ struct DocumentEditorExportFlow {
         let abandon: @MainActor () -> Void = {
             if DocumentEditorView.abandonShare(
                 copy: exportURL, report: currentReport, attempt: attempt, documentState: documentState) {
-                toastManager.enqueue(DocumentEditorView.shareSheetUnavailableMessage, severity: .warning)
+                toastManager.post(.shareSheetUnavailable)
             }
         }
         guard let topVC = MatchExportService.topViewController() else {

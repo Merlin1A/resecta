@@ -359,10 +359,14 @@ struct DocumentEditorView: View {
                     // sheet's own Dismiss, so the notice naming the dropped
                     // matches is read here, from the session about to go.
                     if let session = redactionState.activeSearch {
-                        let notice = SearchAndRedactSheet.dismissClearedMessage(for: session)
+                        let notice: MessageID? = SearchAndRedactSheet.dismissClearedMessage(for: session) == nil
+                            ? nil
+                            : .searchClosedCleared(
+                                count: SearchAndRedactSheet.unappliedMatchCount(in: session),
+                                interface: session.searchModeType.interface)
                         Task { @MainActor in
                             guard redactionState.activeSearch != nil else { return }
-                            if let notice { toastManager.enqueue(notice, severity: .info) }
+                            if let notice { toastManager.post(notice) }
                             redactionState.activeSearch = nil
                         }
                     } else if redactionState.pendingCanvasRationaleRequest != nil {
@@ -636,7 +640,7 @@ struct DocumentEditorView: View {
         case .verifyOnly:
             coordinator.runVerifyOnly()
         case .blockedBySelections:
-            toastManager.enqueue(DocumentState.RedactRefusal.selectedMatches.hint, severity: .info)
+            toastManager.post(.applyOrClearSelectedMatchesBeforeVerify)
         case .fullPipeline:
             Self.prepareForPurgeRerun(
                 documentState: documentState,

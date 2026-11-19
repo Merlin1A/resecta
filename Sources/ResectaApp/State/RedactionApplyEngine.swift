@@ -207,7 +207,7 @@ extension RedactionState {
 
         lassoCut = truncated && barShowing ? LassoCut(at: now, selection: newSelection) : nil
         if truncated && !barShowing {
-            toastManager?.enqueue(Self.lassoSelectionCapToastMessage, severity: .warning)
+            toastManager?.post(.selectionLimit)
         }
 
         return (selected: newSelection.count, truncated: truncated)

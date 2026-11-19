@@ -416,10 +416,7 @@ struct SearchAndRedactSheet: View {
         // Notify when results are truncated.
         .onChange(of: searchState.resultsAtCap) { _, atCap in
             if atCap {
-                toastManager.enqueue(
-                    "Search results truncated. Refine your query for more specific matches.",
-                    severity: .warning
-                )
+                toastManager.post(.searchResultsTruncated)
             }
         }
         // Mode switch cleanup: clear stale results and mode-specific state.
@@ -1093,7 +1090,7 @@ struct SearchAndRedactSheet: View {
         } else {
             savedRegexSaveLabel = ""
             savedRegexSaveError = nil
-            toastManager.enqueue(Self.savedRegexSavedToast, severity: .success)
+            toastManager.post(.savedRegexSaved)
         }
     }
 }

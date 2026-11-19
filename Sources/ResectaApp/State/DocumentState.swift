@@ -403,20 +403,25 @@ class DocumentState {
     /// The results screen's way back to the editor.
     static let keepEditingTitle = "Keep Editing"
 
-    /// The notice for a refused drop, or nil when the import may start:
+    /// The message for a refused drop, or nil when the import may start:
     /// the results or error screen, else a run in progress.
-    func importRefusalMessage(door: ImportDoor? = nil) -> String? {
+    func importRefusal(door: ImportDoor? = nil) -> MessageID? {
         if canStartImport { return nil }
         switch phase {
         case .verified:
-            return Self.importBlockedOnThisScreenMessage(wayBack: Self.keepEditingTitle)
+            return .importBlockedOnThisScreen(wayBack: Self.keepEditingTitle)
         case .failed(let error, let returnPhase):
-            return Self.importBlockedOnThisScreenMessage(
+            return .importBlockedOnThisScreen(
                 wayBack: FailedStateView.primaryActionLabel(
                     FailedStateView.primaryAction(error: error, returnPhase: returnPhase), door: door))
         default:
-            return Self.importBlockedDuringPipelineMessage
+            return .importBlockedDuringRun
         }
+    }
+
+    /// The refused drop's sentence, or nil when the import may start.
+    func importRefusalMessage(door: ImportDoor? = nil) -> String? {
+        importRefusal(door: door).map { MessageCatalog.row(for: $0).text }
     }
 
     /// Toast copy for a dropped file that is not a PDF (an image payload,

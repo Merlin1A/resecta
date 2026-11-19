@@ -85,11 +85,9 @@ struct DocumentEditorScenePhaseHandler: ViewModifier {
             outputFileExists: exists
         ) else { return }
         let override = documentState.documentOverride
-        toastManager.enqueue(
-            DocumentEditorView.purgeRerunToastMessage,
-            severity: .warning,
-            actionLabel: "Re-run",
-            actionHandler: {
+        toastManager.post(
+            .outputReclaimed,
+            action: {
                 // Deferral pattern: ToastView's button
                 // action calls this actionHandler() and then
                 // `toastManager.dismiss(item)` — whose `withAnimation {

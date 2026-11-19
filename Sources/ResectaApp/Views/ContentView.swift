@@ -43,11 +43,12 @@ struct ContentView: View {
         )
         .environment(toastManager) // inject toast manager
         #if DEBUG
-        // Sim-verification hook: `--showToast` enqueues a two-sentence
+        // Sim-verification hook: `--showToast` posts a two-sentence
         // warning toast once the workspace is up, so the toast's line cap
-        // can be photographed at accessibility sizes. `--showToast=<id>`
-        // shows one of the app's own toast messages instead
-        // (`ResectaApp.toastHook(for:)`).
+        // can be photographed at accessibility sizes. `--showToast=<name>`
+        // posts the message of that name in the message table instead
+        // (`ResectaApp.toastHook(for:)`); a row with an action shows its
+        // button, which does nothing here.
         .task {
             switch ResectaApp.toastHook(for: CommandLine.arguments) {
             case .absent:
@@ -56,10 +57,10 @@ struct ContentView: View {
                 preconditionFailure(reason)
             case .bare:
                 try? await Task.sleep(for: .seconds(2))
-                toastManager.enqueue(DocumentEditorView.purgeRerunToastMessage, severity: .warning)
-            case .named(let id):
+                toastManager.post(.outputReclaimed)
+            case .named(let name):
                 try? await Task.sleep(for: .seconds(2))
-                toastManager.enqueue(id.message, severity: id.severity)
+                toastManager.post(MessageID.example(named: name), action: {})
             }
         }
         // `--forceDetectionDegrade`: once the test document is in the
@@ -76,8 +77,8 @@ struct ContentView: View {
                     let diagnostics = GazetteerLoadDiagnostics(failedGazetteers: [
                         GazetteerLoadDiagnostics.Gazetteer.nerNameModel.rawValue,
                     ])
-                    if let toast = ws.redactionState.noteScanKickoffDiagnostics(diagnostics) {
-                        toastManager.enqueue(toast, severity: .warning)
+                    if ws.redactionState.noteScanKickoffDiagnostics(diagnostics) != nil {
+                        toastManager.post(.detectionDegraded(failedGazetteers: diagnostics.failedGazetteers))
                     }
                     return
                 }

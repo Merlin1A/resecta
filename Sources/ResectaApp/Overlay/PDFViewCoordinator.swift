@@ -322,7 +322,7 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
     @discardableResult
     func noteRegionTooSmall() -> Bool {
         guard let toastManager else { return false }
-        toastManager.enqueue(RedactionOverlayView.subThresholdRejectionAnnouncement, severity: .info)
+        toastManager.post(.boxTooSmall)
         return true
     }
 

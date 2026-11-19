@@ -185,11 +185,8 @@ extension SearchAndRedactSheet {
     /// (user-initiated transition AND the clear dropped at least one
     /// result). The message names the unapplied count when unapplied
     /// matches were lost; an all-applied clear (the former silent
-    /// carve-out) says so instead of staying quiet. Severity is `.info`
-    /// (bottom position) — observed
-    /// on-sim: a `.warning` toast routes to the TOP position, which
-    /// while this sheet is presented is the editor's dimming scrim, so
-    /// tapping its Undo button dismissed the whole sheet.
+    /// carve-out) says so instead of staying quiet. The two sentences and
+    /// their severity are the message table's (`MessageCatalog`).
     ///
     /// The Undo handler restores the previous mode FIRST — flagging the
     /// transition programmatic so the `.onChange` handler in the hub
@@ -217,25 +214,12 @@ extension SearchAndRedactSheet {
         unappliedCount: Int
     ) {
         guard !isProgrammatic, !snapshot.results.isEmpty else { return }
-        // Every interface-crossing transition is programmatic (magic
-        // wand, review arrival, saved-search recall), and the guard
-        // above skips programmatic transitions — a toast that reaches
-        // this point names a Search-side mode change.
-        let verb = "Mode switch"
-        let message: String
-        if unappliedCount > 0 {
-            let suffix = unappliedCount == 1 ? "" : "es"
-            message = "\(verb) cleared \(unappliedCount) unapplied match\(suffix)."
-        } else {
-            let count = snapshot.results.count
-            let suffix = count == 1 ? "" : "es"
-            message = "\(verb) cleared \(count) match\(suffix) (all already applied)."
-        }
-        toastManager.enqueue(
-            message,
-            severity: .info,
-            actionLabel: discardUndoActionLabel,
-            actionHandler: { [weak redactionState, weak documentState] in
+        let id: MessageID = unappliedCount > 0
+            ? .modeSwitchCleared(unappliedCount: unappliedCount)
+            : .modeSwitchClearedAllApplied(count: snapshot.results.count)
+        toastManager.post(
+            id,
+            action: { [weak redactionState, weak documentState] in
                 // Deferral pattern: the restore flips
                 // searchModeType and repopulates results — a larger
                 // @Observable mutation than the sibling selection

@@ -83,7 +83,10 @@ struct CopyOfRecordPolishTests {
         let toolbar = try source("Sources/ResectaApp/Views/Search/SearchToolbarSection.swift")
         #expect(toolbar.contains("optionChip(\"Include OCR Pages\""))
         let trigger = try source("Sources/ResectaApp/Views/Search/SearchAndRedactSheet+Trigger.swift")
-        #expect(trigger.contains("Turn on Include OCR Pages to search scanned content."))
+        // The sentence lives in the message table; the trigger posts its row by name.
+        #expect(trigger.contains("toastManager?.post(.scannedRegionsNotAnalyzed)"))
+        let table = try source("Sources/ResectaApp/State/MessageCatalog.swift")
+        #expect(table.contains("Turn on Include OCR Pages to search scanned content."))
         #expect(trigger.contains("argument: \"Scanning page \\(current) of \\(total)\""))
     }
 
