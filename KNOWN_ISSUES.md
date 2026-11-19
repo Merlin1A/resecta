@@ -348,6 +348,15 @@ A PDF can move its drawing position back over text it has already printed, so th
 
 ---
 
+### KI-45: On a Scan, a Blank Line Through a Word Can Leave Part of It Uncovered (Medium)
+**Affects:** Search and Scan on scanned pages
+
+On a scanned page, Resecta fits each box to the word's ink in the scan. If a single row of the scan's pixels is completely white across the middle of a word, the box can be fitted to only the part of the word above that row. When you apply it, the lower part of the word's letters stays printed in the export, with either export mode, and the checks after export do not report it. On most real scans, a row through a word is rarely completely white.
+
+**Workaround:** On scanned pages, before you tap Redact, check that each box covers the whole height of the word; where one does not, drag its handle down over the rest of the word, or draw a box over it with Rectangle.
+
+---
+
 ## Fixed
 
 ### KI-8: Duplicate Regions from Multiple Scan Runs (Low) — FIXED (entry moved 2026-10-01)
