@@ -232,3 +232,4 @@ with its reason and the mutant that is caught in its place.
 | `search-rerun-notice-counts-ticked-only.patch` | A re-run's notice counts only the ticked matches without a box. | ResectaAppTests/SearchRerunNoticeTests nothingTickedCountsZero; ResectaAppUITests/SearchTypingFocusUITests testTypingWithNothingTicked_postsNoNotice |
 | `search-rerun-notice-silent-at-zero.patch` | A re-run with nothing ticked posts no notice. | ResectaAppTests/DiscardUndoToastTests rerunNamesTheClearedMatches |
 | `search-rerun-notice-typing-included.patch` | A run started by typing names the ticked matches it clears. | ResectaAppUITests/SearchTypingFocusUITests testTypingOverTickedRows_postsTheNotice |
+| `failed-screen-own-identifiers.patch` | The failure screen's identifier names the screen, and its words and each button keep their own. | ResectaAppUITests/FailedStateIdentifiersUITests testFailedScreen_eachControlAnswersToItsOwnIdentifier |
