@@ -33,7 +33,17 @@ struct InkFitBusyPoolTests {
         return out
     }
 
-    @Test("More hidden-layer searches than the task pool has threads fit side by side, not one render at a time, and a regex scan beside them cancels promptly")
+    /// How many searches are running at once: a search runs from its first
+    /// hit to its end, and the most at any moment is kept.
+    final class AtOnce: @unchecked Sendable {
+        private let lock = NSLock()
+        private var now = 0, most = 0
+        func began() { lock.withLock { now += 1; most = max(most, now) } }
+        func ended() { lock.withLock { now -= 1 } }
+        var peak: Int { lock.withLock { most } }
+    }
+
+    @Test("More hidden-layer searches than the task pool has threads fit side by side, not one at a time, and a regex scan beside them cancels promptly")
     func busyPoolLeavesOtherWorkMoving() async throws {
         let data = try await Self.export(mark: CGRect(x: 0.013, y: 0.011, width: 0.019, height: 0.008))
         // The pages read first (as each search's first page read would), so
@@ -48,6 +58,7 @@ struct InkFitBusyPoolTests {
         let aloneSeconds = Date().timeIntervalSince(aloneStarted)
         let count = ProcessInfo.processInfo.activeProcessorCount + 4
         let finished = OCRLegConcurrencyTests.ResultBox(), degraded = OCRLegConcurrencyTests.ResultBox()
+        let atOnce = AtOnce()
         let started = Date()
         let searches = Task {
             await withTaskGroup(of: Int.self) { group in
@@ -55,7 +66,13 @@ struct InkFitBusyPoolTests {
                     group.addTask {
                         // A document of each search's own (no shared PDF objects).
                         guard let doc = PDFDocument(data: data) else { return 0 }
-                        let results = await Self.search(doc, mode)
+                        var results: [SearchResult] = []
+                        let stream = DocumentSearcher().search(SendablePDFDocument(doc), mode: mode, progress: { _, _ in })
+                        for await result in stream {
+                            if results.isEmpty { atOnce.began() }
+                            results.append(result)
+                        }
+                        if !results.isEmpty { atOnce.ended() }
                         degraded.add(results.filter(\.inkFitDegraded).count)
                         return results.count
                     }
@@ -87,18 +104,21 @@ struct InkFitBusyPoolTests {
         while finished.count < count, Date() < deadline { try await Task.sleep(for: .milliseconds(200)) }
         let together = Date().timeIntervalSince(started)
         #expect(finished.count == count, "\(finished.count) of \(count) searches finished in 120 s")
-        // Each search's renders run on its own thread: together they take
-        // about as long as their share of the cores, not one render at a time
-        // across all of them (measured on 10 cores, 14 searches: 1.2 times
-        // one alone inline, 2.7 times with the renders on one lane).
-        let cores = Double(ProcessInfo.processInfo.activeProcessorCount)
-        let bound = aloneSeconds * 1.5 * max(1, Double(count) / cores)
-        #expect(together < bound, "\(count) searches took \(together) s; one alone \(aloneSeconds) s (bound \(bound) s)")
+        // Side by side, not one at a time: more searches run at once than
+        // the pool has threads, which only searches that wait without
+        // holding a thread can do. Searches held to one at a time run one;
+        // searches that each hold a thread while they wait run at most as
+        // many as the pool has threads. How long they take together is for
+        // the timing runs on an optimised build, not this test (a debug
+        // build's time is no measure of a stall).
+        let threads = ProcessInfo.processInfo.activeProcessorCount
+        #expect(atOnce.peak >= threads + 1,
+                "at most \(atOnce.peak) of \(count) searches ran at once; the pool has \(threads) threads")
         #expect(finished.hits == alone.count * count, "every search returns the hits one alone does: \(finished.hits) of \(alone.count * count)")
         // Reported, not judged (a degraded box holds its word; how many
         // degrade under load is measured here).
         print("busy-pool: alone \(aloneSeconds) s, \(alone.filter(\.inkFitDegraded).count) of \(alone.count) degraded; "
-              + "\(count) together \(together) s, \(degraded.hits) of \(finished.hits) degraded; regex cancel \(waited)")
+              + "\(count) together \(together) s, \(atOnce.peak) at once, \(degraded.hits) of \(finished.hits) degraded; regex cancel \(waited)")
         searches.cancel()
     }
 
