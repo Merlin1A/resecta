@@ -1,0 +1,25 @@
+Property: The text-size limit applies to the tile's symbol alone; the row's words keep growing.
+Area: results (the buttons and their card)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/ResultsActionsLargeTextTests
+Must go red: ResectaAppTests/ResultsActionsLargeTextTests rowWordsKeepGrowing; ResectaAppTests/ResultsActionsLargeTextTests symbolStaysInsideItsTile
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationResultsActions.swift b/Sources/ResectaApp/Views/VerificationResultsActions.swift
+index d128977f..186a5c36 100644
+--- a/Sources/ResectaApp/Views/VerificationResultsActions.swift
++++ b/Sources/ResectaApp/Views/VerificationResultsActions.swift
+@@ -350,7 +350,6 @@ struct ResultsActionRow: View {
+     static func tileSymbol(_ symbol: String) -> some View {
+         Image(systemName: symbol)
+             .font(.callout.weight(.semibold))
+-            .dynamicTypeSize(...symbolSizeLimit)
+     }
+ 
+     @Environment(\.colorScheme) private var colorScheme
+@@ -386,5 +385,6 @@ struct ResultsActionRow: View {
+         .padding(.vertical, ResectaTokens.Results.rowVerticalPadding)
+         .frame(minHeight: ResectaTokens.Results.rowMinHeight)
+         .contentShape(Rectangle())
++        .dynamicTypeSize(...Self.symbolSizeLimit)
+     }
+ }
