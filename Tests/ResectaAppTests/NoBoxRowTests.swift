@@ -1,0 +1,131 @@
+import Testing
+import Foundation
+import CoreGraphics
+import RedactionEngine
+@testable import ResectaApp
+
+/// A match with no box, in the app: listed, never selected, never
+/// applied, and not counted by Select All; its row carries the approved words.
+@Suite("A hit with no box: the app's side", .tags(.search))
+@MainActor
+struct NoBoxRowTests {
+
+    static func boxed(page: Int = 0, selected: Bool = false, occurrence: UUID? = nil) -> SearchResult {
+        SearchResult(pageIndex: page, normalizedRect: CGRect(x: 0.1, y: 0.5, width: 0.3, height: 0.02),
+                     matchedText: "QUARTZ7", contextSnippet: "ref QUARTZ7 filed", source: .textLayer,
+                     term: "QUARTZ7", isSelected: selected, occurrenceID: occurrence)
+    }
+
+    static func unboxed(page: Int = 0, selected: Bool = false, occurrence: UUID? = nil, offPage: Bool = false) -> SearchResult {
+        SearchResult(pageIndex: page, normalizedRect: .zero, matchedText: "QUARTZ7", contextSnippet: "ref QUARTZ7 filed",
+                     source: .textLayer, term: "QUARTZ7", isSelected: selected, occurrenceID: occurrence,
+                     hasBox: false, liesOffVisiblePage: offPage)
+    }
+
+    @Test("Apply with one ordinary and one unboxed result makes one box; the unboxed row stays listed")
+    func applyMakesOneBox() {
+        let ordinary = Self.boxed(selected: true)
+        let noBox = Self.unboxed(selected: true)
+        let prepared = prepareApply(selected: [ordinary, noBox], existingRectsByPage: [:], existingStripRectsByPage: [:],
+                                    appliedAt: Date(), searchRecord: nil)
+        #expect(prepared.createdRegions[0]?.count == 1, "one box, for the ordinary result")
+        #expect(prepared.createdRegions[0]?.first?.normalizedRect == ordinary.normalizedRect)
+    }
+
+    @Test("No predicate selects a result with no box")
+    func neverSelected() {
+        let state = SearchState()
+        state.results = [Self.boxed(), Self.unboxed()]
+        state.setSelection { _ in true }
+        #expect(state.results.map(\.isSelected) == [true, false])
+        state.toggleSelection(for: state.results[1].id)
+        #expect(state.results[1].isSelected == false, "its row has no tick box to toggle")
+    }
+
+    @Test("Select All neither counts nor blocks on a result with no box")
+    func selectAllSkipsIt() {
+        let state = SearchState()
+        state.results = [Self.boxed(), Self.unboxed()]
+        state.toggleSelectAll()
+        #expect(state.results.map(\.isSelected) == [true, false], "Select All ticks the boxed result")
+        state.toggleSelectAll()
+        #expect(state.results.map(\.isSelected) == [false, false], "a second press is Deselect All")
+    }
+
+    @Test("A result with no box is not a deselection, and it counts as found")
+    func counts() {
+        let state = SearchState()
+        state.results = [Self.boxed(), Self.unboxed()]
+        #expect(state.deselectedCount == 1, "only the boxed result was left un-ticked")
+        #expect(state.totalCount == 2, "both are found matches")
+    }
+
+    @Test("A match across a page break whose first part has no box: a no-box row for it and a tick row for the boxed part")
+    func seamOccurrence() {
+        let occurrence = UUID()
+        let state = SearchState()
+        let noBox = Self.unboxed(page: 0, occurrence: occurrence), box = Self.boxed(page: 1, occurrence: occurrence)
+        state.results = [noBox, box]
+        #expect(state.rowsByPage[0]?.map(\.id) == [noBox.id], "the part with no box is its own row, on its own page")
+        #expect(state.rowsByPage[1]?.map(\.id) == [box.id], "the boxed part is a row of its own, with a tick box")
+        #expect(state.totalCount == 2)
+        state.toggleSelectAll()
+        #expect(state.results.map(\.isSelected) == [false, true])
+        state.toggleSelection(for: box.id)
+        #expect(state.results.map(\.isSelected) == [false, false], "the boxed part's row ticks and unticks it")
+    }
+
+    @Test("A match across a page break whose second part has no box: that part keeps its own no-box row")
+    func seamOccurrenceSecondPartUnboxed() {
+        let occurrence = UUID()
+        let state = SearchState()
+        let box = Self.boxed(page: 0, occurrence: occurrence), noBox = Self.unboxed(page: 1, occurrence: occurrence)
+        state.results = [box, noBox]
+        #expect(state.rowsByPage[0]?.map(\.id) == [box.id])
+        #expect(state.rowsByPage[1]?.map(\.id) == [noBox.id], "the part with no box is listed, never folded into the boxed row")
+        #expect(state.totalCount == 2)
+        state.toggleSelection(for: box.id)
+        #expect(state.results.map(\.isSelected) == [true, false])
+        #expect(state.pieces(of: box.id).map(\.id) == [box.id], "applying the boxed row applies its part alone")
+        #expect(state.pieces(of: noBox.id).map(\.id) == [noBox.id])
+    }
+
+    @Test("A match wrapped onto two boxed lines is still one row")
+    func wrappedBoxedLinesStayOneRow() {
+        let occurrence = UUID()
+        let state = SearchState()
+        state.results = [Self.boxed(page: 0, occurrence: occurrence), Self.boxed(page: 0, occurrence: occurrence)]
+        #expect(state.rowsByPage[0]?.count == 1)
+        #expect(state.totalCount == 1)
+    }
+
+    @Test("The scan's deselection snapshot leaves out a result with no box: nobody un-ticked it")
+    func snapshotLeavesItOut() throws {
+        let state = SearchState()
+        state.searchModeType = .piiScan
+        let left = SearchResult(pageIndex: 0, normalizedRect: CGRect(x: 0.1, y: 0.3, width: 0.2, height: 0.03),
+                                matchedText: "487-63-2210", contextSnippet: "…487-63-2210…", source: .textLayer,
+                                term: "SSN", isSelected: false, piiCategory: .ssn, piiConfidence: 0.9)
+        let noBox = SearchResult(pageIndex: 0, normalizedRect: .zero, matchedText: "487-63-2211",
+                                 contextSnippet: "…487-63-2211…", source: .textLayer, term: "SSN", isSelected: false,
+                                 piiCategory: .ssn, piiConfidence: 0.9, hasBox: false)
+        state.results = [left, noBox]
+        state.setCoverageReport(CoverageReport(
+            scannedPageCount: 1, enabledCategories: [.ssn], candidateCountByCategory: [.ssn: 2],
+            appliedCount: 0, deselectedCount: 0, belowThresholdSuppressedCount: 0,
+            overlapSuppressedCountByCategory: [:],
+            startedAt: Date(timeIntervalSince1970: 0), completedAt: Date(timeIntervalSince1970: 1)))
+        let snapshot = try #require(state.deselectionSnapshotForRun())
+        #expect(snapshot.items.map(\.id) == [left.id], "only the boxed match a person left un-ticked")
+    }
+
+    @Test("The row's words are the approved sentence, word for word; off the visible page, its first sentence alone")
+    func words() {
+        #expect(NoBoxRowCopy.sentence(pageIndex: 20, liesOffVisiblePage: false)
+                == "Found on page 21, but Resecta can't place a box on it. If you can see it there, draw a box by hand.")
+        #expect(NoBoxRowCopy.sentence(pageIndex: 20, liesOffVisiblePage: true)
+                == "Found on page 21, but Resecta can't place a box on it.")
+        let label = SearchResultRow.accessibilityLabel(for: Self.unboxed(page: 2), tier: .high, showsTier: false)
+        #expect(label.hasSuffix("Found on page 3, but Resecta can't place a box on it. If you can see it there, draw a box by hand."))
+    }
+}

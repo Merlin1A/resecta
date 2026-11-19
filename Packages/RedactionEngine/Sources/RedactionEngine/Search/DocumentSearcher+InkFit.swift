@@ -132,7 +132,7 @@ extension DocumentSearcher {
         job.fromLineStart = distanceFromLineStart(of: range, box: readingBox, page: page, visual: visual, frame: job.frame)
         let frame = job.frame
         job.layerBox = { index in
-            page.selection(for: NSRange(location: index, length: 1)).flatMap { DocumentSearcher().normalizedRect(for: $0, page: page) }
+            page.selection(for: NSRange(location: index, length: 1)).flatMap { DocumentSearcher().clampedNormalizedRect(for: $0, page: page) }
                 .map { frame.toReading(CGRect(x: $0.minX * visual.width, y: $0.minY * visual.height,
                                               width: $0.width * visual.width, height: $0.height * visual.height)) }
         }

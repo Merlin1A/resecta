@@ -85,18 +85,34 @@ extension DocumentSearcher {
             let window = seamWindow(seam: seam, raw: raw, matchedText: matchedText, options: effective)
             let occurrence = UUID()
             let previousPage = previous.page
-            var boxes: [(pageIndex: Int, box: TextLayerBox)] = []
+            // Each part in page order. A part with no box is listed with its
+            // page and no box; the other part keeps its own. Neither is merged
+            // into the other.
+            var parts: [(pageIndex: Int, box: TextLayerBox?, offPage: Bool)] = []
             if leftPart.length > 0 {
-                let left = await withInkFitRead(previousPage) { textLayerLines(for: leftPart, page: previousPage) } ?? []
-                boxes += left.map { (previous.index, $0) }
+                if let left = await withInkFitRead(previousPage, { textLayerLines(for: leftPart, page: previousPage) }) {
+                    parts += left.map { (previous.index, $0, false) }
+                } else {
+                    parts.append((previous.index, nil, liesOffVisiblePage(leftPart, page: previousPage)))
+                }
             }
             if rightPart.length > 0 {
-                let right = await withInkFitRead(page) { textLayerLines(for: rightPart, page: page) } ?? []
-                boxes += right.map { (pageIndex, $0) }
+                if let right = await withInkFitRead(page, { textLayerLines(for: rightPart, page: page) }) {
+                    parts += right.map { (pageIndex, $0, false) }
+                } else {
+                    parts.append((pageIndex, nil, liesOffVisiblePage(rightPart, page: page)))
+                }
             }
-            for (partPage, box) in boxes {
+            for part in parts {
+                guard let box = part.box else {
+                    results.append(.unboxed(
+                        pageIndex: part.pageIndex, matchedText: matchedText, contextSnippet: window.snippet,
+                        source: .textLayer, term: term, matchRangeInSnippet: window.matchRange,
+                        occurrenceID: occurrence, liesOffVisiblePage: part.offPage))
+                    continue
+                }
                 results.append(SearchResult(
-                    pageIndex: partPage,
+                    pageIndex: part.pageIndex,
                     normalizedRect: box.rect,
                     matchedText: matchedText,
                     contextSnippet: window.snippet,

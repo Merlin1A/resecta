@@ -10,6 +10,25 @@ import PDFKit
 // matched. iOS 26 reads one recognition, as before.
 extension DocumentSearcher {
 
+    #if DEBUG
+    /// Test seam: recognised lines whose text is in this set are left out of
+    /// the lines a match's box is looked up in, so a match on them has no
+    /// line to be placed on. No real reading does that today (each line's
+    /// offsets cover its own text); the seam plants the drift a no-box row
+    /// guards. Keyed by the planted line's text, so other tests are untouched.
+    static let injectedUnplacedLines = UnplacedLineTexts()
+    #endif
+
+    /// The lines a page's recognised matches are boxed on: all of them, but
+    /// for the test seam above.
+    nonisolated static func boxLookupLines(_ lines: [NormalizedLineEntry]) -> [NormalizedLineEntry] {
+        #if DEBUG
+        let unplaced = injectedUnplacedLines.texts
+        if !unplaced.isEmpty { return lines.filter { !unplaced.contains($0.normalizedText) } }
+        #endif
+        return lines
+    }
+
     /// Whether this OS reads the fast recognition beside the accurate one.
     nonisolated static var readsFastOCRBeside: Bool {
         if #available(iOS 27, *) { return true }
@@ -37,8 +56,8 @@ extension DocumentSearcher {
         guard !fast.isEmpty else { return accurate }
         var groups: [[Int]] = []
         for index in accurate.indices {
-            if let group = groups.firstIndex(where: {
-                accurate[$0[0]].term == accurate[index].term
+            if accurate[index].hasBox, let group = groups.firstIndex(where: {
+                accurate[$0[0]].hasBox && accurate[$0[0]].term == accurate[index].term
                     && accurate[$0[0]].normalizedRect == accurate[index].normalizedRect
             }) {
                 groups[group].append(index)
@@ -52,8 +71,17 @@ extension DocumentSearcher {
         var added: [SearchResult] = []
         for group in groups {
             let first = accurate[group[0]]
+            guard first.hasBox else {
+                // A match with no box: the fast read's match of the same term
+                // and text is its repeat, not a second match (one-for-one).
+                if let repeated = fast.indices.first(where: {
+                    !taken.contains($0) && !fast[$0].hasBox
+                        && fast[$0].term == first.term && fast[$0].matchedText == first.matchedText
+                }) { taken.insert(repeated) }
+                continue
+            }
             let hits = fast.indices.filter {
-                !taken.contains($0) && fast[$0].term == first.term
+                !taken.contains($0) && fast[$0].hasBox && fast[$0].term == first.term
                     && overlapsHalfTheSmaller(first.normalizedRect, fast[$0].normalizedRect)
             }
             taken.formUnion(hits)
@@ -79,6 +107,8 @@ extension DocumentSearcher {
     /// Inserts `match` before the first result below it on the page, or, on
     /// the same row, before the first result to its right.
     nonisolated static func insertInPageOrder(_ match: SearchResult, into results: inout [SearchResult]) {
+        // A match with no box has no place on the page: it follows the rest.
+        guard match.hasBox else { results.append(match); return }
         let box = match.normalizedRect
         let index = results.firstIndex { other in
             let otherBox = other.normalizedRect
@@ -200,24 +230,28 @@ extension DocumentSearcher {
                 onTimeout: { timedOut = true; snapshotTimeoutSink?(pageIndex) }
             ) { matchRange in
                 guard kept.insert(matchRange).inserted else { return false }
-                // The union of every recognised line the match overlaps.
-                guard let mapped = ocrUnionRect(
-                    forUTF16Range: matchRange, lineOffsets: lineOffsets, page: sendablePage.page
-                ) else { return false }
-                let normalizedRect = mapped.rect
+                // The union of every recognised line the match overlaps; a
+                // match no line covers is found with no box, listed, never dropped.
+                let mapped = ocrUnionRect(
+                    forUTF16Range: matchRange, lineOffsets: Self.boxLookupLines(lineOffsets), page: sendablePage.page)
 
                 let matchedText = nsString.substring(with: matchRange)
                 let window = contextSnippet(text: searchText, matchNSRange: matchRange)
 
-                let match = SearchResult(
-                    pageIndex: pageIndex,
-                    normalizedRect: normalizedRect,
-                    matchedText: matchedText,
-                    contextSnippet: window.snippet,
-                    source: .ocr(confidence: avgConfidence),
-                    term: regex.pattern,
-                    matchRangeInSnippet: window.matchRange
-                )
+                let match = mapped.map { mapped in
+                    SearchResult(
+                        pageIndex: pageIndex,
+                        normalizedRect: mapped.rect,
+                        matchedText: matchedText,
+                        contextSnippet: window.snippet,
+                        source: .ocr(confidence: avgConfidence),
+                        term: regex.pattern,
+                        matchRangeInSnippet: window.matchRange
+                    )
+                } ?? .unboxed(
+                    pageIndex: pageIndex, matchedText: matchedText, contextSnippet: window.snippet,
+                    source: .ocr(confidence: avgConfidence), term: regex.pattern,
+                    matchRangeInSnippet: window.matchRange)
                 // A match only the corrected reading holds takes its place in
                 // page order among the raw reading's, as a fast-only match does.
                 if index == 0 {
@@ -242,8 +276,20 @@ extension SearchResult {
             contextSnippet: contextSnippet, source: source, term: term, isSelected: isSelected,
             piiCategory: piiCategory, piiConfidence: piiConfidence, rationale: rationale,
             matchRangeInSnippet: matchRangeInSnippet, occurrenceID: occurrenceID,
-            textLayerRect: textLayerRect, inkFitDegraded: inkFitDegraded)
+            textLayerRect: textLayerRect, inkFitDegraded: inkFitDegraded,
+            hasBox: hasBox, liesOffVisiblePage: liesOffVisiblePage)
         result.identityRect = rect == identity ? nil : identity
         return result
     }
 }
+
+#if DEBUG
+/// The planted line texts of `DocumentSearcher.injectedUnplacedLines`.
+final class UnplacedLineTexts: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: Set<String> = []
+    var texts: Set<String> { lock.lock(); defer { lock.unlock() }; return stored }
+    func insert(_ text: String) { lock.lock(); stored.insert(text); lock.unlock() }
+    func remove(_ text: String) { lock.lock(); stored.remove(text); lock.unlock() }
+}
+#endif

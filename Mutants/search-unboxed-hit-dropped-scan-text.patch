@@ -1,0 +1,25 @@
+Property: A match found with no box is listed, never dropped: site 3, Scan on the text layer
+Area: Search, a hit with no box
+Test command: swift test --filter '^RedactionEngineTests\.NoBoxHitTests/' (in Packages/RedactionEngine, DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer)
+Must go red: RedactionEngineTests/NoBoxHitTests scanText
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift
+index 58d5d76..fb43101 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift
+@@ -91,14 +91,6 @@ extension DocumentSearcher {
+                         : ContextWindow(snippet: match.text, matchRange: 0..<match.text.count)
+                     guard let box = found else {
+                         // Found, but no box: listed with its page, never dropped.
+-                        continuation.yield(.unboxed(
+-                            pageIndex: pageIndex, matchedText: match.text,
+-                            contextSnippet: window.snippet, source: .textLayer,
+-                            term: match.category?.rawValue ?? "PII",
+-                            piiCategory: match.category, piiConfidence: match.confidence,
+-                            rationale: match.rationale, matchRangeInSnippet: window.matchRange,
+-                            liesOffVisiblePage: match.range.length > 0 && liesOffVisiblePage(match.range, page: page)))
+-                        totalYielded += 1
+                         continue
+                     }
+ 

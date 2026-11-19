@@ -140,7 +140,7 @@ extension DocumentSearcher {
 
             // The shared enumeration with the per-match time check — bails
             // mid-enumeration instead of waiting for all matches to complete;
-            // the cap counts only the results that could be placed on the page.
+            // the cap counts every result yielded, a match with no box included.
             let startTime = ContinuousClock.now
             let effectiveTimeout: Duration =
                 regexTimeoutOverride ?? Self.perPageRegexTimeout
@@ -155,15 +155,21 @@ extension DocumentSearcher {
                     timeoutSink?(pageIndex)
                 }
             ) { matchRange in
-                guard let rawRange = regexPage.rawNSRange(matchRange),
-                      let rects = textLayerLines(for: rawRange, page: sendablePage.page) else {
-                    return false
-                }
+                guard let rawRange = regexPage.rawNSRange(matchRange) else { return false }
                 let matchedText = nsString.substring(with: matchRange)
                 let window = contextSnippet(
                     text: searchText,
                     matchNSRange: matchRange
                 )
+                guard let rects = textLayerLines(for: rawRange, page: sendablePage.page) else {
+                    // Found, but no box: listed with its page, never dropped.
+                    continuation.yield(.unboxed(
+                        pageIndex: pageIndex, matchedText: matchedText,
+                        contextSnippet: window.snippet, source: .textLayer, term: pattern,
+                        matchRangeInSnippet: window.matchRange,
+                        liesOffVisiblePage: liesOffVisiblePage(rawRange, page: sendablePage.page)))
+                    return true
+                }
                 // One result per line the match touches (the counting rule).
                 let occurrence = rects.count > 1 ? UUID() : nil
                 pageRects.append(contentsOf: rects.map(\.rect))

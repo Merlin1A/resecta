@@ -197,6 +197,10 @@ extension SearchResultRow {
                      ?? "Search match, page \(result.pageIndex + 1)"]
         if showsTier { parts.append(tier.descriptor) }
         if isApplied { parts.append("applied") }
+        if !result.hasBox {
+            parts.append(NoBoxRowCopy.sentence(
+                pageIndex: result.pageIndex, liesOffVisiblePage: result.liesOffVisiblePage))
+        }
         return parts.joined(separator: ", ")
     }
 
