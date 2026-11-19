@@ -34,6 +34,21 @@ extension DocumentEditorView {
         paranoid ? SettingsView.paranoidForcesSecureLine : ""
     }
 
+    /// A mode's name as the Switch Mode list draws it. On iOS 27 the list's
+    /// row is a few points narrower than "Secure Rasterization", and the
+    /// system breaks the word with a hyphen. Marked as text in no language,
+    /// a name has no hyphenation rules, so it breaks only at its space. The
+    /// words, and the words spoken, are unchanged; earlier systems draw the
+    /// plain name as before.
+    static func modeName(_ words: String) -> Text {
+        if #available(iOS 27, *) {
+            var name = AttributedString(words)
+            name.languageIdentifier = "zxx"
+            return Text(name)
+        }
+        return Text(words)
+    }
+
     // Pipeline mode picker (per-document override). Unavailable, it is a
     // disabled row showing the mode in force: a disabled nested menu is
     // drawn as available inside the toolbar's … menu.
@@ -46,9 +61,9 @@ extension DocumentEditorView {
                         get: { effectivePipelineMode },
                         set: { documentOverride = $0 }
                     )) {
-                        Label { Text("Secure Rasterization") } icon: { PipelineMode.secureRasterization.glyph }
+                        Label { Self.modeName("Secure Rasterization") } icon: { PipelineMode.secureRasterization.glyph }
                             .tag(PipelineMode.secureRasterization)
-                        Label { Text("Searchable Redaction") } icon: { PipelineMode.searchableRedaction.glyph }
+                        Label { Self.modeName("Searchable Redaction") } icon: { PipelineMode.searchableRedaction.glyph }
                             .tag(PipelineMode.searchableRedaction)
                     }
                 } label: {

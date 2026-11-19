@@ -267,3 +267,4 @@ with its reason and the mutant that is caught in its place.
 | `balanced-lines-no-clamp.patch` | The balanced width is never wider than the line, even for a run wider than the line. | ResectaAppTests/BalancedLinesTests resultIsBounded; ResectaAppTests/BalancedLinesTests narrowestWidthTable |
 | `balanced-lines-split-no-break-space.patch` | A no-break space keeps its words in one run. | ResectaAppTests/BalancedLinesTests narrowestWidthTable |
 | `balanced-lines-title-bypasses-builder.patch` | Every balanced title and sentence is built by the one builder, with its measuring runs. | ResectaAppTests/BalancedLinesTests layoutIsBuiltInOnePlace |
+| `mode-menu-names-whole-words.patch` | On iOS 27 the Switch Mode list draws each mode's name with no hyphenation rules, so "Secure Rasterization" breaks only at its space; earlier systems draw the plain names. | ResectaAppTests/EffectivePipelineModeTests modeNamesHaveNoHyphenationOnIOS27 |
