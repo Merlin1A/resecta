@@ -94,6 +94,7 @@ enum PageTextPath {
         }
         var drawnCellDropped = 0
         var passes = 0
+        var lines: HiddenTextLines? = nil
         while true {
             let pass = TextLayerReconstructor.validateSurvivors(
                 current, regionShapes: shapes, frame: frame)
@@ -111,14 +112,16 @@ enum PageTextPath {
             }
             let ruleTook = wordsLosingALetter(before: current.surviving, after: pass.result.surviving)
             current = closeOverMarkedWords(pass.result, marked: ruleTook)
-            if ruleTook.isEmpty { break }
+            // The pass that takes nothing laid out the survivors as they
+            // stand: the writer draws its lines.
+            if ruleTook.isEmpty { lines = pass.lines; break }
             passes += 1
             guard passes < TextLayerReconstructor.drawnCellRulePassLimit else {
                 return Result(outcome: .picture(.extractionFailed), runsLeftOut: 0,
                               drawnCellDropped: drawnCellDropped)
             }
         }
-        let validated = (result: current, dropped: drawnCellDropped)
+        let validated = (result: current, dropped: drawnCellDropped, lines: lines)
         if validated.result.surviving.isEmpty, !alphabet.wordIndices.isEmpty,
            let reason = alphabet.reasonIfNoWordLeft {
             return Result(outcome: .picture(reason), runsLeftOut: alphabet.runsLeftOut,
