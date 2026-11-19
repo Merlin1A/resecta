@@ -57,14 +57,30 @@ extension DocumentSearcher {
     }
 
     /// Yields `results` until the result cap: the one capped emission every
-    /// routing site shares.
+    /// routing site shares. The cap counts occurrences, not rows: a match
+    /// over several lines, or across a page break, is listed whole or not at
+    /// all. A piece of an occurrence this call has begun is always yielded; a
+    /// new occurrence is begun only under the cap, and `total` counts it once.
+    /// Every piece of an occurrence arrives in one call (a page's results, its
+    /// recognised lines, or both sides of a page break together).
     func emitCapped(
         _ results: [SearchResult], into continuation: AsyncStream<SearchResult>.Continuation, total: inout Int
     ) {
+        var begun = Set<UUID>()
         for result in results {
-            if total >= Self.maxResults { break }
+            let key = Self.occurrenceKey(result)
+            if !begun.contains(key) {
+                if total >= Self.maxResults { continue }
+                begun.insert(key)
+                total += 1
+            }
             continuation.yield(result)
-            total += 1
         }
+    }
+
+    /// The occurrence a result belongs to, keyed as the result list keys it:
+    /// a piece with a box by its occurrence, a piece with no box on its own.
+    static func occurrenceKey(_ result: SearchResult) -> UUID {
+        result.hasBox ? (result.occurrenceID ?? result.id) : result.id
     }
 }
