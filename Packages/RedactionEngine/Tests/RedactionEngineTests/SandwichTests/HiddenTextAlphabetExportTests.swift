@@ -89,10 +89,14 @@ struct HiddenTextAlphabetExportTests {
         defer { try? FileManager.default.removeItem(at: run.url) }
         let result = try await Self.rasterized(data, regions: regions)
         guard let leftOut = page.leftOut else {
-            // The right-to-left control: the pre-flight check makes the page a
-            // picture before the text path is reached, before and after.
+            // The right-to-left control: the page's mode decision makes the
+            // page a picture before the text path is reached, before and after.
             let source = try #require(PDFDocument(data: data)?.page(at: 0))
-            #expect(TextLayerDetector.checkFallbackTriggers(source) == .rtlText, "\(page.name)")
+            let decided = PageModeDecision.decide(
+                effectiveMode: .searchableRedaction, textLayerStatus: .rich, page: source,
+                pageRegions: regions, inkPlanCovers: false)
+            #expect(decided.mode == .secureRasterization, "\(page.name)")
+            #expect(decided.fallbackReason == .rtlText, "\(page.name)")
             return
         }
         if page.name.hasPrefix("the object mark") {

@@ -147,9 +147,11 @@ struct PageTextPathTests {
 
     /// Lines with a character Courier has no glyph for, which the system
     /// draws in a face of its own, and a line of only zero-width marks.
-    static let mixedLines = ["Report \u{6F22} 12", "Report \u{F0B7} 12", "\u{200B}\u{FEFF}"]
+    // Runs Courier lacks, drawn in Courier New (one face for the arrow,
+    // one for the Kazakh word), and a line of break marks only.
+    static let mixedLines = ["Report \u{2192} 12", "Report \u{049A}\u{0430}\u{0437}\u{0430}\u{049B} 12", "\u{200B}\u{FEFF}"]
 
-    @Test("On a line with a run the system draws in another face, every cell keeps Courier's own height and centre",
+    @Test("On a line with a run in another of the three faces, every cell keeps Courier's own height and centre",
           arguments: mixedLines)
     func mixedLineKeepsCourierCells(_ text: String) throws {
         var entries: [CharacterInfo] = []
@@ -165,7 +167,7 @@ struct PageTextPathTests {
         let line = lines[0].line
         let courier = CTFontCreateWithName("Courier" as CFString, line.fontSize, nil)
         let ascent = CTFontGetAscent(courier), descent = CTFontGetDescent(courier)
-        if text.unicodeScalars.contains("\u{6F22}") {
+        if text.unicodeScalars.contains("\u{2192}") {
             // The case has power: this line's own bounds are not Courier's,
             // so a cell measured by them would sit elsewhere.
             let laid = try #require(HiddenTextLine.layout(line.text, size: line.fontSize))
