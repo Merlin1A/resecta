@@ -102,7 +102,7 @@ struct VerificationLayerPartitionTests {
         #expect(p.clusterTitle == "1 check passed")
     }
 
-    @Test("Nothing-to-check rows have their own group; the headers carry counts, spoken with a comma")
+    @Test("Nothing-to-check rows are counted in the list row's title; the headers carry counts, spoken with a comma")
     func nothingToCheckGroupAndHeaders() {
         let idle = LayerResult(name: "Search Re-check", symbolName: "shield", status: .notApplicable("x"),
                                shortDescription: "", detailDescription: "", pageReferences: nil,
@@ -113,11 +113,119 @@ struct VerificationLayerPartitionTests {
         #expect(p.isWhollyClean == false)
         #expect(p.summaryLine1 == "1 of 2 checks passed")
         #expect(p.summaryLine2 == "1\u{00A0}had nothing to check")
-        #expect(VerificationLayerPartition.sectionHeader("Nothing to check", count: 3) == "Nothing to check · 3")
+        #expect(p.clusterTitle == "1 check passed · 1\u{00A0}had nothing to check")
+        #expect(p.clusterSpokenLabel == "1 check passed, 1\u{00A0}had nothing to check")
+        #expect(p.clusterTitleBase == "1 check passed")
+        #expect(p.clusterTitleClauses == ["1\u{00A0}had nothing to check"])
+        // Passes, a riding note and an idle check: both clauses, notes first.
+        let both = VerificationLayerPartition(layers: [layer(.pass), layer(.info("i")), idle, layer(.pass)],
+                                              perPageModes: [])
+        #expect(both.clusterTitle == "2 checks passed · 1\u{00A0}note · 1\u{00A0}had nothing to check")
+        #expect(both.clusterSpokenLabel == "2 checks passed, 1\u{00A0}note, 1\u{00A0}had nothing to check")
+        #expect(VerificationLayerPartition.sectionHeader("Notes", count: 3) == "Notes · 3")
         #expect(VerificationLayerPartition.sectionHeaderSpoken("Findings", count: 3) == "Findings, 3.")
         let one = VerificationLayerPartition(layers: [layer(.fail("f"))], perPageModes: [])
         #expect(one.summaryLine1 == "0 of 1 check passed")
         let riding = VerificationLayerPartition(layers: [layer(.pass), layer(.info("i"))], perPageModes: [])
         #expect(riding.clusterSpokenLabel == "1 check passed, 1\u{00A0}note")
+    }
+
+    // MARK: - The list row's members
+
+    private func idle(_ identity: VerificationLayer) -> LayerResult {
+        LayerResult(name: identity.name, symbolName: "shield", status: .notApplicable("x"),
+                    shortDescription: "", detailDescription: "", pageReferences: nil,
+                    durationSeconds: 0, layer: identity)
+    }
+
+    @Test("Checks that had nothing to check join the list row, in the checks' own order")
+    func idleChecksJoinTheList() {
+        typealias Section = VerificationDetailsSection
+        // (layers, expected members, "Nothing to check" drawn as a group)
+        let rows: [([LayerResult], [Int], Bool)] = [
+            // 10 passed, 3 idle, the idle ones last.
+            (Array(repeating: layer(.pass), count: 10) + [idle(.searchRecheck), idle(.binaryStringSearch),
+                                                           idle(.characterCount)],
+             Array(0..<13), false),
+            // Passes, a riding note and an idle check.
+            ([layer(.pass), layer(.info("i")), idle(.searchRecheck)], [0, 1, 2], false),
+            // No pass and no riding note: the group stays, there is no row.
+            ([layer(.fail("f")), idle(.searchRecheck)], [], true),
+            // No idle check.
+            ([layer(.pass), layer(.pass)], [0, 1], false),
+            // An idle check between two passed ones sits between them.
+            ([layer(.pass), idle(.searchRecheck), layer(.pass)], [0, 1, 2], false),
+        ]
+        var ran = 0
+        for (layers, members, group) in rows {
+            let p = VerificationLayerPartition(layers: layers, perPageModes: [])
+            #expect(Section.listRowMembers(p) == members, "row \(ran)")
+            #expect(Section.groups(p).contains { $0.header == "Nothing to check" } == group, "row \(ran)")
+            ran += 1
+        }
+        print("[idle-checks] built reports \(ran)")
+        #expect(ran == 5)
+        // Over the seeded reports: every check is in exactly one drawn group
+        // or in the list row, never two and never none.
+        var seeded = 0
+        for (name, report) in VerificationDebugFixtures.all {
+            let p = VerificationLayerPartition(layers: report.layers, perPageModes: report.perPageModes)
+            let placed = Section.groups(p).flatMap(\.indices) + Section.listRowMembers(p)
+            #expect(placed.sorted() == Array(report.layers.indices), "\(name)")
+            seeded += 1
+        }
+        print("[idle-checks] seeded reports \(seeded)")
+        #expect(seeded == 18)
+    }
+
+    @Test("A run with idle checks and a riding note arrives with the list closed")
+    func aRunWithIdleChecksArrivesClosed() {
+        let p = VerificationLayerPartition(layers: [layer(.pass), layer(.info("i")), idle(.searchRecheck)],
+                                           perPageModes: [])
+        #expect(!VerificationDetailsSection.clusterOpensByDefault(p))
+        #expect(VerificationResultsView.visibleNoteCount(p) == 0)
+        #expect(p.isWhollyClean == false)
+    }
+
+    @Test("Closing the list closes its open member, of any kind; other open items stay")
+    func closingTheListClosesItsOpenMember() {
+        typealias Open = VerificationDetailsSection.OpenItem
+        // A passed check, a riding note and an idle check in the row; a
+        // failed check in a group above.
+        let p = VerificationLayerPartition(layers: [layer(.pass), layer(.info("i")), idle(.searchRecheck),
+                                                    layer(.fail("f"))], perPageModes: [])
+        #expect(VerificationDetailsSection.listRowMembers(p) == [0, 1, 2])
+        // (open before, expected after closing)
+        let rows: [(Open?, Open?)] = [
+            (.layer(2), nil),          // an open idle member closes
+            (.layer(0), nil),          // an open passed member closes
+            (.layer(3), .layer(3)),    // a row of a group above stays open
+            (.pageModes, .pageModes),  // Page Modes stays open
+            (nil, nil),                // nothing open
+        ]
+        for (before, after) in rows {
+            #expect(VerificationDetailsSection.openItemAfterTogglingList(isOpen: true, openItem: before,
+                                                                         partition: p) == after)
+        }
+        #expect(rows.count == 5)
+        // Opening the list closes nothing.
+        #expect(VerificationDetailsSection.openItemAfterTogglingList(isOpen: false, openItem: .layer(2),
+                                                                     partition: p) == .layer(2))
+    }
+
+    @Test("Members keep their rows: a passed check no mark; a note and an idle check their mark and reason")
+    func memberRowsKeepTheirReasons() {
+        #expect(VerificationDetailsSection.memberLayout(.passed) == .member)
+        #expect(VerificationDetailsSection.memberLayout(.note) == .lead)
+        #expect(VerificationDetailsSection.memberLayout(.nothingToCheck) == .lead)
+        let identities: [VerificationLayer] = [.searchRecheck, .detectionSweep, .binaryStringSearch,
+                                               .characterCount, .hiddenWordInk]
+        for identity in identities {
+            let reason = VerificationRowModel.nothingToCheckReason(for: identity)
+            #expect(reason != nil, "\(identity)")
+            #expect(VerificationRowModel.caption(for: idle(identity), outcome: .nothingToCheck) == reason,
+                    "\(identity)")
+        }
+        #expect(identities.count == 5)
     }
 }

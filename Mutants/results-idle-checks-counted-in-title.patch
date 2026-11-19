@@ -1,0 +1,20 @@
+Property: The row's title and spoken label count the checks that had nothing to check.
+Area: results (the passed checks' row)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationLayerPartitionTests
+Must go red: ResectaAppTests/VerificationLayerPartitionTests nothingToCheckGroupAndHeaders
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationLayerPartition.swift b/Sources/ResectaApp/Views/VerificationLayerPartition.swift
+index 1bbdd165..396b5703 100644
+--- a/Sources/ResectaApp/Views/VerificationLayerPartition.swift
++++ b/Sources/ResectaApp/Views/VerificationLayerPartition.swift
+@@ -117,8 +117,7 @@ nonisolated struct VerificationLayerPartition: Equatable {
+     /// The title's clauses after the first part, in the shipped order: the
+     /// riding notes, then the checks that had nothing to check.
+     var clusterTitleClauses: [String] {
+-        [VerificationOutcome.note.headerClause(count: clusterNoteCount),
+-         VerificationOutcome.nothingToCheck.headerClause(count: nothingToCheck.count)].compactMap { $0 }
++        [VerificationOutcome.note.headerClause(count: clusterNoteCount)].compactMap { $0 }
+     }
+ 
+     /// The cluster's spoken title: "9 checks passed, 1 note".

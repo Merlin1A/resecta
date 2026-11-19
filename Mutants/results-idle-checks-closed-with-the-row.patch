@@ -1,0 +1,19 @@
+Property: Closing the row closes an open idle member as well as a passed one.
+Area: results (the passed checks' row)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationLayerPartitionTests
+Must go red: ResectaAppTests/VerificationLayerPartitionTests closingTheListClosesItsOpenMember
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationDetailsSection.swift b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
+index c854dbc1..5b698e92 100644
+--- a/Sources/ResectaApp/Views/VerificationDetailsSection.swift
++++ b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
+@@ -98,7 +98,7 @@ struct VerificationDetailsSection: View {
+     /// whichever of its members is open; any other open item stays.
+     static func openItemAfterTogglingList(isOpen: Bool, openItem: OpenItem?,
+                                           partition: VerificationLayerPartition) -> OpenItem? {
+-        if isOpen, case .layer(let open) = openItem, listRowMembers(partition).contains(open) { return nil }
++        if isOpen, case .layer(let open) = openItem, partition.cluster.contains(open) { return nil }
+         return openItem
+     }
+ 
