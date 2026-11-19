@@ -15,7 +15,7 @@ struct VerificationFallbackReasonDisplayTests {
     private nonisolated static let allReasons: [TextLayerDetector.FallbackReason] = [
         .noExtractableText, .cjkEncodingFailure, .rtlText, .verticalText,
         .zeroSizeBounds, .unresolvedEncoding, .extractionFailed, .hiddenText,
-        .unanchoredRegion, .noWritableText,
+        .unanchoredRegion, .noWritableText, .inkEscapesBox,
     ]
 
     @Test("Every reason has non-empty short copy",
@@ -45,6 +45,14 @@ struct VerificationFallbackReasonDisplayTests {
                 == "hand-drawn box on scanned text")
         #expect(TextLayerDetector.FallbackReason.noWritableText.shortReasonText
                 == "no searchable text left on the page")
+        #expect(TextLayerDetector.FallbackReason.inkEscapesBox.shortReasonText
+                == "ink past a box's edge")
+    }
+
+    @Test("No two reasons share a phrase: a new reason never shows an old one's words")
+    func reasonPhrasesDistinct() {
+        let phrases = Self.allReasons.map(\.shortReasonText)
+        #expect(Set(phrases).count == phrases.count, "\(phrases)")
     }
 
     @Test("Chip reason row copy: page number + mode + reason")

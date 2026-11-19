@@ -171,6 +171,8 @@ public final class PageRasterizer: @unchecked Sendable {
                 try self.paint(context: ctx, page: page, content: content)
                 try self.readBack(context: ctx, page: page, width: width, height: height, content: content)
             }
+            // A box the ink check widened: a Searchable page becomes a picture.
+            if planPaint.inkWidened { Self.dropTextLayer(&textLayer, reason: .inkEscapesBox, page: page) }
 
             // 7. Extract final image
             guard let redactedImage = ctx.makeImage() else {
@@ -183,6 +185,7 @@ public final class PageRasterizer: @unchecked Sendable {
                                         columns: $0.maxX - $0.minX, rows: $0.maxY - $0.minY)
             }
             result.regionsPaintedOutsideThePlan = planPaint.outsidePlan
+            result.inkVerdicts = planPaint.inkVerdicts
             return result
         }
     }
