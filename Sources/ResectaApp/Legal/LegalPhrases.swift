@@ -57,4 +57,27 @@ public enum LegalPhrases {
         "says nothing about the text",
         "no longer follows the text",
     ]
+
+    /// Words matched only where they stand whole: no letter, digit or
+    /// underscore may touch either end, so "proven" bans "proven" but not
+    /// "provenance", and "anonymous" bans "anonymous" but not "anonymousness".
+    /// Read by `Scripts/claims-lint.sh` for its sweep, case-insensitively.
+    public static let wordEdgeTerms: [String] = [
+        // Words that promise an outcome no tool can promise.
+        "proven",
+        "formally verified",
+        "compliant",
+        "court-ready",
+        "de-identified",
+        "deidentified",
+        "anonymised",
+        "anonymized",
+        "anonymous",
+        "anonymously",
+        "hipaa",
+        // Sentences that size what a box still shows.
+        "only narrows",
+        "a few bits",
+        "safe from",
+    ]
 }

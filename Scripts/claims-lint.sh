@@ -15,7 +15,10 @@
 # The banned set is READ from LegalPhrases.bannedTerms
 # (Sources/ResectaApp/Legal/LegalPhrases.swift), its one home: the string
 # literals between `bannedTerms: [String] = [` and the closing `]`. A list
-# that reads empty fails the lint (fail closed).
+# that reads empty fails the lint (fail closed). A second list,
+# LegalPhrases.wordEdgeTerms, is read the same way and matched only where a
+# term stands whole (no letter, digit or underscore at either end); it fails
+# closed too.
 #
 # Usage: Scripts/claims-lint.sh              (the sweep; exit 0 PASS, 1 FAIL)
 #        Scripts/claims-lint.sh --self-test  (scratch trees; reads only the list file, for the
@@ -106,6 +109,17 @@ banned_patterns() { # $1 = the list file
     printf '%s' "$terms"
 }
 
+# The word-edge terms (LegalPhrases.wordEdgeTerms) as one ERE alternation that
+# matches a term only where no letter, digit or underscore touches either end.
+word_edge_patterns() { # $1 = the list file
+    terms=$(sed -n '/wordEdgeTerms: \[String\] = \[/,/^[[:space:]]*\]/p' "$1" \
+        | sed -n 's/^[[:space:]]*"\([^"]*\)".*/\1/p' \
+        | sed 's/[][\\.*^$?+(){}|/]/\\&/g' \
+        | paste -sd '|' -)
+    [ -n "$terms" ] || return 1
+    printf '(^|[^[:alnum:]_])(%s)([^[:alnum:]_]|$)' "$terms"
+}
+
 # Reads "path:line:text" hits on stdin; prints those still matching once the
 # allowed phrases are removed, minus lines that carry the marker.
 keep_offending() {
@@ -122,7 +136,11 @@ sweep() { # $1 = the tree root
         echo "CLAIMS-LINT FAIL: no banned terms read from $LIST_FILE"
         return 1
     fi
-    PATTERNS="$BANNED|$DOC_ONLY"
+    if ! EDGE=$(word_edge_patterns "$ROOT/$LIST_FILE"); then
+        echo "CLAIMS-LINT FAIL: no word-edge terms read from $LIST_FILE"
+        return 1
+    fi
+    PATTERNS="$BANNED|$DOC_ONLY|$EDGE"
     fail=0
 
     # 1. Shipping markdown.
@@ -195,7 +213,7 @@ self_test() {
         d="$T/$1"
         mkdir -p "$d/Sources/ResectaApp/Legal" "$d/Sources/ResectaApp/Views" "$d/Sources/ResectaApp/State" \
             "$d/Packages/RedactionEngine/Sources/RedactionEngine/Verification"
-        printf 'public enum LegalPhrases {\n    public static let bannedTerms: [String] = [\n        "guarantee",\n        "ensures",\n        "100%%",\n    ]\n}\n' \
+        printf 'public enum LegalPhrases {\n    public static let bannedTerms: [String] = [\n        "guarantee",\n        "ensures",\n        "100%%",\n    ]\n    public static let wordEdgeTerms: [String] = [\n        "proven",\n    ]\n}\n' \
             > "$d/$LIST_FILE"
         printf '# readme\nclean text.\n' > "$d/README.md"
         printf '%s' "$d"
@@ -215,6 +233,7 @@ self_test() {
     d=$(case_tree engine);       printf 'LayerCopy(short: "Ensures every page is clean", detail: "")\n' > "$d/Packages/RedactionEngine/Sources/RedactionEngine/Verification/X.swift"; check "a verification copy literal" "$d" FAIL
     d=$(case_tree comment);      printf '// what the app "guarantees" is not the point\n/// a "guarantee" in a doc comment\n' > "$d/Sources/ResectaApp/Views/X.swift"; check "a quoted word in a comment line" "$d" PASS
     d=$(case_tree device);       printf 'Your documents never leave the phone.\n' >> "$d/README.md"; check "the doc-only device-boundary pattern" "$d" FAIL
+    d=$(case_tree emptyedge);    printf 'public enum LegalPhrases {\n    public static let bannedTerms: [String] = [\n        "guarantee",\n    ]\n    public static let wordEdgeTerms: [String] = [\n    ]\n}\n' > "$d/$LIST_FILE"; check "an empty word-edge list fails closed" "$d" FAIL
     d=$(case_tree emptylist);    printf 'public enum LegalPhrases {\n    public static let bannedTerms: [String] = [\n    ]\n}\n' > "$d/$LIST_FILE"; check "an empty banned list fails closed" "$d" FAIL
 
     # The length-claim stems. A literal's case reads the list file of record,
@@ -231,6 +250,8 @@ self_test() {
             lit) d=$(stem_tree "s$n"); LENGTH_PATTERNS=off; printf '%s\n' "$line" >> "$d/README.md"
                  check "literal $id catches its line" "$d" FAIL; LENGTH_PATTERNS=on ;;
             pat) d=$(case_tree "s$n"); printf '%s\n' "$line" >> "$d/README.md"; check "pattern $id catches its line" "$d" FAIL ;;
+            edge) d=$(stem_tree "s$n"); LENGTH_PATTERNS=off; printf '%s\n' "$line" >> "$d/README.md"
+                 check "word-edge term $id catches its line" "$d" FAIL; LENGTH_PATTERNS=on ;;
             ok)  d=$(stem_tree "s$n"); printf '%s\n' "$line" >> "$d/README.md"; check "innocent line $id passes" "$d" PASS ;;
         esac
     done <<'LINES'
@@ -251,7 +272,7 @@ lit|cannot show how long|A widened box cannot show how long the text is.
 lit|can't show how long|A widened box can't show how long the text is.
 lit|no longer shows how long|The box no longer shows how long the name is.
 lit|can no longer show|A widened box can no longer show the name's length.
-lit|width says nothing|So their width says nothing about the text.
+lit|width says nothing|Their width says nothing.
 lit|says nothing about the text|The box says nothing about the text beyond that it fits.
 lit|no longer follows the text|The box's width then no longer follows the text.
 pat|L1|Each box hides how long the name is.
@@ -287,12 +308,41 @@ ok|17|…so the gap is kept only in whole cells: 13 here, the same for any words
 ok|18|The ink check keeps a box from leaving ink past its edge.
 ok|19|Search finds the text you type without showing other forms of it.
 ok|20|Resecta re-sets each kept character in one fixed-width font.
+edge|proven|Proven removal on every page.
+edge|formally verified|The redaction engine is formally verified.
+edge|compliant|Exports are compliant with privacy law.
+edge|court-ready|Court-ready copies in one tap.
+edge|de-identified|Each shared copy is de-identified.
+edge|deidentified|The exported file is deidentified.
+edge|anonymised|Names are anonymised before you share.
+edge|anonymized|The shared copy is fully anonymized.
+edge|anonymous|Every redacted copy is anonymous.
+edge|anonymously|Share your redacted copy anonymously.
+edge|hipaa|Built for HIPAA workflows.
+edge|only narrows|A widened box only narrows the list of possible names.
+edge|a few bits|A box leaks only a few bits about the name.
+edge|safe from|Widened boxes are safe from AI models.
+ok|proven|OpenStreetMap (ODbL 1.0) — a provenance acknowledgement
+ok|formally verified|The fixture counts were informally verified by hand.
+ok|compliant|The form marks noncompliant entries in red.
+ok|court-ready|These shoes are hardcourt-ready.
+ok|de-identified|Each code-identified field is listed once.
+ok|deidentified|An identifier such as `isDeidentifiedCopy` is code, not copy.
+ok|anonymised|Redacted names can be deanonymised from what is left around them.
+ok|anonymized|A study deanonymized names from the words around them.
+ok|anonymous|Anonymousness is hard to measure.
+ok|anonymously|A setting named `reportAnonymously` is code, not copy.
+ok|hipaa|A key such as `hipaaMode` is code, not copy.
+ok|only narrows|The search commonly narrows to one page.
+ok|a few bits|The stream ends with an extra few bits of padding.
+ok|safe from|The old path was unsafe from the start.
 LINES
-    [ "$n" -eq 53 ] || { echo "  FAIL the stem cases: $n read, 53 wanted (20 literals, 13 patterns, 20 innocent lines)"; bad=1; }
+    [ "$n" -eq 81 ] || { echo "  FAIL the stem cases: $n read, 81 wanted (20 literals, 13 patterns, 14 word-edge terms, 34 innocent lines)"; bad=1; }
     d=$(case_tree wrapped);      printf 'The box'"'"'s width then no longer\nfollows the text.\n' >> "$d/README.md"; check "a length claim wrapped across two lines" "$d" FAIL
     d=$(case_tree blankstop);    printf 'Hidden\n\nlength of the name.\n' >> "$d/README.md"; check "a blank line ends a sentence" "$d" PASS
     d=$(case_tree lenmarker);    printf 'Each box hides how long the name is. <!-- LegalPhrases:safe -->\n' >> "$d/README.md"; check "a length claim on a marked line" "$d" PASS
     d=$(case_tree lenswift);     printf 'let s = "Widen Boxes masks the length of short names."\n' > "$d/Sources/ResectaApp/Views/X.swift"; check "a length claim in a Swift string literal" "$d" FAIL
+    d=$(case_tree unreadable);   chmod 000 "$d/README.md"; check "a listed document the matcher cannot read" "$d" FAIL; chmod 644 "$d/README.md"
     d=$(case_tree lencomment);   printf '// "Widen Boxes masks the length of short names." is banned\n' > "$d/Sources/ResectaApp/Views/X.swift"; check "a length claim in a Swift comment line" "$d" PASS
     if [ "$bad" -eq 0 ]; then echo "claims-lint --self-test: PASS"; else echo "claims-lint --self-test: FAIL"; return 1; fi
 }

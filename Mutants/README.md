@@ -283,3 +283,4 @@ with its reason and the mutant that is caught in its place.
 | `settings-box-switch-off-by-default.patch` | The box switch is off by default. | ResectaAppTests/SettingsStateTests "The box switch is off by default, and Reset to Defaults turns it off" |
 | `settings-box-switch-one-key.patch` | The box switch is stored under one key. | ResectaAppTests/SettingsStateTests "The box switch is stored under one key" |
 | `settings-paranoid-footer-words.patch` | The Paranoid Mode footer reads its words of record. | ResectaAppTests/SettingsCopyTableTests "Each line reads as its words of record" [.set12] |
+| (no patch) the claims lint's length pattern L2 deleted (`Scripts/claims-lint.sh`) | EQUIVALENT: pattern L1 matches every line L2 matches ("hide", a gap that holds " text ", then "length"), so deleting L2 changes no verdict. Caught in its place: deleting L1, which turns the self-test case for pattern L1 red. | none (equivalent) |
