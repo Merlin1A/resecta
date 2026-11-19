@@ -1,0 +1,19 @@
+Property: A pattern search counts matches toward the limit, not the rows a broken match lists.
+Area: Search, the result limit
+Test command: cd Packages/RedactionEngine && DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --no-parallel --filter '^RedactionEngineTests\.SearchLimitOccurrenceTests/'
+Must go red: RedactionEngineTests/SearchLimitOccurrenceTests limitKeepsMatchesWhole
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+TextModes.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+TextModes.swift
+index 4754b426..c50439bc 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+TextModes.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+TextModes.swift
+@@ -187,7 +187,7 @@ extension DocumentSearcher {
+                 }
+                 return true
+             }
+-            totalYielded += yielded
++            totalYielded += max(yielded, pageRects.count)
+             emitCapped(await hybridOCRLeg(page: page, pageIndex: pageIndex, textLayerRects: pageRects, includeOCR: options.includeOCR) {
+                 await self.searchPageViaOCRFallback_regex(page: page, pageIndex: pageIndex, regex: regex, options: options) }, into: continuation, total: &totalYielded)
+ 

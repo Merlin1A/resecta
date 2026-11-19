@@ -1,0 +1,20 @@
+Property: Once a match is begun under the limit, every part of it is listed, even past the limit.
+Area: Search, the result limit
+Test command: cd Packages/RedactionEngine && DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --no-parallel --filter '^RedactionEngineTests\.SearchLimitOccurrenceTests/'
+Must go red: RedactionEngineTests/SearchLimitOccurrenceTests limitKeepsMatchesWhole
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+HybridRoute.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+HybridRoute.swift
+index aca99dc6..1c8c91f8 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+HybridRoute.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+HybridRoute.swift
+@@ -69,8 +69,8 @@ extension DocumentSearcher {
+         var begun = Set<UUID>()
+         for result in results {
+             let key = Self.occurrenceKey(result)
++            if total >= Self.maxResults { continue }
+             if !begun.contains(key) {
+-                if total >= Self.maxResults { continue }
+                 begun.insert(key)
+                 total += 1
+             }
