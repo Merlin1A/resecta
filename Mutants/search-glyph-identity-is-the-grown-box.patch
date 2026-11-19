@@ -1,0 +1,19 @@
+Property: A box grown for cover never widens what a hybrid page tells the match by: a recognised occurrence beside the growth is kept.
+Area: Search, the match boxes from the page's own drawing
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'ContentGlyphWalkTests|ContentGlyphFontTests|ContentGlyphBoxTests|ContentGlyphMapTests|ContentGlyphExportTests|ContentGlyphRouteTests'
+Must go red: RedactionEngineTests/ContentGlyphRouteTests hybridNeighbourBesideTheGrowth
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/SearchResult.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/SearchResult.swift
+index f9d50ba0..d6d82b69 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/SearchResult.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/SearchResult.swift
+@@ -67,7 +67,7 @@ public struct SearchResult: Sendable, Identifiable, Equatable {
+     var identityRect: CGRect? = nil
+ 
+     /// The box a hybrid page tells this match by (`identityRect`).
+-    var hybridIdentity: CGRect { identityRect ?? normalizedRect }
++    var hybridIdentity: CGRect { normalizedRect }
+ 
+     public init(
+         id: UUID = UUID(),
