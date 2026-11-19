@@ -1,0 +1,21 @@
+Property: A run with no record reads Skipped, never Nothing to check.
+Area: the Box Fill row
+Test command: cd Packages/RedactionEngine && swift test --skip-build --no-parallel --filter BoxFillRowTests (after swift build --build-tests)
+Must go red: RedactionEngineTests/BoxFillRowTests each [no record of the run: Skipped], throughTheEngine
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/BoxFillRow.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/BoxFillRow.swift
+index 35889a69..42ac3cac 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/BoxFillRow.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/BoxFillRow.swift
+@@ -26,7 +26,9 @@ enum BoxFillRow {
+ 
+     /// The row for `report`, against the boxes and regions of `record`.
+     static func reading(report: BoxCheckReport, record: RunRecord?) -> Reading {
+-        guard let record, case .pages(let pictures) = report else { return .skipped }
++        guard let record, case .pages(let pictures) = report else {
++            return .row(CheckRow(status: .notApplicable("No boxes to check."), pages: nil, couldNotVerify: false), nil)
++        }
+         var unreadPages: Set<Int> = []
+         var notChecked: [Int] = []
+         var found: [Int] = []
