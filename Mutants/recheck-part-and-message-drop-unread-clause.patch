@@ -1,7 +1,7 @@
 Property: A Search Re-check that needs review lists, in its part, the page its coverage check could not read; dropping that clause from both the part and the message is caught by the part's own pin.
 Area: the Search Re-check's could-not part
 Test command: cd Packages/RedactionEngine && swift test --filter SearchRecheckPartInMessageTests
-Must go red: RedactionEngineTests/SearchRecheckPartInMessageTests row [the three cases where the coverage check could not read page 2]
+Must go red: RedactionEngineTests/SearchRecheckPartInMessageTests row [the four cases where the coverage check could not read page 2: every page opens, and page 2 does not open, each alone and with nothing compared for both]
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SearchRecheck.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SearchRecheck.swift
