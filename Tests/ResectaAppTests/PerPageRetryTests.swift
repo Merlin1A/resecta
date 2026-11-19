@@ -25,7 +25,7 @@ struct PerPageRetryTests {
     func testRetryAtHalfDPISucceeds() async throws {
         let coord = makeCoordinatorWithMultiPagePDF(pages: 50, regions: true)
         let rasterizer = PageRasterizer()
-        let pageDataList = coord.buildPDFPageData(effectiveMode: .secureRasterization)
+        let pageDataList = coord.buildPDFPageData(effectiveMode: .secureRasterization, record: nil)
         #expect(pageDataList.count == 50, "Test precondition — 50-page fixture")
 
         // Capture the primary cap up front (see testSecondFailurePropagates
@@ -69,7 +69,7 @@ struct PerPageRetryTests {
     func testRetryRendersAtTheLowestTier(primaryCap: Int) async throws {
         let coord = makeCoordinatorWithMultiPagePDF(pages: 1, regions: true)
         let rasterizer = PageRasterizer()
-        let pageDataList = coord.buildPDFPageData(effectiveMode: .secureRasterization)
+        let pageDataList = coord.buildPDFPageData(effectiveMode: .secureRasterization, record: nil)
         let pageData = try #require(pageDataList.first)
 
         let recorder = PageRasterizerTestSeam.Recorder(
@@ -99,7 +99,7 @@ struct PerPageRetryTests {
         let coord = makeCoordinatorWithMultiPagePDF(pages: 50, regions: true)
         let rasterizer = PageRasterizer()
 
-        let pageDataList = coord.buildPDFPageData(effectiveMode: .secureRasterization)
+        let pageDataList = coord.buildPDFPageData(effectiveMode: .secureRasterization, record: nil)
         let target = try #require(pageDataList.first(where: { $0.pageIndex == 27 }))
 
         // The page fails BOTH attempts: the production wrapper's

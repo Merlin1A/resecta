@@ -67,6 +67,8 @@ extension PipelineCoordinator {
         var filterDigests: [PageFilterDigest?] = []
         var perPageModes: [PipelineMode] = []
         var perPageFallbackReasons: [TextLayerDetector.FallbackReason?] = []
+        // The record's second part: what the rasterizer says it painted.
+        var produced = RunRecord.Produced()
         lastReconstructorAppendOrder.removeAll()
         try await rasterizePagesInParallel(
             pages: pages, rasterizer: rasterizer, onProgress: onProgress
@@ -81,6 +83,7 @@ extension PipelineCoordinator {
             // Collected beside the mode so the two arrays stay
             // index-aligned by construction.
             perPageFallbackReasons.append(result.fallbackReason)
+            produced.record(result, pageIndex: idx)
             try await reconstructor.appendPage(result.pageOutput)
             // Test seam: record append order at the same semantic
             // point as the old per-iteration append. Callback (= in-order
@@ -126,8 +129,7 @@ extension PipelineCoordinator {
             appliedSearches: appliedSearches,
             burnedRegions: Dictionary(uniqueKeysWithValues: pages.compactMap {
                 $0.regions.isEmpty ? nil : ($0.pageIndex, $0.regions) }),
-            // No step of the run writes the record's second part yet.
-            produced: RunRecord.Produced()
+            produced: produced
         )
     }
 

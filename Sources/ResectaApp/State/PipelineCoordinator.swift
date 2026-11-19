@@ -693,11 +693,16 @@ final class PipelineCoordinator: @unchecked Sendable {
     /// pipeline; when nil (test callers, ad-hoc preview paths) the
     /// method snapshots `settingsState` itself so production behavior
     /// is unchanged outside an active run.
+    ///
+    /// `record` has no default: the run hands its confirmed record over
+    /// (`PipelineRunner`), and the producer paints each page from the plan
+    /// it carries. A caller with no record says so with nil, and its pages
+    /// take the region path.
     func buildPDFPageData(
         effectiveMode: PipelineMode,
         runSettings: RunSettings? = nil,
         inkPlans: [Int: InkStripPlan] = [:],
-        record: RunRecord.Confirmed? = nil
+        record: RunRecord.Confirmed?
     ) -> [PDFPageData] {
         guard let doc = documentState.sourceDocument else { return [] }
         return RunInputs.pageData(
