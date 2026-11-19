@@ -81,7 +81,8 @@ public struct VerificationEngine: Sendable {
     #endif
 
     /// Canonical per-mode layer order: every `VerificationLayer` that applies
-    /// to `mode`, in declaration order (`searchRecheck` last in both modes).
+    /// to `mode`, in declaration order (`boxFill` last in both modes; the
+    /// post-sequential checks still run last, by phase).
     /// Counts, ordinals and the coordinator's schedule derive from this list.
     public func layers(for mode: PipelineMode) -> [VerificationLayer] {
         VerificationLayer.allCases.filter { $0.appliesTo(mode) }
@@ -364,6 +365,21 @@ public struct VerificationEngine: Sendable {
                 // The sweep's only WARN family is the same unchecked-pages
                 // one: a WARN here always says the sweep did not fully run.
                 couldNotVerify = outcome.status.isWarn
+            case .boxFill:
+                // Box Fill — each box of the run's record judged on the
+                // stored page picture's blocks; the record's boxes, not the
+                // check's report, decide what must have an answer.
+                switch try runBoxFill(doc, record: record) {
+                case .skipped:
+                    status = .skipped
+                case .row(let row12, let copy12):
+                    status = row12.status
+                    layerPageReferences = row12.pages
+                    couldNotVerify = row12.couldNotVerify
+                    partSentence = row12.partSentence
+                    partPages = row12.partPages
+                    copyOverride = copy12
+                }
             }
         } catch is CancellationError { // LegalPhrases:safe (Swift keyword)
             let duration = CFAbsoluteTimeGetCurrent() - start

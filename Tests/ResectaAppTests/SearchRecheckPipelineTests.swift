@@ -208,7 +208,7 @@ struct SearchRecheckPipelineTests {
 
     // MARK: - PASS
 
-    @Test("PASS end to end in Searchable: thirteen layers, the re-check then the sweep last, 2 found · 2 redacted · 0 remaining")
+    @Test("PASS end to end in Searchable: fourteen layers, the re-check, the sweep, then Box Fill last, 2 found · 2 redacted · 0 remaining")
     func passSearchable() async throws {
         let h = try await makeHarness(mode: .searchableRedaction)
         defer { h.removeOutput() }
@@ -218,9 +218,10 @@ struct SearchRecheckPipelineTests {
 
         let report = try await runVerifyOnly(h)
 
-        #expect(report.layers.count == 13)
-        #expect(report.layers.last?.layer == .detectionSweep)
-        #expect(report.layers.dropLast().last?.layer == .searchRecheck)
+        #expect(report.layers.count == 14)
+        #expect(report.layers.last?.layer == .boxFill)
+        #expect(report.layers.dropLast().last?.layer == .detectionSweep)
+        #expect(report.layers.dropLast(2).last?.layer == .searchRecheck)
         let last = try recheckRow(report)
         #expect(last.name == "Search Re-check")
         #expect(last.status == .pass)
@@ -247,7 +248,7 @@ struct SearchRecheckPipelineTests {
         #expect(!report.overallStatus.isFail && !report.overallStatus.isAttention)
     }
 
-    @Test("Secure Raster schedule: seven layers, the re-check then the sweep last, with the same counts (text-layer fixture; Layer 1 reports the fixture's text, not this test's subject)")
+    @Test("Secure Raster schedule: eight layers, the re-check, the sweep, then Box Fill last, with the same counts (text-layer fixture; Layer 1 reports the fixture's text, not this test's subject)")
     func passRaster() async throws {
         let h = try await makeHarness(mode: .secureRasterization)
         defer { h.removeOutput() }
@@ -255,15 +256,17 @@ struct SearchRecheckPipelineTests {
 
         let report = try await runVerifyOnly(h)
 
-        #expect(report.layers.count == 7)
-        #expect(report.layers.last?.layer == .detectionSweep)
+        #expect(report.layers.count == 8)
+        #expect(report.layers.last?.layer == .boxFill)
+        #expect(report.layers.dropLast().last?.layer == .detectionSweep)
         let last = try recheckRow(report)
         #expect(last.status == .pass)
         #expect(last.queryLines?.count == 1)
         #expect(last.queryLines?.first?.foundCount == 2)
         #expect(last.queryLines?.first?.appliedCount == 2)
         #expect(last.queryLines?.first?.remainingCount == 0)
-        #expect(!report.layers.contains { $0.status.isSkipped },
+        // The fixture's run inputs carry no record, so Box Fill alone reads Skipped.
+        #expect(report.layers.filter(\.status.isSkipped).map(\.layer) == [.boxFill],
                 "the raster verify-only path has no sandwich layers to skip")
     }
 

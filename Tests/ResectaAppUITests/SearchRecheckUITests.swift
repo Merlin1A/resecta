@@ -103,8 +103,8 @@ nonisolated final class SearchRecheckUITests: XCTestCase {
         XCTAssertTrue(results.waitForExistence(timeout: 10), "Results scroll view not found.")
         let masthead = app.descendants(matching: .any)["verificationMasthead"]
         XCTAssertTrue(masthead.waitForExistence(timeout: 10), "The results headline not found.")
-        XCTAssertTrue(masthead.label.hasPrefix("Checks Passed. 7 of 7 checks passed."),
-                      "Secure Rasterization runs a 7-layer check, every one passing: \(masthead.label)")
+        XCTAssertTrue(masthead.label.hasPrefix("Checks Passed. 8 of 8 checks passed."),
+                      "Secure Rasterization runs an 8-layer check, every one passing: \(masthead.label)")
         results.swipeUp()
         // The Detection Sweep's limit is in view before any row is tapped:
         // on the sweep's own row where that row is in view, else in the

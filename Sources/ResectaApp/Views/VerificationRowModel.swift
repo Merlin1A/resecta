@@ -238,6 +238,7 @@ nonisolated struct VerificationRowModel: Equatable {
         case .hiddenWordInk:        return "Hidden Words Under Boxes"
         case .searchRecheck:        return "Search Re-check"
         case .detectionSweep:       return "Detection Sweep"
+        case .boxFill:              return "Box Fill"
         }
     }
 
@@ -256,13 +257,14 @@ nonisolated struct VerificationRowModel: Equatable {
                 ? "Checks Rasterized pages for a text layer."
                 : "Measures characters against regions."
         case .characterCount:       "Compares character counts with the record."
-        case .fontVerification:     "Checks fonts against Courier and Menlo."
+        case .fontVerification:     "Checks fonts: Courier, Courier New, Menlo."
         case .characterLineage:     "Compares kept characters with the record."
         case .operatorReExtraction: "Searches text commands for your terms."
         case .hiddenWordInk:
             "Looks for hidden copies of boxed words."
         case .searchRecheck:        "Re-runs your searches on the redacted PDF."
         case .detectionSweep:       "Runs the detectors on the redacted PDF."
+        case .boxFill:              "Reads each box's fill from the page image."
         }
     }
 
@@ -286,7 +288,7 @@ nonisolated struct VerificationRowModel: Equatable {
         case .characterCount:
             "Each page's count must match the one recorded at redaction, or be at most 2 over. Spaces are not counted."
         case .fontVerification:
-            "Fonts on Searchable pages must be Courier or Menlo, both fixed-width. Any other font fails."
+            "Fonts on Searchable pages must be Courier, Courier New, or Menlo, all fixed-width. Any other font fails."
         case .characterLineage:
             "Each page's kept characters must match the fingerprint recorded at redaction. Zero-width marks are not seen."
         case .operatorReExtraction:
@@ -297,6 +299,8 @@ nonisolated struct VerificationRowModel: Equatable {
             "Each text, regex, or multi-term search is re-run with OCR on and must match nothing. Misread text is not seen."
         case .detectionSweep:
             "The detectors must report nothing beyond the items you chose to leave."
+        case .boxFill:
+            "Image blocks each box touches must be exactly the fill in brightness. Margin edges are not confirmed."
         }
     }
 
@@ -323,7 +327,7 @@ nonisolated struct VerificationRowModel: Equatable {
             "No Searchable pages to check."
         case .hiddenWordInk:
             "No page keeps hidden text over a picture of the page."
-        case .textExtraction, .ocrCheck, .structureCheck, .metadataCheck, .spatialVerification:
+        case .textExtraction, .ocrCheck, .structureCheck, .metadataCheck, .spatialVerification, .boxFill:
             nil
         }
     }

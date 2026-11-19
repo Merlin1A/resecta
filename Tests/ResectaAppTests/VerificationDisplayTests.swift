@@ -697,7 +697,7 @@ struct SearchRecheckQueryLineDisplayTests {
 
     // MARK: - The schedule's summary line
 
-    @Test("A clean run reads N of N checks passed with no suffix — seven in Secure Rasterization, thirteen in Searchable")
+    @Test("A clean run reads N of N checks passed with no suffix — eight in Secure Rasterization, fourteen in Searchable")
     func cleanRunSummaryPerMode() {
         func report(_ mode: PipelineMode) -> VerificationReport {
             let layers = VerificationEngine().layers(for: mode).map { layer in
@@ -708,8 +708,8 @@ struct SearchRecheckQueryLineDisplayTests {
             }
             return VerificationReport(layers: layers, overallStatus: .pass, durationSeconds: 0)
         }
-        #expect(VerificationResultsView.detailsSummaryText(for: report(.secureRasterization)) == "7 of 7 checks passed")
-        #expect(VerificationResultsView.detailsSummaryText(for: report(.searchableRedaction)) == "13 of 13 checks passed")
+        #expect(VerificationResultsView.detailsSummaryText(for: report(.secureRasterization)) == "8 of 8 checks passed")
+        #expect(VerificationResultsView.detailsSummaryText(for: report(.searchableRedaction)) == "14 of 14 checks passed")
     }
 
 }

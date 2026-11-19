@@ -161,7 +161,8 @@ enum VerificationDebugFixtures {
     private static func rows(_ core: [VerificationLayer], recheck: LayerResult, sweep: LayerResult,
                              _ overrides: [VerificationLayer: LayerResult] = [:]) -> [LayerResult] {
         core.map { overrides[$0] ?? ($0 == .metadataCheck ? metadataPass : row($0)) }
-            + [overrides[.searchRecheck] ?? recheck, overrides[.detectionSweep] ?? sweep]
+            + [overrides[.searchRecheck] ?? recheck, overrides[.detectionSweep] ?? sweep,
+               overrides[.boxFill] ?? row(.boxFill)]
     }
 
     private static let secure: [PipelineMode] = [.secureRasterization, .secureRasterization, .secureRasterization]
