@@ -1,0 +1,26 @@
+Property: the selection bar's Duplicate applies only to one selected box that is not a whole page, as the touch-and-hold menu offers it; it is dimmed for several boxes.
+Area: selection bar (editor)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/SelectionBarTests -only-testing:ResectaAppUITests/EditorToolbarUITests/testSelectionBar_deleteTwoShowsTheMessageWithUndo
+Must go red: ResectaAppTests/SelectionBarTests duplicateFollowsTheHoldMenu; ResectaAppUITests/EditorToolbarUITests testSelectionBar_deleteTwoShowsTheMessageWithUndo
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/DocumentEditorView+SelectionBar.swift b/Sources/ResectaApp/Views/DocumentEditorView+SelectionBar.swift
+index 79803499..f8dc142e 100644
+--- a/Sources/ResectaApp/Views/DocumentEditorView+SelectionBar.swift
++++ b/Sources/ResectaApp/Views/DocumentEditorView+SelectionBar.swift
+@@ -41,13 +41,13 @@ extension DocumentEditorView {
+     static func selectionBarDuplicateTarget(
+         selection: Set<UUID>, regions: [Int: [RedactionRegion]]
+     ) -> RedactionRegion? {
+-        guard selection.count == 1, let id = selection.first,
++        guard let id = selection.first,
+               let region = regions.values.lazy.flatMap({ $0 }).first(where: { $0.id == id })
+         else { return nil }
+         let rows = RedactionOverlayView.contextMenuRows(
+             for: region, selectedIDs: selection, infoTitle: nil,
+             canSelectAllOnPage: false, showsRationale: false)
+-        return rows.contains(.duplicate) ? region : nil
++        return rows.contains(.duplicate) || selection.count > 1 ? region : nil
+     }
+ 
+     /// At every accessibility size the actions are symbols.

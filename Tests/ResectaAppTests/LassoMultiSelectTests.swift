@@ -9,7 +9,7 @@ import RedactionEngine
 // hits empty space, the drag is treated as a marquee. On touch-up, the
 // overlay intersects every region's `normalizedRect` against the
 // marquee and routes the hit set through
-// `RedactionState.applyBatch(_:toastManager:)` — a peer of
+// `RedactionState.applyBatch(_:now:)` — a peer of
 // the region-creating `applyFindings` seam, not a collapse onto
 // it. The 500-region cap and warning toast surface inside
 // `applyBatch` itself; see `ApplyBatchCapTests` for that side.
@@ -86,7 +86,7 @@ struct LassoMultiSelectTests {
 
         // Route the hits through applyBatch — the multi-select set must
         // hold exactly those four region IDs after commit.
-        state.applyBatch(hits, toastManager: nil)
+        state.applyBatch(hits)
         #expect(state.selectedRegionIDs == Set(regions.prefix(4).map(\.id)))
     }
 
@@ -132,7 +132,7 @@ struct LassoMultiSelectTests {
         // applyBatch with empty input is a valid no-op selection: the
         // selection set becomes empty.
         state.selectedRegionIDs = Set(regions.map(\.id))  // pre-fill
-        state.applyBatch(hits, toastManager: nil)
+        state.applyBatch(hits)
         #expect(state.selectedRegionIDs.isEmpty)
     }
 
@@ -207,7 +207,7 @@ struct LassoMultiSelectTests {
         #expect(hits.count == 4)
 
         // Apply the lasso batch: the selection changes, no undo step.
-        state.applyBatch(hits, toastManager: nil)
+        state.applyBatch(hits)
         #expect(state.selectedRegionIDs.count == 4)
 
         // Delete via existing affordance — `deleteSelected` routes
@@ -241,7 +241,7 @@ struct LassoMultiSelectTests {
         undoManager.undo()
         #expect(undoManager.canRedo)
 
-        state.applyBatch(regions, toastManager: nil)
+        state.applyBatch(regions)
         #expect(state.selectedRegionIDs == Set(regions.map(\.id)))
         #expect(undoManager.canUndo == false, "selecting is not an undo step")
         #expect(undoManager.canRedo, "Redo is left as it was")
@@ -254,7 +254,7 @@ struct LassoMultiSelectTests {
         let regions = seedRegions(state, count: 3)
         state.selectedRegionIDs = Set(regions.map(\.id))
         let undoManager = UndoManager()
-        state.applyBatch(regions, toastManager: nil)
+        state.applyBatch(regions)
         #expect(state.selectedRegionIDs == Set(regions.map(\.id)))
         #expect(undoManager.canUndo == false)
         state.checkInvariants()
@@ -276,6 +276,22 @@ struct LassoMultiSelectTests {
 
         coordinator.commitLassoSelection([regions[1]])
         #expect(state.selectedRegionIDs == [regions[0].id, regions[1].id])
+    }
+
+    @Test("With Add to Selection on, a marquee cut at 500 says so once, by the warning")
+    func addToSelectionCutQueuesTheWarning() {
+        let state = RedactionState()
+        let regions = seedRegions(state, count: 501)
+        let toastManager = ToastQueueManager()
+        let coordinator = PDFViewCoordinator()
+        coordinator.redactionState = state
+        coordinator.toastManager = toastManager
+        coordinator.isMultiSelectActive = true
+
+        coordinator.commitLassoSelection(regions)
+        #expect(state.selectedRegionIDs.count == 500)
+        #expect(toastManager.activeToasts.map(\.message) == [RedactionState.lassoSelectionCapToastMessage])
+        #expect(state.lassoCut == nil, "no line for the bar as well")
     }
 
     @Test("With Add to Selection off, a marquee replaces and an empty one clears")
