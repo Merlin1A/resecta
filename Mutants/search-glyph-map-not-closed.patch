@@ -1,0 +1,20 @@
+Property: A page whose text and drawn glyphs differ anywhere is not mapped.
+Area: Search, the match boxes from the page's own drawing
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'ContentGlyphWalkTests|ContentGlyphFontTests|ContentGlyphBoxTests|ContentGlyphMapTests|ContentGlyphExportTests'
+Must go red: RedactionEngineTests/ContentGlyphMapTests unmapped
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphMap.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphMap.swift
+index ec64a848..28f03030 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphMap.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphMap.swift
+@@ -25,7 +25,8 @@ struct ContentGlyphMap {
+         var next = 0
+         for unit in pageText.utf16 {
+             if whitespace.contains(unit) { map.append(nil); continue }
+-            guard next < shown.count, shown[next].unit == unit else { return nil }
++            guard next < shown.count else { return nil }
++            guard shown[next].unit == unit else { map.append(nil); continue }
+             map.append(shown[next].glyph)
+             next += 1
+         }

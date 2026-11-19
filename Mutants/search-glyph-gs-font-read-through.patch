@@ -1,0 +1,21 @@
+Property: A gs that sets the font leaves the page unread.
+Area: Search, the match boxes from the page's own drawing
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'ContentGlyphWalkTests|ContentGlyphFontTests|ContentGlyphBoxTests|ContentGlyphMapTests|ContentGlyphExportTests'
+Must go red: RedactionEngineTests/ContentGlyphWalkTests unknownPages
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphWalk.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphWalk.swift
+index a055f4f7..27b185ad 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphWalk.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphWalk.swift
+@@ -234,8 +234,8 @@ enum ContentGlyphWalk {
+             var font: CGPDFArrayRef?
+             guard CGPDFScannerPopName(scanner, &name), let name,
+                   let object = CGPDFContentStreamGetResource(CGPDFScannerGetContentStream(scanner), "ExtGState", name),
+-                  CGPDFObjectGetValue(object, .dictionary, &dictionary), let dictionary,
+-                  !CGPDFDictionaryGetArray(dictionary, "Font", &font) else { s.fail(scanner); return }
++                  CGPDFObjectGetValue(object, .dictionary, &dictionary), let dictionary else { s.fail(scanner); return }
++            _ = font
+         }
+         CGPDFOperatorTableSetCallback(table, "BDC") { scanner, info in
+             guard let s = State.from(info), s.count(scanner) else { return }

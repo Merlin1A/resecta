@@ -1,0 +1,19 @@
+Property: A box no glyph lies past by more than the slack is today's box exactly.
+Area: Search, the match boxes from the page's own drawing
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'ContentGlyphWalkTests|ContentGlyphFontTests|ContentGlyphBoxTests|ContentGlyphMapTests|ContentGlyphExportTests'
+Must go red: RedactionEngineTests/ContentGlyphBoxTests unchanged [Last word end]; RedactionEngineTests/ContentGlyphBoxTests unchanged [(T) 80 (otal) 120 ( due)]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
+index f49c73e3..76b2a60d 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
+@@ -188,7 +188,7 @@ extension DocumentSearcher {
+     /// font come from the system font, which differ from the widths PDFKit
+     /// places them by by about a thousandth of the size: well under this,
+     /// which is a tenth of a pixel at 150 dpi and inside the paint's halo.
+-    static let growthSlack: CGFloat = 0.05
++    static let growthSlack: CGFloat = 0
+ 
+     /// The selection path's transform for any rect in the page's absolute,
+     /// unrotated space (a selection's `bounds(for:)`, or a glyph's box from
