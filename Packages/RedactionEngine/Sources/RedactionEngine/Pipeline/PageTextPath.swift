@@ -40,6 +40,24 @@ enum PageTextPath {
 
     @TaskLocal static var steps = Steps.live
 
+    #if DEBUG
+    /// Tests only, compiled out of a release build: true turns the closure
+    /// over words the filter or the drawn-cell rule took a letter of off, so
+    /// a test can make a leaking export for a check to report. Marked words
+    /// (the alphabet and the paint) still leave whole.
+    @TaskLocal static var wholeWordsOff = false
+    #endif
+
+    /// Whether a word that loses a letter leaves whole: always, but in a
+    /// test that turns it off.
+    static var wholeWords: Bool {
+        #if DEBUG
+        return !wholeWordsOff
+        #else
+        return true
+        #endif
+    }
+
     /// How the page ends.
     enum Outcome: Sendable {
         /// The list to record and write, its record, and the rectangles the
@@ -86,7 +104,8 @@ enum PageTextPath {
         // filter took a letter of, then the drawn-cell rule on what is left.
         // A word the rule takes a letter of leaves whole too, and the rule
         // runs again on the lines that changed, until nothing more leaves.
-        let filterTook = wordsLosingALetter(before: folded, after: filtered.surviving)
+        let wholeWords = Self.wholeWords
+        let filterTook = wholeWords ? wordsLosingALetter(before: folded, after: filtered.surviving) : []
         var current = closeOverMarkedWords(
             filtered, marked: alphabet.wordIndices.union(painted).union(filterTook))
         let shapes = rects.map {
@@ -110,7 +129,8 @@ enum PageTextPath {
                 return Result(outcome: .picture(.extractionFailed), runsLeftOut: 0,
                               drawnCellDropped: drawnCellDropped)
             }
-            let ruleTook = wordsLosingALetter(before: current.surviving, after: pass.result.surviving)
+            let ruleTook = wholeWords
+                ? wordsLosingALetter(before: current.surviving, after: pass.result.surviving) : []
             current = closeOverMarkedWords(pass.result, marked: ruleTook)
             // The pass that takes nothing laid out the survivors as they
             // stand: the writer draws its lines.

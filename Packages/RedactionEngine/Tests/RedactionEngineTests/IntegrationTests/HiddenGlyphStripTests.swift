@@ -132,14 +132,24 @@ struct HiddenGlyphStripTests {
     func withoutStripFarGlyphsSurvive() async throws {
         let f = try Self.fixture()
         defer { withExtendedLifetime(f.doc) {} }
-        let result = try await PageRasterizer().rasterize(
-            Self.pageData(f.page, [Self.region(f.paint, strip: nil)], mode: .searchableRedaction))
+        // With whole words off, so the filter alone decides, as the strip's
+        // own test needs.
+        let result = try await PageTextPath.$wholeWordsOff.withValue(true) {
+            try await PageRasterizer().rasterize(
+                Self.pageData(f.page, [Self.region(f.paint, strip: nil)], mode: .searchableRedaction))
+        }
         #expect(result.fallbackReason == nil)
         let survivors = try #require(result.pageOutput.textLayerEntries)
         let beyond = Self.points(f.paint).maxX + safetyMarginPoints
         let stripPoints = Self.points(f.strip)
         #expect(survivors.contains { $0.bounds.minX > beyond && $0.bounds.intersects(stripPoints) },
                 "the fixture no longer leaves a glyph past the painted box; the strip test above proves nothing")
+        // With whole words on, the drifted word loses a letter to the box and
+        // leaves whole, strip or not.
+        let whole = try await PageRasterizer().rasterize(
+            Self.pageData(f.page, [Self.region(f.paint, strip: nil)], mode: .searchableRedaction))
+        #expect(!(whole.pageOutput.textLayerEntries ?? []).contains { $0.bounds.intersects(stripPoints) },
+                "whole words on: no glyph of the drifted word is left in the text layer")
     }
 
     /// A two-line address over the band with a line after it: the hidden
