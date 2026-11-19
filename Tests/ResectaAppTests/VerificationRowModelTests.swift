@@ -391,7 +391,7 @@ struct VerificationRowModelTests {
         strings += VerificationOutcome.allCases.compactMap { $0.headerClause(count: 2) }
         strings += [VerificationRowModel.skippedCaption, VerificationRowModel.skippedLead,
                     VerificationRowModel.pageCountGateRule, "Findings", "Could not verify", "Notes",
-                    "Nothing to check", "Checks", "Page Count"]
+                    "Nothing to check", "Page Count"]
         return strings.filter { !$0.isEmpty }
     }
 
