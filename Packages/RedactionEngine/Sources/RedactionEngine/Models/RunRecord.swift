@@ -55,6 +55,17 @@ public struct RunRecord: Equatable, Sendable {
         /// entry makes them.
         package let plan: PaintPlan?
 
+        /// The page's regions that admission refuses, each with its reason,
+        /// in the order they were drawn. Given by the regions as drawn, so it
+        /// is never stored: every region is here or reaches the run, and none
+        /// vanishes. Read it from the run's record, never from the editor's
+        /// regions as they stand later.
+        public var refusedRegions: [(id: UUID, reason: RegionAdmission.Refusal)] {
+            regions.compactMap { region in
+                RedactionRegion.admission(normalizedRect: region.normalizedRect).map { (region.id, $0) }
+            }
+        }
+
         public init(pageIndex: Int, regions: [DrawnRegion]) {
             self.init(pageIndex: pageIndex, regions: regions, plan: nil)
         }

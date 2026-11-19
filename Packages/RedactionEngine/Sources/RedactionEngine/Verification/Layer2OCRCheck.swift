@@ -128,16 +128,15 @@ extension VerificationEngine {
         case none
     }
 
-    /// Builds the Layer-2 region set through the SAME sliver
-    /// predicate the fill path uses (`PipelineCoordinator.buildPDFPageData`):
-    /// drop regions with `normalizedRect.width/height <= 0.001`, clamp survivors.
-    /// Painter and verifier then see one region set — a sub-threshold sliver the
+    /// Builds the Layer-2 region set through the SAME admission
+    /// the fill path uses (`RunInputs.pageData`): drop every region admission
+    /// refuses (`RedactionRegion.isAdmitted`), clamp survivors.
+    /// Painter and verifier then see one region set — a sliver the
     /// engine refuses to fill never produces a Layer-2 WARN/FAIL describing a
     /// region that was never redacted.
     static func layer2RegionSnapshot(_ regions: [RedactionRegion]) -> [RedactionRegion] {
         regions.compactMap { region in
-            guard region.normalizedRect.width > 0.001,
-                  region.normalizedRect.height > 0.001 else { return nil }
+            guard RedactionRegion.isAdmitted(normalizedRect: region.normalizedRect) else { return nil }
             var clamped = region
             clamped.normalizedRect = region.normalizedRect.clampedToNormalized()
             return clamped
