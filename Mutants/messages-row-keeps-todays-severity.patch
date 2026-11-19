@@ -1,0 +1,19 @@
+Property: Each message keeps today's severity, so it stays at today's edge, until its redesign.
+Area: the brief messages, the message table
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild build-for-testing -scheme ResectaApp -destination id=<simulator>, then DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test-without-building -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/MessageCatalogTests -only-testing:ResectaAppTests/ModeSwitchToastTests
+Must go red: ResectaAppTests/MessageCatalogTests; ResectaAppTests/ModeSwitchToastTests
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/MessageCatalog.swift b/Sources/ResectaApp/State/MessageCatalog.swift
+index 62879dd9..136e0be5 100644
+--- a/Sources/ResectaApp/State/MessageCatalog.swift
++++ b/Sources/ResectaApp/State/MessageCatalog.swift
+@@ -388,7 +388,7 @@ enum MessageCatalog {
+             // sheet (observed on the simulator).
+             return MessageRow(
+                 text: modeSwitchClearedText(unappliedCount: unappliedCount, count: 0),
+-                todaySeverity: .info, kind: .receipt, tone: .caution,
++                todaySeverity: .warning, kind: .receipt, tone: .caution,
+                 actionLabel: SearchAndRedactSheet.discardUndoActionLabel, actionChangesState: true,
+                 phases: [.editing], mustBeSeen: true)
+         case .modeSwitchClearedAllApplied(let count):
