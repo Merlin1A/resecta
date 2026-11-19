@@ -48,6 +48,28 @@ struct LegalPhraseLintTests {
         }
     }
 
+    /// Check H3's list half: the stems for a claim that a box hides how long
+    /// its text is, the switch's old name among them, are on the one list
+    /// the claims lint reads. This test reads the list; it never edits it.
+    static let lengthClaimStems = [
+        "hide text length",
+        "length hidden", "hidden length", "length is hidden",
+        "hides the length", "hide the length", "hides its length", "hiding the length",
+        "hides how long", "hide how long",
+        "conceals the length", "conceal the length", "masks the length",
+        "cannot show how long", "can't show how long", "no longer shows how long", "can no longer show",
+        "width says nothing", "says nothing about the text", "no longer follows the text",
+    ]
+
+    @Test("The banned-term list holds every stem for a length claim, the switch's old name among them")
+    func lengthClaimStemsAreBanned() {
+        #expect(Self.lengthClaimStems.count == 20)
+        let banned = Set(LegalPhrases.bannedTerms.map { $0.lowercased() })
+        for stem in Self.lengthClaimStems {
+            #expect(banned.contains(stem), "missing from LegalPhrases.bannedTerms: \(stem)")
+        }
+    }
+
     @Test("The first-launch agreement body describes PDF documents and images")
     func gateBodyDescribesPDFDocumentsAndImages() throws {
         // The app opens PDF files and JPEG, PNG and HEIC images; the
