@@ -195,7 +195,9 @@ struct PipelineRunner {
                     deselection: deselectionSnapshot,
                     ocrSkippedPages: entry.ocrSkippedPages,
                     degradeFailures: entry.degradeFailures,
-                    burnedRegionVersion: entry.burnedRegionVersion)))
+                    burnedRegionVersion: entry.burnedRegionVersion,
+                    burnedRegions: runContext.burnedRegions,
+                    record: RunRecord(confirmed: entry.confirmed, produced: runContext.produced))))
 
             // --- Verification ---
             // Paranoid-mode override #2: paranoid
@@ -213,7 +215,8 @@ struct PipelineRunner {
             if verifyForRun {
                 return try await verify(
                     runContext: runContext, effectiveMode: effectiveMode,
-                    burnedRegionVersion: entry.burnedRegionVersion)
+                    burnedRegionVersion: entry.burnedRegionVersion,
+                    record: RunRecord(confirmed: entry.confirmed, produced: runContext.produced))
             } else {
                 sink(.verificationSkipped(burnedRegionVersion: entry.burnedRegionVersion))
                 return .completed
@@ -244,6 +247,9 @@ struct PipelineRunner {
         let burnedRegionVersion: Int
         /// How many times the capture ran: 1, or 2 after a re-run.
         let captureRuns: Int
+        /// The confirmed part of the run's record, read from the same
+        /// region state as `pages`.
+        let confirmed: RunRecord.Confirmed
     }
 
     /// Read the full run's entry snapshot. The manual-term capture
@@ -275,8 +281,15 @@ struct PipelineRunner {
         }
 
         // Synchronous from here: one region state.
+        // The record's confirmed part first, from the live regions as drawn
+        // (the pages below hold them clamped and floor-filtered).
+        let confirmed = RunInputs.confirmedRecord(
+            pageCount: coordinator.documentState.pageCount,
+            geometry: coordinator.documentState.sourceDocument.map(RunInputs.pageGeometry(of:)) ?? [:],
+            regions: redactionState.regions, settings: runSettings)
         let pages = coordinator.buildPDFPageData(
-            effectiveMode: effectiveMode, runSettings: runSettings, inkPlans: sensitiveTerms.inkPlans)
+            effectiveMode: effectiveMode, runSettings: runSettings, inkPlans: sensitiveTerms.inkPlans,
+            record: confirmed)
         let burnedRegionVersion = redactionState.regionVersion
         // The run's deselection facts. The value is recorded onto
         // RedactionState only after `processDocument` returns (inside the
@@ -311,7 +324,8 @@ struct PipelineRunner {
             deselectionSnapshot: deselectionSnapshot,
             ocrSkippedPages: ocrSkippedPages, degradeFailures: degradeFailures,
             appliedSearches: appliedSearches,
-            burnedRegionVersion: burnedRegionVersion, captureRuns: captureRuns)
+            burnedRegionVersion: burnedRegionVersion, captureRuns: captureRuns,
+            confirmed: confirmed)
     }
 
     // MARK: - Verify-only re-run
@@ -382,13 +396,18 @@ struct PipelineRunner {
             perPageFallbackReasons: perPageFallbackReasons,
             sensitiveTerms: sensitiveTerms,
             appliedSearches: appliedSearches,
+            // The regions the run that made this output burned, as it
+            // burned them (clamped, floor-filtered, with its ink strips).
             // Verify-only runs only on an output that is not stale, so the
-            // live regions are the ones it burned.
-            burnedRegions: coordinator.redactionState.regions
+            // live regions are the same regions in their drawn form: they
+            // stand in only where no inputs were kept (the debug seed).
+            burnedRegions: retained?.burnedRegions ?? coordinator.redactionState.regions
         )
+        // The record of the run that made this output, as on the run; nil
+        // only where no inputs were kept (the debug seed).
         return try await verify(
             runContext: runContext, effectiveMode: effectiveMode,
-            burnedRegionVersion: burnedRegionVersion)
+            burnedRegionVersion: burnedRegionVersion, record: retained?.record)
     }
 
     // MARK: - Verification
@@ -413,9 +432,11 @@ struct PipelineRunner {
     /// method loads the output, snapshots the MainActor-isolated inputs,
     /// adapts the orchestrator's events to the `.verifying` transitions and
     /// the VoiceOver announcements, and publishes the report.
+    ///
+    /// `record` is the run's record, handed to the position check.
     private func verify(
         runContext: PipelineCoordinator.PipelineRunContext, effectiveMode: PipelineMode,
-        burnedRegionVersion: Int
+        burnedRegionVersion: Int, record: RunRecord?
     ) async throws -> PipelineRunOutcome {
         // The first verifying step goes out before the loads below suspend.
         // The redacted copy is built and its inputs recorded, so from here a
@@ -468,6 +489,7 @@ struct PipelineRunner {
 
         #if DEBUG
         coordinator.verificationRegionsSeam?(runContext.burnedRegions)
+        coordinator.verificationRecordSeam?(record)
         #endif
         let report = try await VerificationOrchestrator().run(
             outputDocument: wrappedDoc,
@@ -481,6 +503,7 @@ struct PipelineRunner {
             appliedSearches: runContext.appliedSearches,
             manualRegionsWithoutText: runContext.sensitiveTerms.manualRegionsWithoutText,
             sourceDocument: sourceCopy,
+            record: record,
             provisionLayerDocuments: { layers in
                 // Provision one PDFDocument instance per parallel layer off
                 // MainActor. nil ⇒ at least one re-open failed.

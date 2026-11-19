@@ -1,4 +1,5 @@
 import Foundation
+import RedactionCore
 
 /// A single redaction region in normalized PDF page coordinates.
 /// Defined in the engine Models/ directory — used by the overlay, the
@@ -165,5 +166,16 @@ extension CGRect {
         let cw = max(0, min(width, 1 - cx))
         let ch = max(0, min(height, 1 - cy))
         return CGRect(x: cx, y: cy, width: cw, height: ch)
+    }
+}
+
+extension RedactionRegion {
+    /// Admission: whether a region drawn at `normalizedRect` reaches a run. Its
+    /// rectangle is clamped to the page by today's clamp, then the core's one
+    /// admission floor decides (`RegionAdmission`). The page builder and the
+    /// run's record both read this one test.
+    public static func isAdmitted(normalizedRect: CGRect) -> Bool {
+        let clamped = normalizedRect.clampedToNormalized()
+        return RegionAdmission.admits(clampedWidth: Double(clamped.width), clampedHeight: Double(clamped.height))
     }
 }

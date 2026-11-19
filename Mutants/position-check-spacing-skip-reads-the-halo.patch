@@ -1,0 +1,18 @@
+Property: The spacing test skips a gap by a rectangle's own bounds, never by its halo.
+Area: position check
+Test command: cd Packages/RedactionEngine && swift test --filter PositionCheckRecordTests
+Must go red: RedactionEngineTests/PositionCheckRecordTests "Each case" (breakAtTheWidenedBox)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification+SpatialExclusion.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification+SpatialExclusion.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification+SpatialExclusion.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification+SpatialExclusion.swift
+@@ -309,7 +309,7 @@
+                 // buffer, not drawn geometry. A shape under a widened box is
+                 // not skipped by: the writer did not break a line at it.
+                 if regionShapes.indices.contains(where: {
+-                    kind($0, kinds) != .underWidenedBox && regionShapes[$0].bounds.intersects(gapRect)
++                    kind($0, kinds) != .underWidenedBox && regionShapes[$0].expandedBounds.intersects(gapRect)
+                 }) { continue }
+                 let cell = SandwichMetrics.courierAdvancePerPoint * prev.pointSize
+                 let tolerance = SandwichMetrics.advanceWidthTolerancePerPoint * prev.pointSize

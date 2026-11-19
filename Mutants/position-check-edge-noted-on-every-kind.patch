@@ -1,0 +1,18 @@
+Property: The edge note is read against the ordinary rectangles only: a plan's rectangle and a rectangle under a widened box note no edge.
+Area: position check
+Test command: cd Packages/RedactionEngine && swift test --filter PositionCheckRecordTests
+Must go red: RedactionEngineTests/PositionCheckRecordTests "Each case" (plansRectangleNotesNoEdge, breakAtTheWidenedBox, regionOutsideItsWidenedBox)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification+SpatialExclusion.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification+SpatialExclusion.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification+SpatialExclusion.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification+SpatialExclusion.swift
+@@ -187,7 +187,7 @@
+                 // not exposed content (content leaks stay covered by Layers
+                 // 7/9). The graze is held so a later in-region hit on this
+                 // page is never masked by it.
+-                for (s, shape) in regionShapes.enumerated() where kind(s, kinds) == .ordinary {
++                for (s, shape) in regionShapes.enumerated() {
+                     if overlaps(shape) {
+                         scan.grazed = true
+                         break

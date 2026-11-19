@@ -1,0 +1,19 @@
+Property: Smart punctuation folds on both sides unless switched off.
+Area: Search, the rules a search follows
+Test command: cd Packages/RedactionEngine && DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --no-parallel --filter '^RedactionEngineTests\.TextNormalizerTests/'
+Must go red: RedactionEngineTests/TextNormalizerTests smartQuotesNormalized; RedactionEngineTests/TextNormalizerTests emDashNormalized; RedactionEngineTests/TextNormalizerTests smartPunctuationFullMap
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/TextNormalizer.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/TextNormalizer.swift
+index 2032900..8e77821 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/TextNormalizer.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/TextNormalizer.swift
+@@ -66,7 +66,7 @@ public struct TextNormalizer: Sendable {
+     /// Length-preserving by construction (1:1 Character map) — safe to
+     /// apply on both sides of a match without an offset map.
+     public static func normalizeSmartPunctuation(_ text: String) -> String {
+-        String(text.map { smartPunctuationMap[$0] ?? $0 })
++        text
+     }
+ 
+     /// Separator characters removed by digit-format-insensitive matching

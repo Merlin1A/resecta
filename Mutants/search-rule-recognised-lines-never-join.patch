@@ -1,0 +1,19 @@
+Property: A phrase may run from one recognised line into the next when the next is lower and the two overlap across it.
+Area: Search, the rules a search follows
+Test command: cd Packages/RedactionEngine && DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --no-parallel --filter '^RedactionEngineTests\.(OCRCrossLinePhraseTests|OCRLineJoinDirectionTests)/'
+Must go red: RedactionEngineTests/OCRCrossLinePhraseTests crossLinePhraseFound; RedactionEngineTests/OCRLineJoinDirectionTests join
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+OCRCrossLine.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+OCRCrossLine.swift
+index 71b48ef..2ac2fa8 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+OCRCrossLine.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+OCRCrossLine.swift
+@@ -49,7 +49,7 @@ extension DocumentSearcher {
+     /// `next` lies below `line` and the two lines' spans across the page
+     /// overlap (one column).
+     nonisolated static func linesJoin(_ line: CGRect, _ next: CGRect) -> Bool {
+-        next.midY < line.midY && next.minX < line.maxX && line.minX < next.maxX
++        false
+     }
+ 
+     /// The direction `line`'s print runs, in page points (`pageSize`, the

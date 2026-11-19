@@ -123,8 +123,15 @@ extension SandwichVerification {
     /// Technique 2 — the region-overlap tiers over the collected units'
     /// glyph-core boxes. A core centre inside a region is the FAIL returned;
     /// an edge graze is held on the scan for the exit.
+    ///
+    /// For each character the failing test is read against every shape
+    /// before any edge is noted, so an edge noted on one shape never hides a
+    /// centre inside a later one. Every kind of shape takes the failing test;
+    /// an edge is noted only against an ordinary shape (`kinds`, nil = all
+    /// ordinary).
     static func spatialOverlapFailure(
-        regionShapes: [RegionShape], scan: inout SpatialExclusionScan, pageIndex: Int
+        regionShapes: [RegionShape], kinds: [TextPathRectangle.Kind]? = nil,
+        scan: inout SpatialExclusionScan, pageIndex: Int
     ) -> VerificationStatus? {
         // Exclusion pass: two tiers over the non-whitespace
         // units' glyph-core boxes. An edge graze (core box crossing a region
@@ -156,38 +163,38 @@ extension SandwichVerification {
                 bandRects[unitBands[k]] =
                     bandRects[unitBands[k]].map { $0.union(core) } ?? core
             }
-            unitLoop: for (k, unit) in scan.exclusionUnits.enumerated() {
+            for (k, _) in scan.exclusionUnits.enumerated() {
                 let core = coreBoxes[k]
                 let band = bandRects[unitBands[k]] ?? core
-                for shape in regionShapes {
-                    // Tier (a) floor at the un-expanded rect; tier (b)
-                    // halo at the expanded rect within band-intersecting
-                    // lines.
-                    let overlaps = core.intersects(shape.bounds)
-                        || (core.intersects(shape.expandedBounds)
-                            && shape.bounds.intersects(band))
-                    if overlaps {
-                        // Classify by the glyph-core CENTER against the
-                        // un-expanded region. Center inside → the character
-                        // sits IN the region: an output defect, FAIL. Center
-                        // outside → a positional edge graze: band-pitch drawn
-                        // positions drift, so a survivor beside an embedded
-                        // region can land with its core box crossing the rect
-                        // edge while its content stays outside — a
-                        // writer↔verifier contract note, not exposed content
-                        // (content leaks stay covered by Layers 7/9). The
-                        // graze is held so a later in-region hit on this
-                        // page is never masked by it. Messages name the page
-                        // and nothing else — the read-back offset is not
-                        // user copy.
-                        let center = CGPoint(x: core.midX, y: core.midY)
-                        if shape.bounds.contains(center) {
-                            return .fail(
-                                "A character overlaps a redacted area on page \(pageIndex + 1)"
-                            )
-                        }
+                // Tier (a) floor at the un-expanded rect; tier (b) halo at
+                // the expanded rect within band-intersecting lines.
+                func overlaps(_ shape: RegionShape) -> Bool {
+                    core.intersects(shape.bounds)
+                        || (core.intersects(shape.expandedBounds) && shape.bounds.intersects(band))
+                }
+                // Classify by the glyph-core CENTER against the un-expanded
+                // region. Center inside any shape it overlaps → the character
+                // sits IN a redacted area: an output defect, FAIL. Messages
+                // name the page and nothing else — the read-back offset is
+                // not user copy.
+                let center = CGPoint(x: core.midX, y: core.midY)
+                if regionShapes.contains(where: { overlaps($0) && $0.bounds.contains(center) }) {
+                    return .fail(
+                        "A character overlaps a redacted area on page \(pageIndex + 1)"
+                    )
+                }
+                // Center outside every shape → a positional edge graze,
+                // noted against an ordinary shape only: band-pitch drawn
+                // positions drift, so a survivor beside an embedded region
+                // can land with its core box crossing the rect edge while its
+                // content stays outside — a writer↔verifier contract note,
+                // not exposed content (content leaks stay covered by Layers
+                // 7/9). The graze is held so a later in-region hit on this
+                // page is never masked by it.
+                for (s, shape) in regionShapes.enumerated() where kind(s, kinds) == .ordinary {
+                    if overlaps(shape) {
                         scan.grazed = true
-                        continue unitLoop
+                        break
                     }
                 }
             }
@@ -195,11 +202,18 @@ extension SandwichVerification {
         return nil
     }
 
+    /// Shape `index`'s kind; ordinary when no kinds are given.
+    static func kind(_ index: Int, _ kinds: [TextPathRectangle.Kind]?) -> TextPathRectangle.Kind {
+        guard let kinds, index < kinds.count else { return .ordinary }
+        return kinds[index]
+    }
+
     /// Technique 3 — the origin-delta advance lattice over the collected
     /// units, per band in reading order. An off-lattice advance or an
     /// off-pitch size flip is the FAIL returned.
     static func advanceLatticeFailure(
-        regionShapes: [RegionShape], scan: SpatialExclusionScan, pageIndex: Int
+        regionShapes: [RegionShape], kinds: [TextPathRectangle.Kind]? = nil,
+        scan: SpatialExclusionScan, pageIndex: Int
     ) -> VerificationStatus? {
         // Origin-delta
         // lattice crosscheck, replacing the M1 selection-WIDTH check. The
@@ -296,9 +310,10 @@ extension SandwichVerification {
                             - min(prev.bounds.minY, curr.bounds.minY))
                 // Gap-skip tests the UN-expanded rect: a layout hole at a
                 // region is the region's own geometry; the halo is a filter
-                // buffer, not drawn geometry.
-                if regionShapes.contains(where: {
-                    $0.bounds.intersects(gapRect)
+                // buffer, not drawn geometry. A shape under a widened box is
+                // not skipped by: the writer did not break a line at it.
+                if regionShapes.indices.contains(where: {
+                    kind($0, kinds) != .underWidenedBox && regionShapes[$0].bounds.intersects(gapRect)
                 }) { continue }
                 let cell = SandwichMetrics.courierAdvancePerPoint * prev.pointSize
                 let tolerance = SandwichMetrics.advanceWidthTolerancePerPoint * prev.pointSize

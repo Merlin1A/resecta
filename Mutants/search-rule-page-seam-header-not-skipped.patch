@@ -1,0 +1,18 @@
+Property: A phrase across a page break skips up to three lines that repeat at the top or bottom of both pages.
+Area: Search, the rules a search follows
+Test command: cd Packages/RedactionEngine && DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --no-parallel --filter '^RedactionEngineTests\.PageSeamPhraseTests/'
+Must go red: RedactionEngineTests/PageSeamPhraseTests phraseAcrossThePageBreak
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PageSeam.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PageSeam.swift
+index fcf40e7..2337f94 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PageSeam.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PageSeam.swift
+@@ -122,7 +122,6 @@ extension DocumentSearcher {
+         let firstLines = Array(b.head.prefix(4)), lastLines = Array(a.tail.suffix(4))
+         guard !firstLines.isEmpty, !lastLines.isEmpty else { return nil }
+         var first = 0
+-        while first < min(3, firstLines.count), headers.contains(repeatKey(after.substring(with: firstLines[first]))) { first += 1 }
+         var last = lastLines.count - 1
+         while last >= 0, lastLines.count - 1 - last < 3, footers.contains(repeatKey(before.substring(with: lastLines[last]))) { last -= 1 }
+         guard first < firstLines.count, last >= 0 else { return nil }

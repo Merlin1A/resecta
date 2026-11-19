@@ -1,0 +1,19 @@
+Property: Inside a token that holds a digit, each look-alike class reads as one symbol; here {8 B b}.
+Area: Search, the rules a search follows
+Test command: cd Packages/RedactionEngine && DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --no-parallel --filter '^RedactionEngineTests\.SearchRuleCaseTests/'
+Must go red: RedactionEngineTests/SearchRuleCaseTests lookAlikeClass
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/OCRMatchSkeleton.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/OCRMatchSkeleton.swift
+index b64e662..e77eac4 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/OCRMatchSkeleton.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/OCRMatchSkeleton.swift
+@@ -32,7 +32,7 @@ enum OCRMatchSkeleton {
+         }
+         for (letter, digit) in OCRTextNormalizer.digitContextMap { add(letter, digit) }
+         for (digit, letter) in OCRTextNormalizer.letterContextMap { add(letter, digit) }
+-        return symbols
++        return symbols.filter { $0.value != "8" }
+     }()
+ 
+     /// Per Character of `text`: whether it sits in a token (a run of letters

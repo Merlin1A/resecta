@@ -1,0 +1,19 @@
+Property: A page's two sides are read in the frame as it is rasterised: a page turned a quarter has them swapped.
+Area: run record
+Test command: cd Packages/RedactionEngine && swift test --filter RunRecordBoxesTests
+Must go red: RedactionEngineTests/RunRecordBoxesTests "Each case" (quarterTurn)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
+index 8b644530..15efdba4 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
+@@ -66,7 +66,7 @@ public struct RunRecord: Equatable, Sendable {
+         /// admission lets through, as placed. The plan is nil when a side
+         /// cannot be read.
+         public init(pageIndex: Int, regions: [DrawnRegion], cropBox: CGSize, rotation: Int) {
+-            let turned = ((rotation % 360) + 360) % 180 != 0
++            let turned = false && ((rotation % 360) + 360) % 180 != 0
+             var plan: PaintPlan?
+             if let width = PixelPlan.sixtyFourths(ofSide: Double(turned ? cropBox.height : cropBox.width)),
+                let height = PixelPlan.sixtyFourths(ofSide: Double(turned ? cropBox.width : cropBox.height)) {

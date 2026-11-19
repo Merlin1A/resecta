@@ -1,0 +1,19 @@
+Property: Any run of white space reads as one space on both sides.
+Area: Search, the rules a search follows
+Test command: cd Packages/RedactionEngine && DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --no-parallel --filter '^RedactionEngineTests\.(HyphenBreakFoldTests|SearchCoreTests)/'
+Must go red: RedactionEngineTests/HyphenBreakFoldTests otherRunsKeepTheSpace; RedactionEngineTests/SearchCoreTests literalWalk
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/TextNormalizer.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/TextNormalizer.swift
+index 2032900..8d323ce 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/TextNormalizer.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/TextNormalizer.swift
+@@ -119,7 +119,7 @@ public struct TextNormalizer: Sendable {
+         if isBreakAfterHardHyphen(run, previous: previous, beforeThat: beforeThat, next: next) {
+             return ""
+         }
+-        return run.contains(where: isSpacingCharacter) ? " " : ""
++        return ""
+     }
+ 
+     /// Whether a run is a layout engine's line break right after a hard

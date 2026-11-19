@@ -1,0 +1,19 @@
+Property: The record's boxes are made from the regions as drawn, never from them clamped to the page: a box past an edge keeps the part past it.
+Area: run record
+Test command: cd Packages/RedactionEngine && swift test --filter RunRecordBoxesTests
+Must go red: RedactionEngineTests/RunRecordBoxesTests "Each case" (inPastTheEdgeAndThin); RedactionEngineTests/RunRecordBoxesTests "Each case" (whollyOff)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
+index 8b644530..afccf2c7 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
+@@ -73,7 +73,7 @@ public struct RunRecord: Equatable, Sendable {
+                 let admitted = regions.filter { RedactionRegion.isAdmitted(normalizedRect: $0.normalizedRect) }
+                 plan = PaintPlan.asPlaced(
+                     regions: admitted.map { region in
+-                        let r = region.normalizedRect
++                        let r = region.normalizedRect.clampedToNormalized()
+                         return (region.id, PointRect(minX: Double(r.minX), minY: Double(r.minY),
+                                                      maxX: Double(r.maxX), maxY: Double(r.maxY)))
+                     },
