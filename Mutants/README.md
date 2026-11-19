@@ -215,3 +215,4 @@ with its reason and the mutant that is caught in its place.
 | `debug-hooks-read-outside-debug.patch` | Every read of a DEBUG launch hook's name sits inside #if DEBUG, so a Release build compiles none of them. | ResectaAppTests/DebugLaunchHookTests everyHookReadIsInsideDebug |
 | `debug-hooks-unknown-failure-defaults.patch` | An unknown --seedFailure name stops the app; it never falls back to a failure the test did not name. | ResectaAppTests/DebugLaunchHookTests unknownNameStops |
 | `debug-hooks-locked-fixture-without-password.patch` | The locked fixture is encrypted with a user password, so --lockedDoc reaches the password sheet. | ResectaAppUITests/DebugHookSmokeUITests testLockedDocShowsPasswordSheet |
+| `share-copy-write-failure-named-twice.patch` | The app names the failed share-copy write in one place, inside the function that owns it; a second release-path site naming it is caught. | ResectaAppTests/ShareCopyWriteFailureTests failedWriteHasOneOwner |

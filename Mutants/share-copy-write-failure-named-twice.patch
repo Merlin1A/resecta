@@ -1,0 +1,19 @@
+Property: The app names the failed share-copy write in one place, inside the function that owns it; a second release-path site naming it is caught.
+Area: Share, the failed share-copy write
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/ShareCopyWriteFailureTests
+Must go red: ResectaAppTests/ShareCopyWriteFailureTests failedWriteHasOneOwner
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/ShareRiskConfirm.swift b/Sources/ResectaApp/Views/ShareRiskConfirm.swift
+index 143c1a29..1ec63d4f 100644
+--- a/Sources/ResectaApp/Views/ShareRiskConfirm.swift
++++ b/Sources/ResectaApp/Views/ShareRiskConfirm.swift
+@@ -223,7 +223,7 @@ extension DocumentEditorView {
+     static func failExportForPurgedOutput(documentState: DocumentState) {
+         documentState.transition(to: .exporting)
+         documentState.transition(to: .failed(
+-            error: .exportError(.filePurged),
++            error: .exportError(.writeFailed),
+             returnPhase: .editing
+         ))
+     }
