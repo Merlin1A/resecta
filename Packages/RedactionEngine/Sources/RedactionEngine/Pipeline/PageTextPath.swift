@@ -142,10 +142,14 @@ enum PageTextPath {
             }
         }
         let validated = (result: current, dropped: drawnCellDropped, lines: lines)
-        if validated.result.surviving.isEmpty, !alphabet.wordIndices.isEmpty,
-           let reason = alphabet.reasonIfNoWordLeft {
-            return Result(outcome: .picture(reason), runsLeftOut: alphabet.runsLeftOut,
-                          drawnCellDropped: validated.dropped)
+        // A page left with no letter (white space at most) is a picture with
+        // no searchable text left when the alphabet rule left a word out, or
+        // when the page had no letter to begin with (a lone object mark reads
+        // as a space). A page whose boxes took every word is written empty.
+        let noLetterLeft = !validated.result.surviving.contains { Self.isLetter($0) }
+        if noLetterLeft, !alphabet.wordIndices.isEmpty || !folded.contains(where: { Self.isLetter($0) }) {
+            return Result(outcome: .picture(alphabet.reasonIfNoWordLeft ?? .noWritableText),
+                          runsLeftOut: alphabet.runsLeftOut, drawnCellDropped: validated.dropped)
         }
 
         // The record.
@@ -159,6 +163,11 @@ enum PageTextPath {
             outcome: .written(entries: validated.result.surviving, digest: digest, removalRects: rects),
             runsLeftOut: alphabet.runsLeftOut, drawnCellDropped: validated.dropped,
             hiddenTextLines: validated.lines)
+    }
+
+    /// An entry that is a letter of a word: anything but white space.
+    static func isLetter(_ entry: CharacterInfo) -> Bool {
+        !SandwichMetrics.isLineageWhitespace(entry.character)
     }
 
     /// The words that lost at least one letter between `before` and `after`

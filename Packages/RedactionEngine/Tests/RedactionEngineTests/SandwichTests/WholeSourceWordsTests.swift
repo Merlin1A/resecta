@@ -38,6 +38,69 @@ struct WholeSourceWordsTests {
              boxed: [], gone: [], kept: ["The", "most", "you", "could"]),
     ]
 
+    static func lineEntries(_ text: String) -> [CharacterInfo] {
+        var entries: [CharacterInfo] = []
+        var word = 0
+        for (i, character) in text.enumerated() {
+            if character.isWhitespace { word += 1 }
+            entries.append(CharacterInfo(
+                character: String(character), bounds: CGRect(x: 72 + CGFloat(i) * 7.2, y: 700, width: 7.2, height: 12),
+                stringIndex: i, lineIndex: 0, wordIndex: word))
+        }
+        return entries
+    }
+
+    static let frame = PageFrame(rotation: 0, displayedSize: CGSize(width: 612, height: 792))
+
+    /// A word none of the three faces draws, then white space; and a lone
+    /// object mark, which the fold reads as a space.
+    static let noLetterLeft = ["\u{6F22}\u{5B57} ", "\u{FFFC}"]
+
+    @Test("A page left with white space alone is a picture with no searchable text left", arguments: noLetterLeft)
+    func whiteSpaceAloneIsAPicture(_ text: String) async throws {
+        let path = try await PageTextPath.run(
+            entries: Self.lineEntries(text), frame: Self.frame,
+            textPathRectangles: [], paintedRectangles: [], pageIndex: 0)
+        guard case .picture(let reason) = path.outcome else {
+            Issue.record("\(text.unicodeScalars.map { String($0.value, radix: 16) }): \(path.outcome)"); return
+        }
+        #expect(reason == .noWritableText)
+    }
+
+    @Test("A page whose box takes every word, a space left after it, is written empty")
+    func boxesTakeEveryWordWrittenEmpty() async throws {
+        let entries = Self.lineEntries("Alpha ")
+        let box = entries.prefix(5).map(\.bounds).reduce(entries[0].bounds) { $0.union($1) }
+        let path = try await PageTextPath.run(
+            entries: entries, frame: Self.frame,
+            textPathRectangles: [TextPathRectangle(rect: box, kind: .ordinary)], paintedRectangles: [], pageIndex: 0)
+        guard case .written(let written, _, _) = path.outcome else { Issue.record("\(path.outcome)"); return }
+        #expect(!written.contains { !$0.character.allSatisfy(\.isWhitespace) })
+    }
+
+    /// Two spaces the hidden text writes in Courier: on this system each one
+    /// is laid out in Courier if Courier has it, and otherwise the line cannot
+    /// be laid out and the page is a picture with no searchable text left.
+    static let widerSpaces = ["\u{3000}", "\u{2003}"]
+
+    @Test("A space Courier lacks makes its line unlaid and the page a picture; one it has is written", arguments: widerSpaces)
+    func spaceCourierLacks(_ space: String) async throws {
+        let courier = try #require(HiddenTextFonts.faces.first { $0.name == "Courier" }?.font)
+        let has = HiddenTextFonts.hasGlyphs(for: Character(space), in: courier)
+        let text = "Alpha\(space)beta"
+        let path = try await PageTextPath.run(
+            entries: Self.lineEntries(text), frame: Self.frame,
+            textPathRectangles: [], paintedRectangles: [], pageIndex: 0)
+        if has {
+            #expect(HiddenTextLine.layout(text, size: 12) != nil)
+            guard case .written = path.outcome else { Issue.record("Courier has it: \(path.outcome)"); return }
+        } else {
+            #expect(HiddenTextLine.layout(text, size: 12) == nil)
+            guard case .picture(let reason) = path.outcome else { Issue.record("Courier lacks it: \(path.outcome)"); return }
+            #expect(reason == .noWritableText)
+        }
+    }
+
     @Test("The pages are five")
     func pageCount() {
         #expect(Self.pages.count == 5)
