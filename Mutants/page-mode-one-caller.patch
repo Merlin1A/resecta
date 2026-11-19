@@ -5,7 +5,7 @@ Must go red: RedactionEngineTests/PageModeDecisionTests "the trigger check is ca
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Tests/RedactionEngineTests/CorpusTests/VerificationCorpusMirror.swift b/Packages/RedactionEngine/Tests/RedactionEngineTests/CorpusTests/VerificationCorpusMirror.swift
-index 282edb05..ab61fd9f 100644
+index 8a1cfb3a..582457ac 100644
 --- a/Packages/RedactionEngine/Tests/RedactionEngineTests/CorpusTests/VerificationCorpusMirror.swift
 +++ b/Packages/RedactionEngine/Tests/RedactionEngineTests/CorpusTests/VerificationCorpusMirror.swift
 @@ -291,6 +291,9 @@ extension VerificationCorpusRunnerTests {
@@ -17,4 +17,4 @@ index 282edb05..ab61fd9f 100644
 +            assert(copyTrigger == nil || pageMode == .secureRasterization)
              let hasText = pageMode == .searchableRedaction
                  ? (page.string?.isEmpty == false) : false
- 
+             // The page's plan, by the app's own maker (`RunRecord.Page`'s
