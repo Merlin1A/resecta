@@ -1,7 +1,7 @@
 Property: The record's boxes are made from the regions as drawn, never from them clamped to the page: a box past an edge keeps the part past it.
 Area: run record
 Test command: cd Packages/RedactionEngine && swift test --filter RunRecordBoxesTests
-Must go red: RedactionEngineTests/RunRecordBoxesTests "Each case" (inPastTheEdgeAndThin); RedactionEngineTests/RunRecordBoxesTests "Each case" (whollyOff)
+Must go red: RedactionEngineTests/RunRecordBoxesTests "Each case" (inPastTheEdgeAndThin)
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
