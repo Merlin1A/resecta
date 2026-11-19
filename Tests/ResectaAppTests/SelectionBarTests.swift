@@ -132,7 +132,7 @@ struct SelectionBarTests {
         let state = RedactionState()
         let regions = (0..<501).map { _ in Self.box() }
         state.regions[0] = regions
-        state.applyBatch(regions, now: at)
+        state.applyBatch(regions, now: at, barShowing: true)
         #expect(Bar.selectionLimitLineShows(cut: state.lassoCut, selection: state.selectedRegionIDs,
                                             now: at.addingTimeInterval(1), voiceOverRunning: false))
         state.selectedRegionIDs.removeFirst()

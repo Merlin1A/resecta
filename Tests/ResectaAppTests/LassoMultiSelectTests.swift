@@ -278,6 +278,22 @@ struct LassoMultiSelectTests {
         #expect(state.selectedRegionIDs == [regions[0].id, regions[1].id])
     }
 
+    @Test("With Add to Selection on, a marquee cut at 500 says so once, by the warning")
+    func addToSelectionCutQueuesTheWarning() {
+        let state = RedactionState()
+        let regions = seedRegions(state, count: 501)
+        let toastManager = ToastQueueManager()
+        let coordinator = PDFViewCoordinator()
+        coordinator.redactionState = state
+        coordinator.toastManager = toastManager
+        coordinator.isMultiSelectActive = true
+
+        coordinator.commitLassoSelection(regions)
+        #expect(state.selectedRegionIDs.count == 500)
+        #expect(toastManager.activeToasts.map(\.message) == [RedactionState.lassoSelectionCapToastMessage])
+        #expect(state.lassoCut == nil, "no line for the bar as well")
+    }
+
     @Test("With Add to Selection off, a marquee replaces and an empty one clears")
     func marqueeReplacesWithoutAdd() {
         let state = RedactionState()

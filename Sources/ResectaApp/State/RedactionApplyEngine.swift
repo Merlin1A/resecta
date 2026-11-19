@@ -147,12 +147,13 @@ extension RedactionState {
 
     /// Maximum number of regions a single lasso-marquee apply may select.
     /// Defensive cap against accidental select-all on huge documents; the
-    /// cut is recorded (`lassoCut`) and the selection bar says so on a
-    /// second line, so the user can re-target.
+    /// cut is said once, so the user can re-target: as a warning while Add
+    /// to Selection is on, or on the selection bar's second line when the
+    /// bar is showing.
     static let lassoSelectionCap: Int = 500
 
-    /// The selection bar's second line when a lasso marquee would select
-    /// more regions than `lassoSelectionCap` permits. Mechanism-description
+    /// The warning, or the selection bar's second line, when a lasso
+    /// marquee would select more regions than `lassoSelectionCap` permits. Mechanism-description
     /// language — "Selection limited to 500 regions"
     /// names the truncation observably without making a promise claim.
     static let lassoSelectionCapToastMessage: String =
@@ -172,22 +173,29 @@ extension RedactionState {
     /// Enforces the 500-region cap (`lassoSelectionCap`) inside this
     /// method so any caller route — the overlay marquee path today,
     /// hypothetical future select-all-by-detector routes — inherits the
-    /// same defense automatically. On truncation it records the cut in
-    /// `lassoCut`, which the selection bar shows as its second line; no
-    /// message is queued. A batch that is not cut clears the record.
+    /// same defense automatically. On truncation the cut is said once:
+    /// with the bar showing, it is recorded in `lassoCut`, which the bar
+    /// shows as its second line; otherwise (Add to Selection on, whose
+    /// capsule holds the slot) the warning is queued, shown and spoken at
+    /// the cut. A batch that is not cut clears the record.
     ///
     /// - Parameters:
     ///   - regions: Regions to mark selected. Order is preserved across
     ///     the truncation — the first `lassoSelectionCap` entries are
     ///     kept; later entries are dropped.
     ///   - now: The time of the cut (a test seam).
+    ///   - barShowing: Whether the selection bar holds the slot.
+    ///   - toastManager: Where the warning is queued when the bar is not
+    ///     showing; nil queues nothing (a test seam).
     /// - Returns: A tuple naming the count actually selected and a flag
     ///   recording whether the cap truncated the input.
     @MainActor
     @discardableResult
     func applyBatch(
         _ regions: [RedactionRegion],
-        now: Date = .now
+        now: Date = .now,
+        barShowing: Bool = false,
+        toastManager: ToastQueueManager? = nil
     ) -> (selected: Int, truncated: Bool) {
         let truncated = regions.count > Self.lassoSelectionCap
         let kept = truncated
@@ -197,7 +205,10 @@ extension RedactionState {
 
         selectedRegionIDs = newSelection
 
-        lassoCut = truncated ? LassoCut(at: now, selection: newSelection) : nil
+        lassoCut = truncated && barShowing ? LassoCut(at: now, selection: newSelection) : nil
+        if truncated && !barShowing {
+            toastManager?.enqueue(Self.lassoSelectionCapToastMessage, severity: .warning)
+        }
 
         return (selected: newSelection.count, truncated: truncated)
     }

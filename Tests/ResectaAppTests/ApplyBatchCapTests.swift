@@ -9,12 +9,14 @@ import RedactionEngine
 // large documents an indiscriminate marquee could land thousands of
 // regions in one gesture. The cap is a defense against an accidental
 // select-all — when input > 500, `applyBatch` truncates to the first
-// 500 (by stored order) and records the cut (`lassoCut`), which the
-// selection bar shows as its second line. No message is queued.
+// 500 (by stored order) and says so once: while Add to Selection is on
+// (its capsule holds the slot) by the `.warning` toast, as at 1.3.1; with
+// the selection bar showing, by the cut it records (`lassoCut`), which the
+// bar shows as its second line.
 //
 // These tests pin two contracts:
-// 1. `applyBatch` truncates input > 500 to exactly 500 and records the
-//    cut with the selection it left.
+// 1. `applyBatch` truncates input > 500 to exactly 500 and says so once,
+//    by the warning or by the bar's line, never both.
 // 2. The kept set is the *first 500* by input order — preserving the
 //    caller's stable ordering so future callers (sort-by-coverage,
 //    sort-by-detection-confidence) can drive truncation deterministically.
@@ -48,18 +50,12 @@ struct ApplyBatchCapTests {
         return made
     }
 
-    /// The engine file, read relative to this test's own path.
-    private func engineSource() throws -> String {
-        let root = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-        return try String(contentsOf: root.appendingPathComponent("Sources/ResectaApp/State/RedactionApplyEngine.swift"), encoding: .utf8)
-    }
+    // MARK: - Cap arithmetic, and the cut said once
 
-    // MARK: - Cap arithmetic + the recorded cut
-
-    @Test("applyBatch truncates 600 regions to exactly 500 and records the cut, queuing no message")
+    @Test("With Add to Selection on, a cut to 500 queues the warning and records no line")
     func testApplyBatchTruncatesAt500() throws {
         let state = RedactionState()
+        let toastManager = ToastQueueManager()
         let cutAt = Date(timeIntervalSinceReferenceDate: 1_000)
         let regions = fabricateRegions(count: 600)
         // Stash the regions in the state so they're real "resident"
@@ -70,26 +66,41 @@ struct ApplyBatchCapTests {
         // Pre-condition: cap is the documented constant.
         #expect(RedactionState.lassoSelectionCap == 500)
 
-        let outcome = state.applyBatch(regions, now: cutAt)
+        let outcome = state.applyBatch(regions, now: cutAt, barShowing: false, toastManager: toastManager)
 
         // Exactly 500 selected — the first 500 by stored input order.
         #expect(outcome.selected == 500)
         #expect(outcome.truncated == true)
         #expect(state.selectedRegionIDs.count == 500)
 
-        // The cut is recorded with its time and the selection it left.
-        #expect(state.lassoCut == LassoCut(at: cutAt, selection: state.selectedRegionIDs))
-
-        // No message is queued: the batch takes no queue, and its body
-        // enqueues nothing.
-        let source = try engineSource()
-        let start = try #require(source.range(of: "func applyBatch(")?.lowerBound)
-        let end = try #require(source.range(of: "struct LassoCut")?.lowerBound)
-        #expect(!source[start..<end].contains("enqueue("))
+        // The warning, once, at .warning severity with the shipped words.
+        #expect(toastManager.activeToasts.count == 1)
+        let toast = try #require(toastManager.activeToasts.first)
+        #expect(toast.severity == .warning)
+        #expect(toast.message == RedactionState.lassoSelectionCapToastMessage)
+        // No line for the bar as well: one notice.
+        #expect(state.lassoCut == nil)
 
         // The words, pinned, so a rename of the constant fails this test by
         // a mismatch rather than by a silent drift.
         #expect(RedactionState.lassoSelectionCapToastMessage == "Selection limited to 500 regions")
+    }
+
+    @Test("With the selection bar showing, a cut to 500 records the bar's line and queues no warning")
+    func testApplyBatchWithTheBarShowing() {
+        let state = RedactionState()
+        let toastManager = ToastQueueManager()
+        let cutAt = Date(timeIntervalSinceReferenceDate: 2_000)
+        let regions = fabricateRegions(count: 600)
+        state.regions[0] = regions
+
+        let outcome = state.applyBatch(regions, now: cutAt, barShowing: true, toastManager: toastManager)
+
+        #expect(outcome.selected == 500 && outcome.truncated)
+        // The cut is recorded with its time and the selection it left.
+        #expect(state.lassoCut == LassoCut(at: cutAt, selection: state.selectedRegionIDs))
+        // No warning as well: one notice.
+        #expect(toastManager.activeToasts.isEmpty)
     }
 
     @Test("applyBatch under the cap selects everything and records no cut")
