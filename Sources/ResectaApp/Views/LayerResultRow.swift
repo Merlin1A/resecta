@@ -685,6 +685,7 @@ struct LayerResultRow: View {
             if let onReviewInScan, Self.offersReviewInScan(layer: layer) {
                 Button(Self.reviewInScanLabel, action: onReviewInScan)
                     .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ResectaTokens.BrandTeal.text)
                     .accessibilityIdentifier("reviewInScanButton")
             }
         }

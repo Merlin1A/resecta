@@ -90,20 +90,45 @@ struct RedactedPreviewView: View {
         return nil
     }
 
+    /// The label's colour per verdict, from the text tier: the failed and
+    /// needs-review shades, and the support grey for a run whose checks did
+    /// not run (the system's secondary grey, which `VerificationStatus`
+    /// gives that verdict elsewhere, measures under 4.5 to 1 on its wash at
+    /// this size). Nil where no label shows.
+    static func verdictCapsuleColor(verdict: VerificationStatus?) -> Color? {
+        guard let verdict else { return nil }
+        if verdict.isFail { return ResectaTokens.SemanticColor.failText }
+        if verdict.isAttention { return ResectaTokens.SemanticColor.attentionText }
+        if verdict.isSkipped { return ResectaTokens.SemanticColor.supportText }
+        return nil
+    }
+
+    /// The wash behind the label: the label's own colour at this opacity,
+    /// over the capsule's base. One value for all three labels, so they read
+    /// as one family: the largest at which each label measures at least 4.5
+    /// to 1 on its wash, in light and in dark.
+    static let verdictCapsuleStrength: Double = 0.10
+
+    /// The capsule's own opaque ground, under the wash: the system background
+    /// (white in light; black, or #1C1C1E on a raised screen, in dark). The
+    /// label sits in the navigation bar, where the page, the grey around it
+    /// or the bar's material can show through as the document scrolls; on
+    /// its own ground the label keeps one measured contrast over all of them.
+    static let verdictCapsuleBase: Color = Color(uiColor: .systemBackground)
+
     @ViewBuilder
     private func verdictCapsule(text: String) -> some View {
-        // This is small `.caption` TEXT (plus its 12%
-        // wash background riding the same variable, mirroring
-        // ToastSeverity's text/fill pairing), not a glyph — routed
-        // through the WCAG-AA text tier rather than `.color`'s system
-        // hues.
-        let tint = verdict?.textColor ?? .secondary
+        // Small `.caption` text on a wash of its own colour, mirroring
+        // ToastSeverity's text/fill pairing: routed through the text tier
+        // rather than `.color`'s system hues.
+        let tint = Self.verdictCapsuleColor(verdict: verdict) ?? ResectaTokens.SemanticColor.supportText
         Text(text)
             .font(.caption.weight(.medium))
             .foregroundStyle(tint)
             .padding(.horizontal, ResectaTokens.Spacing.sm)
             .padding(.vertical, ResectaTokens.Spacing.xxs)
-            .background(tint.opacity(0.12), in: Capsule())
+            .background(tint.opacity(Self.verdictCapsuleStrength), in: Capsule())
+            .background(Self.verdictCapsuleBase, in: Capsule())
             .accessibilityIdentifier("previewVerdictCapsule")
             .accessibilityLabel(text)
     }
