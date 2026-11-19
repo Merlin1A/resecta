@@ -1,0 +1,19 @@
+Property: The Not Searched list draws its rows in its content's order; it sorts nothing.
+Area: the Not Searched list
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/NotSearchedListTests
+Must go red: ResectaAppTests/NotSearchedListTests sectionsAndRowsInOrder
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/Messages/NotSearchedList.swift b/Sources/ResectaApp/Views/Messages/NotSearchedList.swift
+index 6831c2c6..12d856f7 100644
+--- a/Sources/ResectaApp/Views/Messages/NotSearchedList.swift
++++ b/Sources/ResectaApp/Views/Messages/NotSearchedList.swift
+@@ -75,7 +75,7 @@ struct NotSearchedList: View {
+             if let nameLine = section.nameLine {
+                 items.append(.nameLine(nameLine))
+             }
+-            for (index, row) in section.rows.enumerated() {
++            for (index, row) in section.rows.sorted(by: { ($0.pages.first ?? 0) < ($1.pages.first ?? 0) }).enumerated() {
+                 // Hairlines stand between the rows of one section only.
+                 items.append(.row(row, hairlineAbove: index > 0))
+             }
