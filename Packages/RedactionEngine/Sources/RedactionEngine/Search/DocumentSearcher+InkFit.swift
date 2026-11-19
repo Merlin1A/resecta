@@ -425,7 +425,7 @@ extension DocumentSearcher {
         // The ink rows: at the ink threshold; text lighter than it (grey
         // labels, a faint scan) read again at `inkFitLightThreshold`; light
         // text on a dark ground read as light ink.
-        func read(_ map: GrayBitmap) -> (box: CGRect?, outcome: InkFitOutcome) {
+        func read(_ map: GrayBitmap) -> (box: CGRect?, outcome: InkFitOutcome, margin: Int?) {
             inkBox(in: map, box: seed, window: window,
                    growLeft: anchor?.growLeft ?? true, growRight: anchor?.growRight ?? true)
         }
@@ -436,6 +436,9 @@ extension DocumentSearcher {
             let light = read(bitmap.reading(threshold: inkFitLightThreshold))
             if light.box != nil { reading = light }
         }
+        #if DEBUG
+        inkFitLineMargins.set(reading.margin, for: job.pageKey)
+        #endif
         // No ink rows read for the word (text lighter than the ink
         // threshold, light text on a dark ground, or no inked line on the
         // box): nothing verifies a box against its glyphs, and Vision's box
@@ -505,6 +508,9 @@ extension DocumentSearcher {
     /// Test seam: a stall in place of every job for a page on the Vision
     /// lane, and that job's limit there.
     static let inkFitInjectedLaneStalls = InkFitStalls()
+    /// Test seam: per page content key, the line margin (`inkBox`) of the
+    /// reading the page's last render-read fit used.
+    static let inkFitLineMargins = InkFitMargins()
     #endif
 
     /// `work` on an ink-fit Vision lane (`InkFitQueueState`); nil on a timeout, a

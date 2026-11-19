@@ -1,0 +1,18 @@
+Property: The content basis is the raster rule's S·d / 4608 per side, not the raster's whole-pixel count.
+Area: the raster's content basis (fills, readback, ink growth and the hidden-text ink test)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/FillCoverageBasisTests (or on the host: cd Packages/RedactionEngine && swift test --no-parallel --filter FillCoverageBasisTests)
+Must go red: RedactionEngineTests/FillCoverageBasisTests contentBasisSitsBetweenTheContentAndTheRaster; RedactionEngineTests/FillCoverageBasisTests gainedSideFarEdgeCovered [height 302.626 pt at 300 DPI, bar from 301.667]; RedactionEngineTests/FillCoverageBasisTests rasterizedPageFarEdgeCovered [height 302.626 pt at 300 DPI, bar from 301.667]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift
+@@ -770,7 +770,7 @@
+               PixelPlan.Raster(widthSixtyFourths: w, heightSixtyFourths: h, dpi: Int(dpi)) != nil
+         else { return nil }
+         let perInch = Double(PixelPlan.sixtyFourthsPerInch)
+-        return CGSize(width: Double(w) * Double(dpi) / perInch, height: Double(h) * Double(dpi) / perInch)
++        return CGSize(width: (Double(w) * Double(dpi) / perInch).rounded(.up), height: (Double(h) * Double(dpi) / perInch).rounded(.up))
+     }
+ 
+     /// The transform that draws `cgPage`'s `box` into `targetRect` in the

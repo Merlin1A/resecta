@@ -94,6 +94,14 @@ final class InkFitStalls: @unchecked Sendable {
     func value(for key: Int) -> (stall: TimeInterval, timeout: TimeInterval)? { lock.lock(); defer { lock.unlock() }; return stalls[key] }
     func set(_ value: (stall: TimeInterval, timeout: TimeInterval)?, for key: Int) { lock.lock(); stalls[key] = value; lock.unlock() }
 }
+
+/// The test seam's line margins, by page content key.
+final class InkFitMargins: @unchecked Sendable {
+    private let lock = NSLock()
+    private var margins: [Int: Int?] = [:]
+    func value(for key: Int) -> Int?? { lock.withLock { margins[key] } }
+    func set(_ value: Int?, for key: Int) { lock.withLock { margins[key] = .some(value) } }
+}
 #endif
 
 /// A page image crossing from its render to the Vision lane by value.

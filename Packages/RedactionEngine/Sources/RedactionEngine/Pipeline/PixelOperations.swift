@@ -92,32 +92,45 @@ public func effectiveBounds(_ rawBounds: CGRect, rotation: Int) -> CGRect {
 }
 
 /// Convert normalized coordinates (0–1, bottom-left origin) to pixel
-/// coordinates in the fill bitmap context (bottom-left origin).
+/// coordinates in the fill bitmap context (bottom-left origin), on the
+/// page's CONTENT basis: `content` is how many pixels the page's content
+/// spans on each side (`PageRasterizer.rasterContentSize`, S·d / 4608 for a
+/// side of S sixty-fourths at d dots per inch), not the bitmap's count.
 ///
-/// SECURITY NOTE: Correctness depends entirely on renderPageFromCGPage() producing
-/// a bitmap where visual content fills the full width and height.
+/// SECURITY NOTE: the bitmap is ⌈S·d / 4608⌉ on each side, up to 1.06 px
+/// larger than the content (which spans side × dpi / 72) on a side the
+/// raster rule gains a pixel on. A rect scaled by the BITMAP's count could
+/// then sit more than one pixel above or right of the content near the far
+/// edge, and leave the row holding a glyph's edge unfilled. On the content
+/// basis the rect sits under d / 4608 px from the content (S·d / 4608 is at
+/// most that far past side × dpi / 72), inside the halo below.
+func normalizedToFillPixels(_ normalized: CGRect, content: CGSize) -> CGRect {
+    let clamped = normalized.clampedToNormalized()
+    let aligned = CGRect(
+        x: clamped.minX * content.width,
+        y: clamped.minY * content.height,
+        width: clamped.width * content.width,
+        height: clamped.height * content.height
+    ).pixelAligned()
+    // Expand 1 px outward beyond pixel alignment: it covers the boundary
+    // row/column of the small offset between the two bases and of the
+    // renderer's anti-aliasing. Strictly over-redacting (the safe
+    // direction). Page edges need no special case — fills clip at the
+    // bitmap and verifyFill clamps. Empty aligned rects stay empty so
+    // degenerate regions remain no-ops. Do NOT shrink the bitmap instead:
+    // floor() would crop a column of real page content out of the output.
+    return aligned.isEmpty ? aligned : aligned.insetBy(dx: -1, dy: -1)
+}
+
+/// `normalizedToFillPixels(_:content:)` for a bitmap whose content spans it
+/// exactly (a bitmap drawn in pixels, as a test draws one). A page raster
+/// maps on its content basis instead.
 func normalizedToFillPixels(
     _ normalized: CGRect,
     bitmapWidth: Int,
     bitmapHeight: Int
 ) -> CGRect {
-    let clamped = normalized.clampedToNormalized()
-    let aligned = CGRect(
-        x: clamped.minX * CGFloat(bitmapWidth),
-        y: clamped.minY * CGFloat(bitmapHeight),
-        width: clamped.width * CGFloat(bitmapWidth),
-        height: clamped.height * CGFloat(bitmapHeight)
-    ).pixelAligned()
-    // Expand 1 px outward beyond pixel alignment. The rendered
-    // content spans points × dpi/72 while the bitmap is ceil() of that, so a
-    // rect scaled by the bitmap dimension can sit up to 1 px off the content
-    // basis; the extra pixel covers the boundary row/column in the shifted
-    // direction. Strictly over-redacting (the safe direction). Page
-    // edges need no special case — fills clip at the bitmap and verifyFill
-    // clamps. Empty aligned rects stay empty so degenerate regions
-    // remain no-ops. Do NOT shrink the bitmap instead: floor() would crop a
-    // column of real page content out of the output.
-    return aligned.isEmpty ? aligned : aligned.insetBy(dx: -1, dy: -1)
+    normalizedToFillPixels(normalized, content: CGSize(width: bitmapWidth, height: bitmapHeight))
 }
 
 // MARK: - Pixel Alignment
@@ -151,21 +164,22 @@ internal let cancellationBandRows: Int = 256
 /// across pixel-aligned integer rows, so there is no overlap, no gap, and no
 /// anti-aliasing seam between adjacent bands (blend mode is `.copy` and
 /// anti-aliasing is disabled).
+///
+/// `content`: the page's content basis (`normalizedToFillPixels(_:content:)`);
+/// nil for a bitmap whose content spans it exactly.
 func applyRedactionFills(
     context: CGContext,
     regions: [RedactionRegion],
-    fillColor: FillColor
+    fillColor: FillColor,
+    content: CGSize? = nil
 ) throws {
+    let basis = content ?? CGSize(width: context.width, height: context.height)
     context.setBlendMode(.copy)           // R = S, regardless of destination
     context.setShouldAntialias(false)     // No edge blending
     context.setFillColor(fillColor.cgColor)
 
     for region in regions {
-        let pixelRect = normalizedToFillPixels(
-            region.normalizedRect,
-            bitmapWidth: context.width,
-            bitmapHeight: context.height
-        )
+        let pixelRect = normalizedToFillPixels(region.normalizedRect, content: basis)
         // Fill in 256-row bands with a cancellation check between
         // bands. Region rects are already pixel-aligned (see
         // normalizedToFillPixels → pixelAligned), so integer banding is safe.
@@ -345,14 +359,16 @@ func inkGrowthRect(context: CGContext, fillRect: CGRect) throws -> CGRect? {
 
 /// The ink-growth rects for a page's text-derived regions (search matches and
 /// detected PII; a box the user drew, or a face, is filled as drawn), read
-/// from the rendered page before any fill.
-func inkGrowthRects(context: CGContext, regions: [RedactionRegion]) throws -> [CGRect] {
-    try regions.compactMap { region in
+/// from the rendered page before any fill. `content`: the page's content
+/// basis, as the fills map on it; nil for a bitmap whose content spans it.
+func inkGrowthRects(context: CGContext, regions: [RedactionRegion], content: CGSize? = nil) throws -> [CGRect] {
+    let basis = content ?? CGSize(width: context.width, height: context.height)
+    return try regions.compactMap { region in
         switch region.source {
         case .searchMatch, .detectedPII: break
         case .manual, .detectedFace: return nil
         }
         return try inkGrowthRect(context: context, fillRect: normalizedToFillPixels(
-            region.normalizedRect, bitmapWidth: context.width, bitmapHeight: context.height))
+            region.normalizedRect, content: basis))
     }
 }

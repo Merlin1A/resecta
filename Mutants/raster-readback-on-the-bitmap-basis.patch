@@ -1,0 +1,18 @@
+Property: A page's fills are read back on the basis they were painted on.
+Area: the raster's content basis (fills, readback, ink growth and the hidden-text ink test)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/FillCoverageBasisTests (or on the host: cd Packages/RedactionEngine && swift test --no-parallel --filter FillCoverageBasisTests)
+Must go red: RedactionEngineTests/FillCoverageBasisTests rasterizedPageReadsBackItsFill [height 302.626 pt at 300 DPI, bar from 280.5 to 295.4]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift
+@@ -481,7 +481,7 @@
+         // 6. Verify fills, on the basis they were painted on. 256-row band
+         // cancellation checks happen inside; a thrown CancellationError propagates here.
+         for region in page.regions {
+-            let pixelRect = normalizedToFillPixels(region.normalizedRect, content: content)
++            let pixelRect = normalizedToFillPixels(region.normalizedRect, bitmapWidth: width, bitmapHeight: height)
+             // Clamp to bitmap bounds
+             let clamped = pixelRect.intersection(
+                 CGRect(x: 0, y: 0, width: width, height: height)

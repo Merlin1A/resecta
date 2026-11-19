@@ -96,7 +96,7 @@ public final class PageRasterizer: @unchecked Sendable {
     /// Drop every entry in the per-rasterizer bitmap pool. Called from
     /// `PipelineCoordinator.memoryWarningTask` after iOS posts a memory
     /// warning, so the up to ~135 MB of held bitmap buffers (4 entries ×
-    /// a ~33.7 MB US-Letter raster: 2550×3301 px × 4 B at 300 DPI) are
+    /// a ~33.7 MB US-Letter raster: 2550×3300 px × 4 B at 300 DPI) are
     /// released immediately rather than waiting for the rasterizer to drop at
     /// run end. Idempotent and thread-safe against in-flight
     /// `rasterize(...)` calls (pool guards `entries` internally).
@@ -153,14 +153,22 @@ public final class PageRasterizer: @unchecked Sendable {
 
             ctx.draw(renderedImage, in: CGRect(x: 0, y: 0, width: width, height: height))
 
+            // Every box maps onto the bitmap on the content basis, the
+            // pixels the page's content spans (the raster rule's S·d / 4608
+            // per side), never the bitmap's own count (`normalizedToFillPixels`).
+            guard let content = Self.rasterContentSize(
+                bounds: page.cropBoxBounds, rotation: page.rotation, dpi: CGFloat(raster.dpi)) else {
+                throw PipelineError.redactionError(.bitmapCreationFailed(pageIndex: page.pageIndex))
+            }
+
             // 4b. The hidden-text ink test (`inkTest`).
-            try self.inkTest(&textLayer, context: ctx, page: page, pageSize: raster.effectiveSize)
+            try self.inkTest(&textLayer, context: ctx, page: page, pageSize: raster.effectiveSize, content: content)
 
             // 4c-5. Ink growth, the fills, the growth fills and their readback (`paint`).
-            try self.paint(context: ctx, page: page)
+            try self.paint(context: ctx, page: page, content: content)
 
             // 6. Verify fills (`readBack`).
-            try self.readBack(context: ctx, page: page, width: width, height: height)
+            try self.readBack(context: ctx, page: page, width: width, height: height, content: content)
 
             // 7. Extract final image
             guard let redactedImage = ctx.makeImage() else {
@@ -420,12 +428,12 @@ public final class PageRasterizer: @unchecked Sendable {
     /// fills' own reader (`hasInklessGlyph`).
     private func inkTest(
         _ textLayer: inout TextLayerState, context ctx: CGContext,
-        page: PDFPageData, pageSize effectiveSize: CGSize
+        page: PDFPageData, pageSize effectiveSize: CGSize, content: CGSize
     ) throws {
         if let entries = textLayer.entries,
            try Self.hasInklessGlyph(
                context: ctx, entries: entries, pageSize: effectiveSize,
-               rotation: page.rotation
+               rotation: page.rotation, content: content
            ) {
             textLayer.entries = nil
             textLayer.removalRects = []
@@ -449,15 +457,15 @@ public final class PageRasterizer: @unchecked Sendable {
 
     /// The ink growth read, the fills, then each growth rectangle filled and
     /// read back. Runs after the ink test and before `readBack`.
-    private func paint(context ctx: CGContext, page: PDFPageData) throws {
+    private func paint(context ctx: CGContext, page: PDFPageData, content: CGSize) throws {
         // 4c. Ink growth, read on the rendered page before any fill: a
         // text-derived fill grows over the ink that crosses its edge.
-        let growth = try inkGrowthRects(context: ctx, regions: page.regions)
+        let growth = try inkGrowthRects(context: ctx, regions: page.regions, content: content)
 
-        // 5. Apply fills — bitmap dimensions only, no PDF geometry.
+        // 5. Apply fills on the content basis.
         // 256-row band cancellation checks happen inside.
         try applyRedactionFills(
-            context: ctx, regions: page.regions, fillColor: page.fillColor
+            context: ctx, regions: page.regions, fillColor: page.fillColor, content: content
         )
         for rect in growth {
             ctx.setBlendMode(.copy); ctx.setShouldAntialias(false)
@@ -469,13 +477,11 @@ public final class PageRasterizer: @unchecked Sendable {
     }
 
     /// Every region's fill read back over its clamped pixel rectangle.
-    private func readBack(context ctx: CGContext, page: PDFPageData, width: Int, height: Int) throws {
-        // 6. Verify fills. 256-row band cancellation
-        // checks happen inside; a thrown CancellationError propagates here.
+    private func readBack(context ctx: CGContext, page: PDFPageData, width: Int, height: Int, content: CGSize) throws {
+        // 6. Verify fills, on the basis they were painted on. 256-row band
+        // cancellation checks happen inside; a thrown CancellationError propagates here.
         for region in page.regions {
-            let pixelRect = normalizedToFillPixels(
-                region.normalizedRect, bitmapWidth: width, bitmapHeight: height
-            )
+            let pixelRect = normalizedToFillPixels(region.normalizedRect, content: content)
             // Clamp to bitmap bounds
             let clamped = pixelRect.intersection(
                 CGRect(x: 0, y: 0, width: width, height: height)
@@ -553,12 +559,14 @@ public final class PageRasterizer: @unchecked Sendable {
     /// checked is not known to be clean (`inkTestCanRun` tells the two
     /// apart for the recorded reason).
     static func hasInklessGlyph(
-        context: CGContext, entries: [CharacterInfo], pageSize: CGSize, rotation: Int = 0
+        context: CGContext, entries: [CharacterInfo], pageSize: CGSize, rotation: Int = 0,
+        content: CGSize? = nil
     ) throws -> Bool {
         guard inkTestCanRun(context: context, pageSize: pageSize) else {
             return true
         }
         let bitmap = CGRect(x: 0, y: 0, width: context.width, height: context.height)
+        let basis = content ?? bitmap.size
         let visiblePage = CGRect(x: 0, y: 0, width: 1, height: 1)
         var band = 0
         for entry in entries {
@@ -573,9 +581,7 @@ public final class PageRasterizer: @unchecked Sendable {
             if normalized.width > 0, normalized.height > 0, !normalized.intersects(visiblePage) {
                 return true
             }
-            let box = normalizedToFillPixels(
-                normalized, bitmapWidth: context.width, bitmapHeight: context.height
-            ).intersection(bitmap)
+            let box = normalizedToFillPixels(normalized, content: basis).intersection(bitmap)
             guard !box.isEmpty,
                   Int(box.width) * Int(box.height) >= hiddenTextMinimumBoxArea else { continue }
             let band = try InkContrastFloor.band(forBox: box, rotation: rotation, context: context)
@@ -584,7 +590,8 @@ public final class PageRasterizer: @unchecked Sendable {
             }
             if isLetterOrDigit(entry.character),
                let core = InkContrastFloor.glyphCore(normalized, rotation: rotation,
-                                    bitmapWidth: context.width, bitmapHeight: context.height),
+                                    bitmapWidth: context.width, bitmapHeight: context.height,
+                                    content: basis),
                Int(core.width) * Int(core.height) >= hiddenTextMinimumBoxArea,
                try InkContrastFloor.isCoreNearUniform(context: context, rect: core, band: band) {
                 return true
@@ -681,10 +688,12 @@ public final class PageRasterizer: @unchecked Sendable {
             ? CGSize(width: rawRect.height, height: rawRect.width)
             : rawRect.size
 
-        // Compute pixel dimensions at target DPI
+        // The raster's size by the raster rule; the drawing scale stays dpi / 72.
         let scale = dpi / 72.0
-        let pw = Int(ceil(effectiveSize.width * scale))
-        let ph = Int(ceil(effectiveSize.height * scale))
+        guard let raster = Self.rasterPixelSize(bounds: rawRect, rotation: rotation, dpi: dpi) else {
+            throw PipelineError.redactionError(.bitmapCreationFailed(pageIndex: pageIndex))
+        }
+        let pw = raster.width, ph = raster.height
 
         guard let ctx = createBitmapContext(width: pw, height: ph) else {
             throw PipelineError.redactionError(.bitmapCreationFailed(pageIndex: pageIndex))
@@ -737,6 +746,33 @@ public final class PageRasterizer: @unchecked Sendable {
 }
 
 extension PageRasterizer {
+    /// The raster's size by the raster rule (`PixelPlan`): each side in whole
+    /// sixty-fourths, then ⌈S·d / 4608⌉ pixels. Nil for a refused side or DPI.
+    static func rasterPixelSize(bounds: CGRect, rotation: Int, dpi: CGFloat) -> (width: Int, height: Int)? {
+        let size = effectiveBounds(bounds, rotation: rotation).size
+        guard dpi.rounded() == dpi,
+              let w = PixelPlan.sixtyFourths(ofSide: Double(size.width)),
+              let h = PixelPlan.sixtyFourths(ofSide: Double(size.height)),
+              let raster = PixelPlan.Raster(widthSixtyFourths: w, heightSixtyFourths: h, dpi: Int(dpi))
+        else { return nil }
+        return (raster.pixelWidth, raster.pixelHeight)
+    }
+
+    /// The pixels the page's content spans on each side of that raster, by
+    /// the same rule: S·d / 4608 for a side of S sixty-fourths. It is at most
+    /// d / 4608 px past side × dpi / 72 (the span the content is drawn at),
+    /// and under one pixel short of the raster. Nil where `rasterPixelSize` is.
+    static func rasterContentSize(bounds: CGRect, rotation: Int, dpi: CGFloat) -> CGSize? {
+        let size = effectiveBounds(bounds, rotation: rotation).size
+        guard dpi.rounded() == dpi,
+              let w = PixelPlan.sixtyFourths(ofSide: Double(size.width)),
+              let h = PixelPlan.sixtyFourths(ofSide: Double(size.height)),
+              PixelPlan.Raster(widthSixtyFourths: w, heightSixtyFourths: h, dpi: Int(dpi)) != nil
+        else { return nil }
+        let perInch = Double(PixelPlan.sixtyFourthsPerInch)
+        return CGSize(width: Double(w) * Double(dpi) / perInch, height: Double(h) * Double(dpi) / perInch)
+    }
+
     /// The transform that draws `cgPage`'s `box` into `targetRect` in the
     /// rotation frame PDFKit reports (`rotation`, the `PDFPage.rotation`
     /// every region is built in). CoreGraphics' `getDrawingTransform`
