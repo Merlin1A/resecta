@@ -167,6 +167,8 @@ struct ToastQueueManagerTests {
 
     // MARK: - The run start's drop
 
+    // The plain toast is posted last: a plain message that is waiting gives way to any
+    // newer one, so posted before the second action toast it would be gone before the drop.
     @Test("A run start's drop removes every toast that carries an action, shown or queued, and keeps the rest")
     func dropActionToastsKeepsOtherToasts() async throws {
         let mgr = ToastQueueManager()
