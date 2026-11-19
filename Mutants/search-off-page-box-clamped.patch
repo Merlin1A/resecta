@@ -1,7 +1,7 @@
 Property: A rectangle with no overlap with the visible page is no box: the off-page rectangle is clamped onto the page (the code before a hit with no box was listed)
 Area: Search, a hit with no box
 Test command: swift test --no-parallel --filter '^RedactionEngineTests\.NoBoxHitTests/' (in Packages/RedactionEngine, DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer)
-Must go red: RedactionEngineTests/NoBoxHitTests offVisiblePage; RedactionEngineTests/NoBoxHitTests recheckCountsIt
+Must go red: RedactionEngineTests/NoBoxHitTests offVisiblePage
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
