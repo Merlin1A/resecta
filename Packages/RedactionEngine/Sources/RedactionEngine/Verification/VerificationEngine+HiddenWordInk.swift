@@ -50,12 +50,13 @@ extension VerificationEngine {
     }
 
     /// Run the check over every page of `doc`. Returns the status, its
-    /// pages, the could-not-verify flag and the layer's own copy.
+    /// pages, the could-not-verify flag, the layer's own copy, and beside a
+    /// issue the pages it could not check (`CheckRowComposition`).
     func runHiddenWordInk(
         _ doc: PDFDocument,
         regions: [Int: [RedactionRegion]],
         sourceDocument: SendablePDFDocument?
-    ) async throws -> (VerificationStatus, [Int]?, Bool, LayerCopy?) {
+    ) async throws -> (VerificationStatus, [Int]?, Bool, LayerCopy?, String?, [Int]?) {
         try Task.checkCancellation()
         var outcomes: [(page: Int, outcome: HiddenWordInkPage)] = []
         let source = sourceDocument.flatMap { $0.document.isLocked ? nil : $0.document }
@@ -106,13 +107,14 @@ extension VerificationEngine {
             axis: HiddenWordInkAxis(rotation: sourcePage.rotation)))
     }
 
-    /// Fold the pages: any flagged word → FAIL; else any page not inspected or
-    /// not read → WARN that could not verify; else any edge note → INFO;
-    /// else any page checked → PASS; else NOT APPLICABLE. Each message names
-    /// the first such page; the references list every one.
+    /// Fold the pages: any flagged word → FAIL, with any page not inspected
+    /// or not read beside it; else any such page → WARN that could not
+    /// verify; else any edge note → INFO (a note: never joined); else any
+    /// page checked → PASS; else NOT APPLICABLE. Each message names the
+    /// first such page; the references list every one.
     static func foldHiddenWordInk(
         _ outcomes: [(page: Int, outcome: HiddenWordInkPage)]
-    ) -> (VerificationStatus, [Int]?, Bool, LayerCopy?) {
+    ) -> (VerificationStatus, [Int]?, Bool, LayerCopy?, String?, [Int]?) {
         var failed: [Int] = [], unsure: [Int] = [], noted: [Int] = [], checked = false
         for (page, outcome) in outcomes {
             switch outcome {
@@ -126,25 +128,29 @@ extension VerificationEngine {
                 if !v.edgeNotes.isEmpty { noted.append(page) }
             }
         }
-        if let first = failed.first {
-            return (.fail(hiddenWordInkFailed(page: first + 1)), failed, false, nil)
-        }
-        if let first = unsure.first {
-            return (.warn(hiddenWordInkCouldNotCheck(page: first + 1)), unsure, true, nil)
+        let conditions = unsure.first.map {
+            [UnverifiedCondition(sentence: hiddenWordInkCouldNotCheck(page: $0 + 1), pages: unsure)]
+        } ?? []
+        let found = failed.first.map { (status: VerificationStatus.fail(hiddenWordInkFailed(page: $0 + 1)), pages: Optional(failed)) }
+        if let row = CheckRowComposition.compose(issue: found, conditions: conditions, warnings: []) {
+            return (row.status, row.pages, row.couldNotVerify, nil, row.partSentence, row.partPages)
         }
         if let first = noted.first {
-            return (.info(hiddenWordInkEdgeNote(page: first + 1)), noted, false, nil)
+            return (.info(hiddenWordInkEdgeNote(page: first + 1)), noted, false, nil, nil, nil)
         }
         if checked {
-            return (.pass, nil, false, LayerCopy(short: hiddenWordInkPassed, detail: ""))
+            return (.pass, nil, false, LayerCopy(short: hiddenWordInkPassed, detail: ""), nil, nil)
         }
-        return (.notApplicable(hiddenWordInkNotApplicable), nil, false, nil)
+        return (.notApplicable(hiddenWordInkNotApplicable), nil, false, nil, nil, nil)
     }
 
     /// The source page's hidden characters, in `page.string` order: each
     /// composed character that is not whitespace, boxed by its own selection
     /// in the frame the regions use, with its line. A character PDFKit gives
-    /// no box is left out (the writer cannot have drawn it either).
+    /// no box is left out (the writer cannot have drawn it either). A
+    /// character wholly off the visible page keeps its box clamped to the
+    /// page's edge (`clampedNormalizedRect`): it stays a candidate the
+    /// export's words are aligned against.
     static func hiddenWordInkSourceGlyphs(_ page: PDFPage) -> [HiddenWordInkGlyph] {
         let text = (page.string ?? "") as NSString
         let searcher = DocumentSearcher()
@@ -154,7 +160,7 @@ extension VerificationEngine {
             text.enumerateSubstrings(in: lineRange, options: .byComposedCharacterSequences) { sub, range, _, _ in
                 guard let sub, let char = sub.first, !char.isWhitespace,
                       let selection = page.selection(for: range),
-                      let rect = searcher.normalizedRect(for: selection, page: page) else { return }
+                      let rect = searcher.clampedNormalizedRect(for: selection, page: page) else { return }
                 glyphs.append(HiddenWordInkGlyph(char: char, rect: rect, line: line))
             }
             line += 1
@@ -271,6 +277,8 @@ extension VerificationEngine {
         guard let image = hiddenWordInkRender(cgPage, size: raw, dpi: dpi) else { return nil }
         let turn = ((page.rotation % 360) + 360) % 360
         let toVisual: @Sendable (CGRect) -> CGRect = { Self.hiddenWordInkTurn($0, raw: raw, turn: turn) }
+        // Read on this task before the hop (the seam's contract).
+        let noResults = onRecognitionSimulateNoResults?(image) ?? false
         let boxed = HiddenWordInkImageBox(image: image)
         return await withCheckedContinuation { continuation in
             hiddenWordInkVisionQueue.async {
@@ -282,8 +290,13 @@ extension VerificationEngine {
                     continuation.resume(returning: nil)
                     return
                 }
+                // No result object is no read: the page could not be checked.
+                guard !noResults, let observations = request.results else {
+                    continuation.resume(returning: nil)
+                    return
+                }
                 var words: [HiddenWordInkWord] = []
-                for (line, observation) in (request.results ?? []).enumerated() {
+                for (line, observation) in observations.enumerated() {
                     words.append(HiddenWordInkWord(key: "", rect: toVisual(observation.boundingBox), line: line))
                     guard let candidate = observation.topCandidates(1).first else { continue }
                     let string = candidate.string

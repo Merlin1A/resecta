@@ -40,9 +40,9 @@ struct CouldNotVerifyFlagTests {
         return (doc, url)
     }
 
-    private func zeroDigest(page: Int) -> PageFilterDigest {
+    private func zeroDigest(page: Int, lineage: Data = Data()) -> PageFilterDigest {
         PageFilterDigest(pageIndex: page, extractedCount: 0, excludedCount: 0,
-                         survivingCount: 0, boundaryCharacters: [])
+                         survivingCount: 0, boundaryCharacters: [], lineageHash: lineage)
     }
 
     private func run(
@@ -293,7 +293,7 @@ struct CouldNotVerifyFlagTests {
         let r = await run(5, doc, mode: .searchableRedaction, regions: [0: [region]])
         #expect(message(r).contains("had no measurable position"), "got \(r.status)")
         expectFlag(r, true, "L6 graze page + zero-bounds page")
-        #expect(r.pageReferences == [0, 1])
+        #expect(r.pageReferences == [1], "the unmeasured page only, never the grazed one")
     }
 
     @Test("Layer 6: an unreadable searchable page → true; a short per-page mode array → true")
@@ -318,13 +318,16 @@ struct CouldNotVerifyFlagTests {
     func digestLayersPartial(index: Int) async throws {
         let (doc, url) = try TestFixtures.writeTempPDF(TestFixtures.twoBlankPages(), prefix: "cnv_l\(index)_")
         defer { try? FileManager.default.removeItem(at: url) }
+        // A blank page's lineage record is the digest of no characters: with
+        // it, Layer 9 compares the page (an empty record is not compared).
+        let lineage = SandwichMetrics.emptyLineageDigest
         let partial = await run(index, doc, mode: .searchableRedaction,
-                                digests: [zeroDigest(page: 0), nil])
+                                digests: [zeroDigest(page: 0, lineage: lineage), nil])
         #expect(message(partial).contains("Cross-checked 1 of 2"), "got \(partial.status)")
         expectFlag(partial, true, "L\(index + 1) partial digests")
 
         let full = await run(index, doc, mode: .searchableRedaction,
-                             digests: [zeroDigest(page: 0), zeroDigest(page: 1)])
+                             digests: [zeroDigest(page: 0, lineage: lineage), zeroDigest(page: 1, lineage: lineage)])
         #expect(!full.status.isWarn && !full.status.isFail, "got \(full.status)")
         expectFlag(full, false, "L\(index + 1) full")
     }
@@ -408,7 +411,7 @@ struct CouldNotVerifyFlagTests {
 
     // MARK: - Search Re-check
 
-    @Test("Search Re-check: a page that could not be checked → true; no searches → INFO false; a clean re-run → PASS false")
+    @Test("Search Re-check: a page that could not be checked → true; no searches → INFO false; an applied search with no box over its matches compared nothing → true")
     func searchRecheck() async throws {
         // 300-DPI render of a 40×40-inch page exceeds the searcher's OCR pixel
         // cap → "too large to scan for text" (the layer's unchecked WARN).
@@ -426,10 +429,14 @@ struct CouldNotVerifyFlagTests {
         let info = await run(5, blank, mode: .secureRasterization)
         #expect(info.status.isNotApplicable, "got \(info.status)")
         expectFlag(info, false, "re-check no searches")
-        let clean = await run(5, blank, mode: .secureRasterization,
+        // An applied search with no box over its matches: the coverage
+        // check compared nothing, which is could not verify. The clean
+        // re-run that keeps the flag clear is a covered one
+        // (`SearchRecheckTests`, its covered runs).
+        let noBox = await run(5, blank, mode: .secureRasterization,
                               searches: [TestFixtures.textRequest("Delia")])
-        #expect(clean.status == .pass, "got \(clean.status)")
-        expectFlag(clean, false, "re-check clean")
+        #expect(message(noBox) == "Re-ran 1 search; \(SearchRecheck.coverageNoSearchMatchClause)", "got \(noBox.status)")
+        expectFlag(noBox, true, "re-check compared nothing")
     }
 
     // MARK: - Model default
@@ -445,11 +452,13 @@ struct CouldNotVerifyFlagTests {
 
     // MARK: - Source census
 
-    /// Every `.warn(` construction in the eight verification files is
-    /// classified here — the could-not-verify family (23 sites) and the
-    /// routine-note WARNs — so a new site cannot land silently: an
+    /// Every `.warn(` construction in the verification files is classified
+    /// here — the could-not-verify family (27 sites) and the routine-note
+    /// WARNs — and so is every could-not-verify condition and joined warning
+    /// a check hands the row composer (`UnverifiedCondition(`,
+    /// `CheckWarning(`), so a new site cannot land silently: an
     /// unclassified construction, a moved message or a changed count fails.
-    @Test("source census: the could-not-verify family is exactly 25 sites and every WARN construction is classified")
+    @Test("source census: the could-not-verify family is exactly 27 sites and every WARN construction is classified")
     func warnSiteCensus() throws {
         struct Marker { let text: String; let family: Bool; let sites: Int; let lines: Int }
         let markers: [String: [Marker]] = [
@@ -460,22 +469,29 @@ struct CouldNotVerifyFlagTests {
                 Marker(text: "Some verification checks were skipped", family: false, sites: 0, lines: 1),
             ],
             // The dispatch of the four text-layer checks (Layers 6–9) and the
-            // per-page mode coverage, in their own file.
+            // per-page mode coverage, in their own file. Layer 6's
+            // unmeasured-position condition and Layer 8's font condition pass
+            // the verifier's sentence through (the classifying sites are in
+            // `SandwichVerification.swift` below); Layer 7's count excess is
+            // a joined note.
             "VerificationEngine+SandwichDispatch.swift": [
                 Marker(text: "Per-page mode data covered", family: true, sites: 1, lines: 1),
-                Marker(text: "Cross-checked \\(checked) of \\(eligible)", family: true, sites: 2, lines: 2),
-                // Layer 6's unmeasured-position class, passed through from
-                // `zeroBoundsWarning` (the classifying site); the graze class
-                // returns `grazeWarning`, a note.
-                Marker(text: "return (.warn(msg), (unmeasuredPages + grazePages).sorted(), true)", family: false, sites: 0, lines: 1),
+                Marker(text: "Cross-checked \\(checked) of \\(eligible)", family: true, sites: 1, lines: 1),
+                Marker(text: "UnverifiedCondition(sentence: $0, pages: unmeasuredPages)", family: false, sites: 0, lines: 1),
+                Marker(text: "UnverifiedCondition(sentence: sentence, pages: w.1 ?? [])", family: false, sites: 0, lines: 1),
+                Marker(text: "UnverifiedCondition(sentence: unreadablePagesSentence(pages), pages: pages)", family: false, sites: 0, lines: 1),
+                Marker(text: "CheckWarning(sentence: sentence, pages: w.1)", family: false, sites: 0, lines: 1),
             ],
             // The Layer 7/8 per-page fold: passes the verifier's WARN through
             // (the classifying sites are the verifier's, in
             // `SandwichVerification.swift` below).
-            // Layers 4 and 5, in their own file.
+            // Layers 4 and 5, in their own file. Each could-not-inspect
+            // sentence has two sites: a document that could not be loaded,
+            // and a file with no end marker or a fixed field that did not
+            // decode.
             "VerificationEngine+Structural.swift": [
-                Marker(text: "Could not inspect document structure", family: true, sites: 1, lines: 1),
-                Marker(text: "Could not inspect metadata", family: true, sites: 1, lines: 1),
+                Marker(text: "Could not inspect document structure", family: true, sites: 2, lines: 2),
+                Marker(text: "Could not inspect metadata", family: true, sites: 2, lines: 2),
                 Marker(text: "Structural findings:", family: false, sites: 0, lines: 1),  // LegalPhrases:safe (the engine message)
                 Marker(text: "Auto-injected metadata present: XMP metadata", family: false, sites: 0, lines: 1),
                 Marker(text: "Producer or timestamp fields were not rewritten", family: false, sites: 0, lines: 1),
@@ -487,10 +503,11 @@ struct CouldNotVerifyFlagTests {
             ],
             "VerificationEngine+Layer3.swift": [
                 Marker(text: "All sensitive terms shorter than 3 characters", family: true, sites: 1, lines: 1),
-                Marker(text: "return (.warn(shortTermTail(droppedTermCount)), nil, nil, true)", family: true, sites: 1, lines: 1),
+                Marker(text: "UnverifiedCondition(sentence: shortTermTail(droppedTermCount), pages: [])", family: true, sites: 1, lines: 1),
                 Marker(text: "Sensitive term search exceeded size limit", family: true, sites: 1, lines: 1),
                 Marker(text: "Could not read output PDF for binary search", family: true, sites: 1, lines: 1),
-                Marker(text: "return (.warn(warn.message), warn.pages, nil", family: false, sites: 0, lines: 1),
+                Marker(text: "UnverifiedCondition(sentence: unreadablePagesSentence(pages), pages: pages)", family: false, sites: 0, lines: 1),
+                Marker(text: "CheckWarning(sentence: $0.message, pages: $0.pages)", family: false, sites: 0, lines: 1),
             ],
             "Layer2OCRCheck+Sweep.swift": [
                 Marker(text: "OCR coordinates could not be mapped to page space", family: true, sites: 1, lines: 1),
@@ -504,42 +521,68 @@ struct CouldNotVerifyFlagTests {
                 Marker(text: "A character touches the edge of a redacted area on", family: false, sites: 0, lines: 1),
                 Marker(text: "Character count excess on page", family: false, sites: 0, lines: 1),
             ],
-            // Layer 10, in its own file since the split beside Layer 3's.
+            // Layer 10, in its own file since the split beside Layer 3's. The
+            // could-not-traverse sentence has two sites: a scan that did not
+            // complete, and a page with an operand that was not read.
             "SandwichVerification+Layer10.swift": [
                 Marker(text: "All sensitive terms shorter than 3 characters", family: true, sites: 1, lines: 1),
-                Marker(text: "return (.warn(shortTermTail(droppedTermCount)), nil, nil, true)", family: true, sites: 1, lines: 1),
+                Marker(text: "UnverifiedCondition(sentence: shortTermTail(droppedTermCount), pages: [])", family: true, sites: 1, lines: 1),
                 Marker(text: "Operator-semantic term search exceeded size limit", family: true, sites: 1, lines: 1),
                 Marker(text: "Operator scanner unavailable for page", family: true, sites: 1, lines: 1),
-                Marker(text: "Operator scanner could not traverse page", family: true, sites: 1, lines: 1),
+                Marker(text: "Operator scanner could not traverse page", family: true, sites: 2, lines: 2),
             ],
             // The re-check's two WARN sites, both could-not-verify: the fold's
-            // (pages it could not check, a coverage check it could not run, or
-            // both) and the scan-only outcome for a coverage check it could
-            // not run.
+            // (pages it could not check, a coverage check it could not run,
+            // could not read a page for, or that compared nothing) and the
+            // scan-only outcome for a coverage check it could not run.
             "SearchRecheck.swift": [
                 Marker(text: "status: .warn(message)", family: true, sites: 2, lines: 2),
             ],
             // The sweep's one WARN family: pages it could not read (the
-            // re-check's clause vocabulary).
+            // re-check's clause vocabulary), as its WARN or beside its issue.
             "DetectionSweep.swift": [
                 Marker(text: "status: .warn(message)", family: true, sites: 1, lines: 1),
+                Marker(text: "UnverifiedCondition(sentence: uncheckedClause, pages: uncheckedPages)", family: false, sites: 0, lines: 1),
             ],
-            // The hidden-word check's one WARN, could-not-verify: pages whose
-            // hidden text could not be matched to the print.
+            // The hidden-word check's one could-not-verify condition: pages
+            // whose hidden text could not be matched to the print.
             "VerificationEngine+HiddenWordInk.swift": [
-                Marker(text: "return (.warn(hiddenWordInkCouldNotCheck(page: first + 1)), unsure, true, nil)", family: true, sites: 1, lines: 1),
+                Marker(text: "UnverifiedCondition(sentence: hiddenWordInkCouldNotCheck(page: $0 + 1), pages: unsure)", family: true, sites: 1, lines: 1),
+            ],
+            // The row composer: it joins the sentences the checks hand it and
+            // classifies none of its own.
+            "CheckRowComposition.swift": [
+                Marker(text: "CheckRow(status: .warn(joined)", family: false, sites: 0, lines: 1),
+                Marker(text: "CheckRow(status: .warn(first.sentence)", family: false, sites: 0, lines: 1),
             ],
         ]
-        // Pinned `.warn(` construction counts (pattern matches excluded).
+        // Pinned `.warn(` construction counts (pattern matches excluded),
+        // and pinned condition / joined-warning construction counts.
         let constructionCounts = [
-            "VerificationEngine.swift": 5, "VerificationEngine+Structural.swift": 7,
-            "VerificationEngine+SandwichDispatch.swift": 4,
+            "VerificationEngine.swift": 3, "VerificationEngine+Structural.swift": 5,
+            "VerificationEngine+SandwichDispatch.swift": 0,
             "VerificationEngine+CouldNotVerify.swift": 1,
-            "VerificationEngine+Layer3.swift": 5,
-            "Layer2OCRCheck+Sweep.swift": 3, "SandwichVerification.swift": 5,
-            "SandwichVerification+Layer10.swift": 5,
+            "VerificationEngine+Layer3.swift": 3,
+            "Layer2OCRCheck+Sweep.swift": 0, "SandwichVerification.swift": 5,
+            "SandwichVerification+Layer10.swift": 4,
             "SearchRecheck.swift": 2, "DetectionSweep.swift": 1,
+            "VerificationEngine+HiddenWordInk.swift": 0,
+            "CheckRowComposition.swift": 2,
+        ]
+        let conditionCounts = [
+            "VerificationEngine.swift": 2, "VerificationEngine+Structural.swift": 3,
+            "VerificationEngine+SandwichDispatch.swift": 5,
+            "VerificationEngine+CouldNotVerify.swift": 0,
+            "VerificationEngine+Layer3.swift": 2,
+            "Layer2OCRCheck+Sweep.swift": 2, "SandwichVerification.swift": 0,
+            "SandwichVerification+Layer10.swift": 2,
+            "SearchRecheck.swift": 0, "DetectionSweep.swift": 1,
             "VerificationEngine+HiddenWordInk.swift": 1,
+            "CheckRowComposition.swift": 0,
+        ]
+        let joinedWarningCounts = [
+            "VerificationEngine+Structural.swift": 2, "VerificationEngine+SandwichDispatch.swift": 1,
+            "VerificationEngine+Layer3.swift": 1, "Layer2OCRCheck+Sweep.swift": 1,
         ]
 
         let sources = URL(fileURLWithPath: #filePath)
@@ -553,6 +596,13 @@ struct CouldNotVerifyFlagTests {
             let constructions = lines.filter { $0.contains(".warn(") && !$0.contains("case .warn(") }
             #expect(constructions.count == constructionCounts[file],
                     "\(file): \(constructions.count) `.warn(` constructions; the census pins \(constructionCounts[file] ?? -1) — classify the new site here and set the flag at it")
+            let code = lines.filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+            let conditions = code.filter { $0.contains("UnverifiedCondition(") }.count
+            #expect(conditions == conditionCounts[file],
+                    "\(file): \(conditions) could-not-verify conditions; the census pins \(conditionCounts[file] ?? -1) — classify the new site here")
+            let joined = code.filter { $0.contains("CheckWarning(") }.count
+            #expect(joined == joinedWarningCounts[file, default: 0],
+                    "\(file): \(joined) joined warnings; the census pins \(joinedWarningCounts[file, default: 0]) — classify the new site here")
             for m in list {
                 let hits = lines.filter {
                     $0.contains(m.text) && !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//")
@@ -561,6 +611,6 @@ struct CouldNotVerifyFlagTests {
                 familySites += m.sites
             }
         }
-        #expect(familySites == 25, "the could-not-verify family is \(familySites) sites; the contract says 25")
+        #expect(familySites == 27, "the could-not-verify family is \(familySites) sites; the contract says 27")
     }
 }

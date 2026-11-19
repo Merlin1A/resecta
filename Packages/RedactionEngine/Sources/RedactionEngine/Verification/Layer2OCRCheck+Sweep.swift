@@ -129,17 +129,27 @@ extension VerificationEngine {
     /// flags takes the same nil return the real perform error takes.
     @TaskLocal static var onLayer2OCRSimulateError: (@Sendable (CGImage) -> Bool)?
 
+    /// Guard seam for a recognition pass that performs without error and
+    /// returns no result object (no fixture can make Vision do so on
+    /// demand). Production-inert: nil outside tests. Task-local, read on the
+    /// calling task before the hop to the Vision queue, as the seam above.
+    /// While bound, an image the closure flags reads as having no result
+    /// object. Read by this check and by the hidden-word check.
+    @TaskLocal static var onRecognitionSimulateNoResults: (@Sendable (CGImage) -> Bool)?
+
     /// One image's Layer-2 OCR pass on the dedicated Vision queue: build the
     /// frozen `verificationLayer2` request, perform it, and map the observations
     /// to `OCRHit`s (Sendable) before resuming the awaiting task. A perform
     /// error returns nil — "could not check" — which the caller folds into the
     /// page's `.unchecked` WARN; it must never read as "checked, found nothing"
     /// (the prior [] return made an OCR error indistinguishable from a clean
-    /// page and contributed to PASS).
+    /// page and contributed to PASS). A perform that returns no result
+    /// object is the same: nil, never an empty page.
     private static func layer2OCRHits(in image: CGImage) async -> [OCRHit]? {
         if let simulateError = onLayer2OCRSimulateError, simulateError(image) {
             return nil
         }
+        let noResults = onRecognitionSimulateNoResults?(image) ?? false
         let boxed = Layer2ImageBox(image: image)
         return await withCheckedContinuation { continuation in
             visionPerformQueue.async {
@@ -151,7 +161,10 @@ extension VerificationEngine {
                     continuation.resume(returning: nil)
                     return
                 }
-                let observations = request.results ?? []
+                guard !noResults, let observations = request.results else {
+                    continuation.resume(returning: nil)
+                    return
+                }
                 continuation.resume(returning: observations.compactMap { obs in
                     guard obs.confidence >= Self.ocrConfidenceThreshold else { return nil }
                     let candidate = obs.topCandidates(1).first
@@ -307,7 +320,7 @@ extension VerificationEngine {
         regions: [Int: [RedactionRegion]],
         sensitiveTerms: [SensitiveTerm],
         perPageModes: [PipelineMode]
-    ) async throws -> (VerificationStatus, [Int]?, [String]?, Bool, LayerCopy?, Bool) {
+    ) async throws -> (VerificationStatus, [Int]?, [String]?, Bool, LayerCopy?, Bool, String?, [Int]?) {
         // Entry-level cooperative cancellation, plus a
         // per-page check inside the OCR loop. A 50-page OCR pass that does
         // not check until layer return would exceed the 50 ms p95
@@ -484,13 +497,15 @@ extension VerificationEngine {
     /// `.sensitiveTermOutsideRegions` page and is read only by the ATTENTION
     /// arm; every other arm returns nil for the third element. The sixth
     /// element is true for the fragment arm alone (`LayerResult
-    /// .reviewIsFragment`): the results row picks its sentence by it.
+    /// .reviewIsFragment`): the results row picks its sentence by it. The
+    /// seventh and eighth carry, beside an issue, the pages the check could
+    /// not map or run (`CheckRowComposition`); nil otherwise.
     static func foldLayer2PageOutcomes(
         _ pageOutcomes: [PageOutcome],
         pipelineMode: PipelineMode,
         documentHasRegions: Bool,
         reviewTermsByPage: [Int: [String]] = [:]
-    ) -> (VerificationStatus, [Int]?, [String]?, Bool, LayerCopy?, Bool) {
+    ) -> (VerificationStatus, [Int]?, [String]?, Bool, LayerCopy?, Bool, String?, [Int]?) {
         // Fold the per-page buckets into the per-bucket page lists, SORTED
         // ascending so the message text is byte-identical regardless of OCR
         // completion order (the sequential loop appended in page order; the
@@ -511,6 +526,40 @@ extension VerificationEngine {
         let pagesWithUnmappableImages = pages(in: .unmappable)
         let uncheckedPages = pages(in: .unchecked)
 
+        // The could-not-verify conditions, in order: pages whose OCR
+        // coordinates could not be mapped (multi-image or padded thumbnail),
+        // then pages whose OCR could not run. The fold has every page, so
+        // every issue carries them.
+        var conditions: [UnverifiedCondition] = []
+        if !pagesWithUnmappableImages.isEmpty {
+            let list = pagesWithUnmappableImages.map(String.init).joined(separator: ", ")
+            conditions.append(UnverifiedCondition(
+                sentence: "OCR coordinates could not be mapped to page space on \(pagePhrase(pagesWithUnmappableImages, list: list)) — text could not be confirmed inside or outside a redacted region",
+                pages: pagesWithUnmappableImages.map { $0 - 1 }))
+        }
+        if !uncheckedPages.isEmpty {
+            conditions.append(UnverifiedCondition(
+                sentence: "OCR could not be run on \(pageCountPhrase(uncheckedPages.count))",
+                pages: uncheckedPages.map { $0 - 1 }))
+        }
+        // The in-region text warning on a Searchable page: joined after the
+        // conditions, beside an issue or alone.
+        var inRegion: [CheckWarning] = []
+        if !pagesWithTextInRegionSearchable.isEmpty {
+            let list = pagesWithTextInRegionSearchable.map(String.init).joined(separator: ", ")
+            inRegion.append(CheckWarning(
+                sentence: "OCR detected text within a redacted region on \(pagePhrase(pagesWithTextInRegionSearchable, list: list))",
+                pages: pagesWithTextInRegionSearchable.map { $0 - 1 }))
+        }
+        func found(
+            _ status: VerificationStatus, _ onePagesBased: [Int], terms: [String]? = nil, fragment: Bool = false
+        ) -> (VerificationStatus, [Int]?, [String]?, Bool, LayerCopy?, Bool, String?, [Int]?) {
+            let row = CheckRowComposition.compose(
+                issue: (status, onePagesBased.map { $0 - 1 }), conditions: conditions, warnings: inRegion)
+                ?? CheckRow(status: status, pages: onePagesBased.map { $0 - 1 }, couldNotVerify: false)
+            return (row.status, row.pages, terms, false, nil, fragment, row.partSentence, row.partPages)
+        }
+
         // Page numbers only, never document content, in any message.
         // Priority fold: FAIL (term in region) > FAIL (text in region on a
         // rasterized page) > ATTENTION (a redacted term readable outside
@@ -521,18 +570,19 @@ extension VerificationEngine {
         // whole WARN tier because the report aggregate ranks attention above
         // warn (`aggregateStatus`): a document carrying both a term-outside
         // page and any warning page reports the attention, exactly as a FAIL
-        // page masks every lower arm. The two could-not-verify WARNs
-        // (unmappable, unchecked) stay ahead of every note — a note beside a
-        // page whose check did not run would read as a pass in the
-        // aggregate and drop the could-not-verify flag. The fill note stays
-        // ahead of the outside-text PASS (it says something).
+        // page masks every lower arm. The two could-not-verify conditions
+        // (unmappable, unchecked) ride beside every issue, the in-region
+        // text warning joined after them, and below the issues lead the row
+        // — a note beside a page whose check did not run would read as a
+        // pass in the aggregate and drop the could-not-verify flag. The fill
+        // note stays ahead of the outside-text PASS (it says something).
         if !pagesWithSensitiveTermInRegion.isEmpty {
             let list = pagesWithSensitiveTermInRegion.map(String.init).joined(separator: ", ")
             // An OCR hit inside a redacted region means readable text inside the
             // black box — a leak in EITHER mode. Region scoping already
             // excludes Searchable Redaction's expected surviving text.
-            return (.fail("Sensitive text detected within a redacted region on \(pagePhrase(pagesWithSensitiveTermInRegion, list: list))"),
-                    pagesWithSensitiveTermInRegion.map { $0 - 1 }, nil, false, nil, false)
+            return found(.fail("Sensitive text detected within a redacted region on \(pagePhrase(pagesWithSensitiveTermInRegion, list: list))"),
+                         pagesWithSensitiveTermInRegion)
         }
         // On a rasterized page the region is a destroyed-pixel box that
         // holds NO readable text by construction, so ANY in-region OCR hit is a
@@ -544,8 +594,8 @@ extension VerificationEngine {
         // (term hits already FAILed above via .sensitiveTermInRegion).
         if !pagesWithTextInRegionSecureRaster.isEmpty {
             let list = pagesWithTextInRegionSecureRaster.map(String.init).joined(separator: ", ")
-            return (.fail("Readable text detected within a redacted region on \(pagePhrase(pagesWithTextInRegionSecureRaster, list: list))"),
-                    pagesWithTextInRegionSecureRaster.map { $0 - 1 }, nil, false, nil, false)
+            return found(.fail("Readable text detected within a redacted region on \(pagePhrase(pagesWithTextInRegionSecureRaster, list: list))"),
+                         pagesWithTextInRegionSecureRaster)
         }
         // A term the user redacted is still readable outside every region —
         // read by OCR off the rendered page, so it is reported on BOTH page
@@ -565,9 +615,9 @@ extension VerificationEngine {
                     reviewTerms.append(text)
                 }
             }
-            return (.attention("Text matching your redactions is still readable on \(pagePhrase(pagesWithSensitiveTermOutsideRegions, list: list)) — read by OCR outside every redacted region"),
-                    pagesWithSensitiveTermOutsideRegions.map { $0 - 1 },
-                    reviewTerms.isEmpty ? nil : reviewTerms, false, nil, false)
+            return found(.attention("Text matching your redactions is still readable on \(pagePhrase(pagesWithSensitiveTermOutsideRegions, list: list)) — read by OCR outside every redacted region"),
+                         pagesWithSensitiveTermOutsideRegions,
+                         terms: reviewTerms.isEmpty ? nil : reviewTerms)
         }
         // The start or the end of a redacted term read right beside a box:
         // the uncovered glyphs a box placed short of its text leaves on the
@@ -583,29 +633,18 @@ extension VerificationEngine {
                     reviewTerms.append(text)
                 }
             }
-            return (.attention("Part of a redacted term is readable beside a redaction box on \(pagePhrase(pagesWithSensitiveTermFragmentBesideRegion, list: list)) — read by OCR at the box's edge"),
-                    pagesWithSensitiveTermFragmentBesideRegion.map { $0 - 1 },
-                    reviewTerms.isEmpty ? nil : reviewTerms, false, nil, true)
-        }
-        if !pagesWithTextInRegionSearchable.isEmpty {
-            let list = pagesWithTextInRegionSearchable.map(String.init).joined(separator: ", ")
-            return (.warn("OCR detected text within a redacted region on \(pagePhrase(pagesWithTextInRegionSearchable, list: list))"),
-                    pagesWithTextInRegionSearchable.map { $0 - 1 }, nil, false, nil, false)
+            return found(.attention("Part of a redacted term is readable beside a redaction box on \(pagePhrase(pagesWithSensitiveTermFragmentBesideRegion, list: list)) — read by OCR at the box's edge"),
+                         pagesWithSensitiveTermFragmentBesideRegion,
+                         terms: reviewTerms.isEmpty ? nil : reviewTerms, fragment: true)
         }
         // Unmappable-coordinate pages (multi-image or padded thumbnail)
-        // that carry OCR text near a region — surfaced as a WARN because the
-        // identity check that would FAIL/PASS them is unsound.
-        if !pagesWithUnmappableImages.isEmpty {
-            let list = pagesWithUnmappableImages.map(String.init).joined(separator: ", ")
-            return (.warn("OCR coordinates could not be mapped to page space on \(pagePhrase(pagesWithUnmappableImages, list: list)) — text could not be confirmed inside or outside a redacted region"),
-                    pagesWithUnmappableImages.map { $0 - 1 }, nil, true, nil, false)
-        }
-        // A page whose OCR could not run: the check did not fully run, so
-        // the could-not-verify WARN returns ahead of every note — a note
-        // beside it would read as a pass in the aggregate.
-        if !uncheckedPages.isEmpty {
-            return (.warn("OCR could not be run on \(pageCountPhrase(uncheckedPages.count))"),
-                    uncheckedPages.map { $0 - 1 }, nil, true, nil, false)
+        // that carry OCR text near a region — the identity check that would
+        // FAIL/PASS them is unsound — and pages whose OCR could not run:
+        // the check did not fully run, so they lead every note, the
+        // in-region text warning joined after them. With neither, that
+        // warning stands alone, mark clear.
+        if let row = CheckRowComposition.compose(issue: nil, conditions: conditions, warnings: inRegion) {
+            return (row.status, row.pages, nil, row.couldNotVerify, nil, false, nil, nil)
         }
         if !pagesWithFillArtifactInRegion.isEmpty {
             let list = pagesWithFillArtifactInRegion.map(String.init).joined(separator: ", ")
@@ -620,7 +659,7 @@ extension VerificationEngine {
             // — on a multi-signal document the warning sets the layer status —
             // and above the outside-text PASS (it says something).
             return (.info("OCR detected likely fill artifacts within a redacted region on \(pagePhrase(pagesWithFillArtifactInRegion, list: list)) — no readable text recovered"),
-                    pagesWithFillArtifactInRegion.map { $0 - 1 }, nil, false, nil, false)
+                    pagesWithFillArtifactInRegion.map { $0 - 1 }, nil, false, nil, false, nil, nil)
         }
         if !pagesWithTextOutsideRegionsOnly.isEmpty {
             // Out-of-region OCR text is the page's own un-redacted content:
@@ -638,14 +677,14 @@ extension VerificationEngine {
             switch pipelineMode {
             case .searchableRedaction:
                 return (.pass, nil, nil, false,
-                        LayerCopy(short: "No issues found.", detail: Self.layer2OutsideTextDetail), false)
+                        LayerCopy(short: "No issues found.", detail: Self.layer2OutsideTextDetail), false, nil, nil)
             case .secureRasterization:
                 if documentHasRegions {
                     return (.pass, nil, nil, false,
-                            LayerCopy(short: "No issues found.", detail: Self.layer2OutsideTextDetail), false)
+                            LayerCopy(short: "No issues found.", detail: Self.layer2OutsideTextDetail), false, nil, nil)
                 }
             }
         }
-        return (.pass, nil, nil, false, nil, false)
+        return (.pass, nil, nil, false, nil, false, nil, nil)
     }
 }

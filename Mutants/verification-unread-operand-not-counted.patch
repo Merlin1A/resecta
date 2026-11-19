@@ -1,0 +1,19 @@
+Property: A text operand that cannot be popped or decoded is counted for its page, which Terms in Content Streams then names as not traversed.
+Area: could-not-verify rows (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/CouldNotReadRowTests
+Must go red: RedactionEngineTests/CouldNotReadRowTests eachCase [Terms in Content Streams: a text operator with no operand is a page not read]; RedactionEngineTests/CouldNotReadRowTests eachCase [Terms in Content Streams: an operand that does not decode is a page not read]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification+Layer10.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification+Layer10.swift
+index 88454b52..5ace6815 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification+Layer10.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SandwichVerification+Layer10.swift
+@@ -177,7 +177,7 @@ extension SandwichVerification {
+                     "Operator scanner could not traverse page \(pageIdx + 1)"
+                 ), nil, nil, true, nil, nil)
+             }
+-            if accumulator.unreadOperands > 0 { unreadOperandPages.append(pageIdx) }
++            _ = accumulator.unreadOperands
+ 
+             // The status message reports page index + match count
+             // only; the matched term content is never echoed in it. Mirrors

@@ -517,7 +517,7 @@ struct SandwichVerificationTests {
                 "0 survivors recorded with a measurable output unit must FAIL; got \(result)")
     }
 
-    @Test("A Data() lineage digest means 'not recorded' and passes (the legacy guard holds)")
+    @Test("A Data() lineage digest means 'not recorded' and gives no status (nothing was compared)")
     func emptyDataDigestMeansNotRecorded() async throws {
         let digest = PageFilterDigest(
             pageIndex: 0, extractedCount: 1, excludedCount: 0, survivingCount: 1,
@@ -528,7 +528,7 @@ struct SandwichVerificationTests {
         defer { try? FileManager.default.removeItem(at: url) }
         let page = try #require(doc.page(at: 0))
         let result = try await verifier.verifyCharacterLineage(outputPage: page, digest: digest)
-        #expect(result == .pass, "got \(result)")
+        #expect(result == nil, "got \(String(describing: result))")
     }
 
     @Test("emptyLineageDigest is the filter's empty-set digest and the textless output walk's value")

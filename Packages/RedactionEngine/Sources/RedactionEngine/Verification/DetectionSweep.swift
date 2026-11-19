@@ -73,6 +73,10 @@ struct DetectionSweep: Sendable {
         let reviewTermTexts: [String]?
         /// Display-only per-request lines. Nil on the NOT APPLICABLE row.
         let queryLines: [SearchRecheckQueryLine]?
+        /// Beside an issue: what the sweep could not check, and those pages
+        /// (`CheckRowComposition`). Nil otherwise.
+        var partSentence: String? = nil
+        var partPages: [Int]? = nil
     }
 
     // MARK: - Run
@@ -352,28 +356,47 @@ struct DetectionSweep: Sendable {
                 unchecked: uncheckedByRequest[index])
         }
 
+        // A leftover in a category the user's scan applied (and did not
+        // deselect) is something the scan should have caught: ATTENTION,
+        // the issue, with the pages the sweep could not check beside it.
+        if further > 0 {
+            let message = "\(lead) — \(furtherBody). Open Scan to review."
+            let detail = joined([leadSentence, routeSentence, furtherSentence,
+                                 k == 0 ? "" : uncheckedClause + "."])
+            let row = CheckRowComposition.compose(
+                issue: (.attention(message), furtherPages),
+                conditions: k == 0 ? [] : [UnverifiedCondition(sentence: uncheckedClause, pages: uncheckedPages)],
+                warnings: [])
+            return Outcome(
+                status: .attention(message),
+                copyOverride: LayerCopy(short: message, detail: detail),
+                pageReferences: furtherPages,
+                reviewTermTexts: nil,
+                queryLines: queryLines,
+                partSentence: row?.partSentence,
+                partPages: row?.partPages)
+        }
+
         // A page the check could not read outranks every note (the
         // could-not-verify precedence): the WARN carries the further items
-        // in its detail and its page chips.
+        // in its detail; its page chips are the pages it could not check.
         if k > 0 {
             let message = "\(lead); \(uncheckedClause)"
             let detail = joined([leadSentence, routeSentence, furtherSentence, uncheckedClause + "."])
             return Outcome(
                 status: .warn(message),
                 copyOverride: LayerCopy(short: message, detail: detail),
-                pageReferences: Array(Set(uncheckedPages + furtherPages)).sorted(),
+                pageReferences: uncheckedPages,
                 reviewTermTexts: nil,
                 queryLines: queryLines)
         }
 
-        // A leftover in a category the user's scan applied (and did not
-        // deselect) is something the scan should have caught: ATTENTION.
         // Items only outside the applied categories stay a note.
         if hasFurther {
             let message = "\(lead) — \(furtherBody). Open Scan to review."
             let detail = joined([leadSentence, routeSentence, furtherSentence])
             return Outcome(
-                status: further > 0 ? .attention(message) : .info(message),
+                status: .info(message),
                 copyOverride: LayerCopy(short: message, detail: detail),
                 pageReferences: furtherPages,
                 reviewTermTexts: nil,

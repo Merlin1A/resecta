@@ -100,7 +100,11 @@ struct BreakMarkCountTests {
         -> (count: VerificationStatus, lineage: VerificationStatus) {
         let verifier = SandwichVerification()
         let count = try await verifier.verifyCharacterCount(outputPage: page, digest: digest)
-        let lineage = try await verifier.verifyCharacterLineage(outputPage: page, digest: digest)
+        // These cases expect a verdict: a lineage the check could not read
+        // (nil) fails the test here, never reads as a pass.
+        let lineage = try #require(
+            try await verifier.verifyCharacterLineage(outputPage: page, digest: digest),
+            "Layer 9 must reach a verdict on this page; it could not read the lineage.")
         return (count, lineage)
     }
 

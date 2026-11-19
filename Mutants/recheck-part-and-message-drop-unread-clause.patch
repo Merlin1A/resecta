@@ -1,0 +1,29 @@
+Property: A Search Re-check that needs review lists, in its part, the page its coverage check could not read; dropping that clause from both the part and the message is caught by the part's own pin.
+Area: the Search Re-check's could-not part
+Test command: cd Packages/RedactionEngine && swift test --filter SearchRecheckPartInMessageTests
+Must go red: RedactionEngineTests/SearchRecheckPartInMessageTests row [the three cases where the coverage check could not read page 2]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SearchRecheck.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SearchRecheck.swift
+index 9b6a38a7..47437c0e 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SearchRecheck.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/SearchRecheck.swift
+@@ -406,8 +406,7 @@ struct SearchRecheck: Sendable {
+         // could not read a page it had boxes on, the coverage check that
+         // compared nothing. Their pages: the pages not checked and the
+         // original pages not read. Every issue carries them.
+-        let couldNotClauses = [uncheckedClause, coverageRan ? "" : Self.coverageNotRunClause,
+-                               coverageUnreadPages.isEmpty ? "" : Self.coverageUnreadClause(coverageUnreadPages)]
++        let couldNotClauses = [uncheckedClause, coverageRan ? "" : Self.coverageNotRunClause]
+             .filter { !$0.isEmpty } + coverageComparedNothingClauses
+         let couldNotPages = Array(Set(uncheckedPages + coverageUnreadPages)).sorted()
+         let comparedNothingDetail = coverageComparedNothingClauses
+@@ -427,7 +426,7 @@ struct SearchRecheck: Sendable {
+             let message = "Re-ran \(searches) — \(remainSentence)"
+                 + (k == 0 ? "" : ", \(uncheckedClause)")
+                 + (coverageRan ? "" : "; \(Self.coverageNotRunClause)")
+-                + (coverageUnreadPages.isEmpty ? "" : "; \(Self.coverageUnreadClause(coverageUnreadPages))")
++
+                 + coverageComparedNothingClauses.map { "; \($0)" }.joined()
+             let detail = joined([Self.detailLead, routeSentence, remainSentence + ".",
+                                  k == 0 ? "" : uncheckedClause + ".",

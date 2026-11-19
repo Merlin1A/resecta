@@ -331,7 +331,7 @@ struct RegionCoverageTests {
             filterDigests: [nil], perPageModes: [.searchableRedaction],
             appliedSearches: [request], sourceDocument: SendablePDFDocument(source))
         #expect(result.status.isWarn && result.couldNotVerify, "got \(result.status)")
-        #expect(result.shortDescription == "Re-ran 1 search; the coverage check could not read original page 2")
+        #expect(result.shortDescription == "Re-ran 1 search; the coverage check could not read original page 2; \(SearchRecheck.coverageNoSearchMatchClause)")
         #expect(result.pageReferences == [1])
     }
 
@@ -546,13 +546,13 @@ struct Layer2FragmentBesideRegionTests {
     func foldOrder() {
         #expect(VerificationEngine.pageBucket(for: .sensitiveTermFragmentBesideRegion, effectiveMode: .searchableRedaction) == .sensitiveTermFragmentBesideRegion)
         #expect(VerificationEngine.pageBucket(for: .sensitiveTermFragmentBesideRegion, effectiveMode: .secureRasterization) == .sensitiveTermFragmentBesideRegion)
-        let (status, pages, terms, cnv, _, fragment) = VerificationEngine.foldLayer2PageOutcomes(
+        let (status, pages, terms, cnv, _, fragment, _, _) = VerificationEngine.foldLayer2PageOutcomes(
             [(2, .sensitiveTermFragmentBesideRegion), (1, .textInRegionSearchable)],
             pipelineMode: .searchableRedaction, documentHasRegions: true, reviewTermsByPage: [2: ["123-45-6789"]])
         #expect(status.isAttention)
         #expect(pages == [1] && terms == ["123-45-6789"] && cnv == false)
         #expect(fragment, "the fragment arm carries the flag the results row reads")
-        let (whole, _, _, _, _, wholeFlag) = VerificationEngine.foldLayer2PageOutcomes(
+        let (whole, _, _, _, _, wholeFlag, _, _) = VerificationEngine.foldLayer2PageOutcomes(
             [(2, .sensitiveTermFragmentBesideRegion), (1, .sensitiveTermOutsideRegions)],
             pipelineMode: .searchableRedaction, documentHasRegions: true)
         if case .attention(let message) = whole { #expect(message.hasPrefix("Text matching your redactions")) } else { Issue.record("\(whole)") }

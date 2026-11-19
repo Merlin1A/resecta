@@ -176,7 +176,7 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
         overlay.isMultiSelectActive = isMultiSelectActive
 
         let regions = redactionState?.regions[pageIndex] ?? []
-        let searchHighlights = redactionState?.activeSearch?.resultsByPage[pageIndex] ?? []
+        let searchHighlights = (redactionState?.activeSearch?.resultsByPage[pageIndex] ?? []).filter(\.hasBox)
         let livePreviewRects = livePreviewRects(forPage: pageIndex)
         overlay.configure(
             with: regions,
@@ -351,7 +351,7 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
     func refreshOverlay(for pageIndex: Int) {
         guard let overlay = activeOverlays[pageIndex] else { return }
         let regions = redactionState?.regions[pageIndex] ?? []
-        let searchHighlights = redactionState?.activeSearch?.resultsByPage[pageIndex] ?? []
+        let searchHighlights = (redactionState?.activeSearch?.resultsByPage[pageIndex] ?? []).filter(\.hasBox)
         overlay.configure(
             with: regions,
             selectedIDs: redactionState?.selectedRegionIDs ?? [],
@@ -366,7 +366,7 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
         let selectedIDs = redactionState?.selectedRegionIDs ?? []
         for (pageIndex, overlay) in activeOverlays {
             let regions = redactionState?.regions[pageIndex] ?? []
-            let searchHighlights = redactionState?.activeSearch?.resultsByPage[pageIndex] ?? []
+            let searchHighlights = (redactionState?.activeSearch?.resultsByPage[pageIndex] ?? []).filter(\.hasBox)
             overlay.configure(
                 with: regions,
                 selectedIDs: selectedIDs,

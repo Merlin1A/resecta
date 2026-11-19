@@ -26,7 +26,9 @@ extension SearchAndRedactSheet {
         guard let id, let index = searchState.index(of: id) else { return }
         searchState.currentResultIndex = index
         guard let result = searchState.currentResult else { return }
-        focusWalk(onPage: result.pageIndex, normalizedRect: result.normalizedRect, parking: parking)
+        // A match with no box shows its whole page: there is no rect to frame.
+        let frame = result.hasBox ? result.normalizedRect : CGRect(x: 0, y: 0, width: 1, height: 1)
+        focusWalk(onPage: result.pageIndex, normalizedRect: frame, parking: parking)
     }
 
     /// The canvas half: the page write, the rect-level scroll request

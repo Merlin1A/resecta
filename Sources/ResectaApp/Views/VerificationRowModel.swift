@@ -327,9 +327,29 @@ nonisolated struct VerificationRowModel: Equatable {
     /// A skipped check's lead: what would have saved the record.
     static let skippedLead = "Only a full Redact run saves that record."
 
-    /// The caption under the title, by outcome — never by text.
+    /// The caption under the title, by outcome — never by text. A failed or
+    /// needs-review row whose check also could not read part of its input
+    /// carries that part after the issue's caption: the caption less a final
+    /// full stop, "; ", then the part. A Search Re-check needs-review row
+    /// whose caption is not composed from its query lines shows the engine's
+    /// own sentence, which already carries every could-not clause, so the
+    /// part is not added again.
     static func caption(for layer: LayerResult, outcome: VerificationOutcome,
                         perPageModes: [PipelineMode] = [], pagesOnChips: Bool = false) -> String? {
+        let base = findCaption(for: layer, outcome: outcome, perPageModes: perPageModes, pagesOnChips: pagesOnChips)
+        switch outcome {
+        case .needsReview where layer.layer == .searchRecheck && !composesRecheckCaption(layer):
+            return base
+        case .failed, .needsReview:
+            guard let part = layer.couldNotVerifyPart, let base else { return base }
+            return (base.hasSuffix(".") ? String(base.dropLast()) : base) + "; " + part
+        default:
+            return base
+        }
+    }
+
+    private static func findCaption(for layer: LayerResult, outcome: VerificationOutcome,
+                                    perPageModes: [PipelineMode], pagesOnChips: Bool) -> String? {
         switch outcome {
         case .passed:
             // A Search Re-check that re-ran no typed search (a run that
@@ -363,12 +383,22 @@ nonisolated struct VerificationRowModel: Equatable {
         }
     }
 
-    /// The expanded block's lead lines, by outcome. A word check's
+    /// The expanded block's lead lines, by outcome, then the line that says
+    /// where the check stopped when it stopped at an issue before it had read
+    /// everything.
+    static func lead(for layer: LayerResult, outcome: VerificationOutcome,
+                     perPageModes: [PipelineMode]) -> [String] {
+        let lines = outcomeLead(for: layer, outcome: outcome, perPageModes: perPageModes)
+        guard let stop = stopLine(layer.stopped, pageCount: perPageModes.count) else { return lines }
+        return lines + [stop]
+    }
+
+    /// The lead lines by outcome alone. A word check's
     /// needs-review result opens with the search remedy, except when only
     /// part of a word is readable beside its box: then the remedy is the
     /// box, which the caption already gives, so no search line is added.
-    static func lead(for layer: LayerResult, outcome: VerificationOutcome,
-                     perPageModes: [PipelineMode]) -> [String] {
+    private static func outcomeLead(for layer: LayerResult, outcome: VerificationOutcome,
+                                    perPageModes: [PipelineMode]) -> [String] {
         switch outcome {
         case .couldNotVerify where layer.status.isSkipped:
             return [skippedLead]
@@ -512,6 +542,28 @@ nonisolated struct VerificationRowModel: Equatable {
     static func contentStreamStopLine(pages: [Int]?, pageCount: Int) -> String? {
         guard let first = pages?.min(), pageCount > first + 1 else { return nil }
         return "Scanning stopped at page \(first + 1). Later pages were not searched."
+    }
+
+    /// The line for where a check stopped at an issue, from the engine's
+    /// value alone. The EXIF line names the page the search stopped at and
+    /// is nil when it is the last page or the page count is unknown, as the
+    /// content stream line is.
+    static func stopLine(_ stop: CheckStop?, pageCount: Int) -> String? {
+        switch stop {
+        case nil:
+            return nil
+        case .imageEXIFNotSearched:
+            return "Image EXIF was not searched after this match."
+        case .exifSearchStopped(let page):
+            guard pageCount > page + 1 else { return nil }
+            return "The EXIF search stopped at page \(page + 1). EXIF in images on later pages was not searched."
+        case .bookmarksAndFormFieldsNotRead:
+            return "Bookmarks and form fields were not read after this find."  // LegalPhrases:safe (approved row words)
+        case .formFieldsNotRead:
+            return "Form fields were not read after this find."  // LegalPhrases:safe (approved row words)
+        case .stoppedAtThisFind:
+            return "Checking stopped at this find. Not everything this check looks for was checked."  // LegalPhrases:safe (approved row words)
+        }
     }
 
     // MARK: - The sweep

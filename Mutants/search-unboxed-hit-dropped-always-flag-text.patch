@@ -1,0 +1,27 @@
+Property: A match found with no box is listed, never dropped: site 5, an always-flag term on the text layer
+Area: Search, a hit with no box
+Test command: swift test --no-parallel --filter '^RedactionEngineTests\.NoBoxHitTests/' (in Packages/RedactionEngine, DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer)
+Must go red: RedactionEngineTests/NoBoxHitTests alwaysFlagText
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift
+index 58d5d76..6717039 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift
+@@ -138,16 +138,6 @@ extension DocumentSearcher {
+                         )
+                         guard let box = textLayerBox(for: hit.range, page: page) else {
+                             // Found, but no box: listed with its page, never dropped.
+-                            continuation.yield(.unboxed(
+-                                pageIndex: pageIndex, matchedText: matchedText,
+-                                contextSnippet: window.snippet, source: .textLayer, term: "Custom",
+-                                rationale: MatchRationale.Builder(
+-                                    ruleID: "user.alwaysFlag", preThresholdScore: 1.0,
+-                                    signals: [.userAlwaysFlag(pattern: hit.pattern)]
+-                                ).build(finalScore: 1.0),
+-                                matchRangeInSnippet: window.matchRange,
+-                                liesOffVisiblePage: liesOffVisiblePage(hit.range, page: page)))
+-                            totalYielded += 1
+                             continue
+                         }
+                         pageRects.append(box.rect)

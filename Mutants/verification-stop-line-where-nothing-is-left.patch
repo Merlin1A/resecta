@@ -1,0 +1,43 @@
+Property: A check that returns where nothing is left unread (form fields, appended saves, the file identifier) says it stopped nowhere, so no line is shown there.
+Area: where a check stopped (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --package-path Packages/RedactionEngine --filter CheckStopTests
+Must go red: RedactionEngineTests/CheckStopTests row [S-8], [S-12], [S-16]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Structural.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Structural.swift
+index 42237156..69de363a 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Structural.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Structural.swift
+@@ -120,8 +120,8 @@ extension VerificationEngine {
+             let issue = (status: VerificationStatus.fail(
+                 "Multiple %%EOF markers (\(eofCount)) — incremental update may contain original content"),
+                 pages: [Int]?.none)
+-            return CheckRowComposition.compose(issue: issue, conditions: conditions, warnings: notes)
+-                ?? CheckRow(status: issue.status, pages: nil, couldNotVerify: false)
++            return (CheckRowComposition.compose(issue: issue, conditions: conditions, warnings: notes)
++                ?? CheckRow(status: issue.status, pages: nil, couldNotVerify: false)).stopped(at: .stoppedAtThisFind)
+         }
+         // A file with no end marker was not written whole: its structure
+         // could not be inspected. It leads the unread pages.
+@@ -285,7 +285,7 @@ extension VerificationEngine {
+         // a value. An absent pair stays on the paths below.
+         if let idArray = cgDoc.fileIdentifier,
+            !Self.fileIdentifierMatchesContents(idArray, pdfData: pdfData) {
+-            return (.warn("File identifier was not derived from the file contents"), false, nil, nil)
++            return (.warn("File identifier was not derived from the file contents"), false, nil, .stoppedAtThisFind)
+         }
+ 
+         // XMP metadata — scanned above the /Info guard; fold the
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine.swift
+index c69fa89b..a9d89495 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine.swift
+@@ -582,7 +582,7 @@ public struct VerificationEngine: Sendable {
+         }
+         var acroForm: CGPDFDictionaryRef?
+         if CGPDFDictionaryGetDictionary(catalog, "AcroForm", &acroForm) {
+-            return row(.fail("Form fields found in output"), nil)
++            return row(.fail("Form fields found in output"), nil).stopped(at: .formFieldsNotRead)
+         }
+ 
+         // No leak reported, but some pages were never inspected —

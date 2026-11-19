@@ -40,6 +40,10 @@ struct SearchRecheck: Sendable {
         let reviewTermTexts: [String]?
         /// Display-only per-query lines. Nil on INFO.
         let queryLines: [SearchRecheckQueryLine]?
+        /// Beside an issue: the clauses of what the re-check could not check,
+        /// and those pages (`CheckRowComposition`). Nil otherwise.
+        var partSentence: String? = nil
+        var partPages: [Int]? = nil
     }
 
     /// One page's observation — the shared runner's record.
@@ -92,9 +96,20 @@ struct SearchRecheck: Sendable {
         }
         let typed = requests.enumerated().filter { !$0.element.record.query.isScan }
         let typedRequests = typed.map(\.element)
+        // A coverage check that ran and compared no match knows nothing:
+        // said for each kind that was applied, the scan's first. The count
+        // is one total for the run.
+        let comparedNothing = coverageRan && comparedMatches == 0
+        let applied = requests.filter { $0.origin == .applied }
+        let comparedNothingClauses: [String] = comparedNothing ? [
+            applied.contains { $0.record.query.isScan } ? Self.coverageNoMatchClause : nil,
+            applied.contains { !$0.record.query.isScan } ? Self.coverageNoSearchMatchClause : nil,
+        ].compactMap { $0 } : []
         guard !typedRequests.isEmpty else {
             if !shortfalls.isEmpty {
-                return Self.shortfallOutcome(shortfalls, queryLines: nil)
+                let clauses = unreadPages.isEmpty ? [] : [Self.coverageUnreadClause(unreadPages)]
+                return Self.shortfallOutcome(shortfalls, queryLines: nil,
+                                             part: clauses, partPages: unreadPages)
             }
             if appliedAny, !coverageRan {
                 return Self.coverageNotRunOutcome()
@@ -131,7 +146,8 @@ struct SearchRecheck: Sendable {
         let whole = RecheckObservation.completed(
             observed, pageCount: pageCount, requestCount: typedRequests.count)
         return Self.fold(requests: typedRequests, observations: whole, pageCount: pageCount,
-                         shortfalls: shortfalls, coverageRan: coverageRan, coverageUnreadPages: unreadPages)
+                         shortfalls: shortfalls, coverageRan: coverageRan, coverageUnreadPages: unreadPages,
+                         coverageComparedNothingClauses: comparedNothingClauses)
     }
 
     /// One partly covered match, as the fold reports it: its 0-based page
@@ -142,8 +158,13 @@ struct SearchRecheck: Sendable {
     }
 
     /// The coverage FAIL: the only FAIL this layer reports. Content-free
-    /// message; the request texts ride `reviewTermTexts`.
-    static func shortfallOutcome(_ shortfalls: [Shortfall], queryLines: [SearchRecheckQueryLine]?) -> Outcome {
+    /// message; the request texts ride `reviewTermTexts`. `part` holds the
+    /// clauses of what the re-check could not check, joined beside the
+    /// issue, over `partPages`.
+    static func shortfallOutcome(
+        _ shortfalls: [Shortfall], queryLines: [SearchRecheckQueryLine]?,
+        part: [String] = [], partPages: [Int] = []
+    ) -> Outcome {
         let pages = Array(Set(shortfalls.map(\.page))).sorted()
         let m = shortfalls.count
         let list = pages.map { String($0 + 1) }.joined(separator: ", ")
@@ -156,7 +177,9 @@ struct SearchRecheck: Sendable {
             copyOverride: LayerCopy(short: message, detail: detail),
             pageReferences: pages,
             reviewTermTexts: terms,
-            queryLines: queryLines)
+            queryLines: queryLines,
+            partSentence: part.isEmpty ? nil : CheckRowComposition.join(part),
+            partPages: part.isEmpty ? nil : Array(Set(partPages)).sorted())
     }
 
     /// The coverage sentence of the detail copy.
@@ -206,6 +229,9 @@ struct SearchRecheck: Sendable {
     /// original pages: nothing was compared, so nothing is known.
     static let coverageNoMatchClause = "the re-run found none of the applied scan's matches on the original pages, so the coverage check compared nothing"
 
+    /// The same clause for an applied typed search.
+    static let coverageNoSearchMatchClause = "the re-run found none of the applied search's matches on the original pages, so the coverage check compared nothing"
+
     /// WARN for a run with applied scans only whose coverage check could
     /// not run — there is no typed search to re-run on the output, and the
     /// one check the layer had was not possible — or ran but could not read
@@ -244,7 +270,8 @@ struct SearchRecheck: Sendable {
         pageCount: Int,
         shortfalls: [Shortfall] = [],
         coverageRan: Bool = true,
-        coverageUnreadPages: [Int] = []
+        coverageUnreadPages: [Int] = [],
+        coverageComparedNothingClauses: [String] = []
     ) -> Outcome {
         let requestCount = requests.count
         var remainingByRequest = [Int](repeating: 0, count: requestCount)
@@ -374,10 +401,23 @@ struct SearchRecheck: Sendable {
                 unchecked: uncheckedByRequest[index])
         }
 
+        // The re-check's could-not-verify clauses, in today's order: the
+        // pages it could not check, the coverage check that could not run or
+        // could not read a page it had boxes on, the coverage check that
+        // compared nothing. Their pages: the pages not checked and the
+        // original pages not read. Every issue carries them.
+        let couldNotClauses = [uncheckedClause, coverageRan ? "" : Self.coverageNotRunClause,
+                               coverageUnreadPages.isEmpty ? "" : Self.coverageUnreadClause(coverageUnreadPages)]
+            .filter { !$0.isEmpty } + coverageComparedNothingClauses
+        let couldNotPages = Array(Set(uncheckedPages + coverageUnreadPages)).sorted()
+        let comparedNothingDetail = coverageComparedNothingClauses
+            .map { $0.prefix(1).uppercased() + $0.dropFirst() + "." }
+
         // A partly covered match outranks every other outcome: the box the
         // user applied does not cover what it was applied to.
         if !shortfalls.isEmpty {
-            return shortfallOutcome(shortfalls, queryLines: queryLines)
+            return shortfallOutcome(shortfalls, queryLines: queryLines,
+                                    part: couldNotClauses, partPages: couldNotPages)
         }
 
         if totalRemaining > 0 {
@@ -388,10 +428,12 @@ struct SearchRecheck: Sendable {
                 + (k == 0 ? "" : ", \(uncheckedClause)")
                 + (coverageRan ? "" : "; \(Self.coverageNotRunClause)")
                 + (coverageUnreadPages.isEmpty ? "" : "; \(Self.coverageUnreadClause(coverageUnreadPages))")
+                + coverageComparedNothingClauses.map { "; \($0)" }.joined()
             let detail = joined([Self.detailLead, routeSentence, remainSentence + ".",
                                  k == 0 ? "" : uncheckedClause + ".",
                                  coverageRan ? "" : Self.coverageNotRunDetail,
-                                 coverageUnreadPages.isEmpty ? "" : Self.coverageUnreadDetail(coverageUnreadPages)])
+                                 coverageUnreadPages.isEmpty ? "" : Self.coverageUnreadDetail(coverageUnreadPages)]
+                                + comparedNothingDetail)
             let reviewTerms = requests.enumerated()
                 .filter { remainingByRequest[$0.offset] > 0 }
                 .map { $0.element.record.query.displayText }
@@ -400,22 +442,24 @@ struct SearchRecheck: Sendable {
                 copyOverride: LayerCopy(short: message, detail: detail),
                 pageReferences: remainingPages,
                 reviewTermTexts: reviewTerms,
-                queryLines: queryLines)
+                queryLines: queryLines,
+                partSentence: couldNotClauses.isEmpty ? nil : CheckRowComposition.join(couldNotClauses),
+                partPages: couldNotClauses.isEmpty ? nil : couldNotPages)
         }
 
         // The could-not-verify WARN: pages the re-run could not check, the
-        // coverage check that could not run or could not read a page it had
-        // boxes on, or any of these together — each named.
-        if k > 0 || !coverageRan || !coverageUnreadPages.isEmpty {
-            let clauses = [uncheckedClause, coverageRan ? "" : Self.coverageNotRunClause,
-                           coverageUnreadPages.isEmpty ? "" : Self.coverageUnreadClause(coverageUnreadPages)]
-                .filter { !$0.isEmpty }.joined(separator: "; ")
+        // coverage check that could not run, could not read a page it had
+        // boxes on, or compared nothing, or any of these together — each
+        // named.
+        if !couldNotClauses.isEmpty {
+            let clauses = couldNotClauses.joined(separator: "; ")
             let message = "Re-ran \(searches); \(clauses)"
             let detail = joined([Self.detailLead, routeSentence,
                                  k == 0 ? "" : uncheckedClause + ".",
                                  coverageRan ? "" : Self.coverageNotRunDetail,
-                                 coverageUnreadPages.isEmpty ? "" : Self.coverageUnreadDetail(coverageUnreadPages)])
-            let pages = Array(Set(uncheckedPages + coverageUnreadPages)).sorted()
+                                 coverageUnreadPages.isEmpty ? "" : Self.coverageUnreadDetail(coverageUnreadPages)]
+                                + comparedNothingDetail)
+            let pages = couldNotPages
             return Outcome(
                 status: .warn(message),
                 copyOverride: LayerCopy(short: message, detail: detail),

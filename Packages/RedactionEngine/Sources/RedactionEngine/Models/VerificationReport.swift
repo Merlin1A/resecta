@@ -120,6 +120,25 @@ struct LayerCopy: Sendable, Equatable {
     let detail: String
 }
 
+/// Where a check stopped at its first issue before it had read everything it
+/// looks for. Display-only: the results row shows one line for it, after the row's
+/// lead. Never set where nothing was left unread.
+public enum CheckStop: Sendable, Equatable {
+    /// Terms in Text & Bytes returned at an issue before its image EXIF pass.
+    case imageEXIFNotSearched
+    /// Terms in Text & Bytes' EXIF pass stopped at a match on this 0-based
+    /// page; pictures on later pages were not searched.
+    case exifSearchStopped(page: Int)
+    /// Text & Annotations returned at text or an annotation, before
+    /// bookmarks and form fields.
+    case bookmarksAndFormFieldsNotRead
+    /// Text & Annotations returned at a bookmark, before form fields.
+    case formFieldsNotRead
+    /// Active Content & Structure or Document Metadata returned at an issue
+    /// with more of the check left unread.
+    case stoppedAtThisFind
+}
+
 /// Result of a single verification layer.
 /// Produced by Verification/ components, consumed by VerificationReport
 /// and the verification results UI.
@@ -172,6 +191,22 @@ public struct LayerResult: Sendable {
     /// and remedy by it (the box is short of its text; the remedy is the
     /// box, not a search). False on every other result.
     public let reviewIsFragment: Bool
+    /// Display-only: on a row with an issue whose check also could not read
+    /// part of its input, the could-not-verify part — its conditions'
+    /// sentences, then its warnings, joined by "; ". Like `reviewTermTexts`,
+    /// it exists solely for in-app display composition and is never logged
+    /// or persisted. Nil on every other row; the issue's own status, message
+    /// and pages are not changed by it.
+    public let couldNotVerifyPart: String?
+    /// Display-only: the 0-based pages of `couldNotVerifyPart`'s conditions
+    /// (empty when none names a page), never a page the check read. Nil
+    /// exactly when `couldNotVerifyPart` is nil.
+    public let couldNotVerifyPartPages: [Int]?
+    /// Display-only: where the check stopped at an issue before it had read
+    /// everything (`CheckStop`). Like `reviewTermTexts`, it exists solely for
+    /// in-app display composition and is never logged or persisted. Nil on
+    /// every row that read everything.
+    public let stopped: CheckStop?
 
     /// Whether the expanded row has a detail line to show — false when
     /// the check's short line already says everything it has to say.
@@ -184,7 +219,10 @@ public struct LayerResult: Sendable {
                 layer: VerificationLayer? = nil,
                 queryLines: [SearchRecheckQueryLine]? = nil,
                 couldNotVerify: Bool = false,
-                reviewIsFragment: Bool = false) {
+                reviewIsFragment: Bool = false,
+                couldNotVerifyPart: String? = nil,
+                couldNotVerifyPartPages: [Int]? = nil,
+                stopped: CheckStop? = nil) {
         self.name = name
         self.symbolName = symbolName
         self.status = status
@@ -197,6 +235,9 @@ public struct LayerResult: Sendable {
         self.queryLines = queryLines
         self.couldNotVerify = couldNotVerify
         self.reviewIsFragment = reviewIsFragment
+        self.couldNotVerifyPart = couldNotVerifyPart
+        self.couldNotVerifyPartPages = couldNotVerifyPart == nil ? nil : (couldNotVerifyPartPages ?? [])
+        self.stopped = stopped
     }
 }
 

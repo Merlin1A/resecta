@@ -1,0 +1,19 @@
+Property: The Share sheet's could-not-verify line for a row with an issue names the pages the check could not read, never the issue's pages.
+Area: could-not-verify rows (Share sheet)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationRowPartTests
+Must go red: ResectaAppTests/VerificationRowPartTests shareLinesForAFailedRowWithThePart
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/ShareRiskConfirm.swift b/Sources/ResectaApp/Views/ShareRiskConfirm.swift
+index 143c1a29..94d330c4 100644
+--- a/Sources/ResectaApp/Views/ShareRiskConfirm.swift
++++ b/Sources/ResectaApp/Views/ShareRiskConfirm.swift
+@@ -194,7 +194,7 @@ extension DocumentEditorView {
+             }
+             if layer.status.isFail || layer.status.isAttention, layer.couldNotVerifyPart != nil {
+                 let title = VerificationRowModel.title(for: layer)
+-                let location = VerificationRowModel.pageLocation(layer.couldNotVerifyPartPages).map { " \($0)" } ?? ""
++                let location = VerificationRowModel.pageLocation(layer.pageReferences).map { " \($0)" } ?? ""
+                 return "\(title): could not verify\(location)"
+             }
+             return nil

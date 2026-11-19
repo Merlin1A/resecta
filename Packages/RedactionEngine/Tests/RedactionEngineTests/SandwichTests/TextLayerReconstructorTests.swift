@@ -632,7 +632,7 @@ struct TextLayerReconstructorTests {
             totalCharacters: entries.count, excludedCount: 1
         ).toDigest(pageIndex: 0, redactionRects: [], safetyMargin: safetyMarginPoints, frame: frame)
         let tampered = try await SandwichVerification().verifyCharacterLineage(outputPage: page, digest: dropped)
-        #expect(tampered.isFail, "r=\(rotation): a glyph the digest does not carry must FAIL Layer 9")
+        #expect(tampered?.isFail == true, "r=\(rotation): a glyph the digest does not carry must FAIL Layer 9")
     }
 }
 

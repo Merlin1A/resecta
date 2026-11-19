@@ -251,13 +251,11 @@ struct AdversarialSearchableVerificationTests {
                 "Layer 9 must FAIL when a visible glyph is injected into the output sequence")
     }
 
-    @Test("RT-5: Layer 9 PASSes when digest has empty lineage hash")
-    func rt5Layer9PassesOnEmptyDigest() async throws {
-        // A filter that recorded no surviving characters produces an empty
-        // lineage hash. The verifier short-circuits to PASS; the
-        // corresponding output page is expected to have no composed
-        // characters of its own (the page consists of the rasterized
-        // image only).
+    @Test("RT-5: Layer 9 gives no status when the digest has no lineage record")
+    func rt5Layer9NoStatusOnEmptyDigest() async throws {
+        // A digest with no lineage record (an empty hash) compares nothing:
+        // the verifier gives no status and the dispatcher counts the page
+        // as not checked, never as passed.
         let (doc, url) = try TestFixtures.writeTempPDF(
             TestFixtures.imageOnlyPDF(),
             prefix: "rt5_empty_"
@@ -274,8 +272,8 @@ struct AdversarialSearchableVerificationTests {
         let result = try await sandwichVerifier.verifyCharacterLineage(
             outputPage: page, digest: digest
         )
-        #expect(result == .pass,
-                "Layer 9 must PASS when the filter recorded no surviving characters")
+        #expect(result == nil,
+                "Layer 9 must not pass a page it compared nothing on")
     }
 
     // MARK: - Encoding tricks defeated by Layer 3

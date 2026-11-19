@@ -1,0 +1,19 @@
+Property: A warning that stands alone keeps its row with the could-not-verify mark clear. (Not a put-back: it makes the mistake the three pins guard against.)
+Area: could-not-verify rows (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/CouldNotReadRowTests
+Must go red: RedactionEngineTests/CouldNotReadRowTests eachCase [pin: the in-region text warning alone keeps its row, mark clear]; RedactionEngineTests/CouldNotReadRowTests eachCase [pin: the fragment line alone keeps its row, mark clear]; RedactionEngineTests/CouldNotReadRowTests eachCase [pin: the picture data line alone keeps its row, mark clear]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/CheckRowComposition.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/CheckRowComposition.swift
+index 303b2fa2..60121ca9 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/CheckRowComposition.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/CheckRowComposition.swift
+@@ -84,7 +84,7 @@ enum CheckRowComposition {
+                             couldNotVerify: true)
+         }
+         if let first = warnings.first {
+-            return CheckRow(status: .warn(first.sentence), pages: first.pages, couldNotVerify: false)
++            return CheckRow(status: .warn(first.sentence), pages: first.pages, couldNotVerify: true)
+         }
+         return nil
+     }

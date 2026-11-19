@@ -75,14 +75,12 @@ extension DocumentSearcher {
                     // selection exists) or the located anchor text (whose
                     // selection would cover only part of the block). Every
                     // other match keeps PDFKit selection geometry unchanged.
-                    let box: TextLayerBox
+                    let found: TextLayerBox?
                     if let spatialBox =
                         (match.kind == .address ? spatialRectByText[match.text] : nil) {
-                        box = spatialBox
-                    } else if let charBox = textLayerBox(for: match.range, page: page) {
-                        box = charBox
+                        found = spatialBox
                     } else {
-                        continue
+                        found = textLayerBox(for: match.range, page: page)
                     }
                     // Sentinel-ranged assembly (zero length): the joined
                     // block is its own context, so the window is the whole
@@ -91,6 +89,18 @@ extension DocumentSearcher {
                     let window = match.range.length > 0
                         ? contextSnippet(text: pageText, matchNSRange: match.range)
                         : ContextWindow(snippet: match.text, matchRange: 0..<match.text.count)
+                    guard let box = found else {
+                        // Found, but no box: listed with its page, never dropped.
+                        continuation.yield(.unboxed(
+                            pageIndex: pageIndex, matchedText: match.text,
+                            contextSnippet: window.snippet, source: .textLayer,
+                            term: match.category?.rawValue ?? "PII",
+                            piiCategory: match.category, piiConfidence: match.confidence,
+                            rationale: match.rationale, matchRangeInSnippet: window.matchRange,
+                            liesOffVisiblePage: match.range.length > 0 && liesOffVisiblePage(match.range, page: page)))
+                        totalYielded += 1
+                        continue
+                    }
 
                     pageRects.append(box.rect)
                     continuation.yield(SearchResult(
@@ -121,13 +131,26 @@ extension DocumentSearcher {
                     )
                     for hit in alwaysFlagResult.hits {
                         if Task.isCancelled || totalYielded >= Self.maxResults { break }
-                        guard let box = textLayerBox(for: hit.range, page: page) else { continue }
-                        pageRects.append(box.rect)
                         let ns = pageText as NSString
                         let matchedText = ns.substring(with: hit.range)
                         let window = contextSnippet(
                             text: pageText, matchNSRange: hit.range
                         )
+                        guard let box = textLayerBox(for: hit.range, page: page) else {
+                            // Found, but no box: listed with its page, never dropped.
+                            continuation.yield(.unboxed(
+                                pageIndex: pageIndex, matchedText: matchedText,
+                                contextSnippet: window.snippet, source: .textLayer, term: "Custom",
+                                rationale: MatchRationale.Builder(
+                                    ruleID: "user.alwaysFlag", preThresholdScore: 1.0,
+                                    signals: [.userAlwaysFlag(pattern: hit.pattern)]
+                                ).build(finalScore: 1.0),
+                                matchRangeInSnippet: window.matchRange,
+                                liesOffVisiblePage: liesOffVisiblePage(hit.range, page: page)))
+                            totalYielded += 1
+                            continue
+                        }
+                        pageRects.append(box.rect)
                         continuation.yield(SearchResult(
                             pageIndex: pageIndex,
                             normalizedRect: box.rect,
@@ -301,7 +324,7 @@ extension DocumentSearcher {
             _ range: NSRange
         ) -> (rect: CGRect, window: ContextWindow, ocrConfidence: Float)? {
             guard let (paddedRect, overlappingLines) = ocrUnionRect(
-                forUTF16Range: range, lineOffsets: lineOffsets, page: page
+                forUTF16Range: range, lineOffsets: Self.boxLookupLines(lineOffsets), page: page
             ) else { return nil }
 
             // The canonical context window over the
@@ -348,7 +371,20 @@ extension DocumentSearcher {
             // text-layer pre-threshold merge is V1.1+ scope.
             if userTermsIndex?.underlyingMatcher.shouldSuppress(match.text) != nil { continue }
 
-            guard let mapped = resolvedMapping(for: match) else { continue }
+            guard let mapped = resolvedMapping(for: match) else {
+                // Found, but no recognised line to place it on: listed with
+                // its page, never dropped.
+                let window = match.range.length > 0
+                    ? contextSnippet(text: concatenated, matchNSRange: match.range)
+                    : ContextWindow(snippet: match.text, matchRange: 0..<match.text.count)
+                results.append(.unboxed(
+                    pageIndex: pageIndex, matchedText: match.text,
+                    contextSnippet: window.snippet, source: .ocr(confidence: 1.0),
+                    term: match.category?.rawValue ?? "PII",
+                    piiCategory: match.category, piiConfidence: match.confidence,
+                    rationale: match.rationale, matchRangeInSnippet: window.matchRange))
+                continue
+            }
 
             // Fold OCR confidence into the rationale so power users can
             // see the OCR contribution alongside detector evidence.
@@ -378,9 +414,21 @@ extension DocumentSearcher {
                 timeoutOverride: regexTimeoutOverride
             )
             for hit in alwaysFlagResult.hits {
-                guard let mapped = mapToOCR(hit.range) else { continue }
                 let ns = concatenated as NSString
                 let matchedText = ns.substring(with: hit.range)
+                guard let mapped = mapToOCR(hit.range) else {
+                    // Found, but no recognised line to place it on: listed.
+                    let window = contextSnippet(text: concatenated, matchNSRange: hit.range)
+                    results.append(.unboxed(
+                        pageIndex: pageIndex, matchedText: matchedText,
+                        contextSnippet: window.snippet, source: .ocr(confidence: 1.0), term: "Custom",
+                        rationale: MatchRationale.Builder(
+                            ruleID: "user.alwaysFlag", preThresholdScore: 1.0,
+                            signals: [.userAlwaysFlag(pattern: hit.pattern)]
+                        ).build(finalScore: 1.0),
+                        matchRangeInSnippet: window.matchRange))
+                    continue
+                }
                 results.append(SearchResult(
                     pageIndex: pageIndex,
                     normalizedRect: mapped.rect,

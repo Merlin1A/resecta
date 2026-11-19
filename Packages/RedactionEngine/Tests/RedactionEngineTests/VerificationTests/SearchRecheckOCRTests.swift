@@ -32,12 +32,15 @@ struct SearchRecheckOCRTests {
         #expect(survivor.queryLines?.first?.remainingCount ?? 0 >= 1)
         #expect(survivor.detailDescription.contains("Text was read by OCR from the rendered pages."))
 
-        let clean = await TestFixtures.recheck(
+        // A word the page does not carry: nothing remains, and with no box
+        // over the search's matches the coverage check compared nothing.
+        let absent = await TestFixtures.recheck(
             SendablePDFDocument(doc), requests: [TestFixtures.textRequest("Delia")],
             mode: .secureRasterization)
-        #expect(clean.status == .pass, "a word the page does not carry → PASS; got \(clean.status)")
-        #expect(clean.queryLines?.first?.route == .ocr)
-        #expect(clean.detailDescription == "\(SearchRecheck.detailLead) Text was read by OCR from the rendered pages.")
+        let comparedNothing = SearchRecheck.coverageNoSearchMatchClause
+        #expect(TestFixtures.message(of: absent.status) == "Re-ran 1 search; \(comparedNothing)", "got \(absent.status)")
+        #expect(absent.queryLines?.first?.route == .ocr)
+        #expect(absent.detailDescription == "\(SearchRecheck.detailLead) Text was read by OCR from the rendered pages. \(comparedNothing.prefix(1).uppercased() + comparedNothing.dropFirst()).")
     }
 
     @Test("A page over the OCR pixel cap is reported 'too large to scan for text', not read as clear")
@@ -53,7 +56,7 @@ struct SearchRecheckOCRTests {
             mode: .secureRasterization)
         #expect(result.status == .warn(""), "an unreadable page must not PASS; got \(result.status)")
         #expect(TestFixtures.message(of: result.status)
-                == "Re-ran 1 search; 1 page could not be checked: 1 (too large to scan for text)")
+                == "Re-ran 1 search; 1 page could not be checked: 1 (too large to scan for text); \(SearchRecheck.coverageNoSearchMatchClause)")
         #expect(result.pageReferences == [0])
     }
 

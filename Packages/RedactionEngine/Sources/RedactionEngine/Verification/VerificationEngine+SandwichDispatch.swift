@@ -37,17 +37,44 @@ extension VerificationEngine {
         return Array(perPageModes.count..<pageCount)
     }
 
-    /// WARN copy for a per-page mode coverage gap — the mechanism only.
-    private func perPageModeCoverageWarn(
-        uncovered: [Int], pageCount: Int
-    ) -> VerificationStatus {
+    /// The could-not-verify condition for a per-page mode coverage gap —
+    /// the mechanism only — over the pages beyond the list, or nil when the
+    /// list covers the document.
+    private func perPageModeCoverageCondition(
+        perPageModes: [PipelineMode], pageCount: Int
+    ) -> UnverifiedCondition? {
+        guard let uncovered = perPageModeCoverageGap(
+            perPageModes: perPageModes, pageCount: pageCount) else { return nil }
         let covered = pageCount - uncovered.count
         let unchecked = uncovered.count == 1
             ? "1 page was" : "\(uncovered.count) pages were"
-        return .warn(
-            "Per-page mode data covered \(covered) of \(pageCount) "
-            + "\(pageCount == 1 ? "page" : "pages") — \(unchecked) not checked"
-        )
+        return UnverifiedCondition(
+            sentence: "Per-page mode data covered \(covered) of \(pageCount) "
+                + "\(pageCount == 1 ? "page" : "pages") — \(unchecked) not checked",
+            pages: uncovered)
+    }
+
+    /// The could-not-verify condition for eligible pages that were not
+    /// cross-checked (no rasterization record, or a page that would not
+    /// open), over those pages; nil when every eligible page was checked.
+    private func notCrossCheckedCondition(
+        checked: Int, eligible: Int, uncheckedPages: [Int]
+    ) -> UnverifiedCondition? {
+        guard checked < eligible else { return nil }
+        return UnverifiedCondition(
+            sentence: "Cross-checked \(checked) of \(eligible) \(eligible == 1 ? "page" : "pages") — remaining pages lacked rasterization data",
+            pages: uncheckedPages)
+    }
+
+    /// The could-not-verify condition for pages a per-page loop could not
+    /// open, or nil when every page opened.
+    private func unreadablePagesCondition(_ pages: [Int]) -> UnverifiedCondition? {
+        pages.isEmpty ? nil : UnverifiedCondition(sentence: unreadablePagesSentence(pages), pages: pages)
+    }
+
+    /// A per-page issue of `PerPageOutcomes` as the composer's issue.
+    private func issue(_ failure: (VerificationStatus, [Int]?, Bool)?) -> (status: VerificationStatus, pages: [Int]?)? {
+        failure.map { (status: $0.0, pages: $0.1) }
     }
 
     // MARK: - Layer 6: Spatial Verification
@@ -63,7 +90,7 @@ extension VerificationEngine {
         regions: [Int: [RedactionRegion]],
         perPageModes: [PipelineMode],
         verifier: SandwichVerification
-    ) async throws -> (VerificationStatus, [Int]?, Bool) {
+    ) async throws -> CheckRow {
         // Entry-level cooperative cancellation.
         try Task.checkCancellation()
         var failingPages: [Int] = []
@@ -96,7 +123,13 @@ extension VerificationEngine {
             guard i < perPageModes.count else { continue }
             switch perPageModes[i] {
             case .secureRasterization:
-                if let text = doc.page(at: i)?.string,
+                // A page that cannot be opened was not probed; a page that
+                // opens with no text is the expected state.
+                guard let securePage = doc.page(at: i) else {
+                    unreadablePages.append(i)
+                    continue
+                }
+                if let text = securePage.string,
                    !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     secureDeclaredTextPages.append(i)
                 }
@@ -152,40 +185,36 @@ extension VerificationEngine {
                 }
             }
         }
+        // The could-not-verify conditions, in order: characters with no
+        // measurable position (those pages only, never the grazed ones),
+        // pages that could not be opened, pages beyond `perPageModes`
+        // (never selected above; see perPageModeCoverageGap). The loop has
+        // finished, so every issue carries them all.
+        let conditions = [
+            firstUnmeasuredMessage.map { UnverifiedCondition(sentence: $0, pages: unmeasuredPages) },
+            unreadablePagesCondition(unreadablePages),
+            perPageModeCoverageCondition(perPageModes: perPageModes, pageCount: doc.pageCount),
+        ].compactMap { $0 }
         // A text layer on a page written as image-only outranks every other
         // outcome: the page was declared to carry none.
+        var found: (status: VerificationStatus, pages: [Int]?)?
         if !secureDeclaredTextPages.isEmpty {
             let list = secureDeclaredTextPages.map { String($0 + 1) }.joined(separator: ", ")
-            return (.fail("A page written as image-only still carries a text layer on \(pagePhrase(secureDeclaredTextPages, list: list))"),
-                    secureDeclaredTextPages, false)
+            found = (.fail("A page written as image-only still carries a text layer on \(pagePhrase(secureDeclaredTextPages, list: list))"),
+                     secureDeclaredTextPages)
+        } else if let msg = firstFailMessage {
+            found = (.fail(msg), failingPages)
         }
-        if let msg = firstFailMessage {
-            return (.fail(msg), failingPages, false)
+        if let row = CheckRowComposition.compose(issue: found, conditions: conditions, warnings: []) {
+            return row
         }
-        // The exclusion pass's WARN outranks the unreadable-page WARN
-        // (mirror of FAIL's masking above; the combined case is rare and the
-        // exclusion message is the more actionable of the two). An
-        // unmeasured position (the check did not fully run) outranks a graze
-        // (a positional note; the check ran); the grazed pages ride along
-        // as references.
-        if let msg = firstUnmeasuredMessage {
-            return (.warn(msg), (unmeasuredPages + grazePages).sorted(), true)
-        }
+        // The edge graze is a note (the check ran): never joined, and the
+        // row only when nothing above applies.
         if !grazePages.isEmpty {
-            return (SandwichVerification.grazeWarning(pages: grazePages), grazePages, false)
+            return CheckRow(status: SandwichVerification.grazeWarning(pages: grazePages),
+                            pages: grazePages, couldNotVerify: false)
         }
-        if !unreadablePages.isEmpty {
-            return (unreadablePagesWarn(unreadablePages), unreadablePages, true)
-        }
-        // Pages beyond `perPageModes` were never selected above — report
-        // them rather than pass them (see perPageModeCoverageGap).
-        if let uncovered = perPageModeCoverageGap(
-            perPageModes: perPageModes, pageCount: doc.pageCount
-        ) {
-            return (perPageModeCoverageWarn(
-                uncovered: uncovered, pageCount: doc.pageCount), uncovered, true)
-        }
-        return (.pass, nil, false)
+        return .passed
     }
 
     // MARK: - Layer 7: Character Count Cross-Check
@@ -197,10 +226,11 @@ extension VerificationEngine {
         filterDigests: [PageFilterDigest?],
         perPageModes: [PipelineMode],
         verifier: SandwichVerification
-    ) async throws -> (VerificationStatus, [Int]?, Bool) {
+    ) async throws -> CheckRow {
         // Entry-level cooperative cancellation.
         try Task.checkCancellation()
         var outcomes = PerPageOutcomes()
+        var uncheckedPages: [Int] = []
         // Track how many pages this
         // digest-consuming layer was eligible to cross-check vs how many it
         // actually checked, so a layer that ran no comparisons reports the
@@ -214,10 +244,11 @@ extension VerificationEngine {
                 continue
             }
             eligible += 1
-            guard i < filterDigests.count, let digest = filterDigests[i] else {
+            guard i < filterDigests.count, let digest = filterDigests[i],
+                  let page = doc.page(at: i) else {
+                uncheckedPages.append(i)
                 continue
             }
-            guard let page = doc.page(at: i) else { continue }
 
             checked += 1
             let result = try await verifier.verifyCharacterCount(
@@ -225,7 +256,21 @@ extension VerificationEngine {
             )
             outcomes.record(result, page: i)
         }
-        if let failure = outcomes.failure { return failure }
+        // Conditions: the pages not cross-checked, then the pages beyond
+        // `perPageModes`. The count excess is the warning, joined after them.
+        let conditions = [
+            notCrossCheckedCondition(checked: checked, eligible: eligible, uncheckedPages: uncheckedPages),
+            perPageModeCoverageCondition(perPageModes: perPageModes, pageCount: doc.pageCount),
+        ].compactMap { $0 }
+        let excess = outcomes.warning(couldNotVerify: false)
+        let warnings: [CheckWarning] = excess.flatMap { w in
+            if case .warn(let sentence) = w.0 { return [CheckWarning(sentence: sentence, pages: w.1)] }
+            return nil
+        } ?? []
+        if let failure = issue(outcomes.failure) {
+            return CheckRowComposition.compose(issue: failure, conditions: conditions, warnings: warnings)
+                ?? CheckRow(status: failure.status, pages: failure.pages, couldNotVerify: false)
+        }
         // Eligible-but-unchecked → honest .skipped (the verify-only
         // resume path rebuilds all-nil digests). Partial coverage → .warn
         // (defensive; unreachable today since digests are all-present or
@@ -236,24 +281,17 @@ extension VerificationEngine {
         // never counted as eligible, so they are reported last, on the
         // otherwise-PASS exit (see perPageModeCoverageGap).
         if eligible > 0 && checked == 0 {
-            return (.skipped, nil, false)
-        }
-        if checked < eligible {
-            return (.warn("Cross-checked \(checked) of \(eligible) \(eligible == 1 ? "page" : "pages") — remaining pages lacked rasterization data"), nil, true)
-        }
-        if let uncovered = perPageModeCoverageGap(
-            perPageModes: perPageModes, pageCount: doc.pageCount
-        ) {
-            return (perPageModeCoverageWarn(
-                uncovered: uncovered, pageCount: doc.pageCount), uncovered, true)
+            return CheckRow(status: .skipped, pages: nil, couldNotVerify: false)
         }
         // The verifier's per-page count-excess warnings: a note (the check
-        // ran), ranked below the could-not-verify warnings above.
-        if let warning = outcomes.warning(couldNotVerify: false) { return warning }
-        if noPageKeptATextLayer(perPageModes) {
-            return (.notApplicable(Self.noTextLayerMessage), nil, false)
+        // ran), joined after the could-not-verify conditions, else alone.
+        if let row = CheckRowComposition.compose(issue: nil, conditions: conditions, warnings: warnings) {
+            return row
         }
-        return (.pass, nil, false)
+        if noPageKeptATextLayer(perPageModes) {
+            return CheckRow(status: .notApplicable(Self.noTextLayerMessage), pages: nil, couldNotVerify: false)
+        }
+        return .passed
     }
 
     // MARK: - Layer 8: Font Verification
@@ -264,7 +302,7 @@ extension VerificationEngine {
         _ doc: PDFDocument,
         perPageModes: [PipelineMode],
         verifier: SandwichVerification
-    ) async throws -> (VerificationStatus, [Int]?, Bool) {
+    ) async throws -> CheckRow {
         // Entry-level cooperative cancellation.
         try Task.checkCancellation()
         var outcomes = PerPageOutcomes()
@@ -286,25 +324,27 @@ extension VerificationEngine {
                 outputPage: page, pageIndex: i)
             outcomes.record(result, page: i)
         }
-        if let failure = outcomes.failure { return failure }
-        if !unreadablePages.isEmpty {
-            return (unreadablePagesWarn(unreadablePages), unreadablePages, true)
+        // Conditions, in order: pages that could not be opened, pages
+        // beyond `perPageModes` (never selected above; see
+        // perPageModeCoverageGap), then the verifier's first per-page
+        // warning — a font it could not inspect, a page with no page-level
+        // resources: the check did not run there — over its pages.
+        let fontWarning = outcomes.warning(couldNotVerify: true).flatMap { w -> UnverifiedCondition? in
+            if case .warn(let sentence) = w.0 { return UnverifiedCondition(sentence: sentence, pages: w.1 ?? []) }
+            return nil
         }
-        // Pages beyond `perPageModes` were never selected above — report
-        // them rather than pass them (see perPageModeCoverageGap).
-        if let uncovered = perPageModeCoverageGap(
-            perPageModes: perPageModes, pageCount: doc.pageCount
-        ) {
-            return (perPageModeCoverageWarn(
-                uncovered: uncovered, pageCount: doc.pageCount), uncovered, true)
+        let conditions = [
+            unreadablePagesCondition(unreadablePages),
+            perPageModeCoverageCondition(perPageModes: perPageModes, pageCount: doc.pageCount),
+            fontWarning,
+        ].compactMap { $0 }
+        if let row = CheckRowComposition.compose(issue: issue(outcomes.failure), conditions: conditions, warnings: []) {
+            return row
         }
-        // The verifier's per-page warnings — a font it could not inspect,
-        // a page with no page-level resources: the check did not run there.
-        if let warning = outcomes.warning(couldNotVerify: true) { return warning }
         if noPageKeptATextLayer(perPageModes) {
-            return (.notApplicable(Self.noTextLayerMessage), nil, false)
+            return CheckRow(status: .notApplicable(Self.noTextLayerMessage), pages: nil, couldNotVerify: false)
         }
-        return (.pass, nil, false)
+        return .passed
     }
 
     // MARK: - Layer 9: Character Lineage
@@ -323,7 +363,7 @@ extension VerificationEngine {
         filterDigests: [PageFilterDigest?],
         perPageModes: [PipelineMode],
         verifier: SandwichVerification
-    ) async throws -> (VerificationStatus, [Int]?, Bool) {
+    ) async throws -> CheckRow {
         // Entry-level cooperative cancellation +
         // a per-page check, matching every other layer dispatcher; the
         // composed-character walk inside the verifier carries the banded
@@ -337,6 +377,7 @@ extension VerificationEngine {
         // reports .skipped rather than a silent .pass.
         var eligible = 0
         var checked = 0
+        var uncheckedPages: [Int] = []
 
         for i in 0..<doc.pageCount {
             try Task.checkCancellation()
@@ -344,41 +385,46 @@ extension VerificationEngine {
                 continue
             }
             eligible += 1
-            guard i < filterDigests.count, let digest = filterDigests[i] else {
+            guard i < filterDigests.count, let digest = filterDigests[i],
+                  let page = doc.page(at: i) else {
+                uncheckedPages.append(i)
                 continue
             }
-            guard let page = doc.page(at: i) else { continue }
-
-            checked += 1
-            let result = try await verifier.verifyCharacterLineage(
+            // A digest with no lineage record gives no status: the page
+            // was eligible and not compared.
+            guard let result = try await verifier.verifyCharacterLineage(
                 outputPage: page, digest: digest
-            )
+            ) else {
+                uncheckedPages.append(i)
+                continue
+            }
+            checked += 1
             if case .fail(let msg) = result {
                 failingPages.append(i)
                 if firstFailMessage == nil { firstFailMessage = msg }
             }
         }
+        // Conditions as Layer 7's: the pages not cross-checked, then the
+        // pages beyond `perPageModes`.
+        let conditions = [
+            notCrossCheckedCondition(checked: checked, eligible: eligible, uncheckedPages: uncheckedPages),
+            perPageModeCoverageCondition(perPageModes: perPageModes, pageCount: doc.pageCount),
+        ].compactMap { $0 }
         if let msg = firstFailMessage {
-            return (.fail(msg), failingPages, false)
+            return CheckRowComposition.compose(issue: (.fail(msg), failingPages), conditions: conditions, warnings: [])
+                ?? CheckRow(status: .fail(msg), pages: failingPages, couldNotVerify: false)
         }
-        // Eligible-but-unchecked → .skipped; partial → .warn;
-        // eligible == 0 reads NOT APPLICABLE (nothing to check); pages beyond
-        // `perPageModes` are reported last. See Layer 7.
+        // Eligible-but-unchecked → .skipped; partial → the conditions;
+        // eligible == 0 reads NOT APPLICABLE (nothing to check). See Layer 7.
         if eligible > 0 && checked == 0 {
-            return (.skipped, nil, false)
+            return CheckRow(status: .skipped, pages: nil, couldNotVerify: false)
         }
-        if checked < eligible {
-            return (.warn("Cross-checked \(checked) of \(eligible) \(eligible == 1 ? "page" : "pages") — remaining pages lacked rasterization data"), nil, true)
-        }
-        if let uncovered = perPageModeCoverageGap(
-            perPageModes: perPageModes, pageCount: doc.pageCount
-        ) {
-            return (perPageModeCoverageWarn(
-                uncovered: uncovered, pageCount: doc.pageCount), uncovered, true)
+        if let row = CheckRowComposition.compose(issue: nil, conditions: conditions, warnings: []) {
+            return row
         }
         if noPageKeptATextLayer(perPageModes) {
-            return (.notApplicable(Self.noTextLayerMessage), nil, false)
+            return CheckRow(status: .notApplicable(Self.noTextLayerMessage), pages: nil, couldNotVerify: false)
         }
-        return (.pass, nil, false)
+        return .passed
     }
 }

@@ -279,7 +279,7 @@ struct SearchableMergeProbeTests {
                     "constructedMergeProbe: no merge even with split+overlapping runs (output composed ≥ surviving).")
             #expect(outCount?.isFail != true,
                     "constructedMergeProbe: Layer 7 count must not FAIL (no deficit).")
-            #expect(outLineage.isFail == false,
+            #expect(outLineage?.isFail != true,
                     "constructedMergeProbe: Layer 9 lineage must not FAIL on the constructed-merge path.")
         }
         print("===== END CONSTRUCTED MERGE PROBE =====")
@@ -422,7 +422,12 @@ struct SearchableMergeProbeTests {
         }
         let heldUnits = held.map(\.character)
         let outputHash = try SandwichVerification.computeOutputLineageHash(page)
-        let l9Fail = try await SandwichVerification().verifyCharacterLineage(outputPage: page, digest: digest).isFail
+        // The probe expects a verdict: a lineage the check could not read
+        // (nil) fails this test here, never reads as a pass.
+        let lineage = try #require(
+            try await SandwichVerification().verifyCharacterLineage(outputPage: page, digest: digest),
+            "Layer 9 must reach a verdict on this page; it could not read the lineage.")
+        let l9Fail = lineage.isFail
         print("===== LAYER-9 FAIL (planted) ===== digest units \(heldUnits.map { $0.unicodeScalars.map { String(format: "U+%04X", $0.value) }.joined(separator: " ") }) | output units \(outputUnits.map { $0.unicodeScalars.map { String(format: "U+%04X", $0.value) }.joined(separator: " ") }) | hashes equal: \(outputHash == digest.lineageHash)")
         // Compared by scalars: String's == holds canonically equivalent
         // forms equal, so "e\u{0301}" == "\u{00E9}" there.

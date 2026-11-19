@@ -1,0 +1,19 @@
+Property: A failed row shows where its check stopped, after its lead, as every other row does.
+Area: results rows (App)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -project ResectaApp.xcodeproj -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/CheckStopLineTests
+Must go red: ResectaAppTests/CheckStopLineTests lead [S-1], [S-6], [S-9]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationRowModel.swift b/Sources/ResectaApp/Views/VerificationRowModel.swift
+index 45dfe75d..d1746a9f 100644
+--- a/Sources/ResectaApp/Views/VerificationRowModel.swift
++++ b/Sources/ResectaApp/Views/VerificationRowModel.swift
+@@ -389,7 +389,7 @@ nonisolated struct VerificationRowModel: Equatable {
+     static func lead(for layer: LayerResult, outcome: VerificationOutcome,
+                      perPageModes: [PipelineMode]) -> [String] {
+         let lines = outcomeLead(for: layer, outcome: outcome, perPageModes: perPageModes)
+-        guard let stop = stopLine(layer.stopped, pageCount: perPageModes.count) else { return lines }
++        guard outcome != .failed, let stop = stopLine(layer.stopped, pageCount: perPageModes.count) else { return lines }
+         return lines + [stop]
+     }
+ 

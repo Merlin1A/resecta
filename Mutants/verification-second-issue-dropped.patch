@@ -1,0 +1,21 @@
+Property: Text & Annotations names both of its issues when a page holds selectable text and another holds annotations, text first.
+Area: could-not-verify rows (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/CouldNotReadRowTests
+Must go red: RedactionEngineTests/CouldNotReadRowTests eachCase [Text & Annotations: selectable text and an annotation are both in the row]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine.swift
+index 605e3fcb..a9d9a72c 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine.swift
+@@ -545,9 +545,7 @@ public struct VerificationEngine: Sendable {
+             // issues are in the row, text first.
+             if !annotationPages.isEmpty {
+                 let annotationList = annotationPages.map { String($0 + 1) }.joined(separator: ", ")
+-                message = CheckRowComposition.join([
+-                    message, "Annotations found on \(pagePhrase(annotationPages, list: annotationList))"])
+-                pages = Array(Set(pages + annotationPages)).sorted()
++                _ = annotationList
+             }
+             return row(.fail(message), pages)
+         }

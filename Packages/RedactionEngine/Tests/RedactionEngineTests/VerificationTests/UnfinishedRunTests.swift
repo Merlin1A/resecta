@@ -197,7 +197,7 @@ struct UnfinishedRunTests {
         let row = await postRow(.searchRecheck, doc, requests: [TestFixtures.textRequest("Delia")],
                                 observations: [read(0, [0: count()])])
         #expect(row.status.isWarn, "got \(row.status)")
-        #expect(TestFixtures.message(of: row.status) == "Re-ran 1 search; 1 page could not be checked: 2")
+        #expect(TestFixtures.message(of: row.status) == "Re-ran 1 search; 1 page could not be checked: 2; \(SearchRecheck.coverageNoSearchMatchClause)")
         #expect(row.couldNotVerify)
         #expect(row.pageReferences == [1])
         expectNotPassedBesidePasses(row)
@@ -208,7 +208,7 @@ struct UnfinishedRunTests {
         let row = await postRow(.searchRecheck, doc, requests: [TestFixtures.textRequest("Delia")],
                                 observations: [read(0, [0: count()]), read(1, [:])])
         #expect(row.status.isWarn, "got \(row.status)")
-        #expect(TestFixtures.message(of: row.status) == "Re-ran 1 search; 1 page could not be checked: 2")
+        #expect(TestFixtures.message(of: row.status) == "Re-ran 1 search; 1 page could not be checked: 2; \(SearchRecheck.coverageNoSearchMatchClause)")
         #expect(row.couldNotVerify)
         #expect(row.pageReferences == [1])
         expectNotPassedBesidePasses(row)

@@ -223,6 +223,9 @@ struct RegionCoverage: Sendable {
             var comparedOccurrences = Set<UUID>()
             for await result in stream {
                 try Task.checkCancellation()
+                // A match with no box has nothing to measure a box's cover
+                // against; the Search Re-check counts it as remaining.
+                guard result.hasBox else { continue }
                 let match = PageMatch(
                     requestIndex: index, rect: result.normalizedRect.clampedToNormalized(),
                     term: result.term, occurrence: result.occurrenceID)

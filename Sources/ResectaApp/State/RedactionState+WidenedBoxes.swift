@@ -27,7 +27,7 @@ extension SearchState {
         guard let page = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix(prefix) })
             .flatMap({ Int($0.dropFirst(prefix.count)) }) else { return results }
         return results.map { r in
-            guard r.pageIndex == page, !r.inkFitDegraded else { return r }
+            guard r.pageIndex == page, !r.inkFitDegraded, r.hasBox else { return r }
             return SearchResult(
                 id: r.id, pageIndex: r.pageIndex, normalizedRect: r.normalizedRect, matchedText: r.matchedText,
                 contextSnippet: r.contextSnippet, source: r.source, term: r.term, isSelected: r.isSelected,
