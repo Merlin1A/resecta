@@ -394,9 +394,16 @@ nonisolated final class EditorChromeUITests: XCTestCase {
         app.launch()
     }
 
-    /// The gap between the load message's foot and the top of the page
-    /// bar's glass, read once the message has stopped sliding in.
-    private func messageGapAbovePageBar(_ name: String) -> CGFloat {
+    /// The load message and the page bar, read once the message has stopped
+    /// sliding in.
+    private struct BottomReading {
+        let message: CGRect
+        let bar: CGRect
+        /// The gap between the message's foot and the top of the bar's glass.
+        var gap: CGFloat { (bar.minY - EditorChromeUITests.pageBarTopPadding) - message.maxY }
+    }
+
+    private func readBottom(_ name: String) -> BottomReading {
         let bar = element("pageNav")
         XCTAssertTrue(bar.waitForExistence(timeout: 60), "The page bar never appeared.")
         let message = app.staticTexts
@@ -410,54 +417,58 @@ nonisolated final class EditorChromeUITests: XCTestCase {
             if next == frame { break }
             frame = next
         }
-        let gap = (bar.frame.minY - Self.pageBarTopPadding) - frame.maxY
-        let reading = XCTAttachment(string: "gap \(gap) pt; message \(frame); page bar \(bar.frame)")
+        let read = BottomReading(message: frame, bar: bar.frame)
+        let reading = XCTAttachment(string: "gap \(read.gap) pt; message \(read.message); page bar \(read.bar)")
         reading.name = "\(name)-gap"
         reading.lifetime = .keepAlways
         add(reading)
         attachScreenshot(named: name)
-        return gap
+        return read
+    }
+
+    /// The same reading at the default text size, then at `textSize`. The
+    /// counter's tappable height is floored to the touch target, so its own
+    /// height no longer tells one line from two; the default reading is the
+    /// measure instead. The message is taller than at the default size, or
+    /// the size name was ignored (the system says nothing).
+    private func readBottomAgainstTheDefault(textSize: String, _ name: String) -> (base: BottomReading, sized: BottomReading) {
+        launchEditor(textSize: nil)
+        let base = readBottom("\(name)-default")
+        app.terminate()
+        launchEditor(textSize: textSize)
+        let sized = readBottom(name)
+        XCTAssertGreaterThan(sized.message.height, base.message.height + 1,
+                             "The text size did not take: the message is \(sized.message.height) pt tall, \(base.message.height) pt at the default size.")
+        return (base, sized)
     }
 
     func testBottomMessage_atTheDefaultSize_keepsItsGapAboveThePageBar() {
         launchEditor(textSize: nil)
-        let counter = element("pageNavCounter")
-        XCTAssertTrue(counter.waitForExistence(timeout: 60), "The page counter never appeared.")
-        XCTAssertLessThanOrEqual(counter.frame.height, 40, "The counter is on one line at the default size.")
-        let gap = messageGapAbovePageBar("bottom-message-default-size")
+        let gap = readBottom("bottom-message-default-size").gap
         XCTAssertLessThanOrEqual(abs(gap - Self.defaultGapAbovePageBar), 2,
                                  "The message's gap above the page bar is \(gap) pt.")
     }
 
     func testBottomMessage_atTheLargestOrdinarySize_keepsItsGapAboveThePageBar() {
-        launchEditor(textSize: "UICTContentSizeCategoryXXXL")
-        let counter = element("pageNavCounter")
-        XCTAssertTrue(counter.waitForExistence(timeout: 60), "The page counter never appeared.")
-        // The counter's line is taller here than at the default size, so a
-        // size name the system ignored (it says nothing) fails this test.
-        XCTAssertGreaterThanOrEqual(counter.frame.height, 25, "The text size did not take.")
-        XCTAssertLessThanOrEqual(counter.frame.height, 40, "The counter is on one line below the accessibility sizes.")
-        let gap = messageGapAbovePageBar("bottom-message-largest-ordinary-size")
+        let read = readBottomAgainstTheDefault(textSize: "UICTContentSizeCategoryXXXL", "bottom-message-largest-ordinary-size")
+        XCTAssertLessThanOrEqual(abs(read.sized.bar.height - read.base.bar.height), 1,
+                                 "Below the accessibility sizes the counter is on one line: the page bar is \(read.sized.bar.height) pt tall, \(read.base.bar.height) pt at the default size.")
+        let gap = read.sized.gap
         XCTAssertLessThanOrEqual(abs(gap - Self.defaultGapAbovePageBar), 2,
                                  "The message's gap above the page bar is \(gap) pt.")
     }
 
     func testBottomMessage_atAccessibilityOne_keepsItsGapAboveThePageBar() {
-        launchEditor(textSize: "UICTContentSizeCategoryAccessibilityM")
-        let counter = element("pageNavCounter")
-        XCTAssertTrue(counter.waitForExistence(timeout: 60), "The page counter never appeared.")
-        XCTAssertGreaterThan(counter.frame.height, 40, "The text size did not take: the counter stacks here.")
-        let gap = messageGapAbovePageBar("bottom-message-accessibility-one")
+        let gap = readBottomAgainstTheDefault(textSize: "UICTContentSizeCategoryAccessibilityM", "bottom-message-accessibility-one").sized.gap
         XCTAssertLessThanOrEqual(abs(gap - Self.defaultGapAbovePageBar), 2,
                                  "The message's gap above the page bar is \(gap) pt.")
     }
 
     func testBottomMessage_atTheLargestTextSize_keepsItsGapAboveThePageBar() {
-        launchEditor(textSize: "UICTContentSizeCategoryAccessibilityXXXL")
-        let counter = element("pageNavCounter")
-        XCTAssertTrue(counter.waitForExistence(timeout: 60), "The page counter never appeared.")
-        XCTAssertGreaterThan(counter.frame.height, 40, "The text size did not take: the counter stacks here.")
-        let gap = messageGapAbovePageBar("bottom-message-largest-text-size")
+        let read = readBottomAgainstTheDefault(textSize: "UICTContentSizeCategoryAccessibilityXXXL", "bottom-message-largest-text-size")
+        XCTAssertGreaterThan(read.sized.bar.height, read.base.bar.height + 1,
+                             "At the largest size the counter stacks: the page bar is \(read.sized.bar.height) pt tall, \(read.base.bar.height) pt at the default size.")
+        let gap = read.sized.gap
         XCTAssertGreaterThanOrEqual(gap, 0, "The message overlaps the page bar by \(-gap) pt.")
         XCTAssertLessThanOrEqual(abs(gap - Self.defaultGapAbovePageBar), 2,
                                  "The message's gap above the page bar is \(gap) pt.")
