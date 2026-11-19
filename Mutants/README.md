@@ -233,3 +233,8 @@ with its reason and the mutant that is caught in its place.
 | `search-rerun-notice-silent-at-zero.patch` | A re-run with nothing ticked posts no notice. | ResectaAppTests/DiscardUndoToastTests rerunNamesTheClearedMatches |
 | `search-rerun-notice-typing-included.patch` | A run started by typing names the ticked matches it clears. | ResectaAppUITests/SearchTypingFocusUITests testTypingOverTickedRows_postsTheNotice |
 | `failed-screen-own-identifiers.patch` | The failure screen's identifier names the screen, and its words and each button keep their own. | ResectaAppUITests/FailedStateIdentifiersUITests testFailedScreen_eachControlAnswersToItsOwnIdentifier |
+| `balanced-lines-no-floor.patch` | The balanced width never goes below the text's widest unbreakable run. | ResectaAppTests/BalancedLinesTests narrowestWidthTable; ResectaAppTests/BalancedLinesTests titlesAndSentencesKeepWholeWords |
+| `balanced-lines-smaller-bound.patch` | The search starts from the larger of half the line and the widest run, not the smaller. | ResectaAppTests/BalancedLinesTests narrowestWidthTable |
+| `balanced-lines-no-clamp.patch` | The balanced width is never wider than the line, even for a run wider than the line. | ResectaAppTests/BalancedLinesTests resultIsBounded; ResectaAppTests/BalancedLinesTests narrowestWidthTable |
+| `balanced-lines-split-no-break-space.patch` | A no-break space keeps its words in one run. | ResectaAppTests/BalancedLinesTests narrowestWidthTable |
+| `balanced-lines-title-bypasses-builder.patch` | Every balanced title and sentence is built by the one builder, with its measuring runs. | ResectaAppTests/BalancedLinesTests layoutIsBuiltInOnePlace |

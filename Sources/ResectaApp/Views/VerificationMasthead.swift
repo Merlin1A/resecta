@@ -272,22 +272,14 @@ struct VerificationMasthead: View {
         VStack(spacing: 0) {
             CountRing(content: VerificationMasthead.ringContent(report: report),
                       drawKey: VerificationMasthead.drawKey(for: report))
-            BalancedLines {
-                Text(VerificationResultsView.mastheadTitle(report: report))
-                    .font(.title.bold())
-                    .foregroundStyle(.primary)
-                    .multilineTextAlignment(.center)
-            }
-            .padding(.top, ResectaTokens.Results.ringToTitle)
+            BalancedText(string: VerificationResultsView.mastheadTitle(report: report), font: .title.bold())
+                .foregroundStyle(.primary)
+                .padding(.top, ResectaTokens.Results.ringToTitle)
             if let sentence {
-                BalancedLines {
-                    Text(sentence)
-                        .font(.subheadline)
-                        .foregroundStyle(ResectaTokens.SemanticColor.supportText)
-                        .multilineTextAlignment(.center)
-                }
-                .frame(maxWidth: ResectaTokens.Results.sentenceMaxWidth)
-                .padding(.top, ResectaTokens.Results.titleToSentence)
+                BalancedText(string: sentence, font: .subheadline)
+                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+                    .frame(maxWidth: ResectaTokens.Results.sentenceMaxWidth)
+                    .padding(.top, ResectaTokens.Results.titleToSentence)
                     // The ATTENTION sentence can quote the review terms —
                     // text the checks found still readable in the output.
                     .privacySensitive(quotesTerms)
@@ -437,33 +429,94 @@ struct CountRing: View {
     }
 }
 
+/// The masthead's title or its sentence: the string in its font, centred,
+/// laid out by `BalancedLines`. The one place a balanced text is built; the
+/// callers give it their colour, padding and width limit from outside.
+struct BalancedText: View {
+    let string: String
+    let font: Font
+
+    var body: some View {
+        BalancedLines {
+            Text(string)
+                .font(font)
+                .multilineTextAlignment(.center)
+            // Each run of the text in the same font, each as a text of its
+            // own, one over another: the stack's width is the widest run,
+            // which the layout never goes below. A run is measured alone
+            // because one text holding every run, one per line, measures up
+            // to two points narrower at large sizes. Never drawn, never
+            // spoken.
+            ZStack {
+                ForEach(Array(Self.runs(of: string).enumerated()), id: \.offset) { run in
+                    Text(run.element)
+                        .font(font)
+                        .fixedSize()
+                }
+            }
+            .hidden()
+            .accessibilityHidden(true)
+        }
+    }
+
+    /// The text's unbreakable runs: split on ordinary spaces and line breaks
+    /// only. A no-break space does not end a run; it keeps its words together.
+    static func runs(of string: String) -> [Substring] {
+        string.split(whereSeparator: { $0 == " " || $0 == "\n" })
+    }
+}
+
 /// Lays one wrapping text out at the narrowest width that keeps its line
 /// count, so a two-line title or sentence breaks into balanced lines
-/// instead of a long line and a short one.
+/// instead of a long line and a short one. A second subview, when there is
+/// one, holds the text's unbreakable runs, each measured alone; the width
+/// never goes below its width, so no word breaks to keep the line count.
 struct BalancedLines: Layout {
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         guard let text = subviews.first else { return .zero }
-        let width = balancedWidth(text, proposal: proposal)
+        let width = balancedWidth(subviews, proposal: proposal)
         return text.sizeThatFits(ProposedViewSize(width: width, height: nil))
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
         guard let text = subviews.first else { return }
-        let width = balancedWidth(text, proposal: ProposedViewSize(width: bounds.width, height: nil))
+        let width = balancedWidth(subviews, proposal: ProposedViewSize(width: bounds.width, height: nil))
         let size = text.sizeThatFits(ProposedViewSize(width: width, height: nil))
-        text.place(at: CGPoint(x: bounds.midX, y: bounds.minY), anchor: .top,
+        let top = CGPoint(x: bounds.midX, y: bounds.minY)
+        text.place(at: top, anchor: .top,
                    proposal: ProposedViewSize(width: size.width, height: size.height))
+        // The measuring runs sit at the same point with no size; they add
+        // nothing to the size the layout reports.
+        for runs in subviews.dropFirst() {
+            runs.place(at: top, anchor: .top, proposal: .zero)
+        }
     }
 
-    private func balancedWidth(_ text: LayoutSubview, proposal: ProposedViewSize) -> CGFloat? {
-        guard let available = proposal.width, available.isFinite else { return proposal.width }
-        let height = text.sizeThatFits(ProposedViewSize(width: available, height: nil)).height
-        let single = text.sizeThatFits(ProposedViewSize(width: nil, height: nil))
-        guard single.width > available else { return available }
-        var low = available / 2, high = available
+    private func balancedWidth(_ subviews: Subviews, proposal: ProposedViewSize) -> CGFloat? {
+        let text = subviews[0]
+        let floor = subviews.count > 1 ? subviews[1].sizeThatFits(.unspecified).width : 0
+        return Self.narrowestWidth(
+            available: proposal.width, single: text.sizeThatFits(.unspecified).width, floor: floor
+        ) { text.sizeThatFits(ProposedViewSize(width: $0, height: nil)).height }
+    }
+
+    /// The width the layout gives its text, in plain numbers: `available` is
+    /// the proposed width, `single` the text's width on one line, `floor` its
+    /// widest run's width, and `height(w)` its height at width `w`. The
+    /// narrowest width, rounded up to a whole point, whose height is that at
+    /// `available`; never below `floor` unless the run is wider than the line.
+    static func narrowestWidth(available: CGFloat?, single: CGFloat, floor: CGFloat,
+                               height: (CGFloat) -> CGFloat) -> CGFloat? {
+        guard let available, available.isFinite else { return available }
+        guard single > available else { return available }
+        var low = min(available, max(available / 2, floor))
+        // `low` is never above `available`; at it there is nothing narrower.
+        if low == available { return available }
+        let target = height(available)
+        var high = available
         for _ in 0..<12 {
             let mid = (low + high) / 2
-            if text.sizeThatFits(ProposedViewSize(width: mid, height: nil)).height > height + 0.5 {
+            if height(mid) > target + 0.5 {
                 low = mid
             } else {
                 high = mid
