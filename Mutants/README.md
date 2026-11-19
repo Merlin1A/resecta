@@ -280,3 +280,19 @@ with its reason and the mutant that is caught in its place.
 | `results-idle-checks-not-wholly-clean.patch` | A run with a check that had nothing to check is not wholly clean, so its row arrives closed. | ResectaAppTests/VerificationLayerPartitionTests nothingToCheckGroupAndHeaders; ResectaAppTests/VerificationLayerPartitionTests aRunWithIdleChecksArrivesClosed |
 | `results-idle-checks-closed-with-the-row.patch` | Closing the row closes an open idle member as well as a passed one. | ResectaAppTests/VerificationLayerPartitionTests closingTheListClosesItsOpenMember |
 | `results-idle-checks-keep-their-reason.patch` | An idle member keeps its mark and its reason; only a passed check is drawn bare. | ResectaAppTests/VerificationLayerPartitionTests memberRowsKeepTheirReasons |
+| `results-facts-lines-whole.patch` | A run line is shown whole; its instruction never goes behind a tap. | ResectaAppTests/FactRowTests todaysLinesAreShownWhole |
+| `results-facts-deselection-after-page-modes.patch` | The row about items left unredacted comes after Page Modes. | ResectaAppTests/FactRowTests cardOrder |
+| `results-facts-chevron-only-with-more.patch` | A fact has a chevron, and opens, only when it has something to open to. | ResectaAppTests/FactRowTests aFactOpensOnlyWhenThereIsSomethingToOpen; ResectaAppTests/FactRowTests todaysLinesAreShownWhole; ResectaAppTests/FactRowTests deselectionIsAFact |
+| `results-facts-handed-in-kept.patch` | Facts handed in are placed in the card. | ResectaAppTests/FactRowTests cardOrder |
+| `results-facts-one-open-item.patch` | Opening a fact closes an open check. | ResectaAppTests/FactRowTests oneRowOpenAtATime |
+| `results-facts-door-row-height.patch` | The link row is at least 46 pt high, whatever its text's height. | ResectaAppTests/FactRowTests linkRowCanBeHit |
+| `results-facts-door-row-text-teal.patch` | The link row's label is in the teal made for text, not the tint. | ResectaAppTests/FactRowTests linkRowCanBeHit |
+| `results-facts-no-symbol.patch` | The card's rows carry no symbol in front. | ResectaAppTests/FactRowTests cardRowsCarryNoSymbol |
+| `results-sweep-limit-on-every-outcome.patch` | The limit's row shows on a run that did not pass as well as on one that did. | ResectaAppTests/FactRowTests limitIsInViewExactlyOnce (secureFail) |
+| `results-sweep-limit-only-with-the-check.patch` | A run without the Detection Sweep check has no limit row. | ResectaAppTests/FactRowTests limitIsInViewExactlyOnce |
+| `results-sweep-limit-words-read-not-typed.patch` | The limit's words are read from the sweep's own row, not typed again. | ResectaAppTests/FactRowTests sweepLimitRowWordsAndPlace |
+| `results-sweep-row-keeps-its-limit.patch` | The sweep's own closed row keeps its two sentences. | ResectaAppTests/DetectionSweepRowCaptionTests captionRendersCollapsedOnly; ResectaAppTests/DetectionSweepRowCaptionTests spokenLabelCarriesTheGate; ResectaAppUITests/SearchRecheckUITests testDetectionSweep_drawnBox_rowPresentAndNoDetectionLine |
+| `results-sweep-limit-before-page-modes.patch` | The limit's row comes before Page Modes and the facts about pictures. | ResectaAppTests/FactRowTests sweepLimitRowWordsAndPlace |
+| `results-sweep-limit-not-twice.patch` | The limit's row is not shown while the sweep's own row is in view in its group. | ResectaAppTests/FactRowTests limitIsInViewExactlyOnce (secureScreenshot) |
+| `results-sweep-limit-kept-when-list-opens.patch` | The limit's row stays where the list of checks arrives open. | ResectaAppTests/FactRowTests limitIsInViewExactlyOnce (securePassRidingNote) |
+| `results-sweep-limit-reads-the-groups.patch` | Whether the sweep's row is in view is read from the groups the screen draws, not from a list of its own. | ResectaAppTests/FactRowTests limitIsInViewExactlyOnce (secureAllFailed) |

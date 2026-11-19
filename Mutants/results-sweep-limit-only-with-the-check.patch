@@ -1,0 +1,21 @@
+Property: A run without the Detection Sweep check has no limit row.
+Area: results (the Detection Sweep's limit)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/FactRowTests
+Must go red: ResectaAppTests/FactRowTests limitIsInViewExactlyOnce
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationDetailsSection.swift b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
+index d8fbeaf8..34c1bd39 100644
+--- a/Sources/ResectaApp/Views/VerificationDetailsSection.swift
++++ b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
+@@ -124,8 +124,8 @@ struct VerificationDetailsSection: View {
+         let index = sweepIndex(report)
+         let partition = VerificationLayerPartition(layers: report.layers, perPageModes: report.perPageModes)
+         let inView = index.map { sweepRowInView(partition, sweepIndex: $0) } ?? false
+-        guard showsSweepLimit(runHasCheck: index != nil, sweepRowInView: inView), let index,
+-              let words = LayerResultRow.rowCaptionText(layer: report.layers[index]) else { return nil }
++        guard showsSweepLimit(runHasCheck: true, sweepRowInView: inView) else { return nil }
++        let words = "\(LayerResultRow.detectionSweepGateCaption) \(LayerResultRow.detectionSweepUnreadCaption)"
+         return ResultsFact(id: "sweepLimit", shown: words, identifier: "sweepLimitFact")
+     }
+ 

@@ -1,0 +1,20 @@
+Property: The limit's words are read from the sweep's own row, not typed again.
+Area: results (the Detection Sweep's limit)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/FactRowTests
+Must go red: ResectaAppTests/FactRowTests sweepLimitRowWordsAndPlace
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationDetailsSection.swift b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
+index d8fbeaf8..ed83ef35 100644
+--- a/Sources/ResectaApp/Views/VerificationDetailsSection.swift
++++ b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
+@@ -125,7 +125,8 @@ struct VerificationDetailsSection: View {
+         let partition = VerificationLayerPartition(layers: report.layers, perPageModes: report.perPageModes)
+         let inView = index.map { sweepRowInView(partition, sweepIndex: $0) } ?? false
+         guard showsSweepLimit(runHasCheck: index != nil, sweepRowInView: inView), let index,
+-              let words = LayerResultRow.rowCaptionText(layer: report.layers[index]) else { return nil }
++              LayerResultRow.rowCaptionText(layer: report.layers[index]) != nil else { return nil }
++        let words = "Names and addresses are not swept. Photos, signatures and numbers in formats it does not know are not read eithes."
+         return ResultsFact(id: "sweepLimit", shown: words, identifier: "sweepLimitFact")
+     }
+ 
