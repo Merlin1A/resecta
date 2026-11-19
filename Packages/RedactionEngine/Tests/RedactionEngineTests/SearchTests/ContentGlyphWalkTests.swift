@@ -14,15 +14,27 @@ struct ContentGlyphWalkTests {
     /// further objects (from id 6) the resources name.
     static func page(_ content: String, font: String = helvetica,
                      resources: String = "/Font << /F1 5 0 R >>", extra: [PDFObject] = []) throws -> (PDFPage, CGPDFPage) {
-        let data = buildRawPDF(objects: [
+        let page = try #require(try document(content, font: font, resources: resources, extra: extra).page(at: 0))
+        return (page, try #require(page.pageRef))
+    }
+
+    /// The same page as a document, for a caller that searches it (a page
+    /// keeps no strong hold on its document).
+    static func document(_ content: String, font: String = helvetica,
+                         resources: String = "/Font << /F1 5 0 R >>", extra: [PDFObject] = []) throws -> PDFDocument {
+        try #require(PDFDocument(data: data(content, font: font, resources: resources, extra: extra)))
+    }
+
+    /// The same page's file.
+    static func data(_ content: String, font: String = helvetica,
+                     resources: String = "/Font << /F1 5 0 R >>", extra: [PDFObject] = []) -> Data {
+        buildRawPDF(objects: [
             PDFObject(id: 1, content: "<< /Type /Catalog /Pages 2 0 R >>"),
             PDFObject(id: 2, content: "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
             PDFObject(id: 3, content: "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << \(resources) >> >>"),
             PDFObject(id: 4, content: "<< /Length \(content.utf8.count) >>\nstream\n\(content)\nendstream"),
             PDFObject(id: 5, content: font),
         ] + extra, rootId: 1)
-        let page = try #require(PDFDocument(data: data)?.page(at: 0))
-        return (page, try #require(page.pageRef))
     }
 
     static func glyphs(_ content: String, font: String = helvetica, resources: String = "/Font << /F1 5 0 R >>",

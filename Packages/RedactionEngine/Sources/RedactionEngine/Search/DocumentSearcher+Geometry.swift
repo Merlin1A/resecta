@@ -93,8 +93,10 @@ extension DocumentSearcher {
     /// hidden glyphs' own box rides on the result (`textLayerAndInkRects`).
     public nonisolated func boundingRect(for nsRange: NSRange, page: PDFPage) -> CGRect? {
         guard let selection = page.selection(for: nsRange) else { return nil }
+        let own = Self.ownGlyphs(for: nsRange, page: page)
         return normalizedRect(for: selection, page: page).map {
-            Self.inkFittedRect($0, page: page, text: selection.string, range: nsRange, paintOnly: true)
+            grown(Self.inkFittedRect($0, page: page, text: selection.string, range: nsRange, paintOnly: true),
+                  line: selection.bounds(for: page), by: own, page: page)
         }
     }
 
@@ -106,10 +108,12 @@ extension DocumentSearcher {
     nonisolated func lineRects(for nsRange: NSRange, page: PDFPage) -> [CGRect]? {
         guard let selection = page.selection(for: nsRange) else { return nil }
         let lines = selection.selectionsByLine()
+        let own = Self.ownGlyphs(for: nsRange, page: page)
         let rects = lines.compactMap { line in
             normalizedRect(for: line, page: page).map {
-                Self.inkFittedRect($0, page: page, text: line.string,
-                                   range: lines.count == 1 ? nsRange : line.range(at: 0, on: page), paintOnly: true)
+                grown(Self.inkFittedRect($0, page: page, text: line.string,
+                                         range: lines.count == 1 ? nsRange : line.range(at: 0, on: page), paintOnly: true),
+                      line: line.bounds(for: page), by: own, page: page)
             }
         }
         return rects.isEmpty ? nil : rects
@@ -129,13 +133,14 @@ extension DocumentSearcher {
         guard let cgPage = page.pageRef, Self.carriesHiddenTextOverImage(page, cgPage: cgPage),
               let selection = page.selection(for: nsRange) else { return nil }
         let lines = selection.selectionsByLine()
+        let own = Self.ownGlyphs(for: nsRange, page: page)
         var paint: [CGRect] = [], strip: [CGRect] = [], degraded = false, identity: [CGRect?] = []
         for line in lines {
             guard let raw = normalizedRect(for: line, page: page) else { continue }
             let fit = Self.inkFit(raw, page: page, text: line.string,
                                   range: lines.count == 1 ? nsRange : line.range(at: 0, on: page), paintOnly: true)
             strip.append(raw)
-            paint.append(fit.rect)
+            paint.append(grown(fit.rect, line: line.bounds(for: page), by: own, page: page))
             identity.append(fit.identity)
             degraded = degraded || fit.degraded
         }
@@ -148,15 +153,60 @@ extension DocumentSearcher {
     /// so every rect takes this path (SECURITY: a rect built any other way
     /// is a fill at the wrong pixel position).
     nonisolated func normalizedRect(for selection: PDFSelection, page: PDFPage) -> CGRect? {
-        guard let visual = visualBounds(for: selection, page: page) else { return nil }
-        // A rect with no overlap with the visible page before the clamp is no
-        // box (the clamp would move it onto the page's edge, over other print,
-        // or leave it with no area); a rect partly on the page is clamped.
+        normalizedRect(forPageRect: selection.bounds(for: page), page: page)
+    }
+
+    /// The selection path's transform for any rect in the page's absolute,
+    /// unrotated space (a selection's `bounds(for:)`, or a glyph's box from
+    /// the page's own drawing). A rect with no overlap with the visible page
+    /// before the clamp is no box (the clamp would move it onto the page's
+    /// edge, over other print, or leave it with no area); a rect partly on
+    /// the page is clamped.
+    nonisolated func normalizedRect(forPageRect absoluteBounds: CGRect, page: PDFPage) -> CGRect? {
+        guard let visual = visualBounds(forPageRect: absoluteBounds, page: page) else { return nil }
         let visiblePage = CGRect(x: 0, y: 0, width: visual.width, height: visual.height)
         let overlap = visual.bounds.intersection(visiblePage)
         guard !overlap.isNull, !overlap.isEmpty else { return nil }
         return Self.normalized(visual)
     }
+
+    /// A paint box (normalized) grown sideways to the match's own drawn
+    /// glyphs on this line (`ownGlyphs`): each glyph's box is first cut to
+    /// the line's height (`line`, page space), so a box grows along its line
+    /// and never into the next; a glyph that does not reach the line's height,
+    /// or whose cut box is empty once normalized, adds nothing. An edge moves
+    /// only to a glyph that lies past it by more than `growthSlack`; a box no
+    /// edge of which moves is `rect` exactly. Never smaller than `rect`;
+    /// `rect` itself when `glyphs` is nil.
+    nonisolated func grown(_ rect: CGRect, line: CGRect, by glyphs: [OwnGlyph]?, page: PDFPage) -> CGRect {
+        guard let glyphs else { return rect }
+        let crop = page.bounds(for: .cropBox)
+        let turned = page.rotation == 90 || page.rotation == 270
+        let width = turned ? crop.height : crop.width, height = turned ? crop.width : crop.height
+        guard width > 0, height > 0 else { return rect }
+        let slackX = Self.growthSlack / width, slackY = Self.growthSlack / height
+        var minX = rect.minX, maxX = rect.maxX, minY = rect.minY, maxY = rect.maxY
+        var moved = false
+        for glyph in glyphs {
+            let low = max(glyph.box.minY, line.minY), high = min(glyph.box.maxY, line.maxY)
+            guard high > low else { continue }
+            let cut = CGRect(x: glyph.box.minX, y: low, width: glyph.box.width, height: high - low)
+            guard let n = normalizedRect(forPageRect: cut, page: page), n.width > 0, n.height > 0 else { continue }
+            if n.minX < minX - slackX { minX = n.minX; moved = true }
+            if n.maxX > maxX + slackX { maxX = n.maxX; moved = true }
+            if n.minY < minY - slackY { minY = n.minY; moved = true }
+            if n.maxY > maxY + slackY { maxY = n.maxY; moved = true }
+        }
+        return moved ? CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY) : rect
+    }
+
+    /// How far, in points, a glyph from the page's drawing must lie past a
+    /// box's edge before the edge moves. The walk's advances for a standard
+    /// font come from the system font, which differ from the widths PDFKit
+    /// places them by by about a thousandth of the size: well under this,
+    /// which is a tenth of a pixel at 150 dpi and inside the paint's halo.
+    static let growthSlack: CGFloat = 0.05
+
 
     /// The same transform with no visible-page test: a rect wholly off the
     /// visible page is clamped onto its edge, as every rect was before an
@@ -195,7 +245,13 @@ extension DocumentSearcher {
     /// the /Rotate mirror), with the visual page's width and height.
     nonisolated func visualBounds(for selection: PDFSelection, page: PDFPage)
         -> (bounds: CGRect, width: CGFloat, height: CGFloat)? {
-        let absoluteBounds = selection.bounds(for: page)
+        visualBounds(forPageRect: selection.bounds(for: page), page: page)
+    }
+
+    /// A rect in the page's absolute, unrotated space, in the page's visual
+    /// space, with the visual page's width and height.
+    nonisolated func visualBounds(forPageRect absoluteBounds: CGRect, page: PDFPage)
+        -> (bounds: CGRect, width: CGFloat, height: CGFloat)? {
         guard !absoluteBounds.isEmpty else { return nil }
 
         let pageBounds = page.bounds(for: .cropBox)
