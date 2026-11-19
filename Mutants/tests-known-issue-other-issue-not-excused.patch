@@ -1,4 +1,4 @@
-Property: A known-issue block excuses only the issue it names; any other issue inside it fails the test. Here a planted failure inside each engine block that runs on the Mac host.
+Property: A known-issue block excuses only the issue it names; any other issue inside it fails the test. Here a planted failure inside each engine block that runs on the Mac host, and inside the paint-height block, whose guard is forced on as on a run whose running head was fitted (that block's guard is false on the Mac host and on the simulators, so only the forced guard shows its matcher).
 Area: Tests, the known-issue blocks
 Test command: cd Packages/RedactionEngine && DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --no-parallel --filter '^RedactionEngineTests\.(AddressComponentsRecallTests|HiddenGlyphStripTests|PacketSearchableProbeTests|InkFitBusyPoolTests|PageImageInkFitTests)/'
 Must go red: RedactionEngineTests/AddressComponentsRecallTests aggregateAddressRecall; RedactionEngineTests/AddressComponentsRecallTests perStratumAddressRecall; RedactionEngineTests/HiddenGlyphStripTests stalledFitMarksResultsDegraded; RedactionEngineTests/PacketSearchableProbeTests g3Preflight; RedactionEngineTests/InkFitBusyPoolTests timedOutReadIsReadAgainNextSearch; RedactionEngineTests/PageImageInkFitTests shadedTextPaintHoldsItsGlyphs; RedactionEngineTests/PageImageInkFitTests paintHeightIsTheInkRows
@@ -73,14 +73,17 @@ index fa15f23b..1a4bc2a8 100644
                          "\(word): the painted box \(painted) does not hold its glyphs \(held) (degraded \(fit.degraded))")
              } when: { HostRun.isMac && word == "summary" } matching: { issue in
 diff --git a/Packages/RedactionEngine/Tests/RedactionEngineTests/SearchTests/PageImageInkFitTests.swift b/Packages/RedactionEngine/Tests/RedactionEngineTests/SearchTests/PageImageInkFitTests.swift
-index af514c37..1e94989e 100644
+index af514c37..029d8c8c 100644
 --- a/Packages/RedactionEngine/Tests/RedactionEngineTests/SearchTests/PageImageInkFitTests.swift
 +++ b/Packages/RedactionEngine/Tests/RedactionEngineTests/SearchTests/PageImageInkFitTests.swift
-@@ -358,6 +358,7 @@ struct PageImageInkFitTests {
+@@ -358,8 +358,9 @@ struct PageImageInkFitTests {
              }
          }
          withKnownIssue("On the Mac host macOS's Vision reads these words' ink rows otherwise than iOS's, and some paints reach more than 1 pt past them") {
 +            #expect(Bool(false), "a planted issue that no known issue names")
              #expect(tallerThanInk.isEmpty, "every fitted paint is as tall as its word's ink: \(tallerThanInk)")
-         } when: { HostRun.isMac && runningHeadFitted } matching: { issue in
+-        } when: { HostRun.isMac && runningHeadFitted } matching: { issue in
++        } when: { HostRun.isMac } matching: { issue in
              issue.comments.contains { $0.rawValue.hasPrefix("every fitted paint is as tall as its word's ink: ") }
+         }
+     }
