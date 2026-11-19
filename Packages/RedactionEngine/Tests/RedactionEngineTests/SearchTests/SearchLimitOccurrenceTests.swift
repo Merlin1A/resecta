@@ -114,6 +114,42 @@ struct SearchLimitOccurrenceTests {
         }
     }
 
+    // MARK: a match read by OCR over two lines reaches the limit as one match
+
+    struct OCRRow: Sendable, CustomTestStringConvertible {
+        let name: String
+        let oneLineFirst: Int
+        let listed: Int
+        var testDescription: String { name }
+    }
+
+    static let ocrRows: [OCRRow] = [
+        OCRRow(name: "999 matches on one line each, then the 1000th over two lines: both its lines are listed", oneLineFirst: limit - 1, listed: limit + 1),
+        OCRRow(name: "1000 matches on one line each, then one over two lines: none of its lines is listed", oneLineFirst: limit, listed: limit),
+    ]
+
+    /// One page's OCR results as the OCR cross-line reader returns them
+    /// (`ocrLiteralMatches`): a match over two lines is two results with
+    /// one occurrence id, and the page's results reach `emitCapped` in one
+    /// array, as at each OCR emission site of DocumentSearcher+TextModes.
+    @Test("A match read by OCR over two lines counts once toward the limit", arguments: ocrRows)
+    func ocrCrossLineCountsOnce(_ row: OCRRow) async {
+        func piece(_ y: CGFloat, occurrence: UUID? = nil) -> SearchResult {
+            SearchResult(pageIndex: 0, normalizedRect: CGRect(x: 0.1, y: y, width: 0.2, height: 0.01), matchedText: "Zebra Crossing",
+                         contextSnippet: "Zebra Crossing", source: .ocr(confidence: 0.9), term: "Zebra Crossing", occurrenceID: occurrence)
+        }
+        let wrapped = UUID()
+        let page = (0..<row.oneLineFirst).map { _ in piece(0.1) } + [piece(0.5, occurrence: wrapped), piece(0.52, occurrence: wrapped)]
+        let (stream, continuation) = AsyncStream<SearchResult>.makeStream()
+        var total = 0
+        await DocumentSearcher().emitCapped(page, into: continuation, total: &total)
+        continuation.finish()
+        var listed = 0
+        for await _ in stream { listed += 1 }
+        #expect(listed == row.listed, "rows listed")
+        #expect(total == Self.limit, "matches counted")
+    }
+
     // MARK: the Search Re-check reads a page as stopped at the limit by its matches, not its rows
 
     struct RecheckRow: Sendable, CustomTestStringConvertible {
