@@ -333,9 +333,9 @@ A Searchable export carries a hidden copy of the page's text, drawn over the pic
 ### KI-43: A Word Drawn at Zero Size Can Get a Box Over Other Words (Low)
 **Affects:** Search and Scan (typed pages that carry a word drawn at zero size, as in a tampered or unusual file)
 
-A PDF page can carry a word drawn at zero size: the word is part of the page's text, but nothing of it is printed. When Search or Scan matches such a word on a page that also has printed text, the box is placed where PDFKit, the system's PDF reader, reports the word, and that box can lie over printed words you did not search for. When you apply it, those words are covered in the export. The box shows in the editor, and the covered words show in the preview before you share. No check after export reports it.
+A PDF page can carry a word drawn at zero size: the word is part of the page's text, but nothing of it is printed. When Search or Scan matches such a word on a page that also has printed text, the box is placed where PDFKit, the system's PDF reader, reports the word, and that box can lie over printed words you did not search for. When you apply it, those words are covered in the export. The box shows in the editor, and the covered words show in the preview before you share. No check after export reports it. When such a word starts where a printed line starts, a box for a printed word at the end of that line can also stop short of the word's last letter, so part of that letter stays printed in the export, with either export mode. The word cannot be read from what is left, and no check after export reports this either.
 
-**Workaround:** Before you tap Redact, check that each box Search or Scan placed covers only what you searched for. Where one covers other words, select the box and drag its handles in, or delete it. Export such a document with Secure Rasterization, which keeps no text layer.
+**Workaround:** Before you tap Redact, check that each box Search or Scan placed covers only what you searched for. Where one covers other words, select the box and drag its handles in, or delete it. Export such a document with Secure Rasterization, which keeps no text layer. Check also that each box covers the whole of the word you searched for; where one stops short, drag its handle out over the rest of the word.
 
 ---
 
