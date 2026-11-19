@@ -33,11 +33,16 @@ enum RegionDeleteRule {
         let pages = redactionState.deleteSelected(undoManager: undoManager)
         if count > 1, let toastManager {
             let versionAfterDelete = redactionState.regionVersion
-            toastManager.post(.deletedBoxes(count: count)) { [weak redactionState, weak undoManager] in
-                guard let redactionState, let undoManager, undoManager.canUndo,
-                      redactionState.regionVersion == versionAfterDelete else { return }
-                undoManager.undo()
-            }
+            // The guard: the regions are as the delete left them and the
+            // step is still there to undo. A tap runs the Undo only while it
+            // holds, and the queue ends the notice once it does not.
+            toastManager.post(
+                .deletedBoxes(count: count),
+                action: { [weak undoManager] in undoManager?.undo() },
+                stillValid: { [weak redactionState, weak undoManager] in
+                    guard let redactionState, let undoManager else { return false }
+                    return undoManager.canUndo && redactionState.regionVersion == versionAfterDelete
+                })
         }
         return Outcome(deletedCount: count, pages: pages)
     }

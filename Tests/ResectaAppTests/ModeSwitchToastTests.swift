@@ -349,7 +349,7 @@ struct ModeSwitchToastTests {
     // runloop turn via `Task { @MainActor }`, so the @Observable teardown does
     // not co-mutate with `toastManager.dismiss(item)`'s synchronous
     // `withAnimation { activeToasts.removeAll }` in the same tap. This mirrors
-    // ToastView's button-action order (actionHandler() then dismiss(item)) and
+    // the receipt's button-action order (actionHandler() then dismiss(item)) and
     // pins that the two mutations are sequential, not simultaneous.
     // (runFullPipeline is not invoked here — the contract under test is the
     // deferral of the @Observable teardown; production defers both together.)
@@ -368,7 +368,7 @@ struct ModeSwitchToastTests {
         #expect(manager.activeToasts.contains(item),
                 "precondition: the toast is displayed before the tap")
 
-        // ToastView's button action: actionHandler() (deferred teardown) then
+        // The receipt's button action: actionHandler() (deferred teardown) then
         // the synchronous toastManager.dismiss(item).
         let actionHandler: @MainActor () -> Void = {
             Task { @MainActor in state.activeSearch = nil }
@@ -419,6 +419,36 @@ struct ModeSwitchToastTests {
 
         #expect(coord.documentState.activePipelineTask != nil, "the run started")
         #expect(!toasts.activeToasts.contains { $0.actionHandler != nil })
+    }
+
+    @Test("The mode-switch Undo is withdrawn when the phase leaves editing")
+    func modeSwitchUndoWithdrawnWhenThePhaseLeavesEditing() {
+        let manager = ToastQueueManager()
+        let rs = RedactionState()
+        let doc = Self.editingDocument()
+        manager.documentPhaseDidChange(to: .editing)
+        // Something that must be seen is up, so the Undo waits behind it.
+        manager.post(.deletedBoxes(count: 2), action: {})
+        let state = SearchState()
+        state.results = [makeResult(page: 0)]
+        let snapshot = SearchAndRedactSheet.modeSwitchSnapshot(of: state, previousMode: .text)
+        state.clearResults()
+        SearchAndRedactSheet.enqueueModeSwitchUndoToast(
+            on: manager,
+            redactionState: rs,
+            documentState: doc,
+            snapshot: snapshot,
+            isProgrammatic: false,
+            unappliedCount: 1
+        )
+        #expect(manager.waitingToasts.map(\.message) == ["Mode switch cleared 1 unapplied match."],
+                "precondition: the Undo is waiting")
+
+        manager.documentPhaseDidChange(to: .verifying)
+
+        #expect(manager.waitingToasts.isEmpty, "the waiting Undo is withdrawn")
+        #expect(manager.activeToasts.isEmpty)
+        manager.clearAll()
     }
 
     /// Every phase other than editing, one row each.

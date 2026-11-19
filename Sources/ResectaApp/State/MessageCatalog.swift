@@ -3,10 +3,11 @@ import RedactionEngine
 // One table of every brief message the app raises through the toast queue.
 // A call site names its message by one case of `MessageID`; the table
 // (`MessageCatalog.row(for:)`) holds the message's words and how it is
-// shown today. `ToastQueueManager.post(_:action:)` reads the row's text,
-// today's severity (so today's edge, tint, duration and haptic) and the
-// row's action label. The kind, tone, phases, must-be-seen, repeat and
-// layer fields are recorded here and read by nothing in the app yet.
+// shown today. `ToastQueueManager.post(_:event:action:stillValid:)` reads
+// the row's text, today's severity (so today's edge and tint), its action
+// label, tone, phases, must-be-seen, whether a repeat is the same message,
+// and the layer it belongs to. The kind is recorded here and read by
+// nothing in the app yet.
 
 /// Every message the toast queue shows, one case each.
 enum MessageID: Equatable {

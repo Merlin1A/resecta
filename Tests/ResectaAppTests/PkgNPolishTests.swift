@@ -8,36 +8,39 @@ import Foundation
 // docstring updates, copy tweaks) are not covered here; they are
 // validated by the audit-lint hook + visual review.
 
-// MARK: - ToastQueueManager per-position queue cap
+// MARK: - ToastQueueManager waiting list
 
 @Suite("Toast queue cap", .tags(.search))
 @MainActor
 struct ToastQueueCapTests {
 
-    @Test("Per-position queue caps at 32 entries on overflow")
-    func testQueueCapHoldsAt32() {
+    @Test("A waiting plain confirmation gives way to a newer message; must-be-seen ones all wait")
+    func waitingPlainGivesWayMustBeSeenAllWait() {
         let manager = ToastQueueManager()
-        // Fill the bottom queue past the cap. The first enqueue lands as
-        // the active toast (no queueing required); subsequent enqueues
-        // pile up behind it because the bottom position is occupied.
-        for i in 0..<(ToastQueueManager.perPositionQueueCap + 16) {
+        // One that must be seen is shown (it carries an action), so every
+        // later arrival waits behind it.
+        manager.enqueue(ToastItem(message: "Cleared 2 matches.", severity: .info,
+                                  actionLabel: "Undo", actionHandler: {}))
+        // A burst of plain ones: each newer one drops the one waiting, so
+        // one waits, the newest.
+        for i in 0..<48 {
             manager.enqueue(ToastItem(message: "toast-\(i)", severity: .info))
         }
-        // activeToasts at .bottom: 1. Plus the queue tail cap.
-        let activeBottomCount = manager.activeBottomToasts.count
-        #expect(activeBottomCount == 1)
-        // Drain the queue. Each dismiss → 300ms gap → next shows. We
-        // can't await the gap deterministically in a unit test, so we
-        // instead assert the public surface: the manager survives the
-        // overflow without unbounded growth. The cap pin is the
-        // `perPositionQueueCap` constant.
-        #expect(ToastQueueManager.perPositionQueueCap == 32)
+        #expect(manager.activeToasts.count == 1)
+        #expect(manager.waitingToasts.map(\.message) == ["toast-47"])
+        // Must-be-seen ones are never dropped: all wait, oldest first, and
+        // the plain one gives way to the first of them.
+        for i in 0..<40 {
+            manager.enqueue(ToastItem(message: "undo-\(i)", severity: .info, actionLabel: "Undo", actionHandler: {}))
+        }
+        #expect(manager.waitingToasts.map(\.message) == (0..<40).map { "undo-\($0)" })
+        manager.clearAll()
     }
 
     @Test("clearAll() drops active toasts and both queues")
     func testClearAllDrops() {
         let manager = ToastQueueManager()
-        // Mix top + bottom severities so both queues populate.
+        // Mix severities so the one waiting list holds several kinds.
         manager.enqueue(ToastItem(message: "info-1", severity: .info))
         manager.enqueue(ToastItem(message: "warn-1", severity: .warning))
         manager.enqueue(ToastItem(message: "info-2", severity: .info))
@@ -48,7 +51,7 @@ struct ToastQueueCapTests {
         // After clearAll, a fresh enqueue should display immediately
         // (neither queue still holds a pending item).
         manager.enqueue(ToastItem(message: "info-fresh", severity: .info))
-        #expect(manager.activeBottomToasts.count == 1)
+        #expect(manager.activeToasts.count == 1)
     }
 }
 
