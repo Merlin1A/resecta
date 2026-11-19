@@ -1,0 +1,18 @@
+Property: Accents are not folded by default on typed pages, so a name with an accent and the same name without it stay apart unless the Accents option is on.
+Area: Search's default options
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/SearchUntriedFormsTests
+Must go red: ResectaAppTests/SearchUntriedFormsTests staysAMiss
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/SearchTypes.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/SearchTypes.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/SearchTypes.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/SearchTypes.swift
+@@ -203,7 +203,7 @@
+     /// Diacritic-insensitive matching ("Munoz" matches "Muñoz").
+     /// Off by default: folding introduces false positives in non-Latin
+     /// scripts and many name databases are accent-significant.
+-    public var foldDiacritics: Bool = false
++    public var foldDiacritics: Bool = true
+ 
+     // AND mode for multi-term search.
+     // When true, `searchMultiTerm` retains only pages where EVERY term
