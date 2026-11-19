@@ -1,7 +1,7 @@
 Property: A page's fills are read back on the basis they were painted on.
 Area: the raster's content basis (fills, readback, ink growth and the hidden-text ink test)
 Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/FillCoverageBasisTests (or on the host: cd Packages/RedactionEngine && swift test --no-parallel --filter FillCoverageBasisTests)
-Must go red: RedactionEngineTests/FillCoverageBasisTests rasterizedPageFarEdgeCovered [height 302.626 pt at 300 DPI, bar from 280.5 to 295.4]
+Must go red: RedactionEngineTests/FillCoverageBasisTests rasterizedPageReadsBackItsFill [height 302.626 pt at 300 DPI, bar from 280.5 to 295.4]
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift

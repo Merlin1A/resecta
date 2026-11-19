@@ -292,6 +292,33 @@ struct FillCoverageBasisTests {
         #expect(left.isEmpty, "\(left.count) inked pixel(s) left inside the bar, first \(String(describing: left.first))")
     }
 
+    @Test("A page rasterized whole with a black fill reads each box back on the basis it was painted on",
+          arguments: gainedSides.filter { $0.dpi == 300 && $0.end != nil })
+    func rasterizedPageReadsBackItsFill(_ gained: GainedSide) async throws {
+        // Black on white paper: a row the readback reads that the fill did
+        // not paint is white and fails the readback, as a white fill on
+        // white paper would not show.
+        let other: CGFloat = 100
+        let pageWidth = gained.across ? gained.side : other
+        let pageHeight = gained.across ? other : gained.side
+        let bar = gained.across
+            ? CGRect(x: gained.start, y: 40, width: gained.barLength, height: 20)
+            : CGRect(x: 40, y: gained.start, width: 20, height: gained.barLength)
+        let doc = try #require(PDFDocument(data: Self.barPage(width: pageWidth, height: pageHeight, bar: bar)))
+        let page = try #require(doc.page(at: 0))
+        let region = RedactionRegion(
+            id: UUID(),
+            normalizedRect: CGRect(x: bar.minX / pageWidth, y: bar.minY / pageHeight,
+                                   width: bar.width / pageWidth, height: bar.height / pageHeight),
+            source: .manual)
+        let pageData = PDFPageData(
+            page: page, pageIndex: 0, regions: [region], fillColor: .black, targetDPI: 300,
+            pipelineMode: .secureRasterization, rotation: page.rotation,
+            cropBoxBounds: page.bounds(for: .cropBox), cgPage: page.pageRef, hasText: false)
+        let image = try await PageRasterizer().rasterize(pageData, dpiCap: 300).pageOutput.image
+        print("[fill-basis] read back black \(gained.testDescription): image \(image.width)×\(image.height)")
+    }
+
     @Test("The content basis lies under d/4608 px past the drawn content and under one pixel short of the raster",
           arguments: [(612.0, 792.0), (595.2756, 841.8898), (302.626, 203.266), (656.266, 209.266)], [150, 200, 300])
     func contentBasisSitsBetweenTheContentAndTheRaster(_ size: (Double, Double), dpi: Int) throws {
