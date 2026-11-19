@@ -5,13 +5,13 @@ Must go red: RedactionEngineTests/HiddenTextAlphabetExportTests exportsAsListed 
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/HiddenTextLine.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/HiddenTextLine.swift
-index a8349bed..49af103b 100644
+index 7f0a3972..44c55524 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/HiddenTextLine.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/HiddenTextLine.swift
-@@ -9,6 +9,7 @@ import Foundation
- /// then a picture, and at write time its hidden text is not written.
- enum HiddenTextLine {
+@@ -14,6 +14,7 @@ enum HiddenTextLine {
+ 
      static func layout(_ text: String, size: CGFloat) -> CTLine? {
+         if let refuses, refuses(text) { return nil }
 +        let text = String(text.unicodeScalars.map { JoinedLetters.letters(of: $0) ?? String($0) }.joined())
          let attributed = NSMutableAttributedString()
          // One font object per face for the line, so text in one face is one
