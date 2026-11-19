@@ -377,3 +377,4 @@ with its reason and the mutant that is caught in its place.
 | `search-limit-counts-rows.patch` | The result limit counts matches, not rows: a match over two lines or across a page break is listed whole or not at all. | RedactionEngineTests/SearchLimitOccurrenceTests limitKeepsMatchesWhole |
 | `search-limit-cuts-a-begun-match.patch` | Once a match is begun under the limit, every part of it is listed, even past the limit. | RedactionEngineTests/SearchLimitOccurrenceTests limitKeepsMatchesWhole |
 | `search-limit-pattern-counts-rows.patch` | A pattern search counts matches toward the limit, not the rows a broken match lists. | RedactionEngineTests/SearchLimitOccurrenceTests limitKeepsMatchesWhole |
+| `search-recheck-stop-counts-rows.patch` | The Search Re-check reads a page as stopped at the limit by its matches, not the rows a broken match lists. | RedactionEngineTests/SearchLimitOccurrenceTests recheckStopsAtMatches |
