@@ -92,6 +92,9 @@ struct FailedStateView: View {
                 y: ResectaTokens.Shadow.subtle.y
             )
             .accessibilityElement(children: .combine)
+            // On the card, not the screen: an identifier on the outer stack
+            // reaches every element inside it and hides the buttons' own.
+            .accessibilityIdentifier("failedState")
 
             Spacer()
 
@@ -104,6 +107,7 @@ struct FailedStateView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
+                .accessibilityIdentifier("failedStatePrimaryButton")
 
                 // Secondary: return to empty (start fresh) — only when return phase isn't already .empty
                 if case .empty = returnPhase {
@@ -140,7 +144,6 @@ struct FailedStateView: View {
             }
             .padding(.bottom, ResectaTokens.Spacing.xl)
         }
-        .accessibilityIdentifier("failedState")
         .sheet(item: $safariURL) { url in
             SafariView(url: url)
                 .ignoresSafeArea()
