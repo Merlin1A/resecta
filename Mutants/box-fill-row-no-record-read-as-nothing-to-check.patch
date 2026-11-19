@@ -1,7 +1,7 @@
 Property: A run with no record reads Skipped, never Nothing to check.
 Area: the Box Fill row
 Test command: cd Packages/RedactionEngine && swift test --skip-build --no-parallel --filter BoxFillRowTests (after swift build --build-tests)
-Must go red: RedactionEngineTests/BoxFillRowTests each [no record of the run: Skipped], throughTheEngine
+Must go red: RedactionEngineTests/BoxFillRowTests each [no record of the run: Skipped], neverMapped, throughTheEngine
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/BoxFillRow.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/BoxFillRow.swift
