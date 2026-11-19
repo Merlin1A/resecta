@@ -5,12 +5,12 @@ Must go red: RedactionEngineTests/WholeSourceWordsTests wholeWords [part of a nu
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
-index a1fda75e..88ade656 100644
+index aec41c25..f680ec5d 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
-@@ -86,7 +86,7 @@ enum PageTextPath {
-         // runs again on the lines that changed, until nothing more leaves.
-         let filterTook = wordsLosingALetter(before: folded, after: filtered.surviving)
+@@ -107,7 +107,7 @@ enum PageTextPath {
+         let wholeWords = Self.wholeWords
+         let filterTook = wholeWords ? wordsLosingALetter(before: folded, after: filtered.surviving) : []
          var current = closeOverMarkedWords(
 -            filtered, marked: alphabet.wordIndices.union(painted).union(filterTook))
 +            filtered, marked: alphabet.wordIndices.union(painted))
