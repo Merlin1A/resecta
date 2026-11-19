@@ -533,3 +533,96 @@ struct ApplySeamSingleResultOriginTests {
         #expect(state.regions.isEmpty)
     }
 }
+
+// MARK: - 6. A run's phases and the results screen
+
+@Suite("Apply seam — a run's phases and the results screen")
+@MainActor
+struct ApplySeamRunPhaseTests {
+
+    /// The four phases in which a run owns the boxes (`canMutateRegions`
+    /// is false), one row each.
+    enum RunOwnedPhase: String, CaseIterable, CustomTestStringConvertible {
+        case detecting, redacting, verifying, exporting
+        var testDescription: String { rawValue }
+    }
+
+    /// Every apply origin, one row each.
+    enum Origin: String, CaseIterable, CustomTestStringConvertible {
+        case selectedResults = "the selected results"
+        case oneResult = "one result by id"
+        var testDescription: String { rawValue }
+    }
+
+    private static func phase(_ row: RunOwnedPhase) -> DocumentState.Phase {
+        switch row {
+        case .detecting: .detecting(progress: .init(currentPage: 0, totalPages: 1, currentStep: "Starting"))
+        case .redacting: .redacting(progress: .init(currentPage: 0, totalPages: 1, currentStep: "Starting"))
+        case .verifying:
+            .verifying(progress: .init(currentLayer: 1, totalLayers: 5, layerName: "Layer 1", completedLayers: []))
+        case .exporting: .exporting
+        }
+    }
+
+    @Test("Four run phases by two origins, each pair named once")
+    func rowCount() {
+        #expect(RunOwnedPhase.allCases.count == 4)
+        #expect(Origin.allCases.count == 2)
+        let blocked = RunOwnedPhase.allCases.map { row -> Bool in
+            let doc = DocumentState()
+            doc.phase = Self.phase(row)
+            return doc.canMutateRegions
+        }
+        #expect(blocked == [false, false, false, false])
+    }
+
+    @Test("Every apply origin refuses in every phase where a run owns the boxes, with zero mutations",
+          arguments: RunOwnedPhase.allCases, Origin.allCases)
+    func refusesWhileARunOwnsTheBoxes(_ row: RunOwnedPhase, _ origin: Origin) async {
+        let doc = DocumentState()
+        doc.phase = Self.phase(row)
+        let state = RedactionState()
+        let search = SearchState()
+        let result = makeSearchResult()
+        search.results = [result]
+        state.activeSearch = search
+        let versionBefore = state.regionVersion
+
+        let outcome: RedactionState.ApplyOutcome?
+        switch origin {
+        case .selectedResults:
+            outcome = await state.applyFindings(.selectedSearchResults, undoManager: nil, documentState: doc)
+        case .oneResult:
+            outcome = await state.applyFindings(.searchResult(id: result.id), undoManager: nil, documentState: doc)
+        }
+
+        #expect(outcome == nil)
+        #expect(state.regions.isEmpty)
+        #expect(state.regionMetadata.isEmpty)
+        #expect(state.appliedMatchAudit.isEmpty)
+        #expect(state.regionVersion == versionBefore)
+    }
+
+    @Test("A search apply on the results screen adds its box and discards the made PDF")
+    func resultsScreenApplyDiscardsTheMadePDF() async throws {
+        let doc = DocumentState()
+        doc.phase = .verified(report: VerificationReport(layers: [], overallStatus: .pass, durationSeconds: 0))
+        #expect(doc.canMutateRegions)
+        let state = RedactionState()
+        let search = SearchState()
+        let result = makeSearchResult()
+        search.results = [result]
+        state.activeSearch = search
+        let output = FileManager.default.temporaryDirectory
+            .appendingPathComponent("seam_results_\(UUID().uuidString).pdf")
+        try makeTestPDFData().write(to: output)
+        state.outputURL = output
+
+        let outcome = await state.applyFindings(.searchResult(id: result.id), undoManager: nil, documentState: doc)
+
+        #expect(outcome?.applied == 1)
+        #expect(state.regions[0]?.count == 1)
+        #expect(state.outputURL == nil)
+        #expect(!FileManager.default.fileExists(atPath: output.path))
+    }
+}

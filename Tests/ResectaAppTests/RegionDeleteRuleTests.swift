@@ -59,7 +59,7 @@ struct RegionDeleteRuleTests {
         #expect(toast.message == "Deleted 3 regions.")
         #expect(toast.actionLabel == "Undo")
         #expect(toast.severity == .info)
-        #expect(toast.editsRegions, "a run start drops the notice: the pipeline owns the regions")
+        #expect(toast.actionHandler != nil, "a run start withdraws the notice: it carries an action")
         toast.actionHandler?()
         #expect(state.regions[0]?.count == 3, "the notice's Undo restores the three in one step")
     }

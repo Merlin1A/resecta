@@ -236,9 +236,11 @@ final class PipelineCoordinator: @unchecked Sendable {
         // unapplied selections nor a staged review can be pending here
         // (`redactRefusal(with:)`).
         redactionState.dismissActiveSearch()
-        // A toast whose action edits regions (the nearby-match Add) outlives
-        // the sheet; drop it too, since the run now owns the regions.
-        toastManager?.dropRegionEditActions()
+        // At the start of a full run, every message that carries an action
+        // (an Undo, a Mark, a Re-run) is withdrawn, shown or waiting: the
+        // run now owns the document, and the action no longer means what
+        // it offered.
+        toastManager?.dropActionToasts()
 
         // Snapshot pipeline-affecting settings once at run
         // entry. Subsequent reads (verify-for-run, fillColor, exportDPI,

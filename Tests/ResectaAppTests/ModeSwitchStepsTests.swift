@@ -34,6 +34,7 @@ struct ModeSwitchStepsTests {
             to: state,
             toastManager: toasts,
             redactionState: RedactionState(),
+            documentState: Self.editingDocument(),
             snapshot: snapshot,
             isProgrammatic: false,
             unappliedCount: 1,
@@ -55,6 +56,7 @@ struct ModeSwitchStepsTests {
             to: state,
             toastManager: ToastQueueManager(),
             redactionState: RedactionState(),
+            documentState: Self.editingDocument(),
             snapshot: SearchAndRedactSheet.modeSwitchSnapshot(of: state, previousMode: .text),
             isProgrammatic: false,
             unappliedCount: 1,
@@ -63,5 +65,13 @@ struct ModeSwitchStepsTests {
         #expect(state.results.count == 1)
         #expect(state.piiCategoryFilter == nil)
         #expect(state.sortOrder == .discoveryOrder)
+    }
+
+    /// A document being edited, so the steps keep their meaning: the mode
+    /// switch's Undo restores only while editing.
+    private static func editingDocument() -> DocumentState {
+        let doc = DocumentState()
+        doc.phase = .editing
+        return doc
     }
 }

@@ -137,15 +137,17 @@ extension SearchAndRedactSheet {
     }
 
     /// Apply a plan's steps in order. Every input is explicit: the session
-    /// the steps clear, the toast queue and redaction state the undo toast
-    /// needs, the snapshot and unapplied count the hub read before the
-    /// clear, and the sheet's live-preview scheduler.
+    /// the steps clear, the toast queue, redaction state and document
+    /// state the undo toast needs (its Undo restores only while the
+    /// document is being edited), the snapshot and unapplied count the hub
+    /// read before the clear, and the sheet's live-preview scheduler.
     @MainActor
     static func applyModeSwitchSteps(
         _ plan: ModeSwitchPlan,
         to searchState: SearchState,
         toastManager: ToastQueueManager,
         redactionState: RedactionState,
+        documentState: DocumentState,
         snapshot: ModeSwitchSnapshot,
         isProgrammatic: Bool,
         unappliedCount: Int,
@@ -164,6 +166,7 @@ extension SearchAndRedactSheet {
                 enqueueModeSwitchUndoToast(
                     on: toastManager,
                     redactionState: redactionState,
+                    documentState: documentState,
                     snapshot: snapshot,
                     isProgrammatic: isProgrammatic,
                     unappliedCount: unappliedCount
@@ -199,10 +202,16 @@ extension SearchAndRedactSheet {
     /// surviving Undo button silently no-oped over a fresh sheet.
     /// Coverage report / doctype explanation are NOT restored — they
     /// belong to a completed scan, not to the visible list.
+    ///
+    /// The handler holds the document state weakly, as it does the
+    /// redaction state, and restores only while the document is being
+    /// edited (`modeSwitchRestoreTarget(in:documentState:)`): tapped in
+    /// any other phase, the Undo does nothing and opens nothing.
     @MainActor
     static func enqueueModeSwitchUndoToast(
         on toastManager: ToastQueueManager,
         redactionState: RedactionState,
+        documentState: DocumentState,
         snapshot: ModeSwitchSnapshot,
         isProgrammatic: Bool,
         unappliedCount: Int
@@ -226,15 +235,16 @@ extension SearchAndRedactSheet {
             message,
             severity: .info,
             actionLabel: discardUndoActionLabel,
-            actionHandler: { [weak redactionState] in
+            actionHandler: { [weak redactionState, weak documentState] in
                 // Deferral pattern: the restore flips
                 // searchModeType and repopulates results — a larger
                 // @Observable mutation than the sibling selection
                 // restore — so defer it one runloop turn past the
                 // toast's own synchronous dismiss transaction.
-                Task { @MainActor [weak redactionState] in
-                    guard let redactionState,
-                          let target = Self.modeSwitchRestoreTarget(in: redactionState)
+                Task { @MainActor [weak redactionState, weak documentState] in
+                    guard let redactionState, let documentState,
+                          let target = Self.modeSwitchRestoreTarget(
+                              in: redactionState, documentState: documentState)
                     else { return }
                     Self.restoreModeSwitchSnapshot(snapshot, in: target)
                 }
@@ -247,9 +257,17 @@ extension SearchAndRedactSheet {
     /// the restore mints one and presents it (assigning
     /// `activeSearch` is the presentation trigger), because an Undo
     /// designed to outlive the sheet must be able to bring the session
-    /// back. Pinned by `ModeSwitchToastTests`.
+    /// back. Only while the document's phase is editing: in any other
+    /// phase (a run, the results screen, an import, a failure) there is
+    /// no target, no session is minted, and nothing is presented.
+    /// `canMutateRegions` is not the test, because it is also true on the
+    /// results screen. Pinned by `ModeSwitchToastTests`.
     @MainActor
-    static func modeSwitchRestoreTarget(in redactionState: RedactionState) -> SearchState? {
+    static func modeSwitchRestoreTarget(
+        in redactionState: RedactionState,
+        documentState: DocumentState
+    ) -> SearchState? {
+        guard documentState.phaseKind == .editing else { return nil }
         if let live = redactionState.activeSearch { return live }
         let fresh = SearchState()
         redactionState.activeSearch = fresh
