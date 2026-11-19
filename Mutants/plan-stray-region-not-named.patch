@@ -5,15 +5,15 @@ Must go red: RedactionEngineTests/PlanPaintTests regionOutsideThePlan
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
-index bf781ea2..11ad8fec 100644
+index 768d77f6..525e5c2e 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
-@@ -229,7 +229,7 @@ extension PageRasterizer {
+@@ -285,7 +285,7 @@ extension PageRasterizer {
  
          var result = PlanPaint()
          for (box, rect) in rects { result.painted[box] = PixelPlan.PixelRect(bitmapRect: rect) }
 -        result.outsidePlan = Set(strays.map(\.id))
 +        result.outsidePlan = []
+         result.inkVerdicts = verdicts
+         result.inkWidenedBoxes = widened
          return result
-     }
- }
