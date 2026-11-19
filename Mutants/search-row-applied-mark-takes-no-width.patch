@@ -5,11 +5,11 @@ Must go red: ResectaAppUITests/SearchRowLayoutUITests testApplyingARow_doesNotMo
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Views/SearchResultRow.swift b/Sources/ResectaApp/Views/SearchResultRow.swift
-index 9ecb7637..e3410b53 100644
+index f9bbf064..092f922a 100644
 --- a/Sources/ResectaApp/Views/SearchResultRow.swift
 +++ b/Sources/ResectaApp/Views/SearchResultRow.swift
-@@ -153,7 +153,7 @@ struct SearchResultRow: View {
-                             .privacySensitive()
+@@ -154,7 +154,7 @@ struct SearchResultRow: View {
+                             if !result.hasBox { noBoxLine }
                          }
                      }
 -                    .padding(.leading, ResectaTokens.Spacing.xs)

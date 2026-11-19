@@ -1,7 +1,7 @@
 Property: A match found with no box is listed, never dropped: site 1, typed search on the text layer
 Area: Search, a hit with no box
 Test command: swift test --no-parallel --filter '^RedactionEngineTests\.NoBoxHitTests/' (in Packages/RedactionEngine, DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer)
-Must go red: RedactionEngineTests/NoBoxHitTests typed; RedactionEngineTests/NoBoxHitTests offVisiblePage
+Must go red: RedactionEngineTests/NoBoxHitTests typed; RedactionEngineTests/NoBoxHitTests offVisiblePage; RedactionEngineTests/NoBoxHitTests recheckCountsIt
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+TextMatches.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+TextMatches.swift

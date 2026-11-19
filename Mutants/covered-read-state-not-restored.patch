@@ -1,0 +1,18 @@
+Property: The bitmap's state is put back after every drawing, so each word is drawn under its own transform, never stacked on the last word's.
+Area: the covered-pages read, its drawing test (ConcealingAnnotations.CoverSamples)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/CoverSamplesPixelTests -only-testing:ResectaAppTests/CoveredPagesDecisionsTests
+Must go red: ResectaAppTests/CoverSamplesPixelTests fractionsEqualTheReference
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/ConcealingAnnotations.swift b/Sources/ResectaApp/Views/ConcealingAnnotations.swift
+index ae10121..8da515d 100644
+--- a/Sources/ResectaApp/Views/ConcealingAnnotations.swift
++++ b/Sources/ResectaApp/Views/ConcealingAnnotations.swift
+@@ -177,7 +177,6 @@ enum ConcealingAnnotations {
+             _ annotation: PDFAnnotation, in bounds: CGRect, into context: CGContext, over gray: CGFloat
+         ) -> UnsafePointer<UInt8>? {
+             context.saveGState()
+-            defer { context.restoreGState() }
+             context.setFillColor(gray: gray, alpha: 1)
+             context.fill(CGRect(x: 0, y: 0, width: Self.width, height: Self.height))
+             context.scaleBy(x: CGFloat(Self.width) / bounds.width, y: CGFloat(Self.height) / bounds.height)

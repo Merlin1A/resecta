@@ -30,7 +30,7 @@ enum ConcealingAnnotations {
     /// Whether `annotation`'s own drawing hides what is under it: a widget
     /// with a dark opaque background colour (`/MK /BG`, luminance under
     /// one half), or a drawing that decides at least 60 % of what it lies
-    /// over (`hiddenFraction`). On a page whose text layer reads, that is
+    /// over (`CoverSamples.hiddenFraction`). On a page whose text layer reads, that is
     /// any one word of the text in `area` (`wordRects`), so a wide cover
     /// painted over one word at its edge counts however much blank page
     /// the rest of its rect shows; elsewhere, where the content is in the
@@ -51,7 +51,15 @@ enum ConcealingAnnotations {
         }
         let words = readsText ? wordRects(in: area, on: page) : []
         let targets = words.isEmpty ? [area] : words
-        return targets.contains { hiddenFraction(of: annotation, over: $0) >= 0.6 }
+        guard let samples = CoverSamples() else { return false }
+        return targets.contains { samples.hiddenFraction(of: annotation, over: $0) >= 0.6 }
+    }
+
+    /// `CoverSamples.hiddenFraction` for each of `rects`, drawn in turn into
+    /// one pair of bitmaps as `drawsOpaqueCover` draws an annotation's words.
+    nonisolated static func hiddenFractions(of annotation: PDFAnnotation, over rects: [CGRect]) -> [Double] {
+        guard let samples = CoverSamples() else { return rects.map { _ in 0 } }
+        return rects.map { samples.hiddenFraction(of: annotation, over: $0) }
     }
 
     /// Each word of `page`'s text in `area` (page space): the union of its
@@ -123,46 +131,66 @@ enum ConcealingAnnotations {
         status.map { $0 == .rich } ?? !(page.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    /// The share of `rect` (page space) where `annotation`'s drawing decides
-    /// the pixel whatever lies beneath: drawn once over white and once over
-    /// black (48 × 16 samples), the two results differ there by less than a
-    /// quarter of full scale. An opaque fill decides its pixels, whatever
-    /// the colour; a multiplied highlight leaves black text black, unless
-    /// the highlight is itself dark. Zero for an empty rect.
-    nonisolated private static func hiddenFraction(of annotation: PDFAnnotation, over rect: CGRect) -> Double {
-        let width = 48, height = 16
-        guard let overWhite = rendered(annotation, in: rect, over: 1, width: width, height: height),
-              let overBlack = rendered(annotation, in: rect, over: 0, width: width, height: height) else { return 0 }
-        var hidden = 0
-        for pixel in 0..<(width * height) {
-            var difference = 0
-            for channel in 0..<3 {
-                difference += abs(Int(overWhite[pixel * 4 + channel]) - Int(overBlack[pixel * 4 + channel]))
-            }
-            if difference / 3 < 64 { hidden += 1 }
-        }
-        return Double(hidden) / Double(width * height)
-    }
+    /// Two 48 × 16 RGBA bitmaps, made once for an annotation and used for
+    /// each of its words. Every drawing starts from its grey filled over the
+    /// whole bitmap, under a transform set from nothing, and the state is put
+    /// back after it, so its pixels are the ones a bitmap made for that one
+    /// drawing would hold; the two are compared where they lie, with no copy.
+    nonisolated struct CoverSamples {
+        static let width = 48, height = 16
+        private let overWhite: CGContext
+        private let overBlack: CGContext
 
-    /// `annotation` drawn over a grey fill of `gray` (0 black, 1 white),
-    /// `bounds` (page space) scaled to `width` × `height` RGBA pixels. Nil
-    /// for an empty rect.
-    nonisolated private static func rendered(
-        _ annotation: PDFAnnotation, in bounds: CGRect, over gray: CGFloat, width: Int, height: Int
-    ) -> [UInt8]? {
-        guard bounds.width > 0, bounds.height > 0,
-              let context = CGContext(
+        init?() {
+            guard let white = Self.bitmap(), let black = Self.bitmap() else { return nil }
+            overWhite = white
+            overBlack = black
+        }
+
+        private static func bitmap() -> CGContext? {
+            CGContext(
                 data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
                 space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
-        else { return nil }
-        context.setFillColor(gray: gray, alpha: 1)
-        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
-        context.scaleBy(x: CGFloat(width) / bounds.width, y: CGFloat(height) / bounds.height)
-        context.translateBy(x: -bounds.minX, y: -bounds.minY)
-        annotation.draw(with: .mediaBox, in: context)
-        guard let data = context.data else { return nil }
-        return Array(UnsafeBufferPointer(start: data.bindMemory(to: UInt8.self, capacity: width * height * 4),
-                                         count: width * height * 4))
+        }
+
+        /// The share of `rect` (page space) where `annotation`'s drawing
+        /// decides the pixel whatever lies beneath: drawn once over white and
+        /// once over black, the two results differ there by less than a
+        /// quarter of full scale. An opaque fill decides its pixels, whatever
+        /// the colour; a multiplied highlight leaves black text black, unless
+        /// the highlight is itself dark. Zero for an empty rect.
+        func hiddenFraction(of annotation: PDFAnnotation, over rect: CGRect) -> Double {
+            guard rect.width > 0, rect.height > 0,
+                  let white = draw(annotation, in: rect, into: overWhite, over: 1),
+                  let black = draw(annotation, in: rect, into: overBlack, over: 0) else { return 0 }
+            let count = Self.width * Self.height
+            var hidden = 0
+            for pixel in 0..<count {
+                var difference = 0
+                for channel in 0..<3 {
+                    difference += abs(Int(white[pixel * 4 + channel]) - Int(black[pixel * 4 + channel]))
+                }
+                if difference / 3 < 64 { hidden += 1 }
+            }
+            return Double(hidden) / Double(count)
+        }
+
+        /// `annotation` drawn into `context` over a grey fill of `gray` (0
+        /// black, 1 white), `bounds` (page space) scaled to the bitmap; the
+        /// bitmap's bytes, RGBA, until the next drawing into it.
+        private func draw(
+            _ annotation: PDFAnnotation, in bounds: CGRect, into context: CGContext, over gray: CGFloat
+        ) -> UnsafePointer<UInt8>? {
+            context.saveGState()
+            defer { context.restoreGState() }
+            context.setFillColor(gray: gray, alpha: 1)
+            context.fill(CGRect(x: 0, y: 0, width: Self.width, height: Self.height))
+            context.scaleBy(x: CGFloat(Self.width) / bounds.width, y: CGFloat(Self.height) / bounds.height)
+            context.translateBy(x: -bounds.minX, y: -bounds.minY)
+            annotation.draw(with: .mediaBox, in: context)
+            guard let data = context.data else { return nil }
+            return UnsafePointer(data.bindMemory(to: UInt8.self, capacity: Self.width * Self.height * 4))
+        }
     }
 
     /// Form widgets in `document` that lie over page content

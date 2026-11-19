@@ -1,0 +1,53 @@
+Property: One pair of bitmaps serves one annotation only; a pair kept across annotations would carry one highlight's drawing into the next, of another colour.
+Area: the covered-pages read, its drawing test (ConcealingAnnotations.CoverSamples)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/CoverSamplesPixelTests -only-testing:ResectaAppTests/CoveredPagesDecisionsTests
+Must go red: ResectaAppTests/CoverSamplesPixelTests fractionsEqualTheReference; ResectaAppTests/CoveredPagesDecisionsTests seeThroughAfterBlack
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/ConcealingAnnotations.swift b/Sources/ResectaApp/Views/ConcealingAnnotations.swift
+index ae10121..41f696e 100644
+--- a/Sources/ResectaApp/Views/ConcealingAnnotations.swift
++++ b/Sources/ResectaApp/Views/ConcealingAnnotations.swift
+@@ -51,14 +51,14 @@ enum ConcealingAnnotations {
+         }
+         let words = readsText ? wordRects(in: area, on: page) : []
+         let targets = words.isEmpty ? [area] : words
+-        guard let samples = CoverSamples() else { return false }
++        guard let samples = CoverSamples.shared else { return false }
+         return targets.contains { samples.hiddenFraction(of: annotation, over: $0) >= 0.6 }
+     }
+ 
+     /// `CoverSamples.hiddenFraction` for each of `rects`, drawn in turn into
+     /// one pair of bitmaps as `drawsOpaqueCover` draws an annotation's words.
+     nonisolated static func hiddenFractions(of annotation: PDFAnnotation, over rects: [CGRect]) -> [Double] {
+-        guard let samples = CoverSamples() else { return rects.map { _ in 0 } }
++        guard let samples = CoverSamples.shared else { return rects.map { _ in 0 } }
+         return rects.map { samples.hiddenFraction(of: annotation, over: $0) }
+     }
+ 
+@@ -133,11 +133,16 @@ enum ConcealingAnnotations {
+     /// drawing would hold; the two are compared where they lie, with no copy.
+     nonisolated struct CoverSamples {
+         static let width = 48, height = 16
++        nonisolated(unsafe) static let shared = CoverSamples()
+         private let overWhite: CGContext
+         private let overBlack: CGContext
+ 
+         init?() {
+             guard let white = Self.bitmap(), let black = Self.bitmap() else { return nil }
++            white.setFillColor(gray: 1, alpha: 1)
++            white.fill(CGRect(x: 0, y: 0, width: Self.width, height: Self.height))
++            black.setFillColor(gray: 0, alpha: 1)
++            black.fill(CGRect(x: 0, y: 0, width: Self.width, height: Self.height))
+             overWhite = white
+             overBlack = black
+         }
+@@ -178,8 +183,6 @@ enum ConcealingAnnotations {
+         ) -> UnsafePointer<UInt8>? {
+             context.saveGState()
+             defer { context.restoreGState() }
+-            context.setFillColor(gray: gray, alpha: 1)
+-            context.fill(CGRect(x: 0, y: 0, width: Self.width, height: Self.height))
+             context.scaleBy(x: CGFloat(Self.width) / bounds.width, y: CGFloat(Self.height) / bounds.height)
+             context.translateBy(x: -bounds.minX, y: -bounds.minY)
+             annotation.draw(with: .mediaBox, in: context)

@@ -5,10 +5,10 @@ Must go red: RedactionEngineTests/HyphenBreakFoldTests hyphenBreakJoins
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/TextNormalizer.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/TextNormalizer.swift
-index 2032900..0092a00 100644
+index cbcfc10a..5412f6c7 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/TextNormalizer.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/TextNormalizer.swift
-@@ -117,7 +117,7 @@ public struct TextNormalizer: Sendable {
+@@ -122,7 +122,7 @@ public struct TextNormalizer: Sendable {
      ) -> String {
          if run.unicodeScalars.contains("\u{00AD}") { return "" }
          if isBreakAfterHardHyphen(run, previous: previous, beforeThat: beforeThat, next: next) {
