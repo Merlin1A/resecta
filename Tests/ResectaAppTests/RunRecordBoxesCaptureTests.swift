@@ -34,9 +34,10 @@ struct RunRecordBoxesCaptureTests {
              region(0.2, -0.5, 0.3, 0.2)]]
     }
 
-    private func capture() -> (record: RunRecord.Confirmed, pages: [PDFPageData]) {
+    /// Each call to `regions()` makes new ids: a test that compares ids
+    /// passes the regions it captured.
+    private func capture(_ regions: [Int: [RedactionRegion]] = Self.regions()) -> (record: RunRecord.Confirmed, pages: [PDFPageData]) {
         let doc = makeMultiPagePDFDocument(pages: 3)
-        let regions = Self.regions()
         let snapshot = settings()
         let record = RunInputs.confirmedRecord(
             pageCount: doc.pageCount, geometry: RunInputs.pageGeometry(of: doc),
@@ -64,8 +65,8 @@ struct RunRecordBoxesCaptureTests {
 
     @Test("On every page, the admitted and the refused are together the regions as drawn, and none is both")
     func admittedAndRefusedAreTheDrawn() {
-        let (record, pages) = capture()
         let drawn = Self.regions()
+        let (record, pages) = capture(drawn)
         for page in pages {
             let confirmed = record.pages.first { $0.pageIndex == page.pageIndex }
             let admitted = Set(page.regions.map(\.id))
