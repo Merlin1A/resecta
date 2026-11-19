@@ -5,15 +5,17 @@ Must go red: RedactionEngineTests/InkFitPageIdentityTests pagesWithOneTextAreFit
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
-index c4ae93a..2bfbb3d 100644
+index e81653e2..06427f1f 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
-@@ -11,7 +11,7 @@ extension DocumentSearcher {
-     /// of the page). Read once per page.
-     nonisolated static func carriesHiddenTextOverImage(_ page: PDFPage, cgPage: CGPDFPage) -> Bool {
-         if let known = HiddenTextOverImageCache.shared.value(for: page) { return known }
--        let answer = carriesPageScaleImage(page, cgPage: cgPage) && showsInvisibleText(cgPage)
-+        let answer = false
-         HiddenTextOverImageCache.shared.set(answer, for: page)
-         return answer
+@@ -32,8 +32,8 @@ extension DocumentSearcher {
+         } else {
+             answer = invisible && pageScale
+         }
+-        HiddenTextOverImageCache.shared.set(answer, for: page)
+-        return answer
++        HiddenTextOverImageCache.shared.set(false, for: page)
++        return false
      }
+ 
+     /// A page with no invisible text that draws a picture: its visible text
