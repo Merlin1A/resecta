@@ -5,7 +5,7 @@ Must go red: ResectaAppTests/ApplyBatchCapTests testApplyBatchTruncatesAt500; Re
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/State/RedactionApplyEngine.swift b/Sources/ResectaApp/State/RedactionApplyEngine.swift
-index aba18370..29167df3 100644
+index c4ffedf0..428d2abf 100644
 --- a/Sources/ResectaApp/State/RedactionApplyEngine.swift
 +++ b/Sources/ResectaApp/State/RedactionApplyEngine.swift
 @@ -206,9 +206,6 @@ extension RedactionState {
@@ -13,7 +13,7 @@ index aba18370..29167df3 100644
  
          lassoCut = truncated && barShowing ? LassoCut(at: now, selection: newSelection) : nil
 -        if truncated && !barShowing {
--            toastManager?.enqueue(Self.lassoSelectionCapToastMessage, severity: .warning)
+-            toastManager?.post(.selectionLimit)
 -        }
  
          return (selected: newSelection.count, truncated: truncated)
