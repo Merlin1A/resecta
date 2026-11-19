@@ -1,0 +1,19 @@
+Property: The Search sheet's grey allow-list is exact: an entry with no line fails.
+Area: the Search sheet's text tiers
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/SearchSheetTextTierTests
+Must go red: ResectaAppTests/SearchSheetTextTierTests noSystemGreyOnText
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/SearchResultRow.swift b/Sources/ResectaApp/Views/SearchResultRow.swift
+index e51ccc31..7c4cd6ee 100644
+--- a/Sources/ResectaApp/Views/SearchResultRow.swift
++++ b/Sources/ResectaApp/Views/SearchResultRow.swift
+@@ -276,7 +276,7 @@ struct SearchResultRow: View {
+         } label: {
+             Image(systemName: isRationaleExpanded ? "chevron.up" : "chevron.down")
+                 .font(.caption)
+-                .foregroundStyle(.secondary)
++                .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+                 // Floored to the HIG minimum (46-pt layout frame).
+                 // Same contentShape idiom.
+                 .frame(

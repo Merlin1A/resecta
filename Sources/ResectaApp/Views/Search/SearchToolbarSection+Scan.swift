@@ -95,7 +95,7 @@ extension SearchToolbarSection {
                         Text("OCR ≥\(Int(searchState.minimumOCRConfidence * 100))%")
                             .font(.caption)
                             .monospacedDigit()
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                             .frame(width: 70, alignment: .trailing)
                         Slider(value: $searchState.minimumOCRConfidence, in: 0...1, step: 0.05)
                             .frame(maxWidth: 120)
@@ -115,7 +115,7 @@ extension SearchToolbarSection {
                 )
                 Text(caption)
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                     .padding(.horizontal, ResectaTokens.Spacing.md)
                     // The caption is a full sentence that may open with
                     // an acronym ("OCR not needed …") — lowercasing it
