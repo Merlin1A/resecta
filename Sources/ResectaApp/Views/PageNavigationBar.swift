@@ -123,6 +123,7 @@ struct PageNavigationBar: View {
                     )
                 } label: {
                     Image(systemName: "rectangle.inset.filled")
+                        .dynamicTypeSize(...PageNavigationBar.wholePageGlyphCeiling)
                         .foregroundStyle(marked ? AnyShapeStyle(Color.white) : AnyShapeStyle(.tint))
                         .frame(
                             width: ResectaTokens.TouchTarget.minimum,
@@ -143,6 +144,9 @@ struct PageNavigationBar: View {
                 .accessibilityLabel(PageNavigationBar.wholePageActionLabel(marked: marked))
                 .accessibilityAddTraits(marked ? .isSelected : [])
                 .accessibilityIdentifier("pageNavMarkWholePage")
+                .accessibilityShowsLargeContentViewer {
+                    Label(PageNavigationBar.wholePageActionLabel(marked: marked), systemImage: "rectangle.inset.filled")
+                }
             }
         }
         .padding(.horizontal, ResectaTokens.Spacing.md)
@@ -162,6 +166,14 @@ extension PageNavigationBar {
     /// The marked control's disc: the 44-pt circle inside the control's
     /// 46-pt touch floor.
     static let markedDiscDiameter: CGFloat = 44
+
+    /// The largest text size the control's symbol grows to: at every larger
+    /// size it is drawn as at this one, so it stays inside its disc.
+    static let wholePageGlyphCeiling: DynamicTypeSize = .xxxLarge
+
+    /// The disc left showing beyond the symbol's corners at the ceiling, at
+    /// the least.
+    static let wholePageGlyphMargin: CGFloat = 4
 
     /// The control's words, which are also the undo steps' names: Mark on
     /// an unmarked page, Unmark on a marked one.
