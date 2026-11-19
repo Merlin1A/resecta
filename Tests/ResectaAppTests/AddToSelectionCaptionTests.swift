@@ -36,19 +36,44 @@ struct AddToSelectionCaptionTests {
                 == "Adding to selection, 2 selected")
     }
 
+    private static func occupant(activeTool: DocumentEditorView.DrawingTool?, addToSelection: Bool,
+                                 phaseKind: DocumentState.PhaseKind) -> BottomSlotOccupant? {
+        DocumentEditorView.bottomSlotOccupant(
+            phaseKind: phaseKind, messageShowing: false, selectionNewerThanMessage: false, firstTimeLineDue: false,
+            selectedCount: 0, addToSelection: addToSelection, activeTool: activeTool, widenedOnPage: false)
+    }
+
     @Test("One capsule at a time: the drawing caption for the tool, the Add to Selection capsule for the mode, only while editing")
     func oneCapsule() {
-        #expect(DocumentEditorView.bottomCapsule(activeTool: .rectangle, addToSelection: false, phaseKind: .editing)
-                == .drawing)
-        #expect(DocumentEditorView.bottomCapsule(activeTool: nil, addToSelection: true, phaseKind: .editing)
-                == .addToSelection)
-        #expect(DocumentEditorView.bottomCapsule(activeTool: nil, addToSelection: false, phaseKind: .editing) == nil)
-        #expect(DocumentEditorView.bottomCapsule(activeTool: nil, addToSelection: true, phaseKind: .redacting) == nil)
-        #expect(DocumentEditorView.bottomCapsule(activeTool: .rectangle, addToSelection: false, phaseKind: .verified) == nil)
+        #expect(Self.occupant(activeTool: .rectangle, addToSelection: false, phaseKind: .editing)
+                == .drawingCaption)
+        #expect(Self.occupant(activeTool: nil, addToSelection: true, phaseKind: .editing)
+                == .selection(adding: true))
+        #expect(Self.occupant(activeTool: nil, addToSelection: false, phaseKind: .editing) == nil)
+        #expect(Self.occupant(activeTool: nil, addToSelection: true, phaseKind: .redacting) == nil)
+        #expect(Self.occupant(activeTool: .rectangle, addToSelection: false, phaseKind: .verified) == nil)
     }
 
     @Test("The capsules' text stops growing at Accessibility 1, so a capsule never covers the page")
     func capsuleTextCeiling() {
         #expect(DocumentEditorView.capsuleTypeSizeCeiling == .accessibility1)
+    }
+
+    /// A repository file read relative to this test's own path.
+    private static func repoFile(_ relativePath: String) throws -> String {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        return try String(contentsOf: root.appendingPathComponent(relativePath), encoding: .utf8)
+    }
+
+    @Test("The slot draws its words in the support grey and Done in the text-tier teal")
+    func slotColours() throws {
+        let source = try Self.repoFile("Sources/ResectaApp/Views/DocumentEditorView+Caption.swift")
+        #expect(source.contains("ResectaTokens.SemanticColor.supportText"))
+        #expect(source.contains("ResectaTokens.BrandTeal.text"))
+        #expect(source.contains(".dynamicTypeSize(...Self.capsuleTypeSizeCeiling)"))
+        #expect(source.contains("accessibilityIdentifier(\"addModeDoneButton\")"))
+        #expect(source.contains("\"Turns off Add to Selection.\""))
+        #expect(!source.contains(".foregroundStyle(.secondary)"))
     }
 }
