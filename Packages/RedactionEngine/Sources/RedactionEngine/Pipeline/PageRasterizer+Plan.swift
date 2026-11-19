@@ -75,11 +75,9 @@ extension PageRasterizer {
         }
         guard let raster = PixelPlan.Raster(
             widthSixtyFourths: sides.width, heightSixtyFourths: sides.height, dpi: dpi) else { return nil }
-        let perInch = Double(PixelPlan.sixtyFourthsPerInch)
         return PagePixels(
             width: raster.pixelWidth, height: raster.pixelHeight,
-            content: CGSize(width: Double(sides.width * dpi) / perInch,
-                            height: Double(sides.height * dpi) / perInch),
+            content: CGSize(width: contentSpan(sides.width, dpi: dpi), height: contentSpan(sides.height, dpi: dpi)),
             plan: fromRecord ? raster : nil,
             recordDisagrees: disagrees)
     }
@@ -109,8 +107,13 @@ extension PageRasterizer {
               let h = PixelPlan.sixtyFourths(ofSide: Double(size.height)),
               PixelPlan.Raster(widthSixtyFourths: w, heightSixtyFourths: h, dpi: Int(dpi)) != nil
         else { return nil }
-        let perInch = Double(PixelPlan.sixtyFourthsPerInch)
-        return CGSize(width: Double(w) * Double(dpi) / perInch, height: Double(h) * Double(dpi) / perInch)
+        return CGSize(width: contentSpan(w, dpi: Int(dpi)), height: contentSpan(h, dpi: Int(dpi)))
+    }
+
+    /// The pixels the page's content spans on a side of `s` sixty-fourths
+    /// at `dpi`: S·d / 4608, the one place the content basis is worked out.
+    static func contentSpan(_ s: Int, dpi: Int) -> Double {
+        Double(s) * Double(dpi) / Double(PixelPlan.sixtyFourthsPerInch)
     }
 
     // MARK: - The region path: a page with no plan
