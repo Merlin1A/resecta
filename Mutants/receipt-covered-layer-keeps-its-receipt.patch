@@ -1,0 +1,22 @@
+Property: A layer's surface hidden (a capture cover over its content) ends nothing: its message, one that must be seen included, stops its clock and is drawn again for the rest of its life.
+Area: the brief messages, the queue's layers
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild build-for-testing -scheme ResectaApp -destination id=<simulator>, then DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test-without-building -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/ToastQueueManagerTests
+Must go red: ResectaAppTests/ToastQueueManagerTests hiddenSurfaceEndsNothing
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/ToastQueueManager.swift b/Sources/ResectaApp/State/ToastQueueManager.swift
+index 2babadab..1154fb03 100644
+--- a/Sources/ResectaApp/State/ToastQueueManager.swift
++++ b/Sources/ResectaApp/State/ToastQueueManager.swift
+@@ -507,9 +507,8 @@ final class ToastQueueManager {
+     func setLayerSurface(_ layer: UUID, visible: Bool) {
+         guard let index = layers.firstIndex(where: { $0.id == layer }),
+               layers[index].surfaceVisible != visible else { return }
+-        if !visible, var shown = current, isDrawn(shown), drawingLayer(of: shown)?.id == layer {
+-            shown.returning = true
+-            current = shown
++        if !visible, let shown = current, isDrawn(shown), drawingLayer(of: shown)?.id == layer {
++            endCurrent()
+         }
+         layers[index].surfaceVisible = visible
+         reconcile()
