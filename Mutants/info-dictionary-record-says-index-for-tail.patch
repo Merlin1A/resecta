@@ -5,12 +5,12 @@ Must go red: RedactionEngineTests/InfoDictionaryThroughIndexTests row [case 6]
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
-index 22e3d203..7a3d4725 100644
+index 701a789d..42235f5d 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
-@@ -356,7 +356,7 @@ public actor PDFStreamReconstructor {
+@@ -376,7 +376,7 @@ public actor PDFStreamReconstructor {
          }
-         // The second way, used only where the first refused.
+         // The second way, used where the first refused or failed.
          return overwriteInfoLiteralsInTail(at: url)
 -            ? .byTail(indexRefused: refusal) : .neither(indexRefused: refusal)
 +            ? .byIndex : .neither(indexRefused: refusal)
