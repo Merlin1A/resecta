@@ -8,6 +8,50 @@ import RedactionEngine
 /// test with plain values.
 enum RunInputs {
 
+    /// The confirmed part of the run's record: the fill colour, the quality
+    /// and every region as drawn, one entry per page. It reads the live
+    /// regions, never the pages built from them: those hold the regions
+    /// after the clamp and the size floor, and a region the run drops must
+    /// still be in the record.
+    ///
+    /// `geometry` holds each page's crop box and rotation, read from the
+    /// document at run entry; a page with it gets its plan of boxes as
+    /// placed, made once here. A page without it has no plan.
+    static func confirmedRecord(
+        pageCount: Int,
+        geometry: [Int: PageGeometry],
+        regions: [Int: [RedactionRegion]],
+        settings snapshot: PipelineCoordinator.RunSettings
+    ) -> RunRecord.Confirmed {
+        RunRecord.Confirmed(
+            fillColor: snapshot.fillColor,
+            exportDPI: snapshot.exportDPI,
+            pages: (0..<pageCount).map { page in
+                let drawn = (regions[page] ?? []).map {
+                    RunRecord.DrawnRegion(id: $0.id, normalizedRect: $0.normalizedRect)
+                }
+                guard let sides = geometry[page] else { return RunRecord.Page(pageIndex: page, regions: drawn) }
+                return RunRecord.Page(pageIndex: page, regions: drawn,
+                                      cropBox: sides.cropBox.size, rotation: sides.rotation)
+            })
+    }
+
+    /// A page's crop box and rotation, as the run's record reads them.
+    struct PageGeometry: Equatable {
+        let cropBox: CGRect
+        let rotation: Int
+    }
+
+    /// Every page's crop box and rotation, read serially from `doc`.
+    static func pageGeometry(of doc: PDFDocument) -> [Int: PageGeometry] {
+        var geometry: [Int: PageGeometry] = [:]
+        for i in 0..<doc.pageCount {
+            guard let page = doc.page(at: i) else { continue }
+            geometry[i] = PageGeometry(cropBox: page.bounds(for: .cropBox), rotation: page.rotation)
+        }
+        return geometry
+    }
+
     /// Bridge the document and the applied regions into engine-ready
     /// `PDFPageData`, one per page, in page order.
     ///
@@ -25,7 +69,8 @@ enum RunInputs {
         sourceHasHiddenOCG: Bool,
         settings snapshot: PipelineCoordinator.RunSettings,
         effectiveMode: PipelineMode,
-        inkPlans: [Int: InkStripPlan] = [:]
+        inkPlans: [Int: InkStripPlan] = [:],
+        record: RunRecord.Confirmed? = nil
     ) -> [PDFPageData] {
         (0..<doc.pageCount).compactMap { i -> PDFPageData? in
             guard let page = doc.page(at: i) else { return nil }
@@ -45,9 +90,9 @@ enum RunInputs {
                 // box reaching past the page edge keeps only its on-page
                 // part, and one wholly past the edge clamps to nothing. Read
                 // before the clamp, a box of full size off the page passed
-                // the floor and reached the pipeline with no area.
-                guard clamped.normalizedRect.width > 0.001,
-                      clamped.normalizedRect.height > 0.001 else { return nil }
+                // the floor and reached the pipeline with no area. The run's
+                // record admits by the same test.
+                guard RedactionRegion.isAdmitted(normalizedRect: region.normalizedRect) else { return nil }
                 return clamped
             } ?? []
 
@@ -80,7 +125,8 @@ enum RunInputs {
                 cropBoxBounds: cropBoxBounds,
                 cgPage: cgPage,
                 hasText: hasText,
-                fallbackReason: fallbackReason
+                fallbackReason: fallbackReason,
+                confirmedPage: record?.pages.first { $0.pageIndex == i }
             )
         }
     }

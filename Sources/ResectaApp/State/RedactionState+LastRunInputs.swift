@@ -23,5 +23,10 @@ extension RedactionState {
         /// The degrade-failure list at run entry; nil when not degraded.
         let degradeFailures: [String]?
         var burnedRegionVersion: Int? = nil  // the run's redacted region version
+        /// The run's record: what the user confirmed at the Redact tap and
+        /// what the producer says it did. In memory only, cleared with the
+        /// output. Nil only where the inputs were built by hand (the debug
+        /// seed and tests): such an output's boxes cannot be checked.
+        var record: RunRecord? = nil
     }
 }

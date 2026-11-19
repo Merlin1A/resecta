@@ -125,6 +125,10 @@ final class PipelineCoordinator: @unchecked Sendable {
         let appliedSearches: [SearchRecheckRequest]
         /// The regions the run burned, per page, as burned (clamped, floor-filtered); verification checks these.
         let burnedRegions: [Int: [RedactionRegion]]
+        /// What the producer says it did in this run: the record's second
+        /// part, joined to the confirmed part when the inputs are kept. A
+        /// verify-only run produces nothing.
+        var produced = RunRecord.Produced()
     }
 
     /// Snapshot of pipeline-affecting settings, captured once
@@ -687,7 +691,8 @@ final class PipelineCoordinator: @unchecked Sendable {
     func buildPDFPageData(
         effectiveMode: PipelineMode,
         runSettings: RunSettings? = nil,
-        inkPlans: [Int: InkStripPlan] = [:]
+        inkPlans: [Int: InkStripPlan] = [:],
+        record: RunRecord.Confirmed? = nil
     ) -> [PDFPageData] {
         guard let doc = documentState.sourceDocument else { return [] }
         return RunInputs.pageData(
@@ -697,7 +702,8 @@ final class PipelineCoordinator: @unchecked Sendable {
             sourceHasHiddenOCG: documentState.sourceHasHiddenOCG,
             settings: runSettings ?? RunSettings.snapshot(from: settingsState),
             effectiveMode: effectiveMode,
-            inkPlans: inkPlans
+            inkPlans: inkPlans,
+            record: record
         )
     }
 }
