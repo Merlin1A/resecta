@@ -5,15 +5,15 @@ Must go red: RedactionEngineTests/InkFitBandTests neighbourLineKeepsItsOCRResult
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFit.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFit.swift
-index 30432b6c..f5103326 100644
+index 09332ded..89a932cf 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFit.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFit.swift
-@@ -512,7 +512,7 @@ extension DocumentSearcher {
-         }
+@@ -529,7 +529,7 @@ extension DocumentSearcher {
+                                                growLeft: growLeft, growRight: growRight) == nil
          guard let band, let alone = inkPaint(ink: band, band: nil, seed: seed, window: window,
-                                              growLeft: growLeft, growRight: growRight), alone != paint else { return (paint, nil) }
--        return (paint, alone)
-+        return (paint, nil)
+                                              growLeft: growLeft, growRight: growRight), alone != paint else { return (paint, nil, fellBack) }
+-        return (paint, alone, false)
++        return (paint, nil, false)
      }
  
      /// The page's read tokens: one full-page render at the fit's scale, read
