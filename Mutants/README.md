@@ -280,3 +280,6 @@ with its reason and the mutant that is caught in its place.
 | `measured-sentence-name-as-approved.patch` | Each kind's name is its approved words, letter for letter. | ResectaAppTests/MeasuredLineKindsTests "Each list of kinds gives its approved sentence": the eight rows that name lines of a left-aligned paragraph |
 | `measured-sentence-fixed-order.patch` | The names follow the fixed order of the kinds, whatever order a caller gives them in. | ResectaAppTests/MeasuredLineKindsTests "Each list of kinds gives its approved sentence": the four rows that name both paragraph kinds |
 | `measured-sentence-comma-before-and.patch` | Three or more names take a comma before the "and". | ResectaAppTests/MeasuredLineKindsTests "Each list of kinds gives its approved sentence": the five rows of three or four kinds |
+| `settings-box-switch-off-by-default.patch` | The box switch is off by default. | ResectaAppTests/SettingsStateTests "The box switch is off by default, and Reset to Defaults turns it off" |
+| `settings-box-switch-one-key.patch` | The box switch is stored under one key. | ResectaAppTests/SettingsStateTests "The box switch is stored under one key" |
+| `settings-paranoid-footer-words.patch` | The Paranoid Mode footer reads its words of record. | ResectaAppTests/SettingsCopyTableTests "Each line reads as its words of record" [.set12] |

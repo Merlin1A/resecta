@@ -10,7 +10,14 @@ struct SettingsView: View {
     // constants so the contract can be pinned by unit tests without
     // rendering the form. Mirrors the `InlineWarningBanner.lineLimit(for:)`
     // pattern used for the AX5 line-cap predicate.
-    static let defaultModeAccessibilityHint = "Choose how redacted output is produced. Secure Rasterization produces image-only output with all text removed; Searchable Redaction preserves non-redacted text, except on pages whose text shows no ink; text covered by a picture in the page can still enter the text layer."
+    static let defaultModeAccessibilityHint = "Choose how redacted output is produced. Secure Rasterization produces image-only output, with no text to search or copy. Searchable Redaction keeps a searchable copy of the text you did not box, less some words. A page whose text is invisible or shows no ink is exported as a picture. Text under a picture, bar, or cover already in the page, or stored as different words from those the page prints, can still enter the searchable copy."
+    /// The line under the mode picker for each mode.
+    static let secureModeDescription = "Produces image-only output with all text removed, so the PDF has no text to search or copy. The simplest approach — recommended when redaction confidence is the top priority. A court or regulator that requires searchable PDFs may refuse an image-only PDF."
+    static let searchableModeDescription = "Keeps a searchable copy of the text you did not box, for documents that have a text layer. Words next to a box can be left out. So is text with characters its fonts cannot draw, and the results say where. A page whose text is invisible or shows no ink is exported as a picture. Text under a picture, bar, or cover that was already in the page can still enter the searchable copy. Text that a file stores as different words from those it prints can still enter the searchable copy."
+    /// The banner shown while a run is in progress: its title and body.
+    static let runInProgressTitle = "Redaction in progress"
+    static let runInProgressBody = "A redaction is running. Changes apply to the next one."
+    static let paranoidModeFooter = "Paranoid Mode forces Secure Rasterization and always runs the checks."
     static let fillColorAccessibilityHint = "Color used to fill redacted regions in the output."
     static let verifyToggleDefaultHint = "When enabled, the app runs verification checks before you can export"
     static let verifyToggleParanoidLockedHint = "Locked on because Paranoid Mode is enabled."
@@ -21,7 +28,7 @@ struct SettingsView: View {
     /// rendering the toggle.
     /// What Paranoid Mode does to the pipeline mode — the Settings bullet
     /// and the editor's Switch Mode hint read this one sentence.
-    static let paranoidForcesSecureLine = "Pipeline mode is forced to Secure Rasterization."
+    static let paranoidForcesSecureLine = "The redaction mode is forced to Secure Rasterization."
 
     static func verifyToggleHint(paranoidMode: Bool) -> String {
         paranoidMode ? verifyToggleParanoidLockedHint : verifyToggleDefaultHint
@@ -76,6 +83,7 @@ struct SettingsView: View {
                     pipelineActiveBanner
                 }
                 processingSection     // renamed from "Redaction Mode"
+                redactionBoxesSection
                 exportQualitySection  // renamed from "Output"
                 workflowSection
                     .id("workflowSection")
@@ -153,18 +161,18 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Pipeline in progress")
+                    Text(Self.runInProgressTitle)
                         .font(.subheadline)
                         .fontWeight(.medium)
-                    Text("A pipeline run is in progress. Changes apply to the next run.")
+                    Text(Self.runInProgressBody)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
             }
             .accessibilityElement(children: .combine)
             .accessibilityIdentifier("settingsPipelineActiveBanner")
-            .accessibilityLabel("Pipeline in progress")
-            .accessibilityHint("A pipeline run is in progress. Changes apply to the next run.")
+            .accessibilityLabel(Self.runInProgressTitle)
+            .accessibilityHint(Self.runInProgressBody)
         }
     }
 
@@ -191,12 +199,12 @@ struct SettingsView: View {
             // Description for current selection
             switch settingsState.pipelineMode {
             case .secureRasterization:
-                Text("Produces image-only output with all text removed. The simplest approach \u{2014} recommended when redaction confidence is the top priority.")
+                Text(Self.secureModeDescription)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .listRowSeparator(.hidden)
             case .searchableRedaction:
-                Text("Preserves non-redacted text for search and selection. A page whose text shows no ink is exported as an image only; text covered by a picture in the page can still enter the text layer. Available for documents with an existing text layer.")
+                Text(Self.searchableModeDescription)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .listRowSeparator(.hidden)
@@ -206,6 +214,23 @@ struct SettingsView: View {
         } footer: {
             // Footer note
             Text("Both modes use the same pixel-destruction process for redacted regions.")
+        }
+    }
+
+    // MARK: - Redaction Boxes
+
+    private var redactionBoxesSection: some View {
+        Section {
+            Toggle(RedactionBoxesCopy.switchName, isOn: Binding(
+                get: { settingsState.boxesAcrossColumn },
+                set: { settingsState.boxesAcrossColumn = $0 }
+            ))
+            .accessibilityHint(RedactionBoxesCopy.switchHint)
+            .accessibilityIdentifier("settingsBoxesAcrossColumnToggle")
+        } header: {
+            Text(RedactionBoxesCopy.sectionHeader)
+        } footer: {
+            Text(RedactionBoxesCopy.footer())
         }
     }
 
@@ -412,7 +437,7 @@ struct SettingsView: View {
         } header: {
             Label("Paranoid Mode", systemImage: "lock.fill")
         } footer: {
-            Text("Paranoid mode is designed to reduce the surface area of optional side channels. Behavior is best-effort.")
+            Text(Self.paranoidModeFooter)
         }
     }
 

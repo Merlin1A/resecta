@@ -1,0 +1,19 @@
+Property: The Paranoid Mode footer reads its words of record.
+Area: settings (words)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/SettingsCopyTableTests
+Must go red: ResectaAppTests/SettingsCopyTableTests "Each line reads as its words of record" [.set12]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/SettingsView.swift b/Sources/ResectaApp/Views/SettingsView.swift
+index 5fbb706c..894258ee 100644
+--- a/Sources/ResectaApp/Views/SettingsView.swift
++++ b/Sources/ResectaApp/Views/SettingsView.swift
+@@ -17,7 +17,7 @@ struct SettingsView: View {
+     /// The banner shown while a run is in progress: its title and body.
+     static let runInProgressTitle = "Redaction in progress"
+     static let runInProgressBody = "A redaction is running. Changes apply to the next one."
+-    static let paranoidModeFooter = "Paranoid Mode forces Secure Rasterization and always runs the checks."
++    static let paranoidModeFooter = "Paranoid Mode forces Secure Rasterization and always runs the check."
+     static let fillColorAccessibilityHint = "Color used to fill redacted regions in the output."
+     static let verifyToggleDefaultHint = "When enabled, the app runs verification checks before you can export"
+     static let verifyToggleParanoidLockedHint = "Locked on because Paranoid Mode is enabled."
