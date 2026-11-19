@@ -104,12 +104,13 @@ struct HiddenWordInkLayerCases {
     @Test("V4: a hand box on a line's first word, and on a first word narrower than the drift, read Checks Failed",
           .timeLimit(.minutes(3)))
     func v4() async throws {
-        let p8 = try await Self.partWordsKept { try await Self.p8() }, p9 = try await Self.partWordsKept { try await Self.p9() }
+        // On p9 the hidden copy of "The" lies wholly past the box: no letter
+        // is lost, so it is written whole and the leak needs no switch.
+        let p8 = try await Self.partWordsKept { try await Self.p8() }, p9 = try await Self.p9()
         try Self.expectLeak(p9, leaked: "The", "a hand box on The")
         try Self.expectLeakFails(p8, leaked: "Signed", "a hand box on Signed")
         try Self.expectLeakFails(p9, leaked: "The", "a hand box on The")
         try Self.expectWholeWordGone(try await Self.p8(), word: "Signed", "a hand box on Signed, whole words on")
-        try Self.expectWholeWordGone(try await Self.p9(), word: "The", "a hand box on The, whole words on")
     }
 
     // MARK: - Clean, Secure
