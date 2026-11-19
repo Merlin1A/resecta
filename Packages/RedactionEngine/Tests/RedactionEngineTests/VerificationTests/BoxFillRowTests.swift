@@ -179,6 +179,13 @@ struct BoxFillRowTests {
         let reading = BoxFillRow.reading(report: .noRecord, record: outOfOrder)
         #expect(reading == .row(CheckRow(status: .warn("2 pages could not be read for this check: 1, 2"), pages: [0, 1], couldNotVerify: true), nil))
         if case .row(let row, _) = reading { #expect(Self.sentence(row.status) == "2 pages could not be read for this check: 1, 2") }
+        // Page numbers checked on every page, not the first alone: a repeated number and a gap.
+        let repeated = Self.record([Self.page(0, [Self.share(0.1, 0.1, 0.3, 0.2)]), Self.page(0, [Self.share(0.1, 0.1, 0.3, 0.2)])])
+        let gap = Self.record([Self.page(0, [Self.share(0.1, 0.1, 0.3, 0.2)]), Self.page(2, [Self.share(0.1, 0.1, 0.3, 0.2)])])
+        #expect(BoxCheckInput(record: repeated) == nil)
+        #expect(BoxCheckInput(record: gap) == nil)
+        #expect(BoxFillRow.reading(report: .noRecord, record: gap)
+                == .row(CheckRow(status: .warn("2 pages could not be read for this check: 1, 3"), pages: [0, 2], couldNotVerify: true), nil))
         let one = Self.record([Self.page(0, [Self.share(0.1, 0.1, 0.3, 0.2)])])
         let outside = BoxCheckPage(picture: .fault(.wrongSubject), quality: nil, belowChosen: false, noColour: false, boxes: [])
         let extra = BoxFillRow.reading(report: .pages([Self.read([Self.done]), outside]), record: one)
