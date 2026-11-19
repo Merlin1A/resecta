@@ -1,0 +1,19 @@
+Property: A check's warning stays in its row, joined after its could-not-verify sentences, when it also could not read part of its input.
+Area: could-not-verify rows (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/CouldNotReadRowTests
+Must go red: RedactionEngineTests/CouldNotReadRowTests eachCase [OCR of Page Images: coordinates not mapped, then the in-region text]; RedactionEngineTests/CouldNotReadRowTests eachCase [OCR of Page Images: a page not run, then the in-region text]; RedactionEngineTests/CouldNotReadRowTests eachCase [Terms in Text & Bytes: a term too short, then the fragment line]; RedactionEngineTests/CouldNotReadRowTests eachCase [Terms in Text & Bytes: a term too short, then the picture data line]; RedactionEngineTests/CouldNotReadRowTests eachCase [Terms in Text & Bytes: a page not read, then the fragment line]; RedactionEngineTests/CouldNotReadRowTests eachCase [Terms in Text & Bytes: a page not read, a term too short, then the fragment line]; RedactionEngineTests/CouldNotReadRowTests eachCase [Terms in Text & Bytes: a page not read, then the picture data line]; RedactionEngineTests/CouldNotReadRowTests eachCase [Active Content & Structure: a page not read, then the structural findings]; RedactionEngineTests/CouldNotReadRowTests eachCase [Active Content & Structure: no end marker, then the structural findings]; RedactionEngineTests/CouldNotReadRowTests eachCase [Document Metadata: a field that does not decode, then a field not rewritten]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/CheckRowComposition.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/CheckRowComposition.swift
+index 303b2fa2..a635723e 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/CheckRowComposition.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/CheckRowComposition.swift
+@@ -71,7 +71,7 @@ enum CheckRowComposition {
+         warnings: [CheckWarning]
+     ) -> CheckRow? {
+         let conditionPages = Array(Set(conditions.flatMap(\.pages))).sorted()
+-        let joined = join(conditions.map(\.sentence) + warnings.map(\.sentence))
++        let joined = join(conditions.map(\.sentence))
+         if let issue {
+             guard !conditions.isEmpty else {
+                 return CheckRow(status: issue.status, pages: issue.pages, couldNotVerify: false)

@@ -168,6 +168,10 @@ public struct VerificationEngine: Sendable {
         // returns it beside its status, `false` for every WARN that reports
         // what a check saw.
         var couldNotVerify = false
+        // Display-only: beside an issue whose check also could not read part
+        // of its input, that part's sentence and pages (`CheckRow`).
+        var partSentence: String? = nil
+        var partPages: [Int]? = nil
 
         // Each layer method calls
         // `try Task.checkCancellation()` on entry (and within long inner
@@ -179,11 +183,13 @@ public struct VerificationEngine: Sendable {
         do { // LegalPhrases:safe (Swift keyword usage below)
             switch layer {
             case .textExtraction:
-                let (s0, pages0, cnv0) = try runLayer1TextExtraction(
+                let row0 = try runLayer1TextExtraction(
                     doc, pipelineMode: pipelineMode, perPageModes: perPageModes)
-                status = s0
-                layerPageReferences = pages0
-                couldNotVerify = cnv0
+                status = row0.status
+                layerPageReferences = row0.pages
+                couldNotVerify = row0.couldNotVerify
+                partSentence = row0.partSentence
+                partPages = row0.partPages
             case .ocrCheck:
                 // Layer 2's OCR gate applies the same per-term boundary
                 // discipline as the byte layers (String-space mirror in
@@ -191,7 +197,7 @@ public struct VerificationEngine: Sendable {
                 // substring-match inside an unrelated word read off a raster.
                 // The third element carries the display-only term texts
                 // behind an `.attention` verdict (Layer 3's shape).
-                let (s1, pages1, terms1, cnv1, copy1, fragment1) = try await runLayer2OCR(
+                let (s1, pages1, terms1, cnv1, copy1, fragment1, part1, partPages1) = try await runLayer2OCR(
                     doc, pipelineMode: pipelineMode,
                     regions: regions, sensitiveTerms: sensitiveTerms,
                     perPageModes: perPageModes)
@@ -201,19 +207,25 @@ public struct VerificationEngine: Sendable {
                 couldNotVerify = cnv1
                 copyOverride = copy1
                 layerReviewIsFragment = fragment1
+                partSentence = part1
+                partPages = partPages1
             case .binaryStringSearch:
-                let (s2, pages2, terms2, cnv2) = try runLayer3BinarySearch(doc, sensitiveTerms: sensitiveTerms)
-                status = s2
-                layerPageReferences = pages2
+                let (row2, terms2) = try runLayer3BinarySearch(doc, sensitiveTerms: sensitiveTerms)
+                status = row2.status
+                layerPageReferences = row2.pages
                 layerReviewTerms = terms2
-                couldNotVerify = cnv2
+                couldNotVerify = row2.couldNotVerify
+                partSentence = row2.partSentence
+                partPages = row2.partPages
                 // Manual regions that added no term (whole-page, or no text layer): the clean line gains one sentence.
                 copyOverride = Self.manualRegionsWithoutTextCopy(status, count: manualRegionsWithoutText)
             case .structureCheck:
-                let (s, pages, cnv3) = try runLayer4Structural(doc)
-                status = s
-                layerPageReferences = pages
-                couldNotVerify = cnv3
+                let row3 = try runLayer4Structural(doc)
+                status = row3.status
+                layerPageReferences = row3.pages
+                couldNotVerify = row3.couldNotVerify
+                partSentence = row3.partSentence
+                partPages = row3.partPages
             case .metadataCheck:
                 let (s4, cnv4, copy4) = try runLayer5Metadata(doc)
                 status = s4
@@ -222,32 +234,40 @@ public struct VerificationEngine: Sendable {
             // Layers 6–10: Sandwich-specific.
             // Only run for Searchable Redaction pages.
             case .spatialVerification:
-                let (s5, pages5, cnv5) = try await runLayer6SpatialVerification(
+                let row5 = try await runLayer6SpatialVerification(
                     doc, regions: regions, perPageModes: perPageModes,
                     verifier: sandwichVerifier)
-                status = s5
-                layerPageReferences = pages5
-                couldNotVerify = cnv5
+                status = row5.status
+                layerPageReferences = row5.pages
+                couldNotVerify = row5.couldNotVerify
+                partSentence = row5.partSentence
+                partPages = row5.partPages
             case .characterCount:
-                let (s6, pages6, cnv6) = try await runLayer7CharacterCount(
+                let row6 = try await runLayer7CharacterCount(
                     doc, filterDigests: filterDigests, perPageModes: perPageModes,
                     verifier: sandwichVerifier)
-                status = s6
-                layerPageReferences = pages6
-                couldNotVerify = cnv6
+                status = row6.status
+                layerPageReferences = row6.pages
+                couldNotVerify = row6.couldNotVerify
+                partSentence = row6.partSentence
+                partPages = row6.partPages
             case .fontVerification:
-                let (s7, pages7, cnv7) = try await runLayer8FontVerification(
+                let row7 = try await runLayer8FontVerification(
                     doc, perPageModes: perPageModes, verifier: sandwichVerifier)
-                status = s7
-                layerPageReferences = pages7
-                couldNotVerify = cnv7
+                status = row7.status
+                layerPageReferences = row7.pages
+                couldNotVerify = row7.couldNotVerify
+                partSentence = row7.partSentence
+                partPages = row7.partPages
             case .characterLineage:
-                let (s8, pages8, cnv8) = try await runLayer9CharacterLineage(
+                let row8 = try await runLayer9CharacterLineage(
                     doc, filterDigests: filterDigests, perPageModes: perPageModes,
                     verifier: sandwichVerifier)
-                status = s8
-                layerPageReferences = pages8
-                couldNotVerify = cnv8
+                status = row8.status
+                layerPageReferences = row8.pages
+                couldNotVerify = row8.couldNotVerify
+                partSentence = row8.partSentence
+                partPages = row8.partPages
             case .operatorReExtraction:
                 // Layer 10 — operator-semantic re-extraction.
                 // Independent of `regions`, `perPageModes`, `filterDigests`, and
@@ -261,16 +281,20 @@ public struct VerificationEngine: Sendable {
                 layerPageReferences = l10.pageReferences
                 layerReviewTerms = l10.reviewTermTexts
                 couldNotVerify = l10.couldNotVerify
+                partSentence = l10.partSentence
+                partPages = l10.partPages
             case .hiddenWordInk:
                 // Hidden words under boxes — each word left in the text
                 // layer placed on the source page's print by its own read,
                 // failing when that print lies under a box.
-                let (s11, pages11, cnv11, copy11) = try await runHiddenWordInk(
+                let (s11, pages11, cnv11, copy11, part11, partPages11) = try await runHiddenWordInk(
                     doc, regions: regions, sourceDocument: sourceDocument)
                 status = s11
                 layerPageReferences = pages11
                 couldNotVerify = cnv11
                 copyOverride = copy11
+                partSentence = part11
+                partPages = partPages11
             case .searchRecheck:
                 // Search Re-check — re-runs every applied typed search on
                 // the output through the search engine itself (text layer
@@ -288,6 +312,8 @@ public struct VerificationEngine: Sendable {
                 layerReviewTerms = outcome.reviewTermTexts
                 copyOverride = outcome.copyOverride
                 layerQueryLines = outcome.queryLines
+                partSentence = outcome.partSentence
+                partPages = outcome.partPages
                 // The re-check's only WARN family is its unchecked-pages
                 // one (pages it could not open or read, OCR it could not
                 // run, pages over its caps): a WARN here always says the
@@ -310,6 +336,8 @@ public struct VerificationEngine: Sendable {
                 layerReviewTerms = outcome.reviewTermTexts
                 copyOverride = outcome.copyOverride
                 layerQueryLines = outcome.queryLines
+                partSentence = outcome.partSentence
+                partPages = outcome.partPages
                 // The sweep's only WARN family is the same unchecked-pages
                 // one: a WARN here always says the sweep did not fully run.
                 couldNotVerify = outcome.status.isWarn
@@ -397,7 +425,9 @@ public struct VerificationEngine: Sendable {
             layer: layer,
             queryLines: layerQueryLines,
             couldNotVerify: couldNotVerify,
-            reviewIsFragment: layerReviewIsFragment
+            reviewIsFragment: layerReviewIsFragment,
+            couldNotVerifyPart: partSentence,
+            couldNotVerifyPartPages: partPages
         )
     }
 
@@ -463,7 +493,7 @@ public struct VerificationEngine: Sendable {
         _ doc: PDFDocument,
         pipelineMode: PipelineMode,
         perPageModes: [PipelineMode]
-    ) throws -> (VerificationStatus, [Int]?, Bool) {
+    ) throws -> CheckRow {
         // Entry-level cooperative cancellation.
         try Task.checkCancellation()
         var selectableTextPages: [Int] = []
@@ -497,21 +527,39 @@ public struct VerificationEngine: Sendable {
         }
 
         // Category priority for the verdict message is unchanged:
-        // text > annotations > bookmarks > AcroForm.
+        // text > annotations > bookmarks > AcroForm. Pages that did not
+        // open are known at every issue and ride beside it; the form-field
+        // read comes last, so its own could-not-verify condition is known
+        // only where no earlier issue returned.
+        let unread = unreadablePages.isEmpty ? [] : [UnverifiedCondition(
+            sentence: unreadablePagesSentence(unreadablePages), pages: unreadablePages)]
+        func row(_ status: VerificationStatus, _ pages: [Int]?) -> CheckRow {
+            CheckRowComposition.compose(issue: (status, pages), conditions: unread, warnings: [])
+                ?? CheckRow(status: status, pages: pages, couldNotVerify: false)
+        }
         if !selectableTextPages.isEmpty {
             let list = selectableTextPages.map { String($0 + 1) }.joined(separator: ", ")
-            return (.fail("Selectable text found on \(pagePhrase(selectableTextPages, list: list))"),
-                    selectableTextPages, false)
+            var message = "Selectable text found on \(pagePhrase(selectableTextPages, list: list))"
+            var pages = selectableTextPages
+            // The same loop already holds the pages with annotations: both
+            // issues are in the row, text first.
+            if !annotationPages.isEmpty {
+                let annotationList = annotationPages.map { String($0 + 1) }.joined(separator: ", ")
+                message = CheckRowComposition.join([
+                    message, "Annotations found on \(pagePhrase(annotationPages, list: annotationList))"])
+                pages = Array(Set(pages + annotationPages)).sorted()
+            }
+            return row(.fail(message), pages)
         }
         if !annotationPages.isEmpty {
             let list = annotationPages.map { String($0 + 1) }.joined(separator: ", ")
-            return (.fail("Annotations found on \(pagePhrase(annotationPages, list: list))"),
-                    annotationPages, false)
+            return row(.fail("Annotations found on \(pagePhrase(annotationPages, list: list))"),
+                       annotationPages)
         }
 
         // Check document-level structures
         if doc.outlineRoot != nil {
-            return (.fail("Bookmarks found in output"), nil, false)
+            return row(.fail("Bookmarks found in output"), nil)
         }
 
         // Check for /AcroForm via CGPDFDocument. A silent no-op on any nil
@@ -520,37 +568,38 @@ public struct VerificationEngine: Sendable {
         guard let url = doc.documentURL,
               let cgDoc = CGPDFDocument(url as CFURL),
               let catalog = cgDoc.catalog else {
-            return (.warn("Could not verify /AcroForm absence"), nil, true)
+            let acroForm = UnverifiedCondition(sentence: "Could not verify /AcroForm absence", pages: [])
+            return CheckRowComposition.compose(issue: nil, conditions: [acroForm] + unread, warnings: [])
+                ?? .passed
         }
         var acroForm: CGPDFDictionaryRef?
         if CGPDFDictionaryGetDictionary(catalog, "AcroForm", &acroForm) {
-            return (.fail("Form fields found in output"), nil, false)
+            return row(.fail("Form fields found in output"), nil)
         }
 
         // No leak reported, but some pages were never inspected —
         // an honest WARN, not a clean PASS.
-        if !unreadablePages.isEmpty {
-            return (unreadablePagesWarn(unreadablePages), unreadablePages, true)
-        }
-        return (.pass, nil, false)
+        return CheckRowComposition.compose(issue: nil, conditions: unread, warnings: []) ?? .passed
     }
 
     // MARK: - PDF Data Loading Helper
 
     /// Load raw PDF bytes and a CGPDFDocument from a PDFDocument.
-    /// Prefers URL-based loading; reads the file with default options (no
-    /// mapping requested).
-    /// Falls back to the document's data representation for non-file
-    /// documents, through `RSGuardedDataRepresentation`: PDFKit raises an
+    /// A document opened from a file is read from that file, with default
+    /// options (no mapping requested); when the file cannot be read, nothing
+    /// is returned, never PDFKit's re-written copy in its place, so the
+    /// caller reports that it could not read the output.
+    /// A document with no file URL is read from its data representation,
+    /// through `RSGuardedDataRepresentation`: PDFKit raises an
     /// Objective-C exception while writing a document whose `/Info`
     /// dictionary holds an unreadable key, and Swift cannot intercept it. The
     /// guard returns nil instead, so a damaged or crafted file reads as
     /// "could not load" on the nil path below rather than aborting the
     /// verification.
     func loadPDFData(_ doc: PDFDocument) -> (Data, CGPDFDocument)? {
-        if let url = doc.documentURL,
-           let data = try? Data(contentsOf: url),
-           let cgDoc = CGPDFDocument(url as CFURL) {
+        if let url = doc.documentURL {
+            guard let data = try? Data(contentsOf: url),
+                  let cgDoc = CGPDFDocument(url as CFURL) else { return nil }
             return (data, cgDoc)
         }
         guard let data = RSGuardedDataRepresentation(doc),
@@ -579,10 +628,15 @@ func pageCountPhrase(_ count: Int) -> String {
 /// `pages` are 0-based (the UI chip convention); the copy prints 1-based
 /// numbers — a single page by number, multiple as count + list.
 func unreadablePagesWarn(_ pages: [Int]) -> VerificationStatus {
+    .warn(unreadablePagesSentence(pages))
+}
+
+/// The sentence of `unreadablePagesWarn`, for a row that joins it.
+func unreadablePagesSentence(_ pages: [Int]) -> String {
     let list = pages.map { String($0 + 1) }.joined(separator: ", ")
     return pages.count == 1
-        ? .warn("Page \(list) could not be read for this check")
-        : .warn("\(pages.count) pages could not be read for this check: \(list)")
+        ? "Page \(list) could not be read for this check"
+        : "\(pages.count) pages could not be read for this check: \(list)"
 }
 
 /// Partial-drop honesty tail for the term-search layers (3 and 10): reported

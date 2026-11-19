@@ -495,20 +495,21 @@ struct SandwichVerification: Sendable {
     func verifyCharacterLineage(
         outputPage: PDFPage,
         digest: PageFilterDigest
-    ) async throws -> VerificationStatus {
+    ) async throws -> VerificationStatus? {
         // Entry-level cooperative cancellation —
         // Layer 9 previously had none, so a cancel arriving mid-lineage-walk
         // was not honored until the layer completed. The composed-character
         // walk below carries the banded 256-cadence checks (house pattern).
         try Task.checkCancellation()
         // An empty `Data()` means NO lineage recorded (legacy reports,
-        // hand-built test digests): nothing to compare, pass. A page whose
+        // hand-built test digests): nothing was compared, so no status; the
+        // dispatcher counts the page as not checked. A page whose
         // filter kept no survivor is different — it carries the empty-set
         // digest (`SandwichMetrics.emptyLineageDigest`), which the output walk of a textless
         // page reproduces: 0 expected and 0 found compare equal; 0 expected
         // with any measurable output unit compares unequal and FAILs (an
         // injection).
-        guard !digest.lineageHash.isEmpty else { return .pass }
+        guard !digest.lineageHash.isEmpty else { return nil }
 
         let outputHash = try Self.computeOutputLineageHash(
             outputPage, pageRotation: digest.pageRotation)

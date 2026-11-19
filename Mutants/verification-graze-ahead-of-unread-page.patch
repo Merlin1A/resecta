@@ -1,0 +1,21 @@
+Property: In Character Positions a page that does not open leads the row; the edge graze is the row only when nothing else applies.
+Area: could-not-verify rows (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/CouldNotReadRowTests
+Must go red: RedactionEngineTests/CouldNotReadRowTests eachCase [Character Positions: a page not read leads an edge graze, which is not the row]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+SandwichDispatch.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+SandwichDispatch.swift
+index e319f6d0..5ccb9955 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+SandwichDispatch.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+SandwichDispatch.swift
+@@ -205,6 +205,10 @@ extension VerificationEngine {
+         } else if let msg = firstFailMessage {
+             found = (.fail(msg), failingPages)
+         }
++        if found == nil, firstUnmeasuredMessage == nil, !grazePages.isEmpty {
++            return CheckRow(status: SandwichVerification.grazeWarning(pages: grazePages),
++                            pages: grazePages, couldNotVerify: false)
++        }
+         if let row = CheckRowComposition.compose(issue: found, conditions: conditions, warnings: []) {
+             return row
+         }

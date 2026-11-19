@@ -327,9 +327,29 @@ nonisolated struct VerificationRowModel: Equatable {
     /// A skipped check's lead: what would have saved the record.
     static let skippedLead = "Only a full Redact run saves that record."
 
-    /// The caption under the title, by outcome — never by text.
+    /// The caption under the title, by outcome — never by text. A failed or
+    /// needs-review row whose check also could not read part of its input
+    /// carries that part after the issue's caption: the caption less a final
+    /// full stop, "; ", then the part. A Search Re-check needs-review row
+    /// whose caption is not composed from its query lines shows the engine's
+    /// own sentence, which already carries every could-not clause, so the
+    /// part is not added again.
     static func caption(for layer: LayerResult, outcome: VerificationOutcome,
                         perPageModes: [PipelineMode] = [], pagesOnChips: Bool = false) -> String? {
+        let base = findCaption(for: layer, outcome: outcome, perPageModes: perPageModes, pagesOnChips: pagesOnChips)
+        switch outcome {
+        case .needsReview where layer.layer == .searchRecheck && !composesRecheckCaption(layer):
+            return base
+        case .failed, .needsReview:
+            guard let part = layer.couldNotVerifyPart, let base else { return base }
+            return (base.hasSuffix(".") ? String(base.dropLast()) : base) + "; " + part
+        default:
+            return base
+        }
+    }
+
+    private static func findCaption(for layer: LayerResult, outcome: VerificationOutcome,
+                                    perPageModes: [PipelineMode], pagesOnChips: Bool) -> String? {
         switch outcome {
         case .passed:
             // A Search Re-check that re-ran no typed search (a run that

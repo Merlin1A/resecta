@@ -38,14 +38,17 @@ extension VerificationEngine {
         return LayerCopy(short: short, detail: manualRegionsWithoutTextDetail(count))
     }
 
-    /// Returns (status, affectedPages, reviewTermTexts). The
-    /// decoded-page hits and the EXIF WARN carry their 0-based page lists
-    /// for the UI's tappable page chips; the structural raw-byte pass is
-    /// document-level (nil). The third element carries the display-only term
-    /// texts behind an `.attention` verdict (nil for every other status).
+    /// Returns the row and the review term texts. The decoded-page hits and
+    /// the EXIF WARN carry their 0-based page lists for the UI's tappable
+    /// page chips; the structural raw-byte pass is document-level (nil). The
+    /// second element carries the display-only term texts behind an
+    /// `.attention` verdict (nil for every other status). Pages that could
+    /// not be opened and terms too short to search are could-not-verify
+    /// conditions, in that order; the fragment or EXIF line is the warning
+    /// (`CheckRowComposition`).
     func runLayer3BinarySearch(
         _ doc: PDFDocument, sensitiveTerms: [SensitiveTerm]
-    ) throws -> (VerificationStatus, [Int]?, [String]?, Bool) {
+    ) throws -> (CheckRow, [String]?) {
         // Entry-level cooperative cancellation.
         try Task.checkCancellation()
         // No terms provided — expected for manual-only redaction.
@@ -54,14 +57,15 @@ extension VerificationEngine {
         // notes group without bumping the masthead (Layer-7 boundary-count
         // precedent).
         guard !sensitiveTerms.isEmpty else {
-            return (.notApplicable("No sensitive terms were provided — string search did not run."), nil, nil, false)
+            return (CheckRow(status: .notApplicable("No sensitive terms were provided — string search did not run."),
+                             pages: nil, couldNotVerify: false), nil)
         }
         // Filter terms too short to search (shared
         // `AhoCorasick.isSearchableTerm`): ≥3 scalars (supports 3-letter PII
         // abbreviations like SSN, DOB, PHI) or a 2-character CJK name.
         let validTerms = sensitiveTerms.filter { AhoCorasick.isSearchableTerm($0.text) }
         guard !validTerms.isEmpty else {
-            return (.warn("All sensitive terms shorter than 3 characters"), nil, nil, true)
+            return (CheckRow(status: .warn("All sensitive terms shorter than 3 characters"), pages: nil, couldNotVerify: true), nil)
         }
         // Surfaced on the otherwise-clean path below so a partial drop is
         // never silent (the all-short WARN above covers the total drop).
@@ -75,13 +79,14 @@ extension VerificationEngine {
         // verification call; caching needs an actor/class wrapper for ~25 ms
         // saved once per export — low benefit, no security relevance.
         let termAutomaton = SensitiveTermAutomaton(validTerms: validTerms)
-        guard termAutomaton.hasPatterns else { return (.pass, nil, nil, false) }
+        guard termAutomaton.hasPatterns else { return (.passed, nil) }
         let automaton = termAutomaton.automaton
 
         // If the automaton degraded due to pattern size limits,
         // report the limitation rather than silently passing.
         if automaton.isDegraded {
-            return (.warn("Sensitive term search exceeded size limit — results may be incomplete"), nil, nil, true)
+            return (CheckRow(status: .warn("Sensitive term search exceeded size limit — results may be incomplete"),
+                             pages: nil, couldNotVerify: true), nil)
         }
 
         // Get raw PDF bytes.
@@ -89,7 +94,7 @@ extension VerificationEngine {
         // `Data(contentsOf:)` with default options requests no mapping
         // (`.mappedIfSafe` is an opt-in reading option).
         guard let (data, cgDoc) = loadPDFData(doc) else {
-            return (.warn("Could not read output PDF for binary search"), nil, nil, true)
+            return (CheckRow(status: .warn("Could not read output PDF for binary search"), pages: nil, couldNotVerify: true), nil)
         }
 
         // First WARN encountered, returned only if no FAIL is found below: a
@@ -171,10 +176,15 @@ extension VerificationEngine {
         var decodedMatchCount = 0
         var decodedTermTexts: [String] = []
         var decodedTermsSeen = Set<String>()
+        // Pages that did not open, in either pass: never read as clean. A
+        // page that opens and has no text is skipped, as it carries none.
+        var unreadPages = Set<Int>()
         for i in 0..<doc.pageCount {
-            guard let page = doc.page(at: i),
-                  let pageText = page.string,
-                  !pageText.isEmpty else { continue }
+            guard let page = doc.page(at: i) else {
+                unreadPages.insert(i)
+                continue
+            }
+            guard let pageText = page.string, !pageText.isEmpty else { continue }
             // The decoded text is scanned as extracted and, when the search
             // path's normalizer changes it (a ligature or another
             // compatibility form in the text layer), in that normalized form
@@ -212,25 +222,50 @@ extension VerificationEngine {
         // hit alone is residual text OUTSIDE every region — the user's remedy
         // is a text search — → ATTENTION, with the term texts threaded for
         // display (the message itself stays content-free).
+        // The could-not-verify conditions, in order, as they stand when the
+        // check returns; the warning is the fragment line or the EXIF line.
+        func conditions() -> [UnverifiedCondition] {
+            var out: [UnverifiedCondition] = []
+            if !unreadPages.isEmpty {
+                let pages = unreadPages.sorted()
+                out.append(UnverifiedCondition(sentence: unreadablePagesSentence(pages), pages: pages))
+            }
+            if droppedTermCount > 0 {
+                out.append(UnverifiedCondition(sentence: shortTermTail(droppedTermCount), pages: []))
+            }
+            return out
+        }
+        func warnings() -> [CheckWarning] {
+            deferredWarn.map { [CheckWarning(sentence: $0.message, pages: $0.pages)] } ?? []
+        }
         if let structuralFailMessage {
             let message = [structuralFailMessage, decodedResidualMessage]
                 .compactMap { $0 }
                 .joined(separator: "; ")
-            return (.fail(message), decodedHitPages.isEmpty ? nil : decodedHitPages, nil, false)
+            let issue = (status: VerificationStatus.fail(message), pages: decodedHitPages.isEmpty ? nil : decodedHitPages)
+            return (CheckRowComposition.compose(issue: issue, conditions: conditions(), warnings: warnings())
+                        ?? CheckRow(status: issue.status, pages: issue.pages, couldNotVerify: false), nil)
         }
         if let decodedResidualMessage {
-            return (.attention(decodedResidualMessage), decodedHitPages, decodedTermTexts, false)
+            let issue = (status: VerificationStatus.attention(decodedResidualMessage), pages: Optional(decodedHitPages))
+            return (CheckRowComposition.compose(issue: issue, conditions: conditions(), warnings: warnings())
+                        ?? CheckRow(status: issue.status, pages: issue.pages, couldNotVerify: false), decodedTermTexts)
         }
 
         // EXIF scan ("scan JPEG APP1/EXIF markers", WARN-only):
         // EXIF IFD bytes live inside the image stream and surface in neither
         // page.string nor the structural pass. Scan each JPEG XObject's raw
         // bytes for an APP1/EXIF segment carrying a sensitive term. WARN only;
-        // skipped if a structural fragment WARN was already recorded.
-        if deferredWarn == nil {
-            for pageIdx in 1...max(1, cgDoc.numberOfPages) {
+        // skipped if a structural fragment WARN was already recorded. A page
+        // the Core Graphics reader cannot open joins the unread pages; a
+        // document with no pages has no page to report.
+        if deferredWarn == nil, cgDoc.numberOfPages >= 1 {
+            for pageIdx in 1...cgDoc.numberOfPages {
                 try Task.checkCancellation()
-                guard let cgPage = cgDoc.page(at: pageIdx) else { continue }
+                guard let cgPage = cgDoc.page(at: pageIdx) else {
+                    unreadPages.insert(pageIdx - 1)
+                    continue
+                }
                 if Self.extractRawJPEGStreams(from: cgPage).contains(where: {
                     Self.jpegEXIFContainsTerm($0, automaton: automaton)
                 }) {
@@ -241,13 +276,10 @@ extension VerificationEngine {
             }
         }
 
-        if let warn = deferredWarn { return (.warn(warn.message), warn.pages, nil, false) }
-        if droppedTermCount > 0 {
-            // Partial-coverage honesty: some (not all) terms were too short
-            // to search — terms it could not search: a could-not-verify WARN.
-            return (.warn(shortTermTail(droppedTermCount)), nil, nil, true)
-        }
-        return (.pass, nil, nil, false)
+        // No issue: every could-not-verify condition, then the warning, in
+        // one row (mark set); else the warning alone (mark clear); else a
+        // PASS.
+        return (CheckRowComposition.compose(issue: nil, conditions: conditions(), warnings: warnings()) ?? .passed, nil)
     }
 
     /// Byte ranges of PDF stream data (between `stream` and `endstream` markers).

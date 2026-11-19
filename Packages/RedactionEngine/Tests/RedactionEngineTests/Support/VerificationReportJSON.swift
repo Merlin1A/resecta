@@ -18,6 +18,10 @@ import Foundation
 //   `could_not_verify` (2026-09-17) mirrors `LayerResult.couldNotVerify`:
 //   additive — every earlier evidence file reads as `false`, so
 //   schema_version stays 1.
+//   `could_not_verify_part` and `could_not_verify_part_pages` mirror
+//   `LayerResult.couldNotVerifyPart` and `.couldNotVerifyPartPages`: emitted
+//   only on a row that has them (a nil optional is left out), so every
+//   earlier evidence file reads the same; schema_version stays 1.
 //    per_page_modes:["secureRasterization"|"searchableRedaction"],
 //    per_page_fallback_reasons:[String?],   // FallbackReason case names
 //    skip_reason:"autoVerifyOff"|"cancelled"|"error",
@@ -70,6 +74,8 @@ private struct LayerJSON: Encodable {
     let duration_s: Double
     let review_terms: [String]?
     let could_not_verify: Bool
+    let could_not_verify_part: String?
+    let could_not_verify_part_pages: [Int]?
 
     init(_ layer: LayerResult, index: Int) {
         self.index = index
@@ -82,6 +88,8 @@ private struct LayerJSON: Encodable {
         self.duration_s = layer.durationSeconds
         self.review_terms = layer.reviewTermTexts
         self.could_not_verify = layer.couldNotVerify
+        self.could_not_verify_part = layer.couldNotVerifyPart
+        self.could_not_verify_part_pages = layer.couldNotVerifyPartPages
     }
 }
 

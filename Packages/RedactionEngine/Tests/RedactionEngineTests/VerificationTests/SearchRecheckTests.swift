@@ -16,6 +16,32 @@ struct SearchRecheckTests {
         return SendablePDFDocument(doc)
     }
 
+    /// The clause of a run whose applied typed search had no box over any
+    /// of its matches on the original: the shared fixture's state.
+    private static let comparedNothing = SearchRecheck.coverageNoSearchMatchClause
+    private static let comparedNothingDetail =
+        comparedNothing.prefix(1).uppercased() + comparedNothing.dropFirst() + "."
+
+    /// A run that really compared: the original carries each term under the
+    /// box the searcher places over it, and the output carries `out`.
+    private func coveredRun(_ terms: [String], original: String, output out: [String]) async throws -> LayerResult {
+        let source = try #require(PDFDocument(data: TestFixtures.textPagesPDF([original])))
+        let page = try #require(source.page(at: 0))
+        let raw = try #require(page.string)
+        var boxes: [RedactionRegion] = []
+        for term in terms {
+            let range = (raw as NSString).range(of: term)
+            try #require(range.location != NSNotFound, "the original carries \(term)")
+            let rect = try #require(DocumentSearcher().boundingRect(for: range, page: page))
+            boxes.append(RedactionRegion(id: UUID(), normalizedRect: rect, source: .searchMatch(term: term)))
+        }
+        return await VerificationEngine().runLayer(
+            .searchRecheck, outputDocument: try output(out), sourcePageCount: 1, regions: [0: boxes],
+            sensitiveTerms: [], pipelineMode: .searchableRedaction, filterDigests: [nil],
+            perPageModes: [.searchableRedaction], appliedSearches: terms.map { TestFixtures.textRequest($0) },
+            sourceDocument: SendablePDFDocument(source))
+    }
+
     // MARK: - Statuses
 
     @Test("Zero applied searches → NOT APPLICABLE with the ruled string, never skipped and never a pass")
@@ -34,14 +60,28 @@ struct SearchRecheckTests {
         #expect(VerificationEngine().aggregateStatus([LayerResult.mock(status: .pass), result]) == .pass)
     }
 
-    @Test("Full apply: the term is gone from the output → PASS with the layer's own copy")
-    func fullApplyPasses() async throws {
+    @Test("Full apply with its box over the match on the original: the coverage check compared a covered match, the term is gone from the output → PASS with the layer's own copy, singular and plural")
+    func fullApplyCoveredPasses() async throws {
+        let one = try await coveredRun(["Delia"], original: "Delia R. Hartwell", output: ["Statement of account for the period"])
+        #expect(one.status == .pass, "got \(one.status)")
+        #expect(!one.couldNotVerify)
+        #expect(one.shortDescription == "Re-ran 1 search on the output — no remaining matches in the text the app can read.")
+        #expect(one.detailDescription == "\(SearchRecheck.detailLead) Text was read from the output's text layer.")
+        #expect(one.pageReferences == nil)
+        let two = try await coveredRun(["Delia", "Hartwell"], original: "Delia R. Hartwell", output: ["nothing to see"])
+        #expect(two.status == .pass, "got \(two.status)")
+        #expect(two.shortDescription == "Re-ran 2 searches on the output — no remaining matches in the text the app can read.")
+    }
+
+    @Test("Full apply with no box over the search's matches on the original: the coverage check compared nothing → could not verify, the query line as applied")
+    func fullApplyNoBoxComparedNothing() async throws {
         let result = await TestFixtures.recheck(
             try output(["Statement of account for the period"]),
             requests: [TestFixtures.textRequest("Delia", found: 2, applied: 2)])
-        #expect(result.status == .pass)
-        #expect(result.shortDescription == "Re-ran 1 search on the output — no remaining matches in the text the app can read.")
-        #expect(result.detailDescription == "\(SearchRecheck.detailLead) Text was read from the output's text layer.")
+        #expect(TestFixtures.message(of: result.status) == "Re-ran 1 search; \(Self.comparedNothing)", "got \(result.status)")
+        #expect(result.status.isWarn && result.couldNotVerify)
+        #expect(result.shortDescription == "Re-ran 1 search; \(Self.comparedNothing)")
+        #expect(result.detailDescription == "\(SearchRecheck.detailLead) Text was read from the output's text layer. \(Self.comparedNothingDetail)")
         #expect(result.pageReferences == nil)
         #expect(result.reviewTermTexts == nil)
         let line = try #require(result.queryLines?.first)
@@ -54,13 +94,13 @@ struct SearchRecheckTests {
         #expect(line.perTerm == nil)
     }
 
-    @Test("Two searches, both fully applied → PASS pluralizes")
-    func twoSearchesPass() async throws {
+    @Test("Two searches, both fully applied, no box over either's matches: could not verify, and the count pluralizes")
+    func twoSearchesNoBoxPluralizes() async throws {
         let result = await TestFixtures.recheck(
             try output(["nothing to see"]),
             requests: [TestFixtures.textRequest("Delia"), TestFixtures.textRequest("Hartwell")])
-        #expect(result.status == .pass)
-        #expect(result.shortDescription == "Re-ran 2 searches on the output — no remaining matches in the text the app can read.")
+        #expect(TestFixtures.message(of: result.status) == "Re-ran 2 searches; \(Self.comparedNothing)", "got \(result.status)")
+        #expect(result.shortDescription == "Re-ran 2 searches; \(Self.comparedNothing)")
         #expect(result.queryLines?.count == 2)
     }
 
@@ -71,10 +111,10 @@ struct SearchRecheckTests {
             requests: [TestFixtures.textRequest("Delia", found: 2, applied: 1)])
         #expect(result.status == .attention(""))
         let message = try #require(TestFixtures.message(of: result.status))
-        #expect(message == "Re-ran 1 search — 1 match remains on page 1")
+        #expect(message == "Re-ran 1 search — 1 match remains on page 1; \(Self.comparedNothing)")
         #expect(!message.contains("Delia"), "status messages are content-free")
         #expect(result.shortDescription == message)
-        #expect(result.detailDescription == "\(SearchRecheck.detailLead) Text was read from the output's text layer. 1 match remains on page 1.")
+        #expect(result.detailDescription == "\(SearchRecheck.detailLead) Text was read from the output's text layer. 1 match remains on page 1. \(Self.comparedNothingDetail)")
         #expect(result.pageReferences == [0])
         #expect(result.reviewTermTexts == ["Delia"])
         let line = try #require(result.queryLines?.first)
@@ -89,7 +129,7 @@ struct SearchRecheckTests {
             try output(["Delia on one", "clean page", "Delia on three, Delia again"]),
             requests: [TestFixtures.textRequest("Delia"), TestFixtures.textRequest("Hartwell")])
         #expect(result.status == .attention(""))
-        #expect(TestFixtures.message(of: result.status) == "Re-ran 2 searches — 3 matches remain on 2 pages: 1, 3")
+        #expect(TestFixtures.message(of: result.status) == "Re-ran 2 searches — 3 matches remain on 2 pages: 1, 3; \(Self.comparedNothing)")
         #expect(result.pageReferences == [0, 2])
         #expect(result.reviewTermTexts == ["Delia"])
         #expect(result.queryLines?.map(\.remainingCount) == [3, 0])
@@ -129,10 +169,10 @@ struct SearchRecheckTests {
         #expect(hit.queryLines?.first?.remainingCount == 1)
         #expect(hit.queryLines?.first?.label == "\u{201C}\(pattern)\u{201D}")
         #expect(hit.reviewTermTexts == [pattern])
-        let clean = await TestFixtures.recheck(
+        let none = await TestFixtures.recheck(
             try output(["no digit groups here 12345"]), requests: [TestFixtures.regexRequest(pattern)])
-        #expect(clean.status == .pass)
-        #expect(clean.queryLines?.first?.remainingCount == 0)
+        #expect(TestFixtures.message(of: none.status) == "Re-ran 1 search; \(Self.comparedNothing)", "got \(none.status)")
+        #expect(none.queryLines?.first?.remainingCount == 0)
     }
 
     @Test("regex: a pattern the safety gate rejects lists the page as unchecked, never as 0 remaining")
@@ -143,7 +183,7 @@ struct SearchRecheckTests {
             try output(["Delia R. Hartwell"]), requests: [TestFixtures.regexRequest("(a+)+b")])
         #expect(result.status == .warn(""), "a rejected pattern must not PASS; got \(result.status)")
         #expect(TestFixtures.message(of: result.status)
-                == "Re-ran 1 search; 1 page could not be checked: 1 (the pattern was not accepted)")
+                == "Re-ran 1 search; 1 page could not be checked: 1 (the pattern was not accepted); \(Self.comparedNothing)")
         #expect(result.pageReferences == [0])
         #expect(result.reviewTermTexts == nil)
     }
@@ -243,8 +283,8 @@ struct SearchRecheckTests {
         #expect(unchecked.couldNotVerify, "the unchecked-pages WARN says the re-check did not fully run")
 
         let clean = try output(["nothing here"])
-        let pass = await TestFixtures.recheck(clean, requests: [TestFixtures.textRequest("Delia")])
-        #expect(pass.status == .pass)
+        let pass = try await coveredRun(["Delia"], original: "Delia R. Hartwell", output: ["nothing here"])
+        #expect(pass.status == .pass, "got \(pass.status)")
         #expect(!pass.couldNotVerify)
         let info = await TestFixtures.recheck(clean, requests: [])
         #expect(info.status == .notApplicable(""))

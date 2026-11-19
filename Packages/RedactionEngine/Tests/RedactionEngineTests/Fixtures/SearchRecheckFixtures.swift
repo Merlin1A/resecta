@@ -37,9 +37,10 @@ extension TestFixtures {
             perPageModes: Array(repeating: mode, count: n),
             appliedSearches: requests,
             // The output stands as its own source: these fixtures carry no
-            // regions, so the coverage half has nothing to compare and the
-            // tests read the output half alone. Without a source the layer
-            // would report that the coverage check did not run.
+            // regions, so the coverage half compares nothing and the row
+            // says so (`SearchRecheck.coverageNoSearchMatchClause` for an
+            // applied typed search). Without a source the layer would report
+            // that the coverage check did not run.
             sourceDocument: doc
         )
     }

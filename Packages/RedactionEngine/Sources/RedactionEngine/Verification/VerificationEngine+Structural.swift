@@ -11,16 +11,21 @@ import AppKit  // macOS tooling destination: thumbnail returns NSImage
 extension VerificationEngine {
     // MARK: - Layer 4: Structural Verification
 
-    /// Returns (status, affectedPages) where affectedPages is non-nil
-    /// only for per-page /AA findings (enables tappable page chips in UI).
-    func runLayer4Structural(_ doc: PDFDocument) throws -> (VerificationStatus, [Int]?, Bool) {
+    /// Returns the row, whose pages are non-nil for per-page /AA findings
+    /// (tappable page chips in UI) and for pages that could not be read. A
+    /// file with no end marker and pages whose dictionary could not be read
+    /// are could-not-verify conditions, in that order; "Structural
+    /// findings" is the warning (`CheckRowComposition`).
+    func runLayer4Structural(_ doc: PDFDocument) throws -> CheckRow {
         // Entry-level cooperative cancellation.
         try Task.checkCancellation()
         let loaded = loadPDFData(doc)
         // /Encrypt is a trailer key, never the catalog's: an encrypted output FAILs, locked or not.
-        if let cgDoc = loaded?.1, cgDoc.isEncrypted { return (.fail("Encrypt found in document"), nil, false) }
+        if let cgDoc = loaded?.1, cgDoc.isEncrypted {
+            return CheckRow(status: .fail("Encrypt found in document"), pages: nil, couldNotVerify: false)
+        }
         guard let (pdfData, cgDoc) = loaded, let catalog = cgDoc.catalog else {
-            return (.warn("Could not inspect document structure"), nil, true)
+            return CheckRow(status: .warn("Could not inspect document structure"), pages: nil, couldNotVerify: true)
         }
 
         // FAIL-triggering keys: active content in the document catalog. /AA
@@ -32,7 +37,7 @@ extension VerificationEngine {
         for key in failKeys {
             var obj: CGPDFObjectRef?
             if CGPDFDictionaryGetObject(catalog, key, &obj) {
-                return (.fail("\(key) found in document catalog"), nil, false)
+                return CheckRow(status: .fail("\(key) found in document catalog"), pages: nil, couldNotVerify: false)
             }
         }
 
@@ -47,7 +52,8 @@ extension VerificationEngine {
             for key in ["EmbeddedFiles", "JavaScript"] {
                 var subtree: CGPDFDictionaryRef?
                 if CGPDFDictionaryGetDictionary(namesDict, key, &subtree) {
-                    return (.fail("\(key) found under /Names in document catalog"), nil, false)
+                    return CheckRow(status: .fail("\(key) found under /Names in document catalog"),
+                                    pages: nil, couldNotVerify: false)
                 }
             }
         }
@@ -55,18 +61,29 @@ extension VerificationEngine {
         // Check per-page /AA entries. Page-level automatic actions
         // can trigger JavaScript or URI opens that leak document content.
         // Collects all affected pages for tappable navigation in the UI.
+        // A page whose dictionary cannot be read is never read as clean;
+        // a document with no pages has no page to report.
         let pageCount = cgDoc.numberOfPages
         var aaPages: [Int] = []
-        for pageIdx in 1...max(1, pageCount) {
+        var unreadPages: [Int] = []
+        for pageIdx in stride(from: 1, through: pageCount, by: 1) {
             try Task.checkCancellation()
-            guard let pageDictRef = cgDoc.page(at: pageIdx)?.dictionary else { continue }
+            guard let pageDictRef = cgDoc.page(at: pageIdx)?.dictionary else {
+                unreadPages.append(pageIdx - 1)
+                continue
+            }
             var aaObj: CGPDFObjectRef?
             if CGPDFDictionaryGetObject(pageDictRef, "AA", &aaObj) {
                 aaPages.append(pageIdx - 1)  // 0-indexed for UI (LayerResultRow shows pageRef + 1)
             }
         }
+        var conditions: [UnverifiedCondition] = unreadPages.isEmpty ? [] : [UnverifiedCondition(
+            sentence: unreadablePagesSentence(unreadPages), pages: unreadPages)]
         if !aaPages.isEmpty {
-            return (.fail("Per-page /AA (automatic action) found on \(pageCountPhrase(aaPages.count))"), aaPages, false)
+            let issue = (status: VerificationStatus.fail(
+                "Per-page /AA (automatic action) found on \(pageCountPhrase(aaPages.count))"), pages: Optional(aaPages))
+            return CheckRowComposition.compose(issue: issue, conditions: conditions, warnings: [])
+                ?? CheckRow(status: issue.status, pages: issue.pages, couldNotVerify: false)
         }
 
         // WARN-triggering keys
@@ -89,17 +106,24 @@ extension VerificationEngine {
             eofCount += 1
             searchRange = range.upperBound..<pdfData.endIndex
         }
+        let notes: [CheckWarning] = warnings.isEmpty ? [] : [CheckWarning(
+            sentence: "Structural findings: \(warnings.joined(separator: ", "))", pages: nil)]  // LegalPhrases:safe (the shipped message; a list of structural notes)
         if eofCount > 1 {
             // Incremental updates can append original content
             // after redaction. Resecta's reconstructor writes a single clean
             // PDF stream — multiple markers indicate tampering or corruption.
-            return (.fail("Multiple %%EOF markers (\(eofCount)) — incremental update may contain original content"), nil, false)
+            let issue = (status: VerificationStatus.fail(
+                "Multiple %%EOF markers (\(eofCount)) — incremental update may contain original content"),
+                pages: [Int]?.none)
+            return CheckRowComposition.compose(issue: issue, conditions: conditions, warnings: notes)
+                ?? CheckRow(status: issue.status, pages: nil, couldNotVerify: false)
         }
-
-        if !warnings.isEmpty {
-            return (.warn("Structural findings: \(warnings.joined(separator: ", "))"), nil, false)  // LegalPhrases:safe (the shipped message; a list of structural notes)
+        // A file with no end marker was not written whole: its structure
+        // could not be inspected. It leads the unread pages.
+        if eofCount == 0 {
+            conditions.insert(UnverifiedCondition(sentence: "Could not inspect document structure", pages: []), at: 0)
         }
-        return (.pass, nil, false)
+        return CheckRowComposition.compose(issue: nil, conditions: conditions, warnings: notes) ?? .passed
     }
 
     // MARK: - Layer 5: Metadata Verification
@@ -217,13 +241,28 @@ extension VerificationEngine {
             ("CreationDate", PDFStreamReconstructor.fixedDateValue),
             ("ModDate", PDFStreamReconstructor.fixedDateValue),
         ]
+        // A value that does not decode could not be inspected: that leads,
+        // with the not-rewritten sentence joined after it when another field
+        // decodes to a value that is not the fixed one.
+        var undecodable = false
+        var notRewritten = false
         for (key, fixedValue) in fixedWriterFields {
             var ref: CGPDFStringRef?
             guard CGPDFDictionaryGetString(infoDict, key, &ref), let ref else { continue }
-            var value = (CGPDFStringCopyTextString(ref) as String?) ?? ""
+            guard var value = PDFStringDecode.decode(ref) else {
+                undecodable = true
+                continue
+            }
             while value.hasSuffix(" ") { value.removeLast() }
-            if value != fixedValue {
-                return (.warn("Producer or timestamp fields were not rewritten to the fixed values"), false, nil)
+            if value != fixedValue { notRewritten = true }
+        }
+        if undecodable || notRewritten {
+            let conditions = undecodable
+                ? [UnverifiedCondition(sentence: "Could not inspect metadata", pages: [])] : []
+            let warning = notRewritten
+                ? [CheckWarning(sentence: "Producer or timestamp fields were not rewritten to the fixed values", pages: nil)] : []
+            if let row = CheckRowComposition.compose(issue: nil, conditions: conditions, warnings: warning) {
+                return (row.status, row.couldNotVerify, nil)
             }
         }
 

@@ -250,7 +250,7 @@ struct DetectionSweepFoldTests {
         #expect(outcome.status.isWarn, "got \(outcome.status)")
         let m = message(outcome.status)
         #expect(m == "Ran the detectors on the output; 4 pages could not be checked: 2 (OCR did not run), 3 (the pattern took too long), 4 (too large to scan for text), 5", "got \(m)")
-        #expect(outcome.pageReferences == [0, 1, 2, 3, 4], "the unchecked pages and the pages with possible items")
+        #expect(outcome.pageReferences == [1, 2, 3, 4], "the unchecked pages only, never a page that was read")
         #expect(outcome.copyOverride?.detail.contains("1 possible item remains on page 1.") == true)
         #expect(outcome.copyOverride?.detail.contains("4 pages could not be checked") == true)
         #expect(outcome.reviewTermTexts == nil)
