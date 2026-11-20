@@ -300,13 +300,12 @@ public actor PDFStreamReconstructor {
     /// the file's own index (`PDFTrailerLocator`): the literals are looked
     /// for inside the dictionary the trailer names, and nowhere else, so a
     /// dictionary that lies before the tail window is reached and a
-    /// look-alike elsewhere is never touched. Where that way refuses, or the
-    /// file cannot be read or written through it (an I/O error), the search
-    /// of the file's tail below runs exactly as it did before the index was
-    /// read, so no file fares worse than before. Where the index names the
-    /// dictionary and every literal in it declines, nothing is rewritten and
-    /// the tail is not searched: it holds the same literals, which decline
-    /// the same way, or a look-alike, which is never touched.
+    /// look-alike elsewhere is never chosen by it. Then, on every exit of
+    /// that way (a rewrite, every literal declining, a refusal, an I/O
+    /// error), the search of the file's tail below runs exactly as it did
+    /// before the index was read, so no file fares worse than before: what
+    /// that search rewrites, a look-alike in the tail included, is rewritten
+    /// here too.
     /// The producer
     /// replacement writes `value + ")"` and pads the remainder with spaces
     /// *after* the closing paren, inside the `/Info` dictionary, where
@@ -334,51 +333,72 @@ public actor PDFStreamReconstructor {
 
     @discardableResult
     static func overwriteInfoLiterals(at url: URL) -> RunRecord.InfoDictionaryWay {
-        var refusal = RunRecord.IndexRefusal.indexUnreadable
-        do {
-            // The first way. The file is read mapped and the dictionary's
-            // bytes copied out (at most 4,096), so the mapping is released
-            // before the handle writes.
-            let byIndex: (start: Int, dictionary: Data)? = try {
-                #if DEBUG
-                if indexWayFault == .read { throw CocoaError(.fileReadUnknown) }
-                #endif
-                let fileData = try Data(contentsOf: url, options: .alwaysMapped)
-                switch PDFTrailerLocator.locate(in: fileData) {
-                case .found(let found):
-                    return (found.dictionary.lowerBound, fileData.subdata(in: found.dictionary))
-                case .refused(let reason):
-                    refusal = reason
-                    return nil
-                }
-            }()
+        let first = overwriteInfoLiteralsThroughIndex(at: url)
+        // The second way runs after the first on every exit, as it ran
+        // before the index was read: every literal it rewrites on a file is
+        // rewritten here too, so no file fares worse. A literal the first way
+        // already rewrote reads as the fixed value and is written again
+        // unchanged.
+        let tailRewrote = overwriteInfoLiteralsInTail(at: url)
+        switch first {
+        case .rewrote: return .byIndex
+        case .nothingRewritten: return .byIndexNothingRewritten
+        case .cutShort: return .byIndexCutShort
+        case .refused(let reason):
+            return tailRewrote ? .byTail(indexRefused: reason) : .neither(indexRefused: reason)
+        }
+    }
 
-            if let byIndex {
-                let handle = try FileHandle(forUpdating: url)
-                defer { try? handle.close() }
-                var rewrote = false
-                for rewrite in infoLiteralRewrites {
-                    guard let patch = rewriteBytes(for: rewrite, in: byIndex.dictionary) else { continue }
-                    #if DEBUG
-                    if indexWayFault == .secondWrite, rewrote { throw CocoaError(.fileWriteUnknown) }
-                    #endif
-                    try handle.seek(toOffset: UInt64(byIndex.start + patch.offset))
-                    try handle.write(contentsOf: patch.bytes)
-                    rewrote = true
-                }
-                return rewrote ? .byIndex : .byIndexNothingRewritten
+    /// What the first way did to the file.
+    private enum IndexWayResult {
+        /// At least one literal of the dictionary the index names was rewritten.
+        case rewrote
+        /// Every literal of that dictionary declined.
+        case nothingRewritten
+        /// At least one literal was rewritten, then an I/O error stopped the way.
+        case cutShort
+        /// The way rewrote nothing: the index refused, or an I/O error came first.
+        case refused(RunRecord.IndexRefusal)
+    }
+
+    /// The first way: the literals of the dictionary the trailer names, and
+    /// nowhere else.
+    private static func overwriteInfoLiteralsThroughIndex(at url: URL) -> IndexWayResult {
+        var rewrote = false
+        do {
+            // The file is read mapped and the dictionary's bytes copied out
+            // (at most 4,096), so the mapping is released before the handle
+            // writes.
+            #if DEBUG
+            if indexWayFault == .read { throw CocoaError(.fileReadUnknown) }
+            #endif
+            let fileData = try Data(contentsOf: url, options: .alwaysMapped)
+            let byIndex: (start: Int, dictionary: Data)
+            switch PDFTrailerLocator.locate(in: fileData) {
+            case .found(let found):
+                byIndex = (found.dictionary.lowerBound, fileData.subdata(in: found.dictionary))
+            case .refused(let reason):
+                return .refused(reason)
             }
+
+            let handle = try FileHandle(forUpdating: url)
+            defer { try? handle.close() }
+            for rewrite in infoLiteralRewrites {
+                guard let patch = rewriteBytes(for: rewrite, in: byIndex.dictionary) else { continue }
+                #if DEBUG
+                if indexWayFault == .secondWrite, rewrote { throw CocoaError(.fileWriteUnknown) }
+                #endif
+                try handle.seek(toOffset: UInt64(byIndex.start + patch.offset))
+                try handle.write(contentsOf: patch.bytes)
+                rewrote = true
+            }
+            return rewrote ? .rewrote : .nothingRewritten
         } catch { // LegalPhrases:safe (Swift keyword)
-            // Mechanism-only logging. The tail search below runs as it did
-            // before the index was read; a literal the first way already
-            // rewrote reads as the fixed value and is written again unchanged.
+            // Mechanism-only logging; the second way runs next in any case.
             infoRewriteLogger.warning(
                 "info literal rewrite through the index failed (metadata: \(error.localizedDescription, privacy: .public))")
-            refusal = .readOrWriteFailed
+            return rewrote ? .cutShort : .refused(.readOrWriteFailed)
         }
-        // The second way, used where the first refused or failed.
-        return overwriteInfoLiteralsInTail(at: url)
-            ? .byTail(indexRefused: refusal) : .neither(indexRefused: refusal)
     }
 
     /// The second way: the search of the file's last 262,144 bytes for the

@@ -13,9 +13,9 @@ import UIKit
 // of the information dictionary to fixed ones. It looks for the dictionary in
 // two ways, in this order: through the file's index (the last `startxref`, the
 // classic table, the trailer's `/Info` reference, that object's entry, the
-// object at its offset), and, only where that way refuses, by the search of
-// the file's last 262,144 bytes that it used before. The run records which way
-// it was. The Document Metadata check judges the file, never the record: a
+// object at its offset), and then, on every exit of that way, by the search
+// of the file's last 262,144 bytes that it used before. The run records which
+// way found the dictionary. The Document Metadata check judges the file, never the record: a
 // field that is not the fixed value, or is missing, and an identifier that
 // was not derived from the file read Needs review; a file without the
 // dictionary or the identifier could not be verified.
@@ -37,7 +37,7 @@ struct InfoDictionaryThroughIndexTests {
         Case(id: 1, title: "exports of the fixture set, in both modes, are rewritten by the index and pass"),
         Case(id: 2, title: "a CJK Searchable export whose dictionary lies before the tail window is rewritten by the index"),
         Case(id: 3, title: "a 200-page export in each mode is rewritten by the index"),
-        Case(id: 4, title: "a dictionary 300 KB before the end is rewritten; a look-alike in the tail is untouched"),
+        Case(id: 4, title: "a dictionary 300 KB before the end is rewritten; a look-alike in the tail is rewritten as the tail search alone rewrites it"),
         Case(id: 5, title: "a literal ending in an escaped parenthesis next to the dictionary's end is rewritten whole"),
         Case(id: 6, title: "a cross-reference stream: the tail rewrites, the record names the refusal, the row passes"),
         Case(id: 7, title: "a cross-reference stream with the dictionary 300 KB before the end: neither way, Needs review"),
@@ -50,15 +50,17 @@ struct InfoDictionaryThroughIndexTests {
         Case(id: 14, title: "a file with no identifier in its trailer could not be verified"),
         Case(id: 15, title: "an identifier of one string, and two strings that are not the recomputed one, each read Needs review"),
         Case(id: 16, title: "an I/O error before the index way reads the file: the tail search runs, and the record names the error"),
-        Case(id: 17, title: "an I/O error at the index way's second write: the tail search runs, and the output is the tail search's"),
+        Case(id: 17, title: "an I/O error at the index way's second write: the record says the index way was cut short, and the tail search runs"),
         Case(id: 18, title: "a dictionary the index names whose every literal declines: nothing is rewritten, the record says so, Needs review"),
         Case(id: 19, title: "a trailer with no pair in the writer's shape and one in the tail: located in the tail; a pair that cannot be located could not be verified"),
+        Case(id: 20, title: "a dictionary the index names whose every literal declines, a look-alike in the tail: the look-alike is rewritten as the tail search alone rewrites it"),
+        Case(id: 21, title: "a dictionary the index names that lacks a key, a look-alike in the tail carrying it: both are rewritten"),
     ]
 
-    @Test("The table holds nineteen cases")
+    @Test("The table holds twenty-one cases")
     func tableLength() {
-        #expect(Self.cases.count == 19)
-        #expect(Set(Self.cases.map(\.id)) == Set(1...19))
+        #expect(Self.cases.count == 21)
+        #expect(Set(Self.cases.map(\.id)) == Set(1...21))
     }
 
     @Test("Each case", arguments: InfoDictionaryThroughIndexTests.cases)
@@ -72,26 +74,29 @@ struct InfoDictionaryThroughIndexTests {
         case 6: try await Self.crossReferenceStreamInsideTheWindow()
         case 7: try await Self.crossReferenceStreamBeforeTheWindow()
         case 8: try await Self.producerTwice()
-        case 9: try Self.sameAsTheTailSearch(MadeInfoFile(infoInTrailer: false), refusal: .noInfoEntry, label: "9")
+        case 9: try Self.sameAsTheTailSearch(MadeInfoFile(infoInTrailer: false), way: .byTail(indexRefused: .noInfoEntry), label: "9")
         case 10:
-            try Self.sameAsTheTailSearch(MadeInfoFile(infoEntry: .free), refusal: .entryNotInUse, label: "10 free")
-            try Self.sameAsTheTailSearch(MadeInfoFile(infoEntry: .inUse(generation: 1)), refusal: .wrongObjectHeader,
+            try Self.sameAsTheTailSearch(MadeInfoFile(infoEntry: .free), way: .byTail(indexRefused: .entryNotInUse), label: "10 free")
+            try Self.sameAsTheTailSearch(MadeInfoFile(infoEntry: .inUse(generation: 1)), way: .byTail(indexRefused: .wrongObjectHeader),
                                          label: "10 generation")
-        case 11: try Self.sameAsTheTailSearch(MadeInfoFile(infoEntry: .intoStream), refusal: .wrongObjectHeader, label: "11")
+        case 11: try Self.sameAsTheTailSearch(MadeInfoFile(infoEntry: .intoStream), way: .byTail(indexRefused: .wrongObjectHeader), label: "11")
         case 12: try await Self.noDictionary()
         case 13: try await Self.fieldAbsentOrNotAString()
         case 14: try await Self.noIdentifier()
         case 15: try await Self.identifierNotDerived()
         case 16:
             try PDFStreamReconstructor.$indexWayFault.withValue(.read) {
-                try Self.sameAsTheTailSearch(MadeInfoFile(), refusal: .readOrWriteFailed, label: "16")
+                try Self.sameAsTheTailSearch(MadeInfoFile(), way: .byTail(indexRefused: .readOrWriteFailed), label: "16")
             }
         case 17:
             try PDFStreamReconstructor.$indexWayFault.withValue(.secondWrite) {
-                try Self.sameAsTheTailSearch(MadeInfoFile(), refusal: .readOrWriteFailed, label: "17")
+                try Self.sameAsTheTailSearch(MadeInfoFile(), way: .byIndexCutShort, label: "17")
+                try Self.cutShortBeforeTheWindow()
             }
         case 18: try await Self.everyLiteralDeclines()
         case 19: try await Self.identifierInTheTail()
+        case 20: try Self.everyLiteralDeclinesWithLookAlike()
+        case 21: try Self.keyMissingWithLookAlike()
         default: Issue.record("no case \(c.id)")
         }
     }
@@ -109,7 +114,8 @@ struct InfoDictionaryThroughIndexTests {
     @Test("An index that cannot be read is refused as unreadable, and the tail search runs",
           arguments: Damage.allCases)
     func unreadableIndex(_ damage: Damage) throws {
-        try Self.sameAsTheTailSearch(MadeInfoFile(damage: damage), refusal: .indexUnreadable, label: "unreadable \(damage)")
+        try Self.sameAsTheTailSearch(MadeInfoFile(damage: damage), way: .byTail(indexRefused: .indexUnreadable),
+                                     label: "unreadable \(damage)")
     }
 
     // MARK: - Exports
@@ -179,8 +185,9 @@ struct InfoDictionaryThroughIndexTests {
         let way = run.outcome.produced.infoDictionary
         #expect(way == .byIndex, "\(label): the record says \(String(describing: way))")
         #expect(fields(bytes) == fixedFields, "\(label): \(fields(bytes))")
-        // The writer's file holds one information dictionary: a second one
-        // (whose values the index way would leave) is a stop for this beta.
+        // The writer's file holds one /Producer key. This counts the key,
+        // not dictionaries: a second dictionary the writer made would hold a
+        // second key, and this test would fail on it.
         var producerKeys = 0, from = bytes.startIndex
         while let hit = bytes.range(of: Data("/Producer".utf8), in: from..<bytes.endIndex) {
             producerKeys += 1; from = hit.upperBound
@@ -206,11 +213,10 @@ struct InfoDictionaryThroughIndexTests {
         let way = PDFStreamReconstructor.overwriteInfoLiterals(at: url)
         let after = try Data(contentsOf: url)
         #expect(way == .byIndex, "\(way)")
-        #expect(after.count == before.count)
         let trueDictionary = String(decoding: after[offsets[5]!..<offsets[6]!], as: UTF8.self)
         #expect(trueDictionary.contains("(\(PDFStreamReconstructor.fixedProducerValue))"), "\(trueDictionary)")
         #expect(!trueDictionary.contains(MadeInfoFile.date) && !trueDictionary.contains("Quartz"), "\(trueDictionary)")
-        #expect(after[offsets[7]!...] == before[offsets[7]!...], "the look-alike in the tail is untouched")
+        try expectNoWorseThanTheTailSearch(before: before, after: after, label: "4")
         #expect(before.count - offsets[5]! > window)
         print("INFODICT 4 way=\(way) distance=\(before.count - offsets[5]!)")
     }
@@ -267,9 +273,10 @@ struct InfoDictionaryThroughIndexTests {
         print("INFODICT 8 way=\(way) row=\(row.status)")
     }
 
-    /// The index refuses with `refusal`; the file's output is byte for byte
-    /// what the tail search alone gives on it.
-    static func sameAsTheTailSearch(_ made: MadeInfoFile, refusal: RunRecord.IndexRefusal, label: String) throws {
+    /// The record says `way`; the file's output is byte for byte what the
+    /// tail search alone gives on it.
+    static func sameAsTheTailSearch(_ made: MadeInfoFile, way expected: RunRecord.InfoDictionaryWay,
+                                    label: String) throws {
         let (before, _) = made.build()
         let url = try write(before)
         let tailOnly = try write(before)
@@ -280,7 +287,7 @@ struct InfoDictionaryThroughIndexTests {
         let way = PDFStreamReconstructor.overwriteInfoLiterals(at: url)
         let tailRewrote = PDFStreamReconstructor.overwriteInfoLiteralsInTail(at: tailOnly)
         #expect(tailRewrote, "\(label): the tail search rewrites this file")
-        #expect(way == .byTail(indexRefused: refusal), "\(label): \(way)")
+        #expect(way == expected, "\(label): \(way)")
         #expect(try Data(contentsOf: url) == Data(contentsOf: tailOnly), "\(label): the output is the tail search's")
         #expect(try Data(contentsOf: url) != before, "\(label): the file was rewritten")
         print("INFODICT \(label) way=\(way)")
@@ -374,6 +381,68 @@ struct InfoDictionaryThroughIndexTests {
         let row = try await metadataRow(url)
         expectCouldNotVerify(row, label: "19 literal pair")
         print("INFODICT 19 way=\(way) row=\(row.status)")
+    }
+
+    /// The index names a dictionary before the tail window; its producer is
+    /// rewritten, then the second write fails. The record says so, and the
+    /// dates the index way did not reach stay as the writer wrote them.
+    static func cutShortBeforeTheWindow() throws {
+        let (before, offsets) = MadeInfoFile(padding: 300_000).build()
+        let url = try write(before)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let way = PDFStreamReconstructor.overwriteInfoLiterals(at: url)
+        #expect(way == .byIndexCutShort, "17 before the window: \(way)")
+        let trueDictionary = String(decoding: try Data(contentsOf: url)[offsets[5]!..<offsets[6]!], as: UTF8.self)
+        #expect(trueDictionary.contains("(\(PDFStreamReconstructor.fixedProducerValue))"), "17: \(trueDictionary)")
+        #expect(trueDictionary.contains(MadeInfoFile.date), "17: \(trueDictionary)")
+        print("INFODICT 17 before the window way=\(way)")
+    }
+
+    static func everyLiteralDeclinesWithLookAlike() throws {
+        let made = MadeInfoFile(dictionary: "<< /Producer (short) /CreationDate (D:2026) /ModDate (D:2026) >>",
+                                padding: 300_000, lookAlike: true)
+        let (before, offsets) = made.build()
+        let url = try write(before)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let way = PDFStreamReconstructor.overwriteInfoLiterals(at: url)
+        let after = try Data(contentsOf: url)
+        #expect(way == .byIndexNothingRewritten, "20: \(way)")
+        #expect(after[offsets[5]!..<offsets[6]!] == before[offsets[5]!..<offsets[6]!], "20: the named dictionary is left")
+        try expectNoWorseThanTheTailSearch(before: before, after: after, label: "20")
+        print("INFODICT 20 way=\(way)")
+    }
+
+    static func keyMissingWithLookAlike() throws {
+        let made = MadeInfoFile(dictionary: "<< /Producer (\(MadeInfoFile.producer)) /CreationDate (\(MadeInfoFile.date)) >>",
+                                padding: 300_000, lookAlike: true)
+        let (before, offsets) = made.build()
+        let url = try write(before)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let way = PDFStreamReconstructor.overwriteInfoLiterals(at: url)
+        let after = try Data(contentsOf: url)
+        #expect(way == .byIndex, "21: \(way)")
+        let trueDictionary = String(decoding: after[offsets[5]!..<offsets[6]!], as: UTF8.self)
+        #expect(trueDictionary.contains("(\(PDFStreamReconstructor.fixedProducerValue))"), "21: \(trueDictionary)")
+        #expect(!trueDictionary.contains(MadeInfoFile.date), "21: \(trueDictionary)")
+        try expectNoWorseThanTheTailSearch(before: before, after: after, label: "21")
+        print("INFODICT 21 way=\(way)")
+    }
+
+    /// Every byte the tail search alone changes in `before`, it changes the
+    /// same way in `after`; the tail search alone changes at least one byte
+    /// of this file, so the case can tell.
+    static func expectNoWorseThanTheTailSearch(before: Data, after: Data, label: String) throws {
+        let tailOnly = try write(before)
+        defer { try? FileManager.default.removeItem(at: tailOnly) }
+        #expect(PDFStreamReconstructor.overwriteInfoLiteralsInTail(at: tailOnly), "\(label): the tail search rewrites this file")
+        let alone = try Data(contentsOf: tailOnly)
+        #expect(after.count == before.count && alone.count == before.count, "\(label): lengths")
+        guard after.count == before.count, alone.count == before.count else { return }
+        let b = [UInt8](before), a = [UInt8](after), t = [UInt8](alone)
+        let changed = b.indices.filter { b[$0] != t[$0] }
+        let differing = changed.filter { a[$0] != t[$0] }
+        #expect(!changed.isEmpty, "\(label): the tail search alone changes nothing")
+        #expect(differing.isEmpty, "\(label): \(differing.count) of the \(changed.count) bytes the tail search alone changes differ")
     }
 
     // MARK: - Support
