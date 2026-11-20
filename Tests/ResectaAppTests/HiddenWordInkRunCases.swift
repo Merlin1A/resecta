@@ -19,6 +19,14 @@ import PDFKit
 // the layer and no row could not verify. If the run stops keeping that page's
 // layer, V15 is a design question, not a case to re-scope.
 //
+// The drift puts the colon of "Approved:" under the box. A word that loses a
+// letter to a box now leaves the hidden text whole, so the run writes neither
+// word of that line and the check has nothing it cannot place. V15 and its
+// pair therefore run with that rule turned off (`PageTextPath.$wholeWordsOff`,
+// a test-only switch), which keeps "Approved" beside the box as before. A
+// sibling case pins the export as it is: with the rule on, the line's words
+// are gone and the masthead reads "Checks Passed".
+//
 // V15 (pair) builds the same export directly (the rasterizer and the writer)
 // and runs the verifier and the masthead on it.
 //
@@ -203,7 +211,7 @@ struct HiddenWordInkRunCases {
     @Test("V15: through the app's run, a word beside the box that cannot be placed reads Some Checks Incomplete, from this check",
           .timeLimit(.minutes(3)))
     func v15() async throws {
-        let report = try await Self.approvalRun()
+        let report = try await PageTextPath.$wholeWordsOff.withValue(true) { try await Self.approvalRun() }
         #expect(report.perPageModes == [.searchableRedaction], "STOP if not: the run no longer keeps this page's layer")
         #expect(VerificationResultsView.mastheadTitle(report: report) == "Some Checks Incomplete")
         let layer = try #require(HiddenWordInkAppSeam.layer, "the check is not built")
@@ -214,6 +222,29 @@ struct HiddenWordInkRunCases {
     @Test("V15 (pair): the same export, built directly and verified, reads Some Checks Incomplete, from this check",
           .timeLimit(.minutes(3)))
     func v15Pair() async throws {
+        let (text, report) = try await Self.pairExport(wholeWordsOff: true)
+        #expect(text.contains("Approved"), "precondition: the export keeps the line's other word")
+        #expect(VerificationResultsView.mastheadTitle(report: report) == "Some Checks Incomplete")
+        let layer = try #require(HiddenWordInkAppSeam.layer, "the check is not built")
+        #expect(report.layers.filter(\.couldNotVerify).map(\.layer) == [layer])
+    }
+
+    @Test("V15 (whole words): with a word that loses a letter to a box leaving whole, the line's words are gone and the export reads Checks Passed",
+          .timeLimit(.minutes(3)))
+    func v15WholeWords() async throws {
+        let (text, report) = try await Self.pairExport(wholeWordsOff: false)
+        #expect(!text.contains("Approved"), "the word beside the box lost its colon to the box and left whole")
+        #expect(!text.contains("Okafor"), "the boxed word is gone")
+        #expect(text.contains("After three years the file moves to the long store."), "the line above is kept")
+        #expect(VerificationResultsView.mastheadTitle(report: report) == "Checks Passed")
+        #expect(report.layers.filter(\.couldNotVerify).isEmpty)
+        let layer = try #require(HiddenWordInkAppSeam.layer, "the check is not built")
+        let row = try #require(report.layers.first { $0.layer == layer }, "the report carries the check's row")
+        #expect(row.status == .pass)
+    }
+
+    /// V15 (pair)'s export, built directly and verified: its text and its report.
+    static func pairExport(wholeWordsOff: Bool) async throws -> (String, VerificationReport) {
         let data = Self.page(Self.approvalLines, drift: 4)
         let source = try #require(PDFDocument(data: data))
         let page = try #require(source.page(at: 0))
@@ -225,7 +256,9 @@ struct HiddenWordInkRunCases {
                                    pipelineMode: .searchableRedaction, rotation: page.rotation,
                                    cropBoxBounds: page.bounds(for: .cropBox), cgPage: cgPage,
                                    hasText: page.string?.isEmpty == false)
-        let raster = try await PageRasterizer().rasterize(pageData)
+        let raster = try await PageTextPath.$wholeWordsOff.withValue(wholeWordsOff) {
+            try await PageRasterizer().rasterize(pageData)
+        }
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("hidden-word-pair-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let tempURL = dir.appendingPathComponent("recon.pdf"), outputURL = dir.appendingPathComponent("output.pdf")
@@ -235,8 +268,7 @@ struct HiddenWordInkRunCases {
         await reconstructor.finalize()
         try FileManager.default.moveItem(at: tempURL, to: outputURL)
         let output = try #require(PDFDocument(url: outputURL))
-        #expect((output.page(at: 0)?.string ?? "").contains("Approved"), "precondition: the export keeps the line's other word")
-
+        let text = output.page(at: 0)?.string ?? ""
         let report = try await VerificationOrchestrator().run(
             outputDocument: SendablePDFDocument(output), sourcePageCount: 1, regions: [0: [region]],
             sensitiveTerms: [SensitiveTerm(text: "Okafor", requiresTokenBoundary: false)],
@@ -244,9 +276,7 @@ struct HiddenWordInkRunCases {
             perPageModes: [.searchableRedaction], perPageFallbackReasons: [raster.fallbackReason],
             appliedSearches: [], sourceDocument: SendablePDFDocument(source),
             provisionLayerDocuments: { _ in nil }, events: { _ in })
-        #expect(VerificationResultsView.mastheadTitle(report: report) == "Some Checks Incomplete")
-        let layer = try #require(HiddenWordInkAppSeam.layer, "the check is not built")
-        #expect(report.layers.filter(\.couldNotVerify).map(\.layer) == [layer])
+        return (text, report)
     }
 
     // MARK: - The cross-check over the strip-by-ink cells
