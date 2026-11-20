@@ -8,13 +8,19 @@ import Foundation
 // those bytes occur in the checked file. Pages with equal recorded hashes may
 // share one occurrence of the bytes; ranges of different streams never
 // overlap. No image on a page, or two, is a refusal. No record of the run is
-// one answer for the whole document, never "nothing to check".
+// one answer for the whole document, never "nothing to check". A page the
+// record names past the file's last page is refused, never dropped. Only a
+// picture stored as a JPEG alone is copied out of the file: no other filter
+// is ever undone, so a stream that inflates far past its stored size costs
+// nothing.
 
 /// One image stream a page draws, as the system reader hands it over.
 struct PageImageStream: Sendable {
-    /// The stream's bytes with every filter but the picture's own undone.
+    /// The stream's bytes as stored, when its one filter is DCT; empty
+    /// otherwise, since such a stream is never copied (copying would undo
+    /// its other filters).
     let bytes: Data
-    /// True when those bytes are a JPEG (the stream's last filter is DCT).
+    /// True when the stream's one filter is DCT, so its bytes are a JPEG.
     let isJPEG: Bool
 }
 
@@ -68,6 +74,21 @@ struct SystemPageImageSource: PageImageSource {
         var done: Bool { found.count >= 2 || overLimit }
     }
 
+    /// True when the image's one filter is DCTDecode, named alone or as the
+    /// only entry of an array: its stored bytes are the JPEG, and copying
+    /// them undoes nothing. The app's writer stores each page picture so.
+    static func isJPEGAlone(_ image: CGPDFDictionaryRef) -> Bool {
+        var name: UnsafePointer<CChar>?
+        if CGPDFDictionaryGetName(image, "Filter", &name), let n = name { return String(cString: n) == "DCTDecode" }
+        var array: CGPDFArrayRef?
+        guard CGPDFDictionaryGetArray(image, "Filter", &array), let a = array, CGPDFArrayGetCount(a) == 1 else {
+            return false
+        }
+        var only: UnsafePointer<CChar>?
+        guard CGPDFArrayGetName(a, 0, &only), let o = only else { return false }
+        return String(cString: o) == "DCTDecode"
+    }
+
     private static func collect(_ resources: CGPDFDictionaryRef, depth: Int, into walk: inout FormWalk) {
         var xobjects: CGPDFDictionaryRef?
         guard CGPDFDictionaryGetDictionary(resources, "XObject", &xobjects), let xobj = xobjects else { return }
@@ -82,6 +103,13 @@ struct SystemPageImageSource: PageImageSource {
             var subtype: UnsafePointer<CChar>?
             guard CGPDFDictionaryGetName(d, "Subtype", &subtype), let name = subtype.map({ String(cString: $0) }) else { continue }
             if name == "Image" {
+                // A stream under any other filter is not copied: copying
+                // undoes the filter first, and a Flate stream can inflate a
+                // thousand times over before it could be refused.
+                guard isJPEGAlone(d) else {
+                    walk.found.append(PageImageStream(bytes: Data(), isJPEG: false))
+                    continue
+                }
                 var format = CGPDFDataFormat.raw
                 let data = CGPDFStreamCopyData(s, &format).map { $0 as Data } ?? Data()
                 walk.found.append(PageImageStream(bytes: data, isJPEG: format == .jpegEncoded))
@@ -107,6 +135,8 @@ enum PageImageLocator {
     /// when the page is done. `recordedHashes` holds one SHA-256 a page, as
     /// recorded when the app handed that page's picture to the writer; nil
     /// when the run has no record, which is one answer for the document.
+    /// Each page the record names past the file's last page is handed on
+    /// after the file's own, refused as not in the file.
     /// Returns false, having read nothing, when there is no record.
     @discardableResult
     static func readEach(fileData: Data, source: some PageImageSource, recordedHashes: [Data]?,
@@ -128,6 +158,10 @@ enum PageImageLocator {
                 }
             }
             body(index, outcome)
+        }
+        for index in source.pageCount..<max(source.pageCount, recordedHashes.count) {
+            if Task.isCancelled { throw CancellationError() }
+            body(index, .couldNotFinish(PageImageRefusal(reason: .pageNotInFile, offset: 0)))
         }
         return true
     }

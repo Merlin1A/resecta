@@ -57,16 +57,17 @@ struct PageImageRefusal: Error, Equatable, Sendable {
         case noPageImage
         case twoPageImages
         case formsOverLimit
-        case notJPEG
+        case notJPEG          // not stored as a JPEG alone (its one filter DCT)
         case noRecordedHash
         case hashDiffers
         case bytesNotInFile
+        case pageNotInFile    // the record names a page past the file's last
 
         /// The fault this reason reads as: the picture is not the one the
         /// record names, or it could not be read for this check.
         var fault: FaultName {
             switch self {
-            case .noRecordedHash, .hashDiffers, .bytesNotInFile: .wrongSubject
+            case .noRecordedHash, .hashDiffers, .bytesNotInFile, .pageNotInFile: .wrongSubject
             case .noStartMarker, .markerExpected, .fillByteBeforeMarker, .segmentOutsideStream,
                  .markerNotAllowed, .notBaselineSequential, .precisionNotEightBits, .componentCount,
                  .samplingFactor, .colourSampledAboveBrightness, .secondFrame, .frameSideZero,

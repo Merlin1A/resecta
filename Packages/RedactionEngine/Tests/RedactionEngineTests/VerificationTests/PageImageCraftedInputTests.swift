@@ -224,4 +224,49 @@ struct PageImageCraftedInputTests {
         #expect(reason == "formsOverLimit")
         #expect(elapsed < .seconds(1))
     }
+
+    // MARK: - The file around the picture, and its tables
+
+    @Test("A picture stored under any filter but DCT alone is refused as not a JPEG, its stream never copied or inflated")
+    func filteredPictureNeverCopied() throws {
+        let flate = C.formsPage(picture: C.zlibStored(Data(repeating: 0xFF, count: 64)), columns: 1, rows: 1,
+                                pageForms: [], forms: [], filter: "/FlateDecode")
+        let flateThenDCT = C.formsPage(picture: C.zlibStored(Self.picture), columns: 1, rows: 1,
+                                       pageForms: [], forms: [], filter: "[/FlateDecode /DCTDecode]")
+        for (file, label) in [(flate, "Flate"), (flateThenDCT, "Flate, then DCT")] {
+            let source = try #require(SystemPageImageSource(fileData: file))
+            guard case .success(let streams) = source.images(onPage: 0) else {
+                Issue.record("\(label): the page was refused before its picture"); continue
+            }
+            #expect(streams.count == 1, "\(label): \(streams.count) streams")
+            #expect(streams.allSatisfy { !$0.isJPEG && $0.bytes.isEmpty }, "\(label): the stream was copied")
+            #expect(try Self.pageOutcome(file, picture: Self.picture).reason == "notJPEG", "\(label)")
+        }
+        let dctInAnArray = C.formsPage(picture: Self.picture, columns: 1, rows: 1, pageForms: [], forms: [],
+                                       filter: "[/DCTDecode]")
+        #expect(try Self.pageOutcome(dctInAnArray, picture: Self.picture).completed, "DCT alone, in an array")
+    }
+
+    @Test("Pages the record names past the file's last page are each refused by name, never dropped")
+    func recordPastThePageCount() throws {
+        let file = C.formsPage(picture: Self.picture, columns: 1, rows: 1, pageForms: [], forms: [])
+        let source = try #require(SystemPageImageSource(fileData: file))
+        let hash = C.sha256(Self.picture)
+        let report = try PageImageLocator.read(fileData: file, source: source, recordedHashes: [hash, hash, hash])
+        guard case .pages(let pages) = report else { Issue.record("no pages read"); return }
+        let names = pages.map { page -> String in
+            if case .couldNotFinish(let r) = page { return r.reason.rawValue }
+            return "completed"
+        }
+        #expect(names == ["completed", "pageNotInFile", "pageNotInFile"])
+        #expect(PageImageRefusal.Reason.pageNotInFile.fault == .wrongSubject)
+    }
+
+    @Test("A first-coefficient table whose four-bit codes run up to all ones is refused by name; one code fewer is read")
+    func huffmanCodeOfAllOnes() throws {
+        let blocks = [C.Block(difference: 3)]
+        #expect(try Self.reasonName(C.picture(columns: 1, rows: 1, step: 1, blocks: blocks, dcFourBitCodes: 15)) == nil)
+        #expect(try Self.reasonName(C.picture(columns: 1, rows: 1, step: 1, blocks: blocks, dcFourBitCodes: 16))
+                == "huffmanTable")
+    }
 }

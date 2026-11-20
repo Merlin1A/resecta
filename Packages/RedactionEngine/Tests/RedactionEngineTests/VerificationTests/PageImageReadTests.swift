@@ -231,7 +231,7 @@ struct PageImageReadTests {
 
     @Test("The four lines of the page check's table, as data, against the result")
     func outcomesReadAsTheTable() {
-        let wrongSubject: Set<Reason> = [.noRecordedHash, .hashDiffers, .bytesNotInFile]
+        let wrongSubject: Set<Reason> = [.noRecordedHash, .hashDiffers, .bytesNotInFile, .pageNotInFile]
         for reason in Reason.allCases {
             let kind = PageImageOutcome.couldNotFinish(PageImageRefusal(reason: reason, offset: 0)).kind
             #expect(kind == .fault(wrongSubject.contains(reason) ? .wrongSubject : .unreadableInput), "\(reason)")
