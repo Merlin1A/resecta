@@ -37,12 +37,12 @@ extension VerificationResultsView {
     /// sentence.
     static func mastheadAccessibilityLabel(
         report: VerificationReport, outputExists: Bool = true, isStale: Bool = false,
-        mode: RunMode = .searchableOrUnknown, findingCount: Int = 0
+        mode: RunMode = .searchableOrUnknown, findingRows: Int = 0, handDrawnBoxes: Int = 0
     ) -> String {
         let title = mastheadTitle(report: report, outputExists: outputExists, isStale: isStale)
         let sentence = mastheadSubtitle(
             report: report, outputExists: outputExists, isStale: isStale, mode: mode,
-            findingCount: findingCount) ?? ""
+            findingRows: findingRows, handDrawnBoxes: handDrawnBoxes) ?? ""
         guard !report.overallStatus.isSkipped else { return "\(title). \(sentence)" }
         let partition = partition(report)
         var parts = ["\(title).", "\(partition.summaryLine1)."]
@@ -133,24 +133,22 @@ extension VerificationResultsView {
     }
 
     /// The masthead sentence, by verdict and the rows behind it. Never nil
-    /// (the optional is the shipped call sites' shape). `findingCount` is
-    /// the number of the results screen's findings the checks cannot see
-    /// (`ResultsFindings`); a passing run counts them as notes. Static so
-    /// every arm is unit-testable without a SwiftUI host.
+    /// (the optional is the shipped call sites' shape). `findingRows` is the
+    /// number of rows of the results screen's Findings group and
+    /// `handDrawnBoxes` the number of hand-drawn boxes on pages with no text
+    /// (`ResultsFinding.handRegionsOnPagesWithoutText`); a passing run's
+    /// sentence is `passingSentence` of them. Static so every arm is
+    /// unit-testable without a SwiftUI host.
     static func mastheadSubtitle(
         report: VerificationReport, outputExists: Bool = true, isStale: Bool = false,
-        mode: RunMode = .searchableOrUnknown, findingCount: Int = 0
+        mode: RunMode = .searchableOrUnknown, findingRows: Int = 0, handDrawnBoxes: Int = 0
     ) -> String? {
         guard resultStands(outputExists: outputExists, isStale: isStale) else { return outputMissingSentence }
         let partition = partition(report)
         switch report.overallStatus {
         case .pass, .info, .notApplicable:
-            let notes = visibleNoteCount(partition) + findingCount
-            switch notes {
-            case 0:  return "Look over the redacted PDF in Preview before you share it."
-            case 1:  return "Read the note below before you share the PDF."
-            default: return "Read the notes below before you share the PDF."
-            }
+            return passingSentence(findingRows: findingRows, handDrawnBoxes: handDrawnBoxes,
+                                   notes: visibleNoteCount(partition), outputExists: outputExists)
         case .warn:
             let couldNotVerify = partition.couldNotVerify.map { report.layers[$0] }
             if !couldNotVerify.isEmpty, couldNotVerify.allSatisfy(\.status.isSkipped) {
@@ -250,6 +248,31 @@ extension VerificationResultsView {
             .flatMap { $0.reviewTermTexts ?? [] })
     }
 
+    /// The sentence on a passing run, first match wins: a Findings row (the
+    /// sentence points to the rows below); else hand-drawn boxes no check could
+    /// read under ("No check could read what 1 hand-drawn box covers.");
+    /// else the notes in view ("Read the note below…"); else Preview, or
+    /// the sentence for a PDF that no longer exists.
+    static func passingSentence(findingRows: Int, handDrawnBoxes: Int, notes: Int, outputExists: Bool) -> String {
+        if findingRows > 0 {
+            return findingRows == 1
+                ? "Read the finding below before you share the PDF."  // LegalPhrases:safe (approved row words)
+                : "Read the findings below before you share the PDF."
+        }
+        if handDrawnBoxes > 0 {
+            return handDrawnBoxes == 1
+                ? "No check could read what 1 hand-drawn box covers."
+                : "No check could read what \(handDrawnBoxes) hand-drawn boxes cover."
+        }
+        switch notes {
+        case 0:
+            return outputExists
+                ? "Look over the redacted PDF in Preview before you share it." : outputMissingSentence
+        case 1:  return "Read the note below before you share the PDF."
+        default: return "Read the notes below before you share the PDF."
+        }
+    }
+
     /// The notes a PASS reader sees without opening anything: the Notes
     /// section's rows, plus the notes riding in the pass cluster when the
     /// cluster opens by default (nothing sits above it).
@@ -282,12 +305,15 @@ struct VerificationMasthead: View {
     /// The boxes changed since the redacted PDF was made.
     var isStale: Bool = false
     let mode: VerificationResultsView.RunMode
-    /// The number of the results screen's findings (`ResultsFindings`).
-    var findingCount: Int = 0
+    /// The rows of the results screen's Findings group, and the hand-drawn
+    /// boxes on pages with no text (`mastheadSubtitle`).
+    var findingRows: Int = 0
+    var handDrawnBoxes: Int = 0
 
     var body: some View {
         let sentence = VerificationResultsView.mastheadSubtitle(
-            report: report, outputExists: outputExists, isStale: isStale, mode: mode, findingCount: findingCount)
+            report: report, outputExists: outputExists, isStale: isStale, mode: mode, findingRows: findingRows,
+            handDrawnBoxes: handDrawnBoxes)
         let quotesTerms = VerificationResultsView.mastheadSubtitleIsPrivacySensitive(
             report: report, outputExists: outputExists, isStale: isStale)
         VStack(spacing: 0) {
@@ -310,7 +336,8 @@ struct VerificationMasthead: View {
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(VerificationResultsView.mastheadAccessibilityLabel(
-            report: report, outputExists: outputExists, isStale: isStale, mode: mode, findingCount: findingCount))
+            report: report, outputExists: outputExists, isStale: isStale, mode: mode, findingRows: findingRows,
+            handDrawnBoxes: handDrawnBoxes))
         .accessibilityAddTraits(.isHeader)
         .accessibilityIdentifier("verificationMasthead")
         .privacySensitive(quotesTerms)

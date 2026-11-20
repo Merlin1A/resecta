@@ -3,7 +3,9 @@ import RedactionEngine
 
 // The results page's check sections, below the actions: the Findings group,
 // one row per problem of the run (`VerificationProblemModel.derive`) with its
-// count; a headerless card of the plain warnings; the headerless card of
+// count (and after it, where `ResultsBlock.order` puts it, the small print
+// about what Checks Passed means); the card of plain warnings, headed
+// "Warnings · n"; the headerless card of
 // facts about the PDF (handed-in facts, the run's own lines, Page Modes, the
 // deselection row: `ResultsFactCard.items`); then one row for the list of
 // checks, every check but the plain warnings, which a tap opens to those
@@ -31,6 +33,10 @@ struct VerificationDetailsSection: View {
     /// that no check reports.
     var coveredPages: [Int] = []
     var formValueCount: Int = 0
+    /// The small print's sentences when the screen's order draws it directly
+    /// after the Findings group (`ResultsBlock.order`); nil where the
+    /// results view draws it above this section.
+    var smallPrintAfterFindings: [String]? = nil
     /// Back to the editor with Scan running (the sweep's Review in Scan).
     var onReviewInScan: () -> Void = {}
     /// Facts handed in for the card, each placed by its `place`.
@@ -64,17 +70,18 @@ struct VerificationDetailsSection: View {
                     findingRows(problems)
                 }
                 .padding(.top, ResectaTokens.Results.blockGap)
+                if let smallPrintAfterFindings {
+                    ResultsScopeNote(report: report, sentences: smallPrintAfterFindings)
+                }
             }
             ForEach(Self.groups(partition), id: \.indices) { group in
                 GroupedSection(
-                    header: group.header.map {
-                        VerificationLayerPartition.sectionHeader($0, count: group.indices.count)
-                    },
-                    spokenHeader: group.header.map {
-                        VerificationLayerPartition.sectionHeaderSpoken($0, count: group.indices.count)
-                    }
+                    header: VerificationLayerPartition.sectionHeader(group.header, count: group.indices.count),
+                    spokenHeader: VerificationLayerPartition.sectionHeaderSpoken(group.header,
+                                                                                 count: group.indices.count)
                 ) {
-                    layerRows(group.indices, layout: .lead, showsStatusWord: true)
+                    // The heading names the outcome; the rows do not repeat it.
+                    layerRows(group.indices, layout: .lead, showsStatusWord: false)
                 }
                 .padding(.top, ResectaTokens.Results.blockGap)
             }
@@ -110,13 +117,16 @@ struct VerificationDetailsSection: View {
                 VerificationLayerPartition.sectionHeaderSpoken(findingsHeader, count: rows.count))
     }
 
+    /// The plain warnings' card's heading; its count is the number of rows.
+    static let warningsHeader = "Warnings"
+
     /// The groups of check rows drawn between the Findings group and the
     /// card of facts, each with its rows' engine indices: only the plain
-    /// warnings, in a card with no heading. Every other check is behind a
-    /// Findings row or needs none, and is in the list of checks.
-    static func groups(_ partition: VerificationLayerPartition) -> [(header: String?, indices: [Int])] {
+    /// warnings, in their card. Every other check is behind a Findings row
+    /// or needs none, and is in the list of checks.
+    static func groups(_ partition: VerificationLayerPartition) -> [(header: String, indices: [Int])] {
         let warnings = plainWarnings(partition)
-        return warnings.isEmpty ? [] : [(nil, warnings)]
+        return warnings.isEmpty ? [] : [(warningsHeader, warnings)]
     }
 
     /// The checks whose outcome is a plain warning: not a problem, so in no

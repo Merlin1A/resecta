@@ -173,10 +173,10 @@ struct VerificationMastheadTests {
     }
 
     /// Every seeded report, plus two arms no seeded report reaches: a pass
-    /// with several notes, and a WARN whose check could not run in full.
-    static var everyArm: [(name: String, report: VerificationReport, findingCount: Int)] {
+    /// with two rows of findings, and a WARN whose check could not run in full.
+    static var everyArm: [(name: String, report: VerificationReport, findingRows: Int)] {
         Fixtures.all.sorted { $0.key < $1.key }.map { ($0.key, $0.value, 0) } + [
-            ("a pass with several notes", Fixtures.secureAllPass, 2),
+            ("a pass with two rows of findings", Fixtures.secureAllPass, 2),
             ("a check that could not run in full", report(.warn("w"), [row(.warn("w"), .ocrCheck, cnv: true)]), 0),
         ]
     }
@@ -194,12 +194,12 @@ struct VerificationMastheadTests {
         #expect(Fixtures.all.count == 18)
         var rows = 0
         for arm in Self.everyArm {
-            let standing = Results.mastheadSubtitle(report: arm.report, findingCount: arm.findingCount)
+            let standing = Results.mastheadSubtitle(report: arm.report, findingRows: arm.findingRows)
             #expect(standing != nil && standing != missing, "\(arm.name): a standing result keeps its own sentence")
             for state in Self.states {
                 let shown = Results.mastheadSubtitle(
                     report: arm.report, outputExists: state.outputExists, isStale: state.isStale,
-                    findingCount: arm.findingCount)
+                    findingRows: arm.findingRows)
                 #expect(shown == (Self.stands(state) ? standing : missing), "\(arm.name), \(state.name): \(shown ?? "nil")")
                 rows += 1
             }
