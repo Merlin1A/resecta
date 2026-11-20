@@ -29,6 +29,7 @@ struct PageImageRefusal: Error, Equatable, Sendable {
         case tooManyBlocks
         case noJFIFHeader
         case secondJFIFHeader
+        case jfifHeaderLength
         case adobeSegment
         case unlistedSegmentsOverLimit
         case quantiserTable
@@ -68,7 +69,7 @@ struct PageImageRefusal: Error, Equatable, Sendable {
             case .noStartMarker, .markerExpected, .fillByteBeforeMarker, .segmentOutsideStream,
                  .markerNotAllowed, .notBaselineSequential, .precisionNotEightBits, .componentCount,
                  .samplingFactor, .colourSampledAboveBrightness, .secondFrame, .frameSideZero,
-                 .tooManyBlocks, .noJFIFHeader, .secondJFIFHeader, .adobeSegment,
+                 .tooManyBlocks, .noJFIFHeader, .secondJFIFHeader, .jfifHeaderLength, .adobeSegment,
                  .unlistedSegmentsOverLimit, .quantiserTable, .quantiserStepZero, .huffmanTable,
                  .tableDefinedTwice, .restartDefinition, .scanBeforeFrame, .scanNotEveryComponent,
                  .scanNotSequential, .tableNotDefined, .tableNeverUsed, .scanCutShort,
