@@ -171,36 +171,52 @@ extension PageRasterizer {
     /// order: every growth read on the rendered page before any fill, then
     /// the fills, then the readback of exactly what was filled.
     ///
-    /// A box is painted as ONE rectangle: each side the further out of the
-    /// box's projection and its growth. Growth starts from the margin's edge
+    /// A box is painted as ONE rectangle: each side the furthest out of the
+    /// box's projection, each region it holds as the region path fills that
+    /// region, and its growth. So a box never paints less than the region
+    /// path did: for a region past the page's left or bottom edge, the run's
+    /// clamp slides it onto the page whole, and the region path painted that. Growth starts from the margin's edge
     /// alone (`paint` outward to whole pixels plus one, clipped), so it fires
     /// where it fired before the pixel step, and only for a box holding a
     /// region placed by Search or by detection.
     ///
-    /// A region with no box (the plan's admission and the run's disagreeing)
-    /// is never left unpainted: it is filled as the region path fills it and
-    /// returned in `outsidePlan`, which the record carries to the position
-    /// check as "could not be checked".
+    /// A region with no box (the plan's admission and the run's disagreeing),
+    /// or held only by a box that does not project, is never left unpainted:
+    /// it is filled as the region path fills it and returned in
+    /// `outsidePlan`, which the record carries to the position check as
+    /// "could not be checked".
     func paintPlan(context ctx: CGContext, page: PDFPageData, raster: PixelPlan.Raster,
                    content: CGSize) throws -> PlanPaint {
-        let boxed = Set(page.boxes.flatMap(\.regionIDs))
-        let strays = page.regions.filter { !boxed.contains($0.id) }
+        let bitmap = CGRect(x: 0, y: 0, width: ctx.width, height: ctx.height)
+        var regionsByID: [UUID: RedactionRegion] = [:]
         var growsOnInk: [UUID: Bool] = [:]
-        for region in page.regions { growsOnInk[region.id] = inkGrowthApplies(to: region) }
+        for region in page.regions {
+            regionsByID[region.id] = region
+            growsOnInk[region.id] = inkGrowthApplies(to: region)
+        }
 
-        // 4c. Each box's projection, then its growth, read before any fill.
+        // 4c. Each box's projection, with its regions as the region path
+        // fills them, then its growth, read before any fill.
         var rects: [(box: Int, rect: CGRect)] = []
+        var painted = Set<UUID>()
         for (index, box) in page.boxes.enumerated() {
             guard let projection = PixelPlan.project(
                 inner: box.inner, paint: box.paint,
                 limitAbove: box.limitAbove, limitBelow: box.limitBelow, raster: raster) else { continue }
             var rect = projection.painted.bitmapRect
+            for id in box.regionIDs {
+                guard let region = regionsByID[id] else { continue }
+                let filled = normalizedToFillPixels(region.normalizedRect, content: content).intersection(bitmap)
+                if !filled.isEmpty { rect = rect.union(filled) }
+            }
+            painted.formUnion(box.regionIDs)
             if box.regionIDs.contains(where: { growsOnInk[$0] == true }),
                let grown = try inkGrowthRect(context: ctx, fillRect: projection.marginEdge.bitmapRect) {
                 rect = rect.union(grown)
             }
             rects.append((index, rect))
         }
+        let strays = page.regions.filter { !painted.contains($0.id) }
         let strayGrowth = try inkGrowthRects(context: ctx, regions: strays, content: content)
 
         // 5. The fills.
@@ -217,7 +233,6 @@ extension PageRasterizer {
         #endif
 
         // 6. The readback, of the rectangles filled.
-        let bitmap = CGRect(x: 0, y: 0, width: ctx.width, height: ctx.height)
         let filled = rects.map(\.rect)
             + strays.map { normalizedToFillPixels($0.normalizedRect, content: content).intersection(bitmap) }
             + strayGrowth

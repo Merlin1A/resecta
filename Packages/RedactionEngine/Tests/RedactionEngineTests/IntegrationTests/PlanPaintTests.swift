@@ -11,7 +11,11 @@ import PDFKit
 //
 // Pages are 216 × 144 pt (3 × 2 in) drawn by a hand-made content stream and
 // rasterized whole at 300 dpi. A box is checked against `PixelPlan.project`
-// of the record's own box, the one arithmetic the check will share.
+// of the record's own box, the one arithmetic the check will share, joined
+// with each region it holds as the region path fills it: a box never paints
+// less than the region path did (a region past the left or bottom edge is
+// slid onto the page whole by the run's clamp, and the region path painted
+// that).
 
 @Suite("The producer paints the page data's boxes")
 struct PlanPaintTests {
@@ -93,6 +97,21 @@ struct PlanPaintTests {
             return try #require(PixelPlan.project(inner: box.inner, paint: box.paint, limitAbove: box.limitAbove,
                                                   limitBelow: box.limitBelow, raster: raster))
         }
+        /// The pixels the region path fills for `region`, on the bitmap.
+        func regionPath(_ region: RedactionRegion) -> PixelPlan.PixelRect? {
+            let filled = normalizedToFillPixels(region.normalizedRect, content: content)
+                .intersection(CGRect(x: 0, y: 0, width: bitmap.width, height: bitmap.height))
+            return filled.isEmpty ? nil : PixelPlan.PixelRect(bitmapRect: filled)
+        }
+        /// Box `i`'s rectangle with no growth: its projection joined with
+        /// each region it holds as the region path fills it.
+        func expected(_ i: Int) throws -> PixelPlan.PixelRect {
+            var rect = try projection(i).painted.bitmapRect
+            for region in regions where plan.boxes[i].regionIDs.contains(region.id) {
+                if let filled = regionPath(region) { rect = rect.union(filled.bitmapRect) }
+            }
+            return PixelPlan.PixelRect(bitmapRect: rect)
+        }
         func reported(_ i: Int) throws -> PixelPlan.PixelRect {
             let p = try #require(result.paintedBoxes[i])
             return PixelPlan.PixelRect(minX: p.firstColumn, minY: p.firstRowFromBottom,
@@ -159,7 +178,7 @@ struct PlanPaintTests {
         static let pastAnEdge: [Placement] = [.pastLeft, .pastRight, .pastBottom, .pastTop]
     }
 
-    @Test("Each box is filled as the record's box projects, on a raster of the page's sides S", arguments: Placement.allCases)
+    @Test("Each box is filled as the record's box projects joined with its regions as the region path fills them, on a raster of the page's sides S", arguments: Placement.allCases)
     func fillsOnPixelBoxes(_ placement: Placement) async throws {
         let run = try await Self.run(boxes: placement.boxes)
         #expect(run.bitmap.width == run.raster.pixelWidth && run.bitmap.height == run.raster.pixelHeight,
@@ -167,7 +186,7 @@ struct PlanPaintTests {
         #expect(run.result.paintedBoxes.count == run.plan.boxes.count)
         #expect(run.result.regionsPaintedOutsideThePlan.isEmpty)
         for i in run.plan.boxes.indices {
-            let expected = try run.projection(i).painted
+            let expected = try run.expected(i)
             #expect(try run.reported(i) == expected, "box \(i)")
             #expect(run.bitmap.misses(expected, level: 0) == 0, "box \(i): every pixel of its rectangle is the fill")
         }
@@ -185,10 +204,12 @@ struct PlanPaintTests {
                             width: Self.points(painted.maxX + 6) - Self.points(margin.maxX + 1), height: 8)
         let selected = CGRect(x: 62, y: 62, width: 28, height: 8)
         let run = try await Self.run(boxes: [box], text: true, ink: [selected, letter], fill: .white)
-        #expect(try run.reported(0) == painted, "no growth: the rectangle is the projection")
-        #expect(run.bitmap.misses(painted, level: 255) == 0, "the projection is the fill")
-        let past = PixelPlan.PixelRect(minX: painted.maxX, minY: Int(64 * 300 / 72), maxX: painted.maxX + 5,
+        let expected = try run.expected(0)
+        #expect(try run.reported(0) == expected, "no growth: the rectangle is the projection with its region")
+        #expect(run.bitmap.misses(expected, level: 255) == 0, "that rectangle is the fill")
+        let past = PixelPlan.PixelRect(minX: expected.maxX, minY: Int(64 * 300 / 72), maxX: painted.maxX + 5,
                                        maxY: Int(68 * 300 / 72))
+        try #require(expected.maxX + 5 <= painted.maxX + 6, "the letter runs 5 px past that rectangle")
         #expect(run.bitmap.misses(past, level: 0) == 0, "the letter past the block line keeps its ink")
     }
 
@@ -269,7 +290,52 @@ struct PlanPaintTests {
     @Test("The geometry design's case: the record's box past an edge is the one the producer projected", arguments: Placement.pastAnEdge)
     func recordBoxPastAnEdge(_ placement: Placement) async throws {
         let run = try await Self.run(boxes: placement.boxes)
-        #expect(try run.reported(0) == run.projection(0).painted)
+        #expect(try run.reported(0) == run.expected(0))
+        if placement == .pastLeft || placement == .pastBottom {
+            // The clamp slid the region onto the page whole: the region path's
+            // rectangle reaches past the projection, and is painted.
+            #expect(try run.expected(0) != run.projection(0).painted, "the slid region adds to the projection")
+        }
+    }
+
+    /// Every region of the page, as the region path fills it, is wholly
+    /// within the fill: no pixel the region path painted is left unpainted.
+    static func expectCoversTheRegionPath(_ run: Run, label: String) {
+        for region in run.regions {
+            guard let pixels = run.regionPath(region) else { continue }
+            #expect(run.bitmap.misses(pixels, level: 0) == 0, "\(label): a pixel the region path paints is left")
+        }
+    }
+
+    @Test("The plan paints every pixel the region path paints, pixel for pixel", arguments: Placement.allCases)
+    func coversTheRegionPath(_ placement: Placement) async throws {
+        Self.expectCoversTheRegionPath(try await Self.run(boxes: placement.boxes), label: placement.rawValue)
+    }
+
+    @Test("The corpus runner's pages: the plan paints every pixel the region path paints")
+    func corpusMirrorCoversTheRegionPath() async throws {
+        let doc = try #require(PDFDocument(data: Self.pdf(ink: [])))
+        let seeds = Placement.allCases.flatMap(\.boxes).enumerated().map { i, box in
+            VerificationCorpusMirror.RegionSeed(gtId: "g\(i)", value: "v", category: "c", page: 0, rect: Self.share(box))
+        }
+        let regions = seeds.compactMap { VerificationCorpusMirror.region(from: $0, polygon: false) }
+        try #require(regions.count == seeds.count)
+        for region in regions {
+            let pages = VerificationCorpusMirror.buildPages(
+                doc: doc, effectiveMode: .secureRasterization, regionsByPage: [0: [region]],
+                textLayerStatus: [:], hasHiddenOCG: false)
+            let page = try #require(pages.first)
+            let plan = try #require(page.confirmedPage?.plan)
+            let raster = try #require(PixelPlan.Raster(widthSixtyFourths: plan.widthSixtyFourths,
+                                                       heightSixtyFourths: plan.heightSixtyFourths, dpi: Self.dpi))
+            let result = try await PageRasterizer().rasterize(page, dpiCap: Self.dpi)
+            let perInch = Double(PixelPlan.sixtyFourthsPerInch)
+            let run = Run(result: result, bitmap: try Bitmap(result.pageOutput.image), plan: plan, raster: raster,
+                          ids: [region.id], regions: [region],
+                          content: CGSize(width: Double(plan.widthSixtyFourths * Self.dpi) / perInch,
+                                          height: Double(plan.heightSixtyFourths * Self.dpi) / perInch))
+            Self.expectCoversTheRegionPath(run, label: "mirror \(region.normalizedRect)")
+        }
     }
 
     @Test("The producer paints the page data's box, not the page's region")
@@ -279,9 +345,9 @@ struct PlanPaintTests {
         let painted = try run.projection(0).painted
         #expect(try run.reported(0) == painted)
         #expect(run.bitmap.misses(painted, level: 0) == 0, "the record's box is filled")
-        let regionOnly = PixelPlan.PixelRect(minX: Int(45 * 300 / 72), minY: Int(55 * 300 / 72),
-                                             maxX: Int(85 * 300 / 72), maxY: Int(65 * 300 / 72))
-        #expect(run.bitmap.misses(regionOnly, level: 255) == 0, "the region the record does not place is not painted from the regions")
+        let between = PixelPlan.PixelRect(minX: Int(95 * 300 / 72), minY: Int(55 * 300 / 72),
+                                          maxX: Int(115 * 300 / 72), maxY: Int(65 * 300 / 72))
+        #expect(run.bitmap.misses(between, level: 255) == 0, "between the region and the record's box nothing is painted")
     }
 
     @Test("A region the record holds no box for is painted on its own and named in the record")

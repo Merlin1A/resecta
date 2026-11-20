@@ -70,7 +70,7 @@ enum RunInputs {
         settings snapshot: PipelineCoordinator.RunSettings,
         effectiveMode: PipelineMode,
         inkPlans: [Int: InkStripPlan] = [:],
-        record: RunRecord.Confirmed? = nil
+        record: RunRecord.Confirmed?
     ) -> [PDFPageData] {
         (0..<doc.pageCount).compactMap { i -> PDFPageData? in
             guard let page = doc.page(at: i) else { return nil }
