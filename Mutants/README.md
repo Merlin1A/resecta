@@ -700,3 +700,5 @@ with its reason and the mutant that is caught in its place.
 | `search-statement-hidden-ticked-only.patch` | The hidden count is every match a filter hides, ticked or not. | ResectaAppTests/SearchHiddenCountTests untickedHidden |
 | `account-too-large-read-as-recognised.patch` | A report of a page too large for recognition is the too-large fact. | RedactionEngineTests/AccountReportToFactTests eachRoute; RedactionEngineTests/AccountReportToFactTests tooLargeFolds |
 | `account-unopenable-read-as-failed.patch` | A report of a page that could not be opened is the could-not-open fact. | RedactionEngineTests/AccountReportToFactTests eachRoute; RedactionEngineTests/AccountReportToFactTests unopenableFolds |
+| `search-account-timeout-text-not-kept.patch` | The account keeps which searched text ran out of time on which page. | RedactionEngineTests/SearchAccountTextsTests twoTextsDifferOnlyByATimeout; RedactionEngineTests/SearchAccountTextsTests timeoutsPerPage |
+| `search-account-unboxed-match-not-kept.patch` | A match found with no box reaches its run's account, and so the applied record. | ResectaAppTests/SearchAccountLifecycleTests unboxedMatchReachesTheRecord |
