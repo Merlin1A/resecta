@@ -158,9 +158,25 @@ class RedactionState {
     /// Every closed search account of this document, by the token minted
     /// when its run started. An applied search's record names its token.
     var searchAccounts: [UUID: SearchAccount] = [:]
+    /// The newest closed account's token: the latest run, applied or not.
+    var latestSearchAccountToken: UUID?
 
     func recordSearchAccount(_ account: SearchAccount, token: UUID) {
         searchAccounts[token] = account
+        latestSearchAccountToken = token
+    }
+
+    /// The pages too large for recognition in the accounts that matter: the
+    /// applied searches' (by their records' tokens) and the latest run's.
+    /// Zero-based, as the results strip reads them.
+    func pagesTooLarge(applied tokens: [UUID]) -> Set<Int> {
+        var pages = Set<Int>()
+        for token in Set(tokens + [latestSearchAccountToken].compactMap { $0 }) {
+            guard let account = searchAccounts[token] else { continue }
+            pages.formUnion(account.pages(for: .tooLarge))
+            pages.formUnion(account.pages(for: .picturesNotRead(.tooLarge)))
+        }
+        return pages
     }
 
     /// Writer for `lastDetectionRun` — bumps the run counter.
@@ -375,6 +391,7 @@ class RedactionState {
         // that never happened on the next document.
         lastDetectionRun = nil
         searchAccounts = [:]
+        latestSearchAccountToken = nil
         // A stale region UUID must not present a blank rationale sheet
         // over the next document.
         pendingCanvasRationaleRequest = nil

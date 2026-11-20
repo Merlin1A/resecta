@@ -306,11 +306,10 @@ struct PipelineRunner {
         // `activeSearch`) and falls back to the live search session's
         // snapshot — nil only when neither source has one.
         let deselectionSnapshot = redactionState.runEntryDeselectionSnapshot()
-        // The two run facts the results strip states, read at the same
-        // point for the same reason: the session's detection record and
-        // degrade flags describe the session, and a scan after this run
-        // must not move what the strip says about it.
-        let ocrSkippedPages = redactionState.lastDetectionRun?.ocrSkippedPages ?? []
+        // The degrade flags the results strip states, read here because they
+        // describe the session, and a scan after this run must not move what
+        // the strip says about it. The too-large pages are read below, at the
+        // same entry, from the accounts the applied searches name.
         let degradeFailures: [String]? = redactionState.autoDetectionDegraded
             ? redactionState.autoDetectionDegradeFailures : nil
         // The output re-check requests, from the same region set: the
@@ -323,6 +322,11 @@ struct PipelineRunner {
         let deselectedItems = deselectionSnapshot?.items ?? []
         let appliedSearches = coordinator.collectAppliedSearches(deselected: deselectedItems)
             + [coordinator.collectSweepRequest(deselected: deselectedItems)]
+        // The pages too large for recognition in the accounts that matter:
+        // each applied search's, and the latest run's, typed or Scan, at the
+        // result limit or stopped. Not the last completed Scan's record alone.
+        let ocrSkippedPages = redactionState.pagesTooLarge(
+            applied: appliedSearches.compactMap { $0.record.accountToken })
         return RunEntry(
             pages: pages, sensitiveTerms: sensitiveTerms,
             deselectionSnapshot: deselectionSnapshot,
