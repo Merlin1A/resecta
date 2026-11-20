@@ -5,13 +5,13 @@ Must go red: RedactionEngineTests/InkFitPiecewiseScanTests textLayerBoxOverTheWo
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
-index c4aa22cb..2a6f6878 100644
+index f1e44893..c0ad0330 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
-@@ -126,7 +126,7 @@ extension DocumentSearcher {
+@@ -155,7 +155,7 @@ extension DocumentSearcher {
      /// are `lineRects`' as they are.
      nonisolated func textLayerAndInkRects(for nsRange: NSRange, page: PDFPage)
-         -> (paint: [CGRect], strip: [CGRect], degraded: Bool, identity: [CGRect?])? {
+         -> (paint: [CGRect], strip: [CGRect], degraded: Bool, identity: [CGRect?], characters: [NSRange])? {
 -        guard let cgPage = page.pageRef, Self.carriesHiddenTextOverImage(page, cgPage: cgPage),
 +        guard let cgPage = page.pageRef, Self.showsInvisibleText(cgPage), Self.carriesHiddenTextOverImage(page, cgPage: cgPage),
                let selection = page.selection(for: nsRange) else { return nil }

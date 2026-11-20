@@ -5,15 +5,15 @@ Must go red: RedactionEngineTests/ContentGlyphRouteTests hybridNeighbourBesideTh
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
-index d939a2bf..6695f01b 100644
+index f1e44893..68328b4f 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
-@@ -132,7 +132,7 @@ extension DocumentSearcher {
+@@ -136,7 +136,7 @@ extension DocumentSearcher {
                  let lineRange = lines.count == 1 ? nsRange : line.range(at: 0, on: page)
                  let fitted = Self.inkFittedRect($0, page: page, text: line.string, range: lineRange, paintOnly: true)
                  let rect = grown(fitted, line: line.bounds(for: page), by: Self.ownGlyphs(for: lineRange, page: page), page: page)
--                return (rect, rect == fitted ? nil : fitted)
-+                return (rect, nil)
+-                return (rect, rect == fitted ? nil : fitted, lineRange)
++                return (rect, nil, lineRange)
              }
          }
          return boxes.isEmpty ? nil : boxes

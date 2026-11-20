@@ -1,0 +1,19 @@
+Property: A region placed from a recognised match carries no characters of the page's string.
+Area: search
+Test command: cd Packages/RedactionEngine && swift test --filter 'MatchCharactersTests'
+Must go red: RedactionEngineTests/MatchCharactersTests "A recognised match carries no characters, and its region reads as placed from the picture"
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RedactionRegion+Marks.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RedactionRegion+Marks.swift
+index a7d463d4..96f8f2e3 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RedactionRegion+Marks.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RedactionRegion+Marks.swift
+@@ -18,7 +18,7 @@ extension RedactionRegion {
+                   source: .searchMatch(term: result.term, rationale: result.rationale),
+                   textLayerRect: result.textLayerRect,
+                   textAnchored: result.source == .textLayer)
+-        pageCharacters = result.source == .textLayer ? result.pageCharacters : nil
++        pageCharacters = result.pageCharacters
+     }
+ }
+ 

@@ -1,16 +1,15 @@
 Property: The on arm's plan is made with the switch on.
 Area: measured run entry
 Test command: cd Packages/RedactionEngine && swift test --filter MeasuredRunTests
-Must go red: RedactionEngineTests/MeasuredRunTests "Under the switch's policy the on arm widens the value's box and the off arm does not"; RedactionEngineTests/MeasuredRunTests "A short, long or empty run is unreadable"; RedactionEngineTests/MeasuredRunTests "Two runs of one page give the same boxes"; RedactionEngineTests/MeasuredRunTests "With the product's selection a Search box is not read from its line, so the switch widens nothing"
+Must go red: RedactionEngineTests/MeasuredRunTests "Under the switch's policy the on arm widens the value's box and the off arm does not"; RedactionEngineTests/MeasuredRunTests "A short, long or empty run is unreadable"; RedactionEngineTests/MeasuredRunTests "Two runs of one page give the same boxes"; RedactionEngineTests/MeasuredRunTests "With the product's selection a Search box is read from its line, and the switch widens it"
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Tests/RedactionEngineTests/Fixtures/MeasuredRun.swift b/Packages/RedactionEngine/Tests/RedactionEngineTests/Fixtures/MeasuredRun.swift
-index e6d159d7..147b677e 100644
 --- a/Packages/RedactionEngine/Tests/RedactionEngineTests/Fixtures/MeasuredRun.swift
 +++ b/Packages/RedactionEngine/Tests/RedactionEngineTests/Fixtures/MeasuredRun.swift
-@@ -146,7 +146,7 @@ enum MeasuredRun {
-                               share: PointRect(minX: Double(r.minX), minY: Double(r.minY), maxX: Double(r.maxX), maxY: Double(r.maxY)),
-                               kind: RegionKind(of: region), selected: selected[region.id] ?? [])
+@@ -149,7 +149,7 @@
+         if let selected {
+             planRegions = planRegions.map { var region = $0; region.selected = selected[region.id] ?? []; return region }
          }
 -        let choice = RunRecord.planChoice(source: source, switchOn: arm == .on)
 +        let choice = RunRecord.planChoice(source: source, switchOn: false)
