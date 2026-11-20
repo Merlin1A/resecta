@@ -1,0 +1,19 @@
+Property: A Searchable export whose dictionary lies past the old 256 KiB window is kept only when the index way rewrote it; the tail search alone leaves the writer's values, and the read-back stops the file.
+Area: the information dictionary rewrite and the read-back (Engine, iOS)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<iOS simulator> -only-testing:RedactionEngineTests/MetaReadBackTests/largeCJKSearchable() (run from Packages/RedactionEngine)
+Must go red: RedactionEngineTests/MetaReadBackTests largeCJKSearchable (iOS)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
+index a3ce0256..4da70dd4 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
+@@ -391,7 +391,7 @@ public actor PDFStreamReconstructor {
+     /// again whole failed too: the file may then hold the rest of an old
+     /// value, and `finalize` records it so the file is never promoted.
+     static func overwriteInfoLiteralsReporting(at url: URL) -> (way: RunRecord.InfoDictionaryWay, whole: Bool) {
+-        let (first, firstWhole) = overwriteInfoLiteralsThroughIndex(at: url)
++        let (first, firstWhole) = overwriteInfoLiteralsThroughIndex(at: URL(fileURLWithPath: "/nonexistent"))
+         // The second way runs after the first on every exit, as it ran
+         // before the index was read: every literal it rewrites on a file is
+         // rewritten here too, so no file fares worse. A literal the first way

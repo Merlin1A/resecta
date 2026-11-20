@@ -213,6 +213,10 @@ struct MetaReadBackTests {
         }
     }
 
+    // iOS only: on the Mac the hidden layer is drawn in Courier alone, so
+    // the export carries no large fallback font and its dictionary stays
+    // near the end; the case this test is for is not made there.
+    #if os(iOS)
     @Test("A large Chinese Searchable export, its dictionary past the old window, is kept with its read-back held")
     func largeCJKSearchable() async throws {
         let glyphs = (UInt32(0x4E00)..<UInt32(0x4E00 + 6_000)).compactMap { Unicode.Scalar($0).map(Character.init) }
@@ -230,8 +234,10 @@ struct MetaReadBackTests {
         var distance = -1
         if case .found(let found) = PDFTrailerLocator.locate(in: bytes) { distance = bytes.count - found.dictionary.lowerBound }
         print("READBACK cjk bytes=\(bytes.count) infoFromEnd=\(distance) past256KiB=\(distance > 262_144)")
+        try #require(distance > 262_144, "the dictionary lies past the old 256 KiB window")
         #expect(run.outcome.produced.metaReadBack == .held)
     }
+    #endif
 
     // MARK: - The writer's values stay in memory
 
