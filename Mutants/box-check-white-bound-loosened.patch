@@ -1,0 +1,19 @@
+Property: A white brightness block is exactly the fill only at or above 1013, the value that decodes to 255 at every sample; a box painted at level 254 is not the fill.
+Area: the box check over the stored page picture
+Test command: cd Packages/RedactionEngine && swift test --skip-build --no-parallel --filter 'BoxCheckTests|BoxCheckRuleTests' (after swift build --build-tests)
+Must go red: RedactionEngineTests/BoxCheckRuleTests oneLevelShortOfWhite
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
+index 0b46e217..8b0505a0 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
+@@ -157,7 +157,7 @@ enum ExactFillCheck {
+         guard b.flat else { return false }
+         switch fill {
+         case .black: return b.dcTimesStep <= -1021
+-        case .white: return b.dcTimesStep >= 1013
++        case .white: return b.dcTimesStep >= 1000
+         }
+     }
+ 

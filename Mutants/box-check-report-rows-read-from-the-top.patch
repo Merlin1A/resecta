@@ -1,0 +1,21 @@
+Property: The reported rectangle's rows count from the image's bottom edge and are converted once: top is H minus (r + h), bottom is H minus r.
+Area: the box check over the stored page picture
+Test command: cd Packages/RedactionEngine && swift test --skip-build --no-parallel --filter 'BoxCheckTests|BoxCheckRuleTests' (after swift build --build-tests)
+Must go red: RedactionEngineTests/BoxCheckTests each [35: a Letter box in the top block row, its report read with rows from the bottom]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PixelPaintRule.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PixelPaintRule.swift
+index 47226be6..54548736 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PixelPaintRule.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PixelPaintRule.swift
+@@ -108,8 +108,8 @@ enum PixelPaintRule {
+     /// Nil when it spans no pixel or any of its lines lies outside the image.
+     static func reported(_ p: RunRecord.PaintedPixels, width w: Int, height h: Int) -> Lines? {
+         guard p.columns >= 1, p.rows >= 1 else { return nil }
+-        let r = Lines(left: p.firstColumn, top: h - (p.firstRowFromBottom + p.rows),
+-                      right: p.firstColumn + p.columns, bottom: h - p.firstRowFromBottom)
++        let r = Lines(left: p.firstColumn, top: p.firstRowFromBottom,
++                      right: p.firstColumn + p.columns, bottom: p.firstRowFromBottom + p.rows)
+         guard r.left >= 0, r.top >= 0, r.right <= w, r.bottom <= h else { return nil }
+         return r
+     }

@@ -1,0 +1,22 @@
+Property: The block edge is never pulled back by a limit line.
+Area: the box check's copy of the paint rule, against the painting code's
+Test command: cd Packages/RedactionEngine && swift test --skip-build --no-parallel --filter PixelPaintDifferentialTests (after swift build --build-tests)
+Must go red: RedactionEngineTests/PixelPaintDifferentialTests boxesAgree
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PixelPaintRule.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PixelPaintRule.swift
+index 9e1e885e..f80de00b 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PixelPaintRule.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PixelPaintRule.swift
+@@ -103,8 +103,10 @@ enum PixelPaintRule {
+         if let a = limitAbove { margin.top = max(margin.top, h - floorPixels(a, dpi: d)) }
+         if let b = limitBelow { margin.bottom = min(margin.bottom, h - ceilPixels(b, dpi: d)) }
+         let i = outward(inner, dpi: d, imageHeight: h)
+-        let block = Lines(left: downToBlock(i.left), top: downToBlock(i.top),
++        var block = Lines(left: downToBlock(i.left), top: downToBlock(i.top),
+                           right: upToBlock(i.right), bottom: upToBlock(i.bottom))
++        if let a = limitAbove { block.top = max(block.top, h - floorPixels(a, dpi: d)) }
++        if let b = limitBelow { block.bottom = min(block.bottom, h - ceilPixels(b, dpi: d)) }
+         return Lines(left: min(margin.left, block.left), top: min(margin.top, block.top),
+                      right: max(margin.right, block.right), bottom: max(margin.bottom, block.bottom))
+             .clipped(width: w, height: h)

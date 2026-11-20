@@ -1,0 +1,21 @@
+Property: A report that does not hold the rule's paint never shrinks the painted area judged, and a box whose every required block is the fill under such a report is inconclusive, not completed.
+Area: the box check over the stored page picture
+Test command: cd Packages/RedactionEngine && swift test --skip-build --no-parallel --filter 'BoxCheckTests|BoxCheckRuleTests' (after swift build --build-tests)
+Must go red: RedactionEngineTests/BoxCheckTests each [33: a report smaller with every block the fill; a report past the image; no report]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
+index 9c70a425..4402e9f8 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
+@@ -227,8 +227,8 @@ enum ExactFillCheck {
+         let note: BoxReportNote
+         var painted = rule
+         if let reported {
+-            if let lines = PixelPaintRule.reported(reported, width: w, height: h), lines.contains(rule) {
+-                note = lines == rule ? .none : .reportedLarger
++            if let lines = PixelPaintRule.reported(reported, width: w, height: h) {
++                note = lines.contains(rule) && lines != rule ? .reportedLarger : .none
+                 painted = lines
+             } else {
+                 note = .reportedSmaller

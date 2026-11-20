@@ -1,0 +1,22 @@
+Property: The extra pixel is added to the margin's edge first and the hold at a limit comes last.
+Area: the box check's copy of the paint rule, against the painting code's
+Test command: cd Packages/RedactionEngine && swift test --skip-build --no-parallel --filter PixelPaintDifferentialTests (after swift build --build-tests)
+Must go red: RedactionEngineTests/PixelPaintDifferentialTests boxesAgree
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PixelPaintRule.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PixelPaintRule.swift
+index 9e1e885e..3fd7db45 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PixelPaintRule.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PixelPaintRule.swift
+@@ -99,9 +99,10 @@ enum PixelPaintRule {
+                            dpi d: Int, width w: Int, height h: Int) -> Lines {
+         guard hasArea(inner) else { return Lines(left: 0, top: 0, right: 0, bottom: 0) }
+         let p = outward(paint, dpi: d, imageHeight: h)
+-        var margin = Lines(left: p.left - 1, top: p.top - 1, right: p.right + 1, bottom: p.bottom + 1)
++        var margin = p
+         if let a = limitAbove { margin.top = max(margin.top, h - floorPixels(a, dpi: d)) }
+         if let b = limitBelow { margin.bottom = min(margin.bottom, h - ceilPixels(b, dpi: d)) }
++        margin = Lines(left: margin.left - 1, top: margin.top - 1, right: margin.right + 1, bottom: margin.bottom + 1)
+         let i = outward(inner, dpi: d, imageHeight: h)
+         let block = Lines(left: downToBlock(i.left), top: downToBlock(i.top),
+                           right: upToBlock(i.right), bottom: upToBlock(i.bottom))

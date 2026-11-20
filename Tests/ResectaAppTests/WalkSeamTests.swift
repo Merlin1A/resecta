@@ -26,6 +26,13 @@ struct WalkSeamTests {
             "Sources/ResectaApp/Views/Search/SearchAndRedactSheet+Trigger.swift",
             "Sources/ResectaApp/Views/Search/SearchAndRedactSheet+CompactApply.swift",
             "Sources/ResectaApp/Views/Search/SearchAndRedactSheet+CompactStrip.swift",
+            "Sources/ResectaApp/Views/Search/SearchAndRedactSheet+SearchBar.swift",
+            "Sources/ResectaApp/Views/Search/SearchAndRedactSheet+GrabberPulse.swift",
+            "Sources/ResectaApp/Views/Search/SearchAndRedactSheet+ResultNavigation.swift",
+            "Sources/ResectaApp/Views/Search/SearchAndRedactSheet+LivePreview.swift",
+            "Sources/ResectaApp/Views/Search/SearchAndRedactSheet+DegradeBanner.swift",
+            "Sources/ResectaApp/Views/Search/SearchAndRedactSheet+SaveRegex.swift",
+            "Sources/ResectaApp/Views/Search/SearchModal.swift",
         ] {
             let source = try loadRepoFile(path)
             #expect(!source.contains("requestCanvasScroll("),
@@ -38,7 +45,8 @@ struct WalkSeamTests {
     @Test("Every caller names the seam: the chevrons step the walk, the results section wiring")
     func everyCallerNamesTheSeam() throws {
         let hub = try loadRepoFile("Sources/ResectaApp/Views/SearchAndRedactSheet.swift")
-        let cluster = try slice(hub,
+        let navigation = try loadRepoFile("Sources/ResectaApp/Views/Search/SearchAndRedactSheet+ResultNavigation.swift")
+        let cluster = try slice(navigation,
                                 from: "func resultNavButton(",
                                 to: "func resultNavCounter(")
         #expect(cluster.contains("stepWalk(.previous)") && cluster.contains("stepWalk(.next)"),

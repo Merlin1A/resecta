@@ -1,0 +1,18 @@
+Property: A block is exactly the fill only when it is flat: a DC within the fill's bound with an AC coefficient that is not zero is not the fill.
+Area: the box check over the stored page picture
+Test command: cd Packages/RedactionEngine && swift test --skip-build --no-parallel --filter 'BoxCheckTests|BoxCheckRuleTests' (after swift build --build-tests)
+Must go red: RedactionEngineTests/BoxCheckRuleTests oneBrightPixel
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
+index 9c70a425..1e5c63cd 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
+@@ -152,7 +152,6 @@ enum ExactFillCheck {
+     /// times its step at most −1021 (black) or at least 1013 (white), the
+     /// values that decode to 0 or 255 at every sample whichever way a half rounds.
+     static func isExactFill(_ b: CodedBlock, _ fill: FillColor) -> Bool {
+-        guard b.flat else { return false }
+         switch fill {
+         case .black: return b.dcTimesStep <= -1021
+         case .white: return b.dcTimesStep >= 1013
