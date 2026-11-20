@@ -41,6 +41,14 @@ struct DocumentEditorView: View {
     /// the selection — iPhone parity for the iPad Shift+tap path. iPad
     /// Shift+tap continues to work whether the toggle is on or off.
     @State var isMultiSelectActive: Bool = false
+    /// The selection bar's frame at its bottom place, in the canvas's
+    /// points (measured only while it is drawn there); nil while the bar
+    /// does not hold the slot.
+    @State var selectionBarFrame: CGRect?
+    /// The bar's place is the top: the selection is under its bottom place.
+    @State var selectionBarAtTop = false
+    /// The canvas's coordinate space, where the bar's frame is read.
+    static let canvasSpaceName = "editorCanvas"
 
     /// The band's places whose notice has been spoken and still holds.
     /// Cleared when another document replaces this one.
@@ -198,7 +206,9 @@ struct DocumentEditorView: View {
                 PDFDocumentView(
                     isDrawingMode: activeTool != nil,
                     activeShapeTool: Self.shapeTool(for: activeTool),
-                    isMultiSelectActive: isMultiSelectActive
+                    isMultiSelectActive: isMultiSelectActive,
+                    selectionBarFrame: selectionBarFrame,
+                    onSelectionBarPlace: { selectionBarAtTop = $0 }
                 )
                     .disabled(documentState.canvasLocked)
                     .blur(radius: documentState.canvasLocked ? 3 : 0,
@@ -226,6 +236,7 @@ struct DocumentEditorView: View {
                     .background { GeometryReader { canvas in
                         Color.clear.preference(key: MessageReadableSpace.self, value: canvas.size.height)
                     } }
+                    .coordinateSpace(.named(Self.canvasSpaceName))
 
             case .verifying:
                 // Full-screen replacement — verification is a distinct
