@@ -216,7 +216,8 @@ extension RunRecord {
         /// rewritten.
         case byIndexNothingRewritten
         /// The index named the dictionary and at least one literal in it was
-        /// rewritten before an I/O error stopped that way.
+        /// rewritten, or a write to one had begun, before an I/O error stopped
+        /// that way. A write that began is written again whole.
         case byIndexCutShort
         /// The index way rewrote nothing, for the reason given, and the tail
         /// search rewrote at least one literal.

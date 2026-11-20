@@ -99,8 +99,12 @@ extension PipelineCoordinator {
         // creation guard, per-page decode guard). Comparing the count of pages
         // actually written against the count we appended covers all three —
         // and any future drop cause — with one check. It sits BEFORE the atomic
-        // rename so a truncated temp file never replaces a good output.
-        guard await reconstructor.writtenPageCount == pages.count else {
+        // rename so a truncated temp file never replaces a good output. The
+        // same gate refuses a file whose information-dictionary rewrite left
+        // a literal part-written (a write that threw part-way, and writing it
+        // again whole failed too): the rest of an old value may be in it.
+        guard await reconstructor.writtenPageCount == pages.count,
+              await reconstructor.infoPatchesWhole else {
             throw PipelineError.redactionError(.reconstructionFailed)
         }
 

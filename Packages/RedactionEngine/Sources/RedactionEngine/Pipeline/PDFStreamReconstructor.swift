@@ -51,6 +51,14 @@ public actor PDFStreamReconstructor {
     private var _writtenPageCount = 0
     public var writtenPageCount: Int { _writtenPageCount }
 
+    /// False when a write of the information dictionary's literals threw
+    /// part-way and writing that patch again whole failed too, so the file
+    /// may hold the rest of an old value. Set by `finalize`; the coordinator
+    /// reads it with `writtenPageCount` before the atomic rename, so such a
+    /// file never replaces the output.
+    private var _infoPatchesWhole = true
+    public var infoPatchesWhole: Bool { _infoPatchesWhole }
+
     /// One page's data, produced by `encodeBufferedPage` (or the test seam) and
     /// consumed immediately by `drawBufferedPage`. JPEG bytes are encoded so the
     /// source CGImage can be released back to the caller's autoreleasepool; the
@@ -219,8 +227,11 @@ public actor PDFStreamReconstructor {
         // become whitespace between dictionary entries; each date is
         // overwritten at its exact length), so every xref offset stays
         // valid. Any anomaly leaves that literal untouched — the export
-        // never fails on this step.
-        infoDictionaryWay = Self.overwriteInfoLiterals(at: tempURL)
+        // never fails on this step, unless a literal was left part-written
+        // (`infoPatchesWhole`, which the coordinator reads before promotion).
+        let rewrite = Self.overwriteInfoLiteralsReporting(at: tempURL)
+        infoDictionaryWay = rewrite.way
+        _infoPatchesWhole = rewrite.whole
 
         // The writer also stamps a random per-export `/ID` pair in the
         // trailer. Both halves are rewritten, at their exact offsets, to the
@@ -326,26 +337,40 @@ public actor PDFStreamReconstructor {
     /// whose length differs from the fixed one's.
     #if DEBUG
     /// Test seam: the step of the first way that fails as an I/O error
-    /// would, before the file is read, or before its second write.
-    enum IndexWayFault: Sendable { case read, secondWrite }
+    /// would, before the file is read, before its second write, or part-way
+    /// through its first write.
+    enum IndexWayFault: Sendable { case read, secondWrite, shortFirstWrite }
     @TaskLocal static var indexWayFault: IndexWayFault?
+    /// Test seam: the second way's first write fails part-way.
+    @TaskLocal static var tailShortFirstWrite = false
+    /// Test seam: writing a part-written patch again whole fails too.
+    @TaskLocal static var rewriteWholeFails = false
     #endif
 
     @discardableResult
     static func overwriteInfoLiterals(at url: URL) -> RunRecord.InfoDictionaryWay {
-        let first = overwriteInfoLiteralsThroughIndex(at: url)
+        overwriteInfoLiteralsReporting(at: url).way
+    }
+
+    /// The rewrite, and whether every patch whose write began was written
+    /// whole. False only when a write threw part-way and writing that patch
+    /// again whole failed too: the file may then hold the rest of an old
+    /// value, and `finalize` records it so the file is never promoted.
+    static func overwriteInfoLiteralsReporting(at url: URL) -> (way: RunRecord.InfoDictionaryWay, whole: Bool) {
+        let (first, firstWhole) = overwriteInfoLiteralsThroughIndex(at: url)
         // The second way runs after the first on every exit, as it ran
         // before the index was read: every literal it rewrites on a file is
         // rewritten here too, so no file fares worse. A literal the first way
         // already rewrote reads as the fixed value and is written again
         // unchanged.
-        let tailRewrote = overwriteInfoLiteralsInTail(at: url)
+        let (tailRewrote, tailWhole) = tailWay(at: url)
+        let whole = firstWhole && tailWhole
         switch first {
-        case .rewrote: return .byIndex
-        case .nothingRewritten: return .byIndexNothingRewritten
-        case .cutShort: return .byIndexCutShort
+        case .rewrote: return (.byIndex, whole)
+        case .nothingRewritten: return (.byIndexNothingRewritten, whole)
+        case .cutShort: return (.byIndexCutShort, whole)
         case .refused(let reason):
-            return tailRewrote ? .byTail(indexRefused: reason) : .neither(indexRefused: reason)
+            return (tailRewrote ? .byTail(indexRefused: reason) : .neither(indexRefused: reason), whole)
         }
     }
 
@@ -355,16 +380,51 @@ public actor PDFStreamReconstructor {
         case rewrote
         /// Every literal of that dictionary declined.
         case nothingRewritten
-        /// At least one literal was rewritten, then an I/O error stopped the way.
+        /// At least one literal was rewritten, or a write had begun, then an
+        /// I/O error stopped the way.
         case cutShort
         /// The way rewrote nothing: the index refused, or an I/O error came first.
         case refused(RunRecord.IndexRefusal)
     }
 
+    /// A patch whose write has begun: its place in the file and its bytes.
+    private typealias Patch = (offset: UInt64, bytes: Data)
+
+    /// Writes `patch` at its place through `handle`, setting `inFlight` from
+    /// the moment the write may change a byte until it has written them all.
+    private static func write(_ patch: Patch, with handle: FileHandle, inFlight: inout Patch?,
+                              cutPartWay: Bool) throws {
+        try handle.seek(toOffset: patch.offset)
+        inFlight = patch
+        if cutPartWay {
+            try handle.write(contentsOf: patch.bytes.prefix(patch.bytes.count / 2))
+            throw CocoaError(.fileWriteUnknown)
+        }
+        try handle.write(contentsOf: patch.bytes)
+        inFlight = nil
+    }
+
+    /// After an I/O error: a patch whose write began may have left the start
+    /// of the fixed value and, after it, the rest of the old one, which the
+    /// next search would read past. It is written again whole through a new
+    /// handle. True when nothing was in flight or that write succeeded.
+    private static func writeAgainWhole(_ inFlight: Patch?, at url: URL) -> Bool {
+        guard let patch = inFlight else { return true }
+        #if DEBUG
+        if rewriteWholeFails { return false }
+        #endif
+        guard let again = try? FileHandle(forUpdating: url) else { return false }
+        defer { try? again.close() }
+        guard (try? again.seek(toOffset: patch.offset)) != nil,
+              (try? again.write(contentsOf: patch.bytes)) != nil else { return false }
+        return true
+    }
+
     /// The first way: the literals of the dictionary the trailer names, and
     /// nowhere else.
-    private static func overwriteInfoLiteralsThroughIndex(at url: URL) -> IndexWayResult {
+    private static func overwriteInfoLiteralsThroughIndex(at url: URL) -> (IndexWayResult, whole: Bool) {
         var rewrote = false
+        var inFlight: Patch?
         do {
             // The file is read mapped and the dictionary's bytes copied out
             // (at most 4,096), so the mapping is released before the handle
@@ -378,26 +438,29 @@ public actor PDFStreamReconstructor {
             case .found(let found):
                 byIndex = (found.dictionary.lowerBound, fileData.subdata(in: found.dictionary))
             case .refused(let reason):
-                return .refused(reason)
+                return (.refused(reason), true)
             }
 
             let handle = try FileHandle(forUpdating: url)
             defer { try? handle.close() }
             for rewrite in infoLiteralRewrites {
                 guard let patch = rewriteBytes(for: rewrite, in: byIndex.dictionary) else { continue }
+                var cutPartWay = false
                 #if DEBUG
                 if indexWayFault == .secondWrite, rewrote { throw CocoaError(.fileWriteUnknown) }
+                cutPartWay = indexWayFault == .shortFirstWrite && !rewrote
                 #endif
-                try handle.seek(toOffset: UInt64(byIndex.start + patch.offset))
-                try handle.write(contentsOf: patch.bytes)
+                try write((UInt64(byIndex.start + patch.offset), patch.bytes), with: handle, inFlight: &inFlight,
+                          cutPartWay: cutPartWay)
                 rewrote = true
             }
-            return rewrote ? .rewrote : .nothingRewritten
+            return (rewrote ? .rewrote : .nothingRewritten, true)
         } catch { // LegalPhrases:safe (Swift keyword)
             // Mechanism-only logging; the second way runs next in any case.
             infoRewriteLogger.warning(
                 "info literal rewrite through the index failed (metadata: \(error.localizedDescription, privacy: .public))")
-            return rewrote ? .cutShort : .refused(.readOrWriteFailed)
+            let whole = writeAgainWhole(inFlight, at: url)
+            return (rewrote || inFlight != nil ? .cutShort : .refused(.readOrWriteFailed), whole)
         }
     }
 
@@ -405,6 +468,14 @@ public actor PDFStreamReconstructor {
     /// three literals, as it ran before the index was read, byte for byte.
     /// True when it rewrote at least one literal.
     static func overwriteInfoLiteralsInTail(at url: URL) -> Bool {
+        tailWay(at: url).rewrote
+    }
+
+    /// The second way, and whether every patch whose write began was written
+    /// whole (see `writeAgainWhole`).
+    private static func tailWay(at url: URL) -> (rewrote: Bool, whole: Bool) {
+        var rewritten = false
+        var inFlight: Patch?
         do {
             let handle = try FileHandle(forUpdating: url)
             defer { try? handle.close() }
@@ -420,22 +491,28 @@ public actor PDFStreamReconstructor {
             let windowStart = fileSize - windowLength
             try handle.seek(toOffset: windowStart)
             guard let window = try handle.read(upToCount: Int(windowLength)),
-                  !window.isEmpty else { return false }
+                  !window.isEmpty else { return (false, true) }
 
-            var rewritten = false
             for rewrite in infoLiteralRewrites {
                 guard let patch = rewriteBytes(for: rewrite, in: window) else { continue }
-                try handle.seek(toOffset: windowStart + UInt64(patch.offset))
-                try handle.write(contentsOf: patch.bytes)
+                var cutPartWay = false
+                #if DEBUG
+                cutPartWay = tailShortFirstWrite && !rewritten
+                #endif
+                try write((windowStart + UInt64(patch.offset), patch.bytes), with: handle, inFlight: &inFlight,
+                          cutPartWay: cutPartWay)
                 rewritten = true
             }
-            return rewritten
+            return (rewritten, true)
         } catch { // LegalPhrases:safe (Swift keyword)
             // Mechanism-only logging; the export proceeds with
-            // the writer's own values rather than failing.
+            // the writer's own values rather than failing, unless a patch
+            // was left part-written.
             infoRewriteLogger.warning(
                 "info literal rewrite skipped (metadata: \(error.localizedDescription, privacy: .public))")
-            return false
+            // A patch written again whole is a literal rewritten.
+            let whole = writeAgainWhole(inFlight, at: url)
+            return (rewritten || (inFlight != nil && whole), whole)
         }
     }
 

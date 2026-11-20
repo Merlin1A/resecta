@@ -55,12 +55,15 @@ struct InfoDictionaryThroughIndexTests {
         Case(id: 19, title: "a trailer with no pair in the writer's shape and one in the tail: located in the tail; a pair that cannot be located could not be verified"),
         Case(id: 20, title: "a dictionary the index names whose every literal declines, a look-alike in the tail: the look-alike is rewritten as the tail search alone rewrites it"),
         Case(id: 21, title: "a dictionary the index names that lacks a key, a look-alike in the tail carrying it: both are rewritten"),
+        Case(id: 22, title: "a write cut part-way through the index way's first patch: the patch is written again whole, no byte of the old value stays"),
+        Case(id: 23, title: "a write cut part-way through the tail search's first patch on a file whose index way refuses: written again whole, no byte of the old value stays"),
+        Case(id: 24, title: "a write cut part-way, and writing it again whole fails too, in either way: the rewrite reports the file not whole"),
     ]
 
-    @Test("The table holds twenty-one cases")
+    @Test("The table holds twenty-four cases")
     func tableLength() {
-        #expect(Self.cases.count == 21)
-        #expect(Set(Self.cases.map(\.id)) == Set(1...21))
+        #expect(Self.cases.count == 24)
+        #expect(Set(Self.cases.map(\.id)) == Set(1...24))
     }
 
     @Test("Each case", arguments: InfoDictionaryThroughIndexTests.cases)
@@ -97,6 +100,9 @@ struct InfoDictionaryThroughIndexTests {
         case 19: try await Self.identifierInTheTail()
         case 20: try Self.everyLiteralDeclinesWithLookAlike()
         case 21: try Self.keyMissingWithLookAlike()
+        case 22: try Self.writeCutPartWay()
+        case 23: try Self.tailWriteCutPartWay()
+        case 24: try Self.writeAgainWholeFails()
         default: Issue.record("no case \(c.id)")
         }
     }
@@ -410,6 +416,89 @@ struct InfoDictionaryThroughIndexTests {
         #expect(after[offsets[5]!..<offsets[6]!] == before[offsets[5]!..<offsets[6]!], "20: the named dictionary is left")
         try expectNoWorseThanTheTailSearch(before: before, after: after, label: "20")
         print("INFODICT 20 way=\(way)")
+    }
+
+    /// The bytes of the dictionary's /Producer entry as `before` holds it,
+    /// from its key to the old literal's end: where the first patch goes.
+    static func producerEntry(_ before: Data, dictionary: Range<Int>) -> Range<Int> {
+        let start = before.range(of: Data("/Producer (".utf8), in: dictionary)!.lowerBound
+        return start..<(start + "/Producer (".utf8.count + MadeInfoFile.producer.utf8.count + 1)
+    }
+
+    /// The old producer's last words, which a part-written patch leaves.
+    static let oldProducerTail = Data("Quartz PDFContext".utf8)
+
+    /// The first patch is half written, then the write throws. Inside the
+    /// tail window and before it (where only the index way reaches), the
+    /// producer entry is the one the file gets with no fault, byte for byte,
+    /// and no byte of the old value stays; the rest is what an I/O error at
+    /// that point leaves (case 17).
+    static func writeCutPartWay() throws {
+        for (label, made) in [("inside the window", MadeInfoFile()), ("before the window", MadeInfoFile(padding: 300_000))] {
+            let (before, offsets) = made.build()
+            let cut = try write(before)
+            let whole = try write(before)
+            defer {
+                try? FileManager.default.removeItem(at: cut)
+                try? FileManager.default.removeItem(at: whole)
+            }
+            let (way, wholeAfter) = PDFStreamReconstructor.$indexWayFault.withValue(.shortFirstWrite) {
+                PDFStreamReconstructor.overwriteInfoLiteralsReporting(at: cut)
+            }
+            _ = PDFStreamReconstructor.overwriteInfoLiterals(at: whole)
+            #expect(way == .byIndexCutShort, "22 \(label): \(way)")
+            #expect(wholeAfter, "22 \(label): the patch was written again whole")
+            let after = try Data(contentsOf: cut)
+            let entry = producerEntry(before, dictionary: offsets[5]!..<offsets[6]!)
+            #expect(after[entry] == (try Data(contentsOf: whole))[entry], "22 \(label): the producer entry is not the uninterrupted one")
+            #expect(after.range(of: oldProducerTail) == nil, "22 \(label): a byte of the old producer stays")
+            print("INFODICT 22 \(label) way=\(way)")
+        }
+    }
+
+    /// The tail search is the only writer when the index way refuses; its
+    /// first patch is half written, then the write throws. The producer
+    /// entry is the tail search's with no fault, byte for byte, and no byte
+    /// of the old value stays; the search stops there, as on main.
+    static func tailWriteCutPartWay() throws {
+        let (before, offsets) = MadeInfoFile(infoInTrailer: false).build()
+        let cut = try write(before)
+        let whole = try write(before)
+        defer {
+            try? FileManager.default.removeItem(at: cut)
+            try? FileManager.default.removeItem(at: whole)
+        }
+        let (way, wholeAfter) = PDFStreamReconstructor.$tailShortFirstWrite.withValue(true) {
+            PDFStreamReconstructor.overwriteInfoLiteralsReporting(at: cut)
+        }
+        _ = PDFStreamReconstructor.overwriteInfoLiterals(at: whole)
+        #expect(way == .byTail(indexRefused: .noInfoEntry), "23: \(way)")
+        #expect(wholeAfter, "23: the patch was written again whole")
+        let after = try Data(contentsOf: cut)
+        let entry = producerEntry(before, dictionary: offsets[5]!..<offsets[6]!)
+        #expect(after[entry] == (try Data(contentsOf: whole))[entry], "23: the producer entry is not the uninterrupted one")
+        #expect(after.range(of: oldProducerTail) == nil, "23: a byte of the old producer stays")
+        print("INFODICT 23 way=\(way)")
+    }
+
+    /// When writing the part-written patch again fails too, the rewrite says
+    /// the file is not whole (the producer then refuses it), by either way.
+    static func writeAgainWholeFails() throws {
+        for (label, made, index) in [("index way", MadeInfoFile(padding: 300_000), true),
+                                     ("tail search", MadeInfoFile(infoInTrailer: false), false)] {
+            let (before, _) = made.build()
+            let url = try write(before)
+            defer { try? FileManager.default.removeItem(at: url) }
+            let (way, wholeAfter) = PDFStreamReconstructor.$rewriteWholeFails.withValue(true) {
+                index
+                    ? PDFStreamReconstructor.$indexWayFault.withValue(.shortFirstWrite) {
+                        PDFStreamReconstructor.overwriteInfoLiteralsReporting(at: url) }
+                    : PDFStreamReconstructor.$tailShortFirstWrite.withValue(true) {
+                        PDFStreamReconstructor.overwriteInfoLiteralsReporting(at: url) }
+            }
+            #expect(!wholeAfter, "24 \(label): reported whole (\(way))")
+            print("INFODICT 24 \(label) way=\(way) whole=\(wholeAfter)")
+        }
     }
 
     static func keyMissingWithLookAlike() throws {
