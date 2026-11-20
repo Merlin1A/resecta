@@ -282,6 +282,9 @@ public actor PDFStreamReconstructor {
         // identifier, and none of the writer's own values left in its bytes.
         // The coordinator keeps the file only when this holds.
         _metaReadBack = MetaReadBack.check(url: tempURL, originals: originals)
+        #if DEBUG
+        if Self.readBackAccepts { _metaReadBack = .held }
+        #endif
 
         // Apply `.complete` file protection to the finalized temp
         // file. PipelineCoordinator.downgradeTempProtectionOnSessionClose()
@@ -394,6 +397,9 @@ public actor PDFStreamReconstructor {
     /// values, or its identifier pair, as the writer wrote them.
     @TaskLocal static var finalizeSkipsFixedValues = false
     @TaskLocal static var finalizeSkipsIdentifier = false
+    /// Test seam: the read-back reads as held whatever the file holds, so a
+    /// test can show what the gate's other conditions stop on their own.
+    @TaskLocal static var readBackAccepts = false
     #endif
 
     @discardableResult
