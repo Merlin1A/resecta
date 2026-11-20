@@ -1,0 +1,19 @@
+Property: A block of the unit cut by the image's right or bottom edge is examined like any other, so blocks examined equal blocks expected.
+Area: the box check over the stored page picture
+Test command: cd Packages/RedactionEngine && swift test --skip-build --no-parallel --filter 'BoxCheckTests|BoxCheckRuleTests' (after swift build --build-tests)
+Must go red: RedactionEngineTests/BoxCheckTests each [4: boxes on the image's right and bottom edges; a Letter box a sixty-fourth past the page]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
+index 9c70a425..b0a29d6c 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
+@@ -248,7 +248,7 @@ enum ExactFillCheck {
+         counts.unitExpected = unitCols.count * unitRows.count
+         for by in unitRows {
+             for bx in unitCols {
+-                guard bx < lumaWide, by < lumaHigh else { continue }
++                guard bx < lumaWide, by < lumaHigh, bx * side + side <= w, by * side + side <= h else { continue }
+                 counts.unitExamined += 1
+                 if isExactFill(luma[by * lumaWide + bx], fill) {
+                     counts.unitExact += 1

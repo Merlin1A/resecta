@@ -1,0 +1,22 @@
+Property: The unit is worked out from the box's inner rectangle alone, never from the rectangle the producer reports.
+Area: the box check over the stored page picture
+Test command: cd Packages/RedactionEngine && swift test --skip-build --no-parallel --filter 'BoxCheckTests|BoxCheckRuleTests' (after swift build --build-tests)
+Must go red: RedactionEngineTests/BoxCheckTests each [17: a report smaller than the paint over a block not the fill; the same with no report], [8: a box reported, and painted, 20 pixels larger on one side], [35: a Letter box in the top block row, its report read with rows from the bottom]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
+index 9c70a425..83afc332 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
+@@ -219,9 +219,10 @@ enum ExactFillCheck {
+         let inner = box.inner
+         if inner.maxX <= 0 || inner.minX >= sw || inner.maxY <= 0 || inner.minY >= sh { return .offPage }
+         let w = walk.width, h = walk.height
+-        guard let unit = PixelPaintRule.unit(inner: inner, dpi: dpi, width: w, height: h) else {
++        guard var unit = PixelPaintRule.unit(inner: inner, dpi: dpi, width: w, height: h) else {
+             return .inconclusive(mapsToNoPixel, nil)
+         }
++        if let reported, let lines = PixelPaintRule.reported(reported, width: w, height: h) { unit = lines }
+         let rule = PixelPaintRule.pixelPaint(inner: inner, paint: box.paint, limitAbove: box.limitAbove, limitBelow: box.limitBelow,
+                                              dpi: dpi, width: w, height: h)
+         let note: BoxReportNote

@@ -1,0 +1,19 @@
+Property: The frame's side is the rule's whole-number ceiling of S times d over 4608, never a floating-point product of points and scale as the rasterizer sizes its frame.
+Area: the box check over the stored page picture
+Test command: cd Packages/RedactionEngine && swift test --skip-build --no-parallel --filter 'BoxCheckTests|BoxCheckRuleTests' (after swift build --build-tests)
+Must go red: RedactionEngineTests/BoxCheckTests each [34: a Letter record with a 2,550 by 3,300 frame, and with 3,301 rows]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PixelPaintRule.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PixelPaintRule.swift
+index 47226be6..3851f1da 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PixelPaintRule.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PixelPaintRule.swift
+@@ -31,7 +31,7 @@ enum PixelPaintRule {
+     static func ceilPixels(_ x: Int, dpi d: Int) -> Int { ceilDiv(x * d, sixtyFourthsPerInch) }
+ 
+     /// The frame's side in pixels the rule gives a page side S at quality d.
+-    static func frameSide(_ s: Int, dpi d: Int) -> Int { ceilPixels(s, dpi: d) }
++    static func frameSide(_ s: Int, dpi d: Int) -> Int { Int(ceil(Double(s) / 64 * (Double(d) / 72))) }
+ 
+     /// The page's quality: the first of 150, 200, 300, none above the chosen
+     /// one, whose frame matches the image's width and height both. Nil when
