@@ -1,0 +1,18 @@
+Property: The kept plan names the fill colour the page was drawn under, so a fill changed behind the drawing is seen. Here it always names black.
+Area: drawn plan
+Test command: cd Packages/RedactionEngine && swift test --filter DrawnPlanTests
+Must go red: RedactionEngineTests/DrawnPlanTests keptWithItsSettings
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift
+@@ -52,7 +52,7 @@
+         self.pageIndex = pageIndex
+         self.switchOn = switchOn
+         self.exportDPI = exportDPI
+-        self.fillColor = fillColor
++        self.fillColor = .black
+         self.plan = plan
+         guard let plan else { boxes = []; return }
+         let w = Double(plan.widthSixtyFourths), h = Double(plan.heightSixtyFourths)

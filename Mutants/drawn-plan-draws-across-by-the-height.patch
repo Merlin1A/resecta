@@ -1,0 +1,20 @@
+Property: A box is drawn as a share of the page: across by the page's width S, up by its height. Here it is divided across by the height, so on a page that is not square the rectangle drawn is not the region.
+Area: drawn plan
+Test command: cd Packages/RedactionEngine && swift test --filter DrawnPlanTests
+Must go red: RedactionEngineTests/DrawnPlanTests asPlacedDrawsTheRegion
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift
+@@ -57,8 +57,8 @@
+         guard let plan else { boxes = []; return }
+         let w = Double(plan.widthSixtyFourths), h = Double(plan.heightSixtyFourths)
+         func share(_ r: PageRect64) -> CGRect {
+-            CGRect(x: Double(r.minX) / w, y: Double(r.minY) / h,
+-                   width: Double(r.maxX - r.minX) / w, height: Double(r.maxY - r.minY) / h)
++            CGRect(x: Double(r.minX) / h, y: Double(r.minY) / h,
++                   width: Double(r.maxX - r.minX) / h, height: Double(r.maxY - r.minY) / h)
+         }
+         boxes = plan.boxes.map { Box(regionIDs: $0.regionIDs, paint: share($0.paint), outline: share($0.tight)) }
+     }
