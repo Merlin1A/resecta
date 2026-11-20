@@ -1,0 +1,21 @@
+Property: A patch the tail search began to write is written again whole after an I/O error, so no byte of the old value stays.
+Area: the information dictionary rewrite and the metadata check (Engine)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --package-path Packages/RedactionEngine --filter InfoDictionaryThroughIndexTests
+Must go red: RedactionEngineTests/InfoDictionaryThroughIndexTests row [case 23] (and [case 24])
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
+index f4ed949f..2287f801 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
+@@ -511,8 +511,8 @@ public actor PDFStreamReconstructor {
+             infoRewriteLogger.warning(
+                 "info literal rewrite skipped (metadata: \(error.localizedDescription, privacy: .public))")
+             // A patch written again whole is a literal rewritten.
+-            let whole = writeAgainWhole(inFlight, at: url)
+-            return (rewritten || (inFlight != nil && whole), whole)
++            let whole = true
++            return (rewritten, whole)
+         }
+     }
+ 

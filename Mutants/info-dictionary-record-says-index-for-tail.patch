@@ -5,15 +5,15 @@ Must go red: RedactionEngineTests/InfoDictionaryThroughIndexTests row [case 6]
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
-index bbafdbbf..29d2d6d9 100644
+index beef9798..a5d38e6f 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
-@@ -343,7 +343,7 @@ public actor PDFStreamReconstructor {
-         case .nothingRewritten: return .byIndexNothingRewritten
-         case .cutShort: return .byIndexCutShort
+@@ -370,7 +370,7 @@ public actor PDFStreamReconstructor {
+         case .nothingRewritten: return (.byIndexNothingRewritten, whole)
+         case .cutShort: return (.byIndexCutShort, whole)
          case .refused(let reason):
--            return tailRewrote ? .byTail(indexRefused: reason) : .neither(indexRefused: reason)
-+            return tailRewrote ? .byIndex : .neither(indexRefused: reason)
+-            return (tailRewrote ? .byTail(indexRefused: reason) : .neither(indexRefused: reason), whole)
++            return (tailRewrote ? .byIndex : .neither(indexRefused: reason), whole)
          }
      }
  

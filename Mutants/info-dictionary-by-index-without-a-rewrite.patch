@@ -5,15 +5,15 @@ Must go red: RedactionEngineTests/InfoDictionaryThroughIndexTests row [case 18]
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
-index bbafdbbf..0848aaff 100644
+index beef9798..ff48275e 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
-@@ -340,7 +340,7 @@ public actor PDFStreamReconstructor {
-         let tailRewrote = overwriteInfoLiteralsInTail(at: url)
+@@ -367,7 +367,7 @@ public actor PDFStreamReconstructor {
+         let whole = firstWhole && tailWhole
          switch first {
-         case .rewrote: return .byIndex
--        case .nothingRewritten: return .byIndexNothingRewritten
-+        case .nothingRewritten: return .byIndex
-         case .cutShort: return .byIndexCutShort
+         case .rewrote: return (.byIndex, whole)
+-        case .nothingRewritten: return (.byIndexNothingRewritten, whole)
++        case .nothingRewritten: return (.byIndex, whole)
+         case .cutShort: return (.byIndexCutShort, whole)
          case .refused(let reason):
-             return tailRewrote ? .byTail(indexRefused: reason) : .neither(indexRefused: reason)
+             return (tailRewrote ? .byTail(indexRefused: reason) : .neither(indexRefused: reason), whole)

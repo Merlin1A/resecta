@@ -1,0 +1,19 @@
+Property: A patch the index way began to write is written again whole after an I/O error, so no byte of the old value stays.
+Area: the information dictionary rewrite and the metadata check (Engine)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --package-path Packages/RedactionEngine --filter InfoDictionaryThroughIndexTests
+Must go red: RedactionEngineTests/InfoDictionaryThroughIndexTests row [case 22] (and [case 24])
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
+index f4ed949f..f87e4717 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
+@@ -459,7 +459,7 @@ public actor PDFStreamReconstructor {
+             // Mechanism-only logging; the second way runs next in any case.
+             infoRewriteLogger.warning(
+                 "info literal rewrite through the index failed (metadata: \(error.localizedDescription, privacy: .public))")
+-            let whole = writeAgainWhole(inFlight, at: url)
++            let whole = true
+             return (rewrote || inFlight != nil ? .cutShort : .refused(.readOrWriteFailed), whole)
+         }
+     }
