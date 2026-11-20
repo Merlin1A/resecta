@@ -22,16 +22,24 @@ struct PageImageStream: Sendable {
 /// system reader; a later one changes nothing else.
 protocol PageImageSource {
     var pageCount: Int { get }
-    /// Every image the page draws, its own and those of the forms it draws.
-    func images(onPage index: Int) -> [PageImageStream]
+    /// Every image the page draws, its own and those of the forms it draws,
+    /// up to the second (a page with two is refused either way); or the
+    /// refusal when the page's forms go past what the source follows.
+    func images(onPage index: Int) -> Result<[PageImageStream], PageImageRefusal>
 }
 
 /// The system reader: Core Graphics' own reading of the checked file.
 struct SystemPageImageSource: PageImageSource {
     private let document: CGPDFDocument
 
-    /// Forms within forms are followed this deep, no deeper.
+    /// Forms within forms are followed this deep. A form deeper than this
+    /// refuses the page: an image inside it would go unseen.
     static let formDepthLimit = 8
+    /// The forms followed on one page, counted each time one is named, the
+    /// same form named twice counting twice. Past this the page is refused,
+    /// so forms that name each other many times over cost at most this many
+    /// visits. The app's own pages draw no form.
+    static let formLimit = 64
 
     init?(fileData: Data) {
         guard let provider = CGDataProvider(data: fileData as CFData),
@@ -41,16 +49,26 @@ struct SystemPageImageSource: PageImageSource {
 
     var pageCount: Int { document.numberOfPages }
 
-    func images(onPage index: Int) -> [PageImageStream] {
-        guard let page = document.page(at: index + 1), let dict = page.dictionary else { return [] }
+    func images(onPage index: Int) -> Result<[PageImageStream], PageImageRefusal> {
+        guard let page = document.page(at: index + 1), let dict = page.dictionary else { return .success([]) }
         var resources: CGPDFDictionaryRef?
-        guard CGPDFDictionaryGetDictionary(dict, "Resources", &resources), let res = resources else { return [] }
-        var found: [PageImageStream] = []
-        Self.collect(res, depth: 0, into: &found)
-        return found
+        guard CGPDFDictionaryGetDictionary(dict, "Resources", &resources), let res = resources else { return .success([]) }
+        var walk = FormWalk()
+        Self.collect(res, depth: 0, into: &walk)
+        if walk.overLimit { return .failure(PageImageRefusal(reason: .formsOverLimit, offset: 0)) }
+        return .success(walk.found)
     }
 
-    private static func collect(_ resources: CGPDFDictionaryRef, depth: Int, into found: inout [PageImageStream]) {
+    /// What one page's walk has met so far.
+    private struct FormWalk {
+        var found: [PageImageStream] = []
+        var formsFollowed = 0
+        var overLimit = false
+        /// Two images, or forms past the limit: the page's answer is known.
+        var done: Bool { found.count >= 2 || overLimit }
+    }
+
+    private static func collect(_ resources: CGPDFDictionaryRef, depth: Int, into walk: inout FormWalk) {
         var xobjects: CGPDFDictionaryRef?
         guard CGPDFDictionaryGetDictionary(resources, "XObject", &xobjects), let xobj = xobjects else { return }
         var streams: [CGPDFStreamRef] = []
@@ -59,18 +77,23 @@ struct SystemPageImageSource: PageImageSource {
             if CGPDFObjectGetValue(value, .stream, &stream), let s = stream { streams.append(s) }
             return true
         }, nil)
-        for s in streams {
+        for s in streams where !walk.done {
             guard let d = CGPDFStreamGetDictionary(s) else { continue }
             var subtype: UnsafePointer<CChar>?
             guard CGPDFDictionaryGetName(d, "Subtype", &subtype), let name = subtype.map({ String(cString: $0) }) else { continue }
             if name == "Image" {
                 var format = CGPDFDataFormat.raw
                 let data = CGPDFStreamCopyData(s, &format).map { $0 as Data } ?? Data()
-                found.append(PageImageStream(bytes: data, isJPEG: format == .jpegEncoded))
-            } else if name == "Form", depth < formDepthLimit {
+                walk.found.append(PageImageStream(bytes: data, isJPEG: format == .jpegEncoded))
+            } else if name == "Form" {
+                walk.formsFollowed += 1
+                guard depth < formDepthLimit, walk.formsFollowed <= formLimit else {
+                    walk.overLimit = true
+                    return
+                }
                 var inner: CGPDFDictionaryRef?
                 if CGPDFDictionaryGetDictionary(d, "Resources", &inner), let r = inner {
-                    collect(r, depth: depth + 1, into: &found)
+                    collect(r, depth: depth + 1, into: &walk)
                 }
             }
         }
@@ -124,7 +147,11 @@ enum PageImageLocator {
         func refuse(_ reason: PageImageRefusal.Reason) -> Result<Data, PageImageRefusal> {
             .failure(PageImageRefusal(reason: reason, offset: 0))
         }
-        let images = source.images(onPage: index)
+        let images: [PageImageStream]
+        switch source.images(onPage: index) {
+        case .success(let all): images = all
+        case .failure(let refusal): return .failure(refusal)
+        }
         guard let image = images.first else { return refuse(.noPageImage) }
         guard images.count == 1 else { return refuse(.twoPageImages) }
         guard image.isJPEG else { return refuse(.notJPEG) }

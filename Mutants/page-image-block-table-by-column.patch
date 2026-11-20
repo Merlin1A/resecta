@@ -1,0 +1,18 @@
+Property: Each block's entry sits at its own place in the table, row by row.
+Area: the reader of a page's stored picture (crafted input)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/PageImageCraftedInputTests (or on the host: cd Packages/RedactionEngine && swift test --no-parallel --filter PageImageCraftedInputTests)
+Must go red: RedactionEngineTests/PageImageCraftedInputTests blockTableValuesAndPlaces
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/JPEGEntropyWalk.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/JPEGEntropyWalk.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/JPEGEntropyWalk.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/JPEGEntropyWalk.swift
+@@ -184,7 +184,7 @@
+                             flat = false
+                             k += 1
+                         }
+-                        let index = (gy * down + v) * wide[c] + gx * across + h
++                        let index = (gx * across + h) * high[c] + gy * down + v
+                         blocks[c][index] = CodedBlock(dcTimesStep: Int32(predictors[c] * steps[c]), flat: flat)
+                     }
+                 }

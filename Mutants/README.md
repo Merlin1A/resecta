@@ -427,3 +427,8 @@ with its reason and the mutant that is caught in its place.
 | `search-limit-cuts-a-begun-match.patch` | Once a match is begun under the limit, every part of it is listed, even past the limit. | RedactionEngineTests/SearchLimitOccurrenceTests limitKeepsMatchesWhole |
 | `search-limit-pattern-counts-rows.patch` | A pattern search counts matches toward the limit, not the rows a broken match lists. | RedactionEngineTests/SearchLimitOccurrenceTests limitKeepsMatchesWhole |
 | `search-recheck-stop-counts-rows.patch` | The Search Re-check reads a page as stopped at the limit by its matches, not the rows a broken match lists. | RedactionEngineTests/SearchLimitOccurrenceTests recheckStopsAtMatches |
+| `page-image-block-always-flat.patch` | A block with any coefficient after the first is kept as not flat. | RedactionEngineTests/PageImageCraftedInputTests blockTableValuesAndPlaces |
+| `page-image-block-table-by-column.patch` | Each block's entry sits at its own place in the table, row by row. | RedactionEngineTests/PageImageCraftedInputTests blockTableValuesAndPlaces |
+| `page-image-deep-form-skipped.patch` | A form nested deeper than eight refuses the page; an image inside it never goes unseen. | RedactionEngineTests/PageImageCraftedInputTests formsNestedPastTheLimit |
+| `page-image-first-coefficient-limit-one-past.patch` | A running sum of the first coefficient past 2,047 either way is refused. | RedactionEngineTests/PageImageCraftedInputTests firstCoefficientLimit |
+| `page-image-forms-counted-without-limit.patch` | A page that names more than 64 forms, a form named twice counting twice, is refused. | RedactionEngineTests/PageImageCraftedInputTests formsNamedPastTheLimit |

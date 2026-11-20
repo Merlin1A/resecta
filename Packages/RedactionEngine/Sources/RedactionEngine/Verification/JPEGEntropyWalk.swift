@@ -18,6 +18,9 @@ enum JPEGEntropyWalk {
         fileprivate init() {}
     }
 
+    /// The largest first coefficient a baseline picture can carry: 11 bits.
+    static let firstCoefficientLimit = 2_047
+
     private enum Stop: Error {
         case refused(PageImageRefusal)
         case cancelled
@@ -156,6 +159,13 @@ enum JPEGEntropyWalk {
                         let size = try symbol(&reader, dcTables[c])
                         guard size <= 11 else { throw refused(.coefficientSize, reader.position) }
                         predictors[c] += extend(try reader.bits(size), size)
+                        // A baseline picture's first coefficient fits in 11
+                        // bits (its largest difference is 2,047): a running
+                        // sum past that is no 8-bit picture, refused before
+                        // it is multiplied by the step.
+                        guard abs(predictors[c]) <= JPEGEntropyWalk.firstCoefficientLimit else {
+                            throw refused(.coefficientSize, reader.position)
+                        }
                         var k = 1
                         var flat = true
                         while k < 64 {

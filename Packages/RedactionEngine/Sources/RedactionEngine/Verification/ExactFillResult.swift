@@ -54,6 +54,7 @@ struct PageImageRefusal: Error, Equatable, Sendable {
         // The page and its record.
         case noPageImage
         case twoPageImages
+        case formsOverLimit
         case notJPEG
         case noRecordedHash
         case hashDiffers
@@ -73,7 +74,7 @@ struct PageImageRefusal: Error, Equatable, Sendable {
                  .scanNotSequential, .tableNotDefined, .tableNeverUsed, .scanCutShort,
                  .markerInsideScan, .restartMarkerNotDeclared, .restartMarkerOrder,
                  .huffmanCodeNotInTable, .coefficientSize, .coefficientRun, .noEndMarker,
-                 .bytesAfterEndMarker, .noPageImage, .twoPageImages, .notJPEG:
+                 .bytesAfterEndMarker, .noPageImage, .twoPageImages, .formsOverLimit, .notJPEG:
                 .unreadableInput
             }
         }
