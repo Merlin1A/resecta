@@ -234,14 +234,15 @@ struct RegionCoverage: Sendable {
             let stream = searcher.search(source, mode: request.record.query.searchMode, progress: { _, _ in })
             var strays: [PlacedPiece] = []
             var comparedOccurrences = Set<UUID>()
-            // Every result the re-run yields counts toward the searcher's
-            // cap, boxed or not, on any page; the last page one came from
-            // is where a capped re-run stopped.
-            var yielded = 0
+            // Every match the re-run yields counts toward the searcher's
+            // cap, boxed or not, on any page, once however many lines it
+            // runs over (the searcher counts matches, `emitCapped`); the
+            // last page one came from is where a capped re-run stopped.
+            var yielded = Set<UUID>()
             var lastPage = 0
             for await result in stream {
                 try Task.checkCancellation()
-                yielded += 1
+                yielded.insert(DocumentSearcher.occurrenceKey(result))
                 lastPage = max(lastPage, result.pageIndex)
                 // A match with no box has nothing to measure a box's cover
                 // against; the Search Re-check counts it as remaining.
@@ -270,7 +271,7 @@ struct RegionCoverage: Sendable {
             // stopped on and every page after it were not read whole, and a
             // page never reached reports nothing to the sinks. The searcher
             // walks pages in order, so the pages before were read.
-            if yielded >= DocumentSearcher.maxResults {
+            if yielded.count >= DocumentSearcher.maxResults {
                 unread.formUnion(candidates.filter { $0 >= lastPage })
             }
         }
