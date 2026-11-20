@@ -15,6 +15,11 @@ struct SearchAccountLifecycleTests {
     final class Store {
         var closed: [UUID: SearchAccount] = [:]
         var order: [UUID] = []
+        /// A late report re-sends an account under its token: kept once, updated.
+        func keep(_ account: SearchAccount, _ token: UUID) {
+            if closed[token] == nil { order.append(token) }
+            closed[token] = account
+        }
     }
 
     /// A session with a run that has started reading a ten-page document.
@@ -22,10 +27,7 @@ struct SearchAccountLifecycleTests {
         let search = SearchState()
         search.searchModeType = mode
         search.queryText = "Delia"
-        search.accountClosedSink = { token, account in
-            store.closed[token] = account
-            store.order.append(token)
-        }
+        search.accountClosedSink = { token, account in store.keep(account, token) }
         search.clearResults()
         let run = search.beginRun()
         search.totalPages = 10
@@ -161,7 +163,7 @@ struct SearchAccountLifecycleTests {
     func refusedPattern() {
         let store = Store()
         let search = SearchState()
-        search.accountClosedSink = { token, account in store.closed[token] = account; store.order.append(token) }
+        search.accountClosedSink = { token, account in store.keep(account, token) }
         search.clearResults()
         let run = search.beginRun()
         search.beginAccount(run: run, pageCount: 3)
@@ -174,7 +176,7 @@ struct SearchAccountLifecycleTests {
     func noAccount() async {
         let store = Store()
         let search = SearchState()
-        search.accountClosedSink = { token, account in store.closed[token] = account; store.order.append(token) }
+        search.accountClosedSink = { token, account in store.keep(account, token) }
         search.closeAccount(.completed)
         await search.cancelSearch()
         search.cancelSearchWithoutAwait()
