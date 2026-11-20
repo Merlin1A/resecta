@@ -188,41 +188,20 @@ struct ResectaApp: App {
     // pure functions of the argument list (`DebugLaunchHookTests`).
 
     /// What `--showToast` asks for: the bare flag keeps the purge warning
-    /// it has always shown; `--showToast=<id>` shows one of the app's own
-    /// toast messages at the severity its site posts it with.
+    /// it has always shown; `--showToast=<name>` shows the message of that
+    /// name in the message table (`MessageID.Name`), as its site posts it.
     enum ToastHook: Equatable {
         case absent
         case bare
-        case named(ToastHookID)
+        case named(MessageID.Name)
         case stop(String)
-    }
-
-    /// The toast ids `--showToast=<id>` takes. A toast whose words are a
-    /// literal inside a call has no id: a hook would need a copy of them.
-    enum ToastHookID: String, CaseIterable {
-        case shareSheetUnavailable
-        case selectionLimit
-        case customTermTimeout
-
-        @MainActor var message: String {
-            switch self {
-            case .shareSheetUnavailable: DocumentEditorView.shareSheetUnavailableMessage
-            case .selectionLimit: RedactionState.lassoSelectionCapToastMessage
-            case .customTermTimeout: SearchAndRedactSheet.customTermTimeoutMessage
-            }
-        }
-
-        /// All three sites post their message as a warning
-        /// (`DocumentEditorView+Export.swift`, `RedactionApplyEngine.swift`,
-        /// `SearchAndRedactSheet+Trigger.swift`).
-        var severity: ToastSeverity { .warning }
     }
 
     static func toastHook(for arguments: [String]) -> ToastHook {
         let prefix = "--showToast="
         if let argument = arguments.first(where: { $0.hasPrefix(prefix) }) {
             let id = String(argument.dropFirst(prefix.count))
-            guard let known = ToastHookID(rawValue: id) else {
+            guard let known = MessageID.Name(rawValue: id) else {
                 return .stop("--showToast: unknown toast id \"\(id)\"")
             }
             return .named(known)

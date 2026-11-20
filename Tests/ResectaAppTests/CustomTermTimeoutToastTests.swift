@@ -24,7 +24,7 @@ struct CustomTermTimeoutToastTests {
         let latch = SearchAndRedactSheet.ScanOnceLatch()
         func pageRanOut() {
             guard latch.fire() else { return }
-            toasts.enqueue(SearchAndRedactSheet.customTermTimeoutMessage, severity: .warning)
+            toasts.post(.customTermTimeout)
         }
         pageRanOut()
         #expect(toasts.activeToasts.map(\.message) == [SearchAndRedactSheet.customTermTimeoutMessage])

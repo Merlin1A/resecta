@@ -33,10 +33,7 @@ enum RegionDeleteRule {
         let pages = redactionState.deleteSelected(undoManager: undoManager)
         if count > 1, let toastManager {
             let versionAfterDelete = redactionState.regionVersion
-            toastManager.enqueue(
-                deletedMessage(count: count), severity: .info,
-                actionLabel: SearchAndRedactSheet.discardUndoActionLabel
-            ) { [weak redactionState, weak undoManager] in
+            toastManager.post(.deletedBoxes(count: count)) { [weak redactionState, weak undoManager] in
                 guard let redactionState, let undoManager, undoManager.canUndo,
                       redactionState.regionVersion == versionAfterDelete else { return }
                 undoManager.undo()

@@ -85,8 +85,8 @@ struct RedactWorkspaceView: View {
                     redactionState: workspace.redactionState,
                     door: appCoordinator.openedDoor
                 ) {
-                case .refuse(let message):
-                    toastManager.enqueue(message, severity: .warning)
+                case .refuse(let id):
+                    toastManager.post(id)
                 case .confirmReplace:
                     heldDrop = HeldDrop(dropped: dropped, droppedCount: items.count)
                 case .importNow:
@@ -151,8 +151,8 @@ struct RedactWorkspaceView: View {
         case importNow
         /// Hold the drop for the replace dialog: the open document holds work.
         case confirmReplace
-        /// Refuse with the sentence: the import gate's, or the sheet's.
-        case refuse(String)
+        /// Refuse with the message: the import gate's, or the sheet's.
+        case refuse(MessageID)
     }
 
     /// The replace dialog's words — those of the replace dialog the
@@ -167,7 +167,7 @@ struct RedactWorkspaceView: View {
     /// A drop that owes the dialog while the editor's sheet is up: the
     /// dialog cannot present over the sheet, so the drop is refused with
     /// the import gate's sentence, naming the sheet's Dismiss.
-    static let dropOverSheetMessage = DocumentState.importBlockedOnThisScreenMessage(wayBack: "Dismiss")
+    static let dropOverSheetRefusal: MessageID = .importBlockedOnThisScreen(wayBack: "Dismiss")
 
     /// Whether a drop owes the replace dialog: a document is open and it
     /// holds work by the Close dialog's own rule
@@ -187,14 +187,14 @@ struct RedactWorkspaceView: View {
     static func dropAdmission(
         documentState: DocumentState, redactionState: RedactionState, door: ImportDoor?
     ) -> DropAdmission {
-        if let refusal = documentState.importRefusalMessage(door: door) {
+        if let refusal = documentState.importRefusal(door: door) {
             return .refuse(refusal)
         }
         guard dropNeedsConfirm(documentState: documentState, redactionState: redactionState) else {
             return .importNow
         }
         return DocumentEditorView.sheetSlotIsPresenting(redactionState)
-            ? .refuse(dropOverSheetMessage)
+            ? .refuse(dropOverSheetRefusal)
             : .confirmReplace
     }
 
@@ -204,8 +204,7 @@ struct RedactWorkspaceView: View {
     private func startDropImport(_ dropped: DroppedDocument, droppedCount: Int) {
         activeImportDispatch?.cancel()
         if droppedCount > 1 {
-            toastManager.enqueue(
-                ImportService.dropOpenedFirstMessage(droppedCount: droppedCount), severity: .info)
+            toastManager.post(.droppedFilesFirstOpened(count: droppedCount))
         }
         let workspace = workspace
         activeImportDispatch = Task {
@@ -303,23 +302,24 @@ struct RedactWorkspaceView: View {
     /// Static so the string is pinned.
     static func imageSourceToast(facts: ImportFacts.Summary) -> String? {
         guard case .images = facts.origin else { return nil }
-        return "Image pages are read with on-device text recognition. Barcodes and QR codes are not read."
+        return imageSourceMessage
     }
+
+    /// The image import's notice, raised by `imageSourceToast(facts:)`'s rule.
+    static let imageSourceMessage =
+        "Image pages are read with on-device text recognition. Barcodes and QR codes are not read."
 
     private func checkImageSourceToast() {
         guard workspace.documentState.phaseKind == .editing,
-              let message = Self.imageSourceToast(facts: workspace.documentState.sourceFacts) else { return }
-        toastManager.enqueue(message, severity: .info)
+              Self.imageSourceToast(facts: workspace.documentState.sourceFacts) != nil else { return }
+        toastManager.post(.imagePagesNote)
     }
 
     /// Notify user when text layer detected after import.
     private func checkTextLayerToast() {
         if workspace.documentState.hasAnyTextLayer,
            workspace.documentState.phaseKind == .editing {
-            toastManager.enqueue(
-                ToastItem(message: "Text layer detected \u{2014} Scan and Search can match text in this document.",
-                          severity: .info)
-            )
+            toastManager.post(.textLayerDetected)
         }
     }
 
@@ -328,15 +328,21 @@ struct RedactWorkspaceView: View {
     /// the source was not encrypted. Static so the strings are pinned.
     static func encryptedSourceToast(facts: ImportFacts.Summary) -> String? {
         guard facts.wasEncrypted else { return nil }
-        return facts.hadRestrictions
+        return encryptedSourceMessage(hadRestrictions: facts.hadRestrictions)
+    }
+
+    /// The encrypted source's two lines: with the restrictions, or plain.
+    static func encryptedSourceMessage(hadRestrictions: Bool) -> String {
+        hadRestrictions
             ? "This PDF carries usage restrictions set with an owner password. The redacted copy is built without a password and without those restrictions."
             : "This PDF was password-protected. The redacted copy is built without a password."
     }
 
     private func checkEncryptedSourceToast() {
+        let facts = workspace.documentState.sourceFacts
         guard workspace.documentState.phaseKind == .editing,
-              let message = Self.encryptedSourceToast(facts: workspace.documentState.sourceFacts) else { return }
-        toastManager.enqueue(message, severity: .warning)
+              Self.encryptedSourceToast(facts: facts) != nil else { return }
+        toastManager.post(.encryptedSource(hadRestrictions: facts.hadRestrictions))
     }
 
     // MARK: - The locked import
@@ -387,9 +393,6 @@ struct RedactWorkspaceView: View {
     /// refused at the drop door). The copy is the unsupported-format
     /// message, held on `DocumentState.importRefusedNotPDFMessage`.
     private func enqueueImportRefusedNotPDFToast() {
-        toastManager.enqueue(
-            DocumentState.importRefusedNotPDFMessage,
-            severity: .warning
-        )
+        toastManager.post(.unsupportedFormatDropped)
     }
 }

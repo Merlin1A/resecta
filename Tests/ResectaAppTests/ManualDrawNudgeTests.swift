@@ -496,7 +496,7 @@ struct ManualDrawNudgeTests {
         coord.redactionState.addRegion(
             Self.manualRegion(at: CGRect(x: 0.10, y: 0.10, width: 0.05, height: 0.02)),
             page: 0, undoManager: nil)
-        toasts.enqueue("1 match nearby. Add to selection?", actionLabel: "Add") {}
+        toasts.post(.nearbyMatch, action: {})
         #expect(toasts.activeToasts.count == 1)
 
         coord.runFullPipeline(documentOverride: nil)

@@ -228,7 +228,7 @@ final class PipelineCoordinator: @unchecked Sendable {
         // Run Verification's full route) is refused where the button is
         // disabled, with the button's hint as a notice.
         if let refusal = documentState.redactRefusal(with: redactionState) {
-            if !refusal.hint.isEmpty { enqueueToast(refusal.hint, severity: .warning) }
+            if let id = refusal.message { postMessage(id) }
             return
         }
         // A full run's start ends the pause it would otherwise report.
@@ -586,17 +586,17 @@ final class PipelineCoordinator: @unchecked Sendable {
             )
     }
 
-    /// Enqueue a toast notification. Statically MainActor-isolated: the
-    /// coordinator is MainActor by the SE-0466 default, so every caller
+    /// Post a message through the toast queue. Statically MainActor-isolated:
+    /// the coordinator is MainActor by the SE-0466 default, so every caller
     /// already runs on the MainActor.
-    /// `ToastQueueManager.enqueue` drives `withAnimation`, a UIKit feedback
+    /// `ToastQueueManager.post` drives `withAnimation`, a UIKit feedback
     /// generator and a UIAccessibility post, all of which need the main
     /// thread; the isolation proves that at compile time, where a runtime
     /// thread check could only trap or hop. Synchronous, so a caller's
-    /// next statement observes the enqueued toast.
+    /// next statement observes the posted toast.
     @MainActor
-    func enqueueToast(_ message: String, severity: ToastSeverity) {
-        toastManager?.enqueue(message, severity: severity)
+    func postMessage(_ id: MessageID) {
+        toastManager?.post(id)
     }
 
     /// The one document boundary: a new document (a drop over an open one,
