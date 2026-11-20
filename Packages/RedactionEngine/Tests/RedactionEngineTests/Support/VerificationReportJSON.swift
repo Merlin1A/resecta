@@ -148,6 +148,7 @@ private struct ReportJSON: Encodable {
         case .unanchoredRegion:   "unanchoredRegion"
         case .noWritableText:     "noWritableText"
         case .inkEscapesBox:      "inkEscapesBox"
+        case .invisibleText:      "invisibleText"
         }
     }
 

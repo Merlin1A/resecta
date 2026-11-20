@@ -15,7 +15,7 @@ struct VerificationFallbackReasonDisplayTests {
     private nonisolated static let allReasons: [TextLayerDetector.FallbackReason] = [
         .noExtractableText, .cjkEncodingFailure, .rtlText, .verticalText,
         .zeroSizeBounds, .unresolvedEncoding, .extractionFailed, .hiddenText,
-        .unanchoredRegion, .noWritableText, .inkEscapesBox,
+        .unanchoredRegion, .noWritableText, .inkEscapesBox, .invisibleText,
     ]
 
     @Test("Every reason has non-empty short copy",

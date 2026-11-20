@@ -21,6 +21,7 @@ extension TextLayerDetector.FallbackReason {
         case .unanchoredRegion: "hand-drawn box on scanned text"
         case .noWritableText: "no searchable text left on the page"
         case .inkEscapesBox: "ink past a box's edge"
+        case .invisibleText: "invisible text on the page"
         }
     }
 }
