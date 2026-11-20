@@ -5,17 +5,17 @@ Must go red: ResectaAppUITests/EditorChromeUITests testPageBarCount_isNotOrangeO
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Views/PageNavigationBar.swift b/Sources/ResectaApp/Views/PageNavigationBar.swift
-index 9a8c1350..caf571a2 100644
+index 2a61aeab..3007ed24 100644
 --- a/Sources/ResectaApp/Views/PageNavigationBar.swift
 +++ b/Sources/ResectaApp/Views/PageNavigationBar.swift
-@@ -130,7 +130,9 @@ struct PageNavigationBar: View {
-                         .hidden()
-                         .accessibilityHidden(true)
-                     Text(PageNavigationBar.regionCountLabel(count))
--                        .foregroundStyle(ResectaTokens.SemanticColor.supportText)
-+                        .foregroundStyle(count == 0
-+                            ? AnyShapeStyle(ResectaTokens.SemanticColor.supportText)
-+                            : AnyShapeStyle(Color.orange))
-                 }
-                 .font(.caption.monospacedDigit())
+@@ -186,7 +186,9 @@ struct PageNavigationBar: View {
+                     .hidden()
+                     .accessibilityHidden(true)
+                 Text(PageNavigationBar.regionCountLabel(count))
+-                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
++                    .foregroundStyle(count == 0
++                        ? AnyShapeStyle(ResectaTokens.SemanticColor.supportText)
++                        : AnyShapeStyle(Color.orange))
              }
+             .font(.caption.monospacedDigit())
+         }
