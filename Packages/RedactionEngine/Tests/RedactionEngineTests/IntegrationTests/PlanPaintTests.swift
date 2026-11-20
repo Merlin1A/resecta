@@ -316,12 +316,12 @@ struct PlanPaintTests {
     func corpusMirrorCoversTheRegionPath() async throws {
         let doc = try #require(PDFDocument(data: Self.pdf(ink: [])))
         let seeds = Placement.allCases.flatMap(\.boxes).enumerated().map { i, box in
-            VerificationCorpusMirror.RegionSeed(gtId: "g\(i)", value: "v", category: "c", page: 0, rect: Self.share(box))
+            VerificationCorpusRunnerTests.RegionSeed(gtId: "g\(i)", value: "v", category: "c", page: 0, rect: Self.share(box))
         }
-        let regions = seeds.compactMap { VerificationCorpusMirror.region(from: $0, polygon: false) }
+        let regions = seeds.compactMap { VerificationCorpusRunnerTests.region(from: $0, polygon: false) }
         try #require(regions.count == seeds.count)
         for region in regions {
-            let pages = VerificationCorpusMirror.buildPages(
+            let pages = VerificationCorpusRunnerTests.buildPages(
                 doc: doc, effectiveMode: .secureRasterization, regionsByPage: [0: [region]],
                 textLayerStatus: [:], hasHiddenOCG: false)
             let page = try #require(pages.first)
