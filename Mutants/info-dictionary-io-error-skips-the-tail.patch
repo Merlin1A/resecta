@@ -5,14 +5,15 @@ Must go red: RedactionEngineTests/InfoDictionaryThroughIndexTests row [case 16] 
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
-index 701a789d..38105108 100644
+index bbafdbbf..d7907ee6 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
-@@ -373,6 +373,7 @@ public actor PDFStreamReconstructor {
-             infoRewriteLogger.warning(
-                 "info literal rewrite through the index failed (metadata: \(error.localizedDescription, privacy: .public))")
-             refusal = .readOrWriteFailed
-+            return .neither(indexRefused: refusal)
-         }
-         // The second way, used where the first refused or failed.
-         return overwriteInfoLiteralsInTail(at: url)
+@@ -337,6 +337,8 @@ public actor PDFStreamReconstructor {
+         // rewritten here too, so no file fares worse. A literal the first way
+         // already rewrote reads as the fixed value and is written again
+         // unchanged.
++        if case .refused(.readOrWriteFailed) = first { return .neither(indexRefused: .readOrWriteFailed) }
++        if case .cutShort = first { return .byIndexCutShort }
+         let tailRewrote = overwriteInfoLiteralsInTail(at: url)
+         switch first {
+         case .rewrote: return .byIndex

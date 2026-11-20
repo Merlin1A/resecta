@@ -1,4 +1,4 @@
-Property: The dictionary rewritten is the one the trailer names, never a look-alike in the file's tail.
+Property: The dictionary the index way rewrites is the one the trailer names, never a look-alike in the file's tail.
 Area: the information dictionary rewrite and the metadata check (Engine)
 Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --package-path Packages/RedactionEngine --filter InfoDictionaryThroughIndexTests
 Must go red: RedactionEngineTests/InfoDictionaryThroughIndexTests row [case 4]

@@ -5,15 +5,15 @@ Must go red: RedactionEngineTests/InfoDictionaryThroughIndexTests row [case 6]
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
-index 701a789d..42235f5d 100644
+index bbafdbbf..29d2d6d9 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
-@@ -376,7 +376,7 @@ public actor PDFStreamReconstructor {
+@@ -343,7 +343,7 @@ public actor PDFStreamReconstructor {
+         case .nothingRewritten: return .byIndexNothingRewritten
+         case .cutShort: return .byIndexCutShort
+         case .refused(let reason):
+-            return tailRewrote ? .byTail(indexRefused: reason) : .neither(indexRefused: reason)
++            return tailRewrote ? .byIndex : .neither(indexRefused: reason)
          }
-         // The second way, used where the first refused or failed.
-         return overwriteInfoLiteralsInTail(at: url)
--            ? .byTail(indexRefused: refusal) : .neither(indexRefused: refusal)
-+            ? .byIndex : .neither(indexRefused: refusal)
      }
  
-     /// The second way: the search of the file's last 262,144 bytes for the
