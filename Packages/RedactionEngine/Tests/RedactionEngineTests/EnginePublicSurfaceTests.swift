@@ -58,6 +58,7 @@ struct EnginePublicSurfaceTests {
         _ = (account.pageCount, account.ending, account.stopPage, account.qualifiedPages, account.quietPages)
         _ = (account.plainNoMatchAllowed, account.pagesThatStopRedact, SearchAccount.LineReason.order)
         _ = (account.pages(for: .picturesNotRead(.notReported)), account.patternTimedOutTexts, account.unboxedMatchTexts)
+        _ = (account.forText(""), SearchAccount.joined([account]))
         let record = AppliedSearchRecord(query: query, foundCount: 0, accountToken: UUID(), account: account)
         _ = (record.accountToken, record.account, SearchAccount.PictureCause.allCases)
     }

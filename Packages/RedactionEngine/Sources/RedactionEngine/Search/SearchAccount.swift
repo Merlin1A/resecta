@@ -80,8 +80,60 @@ public struct SearchAccount: Sendable, Hashable {
     public var stopPage: Int? {
         switch account.ending {
         case .completed: nil
-        case .stoppedAtResultLimit(let page), .stopped(let page): page
+        case .stoppedAtResultLimit(let page), .stopped(let page): account.settled.contains(page) ? nil : page
         }
+    }
+
+    /// The account of one searched text of this run: a run's texts share every
+    /// page fact but a pattern running out of time, which it keeps only where
+    /// that text ran out.
+    public func forText(_ text: String) -> SearchAccount {
+        var facts = account.facts
+        for page in facts.indices where patternTimedOutTexts[page]?.contains(text) != true {
+            facts[page].remove(.patternTimedOut)
+        }
+        var derived = self
+        derived.account = AccountOfWhatWasRead(facts: facts, ending: account.ending, settled: account.settled)
+        derived.patternTimedOutTexts = patternTimedOutTexts.compactMapValues { $0.contains(text) ? [text] : nil }
+        return derived
+    }
+
+    /// The facts that say something was read, or what the page holds.
+    private static let kept: AccountOfWhatWasRead.Facts =
+        [.ownText, .anotherAppsLayer, .recognised, .emptyReadBlank, .picturesRequired, .smallPictures]
+
+    /// One text's runs joined, oldest first, for the stop at Redact: a page any
+    /// run read is read, with that run's facts. Any other page keeps the facts
+    /// that say something was read or what it holds from every run, and takes
+    /// its other facts, and its place against the ending, from the latest;
+    /// a page the latest gave no facts stays as the latest left it. Nil for
+    /// no runs. The matches with no box are every run's.
+    public static func joined(_ runs: [SearchAccount]) -> SearchAccount? {
+        guard var joined = runs.last else { return nil }
+        let latest = joined.account
+        var facts = latest.facts
+        var settled = Set<Int>()
+        for page in facts.indices {
+            let reading = runs.last { run in
+                run.account.facts.indices.contains(page) && run.account.state(ofPage: page).kind == .read
+            }
+            if let reading {
+                facts[page] = reading.account.facts[page]
+                settled.insert(page)
+            } else if !facts[page].isEmpty {
+                // A page the latest run gave nothing (no report, or not reached)
+                // stays as the latest left it: taking only the earlier "read"
+                // facts would drop the earlier gap and count an unknown read as read.
+                for run in runs where run.account.facts.indices.contains(page) {
+                    facts[page].formUnion(run.account.facts[page].intersection(kept))
+                }
+            }
+        }
+        joined.account = AccountOfWhatWasRead(facts: facts, ending: latest.ending, settled: settled)
+        for run in runs.dropLast() {
+            joined.unboxedMatchTexts.merge(run.unboxedMatchTexts) { $0.union($1) }
+        }
+        return joined
     }
 
     /// The pages behind one line, ascending. For `notReached` these are the
