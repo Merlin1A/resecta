@@ -5,13 +5,13 @@ Must go red: RedactionEngineTests/PlanPaintTests boxesComeFromThePageData
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
-index bf781ea2..6992ae8a 100644
+index 06cd4910..49a16edb 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
-@@ -190,7 +190,11 @@ extension PageRasterizer {
- 
-         // 4c. Each box's projection, then its growth, read before any fill.
+@@ -199,7 +199,11 @@ extension PageRasterizer {
+         // fills them, then its growth, read before any fill.
          var rects: [(box: Int, rect: CGRect)] = []
+         var painted = Set<UUID>()
 -        for (index, box) in page.boxes.enumerated() {
 +        let remade = PaintPlan.asPlaced(
 +            regions: page.regions.map { ($0.id, PointRect(minX: Double($0.normalizedRect.minX), minY: Double($0.normalizedRect.minY),
