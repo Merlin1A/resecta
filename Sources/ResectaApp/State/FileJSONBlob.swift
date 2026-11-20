@@ -29,33 +29,95 @@ nonisolated struct FileJSONBlob<T: Codable & Sendable>: Sendable {
         self.fallback = fallback
     }
 
+    /// What a read of the file came to.
+    enum ReadOutcome {
+        /// No file is at the path.
+        case absent
+        /// The stored value.
+        case value(T)
+        /// A file is there and could not be read.
+        case notReadable
+        /// The file was read and does not decode, or is of another version.
+        case notUnderstood
+    }
+
+    /// Read the file. The read is attempted first: only its no-such-file
+    /// error answers `absent`, and every other failure answers
+    /// `notReadable`, so no separate question about whether the file is
+    /// there decides it.
+    func read() -> ReadOutcome {
+        let data: Data
+        do {
+            data = try Data(contentsOf: fileURL)
+        } catch { // LegalPhrases:safe (Swift keyword)
+            if Self.isNoSuchFile(error) { return .absent }
+            logger.warning(
+                "FileJSONBlob[\(self.fileURL.lastPathComponent, privacy: .public)] read failed; the list is held")
+            return .notReadable
+        }
+        do {
+            let envelope = try JSONDecoder().decode(Envelope.self, from: data)
+            guard envelope.schemaVersion == schemaVersion else {
+                logger.info(
+                    "FileJSONBlob[\(self.fileURL.lastPathComponent, privacy: .public)] schema mismatch: stored=\(envelope.schemaVersion), expected=\(self.schemaVersion); using fallback")
+                return .notUnderstood
+            }
+            return .value(envelope.payload)
+        } catch { // LegalPhrases:safe (Swift keyword)
+            logger.warning(
+                "FileJSONBlob[\(self.fileURL.lastPathComponent, privacy: .public)] decode failed: \(LogSafeError.publicSummary(error), privacy: .public); \(String(describing: error), privacy: .private)")
+            return .notUnderstood
+        }
+    }
+
+    /// The Cocoa or POSIX error for a file that is not there.
+    private static func isNoSuchFile(_ error: Error) -> Bool {
+        let ns = error as NSError
+        if ns.domain == NSCocoaErrorDomain, ns.code == NSFileReadNoSuchFileError { return true }
+        if ns.domain == NSPOSIXErrorDomain, ns.code == Int(ENOENT) { return true }
+        if let underlying = ns.userInfo[NSUnderlyingErrorKey] as? NSError {
+            return underlying.domain == NSPOSIXErrorDomain && underlying.code == Int(ENOENT)
+        }
+        return false
+    }
+
+    /// The value a store holds after a read: the stored value, or the
+    /// fallback for an absent file or one that is not understood. Nil when
+    /// the file is there and cannot be read: the store then holds.
+    func storeValue(_ outcome: ReadOutcome) -> T? {
+        switch outcome {
+        case .value(let value): value
+        case .absent, .notUnderstood: fallback
+        case .notReadable: nil
+        }
+    }
+
+    /// The read a store opens with: the sweep of an interrupted save's
+    /// orphans, then `read()`.
+    func readAtOpen() -> ReadOutcome {
+        sweepOrphans()
+        return read()
+    }
+
     /// Decode the stored value; returns `fallback` on absence, schema
-    /// mismatch, or decode error. Never throws — corrupted state should
-    /// degrade gracefully rather than break the app.
+    /// mismatch, decode error, or a file that cannot be read. Never throws
+    /// — corrupted state should degrade gracefully rather than break the app.
     func load() -> T {
-        // Sweep temp-file orphans from an interrupted `save` (a crash
-        // between the temp write and the replace leaves a stray
-        // `.{name}.tmp-*` sibling that would otherwise persist forever).
+        sweepOrphans()
+        if case .value(let value) = read() { return value }
+        return fallback
+    }
+
+    /// Sweep temp-file orphans from an interrupted `save` (a crash
+    /// between the temp write and the replace leaves a stray
+    /// `.{name}.tmp-*` sibling that would otherwise persist forever).
+    private func sweepOrphans() {
         let dir = fileURL.deletingLastPathComponent()
         let orphanPrefix = ".\(fileURL.lastPathComponent).tmp-"
         if let siblings = try? FileManager.default.contentsOfDirectory(atPath: dir.path) {
             for name in siblings where name.hasPrefix(orphanPrefix) {
                 try? FileManager.default.removeItem(at: dir.appendingPathComponent(name))
             }
-        }
-        guard let data = try? Data(contentsOf: fileURL) else { return fallback }
-        do {
-            let envelope = try JSONDecoder().decode(Envelope.self, from: data)
-            guard envelope.schemaVersion == schemaVersion else {
-                logger.info(
-                    "FileJSONBlob[\(self.fileURL.lastPathComponent, privacy: .public)] schema mismatch: stored=\(envelope.schemaVersion), expected=\(self.schemaVersion); using fallback")
-                return fallback
-            }
-            return envelope.payload
-        } catch { // LegalPhrases:safe (Swift keyword)
-            logger.warning(
-                "FileJSONBlob[\(self.fileURL.lastPathComponent, privacy: .public)] decode failed: \(LogSafeError.publicSummary(error), privacy: .public); \(String(describing: error), privacy: .private)")
-            return fallback
         }
     }
 

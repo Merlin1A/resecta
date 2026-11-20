@@ -189,6 +189,9 @@ struct SavedRegexLibraryView: View {
         case .refused(let message):
             addError = message
             UINotificationFeedbackGenerator().notificationOccurred(.error)
+        case .notSaved:
+            addError = nil
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
         }
     }
 

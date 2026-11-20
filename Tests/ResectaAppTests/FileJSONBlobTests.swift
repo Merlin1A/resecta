@@ -175,4 +175,81 @@ struct FileJSONBlobTests {
         #expect(second.isExcludedFromBackup == true,
                 "isExcludedFromBackup must survive an atomic re-save")
     }
+
+    // MARK: - What a read came to
+
+    enum ReadCase: CaseIterable, Sendable {
+        case noFile, noFolder, stored, cannotBeRead, doesNotDecode, otherVersion
+    }
+
+    private enum ReadKind: Equatable {
+        case absent, value, notReadable, notUnderstood
+    }
+
+    @Test("A read has six cases")
+    func readCaseCount() {
+        #expect(ReadCase.allCases.count == 6)
+    }
+
+    @Test("A read tells an absent file, a stored value, a file that cannot be read and a file that is not understood apart",
+          arguments: ReadCase.allCases)
+    @MainActor
+    func readTellsTheStatesApart(_ readCase: ReadCase) throws {
+        var url = makeScratchFileURL()
+        defer { removeScratch(url) }
+        let fallback = Payload(items: ["default": 1.0])
+        let blob = FileJSONBlob<Payload>(fileURL: url, schemaVersion: 2, fallback: fallback)
+        let stored = Payload(items: ["stored": 2.0])
+        let expected: ReadKind
+        switch readCase {
+        case .noFile:
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            expected = .absent
+        case .noFolder:
+            url = url.deletingLastPathComponent().appendingPathComponent("missing", isDirectory: true)
+                .appendingPathComponent("blob.json")
+            expected = .absent
+        case .stored:
+            blob.save(stored)
+            expected = .value
+        case .cannotBeRead:
+            blob.save(stored)
+            try UnreadableFile.take(url)
+            expected = .notReadable
+        case .doesNotDecode:
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data("not json".utf8).write(to: url)
+            expected = .notUnderstood
+        case .otherVersion:
+            FileJSONBlob<Payload>(fileURL: url, schemaVersion: 1, fallback: fallback).save(stored)
+            expected = .notUnderstood
+        }
+        defer { UnreadableFile.restore(url) }
+        let reader = FileJSONBlob<Payload>(fileURL: url, schemaVersion: 2, fallback: fallback)
+        let kind: ReadKind
+        switch reader.read() {
+        case .absent: kind = .absent
+        case .value(let value):
+            kind = .value
+            #expect(value == stored)
+        case .notReadable: kind = .notReadable
+        case .notUnderstood: kind = .notUnderstood
+        }
+        #expect(kind == expected)
+        #expect(reader.load() == (readCase == .stored ? stored : fallback))
+    }
+
+    @Test("The read decides an absent file by its own error, with no separate question whether the file is there")
+    func readAsksNoSeparateQuestion() throws {
+        let source = try String(
+            contentsOf: URL(fileURLWithPath: "\(#filePath)")
+                .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+                .appendingPathComponent("Sources/ResectaApp/State/FileJSONBlob.swift"),
+            encoding: .utf8)
+        let start = try #require(source.range(of: "func read() -> ReadOutcome {"))
+        let end = try #require(source.range(of: "func storeValue(", range: start.upperBound..<source.endIndex))
+        #expect(!source[start.upperBound..<end.lowerBound].contains("fileExists"))
+    }
 }

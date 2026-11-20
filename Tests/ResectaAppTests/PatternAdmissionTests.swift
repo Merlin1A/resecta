@@ -53,6 +53,29 @@ struct PatternAdmissionTests {
         #expect(store.userSavedRegexes.count == 1)
     }
 
+    @Test("A pattern that a held store will not take is reported as not saved, not as refused")
+    func heldStoreIsNotSaved() async throws {
+        let suite = "pattern-admission-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let fileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("pattern-admission-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+        #expect(SavedRegexStore(fileURL: fileURL, legacyDefaults: defaults).add(label: "Stored", pattern: "[0-9]{2}") == .saved)
+        try UnreadableFile.take(fileURL)
+        defer { UnreadableFile.restore(fileURL) }
+        let store = SavedRegexStore(fileURL: fileURL, legacyDefaults: defaults)
+
+        let outcome = await PatternAdmission.admit(label: "Ticket", pattern: "[A-Z]{2}-[0-9]{4}", into: store)
+
+        #expect(outcome == .notSaved)
+        #expect(store.userSavedRegexes.isEmpty)
+        #expect(PatternAdmission.outcome(of: .held) == .notSaved)
+        #expect(PatternAdmission.outcome(of: .notSaved) == .notSaved)
+        #expect(PatternAdmission.outcome(of: .refused(.duplicate)) == .refused(message: PatternAdmission.storeRejectedMessage))
+        #expect(PatternAdmission.outcome(of: .saved) == .added)
+    }
+
     // MARK: - Helpers
 
     private func repoRoot(file: StaticString = #filePath) -> URL {

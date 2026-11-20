@@ -38,6 +38,10 @@ struct SavedSearchListSheet: View {
     /// in-action re-arm is swallowed by the tap's own dismissal.
     @State private var savePromptError: String?
     @State private var renameError: String?
+    /// A Save or a Rename the store did not take for a reason that is no
+    /// refusal: the prompt comes back with the typed name and no new words.
+    @State private var savePromptNotSaved = false
+    @State private var renameNotSaved = false
     /// The entry whose rename collided, held across the
     /// alert's dismissal so the `.onChange` re-present can re-arm
     /// `renameTarget` — the button action's own re-arm is swallowed by the
@@ -95,6 +99,7 @@ struct SavedSearchListSheet: View {
                     Button {
                         savePromptName = Self.generatedName(for: searchState)
                         savePromptError = nil
+                        savePromptNotSaved = false
                         showSavePrompt = true
                     } label: {
                         Label(Self.saveCurrentLabel(for: activeInterface), systemImage: "plus.circle")
@@ -118,8 +123,8 @@ struct SavedSearchListSheet: View {
                 TextField("Name", text: $renameText)
                 Button("Rename") {
                     let trimmed = renameText.trimmingCharacters(in: .whitespaces)
-                    if !trimmed.isEmpty,
-                       !savedSearchStore.rename(id: search.id, to: trimmed) {
+                    switch trimmed.isEmpty ? nil : savedSearchStore.rename(id: search.id, to: trimmed) {
+                    case .refused?:
                         // Duplicate name. Setting
                         // `renameTarget` back here is swallowed — the tap's
                         // dismissal write nils it through the binding after
@@ -132,8 +137,13 @@ struct SavedSearchListSheet: View {
                         // does not always write the dismissal back through
                         // the binding.
                         if #available(iOS 27, *) { renameTarget = nil }
-                    } else {
+                    case .notSaved?, .held?:
+                        renameNotSaved = true
+                        renameRetryTarget = search
+                        if #available(iOS 27, *) { renameTarget = nil }
+                    case .saved?, nil:
                         renameError = nil
+                        renameNotSaved = false
                         renameTarget = nil
                     }
                 }
@@ -142,6 +152,7 @@ struct SavedSearchListSheet: View {
                 .disabled(renameText.trimmingCharacters(in: .whitespaces).isEmpty)
                 Button("Cancel", role: .cancel) {
                     renameError = nil
+                    renameNotSaved = false
                     renameTarget = nil
                 }
             } message: { _ in
@@ -153,9 +164,11 @@ struct SavedSearchListSheet: View {
                 Button("Save") {
                     let trimmed = savePromptName.trimmingCharacters(in: .whitespaces)
                     guard !trimmed.isEmpty else { return }
-                    if savedSearchStore.add(Self.capture(from: searchState, name: trimmed)) {
+                    switch savedSearchStore.add(Self.capture(from: searchState, name: trimmed)) {
+                    case .saved:
                         savePromptError = nil
-                    } else {
+                        savePromptNotSaved = false
+                    case .refused:
                         // Duplicate name. A
                         // `showSavePrompt = true` here is swallowed — the
                         // tap's dismissal resets `isPresented` after this
@@ -169,12 +182,18 @@ struct SavedSearchListSheet: View {
                         // Close it here: iOS 27 does not always write the
                         // dismissal back through the binding.
                         if #available(iOS 27, *) { showSavePrompt = false }
+                    case .notSaved, .held:
+                        savePromptNotSaved = true
+                        if #available(iOS 27, *) { showSavePrompt = false }
                     }
                 }
                 // Blank names can't commit — a Save that auto-dismisses
                 // while saving nothing reads as success.
                 .disabled(savePromptName.trimmingCharacters(in: .whitespaces).isEmpty)
-                Button("Cancel", role: .cancel) { savePromptError = nil }
+                Button("Cancel", role: .cancel) {
+                    savePromptError = nil
+                    savePromptNotSaved = false
+                }
             } message: {
                 Text(savePromptError ?? Self.savePromptMessage(for: activeInterface))
             }
@@ -232,19 +251,21 @@ struct SavedSearchListSheet: View {
             .onChange(of: showSavePrompt) { _, isPresented in
                 if #available(iOS 27, *) {
                     reArmSavePromptIfRejected()
-                } else if !isPresented, savePromptError != nil {
+                } else if !isPresented, Self.promptReturnOwed(error: savePromptError, notSaved: savePromptNotSaved) {
+                    savePromptNotSaved = false
                     showSavePrompt = true
                 }
             }
-            .onChange(of: savePromptError) { _, _ in
+            .onChange(of: Self.promptReturnOwed(error: savePromptError, notSaved: savePromptNotSaved)) { _, _ in
                 if #available(iOS 27, *) { reArmSavePromptIfRejected() }
             }
             .onChange(of: renameTarget) { _, target in
                 if #available(iOS 27, *) {
                     reArmRenameIfRejected()
-                } else if target == nil, renameError != nil,
+                } else if target == nil, Self.promptReturnOwed(error: renameError, notSaved: renameNotSaved),
                           let retry = renameRetryTarget {
                     renameRetryTarget = nil
+                    renameNotSaved = false
                     renameTarget = retry
                 }
             }
@@ -259,6 +280,12 @@ struct SavedSearchListSheet: View {
         .presentationBackground(.regularMaterial)
     }
 
+    /// Whether a prompt that has closed is shown again: when a refusal left
+    /// words for it, or when its change was not stored.
+    static func promptReturnOwed(error: String?, notSaved: Bool) -> Bool {
+        error != nil || notSaved
+    }
+
     /// How long a closing alert takes to leave before the next one can
     /// present (iOS 27).
     static let alertDismissalDelay: Duration = .milliseconds(500)
@@ -267,21 +294,25 @@ struct SavedSearchListSheet: View {
     /// once it has closed. Cancel and success clear the error first, so
     /// this never loops.
     private func reArmSavePromptIfRejected() {
-        guard !showSavePrompt, savePromptError != nil else { return }
+        guard !showSavePrompt, Self.promptReturnOwed(error: savePromptError, notSaved: savePromptNotSaved) else { return }
         Task { @MainActor in
             try? await Task.sleep(for: Self.alertDismissalDelay)
-            if !showSavePrompt, savePromptError != nil { showSavePrompt = true }
+            if !showSavePrompt, Self.promptReturnOwed(error: savePromptError, notSaved: savePromptNotSaved) {
+                savePromptNotSaved = false
+                showSavePrompt = true
+            }
         }
     }
 
     /// iOS 27: present the rename prompt again for the entry whose rename
     /// collided, once the prompt has closed.
     private func reArmRenameIfRejected() {
-        guard renameTarget == nil, renameError != nil, renameRetryTarget != nil else { return }
+        guard renameTarget == nil, Self.promptReturnOwed(error: renameError, notSaved: renameNotSaved), renameRetryTarget != nil else { return }
         Task { @MainActor in
             try? await Task.sleep(for: Self.alertDismissalDelay)
-            guard renameTarget == nil, renameError != nil, let retry = renameRetryTarget else { return }
+            guard renameTarget == nil, Self.promptReturnOwed(error: renameError, notSaved: renameNotSaved), let retry = renameRetryTarget else { return }
             renameRetryTarget = nil
+            renameNotSaved = false
             renameTarget = retry
         }
     }

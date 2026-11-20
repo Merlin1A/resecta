@@ -37,7 +37,7 @@ struct UserTermsStoreHydrationTests {
         case alwaysFlag, neverFlag
     }
 
-    private func add(_ term: UserTerm, to list: TermList, in store: UserTermsStore) -> Bool {
+    private func add(_ term: UserTerm, to list: TermList, in store: UserTermsStore) -> ListChange {
         switch list {
         case .alwaysFlag: store.addAlwaysFlag(term)
         case .neverFlag: store.addNeverFlag(term)
@@ -62,11 +62,11 @@ struct UserTermsStoreHydrationTests {
         }
         let seed = UserTermsStore(fileURL: fileURL, legacyDefaults: defaults)
         for pattern in ["first-term", "second-term", "third-term"] {
-            #expect(add(UserTerm(pattern: pattern, isRegex: false), to: list, in: seed))
+            #expect(add(UserTerm(pattern: pattern, isRegex: false), to: list, in: seed) == .saved)
         }
 
         let store = openStore(fileURL, defaults)
-        #expect(add(UserTerm(pattern: "fourth-term", isRegex: false), to: list, in: store))
+        #expect(add(UserTerm(pattern: "fourth-term", isRegex: false), to: list, in: store) == .saved)
         let expected = ["first-term", "second-term", "third-term", "fourth-term"]
         #expect(terms(list, in: store) == expected)
 
@@ -86,17 +86,17 @@ struct UserTermsStoreHydrationTests {
             try? FileManager.default.removeItem(at: capURL.deletingLastPathComponent())
         }
         let stored = UserTerm(pattern: "stored-term", isRegex: false)
-        #expect(UserTermsStore(fileURL: dupURL, legacyDefaults: defaults).addAlwaysFlag(stored))
+        #expect(UserTermsStore(fileURL: dupURL, legacyDefaults: defaults).addAlwaysFlag(stored) == .saved)
         let dupBytes = try Data(contentsOf: dupURL)
-        #expect(!openStore(dupURL, defaults).addAlwaysFlag(stored), "the stored term is a duplicate")
+        #expect(openStore(dupURL, defaults).addAlwaysFlag(stored) == .refused(.duplicate), "the stored term is a duplicate")
         #expect(try Data(contentsOf: dupURL) == dupBytes, "a refused add leaves the file as it was")
 
         let seed = UserTermsStore(fileURL: capURL, legacyDefaults: defaults)
         for i in 0..<UserTermsStore.perListCap {
-            #expect(seed.addAlwaysFlag(UserTerm(pattern: "capped-term-\(i)", isRegex: false)))
+            #expect(seed.addAlwaysFlag(UserTerm(pattern: "capped-term-\(i)", isRegex: false)) == .saved)
         }
         let capBytes = try Data(contentsOf: capURL)
-        #expect(!openStore(capURL, defaults).addAlwaysFlag(UserTerm(pattern: "one-over-the-cap", isRegex: false)),
+        #expect(openStore(capURL, defaults).addAlwaysFlag(UserTerm(pattern: "one-over-the-cap", isRegex: false)) == .refused(.full),
                 "the stored list is at the cap")
         #expect(try Data(contentsOf: capURL) == capBytes, "a refused add leaves the file as it was")
     }
@@ -155,7 +155,7 @@ struct UserTermsStoreHydrationTests {
         // library. The reload asserts the persisted bytes carry the
         // early save.
         let store = SavedRegexStore(fileURL: fileURL, legacyDefaults: defaults)
-        #expect(store.add(label: "Early", pattern: "[0-9]{3}"))
+        #expect(store.add(label: "Early", pattern: "[0-9]{3}") == .saved)
 
         let reloaded = SavedRegexStore(fileURL: fileURL, legacyDefaults: defaults)
         #expect(reloaded.userSavedRegexes.contains(where: { $0.label == "Early" }),

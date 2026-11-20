@@ -59,7 +59,7 @@ struct SaveCurrentRegexCommitTests {
             store: store
         )
 
-        #expect(error == nil)
+        #expect(error == .added)
         #expect(store.userSavedRegexes.count == before + 1)
         #expect(store.userSavedRegexes.last?.label == "ZIP code")
         #expect(store.userSavedRegexes.last?.pattern == #"\b\d{5}\b"#)
@@ -81,7 +81,7 @@ struct SaveCurrentRegexCommitTests {
             store: store
         )
 
-        #expect(error == nil)
+        #expect(error == .added)
         #expect(store.userSavedRegexes.last?.label == "Case number")
         #expect(store.userSavedRegexes.last?.pattern == #"\bCA-\d{6}\b"#)
     }
@@ -98,8 +98,8 @@ struct SaveCurrentRegexCommitTests {
             label: "Digits", pattern: "  ", store: store
         )
 
-        #expect(emptyLabel != nil)
-        #expect(emptyPattern != nil)
+        #expect(emptyLabel == .refused(message: "Label and pattern must not be empty."))
+        #expect(emptyPattern == .refused(message: "Label and pattern must not be empty."))
         #expect(store.userSavedRegexes.isEmpty)
     }
 
@@ -113,7 +113,7 @@ struct SaveCurrentRegexCommitTests {
             label: "Dup", pattern: #"\d{4}"#, store: store
         )
 
-        #expect(error != nil)
+        #expect(error == .refused(message: PatternAdmission.storeRejectedMessage))
         #expect(store.userSavedRegexes.count == 1)
     }
 
@@ -129,6 +129,23 @@ struct SaveCurrentRegexCommitTests {
         #expect(SearchAndRedactSheet.saveCurrentRegexAlertTitle == "Save current pattern")
         // The menu item itself stays unchanged.
         #expect(SearchToolbarSection.saveCurrentRegexMenuItem == "Save current…")
+    }
+
+    @Test("A pattern that a held store will not take is reported as not saved, not as refused")
+    func heldStoreIsNotSavedFromSearch() async throws {
+        let fileURL = Self.makeScratchRegexFileURL()
+        defer { try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent()) }
+        #expect(SavedRegexStore(fileURL: fileURL, legacyDefaults: Self.makeSuite())
+            .add(label: "Stored", pattern: #"\d{2}"#) == .saved)
+        try UnreadableFile.take(fileURL)
+        defer { UnreadableFile.restore(fileURL) }
+        let store = SavedRegexStore(fileURL: fileURL, legacyDefaults: Self.makeSuite())
+
+        let outcome = await SearchAndRedactSheet.commitSaveCurrentRegex(
+            label: "ZIP code", pattern: #"\b\d{5}\b"#, store: store)
+
+        #expect(outcome == .notSaved)
+        #expect(store.userSavedRegexes.isEmpty)
     }
 }
 

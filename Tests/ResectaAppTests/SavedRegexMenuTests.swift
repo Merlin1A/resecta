@@ -141,7 +141,7 @@ struct SavedRegexMenuTests {
 
         let added = store.add(label: "ZIP", pattern: #"\b\d{5}\b"#)
 
-        #expect(added == true)
+        #expect(added == .saved)
         #expect(store.userSavedRegexes.count == initialUserCount + 1)
         #expect(store.userSavedRegexes.last?.label == "ZIP")
         #expect(store.userSavedRegexes.last?.pattern == #"\b\d{5}\b"#)
@@ -172,6 +172,6 @@ struct SavedRegexMenuTests {
 
         // The store also refuses one more add at cap.
         let refused = store.add(label: "extra", pattern: "extra\\d")
-        #expect(refused == false)
+        #expect(refused == .refused(.full))
     }
 }
