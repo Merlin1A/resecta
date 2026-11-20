@@ -1,39 +1,72 @@
 import SwiftUI
 import RedactionEngine
 
-// The editor's one top-banner slot. Two notices share the top edge of
-// the canvas: the paused notice (a run left unfinished when the app went
-// to the background) and the import annotation notice. The hub's body
-// mounts this one slot; it shows one notice at a time, paused first, and
-// a notice that is not shown waits its turn (each one ends only when it
-// is dismissed or replaced).
+// The editor's band under the toolbar. It shows at most one notice: the
+// first that holds, in a fixed order of six places (`TopBannerSlot`). A
+// notice that is not shown waits its turn; hiding the band, or showing
+// another notice in front, ends nothing (each notice ends only when it is
+// dismissed or its condition ends). Two places have a notice today, the
+// paused notice (a run left unfinished when the app went to the
+// background) and the import annotation notice; the other four are kept
+// in order for the notices that fill them later.
 
-enum TopBannerSlot: Equatable {
+enum TopBannerSlot: Hashable, CaseIterable {
+    // Declared in the band's order: the first that holds is shown.
+    case redrawn
     case paused
-    case annotation
+    case importAnnotations
+    case sourceProtection
+    case fit
+    case imagePages
 
-    /// The precedence: paused beats the annotation notice.
-    static func winner(paused: Bool, annotation: Bool) -> TopBannerSlot? {
-        if paused { return .paused }
-        if annotation { return .annotation }
-        return nil
+    /// The band's occupant: the first place, in declared order, whose
+    /// notice holds.
+    static func occupant(of present: Set<TopBannerSlot>) -> TopBannerSlot? {
+        allCases.first { present.contains($0) }
     }
 
-    /// The editor's read of the two notices: the paused notice shows only
-    /// while editing; the annotation notice's own visibility
-    /// (`ImportAnnotationNoticeBanner.isVisible`) says when it is owed.
-    static func winner(documentState: DocumentState) -> TopBannerSlot? {
-        let editing = documentState.phaseKind == .editing
-        return winner(
-            paused: editing && documentState.wasPausedByBackground,
-            annotation: ImportAnnotationNoticeBanner.isVisible(
-                phaseKind: documentState.phaseKind,
-                annotationTypeCount: ImportAnnotationNoticeBanner.noticeWorthyCount(
-                    documentState.sourceAnnotationFindings),
-                filledFormFieldCount: documentState.sourceFilledFormFieldCount,
-                dismissed: documentState.annotationNoticeDismissed
-            )
-        )
+    /// The number drawn on the folded mark: how many notices hold, shown
+    /// from two; nil for one or none.
+    static func waitingCount(of present: Set<TopBannerSlot>) -> Int? {
+        present.count >= 2 ? present.count : nil
+    }
+
+    /// The places whose own condition holds, the phase aside: a run that
+    /// takes the editing phase away and gives it back hides the band, it
+    /// does not end a notice. `widenedOnPage` is the fit notice's input.
+    static func holding(documentState: DocumentState, widenedOnPage: Bool = false) -> Set<TopBannerSlot> {
+        var present: Set<TopBannerSlot> = []
+        if documentState.wasPausedByBackground { present.insert(.paused) }
+        if ImportAnnotationNoticeBanner.isVisible(
+            phaseKind: .editing,
+            annotationTypeCount: ImportAnnotationNoticeBanner.noticeWorthyCount(
+                documentState.sourceAnnotationFindings),
+            filledFormFieldCount: documentState.sourceFilledFormFieldCount,
+            dismissed: documentState.annotationNoticeDismissed
+        ) {
+            present.insert(.importAnnotations)
+        }
+        if widenedOnPage { present.insert(.fit) }
+        return present
+    }
+
+    /// The editor's read: the occupant of what holds while editing, and
+    /// nothing in any other phase.
+    static func winner(documentState: DocumentState, widenedOnPage: Bool = false) -> TopBannerSlot? {
+        guard documentState.phaseKind == .editing else { return nil }
+        return occupant(of: holding(documentState: documentState, widenedOnPage: widenedOnPage))
+    }
+
+    /// Whether the band is drawn: only while editing, and only when the
+    /// editor's sheet slot presents nothing or presents Search parked at
+    /// its compact height. `searchIsTheSheet` is whether the sheet the slot
+    /// presents is Search; every other sheet hides the band. Hiding the
+    /// band ends nothing.
+    static func bandIsShown(
+        phase: DocumentState.PhaseKind, slotPresents: Bool,
+        searchIsTheSheet: Bool, searchDetent: PresentationDetent
+    ) -> Bool {
+        phase == .editing && (!slotPresents || (searchIsTheSheet && searchDetent == .compactFloat))
     }
 }
 
@@ -47,8 +80,20 @@ extension DocumentEditorView {
         switch TopBannerSlot.winner(documentState: documentState) {
         case .paused?:
             resumeBannerOverlay
-        case .annotation?:
+        case .importAnnotations?:
             annotationNoticeBanner
+        case .redrawn?:
+            // The redraw line's place: nothing holds it yet.
+            EmptyView()
+        case .sourceProtection?:
+            // The password-protected source notes' place: nothing holds it yet.
+            EmptyView()
+        case .fit?:
+            // The fit notice's place: the editor passes no fit input yet.
+            EmptyView()
+        case .imagePages?:
+            // The image-pages note's place: nothing holds it yet.
+            EmptyView()
         case nil:
             EmptyView()
         }
