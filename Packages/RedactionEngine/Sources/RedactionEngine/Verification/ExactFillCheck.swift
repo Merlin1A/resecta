@@ -182,15 +182,19 @@ enum ExactFillCheck {
     static func isNeutral(_ b: CodedBlock) -> Bool { b.flat && abs(b.dcTimesStep) <= 3 }
 
     /// The check over a file: every page's picture read by the page-image
-    /// reader, then every box of that page judged. Every page of the record
-    /// has an answer: one the file does not have is not the file the record
-    /// names, and so is each of its boxes. Throws only cancellation.
+    /// reader and held against what the page draws, read by the check itself;
+    /// then every box of that page judged. Every page of the record has an
+    /// answer: one the file does not have is not the file the record names,
+    /// and so is each of its boxes. Throws only cancellation.
     static func run(fileData: Data, source: some PageImageSource, input: BoxCheckInput?) throws(CancellationError) -> BoxCheckReport {
         guard let input else { return .noRecord }
+        let drawings = try PageDrawingReader.read(fileData: fileData)
         var pages: [BoxCheckPage] = []
         try PageImageLocator.readEach(fileData: fileData, source: source, recordedHashes: input.pageImageDigests) { index, outcome in
             let page = index < input.pages.count ? input.pages[index] : nil
-            var judged = judge(page: page, picture: outcome, fill: input.fill, chosenDPI: input.chosenDPI)
+            let drawing = index < drawings.count ? drawings[index] : .failure(PageImageRefusal(reason: .drawingNotRead, offset: 0))
+            let admitted = PageDrawingReader.admit(outcome, drawing: drawing)
+            var judged = judge(page: page, picture: admitted, fill: input.fill, chosenDPI: input.chosenDPI)
             judged.outsidePlan = page?.outsidePlan ?? []
             pages.append(judged)
         }

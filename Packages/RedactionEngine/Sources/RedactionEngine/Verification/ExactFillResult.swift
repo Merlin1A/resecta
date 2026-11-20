@@ -62,6 +62,20 @@ struct PageImageRefusal: Error, Equatable, Sendable {
         case hashDiffers
         case bytesNotInFile
         case pageNotInFile    // the record names a page past the file's last
+        // The page as drawn, read by the box check itself (PageDrawingReader).
+        case drawingNotRead
+        case fileRevised
+        case documentKeyNotListed
+        case pageKeyNotListed
+        case resourceNotListed
+        case operatorNotListed
+        case textNotInvisible
+        case pictureNotDrawnOnce
+        case pictureNotOverThePage
+        case pictureKeyNotListed
+        case pictureColourNotListed
+        case pictureSizeDiffers
+        case unlistedSegment
 
         /// The fault this reason reads as: the picture is not the one the
         /// record names, or it could not be read for this check.
@@ -77,7 +91,10 @@ struct PageImageRefusal: Error, Equatable, Sendable {
                  .scanNotSequential, .tableNotDefined, .tableNeverUsed, .scanCutShort,
                  .markerInsideScan, .restartMarkerNotDeclared, .restartMarkerOrder,
                  .huffmanCodeNotInTable, .coefficientSize, .coefficientRun, .noEndMarker,
-                 .bytesAfterEndMarker, .noPageImage, .twoPageImages, .formsOverLimit, .notJPEG:
+                 .bytesAfterEndMarker, .noPageImage, .twoPageImages, .formsOverLimit, .notJPEG,
+                 .drawingNotRead, .fileRevised, .documentKeyNotListed, .pageKeyNotListed, .resourceNotListed,
+                 .operatorNotListed, .textNotInvisible, .pictureNotDrawnOnce, .pictureNotOverThePage,
+                 .pictureKeyNotListed, .pictureColourNotListed, .pictureSizeDiffers, .unlistedSegment:
                 .unreadableInput
             }
         }
