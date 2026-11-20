@@ -277,10 +277,10 @@ struct VerificationMastheadTests {
     @Test("The spoken label: the title, the counts with their clauses, the sentence")
     func spokenLabel() {
         #expect(Results.mastheadAccessibilityLabel(report: Fixtures.secureFail)
-                == "Checks Failed. 6 of 7 checks passed. 1\u{00A0}failed. \(Self.keepEditing) to fix what failed, "
+                == "Checks Failed. 7 of 8 checks passed. 1\u{00A0}failed. \(Self.keepEditing) to fix what failed, "
                 + "or share after review.")
         #expect(Results.mastheadAccessibilityLabel(report: Fixtures.searchableAllRasterized)
-                == "Checks Passed. 10 of 10 checks passed. 3\u{00A0}had nothing to check. "
+                == "Checks Passed. 11 of 11 checks passed. 3\u{00A0}had nothing to check. "
                 + "Look over the redacted PDF in Preview before you share it.")
         #expect(Results.mastheadAccessibilityLabel(report: Fixtures.pageCountGate)
                 == "Checks Failed. 0 of 1 check passed. 1\u{00A0}failed. \(Self.keepEditing) and run Redact again; "

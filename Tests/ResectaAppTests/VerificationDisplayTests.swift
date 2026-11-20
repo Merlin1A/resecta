@@ -222,12 +222,21 @@ struct VerificationDisplayTests {
         #expect(VerificationResultsView.reviewTermTexts(report: report) == ["DELIA"])
     }
 
-    @Test("ATTENTION masthead subtitle stays generic without term texts")
+    @Test("ATTENTION masthead subtitle without a term row asks that the rows be read, by their number")
     func attentionMastheadGenericFallback() {
         let report = VerificationReport(
             layers: [], overallStatus: .attention("x"), durationSeconds: 0)
         #expect(VerificationResultsView.mastheadSubtitle(report: report)
-                == "Keep\u{00A0}Editing, then use text\u{00A0}search to redact the terms below.")
+                == "Read the findings below before you share the PDF.") // LegalPhrases:safe (approved words)
+        let box = LayerResult(
+            name: VerificationLayer.boxFill.name, symbolName: VerificationLayer.boxFill.symbolName,
+            status: .attention("A box on page 4 is not exactly the fill."),
+            shortDescription: "A box on page 4 is not exactly the fill.", detailDescription: "",
+            pageReferences: [3], durationSeconds: 0, layer: .boxFill)
+        let one = VerificationReport(
+            layers: [box], overallStatus: .attention("x"), durationSeconds: 0)
+        #expect(VerificationResultsView.mastheadSubtitle(report: one)
+                == "Read the finding below before you share the PDF.") // LegalPhrases:safe (approved words)
     }
 
     // MARK: - Privacy-sensitive marking

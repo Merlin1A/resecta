@@ -383,6 +383,10 @@ enum VerificationDebugFixtures {
                                      short: "Multiple %%EOF markers (2) — incremental update may contain original content"),
                 .metadataCheck: row(.metadataCheck, .fail("Metadata key /Author present"),
                                     short: "Metadata key /Author present"),
+                .boxFill: row(.boxFill, .attention("A box on page 1 is not exactly the fill."),
+                              short: "A box on page 1 is not exactly the fill.",
+                              detail: "This check is new and has not yet been shown to stay quiet on correct files.",
+                              pages: [0]),
             ]),
             overallStatus: .fail("Selectable text found on page 1"), durationSeconds: 4.4, perPageModes: secure)
     }()
