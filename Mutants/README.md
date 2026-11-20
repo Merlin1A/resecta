@@ -712,3 +712,4 @@ with its reason and the mutant that is caught in its place.
 | `search-for-text-keeps-every-timeout.patch` | One text's account keeps a timeout only where that text ran out of time. | RedactionEngineTests/SearchAccountJoinTests forTextThatNeverTimedOut; RedactionEngineTests/SearchAccountJoinTests forTextThatTimedOut |
 | `search-account-applied-replaced-dropped.patch` | A replaced run keeps its account when an Apply took a record from it while it was open. | ResectaAppTests/SearchAccountLifecycleTests appliedThenReplaced |
 | `redact-stop-stricter-cures-looser.patch` | A stricter search's read never cures a looser one: only a unit at least as loose in every option covers another. | ResectaAppTests/RedactStopUnitTests looserCoversStricter |
+| `redact-stop-replaced-run-without-boxes.patch` | A replaced run counts at the stop only while a region from it remains. | ResectaAppTests/SearchRunLogTests replacedRunCountsWhileItsBoxesRemain |
