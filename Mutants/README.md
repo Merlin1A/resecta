@@ -446,3 +446,4 @@ with its reason and the mutant that is caught in its place.
 | `paint-rule-copy-block-edge-cut-at-limit.patch` | The block edge is never pulled back by a limit line. | RedactionEngineTests/PixelPaintDifferentialTests boxesAgree |
 | `paint-rule-copy-rounding-swapped-on-one-side.patch` | A rectangle's left edge is rounded down to a whole pixel, outward, like its other sides. | RedactionEngineTests/PixelPaintDifferentialTests boxesAgree |
 | `paint-rule-copy-blocks-every-16-pixels.patch` | Block lines stand every 8 pixels from the picture's left and top edges. | RedactionEngineTests/PixelPaintDifferentialTests boxesAgree |
+| `paint-rule-copy-frame-side-rounded-down.patch` | A page side's picture is rounded up to a whole pixel, so the picture never crops the page. | RedactionEngineTests/PixelPaintDifferentialTests boxesAgree, sizesAgree |

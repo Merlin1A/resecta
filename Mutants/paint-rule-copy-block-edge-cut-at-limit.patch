@@ -5,10 +5,10 @@ Must go red: RedactionEngineTests/PixelPaintDifferentialTests boxesAgree
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PixelPaintRule.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PixelPaintRule.swift
-index 47226be6..84c2fa86 100644
+index 9e1e885e..f80de00b 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PixelPaintRule.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PixelPaintRule.swift
-@@ -96,8 +96,10 @@ enum PixelPaintRule {
+@@ -103,8 +103,10 @@ enum PixelPaintRule {
          if let a = limitAbove { margin.top = max(margin.top, h - floorPixels(a, dpi: d)) }
          if let b = limitBelow { margin.bottom = min(margin.bottom, h - ceilPixels(b, dpi: d)) }
          let i = outward(inner, dpi: d, imageHeight: h)

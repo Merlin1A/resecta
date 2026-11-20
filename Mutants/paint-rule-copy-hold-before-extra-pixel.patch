@@ -5,12 +5,12 @@ Must go red: RedactionEngineTests/PixelPaintDifferentialTests boxesAgree
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PixelPaintRule.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PixelPaintRule.swift
-index 47226be6..41cce35e 100644
+index 9e1e885e..3fd7db45 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PixelPaintRule.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PixelPaintRule.swift
-@@ -92,9 +92,10 @@ enum PixelPaintRule {
-     static func pixelPaint(inner: PageRect64, paint: PageRect64, limitAbove: Int?, limitBelow: Int?,
+@@ -99,9 +99,10 @@ enum PixelPaintRule {
                             dpi d: Int, width w: Int, height h: Int) -> Lines {
+         guard hasArea(inner) else { return Lines(left: 0, top: 0, right: 0, bottom: 0) }
          let p = outward(paint, dpi: d, imageHeight: h)
 -        var margin = Lines(left: p.left - 1, top: p.top - 1, right: p.right + 1, bottom: p.bottom + 1)
 +        var margin = p

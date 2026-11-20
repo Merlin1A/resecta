@@ -5,7 +5,7 @@ Must go red: RedactionEngineTests/PixelPaintDifferentialTests boxesAgree
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PixelPaintRule.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PixelPaintRule.swift
-index 47226be6..5b3c918c 100644
+index 9e1e885e..528180ca 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PixelPaintRule.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PixelPaintRule.swift
 @@ -65,7 +65,7 @@ enum PixelPaintRule {
