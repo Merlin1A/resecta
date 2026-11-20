@@ -218,6 +218,8 @@ struct SearchListLimitOccurrenceTests {
             Issue.record("Could not locate the run end's steps")
             return
         }
+        #expect(body[gate.upperBound..<stop.lowerBound].contains("run: prepared.run"),
+                "the run's own token reaches the decision")
         #expect(body[gate.upperBound..<stop.lowerBound].contains("taskCancelled: cancelled"),
                 "the task's cancel reaches the decision")
         #expect(stop.upperBound <= teardown.lowerBound, "the sinks come down only after the decision")
