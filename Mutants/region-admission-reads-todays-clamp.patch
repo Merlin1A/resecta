@@ -1,0 +1,20 @@
+Property: Admission reads a region's rectangle cut to the page on all four sides, so a region of full size wholly off the left or the bottom is refused, not slid onto the page's edge by today's clamp and admitted.
+Area: region admission
+Test command: cd Packages/RedactionEngine && swift test --filter RegionAdmissionTests
+Must go red: RedactionEngineTests/RegionAdmissionTests "Each case: the predicate's answer, and the record's list of refused regions" (whollyOffTheLeft); RedactionEngineTests/RegionAdmissionTests "Each case: the predicate's answer, and the record's list of refused regions" (whollyBelow); RedactionEngineTests/RunRecordBoxesTests "Each case" (whollyOff)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/RegionAdmission.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/RegionAdmission.swift
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/RegionAdmission.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/RegionAdmission.swift
+@@ -26,7 +26,9 @@
+         let width = maxX - minX, height = maxY - minY
+         // NaN fails every comparison below: such a rectangle is too thin.
+         guard width > floor, height > floor else { return .tooThinToPaint }
+-        let cutWidth = min(maxX, 1) - max(minX, 0), cutHeight = min(maxY, 1) - max(minY, 0)
++        // Today's clamp: the start moved onto the page, the size limited to the room left.
++        let cx = max(0, min(minX, 1)), cy = max(0, min(minY, 1))
++        let cutWidth = min(width, 1 - cx), cutHeight = min(height, 1 - cy)
+         if cutWidth <= 0 || cutHeight <= 0 { return .offThePage }
+         return cutWidth > floor && cutHeight > floor ? nil : .tooThinToPaint
+     }
