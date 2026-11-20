@@ -110,8 +110,12 @@ struct HiddenGlyphStripTests {
     func stripsHiddenGlyphsPaintsBoxAlone() async throws {
         let f = try Self.fixture()
         defer { withExtendedLifetime(f.doc) {} }
-        let result = try await PageRasterizer().rasterize(
-            Self.pageData(f.page, [Self.region(f.paint, strip: f.strip)], mode: .searchableRedaction))
+        // With whole words off, so the strip alone takes the drifted word's
+        // far glyphs: with whole words on the word leaves whole, strip or not.
+        let result = try await PageTextPath.$wholeWordsOff.withValue(true) {
+            try await PageRasterizer().rasterize(
+                Self.pageData(f.page, [Self.region(f.paint, strip: f.strip)], mode: .searchableRedaction))
+        }
         // The page keeps its text layer: the ink test does not mask the strip.
         #expect(result.fallbackReason == nil)
         let survivors = try #require(result.pageOutput.textLayerEntries)

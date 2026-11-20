@@ -10,8 +10,13 @@ import PDFKit
 // V1–V4 export the seeded page (its layer drifted 30 pt along the line) with a
 // box over a word's print through the corpus mirror's route
 // (`HiddenWordInkFixtures.mirrorRun`), which leaves the word's drifted hidden
-// copy in the export, and verify it. Today every one of those reports passes
-// the leak or flags only a neighbour; with the check, each reads Checks Failed
+// copy in the export, and verify it. Since every word that loses a letter
+// to a box leaves whole, the live route leaves that copy only where no letter
+// of it is lost (p6, p7, p9); V1, V4 and V21b make their leak with whole
+// words off (`partWordsKept`) and assert as well that the live export holds
+// no part of the word (`expectWholeWordGone`). Before the check every one
+// of those reports passed the leak or flagged only a neighbour; with the
+// check, each reads Checks Failed
 // with the check's row failing on page 1. Each case first asserts that the
 // leak is in the export, so a case that passes is never a case whose page
 // stopped leaking. Every box these cases draw is one the app marks as not
