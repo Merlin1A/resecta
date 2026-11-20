@@ -1,0 +1,32 @@
+Property: The search list's limit counts matches, not rows: a match over two lines is listed whole, the match that reaches the limit keeps its later lines, and only a new match past the limit is dropped.
+Area: the Search sheet's result list (SearchState.appendResult)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild build-for-testing -scheme ResectaApp -destination id=<simulator>, then DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test-without-building -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/SearchListLimitOccurrenceTests
+Must go red: ResectaAppTests/SearchListLimitOccurrenceTests listLimit (the rows "under the limit: 998 one-line matches…", "999 one-line matches, then one over two lines…", "the 1000th match's second line arrives…")
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/SearchState+RunLifecycle.swift b/Sources/ResectaApp/State/SearchState+RunLifecycle.swift
+index 38c6cb68..35b33d52 100644
+--- a/Sources/ResectaApp/State/SearchState+RunLifecycle.swift
++++ b/Sources/ResectaApp/State/SearchState+RunLifecycle.swift
+@@ -132,16 +132,13 @@ extension SearchState {
+         // Matches never outnumber rows, so they are counted only once
+         // the rows reach the limit.
+         if results.count + pendingResults.count >= DocumentSearcher.maxResults {
+-            let listed = listedMatchKeys()
+-            if listed.count >= DocumentSearcher.maxResults, !listed.contains(Self.occurrenceKey(result)) {
+-                markCapReached()  // a new match past the limit is dropped
+-                return
+-            }
++            markCapReached()  // a result past the cap is dropped
++            return
+         }
+         pendingResults.append((run: runToken, result: result))
+-        if !resultsAtCap, results.count + pendingResults.count >= DocumentSearcher.maxResults,
+-           listedMatchKeys().count >= DocumentSearcher.maxResults {
+-            noteCapReached()  // the match that reaches the limit is kept, with its later lines
++        if results.count + pendingResults.count >= DocumentSearcher.maxResults {
++            markCapReached()  // the result that reaches the cap is kept
++            return
+         }
+         if pendingResults.count >= Self.batchFlushSize {
+             flushPendingResults()

@@ -56,7 +56,8 @@ extension SearchState {
 
     // Fire-and-forget cancellation for two cases that cannot await the
     // task's `value`: (a) self-cancellation from inside the task
-    // (`appendResult` cap-hit) — awaiting a task from within itself
+    // (`appendResult` cap-hit, or the run's end at the cap,
+    // `runEndsCancelled`) — awaiting a task from within itself
     // deadlocks; (b) document close / sheet teardown, where the caller
     // wipes shared state regardless, so a leaked cleanup tail has
     // nothing to clobber.
@@ -65,6 +66,23 @@ extension SearchState {
         activeSearchTask = nil
         isSearching = false
         flushPendingResults()
+    }
+
+    /// A run's stream has ended: whether the run ends as a cancelled one,
+    /// which skips the cleanup tail. A cancelled task does: a successor
+    /// may own the state. So does the current run when it stopped at the
+    /// result limit, where the engine ends the stream: it is stopped as
+    /// the cap's cancel stops one (`cancelSearchWithoutAwait`: what it
+    /// holds is flushed, the run is no longer searching), so the completed
+    /// flag stays down and no Scan report or run record is written (the
+    /// return rule's "a run that stopped at the result cap is listed").
+    /// A superseded run's end (another token) never takes the cap branch,
+    /// so it cannot stop a successor's run.
+    func runEndsCancelled(run: Int, taskCancelled: Bool) -> Bool {
+        if taskCancelled { return true }
+        guard resultsAtCap, run == runToken else { return false }
+        cancelSearchWithoutAwait()
+        return true
     }
 
     /// Replace-selection primitive: every result's `isSelected` is set to
@@ -116,21 +134,34 @@ extension SearchState {
 
     /// Buffer a result from the search stream. Flushed in batches
     /// to avoid per-result @Observable change notifications (P2).
-    /// Stops accepting at engine cap and cancels the search (P3).
+    /// The engine's limit counts matches, not rows (P3): a line of a
+    /// match already listed is always kept, so a match that runs over
+    /// two lines is listed whole; a new match is kept only while fewer
+    /// than `DocumentSearcher.maxResults` are listed. The match that
+    /// reaches the limit marks it, and the run goes on so that match's
+    /// later lines still arrive; the first new match past the limit is
+    /// dropped and stops the run. The engine stops at the limit itself, so
+    /// a run at the limit most often stops at its stream's end
+    /// (`runEndsCancelled`).
     /// `run` names the run the result belongs to (the token
     /// `beginRun()` handed its consumer); a result from a superseded
     /// run is dropped before anything below sees it. A caller that
     /// holds no token — a direct seed — appends to the current run.
     func appendResult(_ result: SearchResult, run: Int? = nil) {
         if let run, run != runToken { return }
+        // Matches never outnumber rows, so they are counted only once
+        // the rows reach the limit.
         if results.count + pendingResults.count >= DocumentSearcher.maxResults {
-            markCapReached()  // a result past the cap is dropped
-            return
+            let listed = listedMatchKeys()
+            if listed.count >= DocumentSearcher.maxResults, !listed.contains(Self.occurrenceKey(result)) {
+                markCapReached()  // a new match past the limit is dropped
+                return
+            }
         }
         pendingResults.append((run: runToken, result: result))
-        if results.count + pendingResults.count >= DocumentSearcher.maxResults {
-            markCapReached()  // the result that reaches the cap is kept
-            return
+        if !resultsAtCap, results.count + pendingResults.count >= DocumentSearcher.maxResults,
+           listedMatchKeys().count >= DocumentSearcher.maxResults {
+            noteCapReached()  // the match that reaches the limit is kept, with its later lines
         }
         if pendingResults.count >= Self.batchFlushSize {
             flushPendingResults()
@@ -141,6 +172,14 @@ extension SearchState {
                 self?.flushPendingResults()
             }
         }
+    }
+
+    /// The matches listed so far, by the key that groups a match's lines:
+    /// the published results and those still buffered.
+    private func listedMatchKeys() -> Set<UUID> {
+        var keys = Set(results.map(Self.occurrenceKey))
+        for entry in pendingResults { keys.insert(Self.occurrenceKey(entry.result)) }
+        return keys
     }
 
     /// Flush buffered results into the published array. Single version
