@@ -1,0 +1,19 @@
+Property: A sized launch of the whole-page control's tests is checked to have taken its text size; a size that never reaches the launch fails the guard.
+Area: the page bar's screen tests (EditorChromeUITests launchWholePageControl)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppUITests/EditorChromeUITests
+Must go red: ResectaAppUITests/EditorChromeUITests testWholePageControl_atTheLargestTextSize_symbolStaysInsideItsDisc; ResectaAppUITests/EditorChromeUITests testWholePageControl_atAccessibilityOne_symbolStaysInsideItsDisc; ResectaAppUITests/EditorChromeUITests testPageBar_atTheLargestTextSize_controlLeadsAndNothingIsCut
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Tests/ResectaAppUITests/EditorChromeUITests.swift b/Tests/ResectaAppUITests/EditorChromeUITests.swift
+index efa21d06..014e082f 100644
+--- a/Tests/ResectaAppUITests/EditorChromeUITests.swift
++++ b/Tests/ResectaAppUITests/EditorChromeUITests.swift
+@@ -98,7 +98,7 @@ nonisolated final class EditorChromeUITests: XCTestCase {
+ 
+     private func launchEditorForWholePage(textSize: String?) {
+         var arguments = ["--uitesting", "--loadTestDocument", "--multipageDoc"]
+-        if let textSize { arguments += ["-UIPreferredContentSizeCategoryName", textSize] }
++        _ = textSize  // mutant: the size name never reaches the launch
+         app.launchArguments = arguments
+         app.launch()
+     }
