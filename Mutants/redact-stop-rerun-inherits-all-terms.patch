@@ -1,0 +1,18 @@
+Property: The button's run lets any term match, whatever the user's all-terms setting.
+Area: the stop at Redact
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/RedactStopGroupsTests
+Must go red: ResectaAppTests/RedactStopGroupsTests k720; ResectaAppTests/RedactStopGroupsTests k732
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/RedactStop+Groups.swift b/Sources/ResectaApp/State/RedactStop+Groups.swift
+index a25e81b6..d8fda24a 100644
+--- a/Sources/ResectaApp/State/RedactStop+Groups.swift
++++ b/Sources/ResectaApp/State/RedactStop+Groups.swift
+@@ -112,7 +112,6 @@ extension RedactStopUnit {
+         options.stripDigitSeparators = digitSeparators
+         options.normalizeSmartPunctuation = quotesAndDashes
+         options.includeOCR = true
+-        options.multiTermConjunction = false
+         return options
+     }
+ }
