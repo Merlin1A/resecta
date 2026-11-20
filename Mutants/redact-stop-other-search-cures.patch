@@ -1,0 +1,18 @@
+Property: Only a run of the same text, or of a text that covers it, cures a page.
+Area: the stop at Redact
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/RedactStopTests
+Must go red: ResectaAppTests/RedactStopTests k705; ResectaAppTests/RedactStopTests k731
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/RedactStop.swift b/Sources/ResectaApp/State/RedactStop.swift
+index ff1685b1..3edfc8ac 100644
+--- a/Sources/ResectaApp/State/RedactStop.swift
++++ b/Sources/ResectaApp/State/RedactStop.swift
+@@ -37,7 +37,6 @@ enum RedactStop {
+     /// its terms'. Nil when no run holds the unit.
+     static func account(for unit: RedactStopUnit, in runs: [Run]) -> SearchAccount? {
+         let accounts = runs.compactMap { run -> SearchAccount? in
+-            guard RedactStopUnit.units(of: run.query).contains(where: { $0.covers(unit) }) else { return nil }
+             return unit.kind == .scan ? run.account : run.account.forText(unit.text)
+         }
+         return SearchAccount.joined(accounts)

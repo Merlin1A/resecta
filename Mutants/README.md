@@ -713,3 +713,7 @@ with its reason and the mutant that is caught in its place.
 | `search-account-applied-replaced-dropped.patch` | A replaced run keeps its account when an Apply took a record from it while it was open. | ResectaAppTests/SearchAccountLifecycleTests appliedThenReplaced |
 | `redact-stop-stricter-cures-looser.patch` | A stricter search's read never cures a looser one: only a unit at least as loose in every option covers another. | ResectaAppTests/RedactStopUnitTests looserCoversStricter |
 | `redact-stop-replaced-run-without-boxes.patch` | A replaced run counts at the stop only while a region from it remains. | ResectaAppTests/SearchRunLogTests replacedRunCountsWhileItsBoxesRemain |
+| `redact-stop-never.patch` | The stop opens when a page that stops Redact is not yet answered. | ResectaAppTests/RedactStopTests k709; ResectaAppTests/RedactStopTests k710; ResectaAppTests/RedactStopTests scanTakenWhole |
+| `redact-stop-small-pictures.patch` | Small pictures alone never open the stop. | ResectaAppTests/RedactStopTests k704; ResectaAppTests/RedactStopTests namesExactlyWhatStops |
+| `redact-stop-answered-forever.patch` | An answer covers only the pages and reasons it was given for; a page unread later is named. | ResectaAppTests/RedactStopTests k705 |
+| `redact-stop-other-search-cures.patch` | Only a run of the same text, or of a text that covers it, cures a page. | ResectaAppTests/RedactStopTests k705; ResectaAppTests/RedactStopTests k731 |
