@@ -1,7 +1,7 @@
 Property: The rectangle reported for a box is the one painted, clipped at the image's edge.
 Area: the plan's report (PageRasterizer.paintPlan)
 Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter PlanPaintTests
-Must go red: RedactionEngineTests/PlanPaintTests reportedIsPainted [pastLeft]; RedactionEngineTests/PlanPaintTests reportedIsPainted [pastBottom]
+Must go red: RedactionEngineTests/PlanPaintTests fillsOnPixelBoxes [pastLeft]; RedactionEngineTests/PlanPaintTests fillsOnPixelBoxes [pastBottom]; RedactionEngineTests/PlanPaintTests recordBoxPastAnEdge [pastLeft]; RedactionEngineTests/PlanPaintTests recordBoxPastAnEdge [pastBottom]
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
