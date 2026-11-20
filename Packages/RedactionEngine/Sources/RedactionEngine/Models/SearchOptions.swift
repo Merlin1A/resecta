@@ -2,10 +2,10 @@ import Foundation
 
 /// Configuration options for search behavior.
 public struct SearchOptions: Sendable, Equatable, Hashable {
-    public var caseSensitive: Bool = false
-    public var wholeWord: Bool = false
-    public var includeOCR: Bool = true
-    public var normalizeUnicode: Bool = true
+    public var caseSensitive: Bool
+    public var wholeWord: Bool
+    public var includeOCR: Bool
+    public var normalizeUnicode: Bool
 
     // Search-recall normalization extensions.
     // The two length-changing flags (separator strip, diacritic fold)
@@ -19,18 +19,18 @@ public struct SearchOptions: Sendable, Equatable, Hashable {
     /// Digit-format-insensitive matching: "123456789" matches
     /// "123-45-6789" by stripping `-`, space, `.`, `/` from both sides
     /// before comparison. Off by default.
-    public var stripDigitSeparators: Bool = false
+    public var stripDigitSeparators: Bool
 
     /// Smart-quote / em-dash folding ("—" matches "-"); 1:1 character
     /// substitution, length-preserving. On by default — universally
     /// helpful on typeset PDFs. On the regex paths only the page text
     /// is folded, never the pattern.
-    public var normalizeSmartPunctuation: Bool = true
+    public var normalizeSmartPunctuation: Bool
 
     /// Diacritic-insensitive matching ("Munoz" matches "Muñoz").
     /// Off by default: folding introduces false positives in non-Latin
     /// scripts and many name databases are accent-significant.
-    public var foldDiacritics: Bool = false
+    public var foldDiacritics: Bool
 
     // AND mode for multi-term search.
     // When true, `searchMultiTerm` retains only pages where EVERY term
@@ -41,8 +41,10 @@ public struct SearchOptions: Sendable, Equatable, Hashable {
     /// union (historical behavior); `true` = AND — only pages where every
     /// queried term has at least one result are included in the output.
     /// Has no effect on `.text`, `.regex`, or `.piiScan` modes.
-    public var multiTermConjunction: Bool = false
+    public var multiTermConjunction: Bool
 
+    /// The one place the options' defaults are written: the stored
+    /// properties have none, since this is the only way an options value is made.
     public init(
         caseSensitive: Bool = false,
         wholeWord: Bool = false,
