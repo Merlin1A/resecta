@@ -698,3 +698,5 @@ with its reason and the mutant that is caught in its place.
 | `search-account-picture-causes-overlap.patch` | A page whose pictures went unread is given one cause. | RedactionEngineTests/SearchAccountTests linesCoverWhatStopsRedact; RedactionEngineTests/SearchAccountTests onePictureCause |
 | `search-account-stop-page-no-report.patch` | The stop page is given to the not-reached line, never to the no-report line. | RedactionEngineTests/SearchAccountTests stopPageWithNoReport |
 | `search-statement-hidden-ticked-only.patch` | The hidden count is every match a filter hides, ticked or not. | ResectaAppTests/SearchHiddenCountTests untickedHidden |
+| `account-too-large-read-as-recognised.patch` | A report of a page too large for recognition is the too-large fact. | RedactionEngineTests/AccountReportToFactTests eachRoute; RedactionEngineTests/AccountReportToFactTests tooLargeFolds |
+| `account-unopenable-read-as-failed.patch` | A report of a page that could not be opened is the could-not-open fact. | RedactionEngineTests/AccountReportToFactTests eachRoute; RedactionEngineTests/AccountReportToFactTests unopenableFolds |
