@@ -68,6 +68,37 @@ enum TopBannerSlot: Hashable, CaseIterable {
     ) -> Bool {
         phase == .editing && (!slotPresents || (searchIsTheSheet && searchDetent == .compactFloat))
     }
+
+    // MARK: - Speaking a notice once
+
+    /// One step of speech: the place whose notice is spoken now, if any,
+    /// and the places marked as spoken after it.
+    struct SpeechStep: Equatable {
+        let speak: TopBannerSlot?
+        let announced: Set<TopBannerSlot>
+    }
+
+    /// A place stays marked as spoken only while its notice holds, so a
+    /// notice whose condition ends and holds again is spoken again; the
+    /// shown notice is spoken when it is not marked. With nothing shown
+    /// (the band hidden) nothing is spoken and every place that still
+    /// holds stays marked, so the band's return is not spoken again.
+    static func announceStep(
+        shown: TopBannerSlot?, holding: Set<TopBannerSlot>, announced: Set<TopBannerSlot>
+    ) -> SpeechStep {
+        var kept = announced.intersection(holding)
+        guard let shown, !kept.contains(shown) else {
+            return SpeechStep(speak: nil, announced: kept)
+        }
+        kept.insert(shown)
+        return SpeechStep(speak: shown, announced: kept)
+    }
+
+    /// The shown notice as speech reads it: nothing while the scene is not
+    /// active, so a notice raised as the app leaves is spoken on its return.
+    static func shownForSpeech(_ shown: TopBannerSlot?, sceneIsActive: Bool) -> TopBannerSlot? {
+        sceneIsActive ? shown : nil
+    }
 }
 
 extension DocumentEditorView {

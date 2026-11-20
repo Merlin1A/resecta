@@ -172,6 +172,95 @@ struct TopBannerSlotTests {
         #expect(!documentState.annotationNoticeDismissed)
     }
 
+    /// One state of the band as speech sees it, or a new document.
+    private enum SpeechState {
+        case band(shown: TopBannerSlot?, holding: Set<TopBannerSlot>, sceneIsActive: Bool = true)
+        case newDocument
+    }
+
+    /// A spoken line: the state it is spoken at, counted from 1, and its notice.
+    private struct Spoken: Equatable {
+        let state: Int
+        let slot: TopBannerSlot
+    }
+
+    private struct SpeechRow {
+        let name: String
+        let states: [SpeechState]
+        let spoken: [Spoken]
+    }
+
+    @Test("A notice is spoken once, and again when its condition has ended and holds again")
+    func spokenOnce() {
+        let rows: [SpeechRow] = [
+            SpeechRow(name: "A-1 the pause shown; Search raised, the pause holding; shown again", states: [
+                .band(shown: .paused, holding: [.paused]),
+                .band(shown: nil, holding: [.paused]),
+                .band(shown: .paused, holding: [.paused]),
+            ], spoken: [Spoken(state: 1, slot: .paused)]),
+            SpeechRow(name: "A-2 the pause shown; Dismiss; a second pause shown", states: [
+                .band(shown: .paused, holding: [.paused]),
+                .band(shown: nil, holding: []),
+                .band(shown: .paused, holding: [.paused]),
+            ], spoken: [Spoken(state: 1, slot: .paused), Spoken(state: 3, slot: .paused)]),
+            SpeechRow(name: "A-3 the pause shown; Restart clears it and leaves editing; a second pause, shown on return", states: [
+                .band(shown: .paused, holding: [.paused]),
+                .band(shown: nil, holding: []),
+                .band(shown: nil, holding: [.paused]),
+                .band(shown: .paused, holding: [.paused]),
+            ], spoken: [Spoken(state: 1, slot: .paused), Spoken(state: 4, slot: .paused)]),
+            SpeechRow(name: "A-4 the pause shown; a new document; a pause in it", states: [
+                .band(shown: .paused, holding: [.paused]),
+                .newDocument,
+                .band(shown: .paused, holding: [.paused]),
+            ], spoken: [Spoken(state: 1, slot: .paused), Spoken(state: 3, slot: .paused)]),
+            SpeechRow(name: "A-5 the pause and the import notice hold; the pause dismissed", states: [
+                .band(shown: .paused, holding: [.paused, .importAnnotations]),
+                .band(shown: .importAnnotations, holding: [.importAnnotations]),
+            ], spoken: [Spoken(state: 1, slot: .paused), Spoken(state: 2, slot: .importAnnotations)]),
+            SpeechRow(name: "A-6 the import notice shown; a run takes the phase away and gives it back", states: [
+                .band(shown: .importAnnotations, holding: [.importAnnotations]),
+                .band(shown: nil, holding: [.importAnnotations]),
+                .band(shown: .importAnnotations, holding: [.importAnnotations]),
+            ], spoken: [Spoken(state: 1, slot: .importAnnotations)]),
+            SpeechRow(name: "A-7 the pause raised with the scene in the background; the scene active", states: [
+                .band(shown: .paused, holding: [.paused], sceneIsActive: false),
+                .band(shown: .paused, holding: [.paused]),
+            ], spoken: [Spoken(state: 2, slot: .paused)]),
+        ]
+        #expect(rows.count == 7)
+        for row in rows {
+            var announced: Set<TopBannerSlot> = []
+            var spoken: [Spoken] = []
+            for (index, state) in row.states.enumerated() {
+                switch state {
+                case .newDocument:
+                    announced = []
+                case let .band(shown, holding, sceneIsActive):
+                    let step = TopBannerSlot.announceStep(
+                        shown: TopBannerSlot.shownForSpeech(shown, sceneIsActive: sceneIsActive),
+                        holding: holding, announced: announced)
+                    announced = step.announced
+                    if let slot = step.speak { spoken.append(Spoken(state: index + 1, slot: slot)) }
+                }
+            }
+            #expect(spoken == row.spoken, "\(row.name)")
+        }
+    }
+
+    @Test("Speech steps: what is kept, what is spoken")
+    func speechStepRows() {
+        #expect(TopBannerSlot.announceStep(shown: .paused, holding: [.paused], announced: [])
+                == TopBannerSlot.SpeechStep(speak: .paused, announced: [.paused]))
+        #expect(TopBannerSlot.announceStep(shown: .paused, holding: [.paused], announced: [.paused])
+                == TopBannerSlot.SpeechStep(speak: nil, announced: [.paused]))
+        #expect(TopBannerSlot.announceStep(shown: nil, holding: [.importAnnotations], announced: [.paused, .importAnnotations])
+                == TopBannerSlot.SpeechStep(speak: nil, announced: [.importAnnotations]))
+        #expect(TopBannerSlot.shownForSpeech(.paused, sceneIsActive: true) == .paused)
+        #expect(TopBannerSlot.shownForSpeech(.paused, sceneIsActive: false) == nil)
+        #expect(TopBannerSlot.shownForSpeech(nil, sceneIsActive: true) == nil)
+    }
+
     @Test("The annotation notice's visibility reads its own facts only")
     func annotationVisibilityReadsItsOwnFacts() {
         #expect(ImportAnnotationNoticeBanner.isVisible(
