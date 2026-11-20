@@ -94,6 +94,30 @@ struct InvisibleTextPageTests {
         }
     }
 
+    @Test("The hidden-word check's leaking page (its case V1), through the app's own decision, is a picture with no text",
+          .timeLimit(.minutes(2)))
+    func hiddenWordCasePageIsAPicture() async throws {
+        typealias F = HiddenWordInkFixtures
+        let doc = try #require(PDFDocument(data: F.seededPage(drift: 30)))
+        let box = RedactionRegion(id: UUID(), normalizedRect: F.inkRect(line: 5, phrase: "Marisol", through: "Vance-Oduya"),
+                                  source: .manual)
+        let pages = Runner.buildPages(
+            doc: doc, effectiveMode: .searchableRedaction, regionsByPage: [0: [box]],
+            textLayerStatus: [0: .rich], hasHiddenOCG: false)
+        let page = try #require(pages.first)
+        #expect(page.pipelineMode == .secureRasterization)
+        #expect(page.fallbackReason == .invisibleText)
+
+        let out = FileManager.default.temporaryDirectory
+            .appendingPathComponent("invisible-text-v1-\(UUID().uuidString).pdf")
+        defer { try? FileManager.default.removeItem(at: out) }
+        let outcome = try await ProductionPageLoop.runRedaction(pages: pages, outputURL: out)
+        #expect(outcome.perPageFallbackReasons == [.invisibleText])
+        let written = try #require(PDFDocument(url: out)?.page(at: 0))
+        #expect(Self.textOperators(try #require(written.pageRef)) == 0)
+        #expect((written.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+    }
+
     /// The text-showing operators (`Tj`, `TJ`, `'`, `"`) in a page's content
     /// and in every form object it draws, to a depth of 8.
     static func textOperators(_ page: CGPDFPage) -> Int {

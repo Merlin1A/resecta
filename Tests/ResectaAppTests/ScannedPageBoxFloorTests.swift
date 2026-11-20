@@ -150,9 +150,13 @@ struct ScannedPageBoxFloorTests {
         Self.expectImageOnly(Self.outcome(Self.imagePage(), [Self.hand()]), "image page, hand box")
     }
 
-    @Test("a hand-drawn box on a page with text in an invisible render mode writes the page as an image")
+    @Test("a hand-drawn box on a page with text in an invisible render mode writes the page as an image, for its invisible text")
     func handBoxOnInvisibleTextPage() {
-        Self.expectImageOnly(Self.outcome(Self.invisibleTextPage(), [Self.hand()]), "invisible text, hand box")
+        // The invisible-text rule runs before the box rule, so the reason is
+        // the page's invisible text, not the box.
+        let page = Self.outcome(Self.invisibleTextPage(), [Self.hand()])
+        #expect(page.pipelineMode == .secureRasterization, "invisible text, hand box")
+        #expect(page.fallbackReason == .invisibleText, "the page states why: \(String(describing: page.fallbackReason))")
     }
 
     @Test("a hand-drawn box on a page with a Type 3 font writes the page as an image")
