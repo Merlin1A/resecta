@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-import RedactionEngine
+@testable import RedactionEngine
 @testable import ResectaApp
 
 // The statement function against the table written by hand from the
