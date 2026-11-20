@@ -92,6 +92,62 @@ struct MessageHostTests {
         }
     }
 
+    @Test("Every dialog and picker holds the messages")
+    func everyDialogHolds() throws {
+        let app = Self.repoRoot().appendingPathComponent("Sources/ResectaApp")
+        var dialogs = 0
+        for url in try Self.swiftFiles(under: app) {
+            let relative = String(url.path.dropFirst(app.path.count + 1))
+            let lines = try Self.codeLines("Sources/ResectaApp/" + relative)
+            let shown = Self.count(lines, [".alert(", ".confirmationDialog(", ".fileImporter(", ".photosPicker("])
+            dialogs += shown
+            if relative == "Views/Messages/MessageHost.swift" { continue }
+            #expect(Self.count(lines, [".holdsMessages("]) == shown, "\(relative): \(shown) dialogs or pickers")
+        }
+        #expect(dialogs == 15, "the scan saw \(dialogs) dialogs and pickers")
+        let share = try Self.codeLines("Sources/ResectaApp/Views/DocumentEditorView+Export.swift")
+        #expect(Self.count(share, ["toastManager.setHold(attempt, true)"]) == 1)
+        #expect(Self.count(share, ["toastManager.setHold(attempt, false)"]) == 2, "released by the share's end and by its abandon")
+    }
+
+    /// Per file, the announcements posted past the queue: each a line that
+    /// names `notification: .announcement` or builds an
+    /// `AccessibilityNotification.Announcement(`. The queue's own is the one
+    /// in `announce`.
+    static let directAnnouncementTable: [String: Int] = [
+        "State/ToastQueueManager.swift": 1,
+        "State/PipelineCoordinator.swift": 1,
+        "Overlay/RedactionOverlayView+Touches.swift": 3,
+        "Overlay/PDFViewCoordinator.swift": 2,
+        "Overlay/SnapGuideEngine.swift": 1,
+        "Views/SearchResultRow.swift": 1,
+        "Views/Search/SearchAndRedactSheet+Trigger.swift": 2,
+        "Views/VerificationProgressView.swift": 1,
+        "Views/DocumentEditorView+SelectionBar.swift": 1,
+    ]
+
+    @Test("Only the listed lines post announcements directly")
+    func onlyListedLinesPostDirectly() throws {
+        let app = Self.repoRoot().appendingPathComponent("Sources/ResectaApp")
+        var found: [String: Int] = [:]
+        for url in try Self.swiftFiles(under: app) {
+            let relative = String(url.path.dropFirst(app.path.count + 1))
+            let lines = try Self.codeLines("Sources/ResectaApp/" + relative)
+            let posts = Self.count(lines, ["notification: .announcement", "AccessibilityNotification.Announcement("])
+            if posts > 0 { found[relative] = posts }
+        }
+        #expect(found == Self.directAnnouncementTable)
+    }
+
+    @Test("The receipt's animations go through the resolver")
+    func animationsGoThroughTheResolver() throws {
+        for relative in ["Views/Messages/MessageHost.swift", "Views/Messages/ReceiptView.swift"] {
+            for line in try Self.codeLines("Sources/ResectaApp/" + relative) where line.contains("Anim.toast") {
+                #expect(line.contains("resolved("), "\(relative): \(line)")
+            }
+        }
+    }
+
     // MARK: - Reading the source
 
     static func repoRoot(file: StaticString = #filePath) -> URL {

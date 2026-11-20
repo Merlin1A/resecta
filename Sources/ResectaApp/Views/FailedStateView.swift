@@ -156,6 +156,7 @@ struct FailedStateView: View {
         // Destructive-action confirmation symmetry.
         // Same shape as Done — copy describes the action
         // without an outcome promise.
+        .holdsMessages(toastManager, while: showStartOverConfirmation)
         .confirmationDialog(
             Self.startOverTitle,
             isPresented: $showStartOverConfirmation,

@@ -116,8 +116,11 @@ struct ContentView: View {
         // queued behind a long-running pipeline notice). `clearAll()`
         // cancels in-flight dismiss tasks and zeroes both queues plus
         // active toasts, so the new workspace starts with a clean slate.
-        .onChange(of: appCoordinator.activeWorkspace.kind) { _, _ in
+        .onChange(of: appCoordinator.activeWorkspace.kind) { _, kind in
             toastManager.clearAll()
+            // Home has no document phase; the editor's observer pushes the
+            // phase again when a document opens.
+            if kind == .home { toastManager.documentPhaseDidChange(to: nil) }
         }
     }
 

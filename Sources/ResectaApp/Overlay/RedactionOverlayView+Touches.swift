@@ -264,7 +264,7 @@ extension RedactionOverlayView {
         moveCommitFeedback.impactOccurred(intensity: 0.4)  // a light tick: the box landed
         coordinator?.addRegion(region, page: pageIndex, undoManager: window?.undoManager)
         // VoiceOver announcement on region commit
-        UIAccessibility.post(notification: .announcement, argument: "Region added")
+        coordinator?.toastManager?.announce("Region added")
     }
 
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {

@@ -97,6 +97,7 @@ struct RedactWorkspaceView: View {
             // The replace dialog for a drop over an open document that
             // holds work: the replace dialog's words, the Close dialog's
             // sentence from its one home.
+            .holdsMessages(toastManager, while: heldDrop != nil)
             .confirmationDialog(
                 Self.dropReplaceTitle,
                 isPresented: Binding(

@@ -426,6 +426,7 @@ struct DocumentEditorView: View {
         // Presented through `doneConfirmationPresented`: the
         // binding re-presents a review parked for this dialog when it
         // goes down without Close.
+        .holdsMessages(toastManager, while: doneConfirmationPresented.wrappedValue)
         .confirmationDialog(
             "Close this document?",
             isPresented: doneConfirmationPresented,

@@ -666,8 +666,9 @@ extension SearchAndRedactSheet {
     /// Apply-graying gate. The success toast goes through the one
     /// `CommitFeedback` builder so the count stays in lockstep with the
     /// review-apply toasts (nil for a no-op apply, so a held shortcut
-    /// against an all-overlap selection emits no "Marked 0" message;
-    /// `toastManager.enqueue` coalesces duplicates). The sheet's
+    /// against an all-overlap selection emits no "Marked 0" message; each
+    /// apply that posts is a new message, which the queue does not merge
+    /// with the last). The sheet's
     /// markers derive from the live regions after the apply.
     /// (Lives here with `triggerSearch()` per the M-6 hub-cap
     /// decomposition — the run-orchestration family stays together;

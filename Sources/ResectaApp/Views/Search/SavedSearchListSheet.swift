@@ -120,6 +120,7 @@ struct SavedSearchListSheet: View {
                     Button("Done") { dismiss() }
                 }
             }
+            .holdsMessages(toastManager, while: renameTarget != nil)
             .alert(Self.renameTitle(for: renameTarget), isPresented: Binding(
                 get: { renameTarget != nil },
                 set: { if !$0 { renameTarget = nil } }
@@ -163,6 +164,7 @@ struct SavedSearchListSheet: View {
                 Text(renameError
                      ?? "The new name is capped at \(SavedSearch.nameLengthCap) characters.")
             }
+            .holdsMessages(toastManager, while: showSavePrompt)
             .alert(Self.savePromptTitle(for: activeInterface), isPresented: $showSavePrompt) {
                 TextField("Name", text: $savePromptName)
                 Button("Save") {
@@ -205,6 +207,7 @@ struct SavedSearchListSheet: View {
             // the app-wide confirmation-dialog pattern (Settings
             // Reset-to-Defaults / Redact N instances). Title comes from
             // `deleteConfirmTitle(for:)` so the copy is pinned by test.
+            .holdsMessages(toastManager, while: deleteTarget != nil)
             .confirmationDialog(
                 Self.deleteConfirmTitle(for: deleteTarget),
                 isPresented: Binding(
@@ -227,6 +230,7 @@ struct SavedSearchListSheet: View {
             // the other interface's list and the other stores are
             // unaffected. Strings come from the `clearAll*(for:)` statics
             // so the copy is pinned by test.
+            .holdsMessages(toastManager, while: showClearAllConfirmation)
             .confirmationDialog(
                 Self.clearAllTitle(for: activeInterface),
                 isPresented: $showClearAllConfirmation,

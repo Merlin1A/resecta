@@ -86,6 +86,7 @@ struct HomeView: View {
                     .accessibilityIdentifier("homeSettingsButton")
                 }
             }
+            .holdsMessages(toastManager, while: showFilePicker)
             .fileImporter(
                 isPresented: $showFilePicker,
                 allowedContentTypes: ImportService.acceptedContentTypes,
@@ -93,7 +94,7 @@ struct HomeView: View {
             ) { result in
                 handleFileImportResult(result)
             }
-            .photoImport(isPresented: $showPhotoPicker) { images, count in
+            .photoImport(isPresented: $showPhotoPicker, toastManager: toastManager) { images, count in
                 guard !isOpening else { return }
                 isOpening = true
                 Task { await appCoordinator.openRedactWithImages(images, count: count) }

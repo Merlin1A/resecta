@@ -197,6 +197,7 @@ struct SearchAndRedactSheet: View {
             requestDismiss()
             return .handled
         }
+        .holdsMessages(toastManager, while: showDismissConfirmation)
         .alert(Self.dismissTitle, isPresented: $showDismissConfirmation) {
             Button("Discard", role: .destructive) {
                 performDismiss(afterConfirmation: true)
@@ -276,6 +277,7 @@ struct SearchAndRedactSheet: View {
         // `RegexSentinelCheck.validate(_:)`, then commits through
         // `savedRegexStore.add(label:pattern:)`; on success a toast
         // names where the saved pattern is managed.
+        .holdsMessages(toastManager, while: showSavedRegexSavePrompt)
         .alert(Self.saveCurrentRegexAlertTitle, isPresented: $showSavedRegexSavePrompt) {
             TextField("Label", text: $savedRegexSaveLabel)
                 .textInputAutocapitalization(.words)

@@ -12,6 +12,8 @@ import RedactionEngine
 /// each image's bytes plus the count, in pick order.
 struct PhotoImportModifier: ViewModifier {
     @Binding var isPresented: Bool
+    /// The message queue, held while the picker is up.
+    let toastManager: ToastQueueManager
     let onPick: (AsyncThrowingStream<Data, any Error>, Int) -> Void
     @State private var selection: [PhotosPickerItem] = []
 
@@ -20,6 +22,7 @@ struct PhotoImportModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+            .holdsMessages(toastManager, while: isPresented)
             .photosPicker(
                 isPresented: $isPresented, selection: $selection,
                 maxSelectionCount: Self.maxSelection, selectionBehavior: .ordered,
@@ -96,9 +99,9 @@ struct PhotoImportModifier: ViewModifier {
 extension View {
     /// The Photos door. `onPick` receives the images' bytes as a stream in
     /// pick order and the number of images picked.
-    func photoImport(isPresented: Binding<Bool>,
+    func photoImport(isPresented: Binding<Bool>, toastManager: ToastQueueManager,
                      onPick: @escaping (AsyncThrowingStream<Data, any Error>, Int) -> Void) -> some View {
-        modifier(PhotoImportModifier(isPresented: isPresented, onPick: onPick))
+        modifier(PhotoImportModifier(isPresented: isPresented, toastManager: toastManager, onPick: onPick))
     }
 }
 
