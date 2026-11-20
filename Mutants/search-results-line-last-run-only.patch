@@ -1,0 +1,19 @@
+Property: The results screen's too-large pages come from every applied search's account and the latest run's.
+Area: the results screen's run facts
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/SearchAccountLifecycleTests
+Must go red: ResectaAppTests/SearchAccountLifecycleTests resultsLineFromAccounts
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/RedactionState.swift b/Sources/ResectaApp/State/RedactionState.swift
+index d3083302..dcd5d6fe 100644
+--- a/Sources/ResectaApp/State/RedactionState.swift
++++ b/Sources/ResectaApp/State/RedactionState.swift
+@@ -171,7 +171,7 @@ class RedactionState {
+     /// Zero-based, as the results strip reads them.
+     func pagesTooLarge(applied tokens: [UUID]) -> Set<Int> {
+         var pages = Set<Int>()
+-        for token in Set(tokens + [latestSearchAccountToken].compactMap { $0 }) {
++        for token in Set([latestSearchAccountToken].compactMap { $0 }) {
+             guard let account = searchAccounts[token] else { continue }
+             pages.formUnion(account.pages(for: .tooLarge))
+             pages.formUnion(account.pages(for: .picturesNotRead(.tooLarge)))

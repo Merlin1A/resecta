@@ -1,0 +1,19 @@
+Property: The lines stand above a list that is not empty as well as above an empty one.
+Area: the Search sheet's statement
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/SearchStatementTableTests -only-testing:ResectaAppTests/SearchStatementRuleTests
+Must go red: ResectaAppTests/SearchStatementTableTests table; ResectaAppTests/SearchStatementRuleTests k204
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/Search/SearchStatement.swift b/Sources/ResectaApp/Views/Search/SearchStatement.swift
+index 0e6f904a..b5118a38 100644
+--- a/Sources/ResectaApp/Views/Search/SearchStatement.swift
++++ b/Sources/ResectaApp/Views/Search/SearchStatement.swift
+@@ -61,7 +61,7 @@ enum SearchStatement {
+         let quiet = account.quietPages.count
+         return Statement(
+             headline: hasResults ? nil : headline(account),
+-            lines: lines,
++            lines: hasResults ? [] : lines,
+             quietCount: quiet > 0 ? quiet : nil,
+             hiddenCount: hiddenCount > 0 ? hiddenCount : nil)
+     }

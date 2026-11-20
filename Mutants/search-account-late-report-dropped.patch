@@ -1,0 +1,19 @@
+Property: A report that arrives after its run closed still adds to that run's account.
+Area: the account of a search run
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/SearchAccountLifecycleTests
+Must go red: ResectaAppTests/SearchAccountLifecycleTests lateReports
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/SearchState+Account.swift b/Sources/ResectaApp/State/SearchState+Account.swift
+index 700bf1a1..fdae37f0 100644
+--- a/Sources/ResectaApp/State/SearchState+Account.swift
++++ b/Sources/ResectaApp/State/SearchState+Account.swift
+@@ -46,7 +46,7 @@ extension SearchState {
+         if run == accountInHandRun, var account = accountInHand {
+             change(&account)
+             accountInHand = account
+-        } else if run == lastAccountRun, var account = lastAccount, let token = lastAccountToken {
++        } else if run == lastAccountRun, var account = lastAccount, let token = lastAccountToken, account.pageCount < 0 {
+             change(&account)
+             lastAccount = account
+             accountClosedSink?(token, account)
