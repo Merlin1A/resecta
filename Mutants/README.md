@@ -697,3 +697,4 @@ with its reason and the mutant that is caught in its place.
 | `search-results-line-last-run-only.patch` | The results screen's too-large pages come from every applied search's account and the latest run's. | ResectaAppTests/SearchAccountLifecycleTests resultsLineFromAccounts |
 | `search-account-picture-causes-overlap.patch` | A page whose pictures went unread is given one cause. | RedactionEngineTests/SearchAccountTests linesCoverWhatStopsRedact; RedactionEngineTests/SearchAccountTests onePictureCause |
 | `search-account-stop-page-no-report.patch` | The stop page is given to the not-reached line, never to the no-report line. | RedactionEngineTests/SearchAccountTests stopPageWithNoReport |
+| `search-statement-hidden-ticked-only.patch` | The hidden count is every match a filter hides, ticked or not. | ResectaAppTests/SearchHiddenCountTests untickedHidden |

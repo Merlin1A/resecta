@@ -1,0 +1,19 @@
+Property: The hidden count is every match a filter hides, ticked or not.
+Area: the Search sheet's statement
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/SearchHiddenCountTests
+Must go red: ResectaAppTests/SearchHiddenCountTests untickedHidden
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/SearchState+Results.swift b/Sources/ResectaApp/State/SearchState+Results.swift
+index fa791ff1..d09f7019 100644
+--- a/Sources/ResectaApp/State/SearchState+Results.swift
++++ b/Sources/ResectaApp/State/SearchState+Results.swift
+@@ -27,7 +27,7 @@ extension SearchState {
+ 
+     /// Matches a filter hides, ticked or not, for the statement's hidden
+     /// count (`SearchStatement`). A wrapped match counts once.
+-    var hiddenByFilterCount: Int { max(0, totalCount - filteredCount) }
++    var hiddenByFilterCount: Int { max(0, selectedCount - selectedFilteredCount) }
+ 
+     /// 1-based position of `currentResult` within `filteredResults`.
+     /// Returns nil when there is no current result or when the current
