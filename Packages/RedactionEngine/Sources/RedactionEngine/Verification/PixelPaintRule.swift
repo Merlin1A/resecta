@@ -75,10 +75,15 @@ enum PixelPaintRule {
     /// A line moved out to the next 8-pixel line above or at it.
     static func upToBlock(_ v: Int) -> Int { ceilDiv(v, blockSide) * blockSide }
 
+    /// Whether a rectangle has an area: one with a side of zero length or
+    /// less has none. The rule paints nothing for a box whose `inner` has none.
+    static func hasArea(_ r: PageRect64) -> Bool { r.minX < r.maxX && r.minY < r.maxY }
+
     /// The unit: `inner`'s lines clipped to the image, then each moved out to
     /// the next 8-pixel line or the image's edge, whichever comes first. Nil
-    /// when `inner` maps to no pixel of the image.
+    /// when `inner` has no area or maps to no pixel of the image.
     static func unit(inner: PageRect64, dpi d: Int, width w: Int, height h: Int) -> Lines? {
+        guard hasArea(inner) else { return nil }
         let c = outward(inner, dpi: d, imageHeight: h).clipped(width: w, height: h)
         guard !c.isEmpty else { return nil }
         return Lines(left: downToBlock(c.left), top: downToBlock(c.top),
@@ -88,9 +93,11 @@ enum PixelPaintRule {
     /// The pixel paint: each side the further out of the margin's edge (one
     /// pixel past `paint`, then held at a limit line) and the block edge
     /// (`inner`'s lines, not clipped, moved out to 8-pixel lines; never held);
-    /// then clipped to the image.
+    /// then clipped to the image. Empty when `inner` has no area: the rule
+    /// paints nothing for that box, whatever its `paint`.
     static func pixelPaint(inner: PageRect64, paint: PageRect64, limitAbove: Int?, limitBelow: Int?,
                            dpi d: Int, width w: Int, height h: Int) -> Lines {
+        guard hasArea(inner) else { return Lines(left: 0, top: 0, right: 0, bottom: 0) }
         let p = outward(paint, dpi: d, imageHeight: h)
         var margin = Lines(left: p.left - 1, top: p.top - 1, right: p.right + 1, bottom: p.bottom + 1)
         if let a = limitAbove { margin.top = max(margin.top, h - floorPixels(a, dpi: d)) }

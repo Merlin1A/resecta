@@ -1,0 +1,19 @@
+Property: A rectangle's left edge is rounded down to a whole pixel, outward, like its other sides.
+Area: the box check's copy of the paint rule, against the painting code's
+Test command: cd Packages/RedactionEngine && swift test --skip-build --no-parallel --filter PixelPaintDifferentialTests (after swift build --build-tests)
+Must go red: RedactionEngineTests/PixelPaintDifferentialTests boxesAgree
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PixelPaintRule.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PixelPaintRule.swift
+index 9e1e885e..528180ca 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PixelPaintRule.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PixelPaintRule.swift
+@@ -65,7 +65,7 @@ enum PixelPaintRule {
+     /// A rectangle in sixty-fourths, its edges in pixels rounded outward:
+     /// left and the bottom row down from the rectangle, right and the top row up.
+     static func outward(_ r: PageRect64, dpi d: Int, imageHeight h: Int) -> Lines {
+-        Lines(left: floorPixels(r.minX, dpi: d), top: h - ceilPixels(r.maxY, dpi: d),
++        Lines(left: ceilPixels(r.minX, dpi: d), top: h - ceilPixels(r.maxY, dpi: d),
+               right: ceilPixels(r.maxX, dpi: d), bottom: h - floorPixels(r.minY, dpi: d))
+     }
+ 

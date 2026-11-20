@@ -1,0 +1,19 @@
+Property: A page side's picture is rounded up to a whole pixel, so the picture never crops the page.
+Area: the box check's copy of the paint rule, against the painting code's
+Test command: cd Packages/RedactionEngine && swift test --skip-build --no-parallel --filter PixelPaintDifferentialTests (after swift build --build-tests)
+Must go red: RedactionEngineTests/PixelPaintDifferentialTests boxesAgree, sizesAgree
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PixelPaintRule.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PixelPaintRule.swift
+index 9e1e885e..12c9a758 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PixelPaintRule.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PixelPaintRule.swift
+@@ -31,7 +31,7 @@ enum PixelPaintRule {
+     static func ceilPixels(_ x: Int, dpi d: Int) -> Int { ceilDiv(x * d, sixtyFourthsPerInch) }
+ 
+     /// The frame's side in pixels the rule gives a page side S at quality d.
+-    static func frameSide(_ s: Int, dpi d: Int) -> Int { ceilPixels(s, dpi: d) }
++    static func frameSide(_ s: Int, dpi d: Int) -> Int { floorPixels(s, dpi: d) }
+ 
+     /// The page's quality: the first of 150, 200, 300, none above the chosen
+     /// one, whose frame matches the image's width and height both. Nil when
