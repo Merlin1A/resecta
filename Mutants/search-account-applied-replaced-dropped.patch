@@ -1,0 +1,19 @@
+Property: A replaced run keeps its account when an Apply took a record from it while it was open.
+Area: the account of a search run
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/SearchAccountLifecycleTests
+Must go red: ResectaAppTests/SearchAccountLifecycleTests appliedThenReplaced
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/SearchState+Account.swift b/Sources/ResectaApp/State/SearchState+Account.swift
+index 7961ed8c..38d5c8cc 100644
+--- a/Sources/ResectaApp/State/SearchState+Account.swift
++++ b/Sources/ResectaApp/State/SearchState+Account.swift
+@@ -74,7 +74,7 @@ extension SearchState {
+         switch how {
+         case .dropped:
+             return
+-        case .replaced where !applied:
++        case .replaced:
+             return
+         case .completed:
+             account.end(.completed)
