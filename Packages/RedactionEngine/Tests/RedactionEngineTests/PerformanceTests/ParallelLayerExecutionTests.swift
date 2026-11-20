@@ -28,11 +28,11 @@ import os
 //
 // REPORT-ONLY: this suite is listed in PERF_ALONE_RedactionEngine in
 // Scripts/test-batched.sh, so it runs by itself after the batches and its
-// results do not gate the batched exit status. The overlap-floor assertion
-// measures wall-clock concurrency shape and has read red under full
-// batch load while passing alone on the same build; a red here is a
-// maintainer review signal (re-run the suite alone on a quiet machine),
-// not a batch verdict.
+// results do not gate the batched exit status. The two parallel-batch tests
+// read no clock: they hold the batch's layers at a barrier until all have
+// started, so load cannot turn them red. The other tests' readings are
+// wall-clock; a red there is a maintainer review signal (re-run the suite
+// alone on a quiet machine), not a batch verdict.
 
 // `.serialized` keeps the five tests from racing each other inside the
 // suite. They measure wall-clock and concurrency shape, so concurrent
@@ -91,11 +91,13 @@ struct ParallelLayerExecutionTests {
         doc: PDFDocument,
         pipelineMode: PipelineMode,
         sensitiveTerms: [SensitiveTerm],
-        filterDigests: [PageFilterDigest?]
+        filterDigests: [PageFilterDigest?],
+        enter: (@Sendable (Int) async -> Void)? = nil
     ) async throws -> OrchestratedRun {
         let log = DispatchLog()
         var verifier = VerificationEngine()
         verifier.onRunLayerDispatch = { ordinal, _ in log.record(ordinal) }
+        verifier.onRunLayerEnter = enter
         let pageCount = doc.pageCount
         var events: [StampedEvent] = []
         let report = try await VerificationOrchestrator(verifier: verifier).run(
@@ -131,20 +133,6 @@ struct ParallelLayerExecutionTests {
             dispatchOrder: dispatches.map(\.ordinal))
     }
 
-    /// Pairs among `ordinals` whose intervals intersect (neither finished
-    /// before the other started).
-    static func overlappingPairs(_ ordinals: [Int], in timeline: [Int: TimedLayer]) -> Int {
-        let timed = ordinals.compactMap { timeline[$0] }
-        var pairs = 0
-        for i in 0..<timed.count {
-            for j in (i + 1)..<timed.count {
-                let a = timed[i], b = timed[j]
-                if a.start < b.end && b.start < a.end { pairs += 1 }
-            }
-        }
-        return pairs
-    }
-
     /// The time the sink received `layerFinished` for `ordinal` (zero-based).
     static func finishedAt(_ ordinal: Int, in events: [StampedEvent]) -> Double? {
         for stamped in events {
@@ -163,9 +151,45 @@ struct ParallelLayerExecutionTests {
             .filter { $0.element.phase == phase }.map(\.offset)
     }
 
-    // MARK: - Test 1 — Parallel base layers overlap
+    /// Layers that must all be running at once: each one that arrives waits
+    /// until every listed layer has arrived, then all go on together. A
+    /// waiter suspends; it holds no thread. If the test is cancelled (its
+    /// time limit), every waiter is let go, so a batch that runs its layers
+    /// one after another fails the test rather than hanging the run.
+    actor Barrier {
+        let expected: Set<Int>
+        private var arrived: Set<Int> = []
+        private var waiting: [CheckedContinuation<Void, Never>] = []
+        /// True once every listed layer was waiting here at the same time.
+        private(set) var metTogether = false
 
-    @Test("Base layers 0/1/2 overlap under the verification orchestrator")
+        init(_ expected: [Int]) { self.expected = Set(expected) }
+
+        func arrive(_ ordinal: Int) async {
+            guard expected.contains(ordinal) else { return }
+            arrived.insert(ordinal)
+            if arrived == expected {
+                metTogether = true
+                letGo()
+                return
+            }
+            await withTaskCancellationHandler {
+                await withCheckedContinuation { waiting.append($0); if Task.isCancelled { letGo() } }
+            } onCancel: {
+                Task { await self.letGo() }
+            }
+        }
+
+        func letGo() {
+            let all = waiting
+            waiting = []
+            all.forEach { $0.resume() }
+        }
+    }
+
+    // MARK: - Test 1 — Parallel base layers run at the same time
+
+    @Test("Base layers 0/1/2 run at the same time under the verification orchestrator", .timeLimit(.minutes(1)))
     func testBaseLayersRunInParallel() async throws {
         // 4-page fixture: enough to give the OCR layer real per-page
         // work so the parallel timeline is observable, while small
@@ -186,26 +210,22 @@ struct ParallelLayerExecutionTests {
         let parallelOrdinals = Self.ordinals(of: .parallelBase, mode: .secureRasterization)
         #expect(parallelOrdinals == [0, 1, 2])
 
+        let barrier = Barrier(parallelOrdinals)
         let run = try await Self.runOrchestrated(
             url: url, doc: doc, pipelineMode: .secureRasterization,
-            sensitiveTerms: [], filterDigests: Array(repeating: nil, count: doc.pageCount))
+            sensitiveTerms: [], filterDigests: Array(repeating: nil, count: doc.pageCount),
+            enter: { await barrier.arrive($0) })
 
         #expect(parallelOrdinals.allSatisfy { run.timeline[$0] != nil },
                 "Expected one timed interval per parallel-base layer (layers 0, 1, 2)")
 
-        // Two layers "overlap" when one's [start, end] interval and the
-        // other's intersect — i.e., neither finished before the other
-        // started. Three layers produce 3 pairs; requiring >= 2 means at
-        // least two-thirds of the pairs must overlap, which excludes the
-        // near-serial schedule (exactly one incidental overlap). If this
-        // turns flaky under full-suite load, that is evidence of a real
-        // scheduling regression rather than justification to widen the
-        // floor.
-        let overlapping = Self.overlappingPairs(parallelOrdinals, in: run.timeline)
-        #expect(
-            overlapping >= 2,
-            "Expected at least two overlapping pairs among layers 0/1/2 in the orchestrator's parallel batch (saw \(overlapping); >= 2 of 3 pairs required)"
-        )
+        // The three layers met at the barrier: each had started and none
+        // could go on until the others had started too, so they ran at the
+        // same time. No clock is read, so load cannot make this flake; a
+        // batch that runs them one after another never meets and fails by
+        // the time limit.
+        let met = await barrier.metTogether
+        #expect(met, "layers 0/1/2 were all running at once in the orchestrator's parallel batch")
 
         // The batch publishes its results in canonical order so the
         // progress UI's `completedLayers` reads ascending.
@@ -281,7 +301,7 @@ struct ParallelLayerExecutionTests {
 
     // MARK: - Test 3b — Layer 10 joins the parallel base batch (Searchable, M3)
 
-    @Test("Layer 10 overlaps base parallel batch in Searchable mode")
+    @Test("Layer 10 runs at the same time as the base parallel batch in Searchable mode", .timeLimit(.minutes(1)))
     func testLayer10ParallelBaseOverlap() async throws {
         // Layer 10 (operator-semantic re-extraction, index 9 in the
         // zero-indexed order) joins the base-parallel batch in
@@ -290,36 +310,31 @@ struct ParallelLayerExecutionTests {
         // Layers 0/1/2 and no sequencing dependency on the
         // sandwich-sequential layers (5–8).
         //
-        // The orchestrator dispatches the batch; the test asserts at
-        // least two pairs of intervals overlap. Non-empty
+        // The orchestrator dispatches the batch; the test holds its four
+        // layers at a barrier until all have started. Non-empty
         // `sensitiveTerms` so Layer 10 does real per-page work via the
         // Aho-Corasick automaton; the token does not appear in the
-        // fixture, so the timing shape is what's under test, not the
-        // result.
+        // fixture, so the schedule is what's under test, not the result.
         let (doc, url) = try await makeMultiPageSandwichPDF(pageCount: 4)
         defer { try? FileManager.default.removeItem(at: url) }
 
         let parallelOrdinals = Self.ordinals(of: .parallelBase, mode: .searchableRedaction)
         #expect(parallelOrdinals == [0, 1, 2, 9])
 
+        let barrier = Barrier(parallelOrdinals)
         let run = try await Self.runOrchestrated(
             url: url, doc: doc, pipelineMode: .searchableRedaction,
             sensitiveTerms: ["NONEXISTENT_SAMPLE_PII_TOKEN_XYZ123"].map { SensitiveTerm(text: $0) },
-            filterDigests: Array(repeating: nil, count: doc.pageCount))
+            filterDigests: Array(repeating: nil, count: doc.pageCount),
+            enter: { await barrier.arrive($0) })
 
         #expect(parallelOrdinals.allSatisfy { run.timeline[$0] != nil },
                 "Expected one timed interval per parallel-base layer (\(parallelOrdinals))")
 
-        // Same overlap predicate the layers-0/1/2 test uses. Four layers
-        // produce 6 pairs; requiring >= 2 excludes the near-serial
-        // schedule (exactly one incidental overlap). If this turns flaky
-        // under full-suite load, that is evidence of a real scheduling
-        // regression rather than justification to widen the floor.
-        let overlapping = Self.overlappingPairs(parallelOrdinals, in: run.timeline)
-        #expect(
-            overlapping >= 2,
-            "Expected at least two overlapping pairs among layers 0/1/2/9 in the orchestrator's parallel batch (saw \(overlapping); >= 2 of 6 pairs required)"
-        )
+        // The four layers met at the barrier, as the layers-0/1/2 test's
+        // three do: all were running at once, with no clock read.
+        let met = await barrier.metTogether
+        #expect(met, "layers 0/1/2/9 were all running at once in the orchestrator's parallel batch")
     }
 
     // MARK: - Test 4 — Wall-clock under 50% of sequential baseline

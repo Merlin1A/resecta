@@ -34,9 +34,10 @@ struct RunRecordBoxesCaptureTests {
              region(0.2, -0.5, 0.3, 0.2)]]
     }
 
-    private func capture() -> (record: RunRecord.Confirmed, pages: [PDFPageData]) {
+    /// Each call to `regions()` makes new ids: a test that compares ids
+    /// passes the regions it captured.
+    private func capture(_ regions: [Int: [RedactionRegion]] = Self.regions()) -> (record: RunRecord.Confirmed, pages: [PDFPageData]) {
         let doc = makeMultiPagePDFDocument(pages: 3)
-        let regions = Self.regions()
         let snapshot = settings()
         let record = RunInputs.confirmedRecord(
             pageCount: doc.pageCount, geometry: RunInputs.pageGeometry(of: doc),
@@ -56,7 +57,36 @@ struct RunRecordBoxesCaptureTests {
             let admitted = (confirmed?.regions ?? []).filter { RedactionRegion.isAdmitted(normalizedRect: $0.normalizedRect) }
             #expect(page.regions.map(\.id) == admitted.map(\.id), "page \(page.pageIndex)")
         }
-        #expect(pages.map { $0.regions.count } == [2, 2, 0])
+        // Admission cuts a region to the page on all four sides: the four
+        // regions wholly off the page on page 1 are refused, off the left and
+        // the bottom as well as off the right and the top.
+        #expect(pages.map { $0.regions.count } == [2, 0, 0])
+    }
+
+    @Test("On every page, the admitted and the refused are together the regions as drawn, and none is both")
+    func admittedAndRefusedAreTheDrawn() {
+        let drawn = Self.regions()
+        let (record, pages) = capture(drawn)
+        for page in pages {
+            let confirmed = record.pages.first { $0.pageIndex == page.pageIndex }
+            let admitted = Set(page.regions.map(\.id))
+            let refused = Set((confirmed?.refusedRegions ?? []).map(\.id))
+            #expect(admitted.isDisjoint(with: refused), "page \(page.pageIndex)")
+            #expect(admitted.union(refused) == Set((drawn[page.pageIndex] ?? []).map(\.id)), "page \(page.pageIndex)")
+        }
+        #expect(record.pages[1].refusedRegions.map(\.reason) == Array(repeating: .offThePage, count: 4))
+        #expect(record.pages[0].refusedRegions.map(\.reason) == [.tooThinToPaint])
+    }
+
+    @Test("The app's readers of admission give the predicate's answer")
+    func appSitesGiveOneAnswer() {
+        let state = RedactionState()
+        let refusedOnly = (Self.regions()[1] ?? []) + [Self.region(0.3, 0.3, 0.2, 0.0005)]
+        state.regions[0] = refusedOnly
+        #expect(refusedOnly.allSatisfy { !RedactionRegion.isAdmitted(normalizedRect: $0.normalizedRect) })
+        #expect(!state.hasEffectiveRegions, "no region a run admits: nothing to redact")
+        state.regions[0] = refusedOnly + [Self.region(-0.15, 0.4, 0.3, 0.05)]
+        #expect(state.hasEffectiveRegions, "a region half off the left is admitted on its on-page half")
     }
 
     @Test("On every page, the page data carries the record's page, its boxes and two sides with it")

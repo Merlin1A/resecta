@@ -1,0 +1,18 @@
+Property: The record lists every region admission refuses, with its reason; none vanishes. Here the list leaves out a region too thin to paint.
+Area: region admission
+Test command: cd Packages/RedactionEngine && swift test --filter RegionAdmissionTests
+Must go red: RedactionEngineTests/RegionAdmissionTests "Each case: the predicate's answer, and the record's list of refused regions" (thin); RedactionEngineTests/RegionAdmissionTests "Each case: the predicate's answer, and the record's list of refused regions" (noArea); RedactionEngineTests/RegionAdmissionTests oneAnswerAtEverySite; RedactionEngineTests/RegionAdmissionTests admittedAndRefusedPartitionTheRecord
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
+@@ -63,7 +63,7 @@
+         public var refusedRegions: [(id: UUID, reason: RegionAdmission.Refusal)] {
+             regions.compactMap { region in
+                 RedactionRegion.admission(normalizedRect: region.normalizedRect).map { (region.id, $0) }
+-            }
++            }.filter { $0.reason != .tooThinToPaint }
+         }
+ 
+         public init(pageIndex: Int, regions: [DrawnRegion]) {

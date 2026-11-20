@@ -301,13 +301,12 @@ class RedactionState {
         regionsModifiedSinceVerification = false
     }
 
-    /// True when at least one region survives the minimum-dimension filter.
+    /// True when at least one region is one a run admits (the run's own
+    /// admission, `RedactionRegion.isAdmitted`).
     /// Short-circuits on first match (avoids full count).
     var hasEffectiveRegions: Bool {
         regions.values.contains { pageRegions in
-            pageRegions.contains {
-                $0.normalizedRect.width > 0.001 && $0.normalizedRect.height > 0.001
-            }
+            pageRegions.contains { RedactionRegion.isAdmitted(normalizedRect: $0.normalizedRect) }
         }
     }
 

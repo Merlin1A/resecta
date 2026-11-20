@@ -29,7 +29,7 @@ struct RunRecordBoxesTests {
     /// Each case, with what it builds and expects.
     enum Case: String, CaseIterable {
         case inPastTheEdgeAndThin = "a region inside, one past the right edge and one 0.0005 high: two boxes, the second not clipped"
-        case whollyOff = "four regions of full size wholly off the page: none off the right or the top; off the left or the bottom, a box as drawn"
+        case whollyOff = "four regions of full size wholly off the page, off the right, the top, the left and the bottom: no box"
         case idsAreTheAdmitted = "the boxes name exactly the regions admission lets through, in order"
         case quarterTurn = "a Letter page turned a quarter has its two sides swapped"
         case outwardRounding = "a region's edges become whole sixty-fourths, left and bottom down, right and top up"
@@ -63,12 +63,12 @@ struct RunRecordBoxesTests {
             let offLeft = Self.region(-0.5, 0.2, 0.3, 0.2)
             let offBottom = Self.region(0.2, -0.5, 0.3, 0.2)
             let plan = try Self.plan([offRight, offTop, offLeft, offBottom])
-            // Today's clamp slides a region wholly off the left or the bottom
-            // onto the page's edge, so admission lets it through.
-            try #require(plan.boxes.count == 2)
-            #expect(plan.boxes.map(\.regionIDs) == [[offLeft.id], [offBottom.id]])
-            #expect(plan.boxes[0].inner.maxX <= 0, "off the left: the box as drawn, wholly off the page")
-            #expect(plan.boxes[1].inner.maxY <= 0, "off the bottom: the box as drawn, wholly off the page")
+            // Admission cuts a region to the page on all four sides, so one
+            // wholly off the left or the bottom is refused like the others.
+            #expect(plan.boxes.isEmpty, "\(plan.boxes.map(\.regionIDs))")
+            for r in [offRight, offTop, offLeft, offBottom] {
+                #expect(RedactionRegion.admission(normalizedRect: r.normalizedRect) == .offThePage)
+            }
 
         case .idsAreTheAdmitted:
             let regions = [Self.region(0.1, 0.1, 0.2, 0.1), Self.region(0.3, 0.3, 0.0005, 0.2),
@@ -76,7 +76,7 @@ struct RunRecordBoxesTests {
                            Self.region(-0.5, 0.4, 0.3, 0.1), Self.region(0.4, 0.7, 0.2, 0.05)]
             let plan = try Self.plan(regions)
             let admitted = regions.filter { RedactionRegion.isAdmitted(normalizedRect: $0.normalizedRect) }
-            #expect(admitted.count == 4)
+            #expect(admitted.count == 3)
             #expect(plan.boxes.map(\.regionIDs) == admitted.map { [$0.id] })
 
         case .quarterTurn:

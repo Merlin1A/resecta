@@ -170,12 +170,18 @@ extension CGRect {
 }
 
 extension RedactionRegion {
-    /// Admission: whether a region drawn at `normalizedRect` reaches a run. Its
-    /// rectangle is clamped to the page by today's clamp, then the core's one
-    /// admission floor decides (`RegionAdmission`). The page builder and the
-    /// run's record both read this one test.
+    /// Admission: whether a region drawn at `normalizedRect` reaches a run,
+    /// and if not, why. The rectangle is cut to the page on all four sides
+    /// and the core's one admission rule decides (`RegionAdmission`). The page
+    /// builder, the run's record, the Layer-2 check and the editor all read
+    /// this one test. Nil when the region is admitted.
+    public static func admission(normalizedRect r: CGRect) -> RegionAdmission.Refusal? {
+        RegionAdmission.refusal(minX: Double(r.minX), minY: Double(r.minY), maxX: Double(r.maxX), maxY: Double(r.maxY))
+    }
+
+    /// Whether a region drawn at `normalizedRect` reaches a run: admission
+    /// gives no reason to refuse it.
     public static func isAdmitted(normalizedRect: CGRect) -> Bool {
-        let clamped = normalizedRect.clampedToNormalized()
-        return RegionAdmission.admits(clampedWidth: Double(clamped.width), clampedHeight: Double(clamped.height))
+        admission(normalizedRect: normalizedRect) == nil
     }
 }

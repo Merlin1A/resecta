@@ -1,0 +1,18 @@
+Property: The record holds every region as drawn, so that the regions a run admits and those it refuses are together the regions drawn. Here the record is built from the admitted regions only, and a refused region is in neither list.
+Area: region admission
+Test command: DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/RunRecordBoxesCaptureTests
+Must go red: ResectaAppTests/RunRecordBoxesCaptureTests admittedAndRefusedAreTheDrawn
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/RunInputs.swift b/Sources/ResectaApp/State/RunInputs.swift
+--- a/Sources/ResectaApp/State/RunInputs.swift
++++ b/Sources/ResectaApp/State/RunInputs.swift
+@@ -27,7 +27,7 @@
+             fillColor: snapshot.fillColor,
+             exportDPI: snapshot.exportDPI,
+             pages: (0..<pageCount).map { page in
+-                let drawn = (regions[page] ?? []).map {
++                let drawn = (regions[page] ?? []).filter { RedactionRegion.isAdmitted(normalizedRect: $0.normalizedRect) }.map {
+                     RunRecord.DrawnRegion(id: $0.id, normalizedRect: $0.normalizedRect)
+                 }
+                 guard let sides = geometry[page] else { return RunRecord.Page(pageIndex: page, regions: drawn) }
