@@ -1,0 +1,18 @@
+Property: Both invisible render modes, 3 and 7, are read.
+Area: page mode (Detection)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/InvisibleTextPageTests (or on the host: cd Packages/RedactionEngine && swift test --no-parallel --filter InvisibleTextPageTests)
+Must go red: RedactionEngineTests/InvisibleTextPageTests reading [a hidden layer over a scan, mode 7]; RedactionEngineTests/InvisibleTextPageTests exported [a hidden layer over a scan, mode 7]; RedactionEngineTests/InvisibleTextPageTests exported [an invisible layer 2 pt off its ink, mode 7]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
+@@ -65,7 +65,7 @@
+         let show: CGPDFOperatorCallback = { scanner, info in
+             guard let info else { return }
+             let state = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
+-            if state.mode == 3 || state.mode == 7 { state.found = true; CGPDFScannerStop(scanner) }
++            if state.mode == 3 { state.found = true; CGPDFScannerStop(scanner) }
+         }
+         for op in ["Tj", "TJ", "'", "\""] { CGPDFOperatorTableSetCallback(table, op, show) }
+         CGPDFOperatorTableSetCallback(table, "Do") { scanner, info in

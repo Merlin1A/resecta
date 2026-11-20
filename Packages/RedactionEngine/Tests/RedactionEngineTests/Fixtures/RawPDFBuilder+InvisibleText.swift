@@ -65,12 +65,14 @@ extension TestFixtures {
                 """)])
     }
 
-    /// A typed page of seventeen visible lines that sets render mode 3 and
-    /// unsets it with no text shown between: once inside a saved state it
-    /// restores, once inside a text object that sets 0 again.
+    /// A typed page of seventeen visible lines that sets an invisible render
+    /// mode and unsets it with no text shown between: mode 7 inside a saved
+    /// state it restores, and mode 3 inside a text object that sets 0 again.
+    /// Mode 7 stays out of the text object: it is a clip mode, and a text
+    /// object that ends in it would clip the page's later ink away.
     static func invisibleModeSetAndUnsetPDF() -> Data {
         invisiblePage(
-            stream: "q 3 Tr Q\nBT 7 Tr 0 Tr ET\n\(layerLines(mode: 0))",
+            stream: "q 7 Tr Q\nBT 3 Tr 0 Tr ET\n\(layerLines(mode: 0))",
             resources: "/Font << /F1 5 0 R >>")
     }
 }
