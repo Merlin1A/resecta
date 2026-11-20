@@ -155,6 +155,14 @@ class RedactionState {
     }
     var lastDetectionRun: DetectionRunRecord? = nil
 
+    /// Every closed search account of this document, by the token minted
+    /// when its run started. An applied search's record names its token.
+    var searchAccounts: [UUID: SearchAccount] = [:]
+
+    func recordSearchAccount(_ account: SearchAccount, token: UUID) {
+        searchAccounts[token] = account
+    }
+
     /// Writer for `lastDetectionRun` — bumps the run counter.
     /// `scanSummary` is passed by the Scan-interface run path.
     func recordDetectionRun(
@@ -366,6 +374,7 @@ class RedactionState {
         // The detection-run record would describe a run
         // that never happened on the next document.
         lastDetectionRun = nil
+        searchAccounts = [:]
         // A stale region UUID must not present a blank rationale sheet
         // over the next document.
         pendingCanvasRationaleRequest = nil

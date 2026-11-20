@@ -57,8 +57,8 @@ struct EnginePublicSurfaceTests {
         _ = (account.pageCount, account.ending, account.stopPage, account.qualifiedPages, account.quietPages)
         _ = (account.plainNoMatchAllowed, account.pagesThatStopRedact, SearchAccount.LineReason.order)
         _ = account.pages(for: .picturesNotRead(.notReported))
-        let record = AppliedSearchRecord(query: query, foundCount: 0, runToken: 1, account: account)
-        _ = (record.runToken, record.account, SearchAccount.PictureCause.allCases)
+        let record = AppliedSearchRecord(query: query, foundCount: 0, accountToken: UUID(), account: account)
+        _ = (record.accountToken, record.account, SearchAccount.PictureCause.allCases)
     }
 
     /// Never called: it type-checks only while every member it names is public.

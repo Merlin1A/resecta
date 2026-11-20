@@ -468,6 +468,17 @@ final class SearchState: Identifiable {
     /// never dropped by it.
     var runToken: Int = 0
 
+    /// The account of what the run in hand has read (`SearchState+Account.swift`).
+    var accountInHand: SearchAccount?
+    var accountInHandRun: Int = 0
+    var accountInHandToken: UUID?
+    /// The last run's closed account, its run and its token.
+    var lastAccount: SearchAccount?
+    var lastAccountRun: Int = 0
+    var lastAccountToken: UUID?
+    /// Where a closed account goes: the document's store, installed by the run.
+    @ObservationIgnored var accountClosedSink: (@MainActor (UUID, SearchAccount) -> Void)?
+
     /// The options the current run started with, which the applied
     /// record names (`appliedSearchRecord()`); nil before any run.
     var lastRunOptions: SearchOptions?
@@ -576,6 +587,10 @@ final class SearchState: Identifiable {
     /// `regexError` itself, so the observer can wipe a stale list
     /// without nilling the error it is reacting to.
     private func clearResultState() {
+        // An account still open describes results about to go: it is dropped.
+        closeAccount(.dropped)
+        lastAccount = nil
+        lastAccountToken = nil
         flushTask?.cancel()
         flushTask = nil
         runToken += 1

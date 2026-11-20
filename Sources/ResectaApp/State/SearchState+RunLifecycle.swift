@@ -46,6 +46,7 @@ extension SearchState {
     // MARK: - Methods
 
     func cancelSearch() async {
+        closeAccount(.cancelled)
         let task = activeSearchTask
         activeSearchTask = nil
         task?.cancel()
@@ -62,6 +63,7 @@ extension SearchState {
     // wipes shared state regardless, so a leaked cleanup tail has
     // nothing to clobber.
     func cancelSearchWithoutAwait() {
+        closeAccount(.cancelled)
         activeSearchTask?.cancel()
         activeSearchTask = nil
         isSearching = false

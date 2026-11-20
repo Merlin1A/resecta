@@ -44,6 +44,10 @@ extension SearchState {
             ocrSkippedPages: ocrSkippedPages,
             regexTimeoutPages: regexTimeoutPages,
             unscannedPageCount: capUnscannedPageCount,
-            scanConfiguration: scanConfiguration)
+            scanConfiguration: scanConfiguration,
+            // An open account has no ending yet: the record carries only its
+            // token, and the account is read from the store once the run ends.
+            accountToken: accountInHandToken ?? lastAccountToken,
+            account: accountInHand == nil ? lastAccount : nil)
     }
 }

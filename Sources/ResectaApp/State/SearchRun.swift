@@ -71,7 +71,7 @@ import RedactionEngine
                 // Install the per-page text-layer classification
                 // so the engine routes `.sparse`/`.none` pages to OCR.
                 await searcher.setTextLayerStatus(prepared.textLayerStatus)
-                await installEngineSinks()
+                await installEngineSinks(run: prepared.run)
                 await classifyDoctypeIfNeeded(prepared)
 
                 let stream = searcher.search(
@@ -136,6 +136,8 @@ import RedactionEngine
     /// such exit has already surfaced its notice and, for a Scan, its
     /// failed run record.
     private func prepareSearchRun() async -> PreparedRun? {
+        // A run this one replaces keeps no account: its pages are read again here.
+        searchState.closeAccount(.dropped)
         await searchState.cancelSearch()
         // Snapshot the just-completed scan's
         // results (if any) into `priorScanFingerprints` BEFORE
@@ -215,6 +217,10 @@ import RedactionEngine
         let mode = buildSearchMode()
         searchState.lastRunShape = searchState.currentRunShape  // read in the same stretch as the query above
         searchState.totalPages = liveDoc.pageCount
+        searchState.accountClosedSink = { [weak redactionState] token, account in
+            redactionState?.recordSearchAccount(account, token: token)
+        }
+        searchState.beginAccount(run: run, pageCount: liveDoc.pageCount)
 
         // Snapshot the user-selected preset's
         // vector before kickoff so each scan runs against a stable
@@ -320,7 +326,7 @@ import RedactionEngine
     /// The seven engine sinks, installed on the run task before the
     /// stream opens. `tearDownEngineSinks()` nils six of them at the
     /// tail (the OCR-skip sink has never been nilled there).
-    private func installEngineSinks() async {
+    private func installEngineSinks(run: Int) async {
         // Install the overlap sink. `DocumentSearcher` calls this
         // once per page where the resolver dropped at least one loser.
         await searcher.setOverlapSink({ [weak searchState] counts in
@@ -343,6 +349,7 @@ import RedactionEngine
         await searcher.setRegexTimeoutSink({ [weak searchState] page in
             Task { @MainActor in
                 searchState?.recordRegexTimeout(page: page)
+                searchState?.recordPatternTimedOut(page: page, run: run)
             }
         })
         // Install the regex-rejection sink beside the timeout
@@ -382,8 +389,9 @@ import RedactionEngine
         // sheet over Search (the saved list as a recall starts the run)
         // does not take them.
         let runLayer = messageLayerID
-        await searcher.setUserTermsTimeoutSink({ [weak toastManager] _, _ in
+        await searcher.setUserTermsTimeoutSink({ [weak toastManager, weak searchState] page, _ in
             Task { @MainActor in
+                searchState?.recordPatternTimedOut(page: page, run: run)
                 guard timeoutToast.fire() else { return }
                 toastManager?.post(.customTermTimeout, runLayer: runLayer)
             }
@@ -397,12 +405,19 @@ import RedactionEngine
         //
         // The user-facing string is mechanism-description
         // language; it makes no outcome promise.
-        await searcher.setScannedRegionNotAnalyzedSink({ [weak toastManager] _ in
+        await searcher.setScannedRegionNotAnalyzedSink({ [weak toastManager, weak searchState] page in
             Task { @MainActor in
+                searchState?.recordRecognitionOff(page: page, run: run)
                 toastManager?.post(.scannedRegionsNotAnalyzed, runLayer: runLayer)
             }
         })
-
+        // Install the page-coverage sink: each page's report goes into this
+        // run's account (`SearchState+Account.swift`).
+        await searcher.setPageCoverageSink({ [weak searchState] coverage in
+            Task { @MainActor in
+                searchState?.recordCoverage(coverage, run: run)
+            }
+        })
     }
 
     /// The first-page doctype classification for a Scan run: cheap
@@ -452,6 +467,7 @@ import RedactionEngine
         await searcher.setRegexRejectionSink(nil)
         await searcher.setUserTermsTimeoutSink(nil)
         await searcher.setScannedRegionNotAnalyzedSink(nil)
+        await searcher.setPageCoverageSink(nil)
 
     }
 

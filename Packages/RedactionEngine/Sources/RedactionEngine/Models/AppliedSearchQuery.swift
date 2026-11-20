@@ -116,9 +116,10 @@ public struct AppliedSearchRecord: Sendable, Hashable {
     /// What a Scan ran with (the preset thresholds and the user terms); nil
     /// for a typed search.
     public let scanConfiguration: ScanRunConfiguration?
-    /// The run's token: the record looks its account up by it once the run has
-    /// ended, so an Apply mid-run reads how that run ended later.
-    public let runToken: Int?
+    /// The account's token, minted when its run starts: the record looks the
+    /// account up by it once the run has ended, so an Apply mid-run reads how
+    /// that run ended later. A run token is not used: each sheet starts its own count.
+    public let accountToken: UUID?
     /// What the run had read when the record was made. The fields above
     /// agree with it.
     public let account: SearchAccount?
@@ -131,7 +132,7 @@ public struct AppliedSearchRecord: Sendable, Hashable {
         regexTimeoutPages: Set<Int> = [],
         unscannedPageCount: Int = 0,
         scanConfiguration: ScanRunConfiguration? = nil,
-        runToken: Int? = nil,
+        accountToken: UUID? = nil,
         account: SearchAccount? = nil
     ) {
         self.query = query
@@ -141,7 +142,7 @@ public struct AppliedSearchRecord: Sendable, Hashable {
         self.regexTimeoutPages = regexTimeoutPages
         self.unscannedPageCount = unscannedPageCount
         self.scanConfiguration = scanConfiguration
-        self.runToken = runToken
+        self.accountToken = accountToken
         self.account = account
     }
 }
