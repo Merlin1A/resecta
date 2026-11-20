@@ -53,7 +53,7 @@ struct TouchTargetFloorTests {
             // it stays out of this inventory (the footer keeps its
             // Select All floor, listed below).
             "Sources/ResectaApp/Views/Search/SearchToolbarSection.swift",
-            "Sources/ResectaApp/Views/SearchAndRedactSheet.swift",
+            "Sources/ResectaApp/Views/Search/SearchAndRedactSheet+SearchBar.swift",
             // The compact handle's per-item
             // Apply — its builder split out under the M-6 hub cap.
             "Sources/ResectaApp/Views/Search/SearchAndRedactSheet+CompactApply.swift",
@@ -79,10 +79,10 @@ struct TouchTargetFloorTests {
     func newIdentifiersArePresent() throws {
         let expectations: [(path: String, identifier: String)] = [
             ("Sources/ResectaApp/Views/SearchResultRow.swift", "rationaleDisclosureButton"),
-            ("Sources/ResectaApp/Views/SearchAndRedactSheet.swift", "rescanButton"),
-            ("Sources/ResectaApp/Views/SearchAndRedactSheet.swift", "savedSearchesBookmark"),
-            ("Sources/ResectaApp/Views/SearchAndRedactSheet.swift", "resultNavPrevious"),
-            ("Sources/ResectaApp/Views/SearchAndRedactSheet.swift", "resultNavNext"),
+            ("Sources/ResectaApp/Views/Search/SearchAndRedactSheet+SearchBar.swift", "rescanButton"),
+            ("Sources/ResectaApp/Views/Search/SearchAndRedactSheet+SearchBar.swift", "savedSearchesBookmark"),
+            ("Sources/ResectaApp/Views/Search/SearchAndRedactSheet+ResultNavigation.swift", "resultNavPrevious"),
+            ("Sources/ResectaApp/Views/Search/SearchAndRedactSheet+ResultNavigation.swift", "resultNavNext"),
         ]
         for expectation in expectations {
             let source = try loadRepoFile(expectation.path)

@@ -78,7 +78,7 @@ struct CopyOfRecordPolishTests {
         let popover = try source("Sources/ResectaApp/Views/DiagnosticsPanel/ReverseRationalePopover.swift")
         #expect(popover.contains("Button(\"Done\") { dismiss() }"))
         #expect(!popover.contains("Button(\"Close\")"))
-        let sheet = try source("Sources/ResectaApp/Views/SearchAndRedactSheet.swift")
+        let sheet = try source("Sources/ResectaApp/Views/Search/SearchAndRedactSheet+SaveRegex.swift")
         #expect(sheet.contains("return PatternAdmission.storeRejectedMessage"))
         let toolbar = try source("Sources/ResectaApp/Views/Search/SearchToolbarSection.swift")
         #expect(toolbar.contains("optionChip(\"Include OCR Pages\""))

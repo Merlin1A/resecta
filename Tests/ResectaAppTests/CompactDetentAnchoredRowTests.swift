@@ -55,7 +55,7 @@ struct CompactDetentAnchoredRowTests {
 
     @Test("The compact handle mounts the result-nav pair at the parked site, which carries the nav ids")
     func compactStripCarriesResultNavCluster() throws {
-        let source = try loadRepoFile("Sources/ResectaApp/Views/SearchAndRedactSheet.swift")
+        let source = try loadRepoFile("Sources/ResectaApp/Views/Search/SearchAndRedactSheet+ResultNavigation.swift")
         // The strip's body lives in the +CompactStrip extension file.
         let stripFile = try loadRepoFile("Sources/ResectaApp/Views/Search/SearchAndRedactSheet+CompactStrip.swift")
         let strip = try slice(stripFile,
