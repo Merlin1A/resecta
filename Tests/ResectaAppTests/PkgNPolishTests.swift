@@ -252,20 +252,6 @@ struct HomeViewFailureRoutingTests {
 @MainActor
 struct ApplyTriggersToastTests {
 
-    @Test("ToastQueueManager.enqueue with .success severity targets the bottom position")
-    func testSuccessToastTargetsBottomPosition() {
-        // SearchAndRedactSheet's apply paths route through
-        // `toastManager.post(.marked(…))`, a success-severity row. The
-        // severity-to-position mapping is the load-bearing invariant —
-        // success toasts land at the bottom (non-blocking confirmatory
-        // position).
-        let manager = ToastQueueManager()
-        manager.enqueue(ToastItem(message: "Marked 3 for redaction", severity: .success))
-        #expect(manager.activeBottomToasts.count == 1)
-        #expect(manager.activeTopToasts.isEmpty)
-        #expect(manager.activeBottomToasts.first?.message == "Marked 3 for redaction")
-    }
-
     @Test("Singular-form copy renders for 1-instance apply")
     func testSingularFormCopy() {
         // UX-singular-plural-grammar: the count-suffix ternary

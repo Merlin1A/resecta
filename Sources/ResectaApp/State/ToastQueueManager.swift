@@ -13,40 +13,6 @@ enum ToastSeverity: Equatable {
     case success
     case warning
     case error
-
-    var sfSymbol: String {
-        switch self {
-        case .info: "info.circle.fill"
-        case .success: "checkmark.circle.fill"
-        case .warning: "exclamationmark.triangle.fill"
-        case .error: "xmark.circle.fill"
-        }
-    }
-
-    // Routed through the WCAG-AA text tier: ToastView
-    // applies this to the action-button TEXT, the severity glyph, and a
-    // 10%-opacity background fill. The text use is what mandates the
-    // text tier; the glyph/fill ride along on the same value.
-    var tintColor: Color {
-        switch self {
-        case .info: ResectaTokens.SemanticColor.infoText
-        case .success: ResectaTokens.SemanticColor.passText
-        case .warning: ResectaTokens.SemanticColor.warnText
-        case .error: ResectaTokens.SemanticColor.failText
-        }
-    }
-
-    /// Bottom for non-blocking confirmatory toasts; top for attention-demanding alerts.
-    var position: ToastPosition {
-        switch self {
-        case .info, .success: .bottom
-        case .warning, .error: .top
-        }
-    }
-}
-
-enum ToastPosition {
-    case top, bottom
 }
 
 /// The event a brief message reports. Two posts are the same message only
@@ -202,13 +168,6 @@ final class ToastQueueManager {
     /// one-line bar's height.
     var pageBarHeight: CGFloat = 0
 
-    /// Pre-filtered active toasts by position — avoids per-render .filter allocations.
-    var activeTopToasts: [ToastItem] {
-        activeToasts.filter { $0.severity.position == .top }
-    }
-    var activeBottomToasts: [ToastItem] {
-        activeToasts.filter { $0.severity.position == .bottom }
-    }
 
     /// The document phase last pushed; nil until one is (and at Home).
     private(set) var documentPhase: DocumentState.PhaseKind?

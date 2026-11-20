@@ -186,11 +186,11 @@ struct ToastQueueManagerTests {
                 "the shown toast with an action is withdrawn")
         // The queue drains after the 0.3 s gap: only the plain toast is left.
         for _ in 0..<100 {
-            if mgr.activeBottomToasts.count == 1 { break }
+            if mgr.activeToasts.count == 1 { break }
             try await Task.sleep(for: .milliseconds(10))
         }
-        #expect(mgr.activeBottomToasts.map { $0.message } == ["Saved"])
-        mgr.dismiss(mgr.activeBottomToasts[0])
+        #expect(mgr.activeToasts.map { $0.message } == ["Saved"])
+        mgr.dismiss(mgr.activeToasts[0])
         try await Task.sleep(for: .milliseconds(450))
         #expect(mgr.activeToasts.isEmpty, "the waiting toast with an action never shows")
     }
@@ -725,35 +725,6 @@ struct ToastQueueManagerTests {
         clock.advance(2.5)
         mgr.settleClocks()
         #expect(ran.count == 3)
-    }
-
-    // MARK: - Severity tint routes through the text tier
-
-    @Test("ToastSeverity.tintColor maps each case to its text-tier token",
-          arguments: [
-            (ToastSeverity.info, ResectaTokens.SemanticColor.infoText),
-            (ToastSeverity.success, ResectaTokens.SemanticColor.passText),
-            (ToastSeverity.warning, ResectaTokens.SemanticColor.warnText),
-            (ToastSeverity.error, ResectaTokens.SemanticColor.failText),
-          ])
-    func tintColorRoutesThroughTextTier(severity: ToastSeverity, expected: Color) {
-        #expect(severity.tintColor == expected)
-    }
-
-    @Test("Source-contains pin: ToastSeverity.tintColor body references the four text-tier tokens")
-    func tintColorSourceReferencesTextTierTokens() throws {
-        let source = try loadRepoFile("Sources/ResectaApp/State/ToastQueueManager.swift")
-        guard let propertyRange = source.range(of: "var tintColor: Color {"),
-              let closeRange = source.range(
-                of: "\n    }", range: propertyRange.upperBound..<source.endIndex)
-        else {
-            Issue.record("Could not locate ToastSeverity.tintColor body")
-            return
-        }
-        let body = source[propertyRange.upperBound..<closeRange.lowerBound]
-        for token in ["infoText", "passText", "warnText", "failText"] {
-            #expect(body.contains(token), "tintColor body missing reference to \(token)")
-        }
     }
 
     /// Mirrors `HonestySurfacesTests.loadRepoFile` — reads a repo-relative
