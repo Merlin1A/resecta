@@ -107,6 +107,9 @@ struct RunEntryPendingRunGateTests {
         let coordinator = try loadRepoFile("Sources/ResectaApp/State/PipelineCoordinator.swift")
         #expect(coordinator.contains("record: RunRecord.Confirmed?\n    ) -> [PDFPageData]"),
                 "buildPDFPageData's record has no default")
+        let inputs = try loadRepoFile("Sources/ResectaApp/State/RunInputs.swift")
+        #expect(inputs.contains("record: RunRecord.Confirmed?\n    ) -> [PDFPageData]"),
+                "RunInputs.pageData's record has no default")
     }
 
     @Test("Source pin: the capture is awaited first; the snapshot that follows, and the run up to `.redacting`, do not suspend")

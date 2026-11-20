@@ -343,11 +343,10 @@ struct PlanPaintTests {
         let region = CGRect(x: 40.3, y: 50.7, width: 50.1, height: 20.2)
         let run = try await Self.run(boxes: [region], recordOffset: 80)
         let painted = try run.projection(0).painted
-        #expect(try run.reported(0) == painted)
         #expect(run.bitmap.misses(painted, level: 0) == 0, "the record's box is filled")
-        let between = PixelPlan.PixelRect(minX: Int(95 * 300 / 72), minY: Int(55 * 300 / 72),
-                                          maxX: Int(115 * 300 / 72), maxY: Int(65 * 300 / 72))
-        #expect(run.bitmap.misses(between, level: 255) == 0, "between the region and the record's box nothing is painted")
+        #expect(try run.reported(0) == run.expected(0), "the box joined with its region as the region path fills it")
+        let regionPixels = try #require(run.regionPath(run.regions[0]))
+        #expect(run.bitmap.misses(regionPixels, level: 0) == 0, "the region is painted too: cover never less than the region path")
     }
 
     @Test("A region the record holds no box for is painted on its own and named in the record")

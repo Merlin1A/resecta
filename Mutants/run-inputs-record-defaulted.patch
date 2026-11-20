@@ -1,0 +1,19 @@
+Property: The run inputs' page builder takes the record with no default, so a caller that leaves it out does not compile.
+Area: the run entry (RunInputs.pageData)
+Test command: xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/RunEntryPendingRunGateTests
+Must go red: ResectaAppTests/RunEntryPendingRunGateTests runHandsTheRecordToThePageBuilder
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/RunInputs.swift b/Sources/ResectaApp/State/RunInputs.swift
+index f8826083..9debd3fc 100644
+--- a/Sources/ResectaApp/State/RunInputs.swift
++++ b/Sources/ResectaApp/State/RunInputs.swift
+@@ -70,7 +70,7 @@ enum RunInputs {
+         settings snapshot: PipelineCoordinator.RunSettings,
+         effectiveMode: PipelineMode,
+         inkPlans: [Int: InkStripPlan] = [:],
+-        record: RunRecord.Confirmed?
++        record: RunRecord.Confirmed? = nil
+     ) -> [PDFPageData] {
+         (0..<doc.pageCount).compactMap { i -> PDFPageData? in
+             guard let page = doc.page(at: i) else { return nil }
