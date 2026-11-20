@@ -1,0 +1,19 @@
+Property: Under the heading "Warnings · n" the rows do not repeat the outcome word.
+Area: results screen
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/ResultsOrderAndSentenceTests
+Must go red: ResectaAppTests/ResultsOrderAndSentenceTests warningsHeading
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationDetailsSection.swift b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
+index b26c09ea..2f6c9534 100644
+--- a/Sources/ResectaApp/Views/VerificationDetailsSection.swift
++++ b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
+@@ -81,7 +81,7 @@ struct VerificationDetailsSection: View {
+                                                                                  count: group.indices.count)
+                 ) {
+                     // The heading names the outcome; the rows do not repeat it.
+-                    layerRows(group.indices, layout: .lead, showsStatusWord: false)
++                    layerRows(group.indices, layout: .lead, showsStatusWord: true)
+                 }
+                 .padding(.top, ResectaTokens.Results.blockGap)
+             }
