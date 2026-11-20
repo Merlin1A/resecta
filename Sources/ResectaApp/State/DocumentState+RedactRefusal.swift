@@ -12,15 +12,44 @@ extension DocumentState {
         case selectedMatches  // unapplied search selections; a run would drop them
         case noRegions        // no region survives the minimum-dimension filter
         case busy             // another phase, a run in flight, a pending review or a touch held on the canvas; no hint
+        /// A search that counts left a page not read, and it is not yet
+        /// answered: the stop at Redact, a sheet that needs an answer.
+        case pagesNotRead
+
+        /// How a refusal is shown: a notice that leaves, or a sheet that needs an answer.
+        enum Presentation: Equatable {
+            case notice
+            case sheet
+        }
+
+        var presentation: Presentation { self == .pagesNotRead ? .sheet : .notice }
 
         /// The hint the button speaks and the funnel shows.
         var hint: String {
             switch self {
             case .selectedMatches: return "Apply or clear the selected matches first"
             case .noRegions: return "Draw regions or apply Scan or Search results first"
-            case .busy: return ""
+            case .busy, .pagesNotRead: return ""
             }
         }
+    }
+
+    /// Whether the stop at Redact is returned. Off until the stop's sheet is
+    /// drawn: a refusal with nothing on screen would leave a Redact tap
+    /// silent. The sheet's own change turns it on.
+    static let pagesNotReadReturned = false
+
+    /// The one order of the refusals: the selected matches, the missing
+    /// regions, a run that cannot start, then the cases that need an answer,
+    /// pages not read first.
+    static func refusal(
+        unappliedSelections: Bool, hasRegions: Bool, canStart: Bool, pagesNotRead: Bool
+    ) -> RedactRefusal? {
+        if unappliedSelections { return .selectedMatches }
+        if !hasRegions { return .noRegions }
+        if !canStart { return .busy }
+        if pagesNotRead { return .pagesNotRead }
+        return nil
     }
 
     /// True while the live search session holds selections not yet applied
@@ -32,14 +61,15 @@ extension DocumentState {
             liveApplied: redactionState.liveAppliedSearchResultIDs) ?? false
     }
 
-    /// The refusal that holds now, or nil when Redact may start. The
-    /// selected matches come first, then the missing regions. A finger held
-    /// on the canvas refuses as busy: the run would burn the stored place of
-    /// a box the screen shows elsewhere.
+    /// The refusal that holds now, or nil when Redact may start, in the one
+    /// order above. A finger held on the canvas refuses as busy: the run
+    /// would burn the stored place of a box the screen shows elsewhere.
     func redactRefusal(with redactionState: RedactionState) -> RedactRefusal? {
-        if Self.hasUnappliedSelections(redactionState) { return .selectedMatches }
-        if !redactionState.hasEffectiveRegions { return .noRegions }
-        if !canStartPipeline || redactionState.canvasHoldsATouch { return .busy }
-        return nil
+        Self.refusal(
+            unappliedSelections: Self.hasUnappliedSelections(redactionState),
+            hasRegions: redactionState.hasEffectiveRegions,
+            canStart: canStartPipeline && !redactionState.canvasHoldsATouch,
+            pagesNotRead: Self.pagesNotReadReturned
+                && RedactStop.opens(runs: redactionState.closedSearchRuns, answered: redactionState.redactStopAnswered))
     }
 }

@@ -174,6 +174,17 @@ class RedactionState {
         searchRunLog.append(SearchRunLogEntry(token: token, query: query))
     }
 
+    /// The pages answered at the stop at Redact, by page and reason: Redact
+    /// Anyway records them, and they last while the document is open.
+    var redactStopAnswered: Set<RedactStop.Page> = []
+
+    /// Redact Anyway: every page the stop names now is answered.
+    func answerRedactStop() {
+        for pages in RedactStop.pagesToName(runs: closedSearchRuns, answered: redactStopAnswered).values {
+            redactStopAnswered.formUnion(pages)
+        }
+    }
+
     /// The replaced runs whose accounts were kept, since an Apply took a
     /// record from each while it was open.
     var replacedSearchTokens: Set<UUID> = []
@@ -433,6 +444,7 @@ class RedactionState {
         latestSearchAccountToken = nil
         searchRunLog = []
         replacedSearchTokens = []
+        redactStopAnswered = []
         // A stale region UUID must not present a blank rationale sheet
         // over the next document.
         pendingCanvasRationaleRequest = nil

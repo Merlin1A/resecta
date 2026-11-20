@@ -536,7 +536,7 @@ extension DocumentState.RedactRefusal {
         switch self {
         case .selectedMatches: .applyOrClearSelectedMatchesBeforeRedact
         case .noRegions: .drawOrApplyFirst
-        case .busy: nil
+        case .busy, .pagesNotRead: nil
         }
     }
 }

@@ -222,13 +222,31 @@ final class PipelineCoordinator: @unchecked Sendable {
 
     /// Run the complete Redact → Verify → Results pipeline.
     /// Stores the Task in documentState.activePipelineTask for cancellation.
+    /// The stop's Redact Anyway: the pages it names are answered, and the
+    /// funnel is entered again, so a second case that needs an answer is shown next.
+    func answerPagesNotReadAndRun(documentOverride: PipelineMode?) {
+        guard documentState.redactRefusalAwaitingAnswer == .pagesNotRead else { return }
+        documentState.redactRefusalAwaitingAnswer = nil
+        redactionState.answerRedactStop()
+        runFullPipeline(documentOverride: documentOverride)
+    }
+
+    /// The stop's Cancel: nothing is answered and no run starts.
+    func cancelRefusalAwaitingAnswer() {
+        documentState.redactRefusalAwaitingAnswer = nil
+    }
+
     func runFullPipeline(documentOverride: PipelineMode?) {
         // The Redact button's rule, read before any side effect: every
         // route into a run (the paused banner's Restart, the purge Re-run,
         // Run Verification's full route) is refused where the button is
         // disabled, with the button's hint as a notice.
         if let refusal = documentState.redactRefusal(with: redactionState) {
-            if let id = refusal.message { postMessage(id) }
+            switch refusal.presentation {
+            case .notice: if let id = refusal.message { postMessage(id) }
+            // The editor presents the sheet; its answer enters this funnel again.
+            case .sheet: documentState.redactRefusalAwaitingAnswer = refusal
+            }
             return
         }
         // A full run's start ends the pause it would otherwise report.

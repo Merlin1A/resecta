@@ -238,6 +238,8 @@ class DocumentState {
 
     /// Active pipeline task — stored for cancellation support.
     var activePipelineTask: Task<Void, Never>?
+    /// A refusal shown as a sheet, published by the run funnel until it is answered.
+    var redactRefusalAwaitingAnswer: RedactRefusal?
 
     /// Active import task — stored for cancellation support. Parallels
     /// `activePipelineTask`. The import path has its own
@@ -630,6 +632,7 @@ class DocumentState {
         documentOverride = nil
         wasPausedByBackground = false
         pausedFromPhase = nil  // clear alongside wasPausedByBackground
+        redactRefusalAwaitingAnswer = nil
         transition(to: .empty)
     }
 
