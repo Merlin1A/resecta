@@ -5,10 +5,9 @@ Must go red: ResectaAppTests/RunRecordTests "Each case" (regionsAsDrawn)
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/State/PipelineRunner.swift b/Sources/ResectaApp/State/PipelineRunner.swift
-index 41b05fce..e3994d77 100644
 --- a/Sources/ResectaApp/State/PipelineRunner.swift
 +++ b/Sources/ResectaApp/State/PipelineRunner.swift
-@@ -284,7 +284,14 @@ struct PipelineRunner {
+@@ -286,7 +286,14 @@
          let confirmed = RunInputs.confirmedRecord(
              pageCount: coordinator.documentState.pageCount,
              geometry: coordinator.documentState.sourceDocument.map(RunInputs.pageGeometry(of:)) ?? [:],
@@ -21,6 +20,6 @@ index 41b05fce..e3994d77 100644
 +                }
 +            },
 +            settings: runSettings)
-         let pages = coordinator.buildPDFPageData(
-             effectiveMode: effectiveMode, runSettings: runSettings, inkPlans: sensitiveTerms.inkPlans,
-             record: confirmed)
+         // A box the release cannot apply as planned refuses the run here,
+         // before any page is built or rasterised.
+         if let page = confirmed.firstPageWithBoxThatCannotShowLength {
