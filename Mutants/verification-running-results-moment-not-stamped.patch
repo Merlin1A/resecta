@@ -1,0 +1,19 @@
+Property: The editor stamps the moment the running checks give way to the results.
+Area: verification (the screen while the checks run)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationRunningWiringTests
+Must go red: ResectaAppTests/VerificationRunningWiringTests editorStampsResultsMoment
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/DocumentEditorView.swift b/Sources/ResectaApp/Views/DocumentEditorView.swift
+index 93ddfb90..32769eee 100644
+--- a/Sources/ResectaApp/Views/DocumentEditorView.swift
++++ b/Sources/ResectaApp/Views/DocumentEditorView.swift
+@@ -258,7 +258,7 @@ struct DocumentEditorView: View {
+         // The results replacing the running checks: the moment the bar's
+         // trailing button turns from Stop into Settings.
+         .onChange(of: documentState.phaseKind) { oldKind, newKind in
+-            if oldKind == .verifying, newKind == .verified { resultsAppearedAt = Date() }
++            if oldKind == .verifying, newKind == .verified { }
+         }
+         // Search is presented only while editing, importing or failed; a
+         // session present in any other phase comes down, including one
