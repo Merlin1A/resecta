@@ -81,6 +81,15 @@ struct SearchAccountTests {
         #expect(SearchAccount.LineReason.order.last == .noReport)
     }
 
+    @Test("A stop page with no report is given to not reached as searched in part, not to the no-report line")
+    func stopPageWithNoReport() {
+        let account = Self.account([[.ownText], [], []], .stopped(page: 1))
+        #expect(account.pages(for: .noReport) == [])
+        #expect(account.stopPage == 1)
+        #expect(account.pages(for: .notReached) == [2])
+        #expect(account.pagesThatStopRedact == [1, 2])
+    }
+
     @Test("Not reached is the pages after the stop page; the stop page is given apart")
     func notReached() {
         let account = Self.account([[.ownText], [.ownText], [], []], .stopped(page: 1))

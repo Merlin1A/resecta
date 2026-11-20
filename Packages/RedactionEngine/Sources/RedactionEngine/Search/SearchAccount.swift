@@ -89,7 +89,8 @@ public struct SearchAccount: Sendable, Hashable {
         case .patternTimedOut: return summary.pages(withReason: .patternTimedOut)
         case .notReached:
             return (summary.pages(in: .notReachedResultLimit) + summary.pages(in: .notReachedStopped)).sorted()
-        case .noReport: return summary.pages(in: .noReport)
+        // The stop page belongs to "not reached" as searched in part, even with no report.
+        case .noReport: return summary.pages(in: .noReport).filter { $0 != stopPage }
         }
     }
 
