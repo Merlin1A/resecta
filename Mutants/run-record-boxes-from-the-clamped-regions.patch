@@ -7,12 +7,12 @@ Apply in a scratch worktree with `git apply`; discard after.
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
-@@ -99,7 +99,7 @@
-                 // Each region goes with its kind; under "as placed" the plan
-                 // reads none.
-                 let planRegions = admitted.map { region in
--                    let r = region.normalizedRect
-+                    let r = region.normalizedRect.clampedToNormalized()
-                     return PlanRegion(id: region.id,
-                                       share: PointRect(minX: Double(r.minX), minY: Double(r.minY),
-                                                        maxX: Double(r.maxX), maxY: Double(r.maxY)),
+@@ -109,7 +109,7 @@
+             // Each region goes with its kind; under "as placed" the plan
+             // reads none.
+             let planRegions = admitted.map { region in
+-                let r = region.normalizedRect
++                let r = region.normalizedRect.clampedToNormalized()
+                 return PlanRegion(id: region.id,
+                                   share: PointRect(minX: Double(r.minX), minY: Double(r.minY),
+                                                    maxX: Double(r.maxX), maxY: Double(r.maxY)),

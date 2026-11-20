@@ -7,12 +7,12 @@ Apply in a scratch worktree with `git apply`; discard after.
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
-@@ -95,7 +95,7 @@
-             if let width = PixelPlan.sixtyFourths(ofSide: Double(turned ? cropBox.height : cropBox.width)),
-                let height = PixelPlan.sixtyFourths(ofSide: Double(turned ? cropBox.width : cropBox.height)) {
-                 let admitted = regions.filter { RedactionRegion.isAdmitted(normalizedRect: $0.normalizedRect) }
--                let choice = RunRecord.planChoice(source: RunRecord.planSource, switchOn: switchOn)
-+                let choice = RunRecord.planChoice(source: .switchPolicy, switchOn: switchOn)
-                 // Each region goes with its kind; under "as placed" the plan
-                 // reads none.
-                 let planRegions = admitted.map { region in
+@@ -105,7 +105,7 @@
+                   let height = PixelPlan.sixtyFourths(ofSide: Double(turned ? cropBox.width : cropBox.height))
+             else { return nil }
+             let admitted = regions.filter { RedactionRegion.isAdmitted(normalizedRect: $0.normalizedRect) }
+-            let choice = RunRecord.planChoice(source: RunRecord.planSource, switchOn: switchOn)
++            let choice = RunRecord.planChoice(source: .switchPolicy, switchOn: switchOn)
+             // Each region goes with its kind; under "as placed" the plan
+             // reads none.
+             let planRegions = admitted.map { region in
