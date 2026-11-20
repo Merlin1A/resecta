@@ -236,6 +236,8 @@ struct HiddenWordInkRunCases {
         #expect(!text.contains("Approved"), "the word beside the box lost its colon to the box and left whole")
         #expect(!text.contains("Okafor"), "the boxed word is gone")
         #expect(text.contains("After three years the file moves to the long store."), "the line above is kept")
+        #expect(text.trimmingCharacters(in: .whitespacesAndNewlines).hasSuffix("long store."),
+                "the line above is the last: no piece of the removed line is left")
         #expect(VerificationResultsView.mastheadTitle(report: report) == "Checks Passed")
         #expect(report.layers.filter(\.couldNotVerify).isEmpty)
         let layer = try #require(HiddenWordInkAppSeam.layer, "the check is not built")
@@ -249,9 +251,9 @@ struct HiddenWordInkRunCases {
         let source = try #require(PDFDocument(data: data))
         let page = try #require(source.page(at: 0))
         let cgPage = try #require(page.pageRef)
+        let strip = try #require(Self.hiddenRect(page, "Okafor"), "the boxed word has a hidden box")
         let region = RedactionRegion(id: UUID(), normalizedRect: Self.inkRect(Self.approvalLines, line: 23, phrase: "Okafor"),
-                                     source: .searchMatch(term: "okafor"),
-                                     textLayerRect: try #require(Self.hiddenRect(page, "Okafor")), textAnchored: true)
+                                     source: .searchMatch(term: "okafor"), textLayerRect: strip, textAnchored: true)
         let pageData = PDFPageData(page: page, pageIndex: 0, regions: [region], fillColor: .black, targetDPI: 300,
                                    pipelineMode: .searchableRedaction, rotation: page.rotation,
                                    cropBoxBounds: page.bounds(for: .cropBox), cgPage: cgPage,
