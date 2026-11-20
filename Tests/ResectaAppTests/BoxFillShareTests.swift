@@ -47,7 +47,7 @@ struct BoxFillShareTests {
                               short: "A box on page 4 is not exactly the fill.",
                               detail: "This check is new and has not yet been shown to stay quiet on correct files.", pages: [3]))
         #expect(issue.overallStatus.isAttention)
-        #expect(VerificationMasthead.mastheadSubtitle(report: issue) == "Read the finding below before you share the PDF.") // LegalPhrases:safe (approved words)
+        #expect(VerificationResultsView.mastheadSubtitle(report: issue) == "Read the finding below before you share the PDF.") // LegalPhrases:safe (approved words)
         #expect(kindID(issue) == "failOrAttention")
         #expect(VerificationRowModel(layer: issue.layers.last!, perPageModes: [.secureRasterization]).outcome == .needsReview)
     }
@@ -81,6 +81,6 @@ struct BoxFillShareTests {
                                        durationSeconds: 0, layer: .metadataCheck)
         two = VerificationReport(layers: layers, overallStatus: .attention("x"), durationSeconds: 1,
                                  perPageModes: [.secureRasterization])
-        #expect(VerificationMasthead.mastheadSubtitle(report: two) == "Read the findings below before you share the PDF.") // LegalPhrases:safe (approved words)
+        #expect(VerificationResultsView.mastheadSubtitle(report: two) == "Read the findings below before you share the PDF.") // LegalPhrases:safe (approved words)
     }
 }
