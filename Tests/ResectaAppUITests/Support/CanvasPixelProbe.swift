@@ -69,10 +69,11 @@ nonisolated struct CanvasPixelProbe {
     private func isWhite(_ c: (Int, Int, Int)) -> Bool { c.0 >= 250 && c.1 >= 250 && c.2 >= 250 }
 
     /// The fit page: the longest white vertical run at x = 12 gives the top,
-    /// the longest white horizontal run 15 points below it the sides, the
-    /// height from the Letter aspect. Nil when the page fills the width
+    /// the longest white horizontal run `sideRow` points below it (15 unless
+    /// given; a row clear of the page's text) the sides, the height from the
+    /// page's aspect (Letter unless given). Nil when the page fills the width
     /// (zoomed past fit).
-    func fitPage() -> CGRect? {
+    func fitPage(aspect: CGFloat = 792.0 / 612.0, sideRow: CGFloat = 15) -> CGRect? {
         func longestRun(_ count: Int, _ white: (Int) -> Bool) -> (Int, Int)? {
             var best: (Int, Int)?
             var start: Int?
@@ -89,10 +90,10 @@ nonisolated struct CanvasPixelProbe {
         let h = Int(windowSize.height), w = Int(windowSize.width)
         guard let v = longestRun(h, { isWhite(rgb(12, CGFloat($0))) }), v.1 - v.0 > 200 else { return nil }
         let top = CGFloat(v.0)
-        guard let hr = longestRun(w, { isWhite(rgb(CGFloat($0), top + 15)) }), hr.1 - hr.0 > 200 else { return nil }
+        guard let hr = longestRun(w, { isWhite(rgb(CGFloat($0), top + sideRow)) }), hr.1 - hr.0 > 200 else { return nil }
         let left = CGFloat(hr.0), pageWidth = CGFloat(hr.1 - hr.0)
         if left <= 0 && pageWidth >= windowSize.width - 1 { return nil }
-        return CGRect(x: left, y: top, width: pageWidth, height: pageWidth * 792 / 612)
+        return CGRect(x: left, y: top, width: pageWidth, height: pageWidth * aspect)
     }
 
     /// The bounds of a tint inside `rect`, nil under 12 matching points.
