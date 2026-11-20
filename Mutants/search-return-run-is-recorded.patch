@@ -5,14 +5,14 @@ Must go red: ResectaAppUITests/SearchTypingFocusUITests testReturn_onTheListedSe
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/State/SearchRun.swift b/Sources/ResectaApp/State/SearchRun.swift
-index 7c6b794c..64e37700 100644
+index 8507d6f9..0cde5f18 100644
 --- a/Sources/ResectaApp/State/SearchRun.swift
 +++ b/Sources/ResectaApp/State/SearchRun.swift
-@@ -212,7 +212,6 @@ import RedactionEngine
+@@ -213,7 +213,6 @@ import RedactionEngine
          }
  
          let mode = buildSearchMode()
 -        searchState.lastRunShape = searchState.currentRunShape  // read in the same stretch as the query above
          searchState.totalPages = liveDoc.pageCount
-         searchState.accountOpenedSink = { [weak redactionState] token, query in
-             redactionState?.recordSearchRunOpened(token: token, query: query)
+         searchState.accountReplacedSink = { [weak redactionState] token in
+             redactionState?.recordSearchRunReplaced(token: token)
