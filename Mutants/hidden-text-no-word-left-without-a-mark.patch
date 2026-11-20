@@ -5,17 +5,15 @@ Must go red: RedactionEngineTests/HiddenTextAlphabetExportTests exportsAsListed 
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
-index c63f8dbf..5b728299 100644
+index 2cfafd88..9ea0c8b5 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
-@@ -92,8 +92,8 @@ enum PageTextPath {
-             return Result(outcome: .picture(.extractionFailed), runsLeftOut: 0,
-                           drawnCellDropped: validated.dropped)
-         }
--        if validated.result.surviving.isEmpty, !alphabet.wordIndices.isEmpty,
--           let reason = alphabet.reasonIfNoWordLeft {
-+        if validated.result.surviving.isEmpty {
-+            let reason = TextLayerDetector.FallbackReason.noWritableText
-             return Result(outcome: .picture(reason), runsLeftOut: alphabet.runsLeftOut,
-                           drawnCellDropped: validated.dropped)
+@@ -176,7 +176,7 @@ enum PageTextPath {
+         // when the page had no letter to begin with (a lone object mark reads
+         // as a space). A page whose boxes took every word is written empty.
+         let noLetterLeft = !validated.result.surviving.contains { Self.isLetter($0) }
+-        if noLetterLeft, !alphabet.wordIndices.isEmpty || !folded.contains(where: { Self.isLetter($0) }) {
++        if noLetterLeft {
+             return Result(outcome: .picture(alphabet.reasonIfNoWordLeft ?? .noWritableText),
+                           runsLeftOut: alphabet.runsLeftOut, drawnCellDropped: validated.dropped)
          }

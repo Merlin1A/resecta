@@ -5,15 +5,15 @@ Must go red: RedactionEngineTests/WholeSourceWordsTests wholeWords [part of a nu
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
-index aec41c25..f680ec5d 100644
+index 2cfafd88..f39d8feb 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
-@@ -107,7 +107,7 @@ enum PageTextPath {
+@@ -130,7 +130,7 @@ enum PageTextPath {
          let wholeWords = Self.wholeWords
          let filterTook = wholeWords ? wordsLosingALetter(before: folded, after: filtered.surviving) : []
-         var current = closeOverMarkedWords(
--            filtered, marked: alphabet.wordIndices.union(painted).union(filterTook))
-+            filtered, marked: alphabet.wordIndices.union(painted))
-         let shapes = rects.map {
-             RegionShape(expandedBounds: $0.insetBy(dx: -safetyMargin, dy: -safetyMargin), bounds: $0)
+         guard var current = try steps.closure(
+-            filtered, alphabet.wordIndices.union(painted).union(filterTook)) else {
++            filtered, alphabet.wordIndices.union(painted)) else {
+             return Result(outcome: .picture(.extractionFailed), runsLeftOut: 0, drawnCellDropped: 0)
          }
+         let shapes = rects.map {
