@@ -25,12 +25,19 @@ struct SearchSheetTextTierTests {
         "Views/Search/SavedSearchListSheet.swift",
         "Views/Search/SearchResultsBanners.swift",
         "Views/Search/SearchAndRedactSheet+CompactApply.swift",
+        "Views/Search/SearchAndRedactSheet+SearchBar.swift",
+        "Views/Search/SearchAndRedactSheet+GrabberPulse.swift",
+        "Views/Search/SearchAndRedactSheet+ResultNavigation.swift",
+        "Views/Search/SearchAndRedactSheet+LivePreview.swift",
+        "Views/Search/SearchAndRedactSheet+DegradeBanner.swift",
+        "Views/Search/SearchAndRedactSheet+SaveRegex.swift",
+        "Views/Search/SearchModal.swift",
     ]
 
     /// The lines that keep the system grey: (file, line trimmed, how many, why).
     static let allowList: [(file: String, line: String, count: Int, reason: String)] = [
-        ("Views/SearchAndRedactSheet.swift", ".foregroundStyle(.secondary)", 1, "the stop glyph in the field"),
-        ("Views/SearchAndRedactSheet.swift", ".fill(Color.secondary.opacity(0.4))", 1, "the grabber's fill"),
+        ("Views/Search/SearchAndRedactSheet+SearchBar.swift", ".foregroundStyle(.secondary)", 1, "the stop glyph in the field"),
+        ("Views/Search/SearchAndRedactSheet+GrabberPulse.swift", ".fill(Color.secondary.opacity(0.4))", 1, "the grabber's fill"),
         ("Views/SearchResultRow.swift",
          ".foregroundStyle(result.isSelected ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))", 1,
          "the empty selection circle"),
@@ -65,7 +72,7 @@ struct SearchSheetTextTierTests {
 
     @Test("No system grey on text in the Search sheet's files")
     func noSystemGreyOnText() throws {
-        #expect(Self.files.count == 11)
+        #expect(Self.files.count == 18)
         #expect(Self.allowList.reduce(0) { $0 + $1.count } == 12)
         var found: [String: Int] = [:]
         for file in Self.files {
@@ -95,7 +102,7 @@ struct SearchSheetTextTierTests {
         #expect(!row.contains { $0.contains(".foregroundStyle(.tint)") })
         #expect(row.filter { $0.contains("AnyShapeStyle(.tint)") }.count == 1, "only the ticked circle keeps the tint")
 
-        let hub = try Self.source("Views/SearchAndRedactSheet.swift")
+        let hub = try Self.source("Views/Search/SearchAndRedactSheet+SearchBar.swift")
         let start = try #require(hub.range(of: "static func circularIconLabel("))
         let end = try #require(hub.range(of: "\n    }\n", range: start.upperBound..<hub.endIndex))
         #expect(!hub[start.upperBound..<end.lowerBound].contains(".foregroundStyle(.tint)"),
