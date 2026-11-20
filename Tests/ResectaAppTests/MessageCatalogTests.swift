@@ -21,6 +21,8 @@ struct MessageCatalogTests {
         let tone: MessageTone
         let phases: Set<DocumentState.PhaseKind>
         let mustBeSeen: Bool
+        let coalescesRepeats: Bool
+        let showsInRemainingLayer: Bool
     }
 
     static let everyPhase: Set<DocumentState.PhaseKind> = [
@@ -28,47 +30,95 @@ struct MessageCatalogTests {
     ]
 
     static let frozen: [MessageID.Name: Frozen] = [
-        .textLayerDetected: Frozen(severity: .info, kind: .notice, tone: .note, phases: [.editing], mustBeSeen: false),
-        .imagePagesNote: Frozen(severity: .info, kind: .notice, tone: .caution, phases: [.editing], mustBeSeen: true),
-        .encryptedSource: Frozen(severity: .warning, kind: .notice, tone: .caution, phases: [.editing], mustBeSeen: true),
+        .textLayerDetected: Frozen(
+            severity: .info, kind: .notice, tone: .note, phases: [.editing], mustBeSeen: false,
+            coalescesRepeats: true, showsInRemainingLayer: true),
+        .imagePagesNote: Frozen(
+            severity: .info, kind: .notice, tone: .caution, phases: [.editing], mustBeSeen: true,
+            coalescesRepeats: true, showsInRemainingLayer: true),
+        .encryptedSource: Frozen(
+            severity: .warning, kind: .notice, tone: .caution, phases: [.editing], mustBeSeen: true,
+            coalescesRepeats: true, showsInRemainingLayer: true),
         .droppedFilesFirstOpened: Frozen(
-            severity: .info, kind: .notice, tone: .caution, phases: [.editing], mustBeSeen: true),
+            severity: .info, kind: .notice, tone: .caution, phases: [.editing], mustBeSeen: true,
+            coalescesRepeats: false, showsInRemainingLayer: false),
         .unsupportedFormatDropped: Frozen(
-            severity: .warning, kind: .receipt, tone: .caution, phases: everyPhase, mustBeSeen: false),
+            severity: .warning, kind: .receipt, tone: .caution, phases: everyPhase, mustBeSeen: false,
+            coalescesRepeats: true, showsInRemainingLayer: false),
         .importBlockedDuringRun: Frozen(
             severity: .warning, kind: .receipt, tone: .caution,
-            phases: [.editing, .importing, .detecting, .redacting, .verifying, .exporting], mustBeSeen: false),
+            phases: [.editing, .importing, .detecting, .redacting, .verifying, .exporting], mustBeSeen: false,
+            coalescesRepeats: true, showsInRemainingLayer: false),
         .importBlockedOnThisScreen: Frozen(
-            severity: .warning, kind: .receipt, tone: .caution, phases: [.editing, .verified, .failed], mustBeSeen: false),
-        .outputReclaimed: Frozen(severity: .warning, kind: .receipt, tone: .caution, phases: [.verified], mustBeSeen: true),
-        .shared: Frozen(severity: .success, kind: .receipt, tone: .done, phases: [.verified], mustBeSeen: false),
+            severity: .warning, kind: .receipt, tone: .caution, phases: [.editing, .verified, .failed],
+            mustBeSeen: false,
+            coalescesRepeats: true, showsInRemainingLayer: false),
+        .outputReclaimed: Frozen(
+            severity: .warning, kind: .receipt, tone: .caution, phases: [.verified], mustBeSeen: true,
+            coalescesRepeats: true, showsInRemainingLayer: false),
+        .shared: Frozen(
+            severity: .success, kind: .receipt, tone: .done, phases: [.verified], mustBeSeen: false,
+            coalescesRepeats: false, showsInRemainingLayer: false),
         .shareSheetUnavailable: Frozen(
-            severity: .warning, kind: .receipt, tone: .stop, phases: [.verified], mustBeSeen: true),
+            severity: .warning, kind: .receipt, tone: .stop, phases: [.verified], mustBeSeen: true,
+            coalescesRepeats: true, showsInRemainingLayer: false),
         .applyOrClearSelectedMatchesBeforeRedact: Frozen(
-            severity: .warning, kind: .receipt, tone: .caution, phases: [.editing], mustBeSeen: false),
+            severity: .warning, kind: .receipt, tone: .caution, phases: [.editing], mustBeSeen: false,
+            coalescesRepeats: true, showsInRemainingLayer: false),
         .applyOrClearSelectedMatchesBeforeVerify: Frozen(
-            severity: .info, kind: .receipt, tone: .caution, phases: [.verified], mustBeSeen: false),
-        .drawOrApplyFirst: Frozen(severity: .warning, kind: .receipt, tone: .caution, phases: [.editing], mustBeSeen: false),
-        .boxTooSmall: Frozen(severity: .info, kind: .receipt, tone: .caution, phases: [.editing], mustBeSeen: false),
-        .deletedBoxes: Frozen(severity: .info, kind: .receipt, tone: .done, phases: [.editing], mustBeSeen: true),
-        .selectionLimit: Frozen(severity: .warning, kind: .receipt, tone: .caution, phases: [.editing], mustBeSeen: true),
-        .nearbyMatch: Frozen(severity: .info, kind: .receipt, tone: .note, phases: [.editing], mustBeSeen: true),
-        .marked: Frozen(severity: .success, kind: .receipt, tone: .done, phases: [.editing], mustBeSeen: false),
-        .searchClosedCleared: Frozen(severity: .info, kind: .receipt, tone: .caution, phases: [.editing], mustBeSeen: true),
-        .searchRerunCleared: Frozen(severity: .info, kind: .receipt, tone: .caution, phases: [.editing], mustBeSeen: true),
-        .modeSwitchCleared: Frozen(severity: .info, kind: .receipt, tone: .caution, phases: [.editing], mustBeSeen: true),
+            severity: .info, kind: .receipt, tone: .caution, phases: [.verified], mustBeSeen: false,
+            coalescesRepeats: true, showsInRemainingLayer: false),
+        .drawOrApplyFirst: Frozen(
+            severity: .warning, kind: .receipt, tone: .caution, phases: [.editing], mustBeSeen: false,
+            coalescesRepeats: true, showsInRemainingLayer: false),
+        .boxTooSmall: Frozen(
+            severity: .info, kind: .receipt, tone: .caution, phases: [.editing], mustBeSeen: false,
+            coalescesRepeats: true, showsInRemainingLayer: false),
+        .deletedBoxes: Frozen(
+            severity: .info, kind: .receipt, tone: .done, phases: [.editing], mustBeSeen: true,
+            coalescesRepeats: false, showsInRemainingLayer: false),
+        .selectionLimit: Frozen(
+            severity: .warning, kind: .receipt, tone: .caution, phases: [.editing], mustBeSeen: true,
+            coalescesRepeats: true, showsInRemainingLayer: false),
+        .nearbyMatch: Frozen(
+            severity: .info, kind: .receipt, tone: .note, phases: [.editing], mustBeSeen: true,
+            coalescesRepeats: true, showsInRemainingLayer: false),
+        .marked: Frozen(
+            severity: .success, kind: .receipt, tone: .done, phases: [.editing], mustBeSeen: false,
+            coalescesRepeats: false, showsInRemainingLayer: false),
+        .searchClosedCleared: Frozen(
+            severity: .info, kind: .receipt, tone: .caution, phases: [.editing], mustBeSeen: true,
+            coalescesRepeats: false, showsInRemainingLayer: true),
+        .searchRerunCleared: Frozen(
+            severity: .info, kind: .receipt, tone: .caution, phases: [.editing], mustBeSeen: true,
+            coalescesRepeats: false, showsInRemainingLayer: false),
+        .modeSwitchCleared: Frozen(
+            severity: .info, kind: .receipt, tone: .caution, phases: [.editing], mustBeSeen: true,
+            coalescesRepeats: false, showsInRemainingLayer: false),
         .modeSwitchClearedAllApplied: Frozen(
-            severity: .info, kind: .receipt, tone: .note, phases: [.editing], mustBeSeen: true),
-        .recallCleared: Frozen(severity: .info, kind: .receipt, tone: .caution, phases: [.editing], mustBeSeen: true),
+            severity: .info, kind: .receipt, tone: .note, phases: [.editing], mustBeSeen: true,
+            coalescesRepeats: false, showsInRemainingLayer: false),
+        .recallCleared: Frozen(
+            severity: .info, kind: .receipt, tone: .caution, phases: [.editing], mustBeSeen: true,
+            coalescesRepeats: false, showsInRemainingLayer: true),
         .searchResultsTruncated: Frozen(
-            severity: .warning, kind: .notice, tone: .caution, phases: [.editing], mustBeSeen: true),
-        .savedRegexSaved: Frozen(severity: .success, kind: .receipt, tone: .done, phases: [.editing], mustBeSeen: false),
-        .detectionDegraded: Frozen(severity: .warning, kind: .notice, tone: .caution, phases: [.editing], mustBeSeen: true),
-        .customTermTimeout: Frozen(severity: .warning, kind: .notice, tone: .caution, phases: [.editing], mustBeSeen: true),
+            severity: .warning, kind: .notice, tone: .caution, phases: [.editing], mustBeSeen: true,
+            coalescesRepeats: true, showsInRemainingLayer: false),
+        .savedRegexSaved: Frozen(
+            severity: .success, kind: .receipt, tone: .done, phases: [.editing], mustBeSeen: false,
+            coalescesRepeats: false, showsInRemainingLayer: false),
+        .detectionDegraded: Frozen(
+            severity: .warning, kind: .notice, tone: .caution, phases: [.editing], mustBeSeen: true,
+            coalescesRepeats: true, showsInRemainingLayer: false),
+        .customTermTimeout: Frozen(
+            severity: .warning, kind: .notice, tone: .caution, phases: [.editing], mustBeSeen: true,
+            coalescesRepeats: true, showsInRemainingLayer: false),
         .scannedRegionsNotAnalyzed: Frozen(
-            severity: .warning, kind: .notice, tone: .caution, phases: [.editing], mustBeSeen: true),
+            severity: .warning, kind: .notice, tone: .caution, phases: [.editing], mustBeSeen: true,
+            coalescesRepeats: true, showsInRemainingLayer: false),
         .searchPreparationFailed: Frozen(
-            severity: .warning, kind: .receipt, tone: .stop, phases: [.editing], mustBeSeen: true),
+            severity: .warning, kind: .receipt, tone: .stop, phases: [.editing], mustBeSeen: true,
+            coalescesRepeats: true, showsInRemainingLayer: false),
     ]
 
     /// The 29 names, in the table's order: what `--showToast=<name>` takes.
@@ -176,6 +226,8 @@ struct MessageCatalogTests {
             #expect(row.tone == want.tone, "\(id)")
             #expect(row.phases == want.phases, "\(id)")
             #expect(row.mustBeSeen == want.mustBeSeen, "\(id)")
+            #expect(row.coalescesRepeats == want.coalescesRepeats, "\(id)")
+            #expect(row.showsInRemainingLayer == want.showsInRemainingLayer, "\(id)")
         }
         let rows = MessageID.Name.allCases.map { MessageCatalog.row(for: .example(named: $0)) }
         #expect(rows.filter { $0.todaySeverity == .info }.count == 12)
@@ -188,6 +240,25 @@ struct MessageCatalogTests {
         #expect(rows.filter { $0.tone == .note }.count == 3)
         #expect(rows.filter { $0.tone == .stop }.count == 2)
         #expect(rows.filter(\.mustBeSeen).count == 18)
+        #expect(rows.filter(\.showsInRemainingLayer).count == 5)
+    }
+
+    @Test("Every row is either one message while it is up or a new event each time, and the split is 19 and 10")
+    func everyRowCoalescesOrNot() {
+        let rows = MessageID.Name.allCases.map { (name: $0, row: MessageCatalog.row(for: .example(named: $0))) }
+        let oneWhileUp = Set(rows.filter { $0.row.coalescesRepeats }.map { $0.name })
+        let newEachTime = Set(rows.filter { !$0.row.coalescesRepeats }.map { $0.name })
+        #expect(oneWhileUp.count == 19)
+        #expect(newEachTime.count == 10)
+        // Each post of these reports one thing the person did or lost.
+        #expect(newEachTime == [
+            .droppedFilesFirstOpened, .shared, .deletedBoxes, .marked, .searchClosedCleared,
+            .searchRerunCleared, .modeSwitchCleared, .modeSwitchClearedAllApplied, .recallCleared, .savedRegexSaved,
+        ])
+        // Every variant of a row agrees with its row.
+        for id in MessageID.examples {
+            #expect(MessageCatalog.row(for: id).coalescesRepeats == oneWhileUp.contains(id.name), "\(id)")
+        }
     }
 
     @Test("Only the three shipped confirmations use the success severity")

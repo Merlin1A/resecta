@@ -1,0 +1,19 @@
+Property: A superseded run's end at the result limit takes no cap branch: the newer run is left searching, its task kept.
+Area: the Search sheet's run end (SearchState.runEndsCancelled)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild build-for-testing -scheme ResectaApp -destination id=<simulator>, then DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test-without-building -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/SearchListLimitOccurrenceTests
+Must go red: ResectaAppTests/SearchListLimitOccurrenceTests supersededEndAtTheLimit
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/SearchState+RunLifecycle.swift b/Sources/ResectaApp/State/SearchState+RunLifecycle.swift
+index ec02e60c..7e4afcb8 100644
+--- a/Sources/ResectaApp/State/SearchState+RunLifecycle.swift
++++ b/Sources/ResectaApp/State/SearchState+RunLifecycle.swift
+@@ -80,7 +80,7 @@ extension SearchState {
+     /// so it cannot stop a successor's run.
+     func runEndsCancelled(run: Int, taskCancelled: Bool) -> Bool {
+         if taskCancelled { return true }
+-        guard resultsAtCap, run == runToken else { return false }
++        guard resultsAtCap else { return false }
+         cancelSearchWithoutAwait()
+         return true
+     }

@@ -80,6 +80,25 @@ struct RegionDeleteRuleTests {
         #expect(state.regions[0]?.count == 2, "the remaining region and the new one stay; nothing is undone")
     }
 
+    @Test("A delete's Undo ends when a box changes after it")
+    func deleteUndoEndsWhenABoxChanges() throws {
+        let state = Self.state(selecting: 3)
+        let undoManager = Self.manager()
+        let toasts = ToastQueueManager()
+        _ = Self.delete(state, undoManager, toasts)
+        let toast = try #require(toasts.activeToasts.first)
+        toasts.revalidate()
+        #expect(toasts.activeToasts.map(\.id) == [toast.id], "nothing has changed: the Undo stays")
+        undoManager.beginUndoGrouping()
+        state.addRegion(RedactionRegion(
+            id: UUID(), normalizedRect: CGRect(x: 0.5, y: 0.5, width: 0.1, height: 0.1), source: .manual),
+            page: 0, undoManager: undoManager)
+        undoManager.endUndoGrouping()
+        toasts.revalidate()
+        #expect(toasts.activeToasts.isEmpty, "a box drawn after the delete ends its Undo")
+        #expect(toasts.waitingToasts.isEmpty)
+    }
+
     @Test("One selected region is deleted with no notice; Add to Selection still ends")
     func oneRegionNoNotice() {
         let state = Self.state(selecting: 1)
