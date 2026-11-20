@@ -24,7 +24,7 @@ struct SearchAccountLifecycleTests {
 
     /// A session with a run that has started reading a ten-page document.
     static func running(_ store: Store, mode: SearchModeType = .text) -> (SearchState, Int) {
-        let search = SearchState()
+        let search = SearchState(defaults: makeScratchDefaults().0)
         search.searchModeType = mode
         search.queryText = "Delia"
         search.accountClosedSink = { token, account in store.keep(account, token) }
@@ -162,7 +162,7 @@ struct SearchAccountLifecycleTests {
     @Test("A pattern the engine refuses at the start: no result is cleared, so the run's tail closes it completed with no page read")
     func refusedPattern() {
         let store = Store()
-        let search = SearchState()
+        let search = SearchState(defaults: makeScratchDefaults().0)
         search.accountClosedSink = { token, account in store.keep(account, token) }
         search.clearResults()
         let run = search.beginRun()
@@ -175,7 +175,7 @@ struct SearchAccountLifecycleTests {
     @Test("Preparation failed or the pattern was invalid: no account opened, and a close does nothing")
     func noAccount() async {
         let store = Store()
-        let search = SearchState()
+        let search = SearchState(defaults: makeScratchDefaults().0)
         search.accountClosedSink = { token, account in store.keep(account, token) }
         search.closeAccount(.completed)
         await search.cancelSearch()
