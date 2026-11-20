@@ -1,0 +1,19 @@
+Property: on a hybrid page (a hidden text layer over a page image, read by OCR too), a text-layer match whose paint took more than its word's tallest band is told by that band's box when the OCR leg's repeats are dropped, never by the grown paint, so an occurrence on the neighbour line that only OCR read keeps its own result and box.
+Area: search ink fit and hybrid merge (engine)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter InkFitBandTests
+Must go red: RedactionEngineTests/InkFitBandTests neighbourLineKeepsItsOCRResult
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFit.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFit.swift
+index 09332ded..89a932cf 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFit.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFit.swift
+@@ -529,7 +529,7 @@ extension DocumentSearcher {
+                                                growLeft: growLeft, growRight: growRight) == nil
+         guard let band, let alone = inkPaint(ink: band, band: nil, seed: seed, window: window,
+                                              growLeft: growLeft, growRight: growRight), alone != paint else { return (paint, nil, fellBack) }
+-        return (paint, alone, false)
++        return (paint, nil, false)
+     }
+ 
+     /// The page's read tokens: one full-page render at the fit's scale, read

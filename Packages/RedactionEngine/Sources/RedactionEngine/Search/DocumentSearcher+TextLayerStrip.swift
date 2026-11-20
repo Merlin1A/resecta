@@ -19,13 +19,21 @@ extension DocumentSearcher {
         /// The fit could not read the page in time: `rect` is the drift
         /// envelope around the hidden glyphs, not the ink they name.
         var degraded = false
+        /// The box a hybrid page tells this match's OCR repeat by, where it is
+        /// not `rect`: the box the word's tallest band alone paints, when the
+        /// fit took more bands (`SearchResult.identityRect`); nil otherwise.
+        var identity: CGRect? = nil
+        /// The box the hybrid merge compares (`mergeHybridResults`).
+        var mergeIdentity: CGRect { identity ?? rect }
     }
 
     /// One box per line the range's selection touches (the `lineRects`
     /// counting rule), each with its hidden glyphs' box where the page has one.
     nonisolated func textLayerLines(for nsRange: NSRange, page: PDFPage) -> [TextLayerBox]? {
         if let split = textLayerAndInkRects(for: nsRange, page: page) {
-            return zip(split.paint, split.strip).map { TextLayerBox(rect: $0, textLayerRect: $1, degraded: split.degraded) }
+            return split.paint.indices.map {
+                TextLayerBox(rect: split.paint[$0], textLayerRect: split.strip[$0], degraded: split.degraded, identity: split.identity[$0])
+            }
         }
         return lineRects(for: nsRange, page: page)?.map { TextLayerBox(rect: $0, textLayerRect: nil) }
     }
@@ -35,9 +43,12 @@ extension DocumentSearcher {
     nonisolated func textLayerBox(for nsRange: NSRange, page: PDFPage) -> TextLayerBox? {
         if let split = textLayerAndInkRects(for: nsRange, page: page), let paint = split.paint.first,
            let strip = split.strip.first {
-            return TextLayerBox(rect: split.paint.dropFirst().reduce(paint) { $0.union($1) },
+            let rect = split.paint.dropFirst().reduce(paint) { $0.union($1) }
+            let identities = split.paint.indices.map { split.identity[$0] ?? split.paint[$0] }
+            let identity = identities.dropFirst().reduce(identities[0]) { $0.union($1) }
+            return TextLayerBox(rect: rect,
                                 textLayerRect: split.strip.dropFirst().reduce(strip) { $0.union($1) },
-                                degraded: split.degraded)
+                                degraded: split.degraded, identity: identity == rect ? nil : identity)
         }
         return boundingRect(for: nsRange, page: page).map { TextLayerBox(rect: $0, textLayerRect: nil) }
     }

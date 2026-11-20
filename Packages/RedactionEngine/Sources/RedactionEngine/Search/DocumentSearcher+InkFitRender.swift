@@ -156,9 +156,10 @@ extension DocumentSearcher {
 
     enum InkFitOutcome: Equatable { case fitted, capped, noInk, darkGround, otherLine }
 
-    /// The ink of the word under `box`, in visual points: the run of inked rows
-    /// that meets the box (a dot or an accent a small gap above or below joins
-    /// it), then, on those rows, the inked columns that continue past either
+    /// The ink of the word under `box`, in visual points: every run of inked
+    /// rows that meets the box's rows (a light row through the word splits it
+    /// into two; a dot or an accent a small gap above or below joins them),
+    /// then, on those rows, the inked columns that continue past either
     /// side of the box with no gap as wide as a word space, one pixel wider on
     /// every side. A row inked across the window (a rule) is not ink here. The
     /// window bounds the growth: a box that reaches its edge is `.capped`. Nil
@@ -168,12 +169,24 @@ extension DocumentSearcher {
     nonisolated static func inkBox(in bitmap: GrayBitmap, box: CGRect, window: CGRect,
                                    growLeft: Bool = true, growRight: Bool = true)
         -> (box: CGRect?, outcome: InkFitOutcome, margin: Int?) {
+        let reading = inkBoxes(in: bitmap, box: box, window: window, growLeft: growLeft, growRight: growRight)
+        return (reading.box, reading.outcome, reading.margin)
+    }
+
+    /// `inkBox`, and the box of the line with the most rows inside the box
+    /// alone, with its dots and accents (`band`), when that is a different
+    /// box: the fit falls back to it when the whole box reaches past its
+    /// window (another line that meets the box by a row can carry its columns
+    /// to the window's edge). `margin` is `inkBox`'s, from the same line.
+    nonisolated static func inkBoxes(in bitmap: GrayBitmap, box: CGRect, window: CGRect,
+                                     growLeft: Bool = true, growRight: Bool = true)
+        -> (box: CGRect?, outcome: InkFitOutcome, band: CGRect?, margin: Int?) {
         let s = inkFitScale
         let bx0 = max(0, Int(((box.minX - window.minX) * s).rounded(.down)))
         let bx1 = min(bitmap.width, Int(((box.maxX - window.minX) * s).rounded(.up)))
         let by0 = max(0, Int(((box.minY - window.minY) * s).rounded(.down)))
         let by1 = min(bitmap.height, Int(((box.maxY - window.minY) * s).rounded(.up)))
-        guard bx1 > bx0, by1 > by0 else { return (nil, .noInk, nil) }
+        guard bx1 > bx0, by1 > by0 else { return (nil, .noInk, nil, nil) }
 
         // Rules across the window (rows) and down it (columns), and a dark ground.
         var isRule = [Bool](repeating: false, count: bitmap.height)
@@ -185,7 +198,7 @@ extension DocumentSearcher {
             inked += n
             isRule[y] = Double(n) >= inkFitRuleShare * Double(bitmap.width)
         }
-        if Double(inked) > inkFitDarkGroundShare * Double(bitmap.width * bitmap.height) { return (nil, .darkGround, nil) }
+        if Double(inked) > inkFitDarkGroundShare * Double(bitmap.width * bitmap.height) { return (nil, .darkGround, nil, nil) }
         let isRuleColumn = columnInk.map { Double($0) >= inkFitRuleShare * Double(bitmap.height) }
 
         func rowHasInk(_ y: Int, _ x0: Int, _ x1: Int) -> Bool {
@@ -204,38 +217,47 @@ extension DocumentSearcher {
         // inked by any line means the box sits between lines (a layer set more
         // than half a line off): no fit.
         func overlap(_ r: ClosedRange<Int>) -> Int { max(0, min(r.upperBound + 1, by1) - max(r.lowerBound, by0)) }
-        guard let line = runs.max(by: { overlap($0) < overlap($1) }), overlap(line) > 0 else { return (nil, .noInk, nil) }
+        guard let line = runs.max(by: { overlap($0) < overlap($1) }), overlap(line) > 0 else { return (nil, .noInk, nil, nil) }
         let margin = overlap(line) * 2 - (by1 - by0)
-        guard margin >= 0 else { return (nil, .otherLine, margin) }
-        var lo = line.lowerBound, hi = line.upperBound
-        // A dot or an accent: a shorter run a small gap away joins the band.
-        var grew = true
-        while grew {
-            grew = false
-            let band = hi - lo + 1, gap = max(2, Int(0.35 * Double(band)))
-            for r in runs where r.upperBound < lo || r.lowerBound > hi {
-                let short = r.count * 2 <= band
-                let near = r.upperBound < lo ? lo - r.upperBound - 1 <= gap : r.lowerBound - hi - 1 <= gap
-                if short && near { lo = min(lo, r.lowerBound); hi = max(hi, r.upperBound); grew = true }
+        guard margin >= 0 else { return (nil, .otherLine, nil, margin) }
+        // The box on rows `from`...`to`: dots and accents, then columns.
+        func fitted(_ from: Int, _ to: Int) -> (box: CGRect, outcome: InkFitOutcome) {
+            var lo = from, hi = to
+            // A dot or an accent: a shorter run a small gap away joins the band.
+            var grew = true
+            while grew {
+                grew = false
+                let band = hi - lo + 1, gap = max(2, Int(0.35 * Double(band)))
+                for r in runs where r.upperBound < lo || r.lowerBound > hi {
+                    let short = r.count * 2 <= band
+                    let near = r.upperBound < lo ? lo - r.upperBound - 1 <= gap : r.lowerBound - hi - 1 <= gap
+                    if short && near { lo = min(lo, r.lowerBound); hi = max(hi, r.upperBound); grew = true }
+                }
             }
+            // Columns on the band: continue past each side while the gap stays
+            // narrower than a word space.
+            func columnHasInk(_ x: Int) -> Bool {
+                guard !isRuleColumn[x] else { return false }
+                for y in lo...hi where !isRule[y] && bitmap.isInk(x, y) { return true }
+                return false
+            }
+            let gapTolerance = max(2, Int(0.15 * Double(hi - lo + 1)))
+            var right = bx1 - 1, x = bx1
+            while growRight, x < bitmap.width, x - right <= gapTolerance { if columnHasInk(x) { right = x }; x += 1 }
+            var left = bx0, xl = bx0 - 1
+            while growLeft, xl >= 0, left - xl <= gapTolerance { if columnHasInk(xl) { left = xl }; xl -= 1 }
+            let capped = lo == 0 || hi == bitmap.height - 1 || left == 0 || right == bitmap.width - 1
+            // One render pixel outward on every side: an edge pixel the
+            // anti-aliasing half-inks is inside the box (the safe direction).
+            return (CGRect(x: window.minX + CGFloat(left - 1) / s, y: window.minY + CGFloat(lo - 1) / s,
+                           width: CGFloat(right + 3 - left) / s, height: CGFloat(hi + 3 - lo) / s),
+                    capped ? .capped : .fitted)
         }
-        // Columns on the band: continue past each side while the gap stays
-        // narrower than a word space.
-        func columnHasInk(_ x: Int) -> Bool {
-            guard !isRuleColumn[x] else { return false }
-            for y in lo...hi where !isRule[y] && bitmap.isInk(x, y) { return true }
-            return false
-        }
-        let gapTolerance = max(2, Int(0.15 * Double(hi - lo + 1)))
-        var right = bx1 - 1, x = bx1
-        while growRight, x < bitmap.width, x - right <= gapTolerance { if columnHasInk(x) { right = x }; x += 1 }
-        var left = bx0, xl = bx0 - 1
-        while growLeft, xl >= 0, left - xl <= gapTolerance { if columnHasInk(xl) { left = xl }; xl -= 1 }
-        let capped = lo == 0 || hi == bitmap.height - 1 || left == 0 || right == bitmap.width - 1
-        // One render pixel outward on every side: an edge pixel the
-        // anti-aliasing half-inks is inside the box (the safe direction).
-        return (CGRect(x: window.minX + CGFloat(left - 1) / s, y: window.minY + CGFloat(lo - 1) / s,
-                       width: CGFloat(right + 3 - left) / s, height: CGFloat(hi + 3 - lo) / s),
-                capped ? .capped : .fitted, margin)
+        // Every run that meets the box's rows is the word's: a light row
+        // through a word splits it into runs of like height, and each is ink.
+        let met = runs.filter { overlap($0) > 0 }
+        let whole = fitted(met.map(\.lowerBound).min() ?? line.lowerBound, met.map(\.upperBound).max() ?? line.upperBound)
+        let bandOnly = met.count > 1 ? fitted(line.lowerBound, line.upperBound).box : nil
+        return (whole.box, whole.outcome, bandOnly, margin)
     }
 }

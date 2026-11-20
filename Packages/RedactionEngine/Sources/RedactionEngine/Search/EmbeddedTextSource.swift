@@ -161,14 +161,15 @@ public struct EmbeddedTextSource: Sendable {
                 // On a hidden layer over a page image the line is boxed on
                 // its ink alone; the layer's own box rides beside it, the
                 // hidden glyphs a Searchable export strips.
-                let fit = !fitLines || normalized == .zero ? (rect: normalized, degraded: false)
+                let fit = !fitLines || normalized == .zero ? (rect: normalized, degraded: false, identity: nil)
                     : DocumentSearcher.inkFit(normalized, page: page, text: lineText, paintOnly: true)
                 return OCREngine.TextLine(
                     text: lineText,
                     normalizedRect: fit.rect,
                     confidence: 1.0,
                     textLayerRect: fit.rect == normalized ? nil : normalized,
-                    inkFitDegraded: fit.degraded
+                    inkFitDegraded: fit.degraded,
+                    identityRect: fit.identity
                 )
             }
 
