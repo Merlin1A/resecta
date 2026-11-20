@@ -27,34 +27,32 @@ struct WhitespaceFoldTests {
     ]
 
     @Test("A run between two words normalizes to one space on the page and on the query side", arguments: runs)
-    func runFoldsToOneSpace(name: String, text: String) {
+    func runFoldsToOneSpace(name: String, text: String) throws {
         let options = SearchOptions()
         #expect(SearchCore.normalizedText(text, options: options) == "jane doe", "\(name)")
         let page = SearchCore.normalizedPage(text, options: options)
         #expect(page.text == "jane doe", "\(name)")
         // The map spans the raw text from the J to the e: the base range of
         // the whole normalized text is the whole raw text.
-        let map = try? #require(page.rawMap, "\(name): the fold leaves the fast path")
-        if let map {
-            let whole = map.nsRange(baseStart: 0, length: page.text.count)
-            #expect(whole == NSRange(location: 0, length: (text as NSString).length), "\(name)")
-            // The one space covers the run's first and last raw characters.
-            let space = map.nsRange(baseStart: 4, length: 1)
-            let rawRun = (text as NSString).length - 7
-            #expect(space == NSRange(location: 4, length: rawRun), "\(name): the space spans the run")
-        }
+        let map = try #require(page.rawMap, "\(name): the fold leaves the fast path")
+        let whole = map.nsRange(baseStart: 0, length: page.text.count)
+        #expect(whole == NSRange(location: 0, length: (text as NSString).length), "\(name)")
+        // The one space covers the run's first and last raw characters.
+        let space = map.nsRange(baseStart: 4, length: 1)
+        let rawRun = (text as NSString).length - 7
+        #expect(space == NSRange(location: 4, length: rawRun), "\(name): the space spans the run")
     }
 
     @Test("A zero-width character inside a word is dropped, never spaced")
-    func zeroWidthInsideAWordIsDropped() {
+    func zeroWidthInsideAWordIsDropped() throws {
         let options = SearchOptions()
         #expect(SearchCore.normalizedText("Ja\u{200B}ne", options: options) == "jane")
         #expect(SearchCore.normalizedText("Ja\u{FEFF}ne Doe", options: options) == "jane doe")
         let page = SearchCore.normalizedPage("Ja\u{200B}ne Doe", options: options)
         #expect(page.text == "jane doe")
-        let map = try? #require(page.rawMap)
+        let map = try #require(page.rawMap)
         // "jane" spans the raw J…e including the dropped joiner.
-        #expect(map?.nsRange(baseStart: 0, length: 4) == NSRange(location: 0, length: 5))
+        #expect(map.nsRange(baseStart: 0, length: 4) == NSRange(location: 0, length: 5))
     }
 
     @Test("The fold composes with the case fold, Accents and Digit separators in the existing order")

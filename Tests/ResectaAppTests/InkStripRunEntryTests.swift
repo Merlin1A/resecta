@@ -131,7 +131,8 @@ struct InkStripRunEntryTests {
 
     static func coordinator() throws -> PipelineCoordinator {
         let coord = makeCoordinator()
-        coord.documentState.sourceDocument = try #require(PDFDocument(data: seeded))
+        let source = try #require(PDFDocument(data: seeded))
+        coord.documentState.sourceDocument = source
         coord.documentState.textLayerStatus = [0: .rich]
         coord.documentState.phase = .editing
         return coord
