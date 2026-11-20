@@ -188,6 +188,10 @@ extension PaintAndKindsCasesTests {
         for word in row.stay { #expect(hidden.contains(word), "\(row): \(word) stays") }
         for word in row.leave { #expect(!hidden.contains(word), "\(row): \(word) leaves") }
         #expect(path.runsLeftOut == 0, "\(row): no mark of the paint or the box is a run left out")
+        if row.number == 1 {
+            // The count of unboxed words left out on the page, written by hand.
+            #expect(Self.unboxedLeftOut(page, page1, boxed: row.boxed) == 0, "\(row): no unboxed word is left out")
+        }
     }
 }
 

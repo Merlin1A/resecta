@@ -101,6 +101,54 @@ struct WholeSourceWordsTests {
         }
     }
 
+    /// A tightly set line: four words in one TJ array with 0.48 pt between
+    /// them and no space character, which PDFKit reads as one run; and a
+    /// loose line, 4.8 pt between its words, which it reads as four.
+    static func tightLinePage() -> Data {
+        let tight = "[(Signed) -40 (by) -40 (Morgan) -40 (Reyes)] TJ"
+        let loose = "[(Paid) -400 (in) -400 (full) -400 (today)] TJ"
+        let stream = "BT /F1 12 Tf 72 700 Td \(tight) ET BT /F1 12 Tf 72 680 Td \(loose) ET"
+        return buildRawPDF(objects: [
+            PDFObject(id: 1, content: "<< /Type /Catalog /Pages 2 0 R >>"),
+            PDFObject(id: 2, content: "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+            PDFObject(id: 3, content: "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>"),
+            PDFObject(id: 4, content: "<< /Length \(stream.utf8.count) >>\nstream\n\(stream)\nendstream"),
+            PDFObject(id: 5, content: "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"),
+        ], rootId: 1)
+    }
+
+    @Test("Words PDFKit joins on a tightly set line stay joined, and a box on one takes the joined run")
+    func pdfKitJoinedWords() async throws {
+        let page = try #require(PDFDocument(data: Self.tightLinePage())?.page(at: 0))
+        let read = page.string ?? ""
+        try #require(read.contains("SignedbyMorganReyes"), "precondition: PDFKit joins the tight line; it reads \(read.debugDescription)")
+        try #require(read.contains("Paid in full today"), "precondition: PDFKit keeps the loose line's words; it reads \(read.debugDescription)")
+        let entries = try await TextLayerExtractor().extractCharacters(from: page)
+        let frame = PageFrame(rotation: 0, displayedSize: CGSize(width: 612, height: 792))
+        // No box: the joined run is written joined.
+        let open = try await PageTextPath.run(entries: entries, frame: frame, textPathRectangles: [],
+                                              paintedRectangles: [], pageIndex: 0)
+        let openText = try #require(try WholeWordAssertion.write(open, frame: frame)).text
+        #expect(WholeWordAssertion.words(openText).contains("SignedbyMorganReyes"), "\(openText.debugDescription)")
+        // A box on "Morgan" alone: the whole joined run leaves; the loose line stays.
+        let text = entries.map(\.character).joined() as NSString
+        let range = text.range(of: "Morgan")
+        let morgan = entries.filter { (range.location..<(range.location + range.length)).contains($0.stringIndex) }
+        try #require(morgan.count == 6, "the six letters of Morgan")
+        let box = morgan.map(\.bounds).reduce(morgan[0].bounds) { $0.union($1) }
+        let rectangles = [TextPathRectangle(rect: box, kind: .ordinary)]
+        let boxed = try await PageTextPath.run(entries: entries, frame: frame, textPathRectangles: rectangles,
+                                               paintedRectangles: [], pageIndex: 0)
+        let written = try #require(try WholeWordAssertion.write(boxed, frame: frame))
+        WholeWordAssertion.holds(written, boxedWords: ["SignedbyMorganReyes", "Morgan"], rectangles: rectangles,
+                                 painted: [], frame: frame, "the box on Morgan")
+        let words = WholeWordAssertion.words(written.text)
+        for part in ["Signed", "Morgan", "Reyes"] {
+            #expect(!written.text.contains(part), "no part of the joined run is written: \(written.text.debugDescription)")
+        }
+        #expect(words == ["Paid", "in", "full", "today"], "\(words)")
+    }
+
     @Test("The pages are five")
     func pageCount() {
         #expect(Self.pages.count == 5)
