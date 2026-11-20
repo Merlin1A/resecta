@@ -12,6 +12,10 @@ enum PatternAdmission {
     enum Outcome: Equatable {
         case added
         case refused(message: String)
+        /// The store did not take the change for a reason that is no
+        /// refusal: its write did not report success, or its file could
+        /// not be read. Nothing is said.
+        case notSaved
     }
 
     /// The sentinel's refusal copy: the catalog string every surface shows.
@@ -34,8 +38,15 @@ enum PatternAdmission {
         guard await sentinelAdmits(pattern) else {
             return .refused(message: sentinelRejectedMessage)
         }
-        return store.add(label: label, pattern: pattern)
-            ? .added
-            : .refused(message: storeRejectedMessage)
+        return outcome(of: store.add(label: label, pattern: pattern))
+    }
+
+    /// What a store's answer to an add comes to.
+    static func outcome(of change: ListChange) -> Outcome {
+        switch change {
+        case .saved: .added
+        case .refused: .refused(message: storeRejectedMessage)
+        case .notSaved, .held: .notSaved
+        }
     }
 }

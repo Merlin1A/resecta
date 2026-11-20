@@ -50,6 +50,13 @@ final class UserTermsStore {
 
     private let storage: FileJSONBlob<UserTermsBlob>
 
+    /// The file is there and could not be read: the store shows the empty
+    /// list, writes nothing and answers every change `held` until a read
+    /// succeeds.
+    private var isHeld: Bool
+
+    @ObservationIgnored private var readAgain: NoticeObservers?
+
     /// Default production init — reads the Application Support file.
     convenience init() {
         self.init(fileURL: Self.defaultFileURL)
@@ -59,7 +66,9 @@ final class UserTermsStore {
     // store holds the stored lists from its first moment, so no change
     // (and no scan) can act on an empty list before a delayed read lands.
     // The one-time move of the old settings record runs first, before the
-    // read, as it always has.
+    // read, as it always has. A file that is there and cannot be read holds
+    // the store; it reads again when the app comes to the front, when
+    // protected files become available, and at the start of every change.
     init(fileURL: URL, legacyDefaults: UserDefaults = .standard) {
         self.storage = FileJSONBlob(
             fileURL: fileURL,
@@ -67,48 +76,73 @@ final class UserTermsStore {
             fallback: .empty
         )
         storage.migrateLegacyDefaultsIfNeeded(from: legacyDefaults, key: Self.storageKey)
-        self.blob = Self.sanitize(storage.load())
+        let opened = storage.storeValue(storage.readAtOpen())
+        self.blob = Self.sanitize(opened ?? .empty)
+        self.isHeld = opened == nil
+        self.readAgain = NoticeObservers(StoreReadAgain.notices) { [weak self] in
+            _ = self?.loadIfHeld()
+        }
+    }
+
+    /// While held, read the file again. True when the store takes changes.
+    private func loadIfHeld() -> Bool {
+        guard isHeld else { return true }
+        guard let value = storage.storeValue(storage.read()) else { return false }
+        blob = Self.sanitize(value)
+        isHeld = false
+        return true
     }
 
     // MARK: - Mutate
 
     @discardableResult
-    func addAlwaysFlag(_ term: UserTerm) -> Bool {
-        guard Self.isValidUserTerm(term) else { return false }
-        guard blob.alwaysFlag.count < Self.perListCap else { return false }
-        guard !blob.alwaysFlag.contains(term) else { return false }
+    func addAlwaysFlag(_ term: UserTerm) -> ListChange {
+        guard loadIfHeld() else { return .held }
+        guard Self.isValidUserTerm(term) else { return .refused(.invalid) }
+        guard blob.alwaysFlag.count < Self.perListCap else { return .refused(.full) }
+        guard !blob.alwaysFlag.contains(term) else { return .refused(.duplicate) }
         blob.alwaysFlag.append(term)
         persist()
-        return true
+        return .saved
     }
 
     @discardableResult
-    func addNeverFlag(_ term: UserTerm) -> Bool {
-        guard Self.isValidUserTerm(term) else { return false }
-        guard blob.neverFlag.count < Self.perListCap else { return false }
-        guard !blob.neverFlag.contains(term) else { return false }
+    func addNeverFlag(_ term: UserTerm) -> ListChange {
+        guard loadIfHeld() else { return .held }
+        guard Self.isValidUserTerm(term) else { return .refused(.invalid) }
+        guard blob.neverFlag.count < Self.perListCap else { return .refused(.full) }
+        guard !blob.neverFlag.contains(term) else { return .refused(.duplicate) }
         blob.neverFlag.append(term)
         persist()
-        return true
+        return .saved
     }
 
-    func removeAlwaysFlag(at indices: IndexSet) {
+    @discardableResult
+    func removeAlwaysFlag(at indices: IndexSet) -> ListChange {
+        guard loadIfHeld() else { return .held }
         blob.alwaysFlag.remove(atOffsets: indices)
         persist()
+        return .saved
     }
 
-    func removeNeverFlag(at indices: IndexSet) {
+    @discardableResult
+    func removeNeverFlag(at indices: IndexSet) -> ListChange {
+        guard loadIfHeld() else { return .held }
         blob.neverFlag.remove(atOffsets: indices)
         persist()
+        return .saved
     }
 
     /// Remove every term from both lists and persist the empty pair.
     /// Backs the destructive "Delete All Custom Terms" row in
     /// `CustomTermsView`; the row's confirmation copy names exactly this
     /// scope (both lists, this store only).
-    func clearAllTerms() {
+    @discardableResult
+    func clearAllTerms() -> ListChange {
+        guard loadIfHeld() else { return .held }
         blob = .empty
         persist()
+        return .saved
     }
 
     // MARK: - Validation

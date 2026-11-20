@@ -15,50 +15,42 @@ extension SearchAndRedactSheet {
     static let savedRegexSavedToast = "Saved — manage in Settings → Saved Regexes"
 
     /// Sentinel-validate then commit a "Save current..." request against
-    /// the app-wide store. Returns nil on success, or the user-facing
-    /// error message to re-present in the naming alert. Static seam so
-    /// the full round-trip (validate → `SavedRegexStore.add` → persist)
-    /// is unit-testable without hosting the sheet.
+    /// the app-wide store, as a seam testable without hosting the sheet.
     static func commitSaveCurrentRegex(
         label: String,
         pattern: String,
         store: SavedRegexStore
-    ) async -> String? {
+    ) async -> PatternAdmission.Outcome {
         let trimmedLabel = label.trimmingCharacters(in: .whitespaces)
         let trimmedPattern = pattern.trimmingCharacters(in: .whitespaces)
         guard !trimmedLabel.isEmpty, !trimmedPattern.isEmpty else {
-            return "Label and pattern must not be empty."
+            return .refused(message: "Label and pattern must not be empty.")
         }
-        let accepted = await PatternAdmission.sentinelAdmits(trimmedPattern)
-        guard accepted else {
-            return String(
-                localized: "profile.regex.sentinel.rejected",
-                table: "Legal",
-                bundle: .main
-            )
+        guard await PatternAdmission.sentinelAdmits(trimmedPattern) else {
+            return .refused(message: PatternAdmission.sentinelRejectedMessage)
         }
-        guard store.add(label: trimmedLabel, pattern: trimmedPattern) else {
-            return PatternAdmission.storeRejectedMessage
-        }
-        return nil
+        return PatternAdmission.outcome(of: store.add(label: trimmedLabel, pattern: trimmedPattern))
     }
 
-    /// Alert "Save" action: commit, then either toast success (naming
-    /// the management surface) or re-present the alert with the error.
+    /// Alert "Save" action: toast success, or show the alert again.
     func saveCurrentRegex() async {
-        let error = await Self.commitSaveCurrentRegex(
+        switch await Self.commitSaveCurrentRegex(
             label: savedRegexSaveLabel,
             pattern: searchState.queryText,
             store: savedRegexStore
-        )
-        if let error {
-            savedRegexSaveError = error
-            UINotificationFeedbackGenerator().notificationOccurred(.error)
-            showSavedRegexSavePrompt = true
-        } else {
+        ) {
+        case .added:
             savedRegexSaveLabel = ""
             savedRegexSaveError = nil
             toastManager.post(.savedRegexSaved)
+        case .refused(let message):
+            savedRegexSaveError = message
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
+            showSavedRegexSavePrompt = true
+        case .notSaved:
+            savedRegexSaveError = nil
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
+            showSavedRegexSavePrompt = true
         }
     }
 }

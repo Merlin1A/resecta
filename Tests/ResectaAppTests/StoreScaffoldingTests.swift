@@ -53,4 +53,27 @@ struct StoreScaffoldingTests {
         #expect(blob.load() == Row(name: "moved", count: 7))
         #expect(defaults.data(forKey: "legacy.v1") == nil)
     }
+
+    @Test("The legacy move leaves a file it cannot read as it is and keeps the old key")
+    func legacyMoveLeavesAnUnreadableFile() throws {
+        let suite = "store-scaffolding-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let fileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("store-scaffolding-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+        let empty = Row(name: "", count: 0)
+        let blob = FileJSONBlob<Row>(fileURL: fileURL, schemaVersion: 1, fallback: empty)
+        blob.save(Row(name: "stored", count: 1))
+        let seeded = try Data(contentsOf: fileURL)
+        UserDefaultsJSONBlob<Row>(key: "legacy.v1", schemaVersion: 1, defaults: defaults, fallback: empty)
+            .save(Row(name: "old", count: 9))
+
+        try UnreadableFile.take(fileURL)
+        blob.migrateLegacyDefaultsIfNeeded(from: defaults, key: "legacy.v1")
+        UnreadableFile.restore(fileURL)
+
+        #expect(try Data(contentsOf: fileURL) == seeded)
+        #expect(defaults.data(forKey: "legacy.v1") != nil)
+    }
 }

@@ -177,7 +177,7 @@ struct StoreHydrateOffMainActorTests {
         }
 
         let seed = SavedRegexStore(fileURL: fileURL, legacyDefaults: defaults)
-        #expect(seed.add(label: "Keep", pattern: "\\d{3}"))
+        #expect(seed.add(label: "Keep", pattern: "\\d{3}") == .saved)
 
         // Corrupt one row in the stored file (outer FileJSONBlob
         // envelope → payload → userSavedRegexes; the envelope JSON is
@@ -199,7 +199,7 @@ struct StoreHydrateOffMainActorTests {
                 "survivors load; the bad row parks instead of zeroing the list")
 
         // The re-save that used to make the loss permanent.
-        #expect(store.add(label: "Second", pattern: "[a-z]{2}"))
+        #expect(store.add(label: "Second", pattern: "[a-z]{2}") == .saved)
         let rawAfter = String(
             data: try Data(contentsOf: fileURL),
             encoding: .utf8)!

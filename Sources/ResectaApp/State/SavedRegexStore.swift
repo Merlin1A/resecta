@@ -106,6 +106,13 @@ final class SavedRegexStore {
 
     private let blob: FileJSONBlob<SavedRegexEnvelope>
 
+    /// The file is there and could not be read: the store shows no saved
+    /// entries, writes nothing and answers every change `held` until a read
+    /// succeeds.
+    private var isHeld: Bool
+
+    @ObservationIgnored private var readAgain: NoticeObservers?
+
     /// Default production init — reads the Application Support file.
     convenience init() {
         self.init(fileURL: Self.defaultFileURL)
@@ -126,14 +133,32 @@ final class SavedRegexStore {
             fallback: SavedRegexEnvelope(schemaVersion: 1, userSavedRegexes: [])
         )
         blob.migrateLegacyDefaultsIfNeeded(from: legacyDefaults, key: Self.storageKey)
-        let envelope = blob.load()
+        // A file that is there and cannot be read holds the store; it reads
+        // again when the app comes to the front, when protected files become
+        // available, and at the start of every change.
+        let opened = blob.storeValue(blob.readAtOpen())
+        let envelope = opened ?? blob.fallback
         self.userSavedRegexes = envelope.userSavedRegexes
         self.unrecognizedRows = envelope.unrecognized
+        self.isHeld = opened == nil
+        self.readAgain = NoticeObservers(StoreReadAgain.notices) { [weak self] in
+            _ = self?.loadIfHeld()
+        }
+    }
+
+    /// While held, read the file again. True when the store takes changes.
+    private func loadIfHeld() -> Bool {
+        guard isHeld else { return true }
+        guard let envelope = blob.storeValue(blob.read()) else { return false }
+        userSavedRegexes = envelope.userSavedRegexes
+        unrecognizedRows = envelope.unrecognized
+        isHeld = false
+        return true
     }
 
     // MARK: - Mutate
 
-    /// Append a user-saved regex. Returns false if the pattern fails
+    /// Append a user-saved regex. Refused if the pattern fails
     /// the synchronous safety pre-check, the label/pattern is empty,
     /// the user list is at cap, or the label collides with an existing
     /// entry (built-in or user-saved). Async ReDoS sentinel validation
@@ -141,27 +166,31 @@ final class SavedRegexStore {
     /// `RegexSentinelCheck.validate(_:)` BEFORE invoking this method
     /// on user-typed patterns.
     @discardableResult
-    func add(label: String, pattern: String) -> Bool {
+    func add(label: String, pattern: String) -> ListChange {
+        guard loadIfHeld() else { return .held }
         let trimmedLabel = label.trimmingCharacters(in: .whitespaces)
         let trimmedPattern = pattern.trimmingCharacters(in: .whitespaces)
-        guard !trimmedLabel.isEmpty, !trimmedPattern.isEmpty else { return false }
-        guard trimmedPattern.count <= Self.patternLengthCap else { return false }
-        guard userSavedRegexes.count < Self.userSavedCap else { return false }
-        guard DocumentSearcher.validateRegexPattern(trimmedPattern) != nil else { return false }
-        guard !regexes.contains(where: { $0.label == trimmedLabel }) else { return false }
+        guard !trimmedLabel.isEmpty, !trimmedPattern.isEmpty else { return .refused(.invalid) }
+        guard trimmedPattern.count <= Self.patternLengthCap else { return .refused(.invalid) }
+        guard userSavedRegexes.count < Self.userSavedCap else { return .refused(.full) }
+        guard DocumentSearcher.validateRegexPattern(trimmedPattern) != nil else { return .refused(.invalid) }
+        guard !regexes.contains(where: { $0.label == trimmedLabel }) else { return .refused(.duplicate) }
         userSavedRegexes.append(
             SavedRegex(label: trimmedLabel, pattern: trimmedPattern)
         )
         persist()
-        return true
+        return .saved
     }
 
     /// Delete user-saved entries at the given offsets within the
     /// `userSavedRegexes` array (NOT within the merged `regexes`).
     /// Used by `List.onDelete` inside `SavedRegexLibraryView`.
-    func deleteUserSaved(at offsets: IndexSet) {
+    @discardableResult
+    func deleteUserSaved(at offsets: IndexSet) -> ListChange {
+        guard loadIfHeld() else { return .held }
         userSavedRegexes.remove(atOffsets: offsets)
         persist()
+        return .saved
     }
 
     /// Remove every user-saved entry and persist the empty library.
@@ -171,10 +200,13 @@ final class SavedRegexStore {
     /// delete-everything request is the one save that should not
     /// re-emit them. Backs the destructive "Delete All Your Patterns"
     /// row in `SavedRegexLibraryView`.
-    func clearAllUserSaved() {
+    @discardableResult
+    func clearAllUserSaved() -> ListChange {
+        guard loadIfHeld() else { return .held }
         userSavedRegexes = []
         unrecognizedRows = []
         persist()
+        return .saved
     }
 
     private func persist() {

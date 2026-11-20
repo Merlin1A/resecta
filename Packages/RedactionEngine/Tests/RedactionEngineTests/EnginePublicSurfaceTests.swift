@@ -77,6 +77,7 @@ struct EnginePublicSurfaceTests {
         await searcher.setUserTermsTimeoutSink(nil)
         await searcher.setTextLayerStatus([:])
         await searcher.setScannedRegionNotAnalyzedSink(nil)
+        await searcher.setPageCoverageSink(nil)
         _ = try DocumentSearcher.validateRegexPatternWithError("x")
         _ = page.confirmedPage
         _ = RedactionRegion.isAdmitted(normalizedRect: .zero)

@@ -281,6 +281,13 @@ final class SavedSearchStore {
 
     private let blob: FileJSONBlob<SavedSearchEnvelope>
 
+    /// The file is there and could not be read: the store shows no saved
+    /// searches, writes nothing and answers every change `held` until a
+    /// read succeeds.
+    private var isHeld: Bool
+
+    @ObservationIgnored private var readAgain: NoticeObservers?
+
     /// Default production init — reads the Application Support file.
     convenience init() {
         self.init(fileURL: Self.defaultFileURL)
@@ -302,10 +309,29 @@ final class SavedSearchStore {
         // option left `savedSearches = []` until a later MainActor
         // tick, so a mutation landing first would `persist()` just
         // itself over the real library — silent data loss. The file is
-        // one small JSON blob; the read is not worth that window.
-        let hydrated = Self.hydrate(from: blob)
+        // one small JSON blob; the read is not worth that window. A file
+        // that is there and cannot be read holds the store; it reads again
+        // when the app comes to the front, when protected files become
+        // available, and at the start of every change.
+        let opened = blob.storeValue(blob.readAtOpen())
+        let hydrated = Self.hydrate(opened ?? blob.fallback)
         self.savedSearches = hydrated.searches
         self.unrecognizedRows = hydrated.unrecognized
+        self.isHeld = opened == nil
+        self.readAgain = NoticeObservers(StoreReadAgain.notices) { [weak self] in
+            _ = self?.loadIfHeld()
+        }
+    }
+
+    /// While held, read the file again. True when the store takes changes.
+    private func loadIfHeld() -> Bool {
+        guard isHeld else { return true }
+        guard let envelope = blob.storeValue(blob.read()) else { return false }
+        let hydrated = Self.hydrate(envelope)
+        savedSearches = hydrated.searches
+        unrecognizedRows = hydrated.unrecognized
+        isHeld = false
+        return true
     }
 
     /// Hydration gate for the INNER envelope version. The outer
@@ -314,9 +340,8 @@ final class SavedSearchStore {
     /// edit that bumps one without the other reads as the empty fallback
     /// instead of silently succeeding on stale-shaped data.
     private static func hydrate(
-        from blob: FileJSONBlob<SavedSearchEnvelope>
+        _ envelope: SavedSearchEnvelope
     ) -> (searches: [SavedSearch], unrecognized: [RetainedJSONValue]) {
-        let envelope = blob.load()
         guard envelope.schemaVersion == Int(Self.schemaVersion) else { return ([], []) }
         return (envelope.savedSearches, envelope.unrecognized)
     }
@@ -325,21 +350,25 @@ final class SavedSearchStore {
 
     /// Duplicate-save collision check per the in-repo
     /// `SavedRegexStore.add` pattern: an exact-name duplicate is
-    /// rejected (`false`; the UI re-presents the prompt), so a repeated
+    /// refused as a duplicate (the UI re-presents the prompt), so a repeated
     /// Save can no longer append indistinguishable byte-identical rows.
     /// Name-scoped like the regex store's label check — two entries may
     /// share a shape, never a name.
     @discardableResult
-    func add(_ search: SavedSearch) -> Bool {
-        guard !savedSearches.contains(where: { $0.name == search.name }) else { return false }
+    func add(_ search: SavedSearch) -> ListChange {
+        guard loadIfHeld() else { return .held }
+        guard !savedSearches.contains(where: { $0.name == search.name }) else { return .refused(.duplicate) }
         savedSearches.append(search)
         persist()
-        return true
+        return .saved
     }
 
-    func remove(id: UUID) {
+    @discardableResult
+    func remove(id: UUID) -> ListChange {
+        guard loadIfHeld() else { return .held }
         savedSearches.removeAll(where: { $0.id == id })
         persist()
+        return .saved
     }
 
     /// Delete-everything for one interface's list — the bulk control the
@@ -351,12 +380,15 @@ final class SavedSearchStore {
     /// belong to neither interface, and an explicit delete-everything
     /// must not re-emit them on the next save — the same rule as
     /// `SavedRegexStore.clearAllUserSaved()`.
-    func clearAll(interface: SearchInterface) {
+    @discardableResult
+    func clearAll(interface: SearchInterface) -> ListChange {
+        guard loadIfHeld() else { return .held }
         savedSearches.removeAll(where: { $0.mode.interface == interface })
         if savedSearches.isEmpty {
             unrecognizedRows = []
         }
         persist()
+        return .saved
     }
 
     /// Rename only — other fields are immutable in V1.x.
@@ -364,12 +396,13 @@ final class SavedSearchStore {
     /// recreate the indistinguishable-rows state the add guard closes;
     /// renaming an entry to its own current name stays a success.
     @discardableResult
-    func rename(id: UUID, to newName: String) -> Bool {
+    func rename(id: UUID, to newName: String) -> ListChange {
+        guard loadIfHeld() else { return .held }
         let cappedName = String(newName.prefix(SavedSearch.nameLengthCap))
         guard !savedSearches.contains(where: { $0.id != id && $0.name == cappedName }) else {
-            return false
+            return .refused(.duplicate)
         }
-        guard let idx = savedSearches.firstIndex(where: { $0.id == id }) else { return false }
+        guard let idx = savedSearches.firstIndex(where: { $0.id == id }) else { return .refused(.missing) }
         let existing = savedSearches[idx]
         savedSearches[idx] = SavedSearch(
             id: existing.id,
@@ -390,7 +423,7 @@ final class SavedSearchStore {
             multiTermConjunction: existing.multiTermConjunction
         )
         persist()
-        return true
+        return .saved
     }
 
     private func persist() {

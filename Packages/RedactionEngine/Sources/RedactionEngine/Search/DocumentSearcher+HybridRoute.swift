@@ -15,12 +15,25 @@ extension DocumentSearcher {
     /// The second leg on a page whose text layer was searched: nothing unless
     /// the page carries image content; with OCR off, the not-analysed signal
     /// (when `reportsWhenOff`); otherwise the OCR leg's results minus those a
-    /// text-layer rect already covers.
+    /// text-layer rect already covers. Either way the page's pictures are
+    /// reported: required when the census counts them, below the floors when
+    /// the page has a picture it does not count, and whether the text is
+    /// another app's hidden layer over a page-size picture.
     func hybridOCRLeg(
         page: PDFPage, pageIndex: Int, textLayerRects: [CGRect], includeOCR: Bool,
         reportsWhenOff: Bool = true, ocr: () async -> [SearchResult]
     ) async -> [SearchResult] {
-        guard PageImageCensus.carriesImageContent(page) else { return [] }
+        guard PageImageCensus.carriesImageContent(page) else {
+            if let sink = pageCoverageSink, let cgPage = page.pageRef, PageImageCensus.largestImagePixelArea(of: cgPage) != nil {
+                sink(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer, pictures: .belowFloors))
+            }
+            return []
+        }
+        if let sink = pageCoverageSink {
+            let anotherAppsLayer = page.pageRef.map { Self.carriesHiddenTextOverImage(page, cgPage: $0) } ?? false
+            sink(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer, pictures: .required,
+                                    throughAnotherAppsLayer: anotherAppsLayer))
+        }
         guard includeOCR else {
             if reportsWhenOff { scannedRegionNotAnalyzedSink?(pageIndex) }
             return []

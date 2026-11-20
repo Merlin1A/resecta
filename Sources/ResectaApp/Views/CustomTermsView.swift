@@ -17,6 +17,15 @@ struct CustomTermsView: View {
     static let addRowControlMinimumSide: CGFloat = ResectaTokens.TouchTarget.minimum
 
     static let termTooShortMessage = "Term too short (min \(UserTermsStore.literalMinimumLength) characters)."
+    /// The words under an add that the store did not take: today's
+    /// sentence for a refusal, nothing for a change that was not stored.
+    static func addRefusalText(for change: ListChange) -> String? {
+        switch change {
+        case .refused: "Term rejected. The pattern may be invalid or fail the regex safety check."
+        case .saved, .notSaved, .held: nil
+        }
+    }
+
     static let alwaysFlagFooter = "Added as matches alongside detector hits. Use for names, project codes, or identifiers your detector presets may not recognize. Literal terms match anywhere inside a word, in any case."
 
     @Environment(UserTermsStore.self) private var userTermsStore
@@ -129,11 +138,13 @@ struct CustomTermsView: View {
                     UINotificationFeedbackGenerator().notificationOccurred(.error)
                     return
                 }
-                if userTermsStore.addAlwaysFlag(term) {
+                let change = userTermsStore.addAlwaysFlag(term)
+                switch change {
+                case .saved:
                     newAlwaysPattern = ""
                     newAlwaysIsRegex = false
                     alwaysError = nil
-                } else {
+                case .refused:
                     // The duplicate path above is covered; remaining
                     // store rejections come from the validation chain
                     // (regex compile, length cap, per-list cap). The
@@ -141,7 +152,10 @@ struct CustomTermsView: View {
                     // and the per-list cap is gated by `isAtCap` above —
                     // a reject here narrows to "validation failed" with
                     // regex / invalid-input as the typical cause.
-                    alwaysError = "Term rejected. The pattern may be invalid or fail the regex safety check."
+                    alwaysError = Self.addRefusalText(for: change)
+                    UINotificationFeedbackGenerator().notificationOccurred(.error)
+                case .notSaved, .held:
+                    alwaysError = nil
                     UINotificationFeedbackGenerator().notificationOccurred(.error)
                 }
             }
@@ -183,12 +197,17 @@ struct CustomTermsView: View {
                     UINotificationFeedbackGenerator().notificationOccurred(.error)
                     return
                 }
-                if userTermsStore.addNeverFlag(term) {
+                let change = userTermsStore.addNeverFlag(term)
+                switch change {
+                case .saved:
                     newNeverPattern = ""
                     newNeverIsRegex = false
                     neverError = nil
-                } else {
-                    neverError = "Term rejected. The pattern may be invalid or fail the regex safety check."
+                case .refused:
+                    neverError = Self.addRefusalText(for: change)
+                    UINotificationFeedbackGenerator().notificationOccurred(.error)
+                case .notSaved, .held:
+                    neverError = nil
                     UINotificationFeedbackGenerator().notificationOccurred(.error)
                 }
             }

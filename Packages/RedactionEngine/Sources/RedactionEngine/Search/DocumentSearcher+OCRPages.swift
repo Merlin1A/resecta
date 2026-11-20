@@ -103,7 +103,10 @@ extension DocumentSearcher {
                 if Self.readsFastOCRBeside {
                     fast = try? await ocrEngine.recognizeText(in: cgImage, recognitionLevel: .fast)
                 }
-                ocrPageCache.insert(lines, fast: fast, for: pageIndex)
+                // The picture recognition was given, at its own scale, so an
+                // empty read is measured for ink once and kept with the page.
+                let pixelsPerInch = 300 * Double(cgImage.width) / Double(thumbnailSize.width)
+                ocrPageCache.insert(lines, fast: fast, for: pageIndex, picture: (cgImage, pixelsPerInch))
                 textLines = lines
             } catch { // LegalPhrases:safe (Swift keyword)
                 pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocrUnavailable))
@@ -111,7 +114,8 @@ extension DocumentSearcher {
             }
         }
 
-        pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocr))
+        pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocr,
+                                             emptyRead: ocrPageCache.emptyRead(for: pageIndex)))
         return textLines
     }
 }
