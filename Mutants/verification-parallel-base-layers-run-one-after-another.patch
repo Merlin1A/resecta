@@ -1,0 +1,19 @@
+Property: The base layers of the parallel batch run at the same time, each on its own document: none waits for another to finish before it starts.
+Area: verification (the parallel batch)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter "ParallelLayerExecutionTests"
+Must go red: RedactionEngineTests/ParallelLayerExecutionTests testBaseLayersRunInParallel; testLayer10ParallelBaseOverlap
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationOrchestrator.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationOrchestrator.swift
+index 0fbbc02e..b5cabcd6 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationOrchestrator.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationOrchestrator.swift
+@@ -342,7 +342,7 @@ public struct VerificationOrchestrator: Sendable {
+         perPageModes: [PipelineMode],
+         manualRegionsWithoutText: Int = 0
+     ) async throws -> [(VerificationLayer, LayerResult)] {
+-        guard let perLayerDocuments else {
++        guard let perLayerDocuments = [VerificationLayer: SendablePDFDocument]?.none else {
+             // Debug-only diagnostic; no Phase change, no PipelineError, no
+             // user string.
+             #if DEBUG
