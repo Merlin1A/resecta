@@ -1,19 +1,19 @@
 Property: Hidden text over a page-size picture is reported as another app's layer.
 Area: the searcher's coverage reports
-Test command: cd Packages/RedactionEngine && swift test --skip-build --no-parallel --filter PageCoverageReportTests (after swift build --build-tests)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/PageCoverageReportTests (or on the host: cd Packages/RedactionEngine && swift test --filter PageCoverageReportTests)
 Must go red: RedactionEngineTests/PageCoverageReportTests anotherAppsLayer
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+HybridRoute.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+HybridRoute.swift
-index aa0c2ecf..752b8b39 100644
+index 7cacbac8..3580a58a 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+HybridRoute.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+HybridRoute.swift
-@@ -29,7 +29,7 @@ extension DocumentSearcher {
-             }
+@@ -30,7 +30,7 @@ extension DocumentSearcher {
              return []
          }
--        let anotherAppsLayer = page.pageRef.map { Self.carriesHiddenTextOverImage(page, cgPage: $0) } ?? false
-+        let anotherAppsLayer = false
-         pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer, pictures: .required,
-                                              throughAnotherAppsLayer: anotherAppsLayer))
-         guard includeOCR else {
+         if let sink = pageCoverageSink {
+-            let anotherAppsLayer = page.pageRef.map { Self.carriesHiddenTextOverImage(page, cgPage: $0) } ?? false
++            let anotherAppsLayer = false
+             sink(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer, pictures: .required,
+                                     throughAnotherAppsLayer: anotherAppsLayer))
+         }

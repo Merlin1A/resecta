@@ -1,19 +1,19 @@
 Property: A picture below the census floors is reported as below them, not as one the rule requires read.
 Area: the searcher's coverage reports
-Test command: cd Packages/RedactionEngine && swift test --skip-build --no-parallel --filter PageCoverageReportTests (after swift build --build-tests)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/PageCoverageReportTests (or on the host: cd Packages/RedactionEngine && swift test --filter PageCoverageReportTests)
 Must go red: RedactionEngineTests/PageCoverageReportTests smallLogo
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+HybridRoute.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+HybridRoute.swift
-index aa0c2ecf..610b9bae 100644
+index 7cacbac8..63ad9bcf 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+HybridRoute.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+HybridRoute.swift
 @@ -25,7 +25,7 @@ extension DocumentSearcher {
      ) async -> [SearchResult] {
          guard PageImageCensus.carriesImageContent(page) else {
-             if let cgPage = page.pageRef, PageImageCensus.largestImagePixelArea(of: cgPage) != nil {
--                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer, pictures: .belowFloors))
-+                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer, pictures: .required))
+             if let sink = pageCoverageSink, let cgPage = page.pageRef, PageImageCensus.largestImagePixelArea(of: cgPage) != nil {
+-                sink(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer, pictures: .belowFloors))
++                sink(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer, pictures: .required))
              }
              return []
          }

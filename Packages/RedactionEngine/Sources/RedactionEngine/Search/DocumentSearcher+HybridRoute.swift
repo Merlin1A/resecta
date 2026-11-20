@@ -24,14 +24,16 @@ extension DocumentSearcher {
         reportsWhenOff: Bool = true, ocr: () async -> [SearchResult]
     ) async -> [SearchResult] {
         guard PageImageCensus.carriesImageContent(page) else {
-            if let cgPage = page.pageRef, PageImageCensus.largestImagePixelArea(of: cgPage) != nil {
-                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer, pictures: .belowFloors))
+            if let sink = pageCoverageSink, let cgPage = page.pageRef, PageImageCensus.largestImagePixelArea(of: cgPage) != nil {
+                sink(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer, pictures: .belowFloors))
             }
             return []
         }
-        let anotherAppsLayer = page.pageRef.map { Self.carriesHiddenTextOverImage(page, cgPage: $0) } ?? false
-        pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer, pictures: .required,
-                                             throughAnotherAppsLayer: anotherAppsLayer))
+        if let sink = pageCoverageSink {
+            let anotherAppsLayer = page.pageRef.map { Self.carriesHiddenTextOverImage(page, cgPage: $0) } ?? false
+            sink(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer, pictures: .required,
+                                    throughAnotherAppsLayer: anotherAppsLayer))
+        }
         guard includeOCR else {
             if reportsWhenOff { scannedRegionNotAnalyzedSink?(pageIndex) }
             return []

@@ -56,7 +56,8 @@ struct PageCoverageReportTests {
 
     /// One Letter page: `picture` (a JPEG, its pixel size, and where it is drawn in points), then
     /// `text` in render mode 0 (seen) or 3 (hidden).
-    static func pdf(picture: (jpeg: Data, width: Int, height: Int, rect: CGRect)?, text: [String], hidden: Bool) -> Data {
+    static func pdf(picture: (jpeg: Data, width: Int, height: Int, rect: CGRect)?, text: [String], hidden: Bool,
+                    mediaBox: CGSize = page) -> Data {
         var objects: [Data] = []
         func add(_ s: String) -> Int { objects.append(Data(s.utf8)); return objects.count }
         func add(_ d: Data) -> Int { objects.append(d); return objects.count }
@@ -83,7 +84,7 @@ struct PageCoverageReportTests {
         }
         let contents = add(stream("", Data(content.utf8)))
         precondition(objects.count == 5)
-        _ = add("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents \(contents) 0 R /Resources << \(xobjects) /Font << /F1 \(font) 0 R >> >> >>")
+        _ = add("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 \(Int(mediaBox.width)) \(Int(mediaBox.height))] /Contents \(contents) 0 R /Resources << \(xobjects) /Font << /F1 \(font) 0 R >> >> >>")
         var out = Data("%PDF-1.7\n".utf8)
         var offsets: [Int] = []
         for (i, object) in objects.enumerated() {
@@ -170,6 +171,21 @@ struct PageCoverageReportTests {
         #expect(await searcher._testOCRCacheKeys == [0], "the second search reads the page from the cache")
         let cached = try await Self.reports(blank, includeOCR: true, on: searcher)
         #expect(cached == fresh)
+    }
+
+    @Test("C-06 through the searcher: a scanned page 60 inches wide is too large for recognition")
+    func tooLarge() async throws {
+        let wide = CGSize(width: 4320, height: 792)
+        let scan = Self.pdf(picture: (try Self.jpeg(width: 1800, height: 330), 1800, 330, CGRect(origin: .zero, size: wide)),
+                            text: [], hidden: false, mediaBox: wide)
+        let reports = try await Self.reports(scan, includeOCR: true)
+        #expect(Self.only(reports, PageSearchCoverage(pageIndex: 0, route: .ocrSkippedOversize)), "\(reports)")
+    }
+
+    @Test("The suite holds eight tests")
+    func rowCount() throws {
+        let source = try String(contentsOf: URL(fileURLWithPath: #filePath), encoding: .utf8)
+        #expect(source.components(separatedBy: "\n    @Test(\"").count - 1 == 8)
     }
 
     @Test("A scanned page recognition reads lines on reports no empty read")

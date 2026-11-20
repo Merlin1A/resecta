@@ -1,6 +1,6 @@
 Property: A page read by recognition reports whether its read came back empty, and with what picture.
 Area: the searcher's coverage reports
-Test command: cd Packages/RedactionEngine && swift test --skip-build --no-parallel --filter PageCoverageReportTests (after swift build --build-tests)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/PageCoverageReportTests (or on the host: cd Packages/RedactionEngine && swift test --filter PageCoverageReportTests)
 Must go red: RedactionEngineTests/PageCoverageReportTests emptyRead
 Apply in a scratch worktree with `git apply`; discard after.
 

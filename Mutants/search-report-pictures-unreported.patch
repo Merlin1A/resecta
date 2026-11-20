@@ -1,20 +1,20 @@
 Property: A page whose text was searched reports the pictures the rule requires read.
 Area: the searcher's coverage reports
-Test command: cd Packages/RedactionEngine && swift test --skip-build --no-parallel --filter PageCoverageReportTests (after swift build --build-tests)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/PageCoverageReportTests (or on the host: cd Packages/RedactionEngine && swift test --filter PageCoverageReportTests)
 Must go red: RedactionEngineTests/PageCoverageReportTests fullPagePicture, anotherAppsLayer
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+HybridRoute.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+HybridRoute.swift
-index aa0c2ecf..79edf7af 100644
+index 7cacbac8..cad2cfde 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+HybridRoute.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+HybridRoute.swift
-@@ -30,8 +30,7 @@ extension DocumentSearcher {
-             return []
+@@ -31,8 +31,7 @@ extension DocumentSearcher {
          }
-         let anotherAppsLayer = page.pageRef.map { Self.carriesHiddenTextOverImage(page, cgPage: $0) } ?? false
--        pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer, pictures: .required,
--                                             throughAnotherAppsLayer: anotherAppsLayer))
-+        _ = anotherAppsLayer
+         if let sink = pageCoverageSink {
+             let anotherAppsLayer = page.pageRef.map { Self.carriesHiddenTextOverImage(page, cgPage: $0) } ?? false
+-            sink(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer, pictures: .required,
+-                                    throughAnotherAppsLayer: anotherAppsLayer))
++            _ = (sink, anotherAppsLayer)
+         }
          guard includeOCR else {
              if reportsWhenOff { scannedRegionNotAnalyzedSink?(pageIndex) }
-             return []
