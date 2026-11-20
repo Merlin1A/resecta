@@ -106,6 +106,9 @@ struct SearchListLimitOccurrenceTests {
         let successorStarted: Bool
         let completes: Bool
         let staged: Bool
+        /// The last match runs over two lines, and its second line still
+        /// waits to be listed when the stream ends.
+        var lastWraps: Bool = false
         var testDescription: String { name }
     }
 
@@ -120,6 +123,8 @@ struct SearchListLimitOccurrenceTests {
                scan: true, matches: 3, successorStarted: false, completes: true, staged: true),
         EndRow(name: "Scan, stopped at the limit, its task cancelled by a successor: the successor's run is left as it stands",
                scan: true, matches: limit, successorStarted: true, completes: false, staged: false),
+        EndRow(name: "Search, stopped at the limit with its last match's second line not yet listed: the end lists it",
+               scan: false, matches: limit, successorStarted: false, completes: false, staged: false, lastWraps: true),
     ]
 
     @Test("A run that stopped at the limit ends as a cancelled run, in Search and in Scan", arguments: endRows)
@@ -134,7 +139,13 @@ struct SearchListLimitOccurrenceTests {
         state.activeSearchTask = Task {}
         state.totalPages = 40
         state.currentSearchPage = 12
-        for _ in 0..<row.matches { state.appendResult(Self.single(), run: run) }
+        for _ in 0..<(row.lastWraps ? row.matches - 1 : row.matches) { state.appendResult(Self.single(), run: run) }
+        if row.lastWraps {
+            let last = UUID()
+            state.appendResult(Self.line(of: last), run: run)
+            state.appendResult(Self.line(of: last), run: run)
+            #expect(!state.pendingResults.isEmpty, "the last line still waits to be listed")
+        }
         #expect(state.resultsAtCap == (row.matches == Self.limit), "the limit marked")
         #expect(state.isSearching, "the limit alone does not stop the run")
         if row.successorStarted {
@@ -151,7 +162,7 @@ struct SearchListLimitOccurrenceTests {
         #expect(completed == row.completes, "the cleanup tail ran")
         #expect(state.hasCompletedRunSinceClear == row.completes, "the completed flag")
         #expect(state.pendingResults.isEmpty, "what the run holds is flushed")
-        #expect(state.results.count == (row.successorStarted ? 0 : row.matches), "rows listed")
+        #expect(state.results.count == (row.successorStarted ? 0 : row.matches + (row.lastWraps ? 1 : 0)), "rows listed")
         #expect(state.isSearching == row.successorStarted, "still searching: only a successor's run")
         #expect((state.activeSearchTask == nil) == (!row.completes && !row.successorStarted),
                 "the run's task let go at the limit; a successor's kept")
@@ -162,9 +173,71 @@ struct SearchListLimitOccurrenceTests {
                 "what the left-unredacted line reads")
     }
 
+    /// A superseded run's end never takes the cap branch: the run token
+    /// moved on, so the newer run is left going. Every run start today
+    /// cancels the old task first, so this end is reached only here.
+    @Test("A superseded run's end at the limit leaves the newer run going")
+    func supersededEndAtTheLimit() {
+        let state = SearchState()
+        state.clearResults()
+        let run = state.beginRun()
+        state.isSearching = true
+        state.totalPages = 40
+        state.currentSearchPage = 12
+        for _ in 0..<Self.limit { state.appendResult(Self.single(), run: run) }
+        #expect(state.resultsAtCap, "the limit marked")
+        _ = state.beginRun()  // a newer run, the old task not cancelled
+        state.isSearching = true
+        state.activeSearchTask = Task {}
+        #expect(!state.runEndsCancelled(run: run, taskCancelled: false), "the old run's end takes no cap branch")
+        #expect(state.isSearching, "the newer run still searching")
+        #expect(state.activeSearchTask != nil, "the newer run's task kept")
+    }
+
+    /// The view's run end, read from the source: the run task ends through
+    /// `finishSearchRun`, which asks `endRunState` first and stops there for
+    /// a run that ends cancelled, before the sinks come down and before the
+    /// VoiceOver completion line.
+    @Test("The view's run end asks endRunState first and stops there for a cancelled run (source pin)")
+    func finishSearchRunSourcePin() throws {
+        let source = try Self.loadRepoFile("Sources/ResectaApp/Views/Search/SearchAndRedactSheet+Trigger.swift")
+        #expect(source.contains("await finishSearchRun(prepared, cancelled: Task.isCancelled)"),
+                "the run task ends through finishSearchRun")
+        guard let start = source.range(of: "private func finishSearchRun("),
+              let end = source.range(of: "private func tearDownEngineSinks()", range: start.upperBound..<source.endIndex)
+        else {
+            Issue.record("Could not locate finishSearchRun")
+            return
+        }
+        let body = String(source[start.upperBound..<end.lowerBound])
+        guard let gate = body.range(of: "guard Self.endRunState("),
+              let stop = body.range(of: ") else { return }", range: gate.upperBound..<body.endIndex),
+              let teardown = body.range(of: "await tearDownEngineSinks()"),
+              let line = body.range(of: "UIAccessibility.post(")
+        else {
+            Issue.record("Could not locate the run end's steps")
+            return
+        }
+        #expect(body[gate.upperBound..<stop.lowerBound].contains("run: prepared.run"),
+                "the run's own token reaches the decision")
+        #expect(body[gate.upperBound..<stop.lowerBound].contains("taskCancelled: cancelled"),
+                "the task's cancel reaches the decision")
+        #expect(stop.upperBound <= teardown.lowerBound, "the sinks come down only after the decision")
+        #expect(teardown.upperBound <= line.lowerBound, "the completion line comes last")
+        #expect(!body.contains("guard !cancelled"), "no decision of its own beside endRunState")
+    }
+
     @Test("The case table's row count")
     func rowCount() {
         #expect(Self.rows.count == 5)
-        #expect(Self.endRows.count == 5)
+        #expect(Self.endRows.count == 6)
+    }
+
+    private static func loadRepoFile(_ relativePath: String, from file: StaticString = #filePath) throws -> String {
+        let repoRoot = URL(fileURLWithPath: "\(file)")
+            .deletingLastPathComponent()   // Tests/ResectaAppTests
+            .deletingLastPathComponent()   // Tests
+            .deletingLastPathComponent()   // <repo root>
+        return try String(contentsOf: repoRoot.appendingPathComponent(relativePath), encoding: .utf8)
     }
 }

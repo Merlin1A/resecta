@@ -1,14 +1,14 @@
 Property: A run stops at maxResults matches.
 Area: Search, the rules a search follows
 Test command: cd Packages/RedactionEngine && DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --no-parallel --filter '^RedactionEngineTests\.SearchRuleCaseTests/'
-Must go red: RedactionEngineTests/SearchRuleCaseTests resultLimit; RedactionEngineTests/SearchRuleCaseTests searchLimit (the typed rows over the limit)
+Must go red: RedactionEngineTests/SearchRuleCaseTests resultLimit; RedactionEngineTests/SearchRuleCaseTests searchLimit (the typed row over the limit)
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+HybridRoute.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+HybridRoute.swift
-index aca99dc6..92251cae 100644
+index 2058d94f..c5d42d3b 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+HybridRoute.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+HybridRoute.swift
-@@ -70,7 +70,7 @@ extension DocumentSearcher {
+@@ -73,7 +73,7 @@ extension DocumentSearcher {
          for result in results {
              let key = Self.occurrenceKey(result)
              if !begun.contains(key) {
