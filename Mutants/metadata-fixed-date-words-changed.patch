@@ -1,0 +1,19 @@
+Property: An export's creation and change dates read D:20000101000000Z00'00', by the words, not only by the constant the writer and the check share.
+Area: Document Metadata, the fixed values the export carries
+Test command: cd Packages/RedactionEngine && swift test --filter FixedMetadataValuesTests
+Must go red: RedactionEngineTests/FixedMetadataValuesTests datesAreTheFixedDate
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
+index 19dbf3c3..c93804d8 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
+@@ -253,7 +253,7 @@ public actor PDFStreamReconstructor {
+     /// `D:YYYYMMDDHHmmSSZ00'00'` (23 bytes); this constant has the same
+     /// length, so the rewrite is a straight overwrite and the fields carry
+     /// no information about when the file was written.
+-    static let fixedDateValue = "D:20000101000000Z00'00'"
++    static let fixedDateValue = "D:20000101000001Z00'00'"
+ 
+     /// One `/Info` literal the finalize step rewrites: the key as the writer
+     /// spells it, the fixed replacement, and whether a longer existing value
