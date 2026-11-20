@@ -171,7 +171,9 @@ struct PacketSearchableProbeTests {
                 "Non-uniform glyph advance on the dense packet page 1 -- engine-improvement item, out of scope here. Production routes this packet to secure rasterization (no Layer 5).",
                 isIntermittent: true
             ) {
-                #expect(run.layers[5]?.status.isFail == false)
+                #expect(run.layers[5]?.status.isFail == false, "Layer 5 fails on the dense packet page 1")
+            } matching: { issue in
+                issue.comments.contains { $0.rawValue == "Layer 5 fails on the dense packet page 1" }
             }
         }
     }

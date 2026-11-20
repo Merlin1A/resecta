@@ -1,0 +1,27 @@
+Property: A known-issue block excuses only the issue it names; any other issue inside it fails the test. Here the stress run's machine-mismatch block, reached as on another machine.
+Area: Tests, the known-issue blocks
+Test command: cd Packages/RedactionEngine && DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --no-parallel --filter '^RedactionEngineTests\.StressCorpusTests/testStressCorpusBaseline'
+Must go red: RedactionEngineTests/StressCorpusTests testStressCorpusBaseline
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Tests/RedactionEngineTests/IntegrationTests/StressTests/StressCorpusTests.swift b/Packages/RedactionEngine/Tests/RedactionEngineTests/IntegrationTests/StressTests/StressCorpusTests.swift
+index 86185204..d784cf8e 100644
+--- a/Packages/RedactionEngine/Tests/RedactionEngineTests/IntegrationTests/StressTests/StressCorpusTests.swift
++++ b/Packages/RedactionEngine/Tests/RedactionEngineTests/IntegrationTests/StressTests/StressCorpusTests.swift
+@@ -185,7 +185,7 @@ struct StressCorpusTests {
+             // load-bearing.
+             let currentMachine = MachineSpec.current()
+             let sameMachine = baseline.machine?.matches(currentMachine) ?? false
+-            if sameMachine {
++            if sameMachine && ProcessInfo.processInfo.processIdentifier < 0 {
+                 // On the Mac host the budget is report-only: a Debug build's
+                 // wall clock there moves with whatever else the Mac is
+                 // running, so a slow run is a known issue, not a failure.
+@@ -231,6 +231,7 @@ struct StressCorpusTests {
+                     detail = "Baseline JSON predates the machine schema; current wall-clock=\(result.wallClockSeconds)s — refresh the baseline with `make stress-baseline` on this machine."
+                 }
+                 withKnownIssue("Machine mismatch — baseline comparison is documentary") {
++                    #expect(Bool(false), "a planted issue that no known issue names")
+                     Issue.record(Comment(rawValue: detail))
+                 } matching: { issue in
+                     issue.comments.contains { $0.rawValue == detail }

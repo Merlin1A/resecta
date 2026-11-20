@@ -148,6 +148,8 @@ struct ApplyPhaseMemoryStressTests {
                 "phys_footprint unavailable on this host; streaming footprint not asserted (test 1 is the gate)"
             ) {
                 Issue.record("baseline=\(baseline) peakDelta=\(peakDelta): footprint read failed")
+            } matching: { issue in
+                issue.comments.contains { $0.rawValue.hasPrefix("baseline=") && $0.rawValue.hasSuffix(": footprint read failed") }
             }
             return
         }
@@ -215,6 +217,8 @@ struct ApplyPhaseMemoryStressTests {
                 "phys_footprint unavailable on this host; peak not asserted (test 1 is the gate)"
             ) {
                 Issue.record("baseline=\(baseline) peak=\(peak): footprint read failed")
+            } matching: { issue in
+                issue.comments.contains { $0.rawValue.hasPrefix("baseline=") && $0.rawValue.hasSuffix(": footprint read failed") }
             }
             return
         }

@@ -1,0 +1,24 @@
+Property: A known-issue block excuses only the issue it names; any other issue inside it fails the test. Here the stress run's wall-clock block, reached as on the baseline's machine.
+Area: Tests, the known-issue blocks
+Test command: cd Packages/RedactionEngine && DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --no-parallel --filter '^RedactionEngineTests\.StressCorpusTests/testStressCorpusBaseline'
+Must go red: RedactionEngineTests/StressCorpusTests testStressCorpusBaseline
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Tests/RedactionEngineTests/IntegrationTests/StressTests/StressCorpusTests.swift b/Packages/RedactionEngine/Tests/RedactionEngineTests/IntegrationTests/StressTests/StressCorpusTests.swift
+index 86185204..aadf3c69 100644
+--- a/Packages/RedactionEngine/Tests/RedactionEngineTests/IntegrationTests/StressTests/StressCorpusTests.swift
++++ b/Packages/RedactionEngine/Tests/RedactionEngineTests/IntegrationTests/StressTests/StressCorpusTests.swift
+@@ -185,11 +185,12 @@ struct StressCorpusTests {
+             // load-bearing.
+             let currentMachine = MachineSpec.current()
+             let sameMachine = baseline.machine?.matches(currentMachine) ?? false
+-            if sameMachine {
++            if sameMachine || ProcessInfo.processInfo.processIdentifier > 0 {
+                 // On the Mac host the budget is report-only: a Debug build's
+                 // wall clock there moves with whatever else the Mac is
+                 // running, so a slow run is a known issue, not a failure.
+                 withKnownIssue("On the Mac host the wall-clock budget is report-only: a Debug run's time moves with the Mac's load", isIntermittent: true) {
++                    #expect(Bool(false), "a planted issue that no known issue names")
+                     #expect(
+                         delta < 0.20,
+                         "Wall-clock regressed by \(Int(delta * 100))% vs baseline (current=\(result.wallClockSeconds)s baseline=\(baseline.wallClockSeconds)s)"

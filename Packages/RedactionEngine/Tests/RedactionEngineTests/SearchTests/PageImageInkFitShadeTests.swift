@@ -113,7 +113,9 @@ extension PageImageInkFitTests {
             withKnownIssue("On the Mac host macOS's Vision reads this shaded word's ink otherwise than iOS's, and its box does not hold every glyph") {
                 #expect(painted.contains { $0.contains(held) },
                         "\(word): the painted box \(painted) does not hold its glyphs \(held) (degraded \(fit.degraded))")
-            } when: { HostRun.isMac && word == "summary" }
+            } when: { HostRun.isMac && word == "summary" } matching: { issue in
+                issue.comments.contains { $0.rawValue.hasPrefix("\(word): the painted box ") }
+            }
         }
     }
 
