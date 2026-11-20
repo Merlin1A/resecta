@@ -270,8 +270,7 @@ struct VerificationMasthead: View {
             report: report, outputExists: outputExists, mode: mode, findingCount: findingCount)
         let quotesTerms = VerificationResultsView.mastheadSubtitleIsPrivacySensitive(report: report)
         VStack(spacing: 0) {
-            CountRing(content: VerificationMasthead.ringContent(report: report),
-                      drawKey: VerificationMasthead.drawKey(for: report))
+            CountRing(content: VerificationMasthead.ringContent(report: report))
             BalancedText(string: VerificationResultsView.mastheadTitle(report: report), font: .title.bold())
                 .foregroundStyle(.primary)
                 .padding(.top, ResectaTokens.Results.ringToTitle)
@@ -309,46 +308,29 @@ struct VerificationMasthead: View {
         let partition = VerificationLayerPartition(layers: report.layers, perPageModes: report.perPageModes)
         return .count(passed: partition.passedCount, total: partition.totalWithSomethingToCheck, tone: tone)
     }
-
-    /// The report the arc last drew in for: a remount (after Share, Cancel
-    /// or the capture shield) shows the same report static.
-    private static var lastDrawnKey: String?
-
-    /// The report's identity for the draw-in.
-    static func drawKey(for report: VerificationReport) -> String {
-        "\(report.overallStatus)|\(report.layers.count)|\(report.durationSeconds)"
-    }
-
-    /// Whether the arc draws in, claimed once per report when the ring
-    /// appears: a fresh report, never a seeded or UI-test launch, never a
-    /// remount of the same report.
-    static func claimsDrawIn(key: String) -> Bool {
-        guard !CommandLine.arguments.contains("--uitesting") else { return false }
-        defer { lastDrawnKey = key }
-        return lastDrawnKey != key
-    }
 }
 
 /// The count ring: a tertiary track, a round-capped arc from twelve
 /// o'clock for P of T in the verdict's text colour, the figure and the
 /// word `passed` inside. P = 0 draws the whole track tinted, never a solid
-/// ring; SKIPPED draws the track with `shield.slash`. Fixed size at every
-/// Dynamic Type size; hidden from VoiceOver (the masthead's label speaks
-/// the count).
+/// ring; SKIPPED draws the track with `shield.slash`. While the checks run
+/// it is grey: the arc for the results published so far over the checks
+/// in the run, the figure, and the word `completed`; before the first
+/// announcement, the track alone. The arc is drawn at its value, never
+/// swept in. Fixed size at every Dynamic Type size; hidden from VoiceOver
+/// (the block around it speaks the count).
 struct CountRing: View {
     enum Tone: Equatable { case pass, warn, attention, fail }
     enum Content: Equatable {
         case count(passed: Int, total: Int, tone: Tone)
         case skipped
+        case running(finished: Int, total: Int)
     }
 
     let content: Content
-    /// The report's draw-in key (`VerificationMasthead.drawKey(for:)`).
-    let drawKey: String
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var drawn: CGFloat?
 
     private var size: CGFloat { ResectaTokens.Results.ringSize }
     private var stroke: CGFloat { ResectaTokens.Results.ringStroke }
@@ -365,35 +347,51 @@ struct CountRing: View {
             case .count(let passed, let total, let tone):
                 if passed > 0 {
                     Circle()
-                        .trim(from: 0, to: drawn ?? Self.progress(passed: passed, total: total))
+                        .trim(from: 0, to: Self.progress(passed: passed, total: total))
                         .stroke(Self.arcColor(tone), style: StrokeStyle(lineWidth: stroke, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                 }
-                figure(passed: passed, total: total)
+                figure(passed, of: total, word: "passed", wordSize: ResectaTokens.Results.ringWord)
+            case .running(let finished, let total):
+                if total > 0 {
+                    if finished > 0 {
+                        runningArc(finished: finished, total: total)
+                    }
+                    figure(finished, of: total, word: "completed", wordSize: ResectaTokens.Results.ringRunningWord)
+                }
             }
         }
         .padding(stroke / 2)
         .frame(width: size, height: size)
         .accessibilityHidden(true)
-        .onAppear {
-            guard case .count(let passed, let total, _) = content, passed > 0 else { return }
-            let target = Self.progress(passed: passed, total: total)
-            guard !reduceMotion, VerificationMasthead.claimsDrawIn(key: drawKey) else { drawn = target; return }
-            drawn = 0
-            withAnimation(ResectaTokens.Results.arcDrawIn.delay(ResectaTokens.Results.arcDrawInDelay)) {
-                drawn = target
-            }
+    }
+
+    /// The running arc grows with each result; under Reduce Motion it
+    /// changes by a short cross-fade, never a sweep.
+    @ViewBuilder
+    private func runningArc(finished: Int, total: Int) -> some View {
+        let arc = Circle()
+            .trim(from: 0, to: Self.progress(passed: finished, total: total))
+            .stroke(ResectaTokens.SemanticColor.supportText, style: StrokeStyle(lineWidth: stroke, lineCap: .round))
+            .rotationEffect(.degrees(-90))
+        if reduceMotion {
+            arc.id(finished)
+                .transition(.opacity)
+                .animation(.easeInOut(duration: ResectaTokens.Results.runningArcFade), value: finished)
+        } else {
+            arc.animation(.easeOut(duration: ResectaTokens.Results.runningArcGrow), value: finished)
         }
     }
 
-    private func figure(passed: Int, total: Int) -> some View {
+    private func figure(_ count: Int, of total: Int, word: String, wordSize: CGFloat) -> some View {
         let size = Self.figureSize(total: total)
         return VStack(spacing: 1) {
-            Text("\(passed)\(Text("/").font(.system(size: size, weight: .light)).foregroundStyle(ResectaTokens.SemanticColor.supportText))\(total)")
+            Text("\(count)\(Text("/").font(.system(size: size, weight: .light)).foregroundStyle(ResectaTokens.SemanticColor.supportText))\(total)")
                 .font(.system(size: size, weight: .semibold).monospacedDigit())
                 .foregroundStyle(.primary)
-            Text("passed")
-                .font(.system(size: ResectaTokens.Results.ringWord))
+                .contentTransition(.numericText())
+            Text(word)
+                .font(.system(size: wordSize))
                 .foregroundStyle(ResectaTokens.SemanticColor.supportText)
         }
         .lineLimit(1)

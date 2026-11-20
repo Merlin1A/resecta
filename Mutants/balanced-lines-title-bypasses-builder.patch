@@ -5,13 +5,13 @@ Must go red: ResectaAppTests/BalancedLinesTests layoutIsBuiltInOnePlace
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Views/VerificationMasthead.swift b/Sources/ResectaApp/Views/VerificationMasthead.swift
-index 03e46d31..5470537a 100644
+index 51b94a07..22609a06 100644
 --- a/Sources/ResectaApp/Views/VerificationMasthead.swift
 +++ b/Sources/ResectaApp/Views/VerificationMasthead.swift
-@@ -272,7 +272,7 @@ struct VerificationMasthead: View {
+@@ -271,7 +271,7 @@ struct VerificationMasthead: View {
+         let quotesTerms = VerificationResultsView.mastheadSubtitleIsPrivacySensitive(report: report)
          VStack(spacing: 0) {
-             CountRing(content: VerificationMasthead.ringContent(report: report),
-                       drawKey: VerificationMasthead.drawKey(for: report))
+             CountRing(content: VerificationMasthead.ringContent(report: report))
 -            BalancedText(string: VerificationResultsView.mastheadTitle(report: report), font: .title.bold())
 +            BalancedLines { Text(VerificationResultsView.mastheadTitle(report: report)).font(.title.bold()).multilineTextAlignment(.center) }
                  .foregroundStyle(.primary)

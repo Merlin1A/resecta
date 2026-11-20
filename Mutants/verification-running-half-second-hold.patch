@@ -1,0 +1,19 @@
+Property: A check is named only after it has run half a second.
+Area: verification (the screen while the checks run)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationProgressLineTests
+Must go red: ResectaAppTests/VerificationProgressLineTests progressLineTable (row 4); ResectaAppTests/VerificationProgressLineTests neverNamesACheckThatIsNotRunning
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/VerificationProgressLine.swift b/Sources/ResectaApp/State/VerificationProgressLine.swift
+index 97d60830..25907f1e 100644
+--- a/Sources/ResectaApp/State/VerificationProgressLine.swift
++++ b/Sources/ResectaApp/State/VerificationProgressLine.swift
+@@ -27,7 +27,7 @@ nonisolated struct VerificationProgressLine: Equatable {
+ 
+     static func make(finished: Int, total: Int, running: VerificationLayer?, runningOpensGroup: Bool,
+                      secondsRunning: TimeInterval, typedSearchApplied: Bool) -> VerificationProgressLine {
+-        guard let running, !runningOpensGroup, secondsRunning >= nameHold,
++        guard let running, !runningOpensGroup,
+               running != .searchRecheck || typedSearchApplied else {
+             return .init(finished: finished, total: total, line: .checking)
+         }

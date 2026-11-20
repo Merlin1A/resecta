@@ -1,0 +1,19 @@
+Property: A check that passed is not announced when it finishes.
+Area: verification (the screen while the checks run)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/AccessibilityLabelTests
+Must go red: ResectaAppTests/AccessibilityLabelTests testLayerCompletionAnnouncement
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Extensions/VerificationStatus+Display.swift b/Sources/ResectaApp/Extensions/VerificationStatus+Display.swift
+index 081e65fa..c64f0d89 100644
+--- a/Sources/ResectaApp/Extensions/VerificationStatus+Display.swift
++++ b/Sources/ResectaApp/Extensions/VerificationStatus+Display.swift
+@@ -80,7 +80,7 @@ extension LayerResult {
+     var runningAnnouncement: String? {
+         let model = VerificationRowModel(layer: self, perPageModes: [])
+         switch model.outcome {
+-        case .passed, .nothingToCheck: return nil
++        case .nothingToCheck: return nil
+         default: return VerificationRowModel.sentence("\(model.title), \(model.outcome.word)")
+         }
+     }

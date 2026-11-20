@@ -32,6 +32,16 @@ struct DocumentEditorToolbar {
     let pipelineModePicker: AnyView
     /// Settings, parking the search sheet first when it is up.
     let openSettings: () -> Void
+    /// When the results last replaced the running checks (nil otherwise).
+    var resultsAppearedAt: Date? = nil
+
+    /// Whether the bar's trailing button takes a tap: not in the moment
+    /// after the results appear, when a tap meant for Stop lands on
+    /// Settings.
+    static func acceptsTrailingTap(resultsAppearedAt: Date?, now: Date) -> Bool {
+        guard let resultsAppearedAt else { return true }
+        return now.timeIntervalSince(resultsAppearedAt) >= ResectaTokens.Results.lateTapGuard
+    }
 
     /// The one reset of the canvas tools: the draw tool off and Add to
     /// Selection off. The editor calls it when a different document
@@ -219,6 +229,7 @@ struct DocumentEditorToolbar {
     @ViewBuilder
     private var settingsButton: some View {
         Button("Settings", systemImage: "gearshape") {
+            guard Self.acceptsTrailingTap(resultsAppearedAt: resultsAppearedAt, now: Date()) else { return }
             openSettings()
         }
         .accessibilityIdentifier("settings-button")

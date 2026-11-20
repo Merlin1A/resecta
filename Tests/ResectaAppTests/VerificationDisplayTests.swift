@@ -11,21 +11,6 @@ import UIKit
 @MainActor
 struct VerificationDisplayTests {
 
-    // MARK: - SF Symbols
-
-    @Test("symbolName maps to correct SF Symbol",
-          arguments: [
-            (VerificationStatus.pass, "checkmark.shield.fill"),
-            (VerificationStatus.warn("w"), "exclamationmark.shield.fill"),
-            (VerificationStatus.info("i"), "info.circle.fill"),
-            (VerificationStatus.attention("a"), "shield.lefthalf.filled"),
-            (VerificationStatus.fail("f"), "xmark.shield.fill"),
-            (VerificationStatus.skipped, "shield.slash"),
-          ])
-    func symbolNameForAllCases(status: VerificationStatus, expected: String) {
-        #expect(status.symbolName == expected)
-    }
-
     // MARK: - Colors
 
     @Test("color maps to correct SwiftUI color",
@@ -200,8 +185,7 @@ struct VerificationDisplayTests {
           ])
     func noOutcomePromiseLanguage(status: VerificationStatus) {
         let bannedWords = ["guaranteed", "ensures", "impossible", "guarantee", "ensure"]
-        let allText = [status.title, status.layerAccessibilityPhrase]
-            .joined(separator: " ").lowercased()
+        let allText = status.title.lowercased()
 
         for word in bannedWords {
             #expect(!allText.contains(word),

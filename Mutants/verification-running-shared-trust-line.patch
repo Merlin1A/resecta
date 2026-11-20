@@ -1,0 +1,19 @@
+Property: The running screen shows the shared trust line.
+Area: verification (the screen while the checks run)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/HomeScreenSourceContractsTests
+Must go red: ResectaAppTests/HomeScreenSourceContractsTests progressTrustLine
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationProgressView.swift b/Sources/ResectaApp/Views/VerificationProgressView.swift
+index d04631a5..8cab9e91 100644
+--- a/Sources/ResectaApp/Views/VerificationProgressView.swift
++++ b/Sources/ResectaApp/Views/VerificationProgressView.swift
+@@ -39,7 +39,7 @@ struct VerificationProgressView: View {
+                                 // there is room, pushed down when the text
+                                 // grows.
+                                 Spacer(minLength: ResectaTokens.Results.blockGap)
+-                                TrustLine()
++                                Text(verbatim: "")
+                                     .accessibilityIdentifier("verificationTrustLine")
+                             }
+                             .onChange(of: Self.stillCheckingDue(progress, now: context.date)) { _, due in

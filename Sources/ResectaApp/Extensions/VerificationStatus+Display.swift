@@ -6,20 +6,6 @@ import RedactionEngine
 
 extension VerificationStatus {
 
-    // MARK: - SF Symbols
-
-    var symbolName: String {
-        switch self {
-        case .pass:      "checkmark.shield.fill"
-        case .warn:      "exclamationmark.shield.fill"
-        case .info:      "info.circle.fill"
-        case .attention: "shield.lefthalf.filled"
-        case .fail:      "xmark.shield.fill"
-        case .skipped:   "shield.slash"
-        case .notApplicable: "minus.circle"
-        }
-    }
-
     // MARK: - Colors
 
     var color: Color {
@@ -67,7 +53,7 @@ extension VerificationStatus {
 
     // MARK: - Titles
 
-    /// The status-level title — the entry flash's, and the masthead's on
+    /// The status-level title: the masthead's on
     /// every verdict but a WARN with a check that could not verify, which
     /// the results view titles `Some Checks Incomplete` from its rows. An
     /// INFO never aggregates; it reads as a pass. The no-break space keeps
@@ -84,39 +70,21 @@ extension VerificationStatus {
     }
 
     // MARK: - Accessibility
-
-    /// Layer-scoped VoiceOver phrase for a single check, in the Verification
-    /// Details words (a skipped check could not verify). Never a phrase about
-    /// the OVERALL run: spoken per-layer mid-run, that would be the same
-    /// premature-confidence anchoring problem intermediateColor exists to
-    /// prevent. The run's end is spoken by
-    /// `VerificationResultsView.completionAnnouncement(report:)`, in the
-    /// masthead's words; the finished rows speak their outcome's word.
-    var layerAccessibilityPhrase: String {
-        switch self {
-        case .pass:      "Passed."
-        case .warn:      "Warning."
-        case .info:      "Note."
-        case .attention: "Needs review."
-        case .fail:      "Failed."
-        case .skipped:   "Could not verify."
-        case .notApplicable: "Nothing to check."
-        }
-    }
 }
 
 extension LayerResult {
-    /// Spoken announcement when this layer completes mid-run
-    /// (PipelineCoordinator's `UIAccessibility.post(.announcement, …)`
-    /// sites). warn/fail/info append `shortDescription` — for those rows it
-    /// IS the payload ("OCR could not be run on 1 page."); pass/skipped stay
-    /// a plain phrase so an eleven-layer run isn't eleven sentences of filler.
-    func completionAnnouncement(layerNumber: Int) -> String {
-        switch status {
-        case .warn, .fail, .info, .attention, .notApplicable:
-            "Layer \(layerNumber), \(name), \(status.layerAccessibilityPhrase) \(shortDescription)"
-        case .pass, .skipped:
-            "Layer \(layerNumber), \(name), \(status.layerAccessibilityPhrase)"
+    /// Spoken when this check finishes mid-run: the words its row's label
+    /// opens with on the results screen, "‹title›, ‹outcome word›." Nothing
+    /// for a check that passed or had nothing to check, so a run of
+    /// thirteen checks is not thirteen sentences. No document text.
+    var runningAnnouncement: String? {
+        let model = VerificationRowModel(layer: self, perPageModes: [])
+        switch model.outcome {
+        case .passed, .nothingToCheck: return nil
+        default: return VerificationRowModel.sentence("\(model.title), \(model.outcome.word)")
         }
     }
+
+    /// At most one announcement in this many seconds while the checks run.
+    static let runningAnnouncementGap: TimeInterval = 3
 }

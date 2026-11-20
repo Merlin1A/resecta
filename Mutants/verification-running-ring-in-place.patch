@@ -1,0 +1,19 @@
+Property: The running ring sits where the results' ring will.
+Area: verification (the screen while the checks run)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppUITests/VerificationRunningUITests
+Must go red: ResectaAppUITests/VerificationRunningUITests testRingStaysInPlace
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationProgressView.swift b/Sources/ResectaApp/Views/VerificationProgressView.swift
+index d04631a5..7422af95 100644
+--- a/Sources/ResectaApp/Views/VerificationProgressView.swift
++++ b/Sources/ResectaApp/Views/VerificationProgressView.swift
+@@ -50,7 +50,7 @@ struct VerificationProgressView: View {
+                             }
+                         }
+                         .padding(.horizontal, ResectaTokens.Spacing.md)
+-                        .padding(.top, ResectaTokens.Spacing.lg)
++                        .padding(.top, ResectaTokens.Spacing.lg + 20)
+                         .padding(.bottom, ResectaTokens.Spacing.lg)
+                         .frame(maxWidth: columnMaxWidth)
+                         .frame(maxWidth: .infinity, minHeight: geometry.size.height, alignment: .top)

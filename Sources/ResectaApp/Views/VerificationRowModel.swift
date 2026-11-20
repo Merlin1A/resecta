@@ -218,6 +218,12 @@ nonisolated struct VerificationRowModel: Equatable {
         guard let identity = layer.layer else {
             return layer.name == pageCountGateName ? "Page Count" : layer.name
         }
+        return title(for: identity)
+    }
+
+    /// A check's title by its identity: the running screen names a check
+    /// before it has a result.
+    static func title(for identity: VerificationLayer) -> String {
         switch identity {
         case .textExtraction:       return "Text & Annotations in the Redacted PDF"
         case .ocrCheck:             return "OCR of Page Images"

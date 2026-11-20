@@ -244,24 +244,6 @@ struct AccessibilityLabelTests {
         LayerResultRow.accessibilityLabel(model: .init(layer: layer, perPageModes: []), layer: layer)
     }
 
-    @Test("Layer-scoped phrases never reuse the overall-run phrasing",
-          arguments: [
-            (VerificationStatus.pass, "Passed."),
-            (VerificationStatus.warn("w"), "Warning."),
-            (VerificationStatus.info("i"), "Note."),
-            (VerificationStatus.attention("a"), "Needs review."),
-            (VerificationStatus.fail("f"), "Failed."),
-            (VerificationStatus.skipped, "Could not verify."),
-          ])
-    func testLayerAccessibilityPhrase(status: VerificationStatus, expected: String) {
-        // Per-layer surfaces must not speak "All checks completed without
-        // issues." after each of up to 10 layers mid-run — that is the
-        // spoken twin of the premature-confidence anchoring that
-        // intermediateColor prevents visually.
-        #expect(status.layerAccessibilityPhrase == expected)
-        #expect(!status.layerAccessibilityPhrase.contains("without issues"))
-    }
-
     // The duration is not spoken: it is not
     // in the collapsed row any more (the expanded row's "Took … s" line is
     // its own reachable element), so the label ends at the pages.
@@ -338,35 +320,38 @@ struct AccessibilityLabelTests {
         )
     }
 
-    @Test("Layer completion announcement appends the diagnostic for warn/fail/info only")
+    @Test("A finished check is spoken by its row's title and outcome word, never with its detail; a pass is silent")
     func testLayerCompletionAnnouncement() {
         let warn = Self.layer(
             status: .warn("w"),
             shortDescription: "OCR could not be run on 1 page."
         )
-        #expect(
-            warn.completionAnnouncement(layerNumber: 2)
-            == "Layer 2, OCR Check, Warning. OCR could not be run on 1 page."
-        )
+        let title = VerificationRowModel.title(for: warn)
+        #expect(warn.runningAnnouncement == "\(title), \(VerificationOutcome.warning.word).")
 
         let fail = Self.layer(
             status: .fail("f"),
             shortDescription: "Text remains on 1 page."
         )
-        #expect(
-            fail.completionAnnouncement(layerNumber: 6)
-            == "Layer 6, OCR Check, Failed. Text remains on 1 page."
-        )
+        #expect(fail.runningAnnouncement == "\(title), \(VerificationOutcome.failed.word).")
+        #expect(fail.runningAnnouncement?.contains("Text remains") == false)
 
-        // pass/skipped stay a plain phrase — no filler sentence per layer.
-        #expect(
-            Self.layer(status: .pass).completionAnnouncement(layerNumber: 1)
-            == "Layer 1, OCR Check, Passed."
-        )
-        #expect(
-            Self.layer(status: .skipped).completionAnnouncement(layerNumber: 9)
-            == "Layer 9, OCR Check, Could not verify."
-        )
+        // A skipped check is spoken with the could-not-verify word, never as a warning.
+        #expect(Self.layer(status: .skipped).runningAnnouncement
+                == "\(title), \(VerificationOutcome.couldNotVerify.word).")
+        #expect(Self.layer(status: .info("i")).runningAnnouncement == "\(title), \(VerificationOutcome.note.word).")
+        #expect(Self.layer(status: .attention("a")).runningAnnouncement
+                == "\(title), \(VerificationOutcome.needsReview.word).")
+
+        // Passed and nothing-to-check are silent.
+        #expect(Self.layer(status: .pass).runningAnnouncement == nil)
+        #expect(Self.layer(status: .notApplicable("n")).runningAnnouncement == nil)
+
+        // At most one in three seconds.
+        let t0 = Date(timeIntervalSince1970: 1_000)
+        #expect(PipelineRunner.announcementDue(lastAnnounced: nil, now: t0))
+        #expect(!PipelineRunner.announcementDue(lastAnnounced: t0, now: t0.addingTimeInterval(2.9)))
+        #expect(PipelineRunner.announcementDue(lastAnnounced: t0, now: t0.addingTimeInterval(3)))
     }
 
     // MARK: - The accessibility rows (the P3 review's ten)

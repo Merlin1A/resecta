@@ -82,9 +82,13 @@ struct TransitionResolverTests {
         // `.move(edge` inflated the count; keep this in sync deliberately.
         // Eight since the scan summary banner went with its file,
         // DocumentEditorView+DetectionBanner.swift: its top-edge slide in
-        // detectionBannerOverlay was the ninth site.
-        #expect(totalMoveEdgeSites == 8,
-                "expected 8 `.move(edge` sites under Sources/ResectaApp/Views, found \(totalMoveEdgeSites)")
+        // detectionBannerOverlay was the ninth site. Six since the running
+        // screen became one ring and one line: the editor's trailing-edge
+        // slide-in of VerificationProgressView (DocumentEditorView.swift)
+        // and each finished check's bottom-edge row slide-in
+        // (VerificationProgressView.swift) went with it.
+        #expect(totalMoveEdgeSites == 6,
+                "expected 6 `.move(edge` sites under Sources/ResectaApp/Views, found \(totalMoveEdgeSites)")
     }
 
     /// For every occurrence of a REAL `.move(edge: .something)` call in
