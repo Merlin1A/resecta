@@ -85,6 +85,35 @@ struct PageTextPathTests {
         #expect(written.count < entries.count)
     }
 
+    @Test("The writer is handed the lines the drawn-cell rule laid out, the lines it would assemble itself",
+          arguments: [0, 90], [false, true])
+    func writerIsHandedTheRulesLines(rotation: Int, boxed: Bool) async throws {
+        let (entries, _, size) = try await Self.entries()
+        let region = try Self.betaRegion(entries)
+        let frame = PageFrame(rotation: rotation, displayedSize: size)
+        let path = try await PageTextPath.run(
+            entries: entries, frame: frame,
+            textPathRectangles: boxed ? [TextPathRectangle(rect: region, kind: .ordinary)] : [],
+            paintedRectangles: [], pageIndex: 0)
+        guard case .written(let written, _, let rects) = path.outcome else {
+            Issue.record("the page is written"); return
+        }
+        let carried = try #require(path.hiddenTextLines)
+        #expect(carried.entryCount == written.count)
+        let own = TextLayerReconstructor.sourceFrameLines(written, redactionRects: rects, frame: frame).map(\.line)
+        #expect(!own.isEmpty)
+        #expect(carried.lines.count == own.count)
+        for (handed, line) in zip(carried.lines, own) {
+            #expect(handed.line.text == line.text)
+            #expect(handed.line.fontSize == line.fontSize)
+            #expect(handed.line.origin == line.origin)
+            let laid = try #require(HiddenTextLine.layout(line.text, size: line.fontSize))
+            #expect(CTLineGetGlyphCount(handed.laidOut) == CTLineGetGlyphCount(laid))
+            #expect(CTLineGetTypographicBounds(handed.laidOut, nil, nil, nil)
+                    == CTLineGetTypographicBounds(laid, nil, nil, nil))
+        }
+    }
+
     @Test("A rectangle under a widened box is read by no step of the path")
     func underWidenedBoxIsNotRead() async throws {
         let (entries, _, size) = try await Self.entries()
@@ -125,7 +154,7 @@ struct PageTextPathTests {
         #expect(Self.sizes.count == 53)
     }
 
-    @Test("The laid-out line is Courier at its size, with Courier's own ascent and descent")
+    @Test("The laid-out line is in the first of the three faces this system has, at its size, with Courier's own ascent and descent")
     func laidOutLineIsCourier() throws {
         for size in Self.sizes {
             let line = try #require(HiddenTextLine.layout("Report 12", size: size))
@@ -133,7 +162,9 @@ struct PageTextPathTests {
             #expect(runs.count == 1)
             let attributes = CTRunGetAttributes(runs[0]) as NSDictionary
             let font = attributes[kCTFontAttributeName as String] as! CTFont
-            #expect(CTFontCopyPostScriptName(font) as String == "Courier")
+            // Courier itself where the system has it; where the name maps
+            // to Menlo, the first face the system does have.
+            #expect(CTFontCopyPostScriptName(font) as String == HiddenTextFonts.faces.first?.name)
             #expect(CTFontGetSize(font) == size)
             var ascent: CGFloat = 0, descent: CGFloat = 0
             CTLineGetTypographicBounds(line, &ascent, &descent, nil)
@@ -145,11 +176,13 @@ struct PageTextPathTests {
 
     /// Lines with a character Courier has no glyph for, which the system
     /// draws in a face of its own, and a line of only zero-width marks.
-    static let mixedLines = ["Report \u{6F22} 12", "Report \u{F0B7} 12", "\u{200B}\u{FEFF}"]
+    // Runs Courier lacks, drawn in Courier New (one face for the arrow,
+    // one for the Kazakh word), and a line of break marks only.
+    static let mixedLines = ["Report \u{2192} 12", "Report \u{049A}\u{0430}\u{0437}\u{0430}\u{049B} 12", "\u{200B}\u{FEFF}"]
 
-    @Test("On a line with a run the system draws in another face, every cell keeps Courier's own height and centre",
-          arguments: mixedLines)
-    func mixedLineKeepsCourierCells(_ text: String) throws {
+    /// One line of entries, one per scalar, 7.2 pt apart at 12 pt, a new word
+    /// after each space.
+    static func lineEntries(_ text: String) -> [CharacterInfo] {
         var entries: [CharacterInfo] = []
         var word = 0
         for (i, scalar) in text.unicodeScalars.enumerated() {
@@ -158,12 +191,41 @@ struct PageTextPathTests {
                 character: String(scalar), bounds: CGRect(x: 72 + CGFloat(i) * 7.2, y: 700, width: 7.2, height: 12),
                 stringIndex: i, lineIndex: 0, wordIndex: word))
         }
+        return entries
+    }
+
+    // A Chinese character none of the three faces has, and a private-use
+    // character the hidden text never holds.
+    static let linesNoFaceDraws = ["Report \u{6F22} 12", "Report \u{F0B7} 12"]
+
+    @Test("On a line with a run none of the three faces can write, that run is left out and counted and the rest is written",
+          arguments: linesNoFaceDraws)
+    func runNoFaceWritesIsLeftOut(_ text: String) async throws {
+        let entries = Self.lineEntries(text)
+        // Whole, the line cannot be laid out in the hidden text's faces.
+        #expect(HiddenTextLine.layout(text, size: 12) == nil)
+        let path = try await PageTextPath.run(
+            entries: entries, frame: PageFrame(rotation: 0, displayedSize: CGSize(width: 612, height: 792)),
+            textPathRectangles: [], paintedRectangles: [], pageIndex: 0)
+        guard case .written(let written, _, _) = path.outcome else {
+            Issue.record("\(text.debugDescription): \(path.outcome)")
+            return
+        }
+        #expect(path.runsLeftOut == 1, "\(text.debugDescription)")
+        let letters = written.map(\.character).joined().filter { !$0.isWhitespace }
+        #expect(letters == "Report12", "\(text.debugDescription): \(letters.debugDescription)")
+    }
+
+    @Test("On a line with a run in another of the three faces, every cell keeps Courier's own height and centre",
+          arguments: mixedLines)
+    func mixedLineKeepsCourierCells(_ text: String) throws {
+        let entries = Self.lineEntries(text)
         let lines = TextLayerReconstructor.layoutLinesWithSources(entries, pageWidth: 612, redactionRects: [])
         try #require(lines.count == 1, "\(lines.map(\.line.text))")
         let line = lines[0].line
         let courier = CTFontCreateWithName("Courier" as CFString, line.fontSize, nil)
         let ascent = CTFontGetAscent(courier), descent = CTFontGetDescent(courier)
-        if text.unicodeScalars.contains("\u{6F22}") {
+        if text.unicodeScalars.contains("\u{2192}") {
             // The case has power: this line's own bounds are not Courier's,
             // so a cell measured by them would sit elsewhere.
             let laid = try #require(HiddenTextLine.layout(line.text, size: line.fontSize))
@@ -185,7 +247,7 @@ struct PageTextPathTests {
 
     struct Fault: Error {}
 
-    @Test("A step that fails makes the path fail, and the rasterizer then writes a picture")
+    @Test("A step that throws makes the path throw")
     func faultingStepThrows() async throws {
         let (entries, _, size) = try await Self.entries()
         var steps = PageTextPath.Steps.live
@@ -197,6 +259,37 @@ struct PageTextPathTests {
                     textPathRectangles: [], paintedRectangles: [], pageIndex: 0)
             }
         }
+    }
+
+    @Test("A line that cannot be laid out makes the page a picture, with a region on it or none")
+    func unlaidLineMakesAPicture() async throws {
+        let (entries, _, size) = try await Self.entries()
+        let frame = PageFrame(rotation: 0, displayedSize: size)
+        let region = try Self.betaRegion(entries)
+        for rectangles in [[], [TextPathRectangle(rect: region, kind: .ordinary)]] {
+            let control = try await PageTextPath.run(
+                entries: entries, frame: frame,
+                textPathRectangles: rectangles, paintedRectangles: [], pageIndex: 0)
+            guard case .written = control.outcome else {
+                Issue.record("control with \(rectangles.count) region(s): \(control.outcome)")
+                continue
+            }
+            let refused = try await HiddenTextLine.$refuses.withValue({ _ in true }) {
+                try await PageTextPath.run(
+                    entries: entries, frame: frame,
+                    textPathRectangles: rectangles, paintedRectangles: [], pageIndex: 0)
+            }
+            guard case .picture(let reason) = refused.outcome else {
+                Issue.record("with \(rectangles.count) region(s): \(refused.outcome)")
+                continue
+            }
+            #expect(reason == .noWritableText, "with \(rectangles.count) region(s)")
+        }
+        let found = HiddenTextLine.$refuses.withValue({ _ in true }) {
+            TextLayerReconstructor.drawnCellHits(entries: entries, pageWidth: size.width, regionShapes: [])
+        }
+        #expect(!found.laidOut)
+        #expect(found.hits.isEmpty)
     }
 
     @Test("The whole-word closure leaves each marked word out whole and counts it")

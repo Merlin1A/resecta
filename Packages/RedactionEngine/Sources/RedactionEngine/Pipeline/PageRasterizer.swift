@@ -188,19 +188,6 @@ public final class PageRasterizer: @unchecked Sendable {
         let dpi: Int
     }
 
-    /// A Searchable page's text layer as it crosses the render: the
-    /// surviving characters, their digest, the removal rectangles the line
-    /// assembly reads, the page's fallback reason and its count of runs left
-    /// out. `prepareTextLayer` writes it; after the render, only the ink test
-    /// changes it: it may drop the text layer and record why.
-    struct TextLayerState {
-        var entries: [CharacterInfo]?
-        var digest: PageFilterDigest?
-        var removalRects: [CGRect]
-        var fallbackReason: TextLayerDetector.FallbackReason?
-        var runsLeftOut: Int = 0
-    }
-
     /// The front gate, the test seam, the mode check and the DPI. Throws
     /// the page's refusal.
     private func preflight(_ page: PDFPageData, dpiCap: Int) throws -> Raster {
@@ -294,6 +281,7 @@ public final class PageRasterizer: @unchecked Sendable {
         var fallbackReason = page.fallbackReason
         // The text path's count of runs left out (zero unless the path ran).
         var runsLeftOut = 0
+        var hiddenTextLines: HiddenTextLines? = nil
 
         if page.pipelineMode == .searchableRedaction {
             let extractor = TextLayerExtractor()
@@ -340,11 +328,11 @@ public final class PageRasterizer: @unchecked Sendable {
                     // SOURCE frame of a rotated page.
                     let frame = PageFrame(
                         rotation: page.rotation, displayedSize: effectiveSize)
-                    // The page's text path: the filter, the drawn-cell rule
-                    // and the record, each step through its seam
-                    // (`PageTextPath`). Its rectangles are the removal
-                    // rectangles above, every one ordinary; nothing is painted
-                    // by a plan yet.
+                    // The page's text path: the fold, the filter, the alphabet
+                    // marks, the drawn-cell rule and the record, each step
+                    // through its seam (`PageTextPath`). Its rectangles are
+                    // the removal rectangles above, every one ordinary; no
+                    // painted rectangle is passed.
                     let path = try await PageTextPath.run(
                         entries: characters, frame: frame,
                         textPathRectangles: redactionRectsInPoints.map {
@@ -362,14 +350,16 @@ public final class PageRasterizer: @unchecked Sendable {
                         textLayerEntries = entries
                         redactionRectsForTextLayer = removalRects
                         pageDigest = digest
+                        hiddenTextLines = path.hiddenTextLines
                     case .picture(let reason):
                         // The page is written without a text layer (entries
-                        // and digest never set, the reason recorded). Today
-                        // the one such outcome is the drawn-cell rule's
-                        // re-flow limit leaving a cell inside a region.
+                        // and digest never set, the reason recorded): the
+                        // drawn-cell rule did not settle outside the regions,
+                        // a line could not be laid out in the hidden text's
+                        // faces, or no word the hidden text can write is left.
                         fallbackReason = reason
                         pageRasterizerLogger.log(
-                            "page \(page.pageIndex) fell back to secure rasterization at runtime (the text layer did not settle outside the redaction regions)"
+                            "page \(page.pageIndex) fell back to secure rasterization at runtime (the text path ended in a picture: \(String(describing: reason), privacy: .public))"
                         )
                     }
                 } else {
@@ -397,7 +387,7 @@ public final class PageRasterizer: @unchecked Sendable {
         return TextLayerState(
             entries: textLayerEntries, digest: pageDigest,
             removalRects: redactionRectsForTextLayer, fallbackReason: fallbackReason,
-            runsLeftOut: runsLeftOut
+            runsLeftOut: runsLeftOut, hiddenTextLines: hiddenTextLines
         )
     }
 
@@ -439,6 +429,7 @@ public final class PageRasterizer: @unchecked Sendable {
             textLayer.removalRects = []
             textLayer.digest = nil
             textLayer.runsLeftOut = 0
+            textLayer.hiddenTextLines = nil
             if Self.inkTestCanRun(context: ctx, pageSize: effectiveSize) {
                 textLayer.fallbackReason = .hiddenText
                 pageRasterizerLogger.log(
@@ -509,7 +500,7 @@ public final class PageRasterizer: @unchecked Sendable {
         // Use point dimensions (not pixel) for the PDF media box.
         // The CGImage carries the full pixel resolution; CGPDFContext embeds it
         // at native DPI when drawn into the smaller point-sized rect.
-        let output = PageOutput(
+        var output = PageOutput(
             image: redactedImage,
             size: effectiveSize,
             textLayerEntries: textLayer.entries,
@@ -517,6 +508,7 @@ public final class PageRasterizer: @unchecked Sendable {
             rotation: page.rotation,
             runsLeftOut: textLayer.runsLeftOut
         )
+        output.hiddenTextLines = textLayer.hiddenTextLines
         return RasterizeResult(pageOutput: output, filterDigest: textLayer.digest,
                                fallbackReason: textLayer.fallbackReason)
     }

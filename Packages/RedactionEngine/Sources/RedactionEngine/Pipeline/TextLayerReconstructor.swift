@@ -1,13 +1,18 @@
 import CoreGraphics
 import CoreText
 import Foundation
+import os
+
+private let textLayerLogger = Logger(subsystem: "com.resecta.engine", category: "TextLayerReconstructor")
 
 // Draws surviving characters as invisible (rendering mode 3) text in the
 // PDF context, positioned over the rasterized page image.
 //
-// Security: Uses fresh Courier font only (no original document fonts).
-// Bland et al. glyph positioning attack vector reduced — Courier has uniform
-// advance widths and CTLineDraw produces only simple Tj operators. The J-12
+// Security: draws only in fresh Courier, Courier New and Menlo, chosen per run
+// by `HiddenTextFonts` (no original document fonts; a line any glyph of which
+// the system lays out in another face is not drawn). Bland et al. glyph
+// positioning attack vector reduced — the three faces have uniform advance
+// widths and CTLineDraw produces only simple Tj operators. The J-12
 // layout (2026-06-09) derives one quantized pitch per line band from source
 // metrics: the content-dependent channel this re-opens is the
 // band's quantized size class — bounded bits, redundant with the visible
@@ -70,7 +75,8 @@ enum TextLayerReconstructor {
         entries: [CharacterInfo],
         pageSize: CGSize,
         redactionRects: [CGRect] = [],
-        rotation: Int = 0
+        rotation: Int = 0,
+        laidOut carried: HiddenTextLines? = nil
     ) {
         guard !entries.isEmpty else { return }
 
@@ -78,15 +84,27 @@ enum TextLayerReconstructor {
         context.setTextDrawingMode(.invisible)
 
         let frame = PageFrame(rotation: rotation, displayedSize: pageSize)
-        let lines = sourceFrameLines(
-            entries, redactionRects: redactionRects, frame: frame
-        ).map(\.line)
         // Each line laid out in the hidden text's faces, with no relationship
         // to the original document's fonts, CMaps or glyph tables (the ASD
         // CMap leakage vector). A line that cannot be laid out in them means
-        // the page's hidden text is not written at all.
-        let laidOut = lines.map { HiddenTextLine.layout($0.text, size: $0.fontSize) }
-        guard laidOut.allSatisfy({ $0 != nil }) else { return }
+        // the page's hidden text is not written at all. The drawn-cell rule
+        // lays out every line before the record, so such a page is a picture
+        // before it reaches here; the lines it laid out are drawn as they are.
+        let lines: [TextLayerLine]
+        let laidOut: [CTLine?]
+        if let carried, carried.entryCount == entries.count, !carried.lines.isEmpty {
+            lines = carried.lines.map(\.line)
+            laidOut = carried.lines.map(\.laidOut)
+        } else {
+            lines = sourceFrameLines(
+                entries, redactionRects: redactionRects, frame: frame
+            ).map(\.line)
+            laidOut = lines.map { HiddenTextLine.layout($0.text, size: $0.fontSize) }
+        }
+        guard laidOut.allSatisfy({ $0 != nil }) else {
+            textLayerLogger.log("a line could not be laid out in the hidden text's faces: no hidden text written on this page")
+            return
+        }
         for (line, laid) in zip(lines, laidOut) {
             guard let ctLine = laid else { continue }
             context.saveGState()
@@ -377,22 +395,27 @@ enum TextLayerReconstructor {
 
     /// The drawn-cell rule's hits, and whether every line could be laid out
     /// in the hidden text's faces (`HiddenTextLine`). A line that could not
-    /// is measured no further; its page is a picture.
+    /// is measured no further; its page is a picture. Every line is laid out
+    /// on a page with no region too, where nothing is measured. `lines` are
+    /// the lines laid out, for the writer; empty when one could not be.
     static func drawnCellHits(
         entries: [CharacterInfo],
         pageWidth: CGFloat,
         regionShapes: [RegionShape]
-    ) -> (hits: IndexSet, laidOut: Bool) {
-        guard !entries.isEmpty, !regionShapes.isEmpty else { return (IndexSet(), true) }
+    ) -> (hits: IndexSet, laidOut: Bool, lines: [(line: TextLayerLine, laidOut: CTLine)]) {
+        guard !entries.isEmpty else { return (IndexSet(), true, []) }
         let rects = regionShapes.map(\.bounds)
         var hits = IndexSet()
+        var lines: [(line: TextLayerLine, laidOut: CTLine)] = []
         for sourced in layoutLinesWithSources(
             entries, pageWidth: pageWidth, redactionRects: rects
         ) {
             let line = sourced.line
             guard let ctLine = HiddenTextLine.layout(line.text, size: line.fontSize) else {
-                return (hits, false)
+                return (hits, false, [])
             }
+            lines.append((line, ctLine))
+            if regionShapes.isEmpty { continue }
             // The cell's height is the Courier face's own, as the writer's
             // base formula takes it: a line's typographic bounds are the
             // largest over its glyph runs, so a run in a substituted face
@@ -415,7 +438,7 @@ enum TextLayerReconstructor {
                 if inside { hits.insert(entry) }
             }
         }
-        return (hits, true)
+        return (hits, true, lines)
     }
 
     /// The drawn-cell rule in the page's SOURCE frame: on a page stored
@@ -435,7 +458,7 @@ enum TextLayerReconstructor {
         entries: [CharacterInfo],
         regionShapes: [RegionShape],
         frame: PageFrame
-    ) -> (hits: IndexSet, laidOut: Bool) {
+    ) -> (hits: IndexSet, laidOut: Bool, lines: [(line: TextLayerLine, laidOut: CTLine)]) {
         guard !frame.isUnrotated else {
             return drawnCellHits(
                 entries: entries, pageWidth: frame.displayedSize.width,
@@ -472,7 +495,7 @@ enum TextLayerReconstructor {
         regionShapes: [RegionShape],
         frame: PageFrame,
         passLimit: Int = drawnCellRulePassLimit
-    ) -> (result: FilterResult, dropped: Int, settled: Bool) {
+    ) -> (result: FilterResult, dropped: Int, settled: Bool, lines: HiddenTextLines?, laidOut: Bool) {
         var surviving = result.surviving
         var dropped = 0
         var passes = 0
@@ -482,12 +505,12 @@ enum TextLayerReconstructor {
                 .map(\.element)
             dropped += hits.count
         }
-        var (hits, laidOut) = drawnCellHits(
+        var (hits, laidOut, lines) = drawnCellHits(
             entries: surviving, regionShapes: regionShapes, frame: frame)
         while laidOut, !hits.isEmpty, passes < passLimit {
             drop(hits)
             passes += 1
-            (hits, laidOut) = drawnCellHits(
+            (hits, laidOut, lines) = drawnCellHits(
                 entries: surviving, regionShapes: regionShapes, frame: frame)
         }
         // A line the hidden text's faces cannot lay out leaves the page
@@ -499,7 +522,11 @@ enum TextLayerReconstructor {
                 surviving: surviving,
                 totalCharacters: result.totalCharacters,
                 excludedCount: result.excludedCount + dropped),
-            dropped, settled)
+            dropped, settled,
+            // The settled pass laid out the survivors as they stand: the
+            // writer draws those lines.
+            settled ? HiddenTextLines(lines: lines, entryCount: surviving.count) : nil,
+            laidOut)
     }
 
     // MARK: - Text Run Grouping

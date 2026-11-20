@@ -1,0 +1,19 @@
+Property: Every line of a Searchable page is laid out in the hidden text's faces before the record, on a page with no region too, so a line that cannot be laid out makes the page a picture and the record never lists text the writer does not write.
+Area: hidden text (the drawn-cell rule's layout)
+Test command: cd Packages/RedactionEngine && swift test --filter "PageTextPathTests"
+Must go red: RedactionEngineTests/PageTextPathTests unlaidLineMakesAPicture
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextLayerReconstructor.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextLayerReconstructor.swift
+index a31f53d7..3bbf7f60 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextLayerReconstructor.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextLayerReconstructor.swift
+@@ -403,7 +403,7 @@ enum TextLayerReconstructor {
+         pageWidth: CGFloat,
+         regionShapes: [RegionShape]
+     ) -> (hits: IndexSet, laidOut: Bool, lines: [(line: TextLayerLine, laidOut: CTLine)]) {
+-        guard !entries.isEmpty else { return (IndexSet(), true, []) }
++        guard !entries.isEmpty, !regionShapes.isEmpty else { return (IndexSet(), true, []) }
+         let rects = regionShapes.map(\.bounds)
+         var hits = IndexSet()
+         var lines: [(line: TextLayerLine, laidOut: CTLine)] = []

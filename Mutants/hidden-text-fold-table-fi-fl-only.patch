@@ -1,0 +1,24 @@
+Property: Each of the seven joined-letter code points is written as its letters.
+Area: hidden text (the alphabet, wired into the text path)
+Test command: cd Packages/RedactionEngine && swift test --filter "HiddenTextAlphabetExportTests|TextPathAlphabetFaultTests|HiddenTextFontsTests" (or DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/HiddenTextAlphabetExportTests -only-testing:RedactionEngineTests/TextPathAlphabetFaultTests -only-testing:RedactionEngineTests/HiddenTextFontsTests)
+Must go red: RedactionEngineTests/HiddenTextAlphabetExportTests exportsAsListed [the seven joined letters, each stored as one character]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Text/JoinedLetters.swift b/Packages/RedactionEngine/Sources/RedactionCore/Text/JoinedLetters.swift
+index b88c544b..bcf50065 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Text/JoinedLetters.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Text/JoinedLetters.swift
+@@ -8,13 +8,8 @@ package enum JoinedLetters {
+ 
+     /// Each joined-letter code point and its letters, in order.
+     package static let letters: [Unicode.Scalar: String] = [
+-        "\u{FB00}": "ff",
+         "\u{FB01}": "fi",
+         "\u{FB02}": "fl",
+-        "\u{FB03}": "ffi",
+-        "\u{FB04}": "ffl",
+-        "\u{FB05}": "st",
+-        "\u{FB06}": "st",
+     ]
+ 
+     /// The letters `scalar` stands for, or nil when it is not a joined letter.

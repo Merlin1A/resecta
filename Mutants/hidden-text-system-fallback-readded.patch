@@ -1,0 +1,30 @@
+Property: The system's font fallback is never used for the hidden text: a run none of the three faces can draw is left out and counted before the record, so the record and the written page hold the same characters.
+Area: hidden text (the alphabet, wired into the text path)
+Test command: cd Packages/RedactionEngine && swift test --filter "AdversarialSearchableVerificationTests|PageTextPathTests|HiddenTextAlphabetExportTests"
+Must go red: RedactionEngineTests/AdversarialSearchableVerificationTests rt5Layer9RoundTripComposedSequence; RedactionEngineTests/PageTextPathTests runNoFaceWritesIsLeftOut [Report 漢 12]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/HiddenTextFonts.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/HiddenTextFonts.swift
+index a8296b86..041a66f2 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/HiddenTextFonts.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/HiddenTextFonts.swift
+@@ -51,6 +51,7 @@ enum HiddenTextFonts {
+     static func choice(for run: String) -> Choice? {
+         let characters = run.filter { $0.unicodeScalars.elementsEqual([NeverWrittenCharacters.objectMark]) == false }
+         if characters.unicodeScalars.contains(where: NeverWrittenCharacters.contains) { return nil }
++        if !characters.isEmpty { return .oneFont("Courier") }
+         if let whole = faces.first(where: { face in characters.allSatisfy { hasGlyphs(for: $0, in: face.1) } }) {
+             return .oneFont(whole.0)
+         }
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/HiddenTextLine.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/HiddenTextLine.swift
+index 7f0a3972..08de0cea 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/HiddenTextLine.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/HiddenTextLine.swift
+@@ -48,6 +48,7 @@ enum HiddenTextLine {
+         }
+         guard closeRun() else { return nil }
+         let line = CTLineCreateWithAttributedString(attributed)
++        return line
+         let glyphRuns = CTLineGetGlyphRuns(line) as? [CTRun] ?? []
+         for glyphRun in glyphRuns {
+             let attributes = CTRunGetAttributes(glyphRun) as NSDictionary
