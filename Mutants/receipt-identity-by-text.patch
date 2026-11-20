@@ -1,0 +1,18 @@
+Property: Two posts are the same message only when they carry the same event; two events with the same words are both shown.
+Area: the brief messages, the queue
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild build-for-testing -scheme ResectaApp -destination id=<simulator>, then DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test-without-building -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/ToastQueueManagerTests
+Must go red: ResectaAppTests/ToastQueueManagerTests sameWordsTwoEvents
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/ToastQueueManager.swift b/Sources/ResectaApp/State/ToastQueueManager.swift
+index c682b155..143147b9 100644
+--- a/Sources/ResectaApp/State/ToastQueueManager.swift
++++ b/Sources/ResectaApp/State/ToastQueueManager.swift
+@@ -313,6 +313,7 @@ final class ToastQueueManager {
+ 
+     private func admit(_ item: ToastItem, layer: UUID?) {
+         let at = now()
++        if entries.contains(where: { $0.item.message == item.message && $0.item.severity == item.severity }) { return }
+         if var shown = current, shown.item.event == item.event {
+             shown.item = shown.item.taking(item)
+             shown.clock = ReceiptClock(life: displayDuration(for: shown.item))

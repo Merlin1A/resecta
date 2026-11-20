@@ -232,7 +232,12 @@ extension SearchAndRedactSheet {
                     else { return }
                     Self.restoreModeSwitchSnapshot(snapshot, in: target)
                 }
-            }
+            },
+            // The Undo means what it offered only while the document is
+            // being edited: a tap in any other phase runs nothing. The
+            // queue's documentPhaseDidChange(to:) ends the message when the
+            // phase leaves editing; nothing in the app calls it yet.
+            stillValid: { [weak documentState] in documentState?.phaseKind == .editing }
         )
     }
 
