@@ -5,7 +5,7 @@ Must go red: RedactionEngineTests/MetaReadBackTests searchablePasses; RedactionE
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
-index a3ce0256..65d75b70 100644
+index c4722007..d5ebf7ca 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
 @@ -227,7 +227,6 @@ public actor PDFStreamReconstructor {
@@ -22,5 +22,5 @@ index a3ce0256..65d75b70 100644
          // The coordinator keeps the file only when this holds.
 +        let originals = MetaReadBack.originals(of: tempURL)
          _metaReadBack = MetaReadBack.check(url: tempURL, originals: originals)
- 
-         // Apply `.complete` file protection to the finalized temp
+         #if DEBUG
+         if Self.readBackAccepts { _metaReadBack = .held }
