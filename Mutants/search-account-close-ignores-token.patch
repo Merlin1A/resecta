@@ -5,14 +5,14 @@ Must go red: ResectaAppTests/SearchAccountLifecycleTests completedOnAnotherToken
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/State/SearchState+Account.swift b/Sources/ResectaApp/State/SearchState+Account.swift
-index 700bf1a1..0918de73 100644
+index 7961ed8c..2dcbf4f8 100644
 --- a/Sources/ResectaApp/State/SearchState+Account.swift
 +++ b/Sources/ResectaApp/State/SearchState+Account.swift
-@@ -57,7 +57,6 @@ extension SearchState {
+@@ -66,7 +66,6 @@ extension SearchState {
      /// an account from another run is left open.
      func closeAccount(_ how: AccountClose, run: Int? = nil) {
          guard var account = accountInHand, let token = accountInHandToken else { return }
 -        if let run, run != accountInHandRun { return }
+         let applied = accountInHandApplied
          accountInHand = nil
          accountInHandToken = nil
-         switch how {

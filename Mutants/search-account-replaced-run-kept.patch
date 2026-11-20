@@ -5,15 +5,15 @@ Must go red: ResectaAppTests/SearchAccountLifecycleTests superseded; ResectaAppT
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/State/SearchState+Account.swift b/Sources/ResectaApp/State/SearchState+Account.swift
-index 700bf1a1..1b0ec86a 100644
+index 7961ed8c..5fb08ba7 100644
 --- a/Sources/ResectaApp/State/SearchState+Account.swift
 +++ b/Sources/ResectaApp/State/SearchState+Account.swift
-@@ -62,7 +62,7 @@ extension SearchState {
-         accountInHandToken = nil
+@@ -73,7 +73,7 @@ extension SearchState {
+         accountInHandApplied = false
          switch how {
          case .dropped:
 -            return
 +            account.end(.completed)
+         case .replaced where !applied:
+             return
          case .completed:
-             account.end(.completed)
-         case .cancelled:
