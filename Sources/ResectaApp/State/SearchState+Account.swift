@@ -35,8 +35,12 @@ extension SearchState {
         amendAccount(run: run) { $0.recordRecognitionOff(page: page) }
     }
 
-    func recordPatternTimedOut(page: Int, run: Int) {
-        amendAccount(run: run) { $0.recordPatternTimedOut(page: page) }
+    func recordPatternTimedOut(page: Int, text: String, run: Int) {
+        amendAccount(run: run) { $0.recordPatternTimedOut(page: page, text: text) }
+    }
+
+    func recordUnboxedMatch(page: Int, text: String, run: Int) {
+        amendAccount(run: run) { $0.recordUnboxedMatch(page: page, text: text) }
     }
 
     /// A report reaches its own run's account. One that arrives after that

@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import Testing
 @testable import RedactionEngine
@@ -181,6 +182,19 @@ struct SearchAccountLifecycleTests {
         await search.cancelSearch()
         search.cancelSearchWithoutAwait()
         #expect(store.order.isEmpty)
+    }
+
+    @Test("A match with no box reaches the run's account and the applied record, by page and text")
+    func unboxedMatchReachesTheRecord() throws {
+        let store = Store()
+        let (search, run) = Self.running(store)
+        search.appendResult(SearchResult.unboxed(pageIndex: 3, matchedText: "Delia Rourke", contextSnippet: "…",
+                                                 source: .textLayer, term: "Delia"), run: run)
+        search.appendResult(SearchResult(pageIndex: 2, normalizedRect: CGRect(x: 0.1, y: 0.1, width: 0.2, height: 0.03),
+                                         matchedText: "Delia", contextSnippet: "…", source: .textLayer, term: "Delia"), run: run)
+        search.closeAccount(.completed, run: run)
+        let record = try #require(search.appliedSearchRecord())
+        #expect(record.account?.unboxedMatchTexts == [3: ["Delia Rourke"]])
     }
 
     @Test("The results line names the too-large pages of the applied searches' accounts and the latest run's")

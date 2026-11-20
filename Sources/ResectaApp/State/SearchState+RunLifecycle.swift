@@ -161,6 +161,8 @@ extension SearchState {
             }
         }
         pendingResults.append((run: runToken, result: result))
+        // A match with no box is a row of the stop at Redact: the account keeps its text.
+        if !result.hasBox { recordUnboxedMatch(page: result.pageIndex, text: result.matchedText, run: runToken) }
         if !resultsAtCap, results.count + pendingResults.count >= DocumentSearcher.maxResults,
            listedMatchKeys().count >= DocumentSearcher.maxResults {
             noteCapReached()  // the match that reaches the limit is kept, with its later lines

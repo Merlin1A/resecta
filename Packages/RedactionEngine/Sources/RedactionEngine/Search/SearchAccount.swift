@@ -36,6 +36,11 @@ public struct SearchAccount: Sendable, Hashable {
     }
 
     private(set) var account: AccountOfWhatWasRead
+    /// Per page, the searched texts that ran out of time there: the one fact
+    /// in which two texts of one run can differ.
+    public private(set) var patternTimedOutTexts: [Int: Set<String>] = [:]
+    /// Per page, the texts of matches found there that could not be given a box.
+    public private(set) var unboxedMatchTexts: [Int: Set<String>] = [:]
 
     public init(pageCount: Int) { account = AccountOfWhatWasRead(pageCount: pageCount) }
 
@@ -46,7 +51,12 @@ public struct SearchAccount: Sendable, Hashable {
 
     public mutating func recordRecognitionOff(page: Int) { account.record(.recognitionOff, forPage: page) }
 
-    public mutating func recordPatternTimedOut(page: Int) { account.record(.patternTimedOut, forPage: page) }
+    public mutating func recordPatternTimedOut(page: Int, text: String) {
+        account.record(.patternTimedOut, forPage: page)
+        patternTimedOutTexts[page, default: []].insert(text)
+    }
+
+    public mutating func recordUnboxedMatch(page: Int, text: String) { unboxedMatchTexts[page, default: []].insert(text) }
 
     public mutating func end(_ ending: Ending) {
         switch ending {

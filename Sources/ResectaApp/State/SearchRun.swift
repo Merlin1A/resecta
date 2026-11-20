@@ -327,6 +327,8 @@ import RedactionEngine
     /// stream opens. `tearDownEngineSinks()` nils six of them at the
     /// tail (the OCR-skip sink has never been nilled there).
     private func installEngineSinks(run: Int) async {
+        // The pattern a regex timeout is for: the run's own query, as it was typed.
+        let pattern = searchState.queryText
         // Install the overlap sink. `DocumentSearcher` calls this
         // once per page where the resolver dropped at least one loser.
         await searcher.setOverlapSink({ [weak searchState] counts in
@@ -349,7 +351,7 @@ import RedactionEngine
         await searcher.setRegexTimeoutSink({ [weak searchState] page in
             Task { @MainActor in
                 searchState?.recordRegexTimeout(page: page)
-                searchState?.recordPatternTimedOut(page: page, run: run)
+                searchState?.recordPatternTimedOut(page: page, text: pattern, run: run)
             }
         })
         // Install the regex-rejection sink beside the timeout
@@ -389,9 +391,9 @@ import RedactionEngine
         // sheet over Search (the saved list as a recall starts the run)
         // does not take them.
         let runLayer = messageLayerID
-        await searcher.setUserTermsTimeoutSink({ [weak toastManager, weak searchState] page, _ in
+        await searcher.setUserTermsTimeoutSink({ [weak toastManager, weak searchState] page, term in
             Task { @MainActor in
-                searchState?.recordPatternTimedOut(page: page, run: run)
+                searchState?.recordPatternTimedOut(page: page, text: term, run: run)
                 guard timeoutToast.fire() else { return }
                 toastManager?.post(.customTermTimeout, runLayer: runLayer)
             }
