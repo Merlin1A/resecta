@@ -1,0 +1,18 @@
+Property: The record keeps the plan the rasterizer paints: made under the one plan source, as placed, one box per admitted region as placed. Here the capture makes the record's plan under the switch's policy while the regions are painted as placed (PACKAGES-VARIANT L299).
+Area: run record
+Test command: cd Packages/RedactionEngine && swift test --filter RunPlanKeptTests
+Must go red: RedactionEngineTests/RunPlanKeptTests keptPlanIsAsPlaced; RedactionEngineTests/RunPlanKeptTests switchIgnoredAsPlaced
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
+@@ -95,7 +95,7 @@
+             if let width = PixelPlan.sixtyFourths(ofSide: Double(turned ? cropBox.height : cropBox.width)),
+                let height = PixelPlan.sixtyFourths(ofSide: Double(turned ? cropBox.width : cropBox.height)) {
+                 let admitted = regions.filter { RedactionRegion.isAdmitted(normalizedRect: $0.normalizedRect) }
+-                let choice = RunRecord.planChoice(source: RunRecord.planSource, switchOn: switchOn)
++                let choice = RunRecord.planChoice(source: .switchPolicy, switchOn: switchOn)
+                 // Each region goes with its kind; under "as placed" the plan
+                 // reads none.
+                 let planRegions = admitted.map { region in

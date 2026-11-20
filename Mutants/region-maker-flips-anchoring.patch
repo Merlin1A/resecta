@@ -1,0 +1,18 @@
+Property: The one maker of a placed region marks it placed from the text, and anchored, exactly when its result was read from the text layer. Here the maker flips that.
+Area: region marks
+Test command: cd Packages/RedactionEngine && swift test --filter RunPlanKeptTests
+Must go red: RedactionEngineTests/RunPlanKeptTests makerSetsBothMarks; RedactionEngineTests/RunPlanKeptTests "Each region's kind, read from its source and its two marks" (anchoredFromText, readFromThePicture); RedactionEngineTests/RunPlanKeptTests movedSearchBoxSendsThePageToAPicture
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RedactionRegion+Marks.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RedactionRegion+Marks.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RedactionRegion+Marks.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RedactionRegion+Marks.swift
+@@ -17,7 +17,7 @@
+         self.init(id: UUID(), normalizedRect: result.normalizedRect,
+                   source: .searchMatch(term: result.term, rationale: result.rationale),
+                   textLayerRect: result.textLayerRect,
+-                  textAnchored: result.source == .textLayer)
++                  textAnchored: result.source != .textLayer)
+     }
+ }
+ 

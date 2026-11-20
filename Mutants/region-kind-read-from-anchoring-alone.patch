@@ -1,0 +1,18 @@
+Property: A region's kind reads both marks: placed from the text and then moved or resized is its own kind. Here the kind reads anchoring alone, so such a region reads as placed from the picture.
+Area: region kinds
+Test command: cd Packages/RedactionEngine && swift test --filter RunPlanKeptTests
+Must go red: RedactionEngineTests/RunPlanKeptTests "Each region's kind, read from its source and its two marks" (movedAfterPlacedFromText)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RedactionRegion+Marks.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RedactionRegion+Marks.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RedactionRegion+Marks.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RedactionRegion+Marks.swift
+@@ -31,8 +31,6 @@
+             self = .drawnByHand
+         } else if region.textAnchored {
+             self = .placedFromTextAnchored
+-        } else if region.placedFromPageText {
+-            self = .placedFromTextThenEdited
+         } else {
+             self = .placedFromPicture
+         }

@@ -1,0 +1,18 @@
+Property: A region is never anchored unless it was placed from the page's text: setting anchoring on one that was not leaves it off. Here the setter lets it on.
+Area: region marks
+Test command: cd Packages/RedactionEngine && swift test --filter RunPlanKeptTests
+Must go red: RedactionEngineTests/RunPlanKeptTests anchoredOnlyWherePlaced
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RedactionRegion.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RedactionRegion.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RedactionRegion.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RedactionRegion.swift
+@@ -44,7 +44,7 @@
+     /// without it decodes as false. It is never true where
+     /// `placedFromPageText` is false: setting it true there leaves it false.
+     public var textAnchored: Bool {
+-        didSet { if textAnchored && !placedFromPageText { textAnchored = false } }
++
+     }
+     /// Placed from a match in the page's own text layer: set once where the
+     /// region is made and never changed. A move or a resize leaves it as it
