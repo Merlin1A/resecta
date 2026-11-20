@@ -16,7 +16,8 @@ struct SearchRecheckOCRTests {
         let img = try TestFixtures.renderedTextImage("CONFIDENTIAL", width: 1200, height: 1500, fontSize: 130)
         let (doc, url) = try await TestFixtures.imagePagesPDF([img], size: CGSize(width: 1200, height: 1500))
         defer { try? FileManager.default.removeItem(at: url) }
-        #expect((doc.page(at: 0)?.string ?? "").isEmpty, "the fixture must carry no text layer")
+        let pageText = try #require(doc.page(at: 0), "the fixture has a first page").string ?? ""
+        #expect(pageText.isEmpty, "the fixture must carry no text layer")
 
         // R-1 (raster half): the sub-document keeps the page image.
         let data = try #require(doc.page(at: 0)?.dataRepresentation)

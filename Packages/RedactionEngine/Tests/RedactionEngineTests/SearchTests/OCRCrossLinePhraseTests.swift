@@ -35,7 +35,8 @@ struct OCRCrossLinePhraseTests {
     static func scannedPage() async throws -> (PDFDocument, URL) {
         let (doc, url) = try await TestFixtures.imagePagesPDF([try twoLineImage()], size: CGSize(width: 1600, height: 1200),
                                                               prefix: "crossline_")
-        #expect((doc.page(at: 0)?.string ?? "").isEmpty, "the fixture carries no text layer")
+        let pageText = try #require(doc.page(at: 0), "the fixture has a first page").string ?? ""
+        #expect(pageText.isEmpty, "the fixture carries no text layer")
         return (doc, url)
     }
 

@@ -42,7 +42,8 @@ struct ScannedSampleNumberSearchTests {
     @Test("A default text search for the service number matches the scanned statement page")
     func serviceNumberOnTheScannedPage() async throws {
         let doc = try scannedSamplePage(2)
-        #expect((doc.page(at: 0)?.string ?? "").isEmpty, "the page is a picture with no text layer")
+        let pageText = try #require(doc.page(at: 0), "the fixture has a first page").string ?? ""
+        #expect(pageText.isEmpty, "the page is a picture with no text layer")
         let searcher = DocumentSearcher()
         await searcher.setTextLayerStatus([0: TextLayerStatus.none])
         var results: [SearchResult] = []
