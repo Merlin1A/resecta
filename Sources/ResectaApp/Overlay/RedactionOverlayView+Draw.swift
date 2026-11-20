@@ -19,6 +19,8 @@ extension RedactionOverlayView {
     /// The committed regions with their lift, badge, dimension label and
     /// resize handles — the first segment of `draw(_:)`.
     func drawCommittedRegions(ctx: CGContext, in rect: CGRect) {
+        // The plan this page is drawn from is kept with its settings (G-06a).
+        coordinator?.noteDrawn(pageIndex: pageIndex, regions: regions)
         // Draw committed regions
         for region in regions {
             let viewRect = pdfNormalizedToOverlay(region.normalizedRect)
