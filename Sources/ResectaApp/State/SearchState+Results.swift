@@ -25,6 +25,10 @@ extension SearchState {
     /// Filtered match count (respects the filters; a wrapped match counts once).
     var filteredCount: Int { Self.occurrenceCount(filteredResults) }
 
+    /// Matches a filter hides, ticked or not, for the statement's hidden
+    /// count (`SearchStatement`). A wrapped match counts once.
+    var hiddenByFilterCount: Int { max(0, totalCount - filteredCount) }
+
     /// 1-based position of `currentResult` within `filteredResults`.
     /// Returns nil when there is no current result or when the current
     /// result is not present in `filteredResults` (i.e. it is hidden by
