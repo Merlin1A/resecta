@@ -10,7 +10,7 @@ import Foundation
 /// report can only add facts, never remove one, so within a run a page's
 /// state is the worst that any term's visit reported. A page's state is the
 /// first row of `state(of:position:)` that applies.
-struct AccountOfWhatWasRead: Sendable, Equatable {
+struct AccountOfWhatWasRead: Sendable, Hashable {
 
     /// What the reports said of one page. Each is a fact a report adds.
     struct Facts: OptionSet, Sendable, Hashable {
@@ -85,7 +85,7 @@ struct AccountOfWhatWasRead: Sendable, Equatable {
     }
 
     /// How the run ended. Pages are zero-based indices.
-    enum Ending: Sendable, Equatable {
+    enum Ending: Sendable, Hashable {
         case completed
         /// The result limit was reached on this page.
         case stoppedAtResultLimit(page: Int)
