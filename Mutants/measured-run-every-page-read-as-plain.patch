@@ -1,0 +1,19 @@
+Property: A page whose content shows invisible text or reaches a picture is not read: the plan is never made on facts the entry did not read.
+Area: measured run entry
+Test command: cd Packages/RedactionEngine && swift test --filter MeasuredRunTests
+Must go red: RedactionEngineTests/MeasuredRunTests "A page whose content reaches a picture is not read and gets no plan"
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Tests/RedactionEngineTests/Fixtures/MeasuredRun.swift b/Packages/RedactionEngine/Tests/RedactionEngineTests/Fixtures/MeasuredRun.swift
+index e6d159d7..d2f4c740 100644
+--- a/Packages/RedactionEngine/Tests/RedactionEngineTests/Fixtures/MeasuredRun.swift
++++ b/Packages/RedactionEngine/Tests/RedactionEngineTests/Fixtures/MeasuredRun.swift
+@@ -98,7 +98,7 @@ enum MeasuredRun {
+     /// or reaches a picture is not read (nil): its facts are not made here.
+     static func planFacts(of page: PDFPage) -> PageTextFacts? {
+         let facts = PageContentFacts.read(page.pageRef)
+-        guard !facts.showsInvisibleText, !facts.reachesImage, !facts.drawsInlineImage else { return nil }
++        _ = facts
+         return PageTextFacts(showsInvisibleText: false, carriesPageScaleImage: false)
+     }
+ 
