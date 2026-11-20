@@ -61,17 +61,19 @@ enum MeasuredRun {
 
     /// Where an anchored region's selected characters come from.
     enum Selection: String, Sendable {
-        /// What the product hands the plan: today no region carries the
-        /// characters its match selected, so none.
+        /// What the product hands the plan: the characters each region's
+        /// match selected, carried with the region (`RunRecord.planRegions`).
         case product
         /// Handed in by a case: the value's own characters in the page's
         /// string, one occurrence for each region, in reading order.
         case valueCharacters
     }
 
-    /// The selected characters of each region, by `selection`.
-    static func selected(_ selection: Selection, regions: [RedactionRegion], value: String, text: String) -> [UUID: Set<Int>] {
-        guard selection == .valueCharacters, !value.isEmpty else { return [:] }
+    /// The selected characters a case hands in for each region, or nil for
+    /// the product's own.
+    static func selected(_ selection: Selection, regions: [RedactionRegion], value: String, text: String) -> [UUID: Set<Int>]? {
+        guard selection == .valueCharacters else { return nil }
+        guard !value.isEmpty else { return [:] }
         let string = text as NSString
         var ranges: [Range<Int>] = []
         var from = 0
@@ -134,17 +136,18 @@ enum MeasuredRun {
         return try await PageWordReader.words(on: page)
     }
 
-    /// The plan of one arm: the admitted regions with their kinds, the
-    /// page's words, and the facts above.
-    static func plan(page: PDFPage, words: PageWords, regions: [RedactionRegion], selected: [UUID: Set<Int>] = [:],
+    /// The plan of one arm: the admitted regions made into the plan's
+    /// regions by the run's own maker over the page's string, the page's
+    /// words, and the facts above. A case may hand in the selected
+    /// characters in place of the product's.
+    static func plan(page: PDFPage, words: PageWords, regions: [RedactionRegion], selected: [UUID: Set<Int>]? = nil,
                      arm: Arm, source: PlanSource) -> Result<PaintPlan, NotReadError> {
         guard let sides = sides(of: page) else { return .failure(NotReadError(reason: .sides)) }
         guard let facts = planFacts(of: page) else { return .failure(NotReadError(reason: .facts)) }
-        let planRegions = regions.filter { RedactionRegion.isAdmitted(normalizedRect: $0.normalizedRect) }.map { region in
-            let r = region.normalizedRect
-            return PlanRegion(id: region.id,
-                              share: PointRect(minX: Double(r.minX), minY: Double(r.minY), maxX: Double(r.maxX), maxY: Double(r.maxY)),
-                              kind: RegionKind(of: region), selected: selected[region.id] ?? [])
+        let admitted = regions.filter { RedactionRegion.isAdmitted(normalizedRect: $0.normalizedRect) }
+        var planRegions = RunRecord.planRegions(admitted.map(RunRecord.DrawnRegion.init(region:)), text: page.string ?? "")
+        if let selected {
+            planRegions = planRegions.map { var region = $0; region.selected = selected[region.id] ?? []; return region }
         }
         let choice = RunRecord.planChoice(source: source, switchOn: arm == .on)
         return .success(PaintPlan.make(regions: planRegions, words: words, text: page.string ?? "", facts: facts,

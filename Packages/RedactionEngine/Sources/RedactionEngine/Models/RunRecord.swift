@@ -107,14 +107,9 @@ public struct RunRecord: Equatable, Sendable {
             let admitted = regions.filter { RedactionRegion.isAdmitted(normalizedRect: $0.normalizedRect) }
             let choice = RunRecord.planChoice(source: RunRecord.planSource, switchOn: switchOn)
             // Each region goes with its kind; under "as placed" the plan
-            // reads none.
-            let planRegions = admitted.map { region in
-                let r = region.normalizedRect
-                return PlanRegion(id: region.id,
-                                  share: PointRect(minX: Double(r.minX), minY: Double(r.minY),
-                                                   maxX: Double(r.maxX), maxY: Double(r.maxY)),
-                                  kind: region.kind)
-            }
+            // reads none. Neither the run's capture nor the editor's drawing
+            // reads page text here, so no characters are selected.
+            let planRegions = RunRecord.planRegions(admitted, text: "")
             return PaintPlan.make(
                 regions: planRegions, words: PageWords(words: []), text: "",
                 facts: .noPageRead,
@@ -137,15 +132,20 @@ public struct RunRecord: Equatable, Sendable {
         public let normalizedRect: CGRect
         /// Read from the region's source and its two marks (`RegionKind(of:)`).
         package let kind: RegionKind
+        /// The characters its match selected on the page's string
+        /// (`RedactionRegion.pageCharacters`).
+        package let pageCharacters: Range<Int>?
 
         public init(region: RedactionRegion) {
-            self.init(id: region.id, normalizedRect: region.normalizedRect, kind: RegionKind(of: region))
+            self.init(id: region.id, normalizedRect: region.normalizedRect, kind: RegionKind(of: region),
+                      pageCharacters: region.pageCharacters)
         }
 
-        package init(id: UUID, normalizedRect: CGRect, kind: RegionKind) {
+        package init(id: UUID, normalizedRect: CGRect, kind: RegionKind, pageCharacters: Range<Int>? = nil) {
             self.id = id
             self.normalizedRect = normalizedRect
             self.kind = kind
+            self.pageCharacters = pageCharacters
         }
     }
 

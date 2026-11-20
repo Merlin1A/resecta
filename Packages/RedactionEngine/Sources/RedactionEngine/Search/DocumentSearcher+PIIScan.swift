@@ -125,7 +125,7 @@ extension DocumentSearcher {
                         piiConfidence: match.confidence,
                         rationale: match.rationale,
                         matchRangeInSnippet: window.matchRange, textLayerRect: box.textLayerRect, inkFitDegraded: box.degraded
-                    ).identified(by: box.identity))
+                    ).identified(by: box.identity).carrying(box.characters))
                     totalYielded += 1
 
                     for tail in tails {
@@ -208,7 +208,7 @@ extension DocumentSearcher {
                                 signals: [.userAlwaysFlag(pattern: hit.pattern)]
                             ).build(finalScore: 1.0),
                             matchRangeInSnippet: window.matchRange, textLayerRect: box.textLayerRect, inkFitDegraded: box.degraded
-                        ).identified(by: box.identity))
+                        ).identified(by: box.identity).carrying(box.characters))
                         totalYielded += 1
                     }
                     // Surface per-(page, pattern) timeouts so the

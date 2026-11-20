@@ -96,18 +96,20 @@ struct MeasuredRunTests {
         #expect(MeasuredRun.unreadable(rows: rows, expected: 2) == ["no widened box in the on arm"])
     }
 
-    @Test("With the product's selection a Search box is not read from its line, so the switch widens nothing")
-    func productSelectionWidensNothing() async throws {
+    @Test("With the product's selection a Search box is read from its line, and the switch widens it")
+    func productSelectionWidens() async throws {
         let page = try #require(try Self.pages().first)
         let document = try #require(PDFDocument(url: page.source))
         let first = try #require(document.page(at: 0))
         let regions = await MeasuredRun.placedRegions(value: page.value, in: document)
         let words = try #require(try await MeasuredRun.words(of: page.source))
         let selected = MeasuredRun.selected(.product, regions: regions, value: page.value, text: first.string ?? "")
-        #expect(selected.isEmpty)
+        #expect(selected == nil)
+        let text = try #require(first.string)
+        #expect(regions.map(\.pageCharacters) == [Range((text as NSString).range(of: page.value))])
         let plan = try MeasuredRun.plan(page: first, words: words, regions: regions, selected: selected, arm: .on,
                                         source: .switchPolicy).get()
-        #expect(plan.boxes.map(\.treatment) == [.couldNotWiden(.scanOrPicture)])
+        #expect(plan.boxes.map(\.treatment) == [.widened])
     }
 
     @Test("The entry reads the run capture's plan source unless a case hands it another")
@@ -156,7 +158,7 @@ struct MeasuredRunTests {
             let words = try #require(try await MeasuredRun.words(of: page.source))
             let text = try #require(first.string)
             let selected = MeasuredRun.selected(.valueCharacters, regions: regions, value: page.value, text: text)
-            #expect(selected.count == 1)
+            #expect(selected?.count == 1)
             let plan = try MeasuredRun.plan(page: first, words: words, regions: regions, selected: selected, arm: .on,
                                             source: .switchPolicy).get()
             #expect(plan.boxes.map(\.treatment) == [.widened])

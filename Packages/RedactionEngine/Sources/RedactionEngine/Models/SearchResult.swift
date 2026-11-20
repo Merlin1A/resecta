@@ -65,6 +65,18 @@ public struct SearchResult: Sendable, Identifiable, Equatable {
     /// took more bands. nil when `normalizedRect` is that box (every other
     /// result). A box grown for cover never widens what a match is told by.
     var identityRect: CGRect? = nil
+    /// The match's characters on its page as a range of the page's string
+    /// (UTF-16), for a match read from the text layer: the line's own part
+    /// for a match that wraps. nil for a recognised match and for a box that
+    /// stands for no single range.
+    package var pageCharacters: Range<Int>? = nil
+
+    /// This result with `characters` as its page characters.
+    package func carrying(_ characters: Range<Int>?) -> SearchResult {
+        var result = self
+        result.pageCharacters = characters
+        return result
+    }
 
     /// The box the hybrid merge compares (`mergeHybridResults`).
     var mergeIdentity: CGRect { identityRect ?? normalizedRect }
