@@ -192,6 +192,11 @@ extension PaintAndKindsCasesTests {
             // The count of unboxed words left out on the page, written by hand.
             #expect(Self.unboxedLeftOut(page, page1, boxed: row.boxed) == 0, "\(row): no unboxed word is left out")
         }
+        if row.number == 19 {
+            // The drawn-cell rule also reads the hidden letters' box, so the
+            // word would leave by it anyway: the filter must take it first.
+            #expect(path.drawnCellDropped == 0, "\(row): the filter takes the letters under the hidden letters' box")
+        }
     }
 }
 
@@ -314,6 +319,13 @@ extension PaintAndKindsCasesTests {
         let wide = try await Self.fieldRun("1,200.00"), narrow = try await Self.fieldRun("98.00")
         #expect(wide.written.text == narrow.written.text, "\(wide.written.text.debugDescription) / \(narrow.written.text.debugDescription)")
         #expect(Self.outside(wide.written) == Self.outside(narrow.written))
+        // Nothing is kept between the value's own rectangle and the plan's on
+        // this page, so the written text cannot show which one the writer
+        // breaks its lines by: read the rectangles it is handed instead.
+        for field in [wide, narrow] {
+            guard case .written(_, _, let removal) = field.path.outcome else { Issue.record("written"); continue }
+            #expect(removal == [Self.fieldPlan], "the writer breaks its lines by the plan's rectangle: \(removal)")
+        }
     }
 
     @Test("13: no letter a match selected has its middle outside its plan's rectangle")
