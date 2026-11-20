@@ -60,20 +60,20 @@ struct SearchStatementRuleTests {
                 for _ in 0..<pageCount { documents = documents.flatMap { doc in facts.map { doc + [$0] } } }
                 let accounts = documents.map { Self.account($0, end) }
                 let ranks = accounts.map { $0.account.states.map(Self.rank) }
+                let statements = accounts.map { Self.empty($0) }
+                let named = accounts.indices.map { Self.named(statements[$0], quiet: accounts[$0]) }
+                let qualified = accounts.map { Set($0.qualifiedPages) }
+                var broken: [String] = []
                 for i in accounts.indices {
-                    let first = Self.empty(accounts[i])
-                    let firstNamed = Self.named(first, quiet: accounts[i])
                     for j in accounts.indices where zip(ranks[i], ranks[j]).allSatisfy({ $0 <= $1 }) {
-                        let second = Self.empty(accounts[j])
-                        let secondNamed = Self.named(second, quiet: accounts[j])
-                        for page in accounts[i].qualifiedPages {
-                            #expect(accounts[j].qualifiedPages.contains(page) || secondNamed.contains(page))
-                        }
-                        #expect(firstNamed.isSubset(of: secondNamed))
-                        #expect(Self.strength(second.headline) <= Self.strength(first.headline))
                         pairs += 1
+                        let kept = qualified[i].isSubset(of: qualified[j].union(named[j]))
+                        let lines = named[i].isSubset(of: named[j])
+                        let weaker = Self.strength(statements[j].headline) <= Self.strength(statements[i].headline)
+                        if !(kept && lines && weaker), broken.count < 5 { broken.append("\(documents[i]) then \(documents[j]) \(end)") }
                     }
                 }
+                #expect(broken.isEmpty, "\(broken)")
             }
         }
         #expect(pairs > 0)
