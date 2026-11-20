@@ -717,3 +717,5 @@ with its reason and the mutant that is caught in its place.
 | `redact-stop-small-pictures.patch` | Small pictures alone never open the stop. | ResectaAppTests/RedactStopTests k704; ResectaAppTests/RedactStopTests namesExactlyWhatStops |
 | `redact-stop-answered-forever.patch` | An answer covers only the pages and reasons it was given for; a page unread later is named. | ResectaAppTests/RedactStopTests k705 |
 | `redact-stop-other-search-cures.patch` | Only a run of the same text, or of a text that covers it, cures a page. | ResectaAppTests/RedactStopTests k705; ResectaAppTests/RedactStopTests k731 |
+| `redact-stop-ahead-of-no-regions.patch` | With nothing to redact, or a run that cannot start, the stop is not shown: it comes after the notices. | ResectaAppTests/RedactStopRefusalTests noRegionsWins |
+| `redact-stop-answer-not-recorded.patch` | Redact Anyway answers every page the stop names, by page and reason. | ResectaAppTests/RedactStopRefusalTests answering |
