@@ -1,10 +1,11 @@
 import XCTest
 
-/// The Detection Sweep's needs-review row offers Review in Scan, as its note
-/// does. The seeded report `searchableSweepReview` reads Needs Review from
-/// the sweep alone. Its row is the thirteenth of a Searchable run
-/// (`layerResult_12`, numbered from zero in the engine's order). Opened,
-/// the row ends with the button; a tap leaves the results for the editor.
+/// The Detection Sweep's needs-review result offers Review in Scan, as its
+/// note does. The seeded report `searchableSweepReview` reads Needs Review
+/// from the sweep alone, the thirteenth check of a Searchable run; on the
+/// results screen it is the Findings row `finding_otherNeedsReview-12`
+/// (its check numbered from zero in the engine's order). Opened, the row
+/// shows the button; a tap leaves the results for the editor.
 /// The debug hook loads the sample document before it seeds the report, so
 /// the tap has a document to return to.
 ///
@@ -33,14 +34,13 @@ nonisolated final class ReviewInScanUITests: XCTestCase {
         let results = app.scrollViews["verificationResults"]
         XCTAssertTrue(results.waitForExistence(timeout: 30), "The seeded results never appeared.")
 
-        let row = app.descendants(matching: .any).matching(identifier: "layerResult_12").firstMatch
+        let row = app.descendants(matching: .any).matching(identifier: "finding_otherNeedsReview-12").firstMatch
         var scrolls = 0
         while !row.isHittable && scrolls < 6 {
             results.swipeUp()
             scrolls += 1
         }
-        XCTAssertTrue(row.waitForExistence(timeout: 10), "The thirteenth verification row never appeared.")
-        XCTAssertTrue(row.label.contains("Detection Sweep"), "Row 13 is not the Detection Sweep: \(row.label)")
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "The sweep's Findings row never appeared.")
         row.tap()
 
         let button = app.buttons["reviewInScanButton"]
