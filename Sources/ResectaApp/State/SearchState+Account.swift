@@ -102,6 +102,7 @@ extension SearchState {
         lastAccount = account
         lastAccountRun = accountInHandRun
         lastAccountToken = token
+        if case .replaced = how { accountReplacedSink?(token) }
         accountClosedSink?(token, account)
     }
 }

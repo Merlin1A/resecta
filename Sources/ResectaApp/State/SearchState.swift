@@ -482,6 +482,8 @@ final class SearchState: Identifiable {
     @ObservationIgnored var accountClosedSink: (@MainActor (UUID, SearchAccount) -> Void)?
     /// Where an opened account's run and query go: the document's run log (`SearchState+RunLog.swift`).
     @ObservationIgnored var accountOpenedSink: (@MainActor (UUID, AppliedSearchQuery) -> Void)?
+    /// Where a replaced run's kept account is named: it counts at the stop only while its boxes remain.
+    @ObservationIgnored var accountReplacedSink: (@MainActor (UUID) -> Void)?
 
     /// The options the current run started with, which the applied
     /// record names (`appliedSearchRecord()`); nil before any run.

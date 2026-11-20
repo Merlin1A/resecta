@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import Testing
 @testable import ResectaApp
@@ -38,5 +39,28 @@ struct SearchRunLogTests {
         state.recordSearchAccount(account, token: last)
         state.recordSearchAccount(account, token: first)
         #expect(state.closedSearchRuns.map(\.query) == [a, c])
+    }
+
+    @Test("Apply, edit the query, then delete the boxes: the replaced run counts while its boxes remain, and not after")
+    func replacedRunCountsWhileItsBoxesRemain() {
+        let token = UUID()
+        let query = AppliedSearchQuery(kind: .text("Delia"), options: SearchOptions())
+        let record = AppliedSearchRecord(query: query, foundCount: 1, accountToken: token)
+        let region = RedactionRegion(id: UUID(), normalizedRect: CGRect(x: 0.1, y: 0.1, width: 0.3, height: 0.04),
+                                     source: .searchMatch(term: "Delia", rationale: nil))
+        let snapshot = MatchAuditSnapshot(
+            origin: .search, resultID: UUID(), regionID: region.id, pageIndex: 0, matchedText: "Delia",
+            source: .textLayer, piiCategory: nil, piiConfidence: nil, rationale: nil, term: "Delia",
+            appliedAt: Date(), searchRecord: record)
+        #expect(RedactionState.liveAccountTokens(regions: [0: [region]], audit: [region.id: snapshot]) == [token])
+        #expect(RedactionState.liveAccountTokens(regions: [:], audit: [region.id: snapshot]).isEmpty, "the boxes deleted")
+
+        let state = RedactionState()
+        state.recordSearchRunOpened(token: token, query: query)
+        var account = SearchAccount(pageCount: 2)
+        account.end(.stopped(page: 0))
+        state.recordSearchRunReplaced(token: token)
+        state.recordSearchAccount(account, token: token)
+        #expect(state.closedSearchRuns.isEmpty, "no region from the replaced run is on the document")
     }
 }
