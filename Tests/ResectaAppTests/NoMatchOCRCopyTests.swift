@@ -104,7 +104,7 @@ struct NoMatchOCRCopyTests {
             "Sources/ResectaApp/Views/Search/SearchResultsSection.swift"), encoding: .utf8)
         #expect(section.contains("description(for: context, ocrReadPages: searchState.lastRunOCRPageCount)"))
         let trigger = try String(contentsOf: root.appendingPathComponent(
-            "Sources/ResectaApp/Views/Search/SearchAndRedactSheet+Trigger.swift"), encoding: .utf8)
+            "Sources/ResectaApp/State/SearchRun.swift"), encoding: .utf8)
         #expect(trigger.contains("searchState.lastRunOCRPageCount = SearchEmptyStateCopy.ocrReadPageCount("))
         #expect(trigger.contains("textLayerStatus, includeOCR: searchState.options.includeOCR, isScan: isPIIScan)"))
     }

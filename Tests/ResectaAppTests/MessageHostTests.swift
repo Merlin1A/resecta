@@ -136,11 +136,11 @@ struct MessageHostTests {
     static let directAnnouncementTable: [String: Int] = [
         "State/ToastQueueManager.swift": 1,
         "State/PipelineCoordinator.swift": 1,
+        "State/SearchRun.swift": 2,
         "Overlay/RedactionOverlayView+Touches.swift": 3,
         "Overlay/PDFViewCoordinator.swift": 2,
         "Overlay/SnapGuideEngine.swift": 1,
         "Views/SearchResultRow.swift": 1,
-        "Views/Search/SearchAndRedactSheet+Trigger.swift": 2,
         "Views/VerificationProgressView.swift": 1,
         "Views/DocumentEditorView+SelectionBar.swift": 1,
     ]
