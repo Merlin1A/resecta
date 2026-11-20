@@ -92,9 +92,6 @@ enum ResectaTokens {
         /// Modal scrim behind sheets/overlays
         static let scrim: Double = 0.4
 
-        // Severity tint overlays
-        static let severityTint: Double = 0.10
-
         /// The tinted-tile wash — a brand or status hue behind a glyph or a
         /// chip's numeral (the Verification Details header's teal tile, the
         /// page chips): the `HomeChoiceCardContent` subtle-tile rule,

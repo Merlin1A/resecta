@@ -14,12 +14,16 @@ import RedactionEngine
 //
 // Presented through the hub's single `.sheet(item:)` slot as
 // `SearchModal.savedSearches`. The capture
-// monitor arrives as a `let` injected from the call site — never an
-// @Environment read inside a view that re-lays-out during sheet dismissal.
+// monitor and the message queue arrive as `let`s injected from the call
+// site — never an @Environment read inside a view that re-lays-out during
+// sheet dismissal.
 
 struct SavedSearchListSheet: View {
     let searchState: SearchState
     let captureMonitor: ScreenCaptureMonitor
+    /// The message queue: this sheet draws its own receipts and holds the
+    /// queue while a dialog is up.
+    let toastManager: ToastQueueManager
     /// Hub-owned recall: applies the shape to `searchState`, triggers the
     /// search, and dismisses this sheet.
     let onRecall: (SavedSearch) -> Void
@@ -276,6 +280,7 @@ struct SavedSearchListSheet: View {
         // Saved query previews may themselves be PII — this sheet
         // presents modally above the search sheet's shield swap, so it
         // carries its own screen-capture shield for the same reason.
+        .messageHost(toastManager, place: .otherSheet)
         .shieldedSheetContent(monitor: captureMonitor)
         .presentationBackground(.regularMaterial)
     }

@@ -38,6 +38,60 @@ struct MessageHostTests {
         }
     }
 
+    /// Per file: presentations (`.sheet(`, `.fullScreenCover(`, `.popover(`),
+    /// `.messageLayer(` and `.messageHost(`. A presentation without a layer is
+    /// an exemption named here: the agreement's legal page (no queue exists
+    /// before agreement) and the canvas's pointer-hover popover.
+    static let presentationTable: [String: [Int]] = [
+        "Views/ContentView.swift": [0, 1, 1],
+        "Views/DocumentEditorView.swift": [1, 2, 1],
+        "Views/SearchAndRedactSheet.swift": [1, 3, 3],
+        "Views/Search/SavedSearchListSheet.swift": [0, 0, 1],
+        "Views/RedactWorkspaceView.swift": [2, 2, 2],
+        "Views/HomeView.swift": [1, 1, 1],
+        "Views/SettingsView.swift": [2, 2, 0],
+        "Views/FailedStateView.swift": [1, 1, 0],
+        "Views/ShareRiskConfirm.swift": [1, 1, 0],
+        "Views/EULAGateView.swift": [1, 0, 0],
+        "Views/EditorAnnouncementObservers.swift": [1, 0, 0],
+    ]
+
+    @Test("Every presentation has a layer and a host or a listed exemption")
+    func everyPresentationHasALayer() throws {
+        let app = Self.repoRoot().appendingPathComponent("Sources/ResectaApp")
+        let files = try Self.swiftFiles(under: app)
+        #expect(files.count > 100, "the scan read \(files.count) files")
+        var seen: Set<String> = []
+        for url in files {
+            let relative = String(url.path.dropFirst(app.path.count + 1))
+            if relative == "Views/Messages/MessageHost.swift" { continue }
+            let lines = try Self.codeLines("Sources/ResectaApp/" + relative)
+            let counts = [
+                Self.count(lines, [".sheet(", ".fullScreenCover(", ".popover("]),
+                Self.count(lines, [".messageLayer("]),
+                Self.count(lines, [".messageHost("]),
+            ]
+            if let want = Self.presentationTable[relative] {
+                seen.insert(relative)
+                #expect(counts == want, "\(relative): \(counts), not \(want)")
+            } else {
+                #expect(counts == [0, 0, 0], "\(relative) presents or hosts but is not in the table: \(counts)")
+            }
+        }
+        #expect(seen == Set(Self.presentationTable.keys), "files in the table that were not read: \(Set(Self.presentationTable.keys).subtracting(seen))")
+    }
+
+    @Test("A drawing host sits inside its view's capture cover")
+    func hostInsideTheCover() throws {
+        for relative in ["Views/SearchAndRedactSheet.swift", "Views/Search/SavedSearchListSheet.swift"] {
+            let lines = try Self.codeLines("Sources/ResectaApp/" + relative)
+            let hosts = lines.indices.filter { lines[$0].contains(".messageHost(") }
+            let cover = try #require(lines.firstIndex { $0.contains(".shieldedSheetContent(") }, "\(relative) has its cover")
+            #expect(!hosts.isEmpty, "\(relative) draws its receipts")
+            for host in hosts { #expect(host < cover, "\(relative): a host after the cover") }
+        }
+    }
+
     // MARK: - Reading the source
 
     static func repoRoot(file: StaticString = #filePath) -> URL {
@@ -51,6 +105,19 @@ struct MessageHostTests {
     static func codeLines(_ relativePath: String) throws -> [String] {
         let text = try String(contentsOf: repoRoot().appendingPathComponent(relativePath), encoding: .utf8)
         return text.components(separatedBy: "\n").filter { !isComment($0) }
+    }
+
+    static func swiftFiles(under directory: URL) throws -> [URL] {
+        let enumerator = FileManager.default.enumerator(at: directory, includingPropertiesForKeys: nil)
+        var files: [URL] = []
+        while let url = enumerator?.nextObject() as? URL {
+            if url.pathExtension == "swift" { files.append(url) }
+        }
+        return files.sorted { $0.path < $1.path }
+    }
+
+    static func count(_ lines: [String], _ needles: [String]) -> Int {
+        lines.reduce(0) { total, line in total + needles.reduce(0) { $0 + line.components(separatedBy: $1).count - 1 } }
     }
 
     static func isComment(_ line: String) -> Bool {

@@ -28,6 +28,7 @@ struct FailedStateView: View {
     // The door the document came through: "Choose Another File" and
     // "Choose Other Photos" ask the next home screen to open it again.
     @Environment(AppCoordinator.self) private var appCoordinator
+    @Environment(ToastQueueManager.self) private var toastManager
 
     @State private var safariURL: URL?
     // Confirmation gates Start Over when drawn regions
@@ -150,6 +151,7 @@ struct FailedStateView: View {
         .sheet(item: $safariURL) { url in
             SafariView(url: url)
                 .ignoresSafeArea()
+                .messageLayer(toastManager, role: .holdsOnly)
         }
         // Destructive-action confirmation symmetry.
         // Same shape as Done — copy describes the action

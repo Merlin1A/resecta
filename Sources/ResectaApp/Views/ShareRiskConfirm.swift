@@ -394,6 +394,8 @@ struct ShareRiskConfirmPresentation: ViewModifier {
     /// 0-based pages where a source annotation covered text no box covers
     /// (`ConcealingAnnotations.pages`), read at the Share tap.
     var concealedPages: [Int] = []
+    /// The confirm asks for a choice: brief messages wait under it.
+    @Environment(ToastQueueManager.self) private var toastManager
 
     /// The confirmed family, held from the confirm until the sheet has
     /// gone. The export presents the system share sheet from the top view
@@ -424,6 +426,7 @@ struct ShareRiskConfirmPresentation: ViewModifier {
                     },
                     onCancel: { kind = nil }
                 )
+                .messageLayer(toastManager, role: .holdsOnly)
                 .presentationDetents([.medium])
             }
     }

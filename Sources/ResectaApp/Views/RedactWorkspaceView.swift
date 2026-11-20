@@ -129,11 +129,16 @@ struct RedactWorkspaceView: View {
                     onCancel: cancelLockedImport,
                     isSubmitting: passwordSubmitInFlight
                 )
+                .messageHost(toastManager, place: .otherSheet)
+                .messageLayer(toastManager, role: .draws)
             }
             // Settings sheet
             .sheet(isPresented: $showSettings) {
                 SettingsView()
                     .environment(settingsState)
+                    .environment(toastManager)
+                    .messageHost(toastManager, place: .otherSheet)
+                    .messageLayer(toastManager, role: .draws)
                     .presentationDetents([.medium, .large])
             }
             // Environment injection — satisfies @Environment reads in

@@ -211,6 +211,11 @@ struct DocumentEditorView: View {
                     // The recovery CTA now lives on the results screen as the
                     // Run Verification card; see `handleRunVerificationTap`.)
                     .overlay(alignment: .bottom) { captionOverlay }
+                    // The height a brief message is read in: the canvas
+                    // between the toolbar's foot and the bottom chrome.
+                    .background { GeometryReader { canvas in
+                        Color.clear.preference(key: MessageReadableSpace.self, value: canvas.size.height)
+                    } }
 
             case .verifying:
                 // Full-screen replacement — verification is a distinct
@@ -343,6 +348,9 @@ struct DocumentEditorView: View {
             switch sheet {
             case .search(let searchState):
                 SearchAndRedactSheet(searchState: searchState, selectedDetent: $searchSheetDetent)
+                    // Search's message layer, outside its capture cover:
+                    // it leaves only when the sheet is dismissed.
+                    .messageLayer(toastManager, role: .draws)
                     // Conditional dismiss: block swipe-dismiss once the USER has
                     // modified selections this session, so the Dismiss
                     // button's confirmation dialog can't be bypassed.
@@ -398,6 +406,8 @@ struct DocumentEditorView: View {
                             redactionState.pendingCanvasRationaleRequest = nil
                         }
                     )
+                    .messageHost(toastManager, place: .otherSheet)
+                    .messageLayer(toastManager, role: .draws)
                 }
             }
         }

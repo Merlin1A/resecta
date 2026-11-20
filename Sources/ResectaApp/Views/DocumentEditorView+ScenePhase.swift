@@ -88,7 +88,7 @@ struct DocumentEditorScenePhaseHandler: ViewModifier {
         toastManager.post(
             .outputReclaimed,
             action: {
-                // Deferral pattern: ToastView's button
+                // Deferral pattern: the receipt's button
                 // action calls this actionHandler() and then
                 // `toastManager.dismiss(item)` — whose `withAnimation {
                 // activeToasts.removeAll }` — synchronously in the same tap.

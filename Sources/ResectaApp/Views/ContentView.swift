@@ -87,61 +87,12 @@ struct ContentView: View {
             preconditionFailure("--forceDetectionDegrade: no document reached the editor; pass --loadTestDocument")
         }
         #endif
-        // Bottom toasts (info, success) — above page navigation bar
-        // Container animation routed through `Anim.resolved` so
-        // the slide-in spring crossfades to the opacity-only
-        // fallback when Reduce Motion is on. Full enum path is spelled
-        // out because `.toastIn` shorthand cannot infer through
-        // `Anim.resolved`'s `Animation` parameter.
-        .overlay(alignment: .bottom) {
-            VStack(spacing: ResectaTokens.Spacing.sm) {
-                ForEach(toastManager.activeBottomToasts) { item in
-                    ToastView(item: item, toastManager: toastManager)
-                        // Routed through the resolver so Reduce Motion
-                        // swaps the slide for an opacity-only crossfade.
-                        .transition(ResectaTokens.Anim.resolvedTransition(
-                            standard: .asymmetric(
-                                insertion: .move(edge: .bottom).combined(with: .opacity),
-                                removal: .opacity
-                            ),
-                            reduceMotion: reduceMotion))
-                        .onTapGesture { toastManager.dismiss(item) }
-                }
-            }
-            // Clear the page nav bar and the Search/Scan sheet parked at
-            // the compact float — `bottomClearance` is the bottom-chrome
-            // model's one clearance (`ParkedChromeLayout.toastClearance`),
-            // written by the editor's page-bar inset and by the sheet.
-            .padding(.bottom, ResectaTokens.Spacing.xl + toastManager.bottomClearance)
-            .animation(
-                ResectaTokens.Anim.resolved(ResectaTokens.Anim.toastIn, reduceMotion: reduceMotion),
-                value: toastManager.toastVersion
-            )
-        }
-        // Top toasts (warning, error) — below the navigation bar
-        // See bottom-overlay comment above; same Reduce-Motion
-        // routing applies to the top toast stack.
-        .overlay(alignment: .top) {
-            VStack(spacing: ResectaTokens.Spacing.sm) {
-                ForEach(toastManager.activeTopToasts) { item in
-                    ToastView(item: item, toastManager: toastManager)
-                        // Routed through the resolver so Reduce Motion
-                        // swaps the slide for an opacity-only crossfade.
-                        .transition(ResectaTokens.Anim.resolvedTransition(
-                            standard: .asymmetric(
-                                insertion: .move(edge: .top).combined(with: .opacity),
-                                removal: .opacity
-                            ),
-                            reduceMotion: reduceMotion))
-                        .onTapGesture { toastManager.dismiss(item) }
-                }
-            }
-            .padding(.top, ResectaTokens.Spacing.xl) // Clear toolbar
-            .animation(
-                ResectaTokens.Anim.resolved(ResectaTokens.Anim.toastIn, reduceMotion: reduceMotion),
-                value: toastManager.toastVersion
-            )
-        }
+        // Brief messages at the workspace's root (Home, the editor, a run,
+        // the results), at the place `MessagePlacement` gives; a presented
+        // sheet draws its own. The editor's capture cover is inside this
+        // host, so the editor's receipt stays drawn over it.
+        .messageHost(toastManager, place: .root)
+        .messageLayer(toastManager, role: .root)
         // Cancel pipeline on .background.
         // wasPausedByBackground stays true — user dismisses via InlineWarningBanner.
         // The .inactive/.active obscure-and-reveal flip lives at the

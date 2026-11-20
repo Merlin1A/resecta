@@ -49,4 +49,22 @@ struct ToastManagerLetInjectionTests {
         #expect(!hasEnvironmentManager,
                 "ReceiptView must NOT read ToastQueueManager via @Environment — that reintroduces the dismiss crash (PR #148)")
     }
+
+    @Test("The message layer and host modifiers take ToastQueueManager as a let, never from the environment")
+    func testMessageModifiersTakeTheManagerAsLet() throws {
+        let root = URL(fileURLWithPath: "\(#filePath)")
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let source = try String(
+            contentsOf: root.appendingPathComponent("Sources/ResectaApp/Views/Messages/MessageHost.swift"), encoding: .utf8)
+        #expect(!source.contains("@Environment(ToastQueueManager.self)"),
+                "the message modifiers must NOT read ToastQueueManager via @Environment (PR #148)")
+        for name in ["MessageLayerModifier", "MessageHostModifier", "MessageHoldModifier"] {
+            guard let start = source.range(of: "struct \(name): ViewModifier {") else {
+                Issue.record("\(name) is missing"); continue
+            }
+            let rest = source[start.upperBound...]
+            let body = rest[..<(rest.range(of: "\n}\n")?.lowerBound ?? rest.endIndex)]
+            #expect(body.contains("let queue: ToastQueueManager"), "\(name) stores the queue as a let")
+        }
+    }
 }

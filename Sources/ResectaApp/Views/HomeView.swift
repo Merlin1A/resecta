@@ -9,6 +9,7 @@ import SwiftUI
 struct HomeView: View {
     @Environment(AppCoordinator.self) private var appCoordinator
     @Environment(SettingsState.self) private var settingsState
+    @Environment(ToastQueueManager.self) private var toastManager
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
@@ -100,6 +101,9 @@ struct HomeView: View {
             .sheet(isPresented: $showSettings) {
                 SettingsView()
                     .environment(settingsState)
+                    .environment(toastManager)
+                    .messageHost(toastManager, place: .otherSheet)
+                    .messageLayer(toastManager, role: .draws)
                     .presentationDetents([.medium, .large])
             }
             // The failed screen's "Choose Another File" asks for the door the

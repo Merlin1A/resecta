@@ -40,6 +40,7 @@ struct SettingsView: View {
     // "no pipeline can be in flight without a document" contract.
     @Environment(DocumentState.self) private var documentState: DocumentState?
     @Environment(\.dismiss) private var dismiss
+    @Environment(ToastQueueManager.self) private var toastManager
 
     @State private var safariURL: URL?
     /// The in-app Acknowledgements sheet (the bundled NOTICE).
@@ -124,6 +125,7 @@ struct SettingsView: View {
             .sheet(item: $safariURL) { url in
                 SafariView(url: url)
                     .ignoresSafeArea()
+                    .messageLayer(toastManager, role: .holdsOnly)
             }
             // Mirrors the established
             // confirmation-dialog pattern used at Redact /
@@ -470,6 +472,7 @@ struct SettingsView: View {
             .accessibilityIdentifier("settingsAcknowledgements")
             .sheet(item: $presentedLegalDocument) { document in
                 LegalDocumentView(document: document)
+                    .messageLayer(toastManager, role: .holdsOnly)
             }
         } header: {
             Label("Privacy", systemImage: "lock.shield")
