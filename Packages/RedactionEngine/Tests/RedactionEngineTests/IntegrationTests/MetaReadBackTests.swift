@@ -93,6 +93,18 @@ struct MetaReadBackTests {
         #expect(MetaReadBack.check(url: url, originals: originals) == .identifierNotDerived)
     }
 
+    @Test("One half of the identifier left as the writer wrote it: not derived from the file")
+    func identifierHalfLeftStops() throws {
+        let (url, originals) = try Self.made()
+        defer { try? FileManager.default.removeItem(at: url) }
+        // The rewrite's second write cut short: its half keeps the writer's value.
+        let data = try Data(contentsOf: url)
+        let pair = try #require(data.range(of: Data("/ID [ <".utf8)))
+        let second = pair.upperBound - data.startIndex + 32 + "> <".utf8.count
+        try Self.overwrite(url, at: second, with: Data(Self.writerID.utf8))
+        #expect(MetaReadBack.check(url: url, originals: originals) == .identifierNotDerived)
+    }
+
     @Test("The rest of an old producer beside the fixed one: the file is not kept, and the rule reads it")
     func oldBytesAfterTheLiteralStop() throws {
         let (url, originals) = try Self.made(between: { url in
