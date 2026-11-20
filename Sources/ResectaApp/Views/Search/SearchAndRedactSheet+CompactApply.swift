@@ -36,7 +36,8 @@ extension SearchAndRedactSheet {
     /// model (`ParkedChromeLayout`, the editor's own inputs read here):
     /// the hug while this sheet is parked at the compact float — so the
     /// "Marked 1 …" toast clears the strip instead of sitting beneath it
-    /// — plus the page bar's height while the bar is up and uncovered;
+    /// — plus the page bar's measured height (the editor stores it) while
+    /// the bar is up and uncovered;
     /// zero with the sheet up at a taller detent, where the sheet-local
     /// host renders inside the sheet. `sheetPresented: false` is the
     /// value the sheet leaves behind on disappearance (the bar alone).
@@ -48,7 +49,8 @@ extension SearchAndRedactSheet {
             pageCount: documentState.pageCount,
             sizeClass: horizontalSizeClass,
             phase: documentState.phaseKind,
-            hugHeight: CompactFloatDetent.hug(for: dynamicTypeSize)
+            hugHeight: CompactFloatDetent.hug(for: dynamicTypeSize),
+            pageBarHeight: toastManager.pageBarHeight
         ).toastClearance
     }
 
