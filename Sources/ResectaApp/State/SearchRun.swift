@@ -218,6 +218,9 @@ import RedactionEngine
         let mode = buildSearchMode()
         searchState.lastRunShape = searchState.currentRunShape  // read in the same stretch as the query above
         searchState.totalPages = liveDoc.pageCount
+        searchState.accountOpenedSink = { [weak redactionState] token, query in
+            redactionState?.recordSearchRunOpened(token: token, query: query)
+        }
         searchState.accountClosedSink = { [weak redactionState] token, account in
             redactionState?.recordSearchAccount(account, token: token)
         }

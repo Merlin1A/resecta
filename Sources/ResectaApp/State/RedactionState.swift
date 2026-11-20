@@ -161,6 +161,25 @@ class RedactionState {
     /// The newest closed account's token: the latest run, applied or not.
     var latestSearchAccountToken: UUID?
 
+    /// Every search run of this document that started reading, oldest first,
+    /// with its query: the stop at Redact counts every run, applied or not.
+    var searchRunLog: [SearchRunLogEntry] = []
+
+    struct SearchRunLogEntry: Equatable {
+        let token: UUID
+        let query: AppliedSearchQuery
+    }
+
+    func recordSearchRunOpened(token: UUID, query: AppliedSearchQuery) {
+        searchRunLog.append(SearchRunLogEntry(token: token, query: query))
+    }
+
+    /// The runs whose accounts closed, oldest first, each with its query. A
+    /// replaced run kept no account and is not among them.
+    var closedSearchRuns: [(query: AppliedSearchQuery, account: SearchAccount)] {
+        searchRunLog.compactMap { entry in searchAccounts[entry.token].map { (entry.query, $0) } }
+    }
+
     func recordSearchAccount(_ account: SearchAccount, token: UUID) {
         searchAccounts[token] = account
         latestSearchAccountToken = token
@@ -392,6 +411,7 @@ class RedactionState {
         lastDetectionRun = nil
         searchAccounts = [:]
         latestSearchAccountToken = nil
+        searchRunLog = []
         // A stale region UUID must not present a blank rationale sheet
         // over the next document.
         pendingCanvasRationaleRequest = nil

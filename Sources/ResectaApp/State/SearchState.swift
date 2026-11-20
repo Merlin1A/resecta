@@ -480,6 +480,8 @@ final class SearchState: Identifiable {
     var lastAccountToken: UUID?
     /// Where a closed account goes: the document's store, installed by the run.
     @ObservationIgnored var accountClosedSink: (@MainActor (UUID, SearchAccount) -> Void)?
+    /// Where an opened account's run and query go: the document's run log (`SearchState+RunLog.swift`).
+    @ObservationIgnored var accountOpenedSink: (@MainActor (UUID, AppliedSearchQuery) -> Void)?
 
     /// The options the current run started with, which the applied
     /// record names (`appliedSearchRecord()`); nil before any run.

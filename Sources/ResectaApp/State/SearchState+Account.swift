@@ -30,6 +30,7 @@ extension SearchState {
         accountInHandRun = run
         accountInHandToken = UUID()
         accountInHandApplied = false
+        if let token = accountInHandToken, let query = runQuery() { accountOpenedSink?(token, query) }
     }
 
     func recordCoverage(_ coverage: PageSearchCoverage, run: Int) {
