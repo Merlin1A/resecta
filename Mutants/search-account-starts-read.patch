@@ -5,10 +5,10 @@ Must go red: RedactionEngineTests/AccountOfWhatWasReadTests row [C-02 a scanned 
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/AccountOfWhatWasRead.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/AccountOfWhatWasRead.swift
-index 7a7931a3..dd42080f 100644
+index 1cd5c69a..ca1d124a 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/AccountOfWhatWasRead.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/AccountOfWhatWasRead.swift
-@@ -198,7 +198,7 @@ struct AccountOfWhatWasRead: Sendable, Equatable {
+@@ -201,7 +201,7 @@ struct AccountOfWhatWasRead: Sendable, Hashable {
      /// Every page starts with no facts: "not read: no report".
      init(pageCount: Int) {
          self.pageCount = max(0, pageCount)
@@ -16,4 +16,4 @@ index 7a7931a3..dd42080f 100644
 +        facts = Array(repeating: .ownText, count: self.pageCount)
      }
  
-     /// Adds a report's facts to one page. A page outside the document is ignored.
+     /// An account derived from others: a run's account for one of its texts, or several runs joined.

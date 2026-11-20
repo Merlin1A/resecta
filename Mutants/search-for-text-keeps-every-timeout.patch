@@ -1,0 +1,18 @@
+Property: One text's account keeps a timeout only where that text ran out of time.
+Area: the search account's public face
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/SearchAccountJoinTests (or on the host: cd Packages/RedactionEngine && swift test --filter 'SearchAccountJoinTests')
+Must go red: RedactionEngineTests/SearchAccountJoinTests forTextThatNeverTimedOut; RedactionEngineTests/SearchAccountJoinTests forTextThatTimedOut
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchAccount.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchAccount.swift
+index d8a91202..f7c40ca9 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchAccount.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchAccount.swift
+@@ -90,7 +90,6 @@ public struct SearchAccount: Sendable, Hashable {
+     public func forText(_ text: String) -> SearchAccount {
+         var facts = account.facts
+         for page in facts.indices where patternTimedOutTexts[page]?.contains(text) != true {
+-            facts[page].remove(.patternTimedOut)
+         }
+         var derived = self
+         derived.account = AccountOfWhatWasRead(facts: facts, ending: account.ending, settled: account.settled)

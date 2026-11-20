@@ -1,0 +1,19 @@
+Property: A page any run of the text read stays read in the join.
+Area: the search account's public face
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/SearchAccountJoinTests (or on the host: cd Packages/RedactionEngine && swift test --filter 'SearchAccountJoinTests')
+Must go red: RedactionEngineTests/SearchAccountJoinTests joinOverEveryPair; RedactionEngineTests/SearchAccountJoinTests k727; RedactionEngineTests/SearchAccountJoinTests k733; RedactionEngineTests/SearchAccountJoinTests k736
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchAccount.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchAccount.swift
+index d8a91202..abe97746 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchAccount.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchAccount.swift
+@@ -117,7 +117,7 @@ public struct SearchAccount: Sendable, Hashable {
+             let reading = runs.last { run in
+                 run.account.facts.indices.contains(page) && run.account.state(ofPage: page).kind == .read
+             }
+-            if let reading {
++            if let reading, reading == runs.last {
+                 facts[page] = reading.account.facts[page]
+                 settled.insert(page)
+             } else if !facts[page].isEmpty {
