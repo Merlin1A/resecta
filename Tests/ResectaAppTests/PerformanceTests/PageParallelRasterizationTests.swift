@@ -460,6 +460,8 @@ struct PageParallelRasterizationTimingTests {
                 "Sequential run completed in \(seqSeconds)s — too fast to measure speedup on this host; ratio noise dominates below 50 ms"
             ) {
                 Issue.record("near-zero sequential baseline; speedup ratio not asserted")
+            } matching: { issue in
+                issue.comments.contains { $0.rawValue == "near-zero sequential baseline; speedup ratio not asserted" }
             }
             return
         }

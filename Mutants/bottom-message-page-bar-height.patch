@@ -1,0 +1,20 @@
+Property: While the page bar is up and uncovered, a bottom message is lifted by the bar's measured height (never less than the one-line bar's).
+Area: editor bottom chrome (bottom message lift)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/ParkedChromeLayoutTests
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppUITests/EditorChromeUITests/testBottomMessage_atAccessibilityOne_keepsItsGapAboveThePageBar -only-testing:ResectaAppUITests/EditorChromeUITests/testBottomMessage_atTheLargestTextSize_keepsItsGapAboveThePageBar
+Must go red: ResectaAppTests/ParkedChromeLayoutTests "A bottom message is lifted by the page bar's measured height"; ResectaAppUITests/EditorChromeUITests testBottomMessage_atAccessibilityOne_keepsItsGapAboveThePageBar; ResectaAppUITests/EditorChromeUITests testBottomMessage_atTheLargestTextSize_keepsItsGapAboveThePageBar
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/BottomChromeLayout.swift b/Sources/ResectaApp/Views/BottomChromeLayout.swift
+index a7655885..1309f323 100644
+--- a/Sources/ResectaApp/Views/BottomChromeLayout.swift
++++ b/Sources/ResectaApp/Views/BottomChromeLayout.swift
+@@ -67,7 +67,7 @@ struct ParkedChromeLayout: Equatable {
+         canvasBottomInset = parked ? hugHeight : 0
+         let barUncovered = showsPageBar && !(sheetPresented && !parked)
+         toastClearance = (parked ? hugHeight : 0)
+-            + (barUncovered ? max(pageBarHeight, Self.pageBarClearance) : 0)
++            + (barUncovered ? Self.pageBarClearance : 0)
+         hintCapsuleLift = 0
+     }
+ }

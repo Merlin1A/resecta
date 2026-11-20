@@ -15,7 +15,7 @@ struct ToastQueueManagerTests {
     @Test("First enqueue shows the toast")
     func firstEnqueueShows() {
         let mgr = ToastQueueManager()
-        mgr.enqueue("Welcome", severity: .info)
+        mgr.enqueue(ToastItem(message: "Welcome", severity: .info))
         #expect(mgr.activeToasts.count == 1)
         #expect(mgr.activeBottomToasts.count == 1)
         #expect(mgr.activeBottomToasts.first?.message == "Welcome")
@@ -24,17 +24,17 @@ struct ToastQueueManagerTests {
     @Test("Duplicate message+severity coalesces into one toast")
     func duplicateCoalesces() {
         let mgr = ToastQueueManager()
-        mgr.enqueue("Saved", severity: .success)
-        mgr.enqueue("Saved", severity: .success)
-        mgr.enqueue("Saved", severity: .success)
+        mgr.enqueue(ToastItem(message: "Saved", severity: .success))
+        mgr.enqueue(ToastItem(message: "Saved", severity: .success))
+        mgr.enqueue(ToastItem(message: "Saved", severity: .success))
         #expect(mgr.activeToasts.count == 1)
     }
 
     @Test("Different severities at different positions coexist")
     func differentPositionsCoexist() {
         let mgr = ToastQueueManager()
-        mgr.enqueue("Heads up", severity: .warning)     // top
-        mgr.enqueue("All good", severity: .success)     // bottom
+        mgr.enqueue(ToastItem(message: "Heads up", severity: .warning))     // top
+        mgr.enqueue(ToastItem(message: "All good", severity: .success))     // bottom
         #expect(mgr.activeToasts.count == 2)
         #expect(mgr.activeTopToasts.count == 1)
         #expect(mgr.activeBottomToasts.count == 1)
@@ -43,9 +43,9 @@ struct ToastQueueManagerTests {
     @Test("Same position queues subsequent toasts")
     func samePositionQueues() {
         let mgr = ToastQueueManager()
-        mgr.enqueue("First", severity: .info)
-        mgr.enqueue("Second", severity: .info)
-        mgr.enqueue("Third", severity: .info)
+        mgr.enqueue(ToastItem(message: "First", severity: .info))
+        mgr.enqueue(ToastItem(message: "Second", severity: .info))
+        mgr.enqueue(ToastItem(message: "Third", severity: .info))
         // All three distinct bottom-position; only first is active.
         #expect(mgr.activeToasts.count == 1)
         #expect(mgr.activeBottomToasts.first?.message == "First")
@@ -54,9 +54,9 @@ struct ToastQueueManagerTests {
     @Test("Same message duplicated while queued also coalesces")
     func duplicateWhileQueuedCoalesces() {
         let mgr = ToastQueueManager()
-        mgr.enqueue("First", severity: .info)     // active
-        mgr.enqueue("Second", severity: .info)    // queued
-        mgr.enqueue("Second", severity: .info)    // should coalesce into queued copy
+        mgr.enqueue(ToastItem(message: "First", severity: .info))     // active
+        mgr.enqueue(ToastItem(message: "Second", severity: .info))    // queued
+        mgr.enqueue(ToastItem(message: "Second", severity: .info))    // should coalesce into queued copy
         // Active is still "First". Queue holds one "Second".
         #expect(mgr.activeBottomToasts.first?.message == "First")
     }
@@ -64,9 +64,11 @@ struct ToastQueueManagerTests {
     @Test("A run start's drop removes every toast that carries an action, shown or queued, and keeps the rest")
     func dropActionToastsKeepsOtherToasts() async throws {
         let mgr = ToastQueueManager()
-        mgr.enqueue("Mode switch cleared 2 unapplied matches.", actionLabel: "Undo") {}
-        mgr.enqueue("Saved", severity: .info)
-        mgr.enqueue("1 match nearby. Mark it too?", actionLabel: "Mark") {}
+        mgr.enqueue(ToastItem(
+            message: "Mode switch cleared 2 unapplied matches.", severity: .info, actionLabel: "Undo", actionHandler: {}))
+        mgr.enqueue(ToastItem(message: "Saved", severity: .info))
+        mgr.enqueue(ToastItem(
+            message: "1 match nearby. Mark it too?", severity: .info, actionLabel: "Mark", actionHandler: {}))
         #expect(mgr.activeToasts.count == 1)
         #expect(mgr.activeToasts.first?.actionHandler != nil)
 
@@ -88,7 +90,7 @@ struct ToastQueueManagerTests {
     @Test("A run start's drop leaves a toast without an action on screen")
     func dropActionToastsLeavesAPlainToast() {
         let mgr = ToastQueueManager()
-        mgr.enqueue("Saved", severity: .info)
+        mgr.enqueue(ToastItem(message: "Saved", severity: .info))
         let shown = mgr.activeToasts.map(\.id)
         #expect(shown.count == 1)
 
@@ -100,8 +102,8 @@ struct ToastQueueManagerTests {
     @Test("Manual dismiss removes the active toast and drains the queue after 0.3 s gap")
     func dismissDrainsQueue() async throws {
         let mgr = ToastQueueManager()
-        mgr.enqueue("First", severity: .info)
-        mgr.enqueue("Second", severity: .info)
+        mgr.enqueue(ToastItem(message: "First", severity: .info))
+        mgr.enqueue(ToastItem(message: "Second", severity: .info))
         let first = mgr.activeBottomToasts.first!
         mgr.dismiss(first)
         // Immediate removal from activeToasts (animation target state).
@@ -121,9 +123,9 @@ struct ToastQueueManagerTests {
     @Test("clearAll empties active + queued + cancels pending drain")
     func clearAllIsIdempotent() async throws {
         let mgr = ToastQueueManager()
-        mgr.enqueue("First", severity: .warning)
-        mgr.enqueue("Second", severity: .warning)
-        mgr.enqueue("Third", severity: .info)
+        mgr.enqueue(ToastItem(message: "First", severity: .warning))
+        mgr.enqueue(ToastItem(message: "Second", severity: .warning))
+        mgr.enqueue(ToastItem(message: "Third", severity: .info))
         mgr.clearAll()
         #expect(mgr.activeToasts.isEmpty)
         // Second clearAll is a no-op.
@@ -138,7 +140,7 @@ struct ToastQueueManagerTests {
     func toastVersionMoves() {
         let mgr = ToastQueueManager()
         let v0 = mgr.toastVersion
-        mgr.enqueue("Hello", severity: .info)
+        mgr.enqueue(ToastItem(message: "Hello", severity: .info))
         #expect(mgr.toastVersion > v0)
         let v1 = mgr.toastVersion
         mgr.dismiss(mgr.activeBottomToasts.first!)

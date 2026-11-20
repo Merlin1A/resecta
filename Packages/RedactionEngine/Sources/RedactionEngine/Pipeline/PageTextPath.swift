@@ -14,19 +14,21 @@ import Foundation
 /// breaks (in the writer and in the drawn-cell rule), the record and the
 /// page output's rectangles all read this one list, every kind but "under a
 /// widened box", which only the position check reads. The painted
-/// rectangles: read by the paint marks, empty until the plan switch fills
-/// them.
+/// rectangles: read by the paint marks; the rasterizer passes none today.
 enum PageTextPath {
 
     /// The path's steps. The default is the real step for each; a test
-    /// replaces one, within `$steps.withValue`, to make it fault.
+    /// replaces one, within `$steps.withValue`, to make it fault. The fold
+    /// and the alphabet marks may also return nothing (nil), which the real
+    /// steps never do: the page is then a picture, as when a step throws.
+    /// Neither step has a time limit of its own.
     struct Steps: Sendable {
-        var fold: @Sendable ([CharacterInfo]) throws -> [CharacterInfo]
+        var fold: @Sendable ([CharacterInfo]) throws -> [CharacterInfo]?
         var filter: @Sendable ([CharacterInfo], [CGRect]) async throws -> FilterResult
-        var alphabetMarks: @Sendable ([CharacterInfo]) throws -> TextPathAlphabetMarks.Marks
+        var alphabetMarks: @Sendable ([CharacterInfo]) throws -> TextPathAlphabetMarks.Marks?
         /// The words the paint covers, by the page's one partition, from the
-        /// survivors and the painted rectangles. Nothing until the plan
-        /// switch hands in painted rectangles.
+        /// survivors and the painted rectangles. Nothing while no painted
+        /// rectangle is handed in.
         var paintMarks: @Sendable ([CharacterInfo], [CGRect]) throws -> Set<Int>
 
         static let live = Steps(
@@ -54,6 +56,9 @@ enum PageTextPath {
         let runsLeftOut: Int
         /// Survivors the drawn-cell rule dropped.
         let drawnCellDropped: Int
+        /// The written list's lines as the drawn-cell rule laid them out,
+        /// for the writer; nil when the page is a picture.
+        var hiddenTextLines: HiddenTextLines? = nil
     }
 
     static func run(
@@ -67,9 +72,14 @@ enum PageTextPath {
         let steps = Self.steps
         let rects = textPathRectangles.filter { $0.kind != .underWidenedBox }.map(\.rect)
 
-        let folded = try steps.fold(entries)
+        // A step that returns nothing writes no text: the page is a picture.
+        guard let folded = try steps.fold(entries) else {
+            return Result(outcome: .picture(.extractionFailed), runsLeftOut: 0, drawnCellDropped: 0)
+        }
         let filtered = try await steps.filter(folded, rects)
-        let alphabet = try steps.alphabetMarks(filtered.surviving)
+        guard let alphabet = try steps.alphabetMarks(filtered.surviving) else {
+            return Result(outcome: .picture(.extractionFailed), runsLeftOut: 0, drawnCellDropped: 0)
+        }
         let painted = try steps.paintMarks(filtered.surviving, paintedRectangles)
 
         // The whole-word closure over every marked word, then the drawn-cell
@@ -80,6 +90,13 @@ enum PageTextPath {
         }
         let validated = TextLayerReconstructor.validateSurvivors(
             closed, regionShapes: shapes, frame: frame)
+        // A line the hidden text's faces cannot lay out leaves no text the
+        // page can write: a picture with no searchable text left. A layout
+        // that does not settle outside the regions is a fault.
+        guard validated.laidOut else {
+            return Result(outcome: .picture(.noWritableText), runsLeftOut: 0,
+                          drawnCellDropped: validated.dropped)
+        }
         guard validated.settled else {
             return Result(outcome: .picture(.extractionFailed), runsLeftOut: 0,
                           drawnCellDropped: validated.dropped)
@@ -99,7 +116,8 @@ enum PageTextPath {
             frame: frame)
         return Result(
             outcome: .written(entries: validated.result.surviving, digest: digest, removalRects: rects),
-            runsLeftOut: alphabet.runsLeftOut, drawnCellDropped: validated.dropped)
+            runsLeftOut: alphabet.runsLeftOut, drawnCellDropped: validated.dropped,
+            hiddenTextLines: validated.lines)
     }
 
     /// `result` with every survivor of a marked word left out, counted as

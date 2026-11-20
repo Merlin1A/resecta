@@ -21,7 +21,7 @@ struct ToastQueueCapTests {
         // the active toast (no queueing required); subsequent enqueues
         // pile up behind it because the bottom position is occupied.
         for i in 0..<(ToastQueueManager.perPositionQueueCap + 16) {
-            manager.enqueue("toast-\(i)", severity: .info)
+            manager.enqueue(ToastItem(message: "toast-\(i)", severity: .info))
         }
         // activeToasts at .bottom: 1. Plus the queue tail cap.
         let activeBottomCount = manager.activeBottomToasts.count
@@ -38,16 +38,16 @@ struct ToastQueueCapTests {
     func testClearAllDrops() {
         let manager = ToastQueueManager()
         // Mix top + bottom severities so both queues populate.
-        manager.enqueue("info-1", severity: .info)
-        manager.enqueue("warn-1", severity: .warning)
-        manager.enqueue("info-2", severity: .info)
-        manager.enqueue("error-1", severity: .error)
+        manager.enqueue(ToastItem(message: "info-1", severity: .info))
+        manager.enqueue(ToastItem(message: "warn-1", severity: .warning))
+        manager.enqueue(ToastItem(message: "info-2", severity: .info))
+        manager.enqueue(ToastItem(message: "error-1", severity: .error))
         #expect(!manager.activeToasts.isEmpty)
         manager.clearAll()
         #expect(manager.activeToasts.isEmpty)
         // After clearAll, a fresh enqueue should display immediately
         // (neither queue still holds a pending item).
-        manager.enqueue("info-fresh", severity: .info)
+        manager.enqueue(ToastItem(message: "info-fresh", severity: .info))
         #expect(manager.activeBottomToasts.count == 1)
     }
 }
@@ -252,12 +252,12 @@ struct ApplyTriggersToastTests {
     @Test("ToastQueueManager.enqueue with .success severity targets the bottom position")
     func testSuccessToastTargetsBottomPosition() {
         // SearchAndRedactSheet's apply paths route through
-        // `toastManager.enqueue(message, severity: .success)`. The
+        // `toastManager.post(.marked(…))`, a success-severity row. The
         // severity-to-position mapping is the load-bearing invariant —
         // success toasts land at the bottom (non-blocking confirmatory
         // position).
         let manager = ToastQueueManager()
-        manager.enqueue("Marked 3 for redaction", severity: .success)
+        manager.enqueue(ToastItem(message: "Marked 3 for redaction", severity: .success))
         #expect(manager.activeBottomToasts.count == 1)
         #expect(manager.activeTopToasts.isEmpty)
         #expect(manager.activeBottomToasts.first?.message == "Marked 3 for redaction")

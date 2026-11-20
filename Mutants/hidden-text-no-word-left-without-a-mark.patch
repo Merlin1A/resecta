@@ -1,0 +1,21 @@
+Property: A page whose every word a box took stays a Searchable page with an empty hidden text and no reason; only a page the alphabet rule left with no word is a picture.
+Area: hidden text (the alphabet, wired into the text path)
+Test command: cd Packages/RedactionEngine && swift test --filter "HiddenTextAlphabetExportTests|TextPathAlphabetFaultTests|HiddenTextFontsTests" (or DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/HiddenTextAlphabetExportTests -only-testing:RedactionEngineTests/TextPathAlphabetFaultTests -only-testing:RedactionEngineTests/HiddenTextFontsTests)
+Must go red: RedactionEngineTests/HiddenTextAlphabetExportTests exportsAsListed [every word under a box]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
+index c63f8dbf..5b728299 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
+@@ -92,8 +92,8 @@ enum PageTextPath {
+             return Result(outcome: .picture(.extractionFailed), runsLeftOut: 0,
+                           drawnCellDropped: validated.dropped)
+         }
+-        if validated.result.surviving.isEmpty, !alphabet.wordIndices.isEmpty,
+-           let reason = alphabet.reasonIfNoWordLeft {
++        if validated.result.surviving.isEmpty {
++            let reason = TextLayerDetector.FallbackReason.noWritableText
+             return Result(outcome: .picture(reason), runsLeftOut: alphabet.runsLeftOut,
+                           drawnCellDropped: validated.dropped)
+         }

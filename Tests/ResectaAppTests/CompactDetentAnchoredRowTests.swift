@@ -115,7 +115,8 @@ struct CompactDetentAnchoredRowTests {
             ParkedChromeLayout(
                 sheetPresented: true, detent: detent, walkLive: true,
                 pageCount: 3, sizeClass: .compact, phase: .editing,
-                hugHeight: CompactFloatDetent.hug(for: .large)
+                hugHeight: CompactFloatDetent.hug(for: .large),
+                pageBarHeight: 0
             ).toastClearance
         }
         #expect(clearance(.compactFloat) == CompactFloatDetent.hugHeight)

@@ -19,6 +19,7 @@ extension TextLayerDetector.FallbackReason {
         case .extractionFailed: "extraction failed"
         case .hiddenText: "hidden text on the page"
         case .unanchoredRegion: "hand-drawn box on scanned text"
+        case .noWritableText: "no searchable text left on the page"
         }
     }
 }

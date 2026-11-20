@@ -140,8 +140,9 @@ extension SearchAndRedactSheet {
     /// notice (the toast manager outlives the sheet), a live selection
     /// deselected in place, then the session dropped.
     func performDismiss(afterConfirmation: Bool) {
-        if let message = Self.dismissalNotice(afterConfirmation: afterConfirmation, in: searchState) {
-            toastManager.enqueue(message, severity: .info)
+        if Self.dismissalNotice(afterConfirmation: afterConfirmation, in: searchState) != nil {
+            toastManager.post(.searchClosedCleared(
+                count: Self.unappliedMatchCount(in: searchState), interface: searchState.searchModeType.interface))
         }
         if searchState.selectedCount > 0 {
             let snapshot = Self.currentSelectionSnapshot(in: searchState)

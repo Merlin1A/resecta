@@ -190,7 +190,9 @@ struct InkFitBusyPoolTests {
         if PageImageInkFitTests.expectsEveryFitNotDegraded {
             withKnownIssue("On the Mac host a later search's read can still be degraded: macOS's Vision reads the page, and how long it takes varies", isIntermittent: true) {
                 #expect(later.allSatisfy { !$0.inkFitDegraded }, "a later search fits the page: \(later.map(\.inkFitDegraded))")
-            } when: { HostRun.isMac }
+            } when: { HostRun.isMac } matching: { issue in
+                issue.comments.contains { $0.rawValue.hasPrefix("a later search fits the page: ") }
+            }
         }
         #expect(InkTokenCache.shared.value(for: key)?.isEmpty == false, "a later search read the page")
     }

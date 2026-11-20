@@ -151,10 +151,7 @@ extension SearchAndRedactSheet {
     /// banner persists it).
     private func failSearchPreparation() {
         searchState.isSearching = false
-        toastManager.enqueue(
-            "Could not prepare the document for search. Try again.",
-            severity: .warning
-        )
+        toastManager.post(.searchPreparationFailed)
         if searchState.searchModeType == .piiScan {
             searchState.scanStartFailed = true
             redactionState.recordDetectionRun(
@@ -184,8 +181,9 @@ extension SearchAndRedactSheet {
         let cleared = Self.rerunClearedCount(in: searchState)
         searchState.skipNextRerunNotice = false  // one shot (a recall)
         searchState.clearResults()
-        if let message = Self.rerunClearedMessage(selectedCount: cleared, interface: searchState.searchModeType.interface) {
-            toastManager.enqueue(message, severity: .info)
+        let interface = searchState.searchModeType.interface
+        if Self.rerunClearedMessage(selectedCount: cleared, interface: interface) != nil {
+            toastManager.post(.searchRerunCleared(count: cleared, interface: interface))
         }
         // The token this run's results and progress hops carry: a
         // cancelled predecessor still draining its stream is told
@@ -320,8 +318,8 @@ extension SearchAndRedactSheet {
         // legacy path).
         if isPIIScan {
             let diagnostics = await DocumentSearcher.scanKickoffDiagnostics()
-            if let toast = redactionState.noteScanKickoffDiagnostics(diagnostics) {
-                toastManager.enqueue(toast, severity: .warning)
+            if redactionState.noteScanKickoffDiagnostics(diagnostics) != nil {
+                toastManager.post(.detectionDegraded(failedGazetteers: diagnostics.failedGazetteers))
             }
         }
 
@@ -415,7 +413,7 @@ extension SearchAndRedactSheet {
         await searcher.setUserTermsTimeoutSink({ [weak toastManager] _, _ in
             Task { @MainActor in
                 guard timeoutToast.fire() else { return }
-                toastManager?.enqueue(SearchAndRedactSheet.customTermTimeoutMessage, severity: .warning)
+                toastManager?.post(.customTermTimeout)
             }
         })
         // Surface the "scanned region not analyzed"
@@ -429,10 +427,7 @@ extension SearchAndRedactSheet {
         // language; it makes no outcome promise.
         await searcher.setScannedRegionNotAnalyzedSink({ [weak toastManager] _ in
             Task { @MainActor in
-                toastManager?.enqueue(
-                    "Some pages hold scanned regions that weren't text-analyzed because OCR is off. Turn on Include OCR Pages to search scanned content.",
-                    severity: .warning
-                )
+                toastManager?.post(.scannedRegionsNotAnalyzed)
             }
         })
 
@@ -725,11 +720,9 @@ extension SearchAndRedactSheet {
                 undoManager: undoManager,
                 documentState: documentState
             ) else { return }
-            if let message = CommitFeedback.markedMessage(
-                applied: searchState.markedCounts(outcome).applied,
-                alreadyCovered: searchState.markedCounts(outcome).alreadyCovered
-            ) {
-                toastManager.enqueue(message, severity: .success)
+            let counts = searchState.markedCounts(outcome)
+            if CommitFeedback.markedMessage(applied: counts.applied, alreadyCovered: counts.alreadyCovered) != nil {
+                toastManager.post(.marked(applied: counts.applied, alreadyCovered: counts.alreadyCovered))
             }
             if navigateToFirst,
                let firstPage = searchState.results.first(where: { selectedIDs.contains($0.id) })?.pageIndex {
@@ -780,8 +773,8 @@ extension SearchAndRedactSheet {
         SavedSearchListSheet.apply(saved, to: searchState)
         searchState.skipNextRerunNotice = true
         triggerSearch()
-        if let message = Self.recallClearedMessage(unappliedCount: dropped) {
-            toastManager.enqueue(message, severity: .info)
+        if Self.recallClearedMessage(unappliedCount: dropped) != nil {
+            toastManager.post(.recallCleared(count: dropped))
         }
     }
 

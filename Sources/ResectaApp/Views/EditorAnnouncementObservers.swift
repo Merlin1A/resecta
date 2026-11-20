@@ -97,11 +97,9 @@ struct EditorAnnouncementObservers: ViewModifier {
             .onChange(of: redactionState.pendingManualDrawNudge?.id) { _, _ in
                 guard let nudge = redactionState.pendingManualDrawNudge else { return }
                 let capturedNudge = nudge
-                toastManager.enqueue(
-                    Self.nudgeToastMessage,
-                    severity: .info,
-                    actionLabel: Self.nudgeToastActionLabel,
-                    actionHandler: { [weak redactionState, weak undoManager, weak documentState] in
+                toastManager.post(
+                    .nearbyMatch,
+                    action: { [weak redactionState, weak undoManager, weak documentState] in
                         guard let state = redactionState else { return }
                         state.acceptManualDrawNudge(
                             capturedNudge, undoManager: undoManager, documentState: documentState)

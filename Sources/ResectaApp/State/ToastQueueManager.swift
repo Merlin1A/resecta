@@ -118,6 +118,14 @@ final class ToastQueueManager {
     /// and by the sheet on its detent changes and disappearance.
     var bottomClearance: CGFloat = 0
 
+    /// The page bar's measured layout height, written by the editor where
+    /// the bar mounts and read by both places that build the bottom-chrome
+    /// model (the editor and the Search sheet), so the lift follows the
+    /// bar when its counter stacks at the larger text sizes. 0 until the
+    /// bar is first measured; the model never lifts by less than the
+    /// one-line bar's height.
+    var pageBarHeight: CGFloat = 0
+
     /// Pre-filtered active toasts by position — avoids per-render .filter allocations.
     var activeTopToasts: [ToastItem] {
         activeToasts.filter { $0.severity.position == .top }
@@ -195,28 +203,16 @@ final class ToastQueueManager {
         }
     }
 
-    /// Convenience: enqueue a toast with message and severity.
-    func enqueue(_ message: String, severity: ToastSeverity = .info) {
-        enqueue(ToastItem(message: message, severity: severity))
-    }
-
-    /// Enqueue an action toast — convenience overload
-    /// for the undo-toast pattern. `actionHandler` runs from MainActor
-    /// when the user taps the button; the toast is dismissed after the
-    /// handler runs. `ToastItem.equality` ignores the closure, so
-    /// coalescing still keys on (message, severity).
-    func enqueue(
-        _ message: String,
-        severity: ToastSeverity = .info,
-        actionLabel: String,
-        actionHandler: @escaping @MainActor () -> Void
-    ) {
-        enqueue(ToastItem(
-            message: message,
-            severity: severity,
-            actionLabel: actionLabel,
-            actionHandler: actionHandler
-        ))
+    /// Post a message by its row: the row's text, today's severity, and the
+    /// row's action label with `action`. A row without a label takes no action.
+    /// `action` runs from MainActor when the user taps the button; the toast
+    /// is dismissed after it runs. `ToastItem.equality` ignores the closure,
+    /// so coalescing still keys on (message, severity).
+    func post(_ id: MessageID, action: (@MainActor () -> Void)? = nil) {
+        let row = MessageCatalog.row(for: id)
+        let handler = row.actionLabel == nil ? nil : action
+        enqueue(ToastItem(message: row.text, severity: row.todaySeverity,
+                          actionLabel: handler == nil ? nil : row.actionLabel, actionHandler: handler))
     }
 
     /// Dismiss a specific toast and show the next queued item for that position after a gap.

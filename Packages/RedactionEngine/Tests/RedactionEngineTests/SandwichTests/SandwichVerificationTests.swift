@@ -327,6 +327,22 @@ struct SandwichVerificationTests {
         }
     }
 
+    @Test("A font not on the accepted list fails with the font's name and the page, in the row's words")
+    func fontVerificationNamesAFontNotAccepted() async throws {
+        let data = TestFixtures.textPagesPDF(["Report summary"])
+        let doc = try #require(PDFDocument(data: data))
+        let page = try #require(doc.page(at: 0))
+
+        let result = try await verifier.verifyFontsAreMonospace(outputPage: page, pageIndex: 0)
+        guard case .fail(let message) = result else {
+            Issue.record("expected .fail for a page drawn in the system font; got \(result)")
+            return
+        }
+        let prefix = "Font not accepted on page 1: "
+        #expect(message.hasPrefix(prefix), "\(message)")
+        #expect(message.count > prefix.count, "the font's name follows: \(message)")
+    }
+
     // MARK: - Fallback Detection
 
     @Test("Image-only PDF has no text layer")

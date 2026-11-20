@@ -37,8 +37,9 @@ struct DocumentBoundaryTests {
         coord.redactionState.removeRegion(region.id, page: 0, undoManager: undo)
         undo.endUndoGrouping()
         #expect(undo.canUndo)
-        toasts.enqueue("Region deleted", severity: .info, actionLabel: "Undo") { undo.undo() }
-        toasts.enqueue("A notice about the first document", severity: .warning)
+        toasts.enqueue(ToastItem(
+            message: "Region deleted", severity: .info, actionLabel: "Undo", actionHandler: { undo.undo() }))
+        toasts.enqueue(ToastItem(message: "A notice about the first document", severity: .warning))
         #expect(!toasts.activeToasts.isEmpty)
         coord.documentState.documentOverride = .searchableRedaction
 

@@ -149,15 +149,14 @@ struct AdversarialSearchableVerificationTests {
         // on emoji ZWJ / regional indicators. Post-redesign, both sides use
         // NSString composed sequences so the iteration unit is the same.
         //
-        // Note: Courier has no glyph for the regional indicators; CoreText
-        // font fallback substitutes a different font, and PDFKit's
-        // outputPage.string reports the substituted characters. Both
-        // filter and verifier walk the SAME composed-character iteration
-        // unit, so the hashes agree iff the substituted output preserves
-        // the codepoint sequence — which CoreText's fallback discipline
-        // does on iOS 26.
+        // None of the hidden text's three faces has a glyph for the regional
+        // indicators, so the text path leaves the flag's run out (counted)
+        // and it is never handed to the system to draw in a face of its
+        // choosing. The record and the written page then hold the same
+        // composed sequences: "ABC" and "XYZ".
         try await assertLayer9RoundTripAgreement(
-            sourceData: TestFixtures.composedSequenceTextLayerPDF()
+            sourceData: TestFixtures.composedSequenceTextLayerPDF(),
+            throughTextPathLeavingOut: 1
         )
     }
 
@@ -718,6 +717,7 @@ struct AdversarialSearchableVerificationTests {
     /// composed-character sequence is what flips the hash.
     private func assertLayer9RoundTripAgreement(
         sourceData: Data,
+        throughTextPathLeavingOut runsLeftOut: Int? = nil,
         sourceLocation: SourceLocation = #_sourceLocation
     ) async throws {
         let sourceDoc = try #require(PDFDocument(data: sourceData),
@@ -727,10 +727,24 @@ struct AdversarialSearchableVerificationTests {
         let pageSize = sourcePage.bounds(for: .mediaBox).size
 
         let extractor = TextLayerExtractor()
-        let chars = try await extractor.extractCharacters(from: sourcePage)
+        var chars = try await extractor.extractCharacters(from: sourcePage)
         #expect(!chars.isEmpty,
                 "Round-trip source fixture must yield CharacterInfo entries",
                 sourceLocation: sourceLocation)
+        if let runsLeftOut {
+            // The page's text path, with no region: what the page records
+            // and writes once the alphabet rule has left its runs out.
+            let path = try await PageTextPath.run(
+                entries: chars, frame: PageFrame(rotation: 0, displayedSize: pageSize),
+                textPathRectangles: [], paintedRectangles: [], pageIndex: 0)
+            guard case .written(let entries, _, _) = path.outcome else {
+                Issue.record("the text path did not write the page: \(path.outcome)", sourceLocation: sourceLocation)
+                return
+            }
+            #expect(path.runsLeftOut == runsLeftOut, sourceLocation: sourceLocation)
+            #expect(!entries.isEmpty, sourceLocation: sourceLocation)
+            chars = entries
+        }
         let filterHash = FilterResult.computeLineageHash(over: chars)
 
         let outputData = try renderInvisibleTextLayer(

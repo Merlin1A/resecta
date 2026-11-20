@@ -60,6 +60,7 @@ public actor PDFStreamReconstructor {
         let textLayerEntries: [CharacterInfo]?
         let redactionRectsInPoints: [CGRect]
         let rotation: Int
+        var hiddenTextLines: HiddenTextLines? = nil
     }
 
     public init(tempURL: URL) {
@@ -182,7 +183,8 @@ public actor PDFStreamReconstructor {
                     entries: entries,
                     pageSize: page.size,
                     redactionRects: page.redactionRectsInPoints,
-                    rotation: page.rotation
+                    rotation: page.rotation,
+                    laidOut: page.hiddenTextLines
                 )
             }
 
@@ -488,7 +490,8 @@ public actor PDFStreamReconstructor {
             size: output.size,
             textLayerEntries: output.textLayerEntries,
             redactionRectsInPoints: output.redactionRectsInPoints,
-            rotation: output.rotation
+            rotation: output.rotation,
+            hiddenTextLines: output.hiddenTextLines
         )
     }
 }

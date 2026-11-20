@@ -194,7 +194,9 @@ struct StressCorpusTests {
                         delta < 0.20,
                         "Wall-clock regressed by \(Int(delta * 100))% vs baseline (current=\(result.wallClockSeconds)s baseline=\(baseline.wallClockSeconds)s)"
                     )
-                } when: { HostRun.isMac }
+                } when: { HostRun.isMac } matching: { issue in
+                    issue.comments.contains { $0.rawValue.hasPrefix("Wall-clock regressed by ") }
+                }
                 // Memory regression window, asserted only on the
                 // baseline's recorded machine (same gating logic as the
                 // wall-clock window — cross-machine memory numbers are not
@@ -230,6 +232,8 @@ struct StressCorpusTests {
                 }
                 withKnownIssue("Machine mismatch — baseline comparison is documentary") {
                     Issue.record(Comment(rawValue: detail))
+                } matching: { issue in
+                    issue.comments.contains { $0.rawValue == detail }
                 }
                 print("[stress documentary] wall-clock delta vs baseline: \(Int(delta * 100))% (current=\(result.wallClockSeconds)s baseline=\(baseline.wallClockSeconds)s; peakMemory current=\(result.peakMemoryBytes)B baseline=\(baseline.peakMemoryBytes)B)")
             }

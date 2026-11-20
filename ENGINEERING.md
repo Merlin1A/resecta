@@ -299,12 +299,12 @@ concurrent entry points. The working rules, checkable by grep:
   `.main.async` hop in the results screen's preview, which waits for the PDF
   view's first layout before it opens a linked page. Main-thread work is
   otherwise expressed through actor isolation, not queue hops.
-- Isolation opt-outs are rare and deliberate: 19 `nonisolated(unsafe)`
+- Isolation opt-outs are rare and deliberate: 20 `nonisolated(unsafe)`
   declarations across ~81,000 lines of app + engine source, and the working
   convention is a written rationale at the declaration site saying why the
   access is safe.
 - Logging goes through `os.Logger`, and what a log line may carry is
-  counted: 61 log interpolations are marked `privacy: .public` across the
+  counted: 62 log interpolations are marked `privacy: .public` across the
   app and engine source, each one a mechanism value — an asset, file or
   preference-key name, a metadata key name, a pipeline phase, a page index,
   a count or a pixel size, a detector or table name, an issuer or state code

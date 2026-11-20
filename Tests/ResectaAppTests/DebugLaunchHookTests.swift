@@ -69,24 +69,8 @@ struct DebugLaunchHookTests {
 
     // MARK: - Toasts
 
-    @Test("Each of the three toast ids parses to the app's own message", arguments: [
-        "shareSheetUnavailable", "selectionLimit", "customTermTimeout",
-    ])
-    @MainActor
-    func toastIdParses(id: String) {
-        guard case .named(let named) = ResectaApp.toastHook(for: ["--showToast=\(id)"]) else {
-            Issue.record("toast id \(id) did not parse")
-            return
-        }
-        #expect(named.rawValue == id)
-        let own: String = switch named {
-        case .shareSheetUnavailable: DocumentEditorView.shareSheetUnavailableMessage
-        case .selectionLimit: RedactionState.lassoSelectionCapToastMessage
-        case .customTermTimeout: SearchAndRedactSheet.customTermTimeoutMessage
-        }
-        #expect(named.message == own)
-        #expect(named.severity == .warning)
-    }
+    // Each message name's parse is pinned with the message table
+    // (`MessageCatalogTests`).
 
     @Test("The bare --showToast keeps today's toast")
     func bareShowToast() {

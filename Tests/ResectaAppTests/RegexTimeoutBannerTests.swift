@@ -100,7 +100,15 @@ struct RegexTimeoutBannerTests {
         }
         let sink = source[start.upperBound..<end.lowerBound]
         #expect(!sink.contains("\\("), "the sink interpolates nothing — no term, no page number")
-        #expect(sink.contains("customTermTimeoutMessage"))
+        // The sink posts the table's row by name; that row's text is the fixed message.
+        #expect(sink.contains("toastManager?.post(.customTermTimeout)"))
+        let table = try loadRepoFile("Sources/ResectaApp/State/MessageCatalog.swift")
+        guard let row = table.range(of: "case .customTermTimeout:\n") else {
+            Issue.record("Could not locate the custom-term timeout row")
+            return
+        }
+        #expect(table[row.upperBound...].hasPrefix(
+            "            return MessageRow(\n                text: SearchAndRedactSheet.customTermTimeoutMessage,"))
     }
 
     /// Mirrors `HonestySurfacesTests.loadRepoFile`.

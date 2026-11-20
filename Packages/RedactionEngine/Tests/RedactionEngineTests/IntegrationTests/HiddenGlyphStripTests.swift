@@ -276,7 +276,9 @@ struct HiddenGlyphStripTests {
         if PageImageInkFitTests.expectsEveryFitNotDegraded {
             withKnownIssue("On the Mac host a box can still be degraded when the wait ends: macOS's Vision reads the page, and how long it takes varies", isIntermittent: true) {
                 #expect(fitted.allSatisfy { !$0.inkFitDegraded }, "a degraded box was served from a cache")
-            } when: { HostRun.isMac }
+            } when: { HostRun.isMac } matching: { issue in
+                issue.comments.contains { $0.rawValue == "a degraded box was served from a cache" }
+            }
         }
     }
 

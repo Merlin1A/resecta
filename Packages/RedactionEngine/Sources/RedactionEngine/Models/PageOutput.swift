@@ -23,6 +23,9 @@ public struct PageOutput: Sendable {
     /// picture; zero for a page that became a picture for any other reason,
     /// and zero until the alphabet rule marks runs.
     public let runsLeftOut: Int
+    /// The text entries' lines as the text path laid them out, drawn as
+    /// they are by the writer; nil for a page that lays its own out.
+    var hiddenTextLines: HiddenTextLines? = nil
 
     public init(image: CGImage, size: CGSize,
                 textLayerEntries: [CharacterInfo]?,

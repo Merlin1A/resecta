@@ -428,7 +428,7 @@ struct SandwichVerification: Sendable {
                     || Self.acceptedFontSuffixes.contains(where: { fontName.hasSuffix($0) })
                 if !accepted {
                     let resultPtr = ctx!.assumingMemoryBound(to: VerificationStatus.self)
-                    resultPtr.pointee = .fail("Non-monospace font found on page \(pageNum): \(fontName)")
+                    resultPtr.pointee = .fail("Font not accepted on page \(pageNum): \(fontName)")
                     return false
                 }
             }

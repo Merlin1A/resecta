@@ -85,25 +85,25 @@ struct DropReplaceConfirmTests {
         #expect(RedactWorkspaceView.dropAdmission(
             documentState: workspace.documentState, redactionState: workspace.redactionState, door: nil) == .confirmReplace)
         workspace.documentState.phase = .verified(report: .skipped)
-        let gate = workspace.documentState.importRefusalMessage(door: nil)
+        let gate = workspace.documentState.importRefusal(door: nil)
         #expect(gate != nil)
         #expect(RedactWorkspaceView.dropAdmission(
             documentState: workspace.documentState, redactionState: workspace.redactionState, door: nil)
-                == .refuse(gate ?? ""))
+                == gate.map(RedactWorkspaceView.DropAdmission.refuse))
     }
 
     @Test("With the editor's sheet up, a drop that owes the confirm is refused with the import gate's sentence")
     func sheetUpRefuses() {
         let workspace = Self.editingWorkspace("sheet")
         workspace.redactionState.activeSearch = Self.touchedSearch()
-        guard case .refuse(let message) = RedactWorkspaceView.dropAdmission(
+        guard case .refuse(let id) = RedactWorkspaceView.dropAdmission(
             documentState: workspace.documentState, redactionState: workspace.redactionState, door: nil)
         else {
             Issue.record("a drop over the presented sheet must be refused")
             return
         }
-        #expect(message == RedactWorkspaceView.dropOverSheetMessage)
-        #expect(message.hasPrefix("Cannot import from this screen."))
+        #expect(id == RedactWorkspaceView.dropOverSheetRefusal)
+        #expect(MessageCatalog.row(for: id).text.hasPrefix("Cannot import from this screen."))
     }
 
     // MARK: - The dialog's words

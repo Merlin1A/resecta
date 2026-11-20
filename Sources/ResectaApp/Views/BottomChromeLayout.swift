@@ -20,10 +20,13 @@ import SwiftUI
 // table without a SwiftUI host.
 
 struct ParkedChromeLayout: Equatable {
-    /// The page bar's own layout height — the chevrons' 46-pt floor
-    /// plus the bar's vertical padding (`PageNavigationBar`). A bottom
-    /// toast clears the bar by this much while the bar is up and no
-    /// taller sheet covers it (the import toast used to sit over it).
+    /// The page bar's own layout height while its counter is on one
+    /// line — the chevrons' 46-pt floor plus the bar's vertical padding
+    /// (`PageNavigationBar`). It is the floor of the lift: a bottom
+    /// toast clears the bar by the bar's measured height, and never by
+    /// less than this, while the bar is up and no taller sheet covers
+    /// it. At the accessibility text sizes the counter stacks and the
+    /// bar is taller than this (the import toast used to sit over it).
     static let pageBarClearance: CGFloat =
         ResectaTokens.TouchTarget.minimum + 2 * ResectaTokens.Spacing.sm
 
@@ -36,7 +39,8 @@ struct ParkedChromeLayout: Equatable {
     /// Zoomed content structurally cannot sit under the float.
     let canvasBottomInset: CGFloat
     /// How far the bottom toast hosts lift: the hug while parked, plus
-    /// the page bar's height while the bar is up and uncovered. Zero
+    /// the page bar's measured height (at least `pageBarClearance`)
+    /// while the bar is up and uncovered. Zero
     /// with the sheet up at a taller detent — the sheet-local host
     /// renders inside the sheet then, and the app-level copy is
     /// covered.
@@ -54,7 +58,8 @@ struct ParkedChromeLayout: Equatable {
         pageCount: Int,
         sizeClass: UserInterfaceSizeClass?,
         phase: DocumentState.PhaseKind,
-        hugHeight: CGFloat
+        hugHeight: CGFloat,
+        pageBarHeight: CGFloat
     ) {
         let parked = sheetPresented && detent == .compactFloat
         let barEligible = sizeClass == .compact && pageCount >= 1 && phase == .editing
@@ -62,7 +67,7 @@ struct ParkedChromeLayout: Equatable {
         canvasBottomInset = parked ? hugHeight : 0
         let barUncovered = showsPageBar && !(sheetPresented && !parked)
         toastClearance = (parked ? hugHeight : 0)
-            + (barUncovered ? Self.pageBarClearance : 0)
+            + (barUncovered ? max(pageBarHeight, Self.pageBarClearance) : 0)
         hintCapsuleLift = 0
     }
 }

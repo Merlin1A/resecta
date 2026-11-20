@@ -34,6 +34,7 @@ extension TestFixtures {
     /// fixture's authored lines, one of these scalars is one drawn glyph.
     static let joinedGlyphLetters: [Unicode.Scalar: String] = [
         "\u{FB00}": "ff", "\u{FB01}": "fi", "\u{FB02}": "fl", "\u{FB03}": "ffi", "\u{FB04}": "ffl",
+        "\u{FB05}": "st", "\u{FB06}": "st",
     ]
 
     /// One page, one line of text per entry of `lines`, each glyph drawn from
