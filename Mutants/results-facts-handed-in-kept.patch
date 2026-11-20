@@ -5,9 +5,10 @@ Must go red: ResectaAppTests/FactRowTests cardOrder
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Views/FactRow.swift b/Sources/ResectaApp/Views/FactRow.swift
+index 57aa7ed6..139fe201 100644
 --- a/Sources/ResectaApp/Views/FactRow.swift
 +++ b/Sources/ResectaApp/Views/FactRow.swift
-@@ -61,7 +61,7 @@
+@@ -61,7 +61,7 @@ nonisolated enum ResultsFactCard {
      static func items(handedIn: [ResultsFact], runLines: [ResultsFact], showsPageModes: Bool,
                        deselection: ResultsFact?, sweepLimit: ResultsFact? = nil) -> [ResultsCardItem] {
          func placed(_ place: ResultsFact.Place) -> [ResultsCardItem] {
