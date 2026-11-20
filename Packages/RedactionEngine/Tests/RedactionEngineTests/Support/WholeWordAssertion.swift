@@ -13,7 +13,8 @@ import Testing
 /// - read back from the written page at the place it is drawn, no hidden
 ///   character's centre lies in a painted rectangle.
 /// The written page is made by the writer's own call, from the text path's
-/// list and its laid-out lines, and read back with PDFKit.
+/// list and its laid-out lines, and read back with PDFKit as the position
+/// check reads it (`SandwichVerification+SpatialExclusion`).
 enum WholeWordAssertion {
 
     /// A page the text path wrote, read back.
@@ -46,8 +47,11 @@ enum WholeWordAssertion {
         while index < ns.length {
             let range = ns.rangeOfComposedCharacterSequence(at: index)
             let character = ns.substring(with: range)
-            if !character.allSatisfy(\.isWhitespace) {
-                readBack.append((character, page.characterBounds(at: range.location)))
+            // Read as the position check reads it: the selection's bounds,
+            // and a character with no box is not drawn anywhere.
+            let bounds = page.selection(for: range)?.bounds(for: page) ?? .zero
+            if !character.allSatisfy(\.isWhitespace), bounds.width > 0, bounds.height > 0 {
+                readBack.append((character, bounds))
             }
             index = range.location + range.length
         }
