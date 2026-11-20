@@ -4,15 +4,16 @@ Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcod
 Must go red: ResectaAppTests/SearchUntriedFormsTests staysAMiss
 Apply in a scratch worktree with `git apply`; discard after.
 
-diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/SearchTypes.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/SearchTypes.swift
---- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/SearchTypes.swift
-+++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/SearchTypes.swift
-@@ -203,7 +203,7 @@
-     /// Diacritic-insensitive matching ("Munoz" matches "Muñoz").
-     /// Off by default: folding introduces false positives in non-Latin
-     /// scripts and many name databases are accent-significant.
--    public var foldDiacritics: Bool = false
-+    public var foldDiacritics: Bool = true
- 
-     // AND mode for multi-term search.
-     // When true, `searchMultiTerm` retains only pages where EVERY term
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/SearchOptions.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/SearchOptions.swift
+index 0c926bdb..4e162dcf 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/SearchOptions.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/SearchOptions.swift
+@@ -50,7 +50,7 @@ public struct SearchOptions: Sendable, Equatable, Hashable {
+         normalizeUnicode: Bool = true,
+         stripDigitSeparators: Bool = false,
+         normalizeSmartPunctuation: Bool = true,
+-        foldDiacritics: Bool = false,
++        foldDiacritics: Bool = true,
+         multiTermConjunction: Bool = false
+     ) {
+         self.caseSensitive = caseSensitive

@@ -173,3 +173,50 @@ struct OverlayCoordinateTests {
         #expect(highlightLabels(overlay) == ["Search highlight, page 3", "Search highlight, page 3"])
     }
 }
+
+// MARK: - Element frames in the overlay's own space
+
+/// The overlay's two kinds of accessibility element.
+nonisolated enum OverlayAccessibilityElementKind: String, CaseIterable, Sendable {
+    case box, searchHighlight
+}
+
+extension OverlayCoordinateTests {
+
+    /// Each element's frame is set in the overlay's own space, so the system
+    /// works out its place on screen each time it is asked and the frame
+    /// follows the page when it moves; a frame fixed in screen coordinates
+    /// when the list was built stays behind.
+    @Test("Each element's frame is given in the overlay's own space",
+          arguments: OverlayAccessibilityElementKind.allCases)
+    func elementFrameIsInTheOverlaysOwnSpace(kind: OverlayAccessibilityElementKind) throws {
+        let overlay = makeOverlay()
+        overlay.pageIndex = 2
+        let box = RedactionRegion(
+            id: UUID(),
+            normalizedRect: CGRect(x: 0.1, y: 0.6, width: 0.23, height: 0.05),
+            source: .manual
+        )
+        let found = highlight(y: 0.3, text: "ACCT-4471")
+        overlay.configure(with: [box], selectedIDs: [], searchHighlights: [found], focusedHighlightID: nil)
+
+        let elements = try #require(overlay.accessibilityElements as? [UIAccessibilityElement])
+        #expect(elements.count == 2)
+        let element: UIAccessibilityElement?
+        let rect: CGRect
+        switch kind {
+        case .box:
+            element = elements.first { $0.accessibilityLabel == "Redaction region 1" }
+            rect = box.normalizedRect
+        case .searchHighlight:
+            element = elements.first { $0.accessibilityLabel?.hasPrefix("Search highlight") == true }
+            rect = found.normalizedRect
+        }
+        let frame = try #require(element).accessibilityFrameInContainerSpace
+        let expected = overlay.pdfNormalizedToOverlay(rect)
+        #expect(abs(frame.minX - expected.minX) < 0.01, "x: \(frame) against \(expected)")
+        #expect(abs(frame.minY - expected.minY) < 0.01, "y: \(frame) against \(expected)")
+        #expect(abs(frame.width - expected.width) < 0.01, "width: \(frame) against \(expected)")
+        #expect(abs(frame.height - expected.height) < 0.01, "height: \(frame) against \(expected)")
+    }
+}

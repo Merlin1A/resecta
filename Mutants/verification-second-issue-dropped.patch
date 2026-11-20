@@ -5,10 +5,10 @@ Must go red: RedactionEngineTests/CouldNotReadRowTests eachCase [Text & Annotati
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine.swift
-index 605e3fcb..a9d9a72c 100644
+index 141a6872..36729b24 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine.swift
-@@ -545,9 +545,7 @@ public struct VerificationEngine: Sendable {
+@@ -556,9 +556,7 @@ public struct VerificationEngine: Sendable {
              // issues are in the row, text first.
              if !annotationPages.isEmpty {
                  let annotationList = annotationPages.map { String($0 + 1) }.joined(separator: ", ")
@@ -17,5 +17,5 @@ index 605e3fcb..a9d9a72c 100644
 -                pages = Array(Set(pages + annotationPages)).sorted()
 +                _ = annotationList
              }
-             return row(.fail(message), pages)
+             return row(.fail(message), pages).stopped(at: .bookmarksAndFormFieldsNotRead)
          }
