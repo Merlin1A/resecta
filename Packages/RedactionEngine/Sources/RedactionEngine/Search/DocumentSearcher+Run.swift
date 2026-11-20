@@ -11,8 +11,9 @@ extension DocumentSearcher {
     ///
     /// Delivery is complete: the stream buffers without bound, so a page
     /// that bursts more matches than a lagging consumer has drained loses
-    /// nothing. The bound on results in flight is `maxResults`, enforced
-    /// at every yield site.
+    /// nothing. The bound on what is in flight is `maxResults` matches,
+    /// enforced at every yield site; a match over several lines is one
+    /// result per line, so a run can yield more results than that.
     ///
     /// - Parameters:
     ///   - document: The PDF to search (SendablePDFDocument wrapper).

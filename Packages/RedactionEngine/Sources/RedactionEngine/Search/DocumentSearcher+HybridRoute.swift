@@ -59,7 +59,10 @@ extension DocumentSearcher {
     /// Yields `results` until the result cap: the one capped emission every
     /// routing site shares. The cap counts occurrences, not rows: a match
     /// over several lines, or across a page break, is listed whole or not at
-    /// all. A piece of an occurrence this call has begun is always yielded; a
+    /// all. The one exception: a piece with no box is an occurrence of its
+    /// own (`occurrenceKey`), so a match across a page break with one part
+    /// boxed and one not counts as two, and either may fall past the cap.
+    /// A piece of an occurrence this call has begun is always yielded; a
     /// new occurrence is begun only under the cap, and `total` counts it once.
     /// Every piece of an occurrence arrives in one call (a page's results, its
     /// recognised lines, or both sides of a page break together).

@@ -132,6 +132,9 @@ struct SearchLimitOccurrenceTests {
     /// (`ocrLiteralMatches`): a match over two lines is two results with
     /// one occurrence id, and the page's results reach `emitCapped` in one
     /// array, as at each OCR emission site of DocumentSearcher+TextModes.
+    /// The array is built here, not read from a scan: the case pins how
+    /// `emitCapped` counts one page's results handed in as one array, not
+    /// the OCR reader itself.
     @Test("A match read by OCR over two lines counts once toward the limit", arguments: ocrRows)
     func ocrCrossLineCountsOnce(_ row: OCRRow) async {
         func piece(_ y: CGFloat, occurrence: UUID? = nil) -> SearchResult {
