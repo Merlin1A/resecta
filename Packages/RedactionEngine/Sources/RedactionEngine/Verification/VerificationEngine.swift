@@ -72,6 +72,14 @@ public struct VerificationEngine: Sendable {
     /// per-task copies the fan-out makes each carry the closure.
     var onRunLayerDispatch: (@Sendable (Int, ObjectIdentifier) -> Void)?
 
+    #if DEBUG
+    /// Test seam, compiled out of a release build: awaited as each
+    /// `runLayer` call starts, with the layer's ordinal, so a test can hold
+    /// the layers of a batch at a barrier and prove they run at the same
+    /// time without reading a clock.
+    var onRunLayerEnter: (@Sendable (Int) async -> Void)?
+    #endif
+
     /// Canonical per-mode layer order: every `VerificationLayer` that applies
     /// to `mode`, in declaration order (`searchRecheck` last in both modes).
     /// Counts, ordinals and the coordinator's schedule derive from this list.
@@ -147,6 +155,9 @@ public struct VerificationEngine: Sendable {
         // Guard seam: record which document instance this layer was
         // dispatched against. No-op in production (closure is nil).
         onRunLayerDispatch?(ordinal, ObjectIdentifier(doc))
+        #if DEBUG
+        await onRunLayerEnter?(ordinal)
+        #endif
 
         let sandwichVerifier = SandwichVerification()
 
