@@ -50,16 +50,19 @@ struct SearchFooterCapBannerTests {
 
         // Fill to the engine cap, then deliver one more result: the cap
         // branch must fire and snapshot 40 - 12 = 28 unscanned pages.
-        let filler = SearchResult(
-            pageIndex: 0,
-            normalizedRect: CGRect(x: 0, y: 0, width: 0.1, height: 0.1),
-            matchedText: "filler",
-            contextSnippet: "filler",
-            source: .textLayer,
-            term: "filler"
-        )
-        state.results = Array(repeating: filler, count: DocumentSearcher.maxResults)
-        state.appendResult(filler)
+        // Each filler is its own match (the cap counts matches).
+        func filler() -> SearchResult {
+            SearchResult(
+                pageIndex: 0,
+                normalizedRect: CGRect(x: 0, y: 0, width: 0.1, height: 0.1),
+                matchedText: "filler",
+                contextSnippet: "filler",
+                source: .textLayer,
+                term: "filler"
+            )
+        }
+        state.results = (0..<DocumentSearcher.maxResults).map { _ in filler() }
+        state.appendResult(filler())
 
         #expect(state.resultsAtCap)
         #expect(state.capUnscannedPageCount == 28)

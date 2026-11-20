@@ -48,7 +48,7 @@ struct SearchRuleCaseTests {
         #expect(SearchCore.isWholeWordInBase(chars: chars, start: start, endExclusive: end) == row.isWholeWord)
     }
 
-    // MARK: a run stops at maxResults result rows
+    // MARK: a run stops at maxResults matches
 
     struct CapRow: Sendable, CustomTestStringConvertible {
         let name: String
@@ -75,7 +75,7 @@ struct SearchRuleCaseTests {
                      matchedText: "x", contextSnippet: "x", source: .textLayer, term: "x")
     }
 
-    @Test("The result limit: a run lists maxResults rows and no more", arguments: capRows)
+    @Test("The result limit: a run lists maxResults matches and no more", arguments: capRows)
     func resultLimit(_ row: CapRow) async {
         let searcher = DocumentSearcher()
         let (stream, continuation) = AsyncStream<SearchResult>.makeStream()
@@ -88,7 +88,7 @@ struct SearchRuleCaseTests {
         #expect(total == row.alreadyYielded + row.yielded)
     }
 
-    // MARK: a whole search in each mode lists maxResults rows and no more
+    // MARK: a whole search in each mode lists maxResults matches and no more
 
     enum LimitMode: String, Sendable, CaseIterable { case text, pattern, scan, alwaysFlag }
 
@@ -139,7 +139,7 @@ struct SearchRuleCaseTests {
         return buildRawPDF(objects: objects, rootId: 1)
     }
 
-    @Test("The result limit: a whole search lists maxResults rows and no more, in each mode", arguments: limitRows)
+    @Test("The result limit: a whole search lists maxResults matches and no more, in each mode", arguments: limitRows)
     func searchLimit(_ row: LimitRow) async throws {
         let doc = try #require(PDFDocument(data: Self.manyTokenPages(row.perPage, addresses: row.mode == .scan)))
         let searcher = DocumentSearcher()

@@ -1,0 +1,19 @@
+Property: The Search Re-check reads a page as stopped at the limit by its matches, not the rows a broken match lists.
+Area: Search Re-check, the result limit
+Test command: cd Packages/RedactionEngine && DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --no-parallel --filter '^RedactionEngineTests\.SearchLimitOccurrenceTests/'
+Must go red: RedactionEngineTests/SearchLimitOccurrenceTests recheckStopsAtMatches
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/OutputRecheck.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/OutputRecheck.swift
+index 62515cca..80f464c7 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/OutputRecheck.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/OutputRecheck.swift
+@@ -297,7 +297,7 @@ struct OutputRecheck: Sendable {
+             }
+             observation.counts[requestIndex] = RecheckObservation.Count(
+                 remaining: remaining,
+-                hitCap: matches.count >= DocumentSearcher.maxResults,
++                hitCap: remaining >= DocumentSearcher.maxResults,
+                 perTerm: perTerm,
+                 rejected: rejection.value,
+                 timedOut: timeout.value,

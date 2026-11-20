@@ -548,10 +548,18 @@ final class SearchState: Identifiable {
     /// the remainder rather than presenting the first N results as full
     /// coverage), publish what is buffered and stop the scan.
     func markCapReached() {
-        resultsAtCap = true
-        capUnscannedPageCount = max(0, totalPages - currentSearchPage)
+        noteCapReached()
         flushPendingResults()
         cancelSearchWithoutAwait()
+    }
+
+    /// The run's matches reached the cap: mark it and snapshot the
+    /// unscanned remainder, once per run, without stopping the scan (the
+    /// last match's later lines are still to arrive).
+    func noteCapReached() {
+        guard !resultsAtCap else { return }
+        resultsAtCap = true
+        capUnscannedPageCount = max(0, totalPages - currentSearchPage)
     }
 
     /// Clear results and increment version for overlay refresh. The

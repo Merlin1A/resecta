@@ -1,0 +1,26 @@
+Property: The result limit counts matches, not rows: a match over two lines or across a page break is listed whole or not at all.
+Area: Search, the result limit
+Test command: cd Packages/RedactionEngine && DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --no-parallel --filter '^RedactionEngineTests\.SearchLimitOccurrenceTests/'
+Must go red: RedactionEngineTests/SearchLimitOccurrenceTests limitKeepsMatchesWhole
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+HybridRoute.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+HybridRoute.swift
+index aca99dc6..b272a8d1 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+HybridRoute.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+HybridRoute.swift
+@@ -68,13 +68,9 @@ extension DocumentSearcher {
+     ) {
+         var begun = Set<UUID>()
+         for result in results {
+-            let key = Self.occurrenceKey(result)
+-            if !begun.contains(key) {
+-                if total >= Self.maxResults { continue }
+-                begun.insert(key)
+-                total += 1
+-            }
++            if total >= Self.maxResults { break }
+             continuation.yield(result)
++            total += 1
+         }
+     }
+ 

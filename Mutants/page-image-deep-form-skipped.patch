@@ -1,0 +1,17 @@
+Property: A form nested deeper than eight refuses the page; an image inside it never goes unseen.
+Area: the reader of a page's stored picture (crafted input)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/PageImageCraftedInputTests (or on the host: cd Packages/RedactionEngine && swift test --no-parallel --filter PageImageCraftedInputTests)
+Must go red: RedactionEngineTests/PageImageCraftedInputTests formsNestedPastTheLimit
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PageImageLocator.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PageImageLocator.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PageImageLocator.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PageImageLocator.swift
+@@ -86,6 +86,7 @@
+                 let data = CGPDFStreamCopyData(s, &format).map { $0 as Data } ?? Data()
+                 walk.found.append(PageImageStream(bytes: data, isJPEG: format == .jpegEncoded))
+             } else if name == "Form" {
++                if depth >= formDepthLimit { continue }
+                 walk.formsFollowed += 1
+                 guard depth < formDepthLimit, walk.formsFollowed <= formLimit else {
+                     walk.overLimit = true

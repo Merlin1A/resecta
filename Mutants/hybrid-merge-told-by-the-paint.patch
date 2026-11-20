@@ -1,0 +1,19 @@
+Property: on a hybrid page, every place the text-layer results reach the hybrid merge passes the box each match is told by (its identity where its paint grew past it), never the paint alone, so a paint grown over a neighbour line never takes that line's OCR-only occurrence for its repeat.
+Area: search hybrid merge (engine)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter HybridDedupTests
+Must go red: RedactionEngineTests/HybridDedupTests identityAtEveryMergeInput
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+TextModes.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+TextModes.swift
+index fbf3d444..d6927ea6 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+TextModes.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+TextModes.swift
+@@ -41,7 +41,7 @@ extension DocumentSearcher {
+                     pageText: pageText, query: query, options: options,
+                     page: page, pageIndex: pageIndex, term: query
+                 ) }
+-                let hybrid = await hybridOCRLeg(page: page, pageIndex: pageIndex, textLayerRects: results.map(\.mergeIdentity),
++                let hybrid = await hybridOCRLeg(page: page, pageIndex: pageIndex, textLayerRects: results.map(\.normalizedRect),
+                     includeOCR: options.includeOCR) { await self.searchPageViaOCR(page: page, pageIndex: pageIndex, query: query, options: options, term: query) }
+                 let seamHits = await pageSeamMatches(from: seam, to: page, pageIndex: pageIndex, pageText: pageText, query: query, options: options, term: query)
+                 emitCapped(results + hybrid + seamHits, into: continuation, total: &totalYielded)

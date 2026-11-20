@@ -205,6 +205,9 @@ final class InkFitCache: @unchecked Sendable {
     static let capacity = 4096
     private let lock = NSLock()
     private var fittedByKey: [Int: CGRect] = [:]
+    /// A fit's identity box where it has one (`InkFitJob.identity`), kept and
+    /// dropped with its fit.
+    private var identityByKey: [Int: CGRect] = [:]
     private var order: [Int] = []
     private var inFlight: Set<Int> = []
 
@@ -216,6 +219,12 @@ final class InkFitCache: @unchecked Sendable {
     func fitted(for key: Int) -> CGRect? {
         lock.lock(); defer { lock.unlock() }
         return fittedByKey[key]
+    }
+
+    /// A fit and its identity box (nil when the fit is its own).
+    func fittedAndIdentity(for key: Int) -> (fitted: CGRect, identity: CGRect?)? {
+        lock.lock(); defer { lock.unlock() }
+        return fittedByKey[key].map { ($0, identityByKey[key]) }
     }
 
     func displayed(for key: Int) -> CGRect? {
@@ -230,12 +239,16 @@ final class InkFitCache: @unchecked Sendable {
     }
 
     /// A fit (cached), or a degraded box (`displayed`, kept for display only).
-    func finish(_ key: Int, fitted: CGRect?, displayed: CGRect? = nil) {
+    func finish(_ key: Int, fitted: CGRect?, displayed: CGRect? = nil, identity: CGRect? = nil) {
         lock.lock(); defer { lock.unlock() }
         inFlight.remove(key)
         if let fitted {
             if fittedByKey.updateValue(fitted, forKey: key) == nil { order.append(key) }
-            while order.count > Self.capacity { fittedByKey.removeValue(forKey: order.removeFirst()) }
+            identityByKey[key] = identity
+            while order.count > Self.capacity {
+                let oldest = order.removeFirst()
+                fittedByKey.removeValue(forKey: oldest); identityByKey.removeValue(forKey: oldest)
+            }
             if displayedByKey.removeValue(forKey: key) != nil { displayedOrder.removeAll { $0 == key } }
         } else if let displayed {
             if displayedByKey.updateValue(displayed, forKey: key) == nil { displayedOrder.append(key) }

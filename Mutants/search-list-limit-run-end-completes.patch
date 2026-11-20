@@ -1,0 +1,22 @@
+Property: A run that stopped at the result limit ends as a cancelled run when its stream ends: flushed and no longer searching, its task let go, the completed flag down, and for a Scan no coverage report and no run record.
+Area: the Search sheet's run end (SearchState.runEndsCancelled, SearchAndRedactSheet.endRunState)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild build-for-testing -scheme ResectaApp -destination id=<simulator>, then DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test-without-building -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/SearchListLimitOccurrenceTests
+Must go red: ResectaAppTests/SearchListLimitOccurrenceTests runEnd (the rows "Search, stopped at the limit…", "Scan, stopped at the limit: it ends as a cancelled run…")
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/SearchState+RunLifecycle.swift b/Sources/ResectaApp/State/SearchState+RunLifecycle.swift
+index 398d3e63..cf8c38c8 100644
+--- a/Sources/ResectaApp/State/SearchState+RunLifecycle.swift
++++ b/Sources/ResectaApp/State/SearchState+RunLifecycle.swift
+@@ -79,10 +79,7 @@ extension SearchState {
+     /// A superseded run's end (another token) never takes the cap branch,
+     /// so it cannot stop a successor's run.
+     func runEndsCancelled(run: Int, taskCancelled: Bool) -> Bool {
+-        if taskCancelled { return true }
+-        guard resultsAtCap, run == runToken else { return false }
+-        cancelSearchWithoutAwait()
+-        return true
++        return taskCancelled
+     }
+ 
+     /// Replace-selection primitive: every result's `isSelected` is set to

@@ -107,10 +107,10 @@ extension DocumentSearcher {
     /// envelope, and the caller reports the page as not fully analysed.
     nonisolated static func inkFit(
         _ rect: CGRect, page: PDFPage, text: String?, range: NSRange? = nil, paintOnly: Bool = false
-    ) -> (rect: CGRect, degraded: Bool) {
-        guard !rect.isEmpty, let cgPage = page.pageRef, carriesHiddenTextOverImage(page, cgPage: cgPage) else { return (rect, false) }
+    ) -> (rect: CGRect, degraded: Bool, identity: CGRect?) {
+        guard !rect.isEmpty, let cgPage = page.pageRef, carriesHiddenTextOverImage(page, cgPage: cgPage) else { return (rect, false, nil) }
         let visual = effectiveBounds(page.bounds(for: .cropBox), rotation: page.rotation).size
-        guard visual.width > 0, visual.height > 0 else { return (rect, false) }
+        guard visual.width > 0, visual.height > 0 else { return (rect, false, nil) }
         let pageKey = InkTokenCache.key(page: page, cgPage: cgPage, visual: visual)
         var job = InkFitJob(rect: rect, cgPage: cgPage, rotation: page.rotation, visual: visual, pageKey: pageKey,
                             pageText: page.string ?? "", text: text, range: range, paintOnly: paintOnly,
@@ -118,14 +118,14 @@ extension DocumentSearcher {
                             wideBefore: range != nil ? wideCharacters(before: range, in: page.string ?? "")
                                 : wideCharacters(before: NSRange(location: 0, length: ((text ?? "") as NSString).length), in: text ?? ""),
                             fromLineStart: 0)
-        if let known = InkFitCache.shared.fitted(for: job.key) { return (known, false) }
+        if let known = InkFitCache.shared.fittedAndIdentity(for: job.key) { return (known.fitted, false, known.identity) }
         // The main thread (the live preview) reads only what a search returned
         // off the main thread: its fit, or the degraded box it painted (so the
         // preview shows what will be applied). It renders, reads and copies
         // nothing, and asks again on `inkFitDidUpdate`.
         if Thread.isMainThread {
-            if let shown = InkFitCache.shared.displayed(for: job.key) { return (shown, true) }
-            return (rect, false)
+            if let shown = InkFitCache.shared.displayed(for: job.key) { return (shown, true, nil) }
+            return (rect, false, nil)
         }
         let readingBox = job.frame.toReading(CGRect(x: rect.minX * visual.width, y: rect.minY * visual.height,
                                                     width: rect.width * visual.width, height: rect.height * visual.height))
@@ -147,16 +147,18 @@ extension DocumentSearcher {
             let wide = job.envelope()
             InkFitCache.shared.finish(job.key, fitted: nil, displayed: wide)
             InkFitUpdates.shared.post()
-            return (wide, true)
+            return (wide, true, nil)
         }
         let onCopy = job.with(privatePage)
         let fitted = onCopy.run()
         let degraded = onCopy.uncached.isRaised
         // A deferred run's envelope stands in until the page is read: not shown.
         let placeholder = InkFitDeferral.current != nil && degraded
-        InkFitCache.shared.finish(job.key, fitted: degraded ? nil : fitted, displayed: degraded && !placeholder ? fitted : nil)
+        let identity = onCopy.identity.value
+        InkFitCache.shared.finish(job.key, fitted: degraded ? nil : fitted, displayed: degraded && !placeholder ? fitted : nil,
+                                  identity: identity)
         if !placeholder { InkFitUpdates.shared.post() }
-        return (fitted, degraded)
+        return (fitted, degraded, identity)
     }
 
     /// Where the ink of a match whose layer box is `box` (reading frame) can
@@ -394,10 +396,7 @@ extension DocumentSearcher {
             }
         }
         let seed = anchor?.rect ?? box
-        let height = max(seed.height, box.height)
-        let vPad = max(height, 4), hPad = max(0.75 * height, 3)
-        let window = seed.insetBy(dx: -hPad, dy: -vPad).intersection(CGRect(origin: .zero, size: size))
-        var fitted = anchor?.rect ?? box
+        let window = inkFitWindow(seed: seed, box: box, size: size)
         let page = InkFitPage(cgPage)
         var stalled = false
         #if DEBUG
@@ -425,9 +424,9 @@ extension DocumentSearcher {
         // The ink rows: at the ink threshold; text lighter than it (grey
         // labels, a faint scan) read again at `inkFitLightThreshold`; light
         // text on a dark ground read as light ink.
-        func read(_ map: GrayBitmap) -> (box: CGRect?, outcome: InkFitOutcome, margin: Int?) {
-            inkBox(in: map, box: seed, window: window,
-                   growLeft: anchor?.growLeft ?? true, growRight: anchor?.growRight ?? true)
+        func read(_ map: GrayBitmap) -> (box: CGRect?, outcome: InkFitOutcome, band: CGRect?, margin: Int?) {
+            inkBoxes(in: map, box: seed, window: window,
+                     growLeft: anchor?.growLeft ?? true, growRight: anchor?.growRight ?? true)
         }
         var reading = read(bitmap)
         if reading.box == nil, reading.outcome == .darkGround {
@@ -451,30 +450,89 @@ extension DocumentSearcher {
             }
         }
         if reading.outcome == .capped { inkFitLogger.log("ink fit reached its window: the box grew to the cap") }
-        // The height is the ink's own rows: Vision's box can reach past its
-        // line's ink into the leading, toward the next line.
-        let minX = min(fitted.minX, ink.minX), maxX = max(fitted.maxX, ink.maxX)
-        fitted = CGRect(x: minX, y: ink.minY, width: maxX - minX, height: ink.height)
-        // A margin past the ink on every side the box may grow (a render's
-        // half-inked edge, a round letter's overshoot): never on a side cut
-        // from a longer token, which would paint its next letter.
-        let side = inkFitMargin, cap = inkFitMargin / 2
-        fitted = CGRect(x: fitted.minX - ((anchor?.growLeft ?? true) ? side : 0), y: fitted.minY - cap,
-                        width: fitted.width + ((anchor?.growLeft ?? true) ? side : 0) + ((anchor?.growRight ?? true) ? side : 0),
-                        height: fitted.height + 2 * cap)
         // The selection box too, unless the caller strips the hidden glyphs by
         // their own rect (`textLayerAndInkRects`): a fill that covers them is
         // then the only thing that removes them from a Searchable export.
-        // The fit past its read word's window (a render that grew onto
-        // another word): the envelope.
-        guard window.insetBy(dx: -inkFitMargin, dy: -inkFitMargin).contains(fitted) else {
+        guard let painted = inkPaintAndIdentity(ink: ink, band: reading.band, seed: seed, window: window,
+                                                growLeft: anchor?.growLeft ?? true, growRight: anchor?.growRight ?? true) else {
             inkFitLogger.log("ink fit: the fitted box reaches past its window; the box is the read word's box, degraded"); return anchorEnvelope()
         }
-        if !job.paintOnly { fitted = fitted.union(box) }
-        let back = frame.toVisual(fitted)
-        return CGRect(x: back.minX / visual.width, y: back.minY / visual.height,
-                      width: back.width / visual.width, height: back.height / visual.height)
-            .clampedToNormalized()
+        func normalizedBack(_ fitted: CGRect) -> CGRect {
+            let back = frame.toVisual(job.paintOnly ? fitted : fitted.union(box))
+            return CGRect(x: back.minX / visual.width, y: back.minY / visual.height,
+                          width: back.width / visual.width, height: back.height / visual.height)
+                .clampedToNormalized()
+        }
+        // The box with every band reached past its window, and the tallest
+        // band's box stands in: that band alone can leave the word's other
+        // bands outside (a light row through the word, the box grown along
+        // the taller rows onto the word before it). The fit paints that box
+        // together with the read word's envelope, degraded as the envelope
+        // is, and the match is told by the band's box.
+        if painted.fellBack {
+            let band = normalizedBack(painted.paint)
+            inkFitLogger.log("ink fit: the box with every band reaches past its window; the box is its tallest band's with the read word's envelope, degraded")
+            job.identity.set(band)
+            return band.union(anchorEnvelope()).clampedToNormalized()
+        }
+        job.identity.set(painted.identity.map(normalizedBack))
+        return normalizedBack(painted.paint)
+    }
+
+    /// The window a word's fit renders and reads: the seed box (the read
+    /// word's, or the selection box) and a line's height above and below it,
+    /// three quarters of one to each side, on the page.
+    nonisolated static func inkFitWindow(seed: CGRect, box: CGRect, size: CGSize) -> CGRect {
+        let height = max(seed.height, box.height)
+        let vPad = max(height, 4), hPad = max(0.75 * height, 3)
+        return seed.insetBy(dx: -hPad, dy: -vPad).intersection(CGRect(origin: .zero, size: size))
+    }
+
+    /// The box a fit paints from its ink box (`inkBoxes`): the seed's columns
+    /// and the ink, with the ink's own rows (Vision's box can reach past its
+    /// line's ink into the leading, toward the next line), and a margin. A
+    /// box past the window grew onto another word: then the box of the band
+    /// alone (`band`, the line with the most rows inside the box, as it was
+    /// before every run meeting the box was taken), and nil when that is past
+    /// the window too (the fit then paints the envelope).
+    nonisolated static func inkPaint(ink: CGRect, band: CGRect?, seed: CGRect, window: CGRect,
+                                     growLeft: Bool, growRight: Bool) -> CGRect? {
+        func paint(_ ink: CGRect) -> CGRect? {
+            let minX = min(seed.minX, ink.minX), maxX = max(seed.maxX, ink.maxX)
+            // A margin past the ink on every side the box may grow (a render's
+            // half-inked edge, a round letter's overshoot): never on a side cut
+            // from a longer token, which would paint its next letter.
+            let side = inkFitMargin, cap = inkFitMargin / 2
+            let fitted = CGRect(x: minX - (growLeft ? side : 0), y: ink.minY - cap,
+                                width: maxX - minX + (growLeft ? side : 0) + (growRight ? side : 0),
+                                height: ink.height + 2 * cap)
+            return window.insetBy(dx: -inkFitMargin, dy: -inkFitMargin).contains(fitted) ? fitted : nil
+        }
+        if let whole = paint(ink) { return whole }
+        guard let band, let alone = paint(band) else { return nil }
+        inkFitLogger.log("ink fit: the box with every band reaches past its window; the box is its tallest band's")
+        return alone
+    }
+
+    /// `inkPaint`'s box, and beside it the box the tallest band alone paints
+    /// when the paint took more than that band: the box a word's fit gave
+    /// before every band was taken. A hybrid page tells an OCR result that
+    /// repeats this match by that box (`SearchResult.identityRect`), never by
+    /// the grown one, which can reach over a neighbour line's occurrence the
+    /// text layer does not hold. nil identity when the paint is that box.
+    /// `fellBack` when the box with every band reached past the window and
+    /// the paint is the tallest band's box standing in for it.
+    nonisolated static func inkPaintAndIdentity(ink: CGRect, band: CGRect?, seed: CGRect, window: CGRect,
+                                                growLeft: Bool, growRight: Bool)
+        -> (paint: CGRect, identity: CGRect?, fellBack: Bool)? {
+        guard let paint = inkPaint(ink: ink, band: band, seed: seed, window: window, growLeft: growLeft, growRight: growRight) else {
+            return nil
+        }
+        let fellBack = band != nil && inkPaint(ink: ink, band: nil, seed: seed, window: window,
+                                               growLeft: growLeft, growRight: growRight) == nil
+        guard let band, let alone = inkPaint(ink: band, band: nil, seed: seed, window: window,
+                                             growLeft: growLeft, growRight: growRight), alone != paint else { return (paint, nil, fellBack) }
+        return (paint, alone, false)
     }
 
     /// The page's read tokens: one full-page render at the fit's scale, read

@@ -1,0 +1,18 @@
+Property: A running sum of the first coefficient past 2,047 either way is refused.
+Area: the reader of a page's stored picture (crafted input)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/PageImageCraftedInputTests (or on the host: cd Packages/RedactionEngine && swift test --no-parallel --filter PageImageCraftedInputTests)
+Must go red: RedactionEngineTests/PageImageCraftedInputTests firstCoefficientLimit
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/JPEGEntropyWalk.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/JPEGEntropyWalk.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/JPEGEntropyWalk.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/JPEGEntropyWalk.swift
+@@ -19,7 +19,7 @@
+     }
+ 
+     /// The largest first coefficient a baseline picture can carry: 11 bits.
+-    static let firstCoefficientLimit = 2_047
++    static let firstCoefficientLimit = 2_048
+ 
+     private enum Stop: Error {
+         case refused(PageImageRefusal)

@@ -136,7 +136,9 @@ extension SearchAndRedactSheet {
                 }
 
                 // Skip the cleanup tail when cancelled — a successor task
-                // may have already installed sinks and set `isSearching`.
+                // may have already installed sinks and set `isSearching` —
+                // and when the run stopped at the result limit, which ends
+                // as a cancelled run (`SearchState.runEndsCancelled`).
                 await finishSearchRun(prepared, cancelled: Task.isCancelled)
             }
         }
@@ -448,48 +450,18 @@ extension SearchAndRedactSheet {
 
     }
 
-    /// The run's cleanup tail: the last flush, the run-state flips, the
-    /// Scan coverage report and run record, the sink teardown and the
-    /// VoiceOver completion line. Skipped when cancelled — a successor
-    /// task may have already installed sinks and set `isSearching`.
+    /// The run's cleanup tail: the state half (`endRunState`: the last
+    /// flush, the run-state flips, the Scan coverage report and run
+    /// record), the sink teardown and the VoiceOver completion line.
+    /// Skipped when the run ends as a cancelled one — a successor task
+    /// may have already installed sinks and set `isSearching`.
     private func finishSearchRun(_ prepared: PreparedRun, cancelled: Bool) async {
-        guard !cancelled else { return }
-        searchState.flushPendingResults()
-        // A completed (non-cancelled) run flips the
-        // empty-state discriminator from "not run yet" to a
-        // genuine result verdict.
-        searchState.hasCompletedRunSinceClear = true
-        searchState.isSearching = false
-
-        if prepared.isPIIScan {
-            let report = Self.makeCoverageReport(
-                scannedPages: searchState.totalPages,
-                enabled: prepared.enabledCategories,
-                results: searchState.results,
-                overlapSuppressed: searchState.pendingOverlapSuppressed,
-                belowThresholdSuppressed: searchState.pendingBelowThresholdSuppressed,
-                startedAt: prepared.scanStartedAt,
-                completedAt: Date()
-            )
-            searchState.setCoverageReport(report)
-
-            // Run-outcome record for the Scan interface —
-            // the summary banner is the run-outcome surface
-            // for both origins now. Found runs auto-dismiss
-            // (the results are on screen in the sheet);
-            // zero-found runs persist so "ran and found
-            // nothing" stays distinguishable from "never
-            // ran" after the sheet closes. Cancelled runs
-            // skip this tail and leave no record.
-            redactionState.recordDetectionRun(
-                searchState.results.isEmpty
-                    ? .nothingFound(pageCount: searchState.totalPages)
-                    : .staged,
-                scanSummary: .init(
-                    foundCount: searchState.results.count,
-                    pageCount: searchState.totalPages),
-                ocrSkippedPages: searchState.ocrSkippedPages)
-        }
+        let scan = prepared.isPIIScan
+            ? ScanRunFacts(enabled: prepared.enabledCategories, startedAt: prepared.scanStartedAt) : nil
+        guard Self.endRunState(
+            run: prepared.run, taskCancelled: cancelled, scan: scan,
+            searchState: searchState, redactionState: redactionState
+        ) else { return }
 
         await tearDownEngineSinks()
 

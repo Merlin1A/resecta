@@ -102,7 +102,7 @@ extension DocumentSearcher {
                         continue
                     }
 
-                    pageRects.append(box.rect)
+                    pageRects.append(box.mergeIdentity)
                     continuation.yield(SearchResult(
                         pageIndex: pageIndex,
                         normalizedRect: box.rect,
@@ -114,7 +114,7 @@ extension DocumentSearcher {
                         piiConfidence: match.confidence,
                         rationale: match.rationale,
                         matchRangeInSnippet: window.matchRange, textLayerRect: box.textLayerRect, inkFitDegraded: box.degraded
-                    ))
+                    ).identified(by: box.identity))
                     totalYielded += 1
                 }
 
@@ -150,7 +150,7 @@ extension DocumentSearcher {
                             totalYielded += 1
                             continue
                         }
-                        pageRects.append(box.rect)
+                        pageRects.append(box.mergeIdentity)
                         continuation.yield(SearchResult(
                             pageIndex: pageIndex,
                             normalizedRect: box.rect,
@@ -165,7 +165,7 @@ extension DocumentSearcher {
                                 signals: [.userAlwaysFlag(pattern: hit.pattern)]
                             ).build(finalScore: 1.0),
                             matchRangeInSnippet: window.matchRange, textLayerRect: box.textLayerRect, inkFitDegraded: box.degraded
-                        ))
+                        ).identified(by: box.identity))
                         totalYielded += 1
                     }
                     // Surface per-(page, pattern) timeouts so the

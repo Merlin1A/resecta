@@ -1,0 +1,19 @@
+Property: on a scan, every run of inked rows that meets the text layer's box is the word's ink, so a light row through a printed word leaves no part of it outside the box, even when the box holds only a few rows of one part.
+Area: search ink fit (engine)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter InkFitBandTests
+Must go red: RedactionEngineTests/InkFitBandTests lightRowThroughTheWord; RedactionEngineTests/InkFitBandTests lightRowWithTheBoxLow; RedactionEngineTests/InkFitBandTests lightRowWithTheBoxSetDown
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitRender.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitRender.swift
+index a7ac194e..45a4ef93 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitRender.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitRender.swift
+@@ -255,7 +255,7 @@ extension DocumentSearcher {
+         }
+         // Every run that meets the box's rows is the word's: a light row
+         // through a word splits it into runs of like height, and each is ink.
+-        let met = runs.filter { overlap($0) > 0 }
++        let met = [line]
+         let whole = fitted(met.map(\.lowerBound).min() ?? line.lowerBound, met.map(\.upperBound).max() ?? line.upperBound)
+         let bandOnly = met.count > 1 ? fitted(line.lowerBound, line.upperBound).box : nil
+         return (whole.box, whole.outcome, bandOnly, margin)

@@ -75,20 +75,48 @@ nonisolated final class EditorChromeUITests: XCTestCase {
     /// Launch the multi-page document at `textSize` (nil: the default) and
     /// return the whole-page control.
     private func launchWholePageControl(atTextSize textSize: String?) -> XCUIElement {
+        // A size name the system ignores says nothing, so a sized launch is
+        // measured against the default size first: the load message must be
+        // taller. (The counter's own height cannot tell: its tappable height
+        // is floored to the touch target at every size.)
+        var defaultHeight: CGFloat?
+        if textSize != nil {
+            launchEditorForWholePage(textSize: nil)
+            defaultHeight = loadMessageHeight()
+            app.terminate()
+        }
+        launchEditorForWholePage(textSize: textSize)
+        let control = app.buttons["pageNavMarkWholePage"]
+        XCTAssertTrue(control.waitForExistence(timeout: 30), "The page bar's whole-page control never appeared.")
+        if let defaultHeight {
+            let height = loadMessageHeight()
+            XCTAssertGreaterThan(height, defaultHeight + 1,
+                                 "The text size did not take: the load message is \(height) pt tall, \(defaultHeight) pt at the default size.")
+        }
+        return control
+    }
+
+    private func launchEditorForWholePage(textSize: String?) {
         var arguments = ["--uitesting", "--loadTestDocument", "--multipageDoc"]
         if let textSize { arguments += ["-UIPreferredContentSizeCategoryName", textSize] }
         app.launchArguments = arguments
         app.launch()
-        let control = app.buttons["pageNavMarkWholePage"]
-        XCTAssertTrue(control.waitForExistence(timeout: 30), "The page bar's whole-page control never appeared.")
-        if textSize != nil {
-            // At an accessibility size the counter stacks its two lines.
-            let counter = element("pageNavCounter")
-            XCTAssertTrue(counter.waitForExistence(timeout: 10))
-            XCTAssertGreaterThan(counter.frame.height, 40,
-                                 "The text size did not take: the counter is \(counter.frame.height) pt tall.")
+    }
+
+    /// The load message's height once it has stopped sliding in.
+    private func loadMessageHeight() -> CGFloat {
+        let message = app.staticTexts
+            .matching(NSPredicate(format: "label BEGINSWITH 'Text layer detected'")).firstMatch
+        XCTAssertTrue(message.waitForExistence(timeout: 60), "The load message never appeared.")
+        var frame = message.frame
+        let deadline = Date().addingTimeInterval(3)
+        while Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.3)
+            let next = message.frame
+            if next == frame { break }
+            frame = next
         }
-        return control
+        return frame.height
     }
 
     private func screenshotProbe() throws -> CanvasPixelProbe {

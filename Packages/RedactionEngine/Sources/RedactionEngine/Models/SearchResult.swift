@@ -58,11 +58,23 @@ public struct SearchResult: Sendable, Identifiable, Equatable {
     /// reaching past the media box), the one reason a result has no box that
     /// the app words differently. false on every other result.
     public let liesOffVisiblePage: Bool
-    /// The box the read itself gave this match, when merging two readings of
-    /// a scanned page grew `normalizedRect` past it: what a hybrid page
-    /// compares with its text-layer matches to tell a repeat. nil when
-    /// `normalizedRect` is that box (every result but a merged one).
+    /// The box a hybrid page tells this match by, when its paint grew past
+    /// it: on an OCR result, the box the read itself gave it, when merging two
+    /// readings of a scanned page grew `normalizedRect`; on a text-layer
+    /// result, the box its word's tallest band alone paints, when the ink fit
+    /// took more bands. nil when `normalizedRect` is that box (every other
+    /// result). A box grown for cover never widens what a match is told by.
     var identityRect: CGRect? = nil
+
+    /// The box the hybrid merge compares (`mergeHybridResults`).
+    var mergeIdentity: CGRect { identityRect ?? normalizedRect }
+
+    /// This result with `identityRect` set.
+    func identified(by rect: CGRect?) -> SearchResult {
+        var result = self
+        result.identityRect = rect
+        return result
+    }
 
     public init(
         id: UUID = UUID(),

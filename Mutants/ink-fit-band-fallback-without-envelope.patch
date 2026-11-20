@@ -1,0 +1,19 @@
+Property: on a scan, when the ink box with every band reaches past the fit's window and the tallest band's box stands in for it, the fit paints that box together with the read word's envelope, so a word split by a white picture row is covered on both sides of the row.
+Area: search ink fit (engine)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter InkFitBandTests
+Must go red: RedactionEngineTests/InkFitBandTests lightRowScanIsCovered
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFit.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFit.swift
+index 09332ded..1c87da1d 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFit.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFit.swift
+@@ -470,7 +470,7 @@ extension DocumentSearcher {
+             let band = normalizedBack(painted.paint)
+             inkFitLogger.log("ink fit: the box with every band reaches past its window; the box is its tallest band's with the read word's envelope, degraded")
+             job.identity.set(band)
+-            return band.union(anchorEnvelope()).clampedToNormalized()
++            return band
+         }
+         job.identity.set(painted.identity.map(normalizedBack))
+         return normalizedBack(painted.paint)

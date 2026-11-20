@@ -159,5 +159,5 @@ enum PageImageFixtures {
 struct GivenPageImageSource: PageImageSource {
     let pages: [[PageImageStream]]
     var pageCount: Int { pages.count }
-    func images(onPage index: Int) -> [PageImageStream] { pages[index] }
+    func images(onPage index: Int) -> Result<[PageImageStream], PageImageRefusal> { .success(pages[index]) }
 }

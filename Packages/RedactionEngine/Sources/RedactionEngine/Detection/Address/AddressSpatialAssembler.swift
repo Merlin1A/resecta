@@ -111,6 +111,10 @@ struct AddressSpatialAssembler: Sendable {
         /// Some participating line's fit fell back to the drift envelope: the
         /// caller reports the page as not fully analysed.
         var inkFitDegraded: Bool = false
+        /// The union of the participating lines' identity boxes when any line
+        /// has one (`OCREngine.TextLine.identityRect`): what a hybrid page tells
+        /// the address's OCR repeat by. Nil otherwise.
+        var identityUnionRect: CGRect? = nil
     }
 
     func assemble(lines: [OCREngine.TextLine]) -> [Assembled] {
@@ -216,7 +220,12 @@ struct AddressSpatialAssembler: Sendable {
                 unionRect: unionRect,
                 confidence: baseConfidence,
                 textLayerUnionRect: textLayerUnionRect,
-                inkFitDegraded: participants.contains(where: \.inkFitDegraded)
+                inkFitDegraded: participants.contains(where: \.inkFitDegraded),
+                identityUnionRect: participants.contains { $0.identityRect != nil }
+                    ? participants.dropFirst().reduce(participants[0].identityRect ?? participants[0].normalizedRect) {
+                        $0.union($1.identityRect ?? $1.normalizedRect)
+                    }
+                    : nil
             ))
         }
         return results
