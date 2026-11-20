@@ -1,0 +1,20 @@
+Property: The trust line follows the text in the flow, never pinned over it.
+Area: verification (the screen while the checks run)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppUITests/VerificationRunningUITests
+Must go red: ResectaAppUITests/VerificationRunningUITests testTrustLineFollowsTheText
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationProgressView.swift b/Sources/ResectaApp/Views/VerificationProgressView.swift
+index d04631a5..293ad3bc 100644
+--- a/Sources/ResectaApp/Views/VerificationProgressView.swift
++++ b/Sources/ResectaApp/Views/VerificationProgressView.swift
+@@ -38,7 +38,8 @@ struct VerificationProgressView: View {
+                                 // flow, never over it: near the foot when
+                                 // there is room, pushed down when the text
+                                 // grows.
+-                                Spacer(minLength: ResectaTokens.Results.blockGap)
++                            }
++                            .overlay(alignment: .bottom) {
+                                 TrustLine()
+                                     .accessibilityIdentifier("verificationTrustLine")
+                             }

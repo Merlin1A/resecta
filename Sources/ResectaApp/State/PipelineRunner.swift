@@ -491,6 +491,12 @@ struct PipelineRunner {
         coordinator.verificationRegionsSeam?(runContext.burnedRegions)
         coordinator.verificationRecordSeam?(record)
         #endif
+        let began = Date()
+        var progress = DocumentState.VerificationProgress(
+            currentLayer: 0, totalLayers: 0, layerName: "", completedLayers: [],
+            typedSearchApplied: Self.appliedTypedSearch(runContext.appliedSearches),
+            checksBegan: began, lastChange: began)
+        var lastAnnounced: Date?
         let report = try await VerificationOrchestrator().run(
             outputDocument: wrappedDoc,
             sourcePageCount: sourcePageCount,
@@ -511,18 +517,14 @@ struct PipelineRunner {
                     outputURL, layers: layers)
             },
             events: { event in
-                switch event {
-                case .layerStarted(let layer, let ordinal, let totalLayers, let completedLayers):
-                    sink(.phase(.verifying(
-                        progress: .init(
-                            currentLayer: ordinal,
-                            totalLayers: totalLayers,
-                            layerName: layer.name,
-                            completedLayers: completedLayers
-                        )
-                    )))
-                case .layerFinished(_, let ordinal, let result):
-                    sink(.announce(result.completionAnnouncement(layerNumber: ordinal)))
+                // A finish publishes progress as a start does, so the
+                // figure is never one short.
+                progress = Self.verificationProgress(after: event, previous: progress, now: Date())
+                sink(.phase(.verifying(progress: progress)))
+                if case .layerFinished(_, _, let result) = event, let words = result.runningAnnouncement,
+                   Self.announcementDue(lastAnnounced: lastAnnounced, now: Date()) {
+                    lastAnnounced = Date()
+                    sink(.announce(words))
                 }
             }
         )
@@ -534,5 +536,46 @@ struct PipelineRunner {
         // announcement speaks document text aloud.
         sink(.announce(VerificationResultsView.completionAnnouncement(report: report)))
         return .completed
+    }
+
+    // MARK: - The running checks' progress
+
+    /// The progress after one engine event: a start names the check, whether
+    /// it opened the group that runs at once, and when; a finish adds its
+    /// result and clears the running check. Every event is a change.
+    static func verificationProgress(after event: VerificationRunEvent,
+                                     previous: DocumentState.VerificationProgress,
+                                     now: Date) -> DocumentState.VerificationProgress {
+        var next = previous
+        switch event {
+        case .layerStarted(let layer, let ordinal, let totalLayers, let completedLayers):
+            next.currentLayer = ordinal
+            next.totalLayers = totalLayers
+            next.layerName = layer.name
+            next.completedLayers = completedLayers
+            next.running = .init(layer: layer, opensGroup: layer.phase == .parallelBase, since: now)
+        case .layerFinished(_, let ordinal, let result):
+            next.currentLayer = ordinal
+            next.completedLayers.append(result)
+            next.running = nil
+        }
+        next.lastChange = now
+        return next
+    }
+
+    /// Whether a finish may be spoken: at most one announcement in
+    /// `LayerResult.runningAnnouncementGap` seconds.
+    static func announcementDue(lastAnnounced: Date?, now: Date) -> Bool {
+        lastAnnounced.map { now.timeIntervalSince($0) >= LayerResult.runningAnnouncementGap } ?? true
+    }
+
+    /// Whether the run applied a typed search: a request the user applied
+    /// whose query is not a Scan.
+    static func appliedTypedSearch(_ requests: [SearchRecheckRequest]) -> Bool {
+        requests.contains { request in
+            guard request.origin == .applied else { return false }
+            if case .piiScan = request.record.query.kind { return false }
+            return true
+        }
     }
 }

@@ -40,10 +40,9 @@ struct DocumentEditorView: View {
     @State var isMultiSelectActive: Bool = false
 
 
-    // Brief status flash state for .verifying → .verified transition
-    @State private var showBriefStatus = false
-    @State private var briefStatus: VerificationStatus?
-    @State private var dismissTask: Task<Void, Never>?
+    /// When the results last replaced the running checks: the bar's
+    /// trailing button ignores taps for a moment after (it was Stop).
+    @State private var resultsAppearedAt: Date?
 
     // Batch delete confirmation
 
@@ -214,16 +213,11 @@ struct DocumentEditorView: View {
                     .overlay(alignment: .bottom) { captionOverlay }
 
             case .verifying:
-                // Full-screen replacement — verification is a distinct workflow phase
-                // Folded the
-                // hand-rolled reduceMotion ternary into the resolver —
-                // identical behavior, one canonical seam.
+                // Full-screen replacement — verification is a distinct
+                // workflow phase. It and the results cross-fade, with the
+                // ring in one place.
                 VerificationProgressView()
-                    .transition(ResectaTokens.Anim.resolvedTransition(
-                        standard: .asymmetric(
-                            insertion: .move(edge: .trailing).combined(with: .opacity),
-                            removal: .opacity),
-                        reduceMotion: reduceMotion))
+                    .transition(.opacity)
 
             case .verified(let report):
                 VerificationResultsView(
@@ -246,7 +240,7 @@ struct DocumentEditorView: View {
             }
             } // End of `else` branch on captureMonitor.isShielded
         }
-        .animation(ResectaTokens.Anim.resolved(ResectaTokens.Anim.modeTransition, reduceMotion: reduceMotion),
+        .animation(Self.phaseAnimation(to: documentState.phaseKind, reduceMotion: reduceMotion),
                    value: documentState.phaseKind)
         // Also animate the shield in/out so the swap reads as a
         // deliberate transition rather than a flash.
@@ -261,25 +255,10 @@ struct DocumentEditorView: View {
         // when the current phase still holds an output reference. See
         // `KNOWN_ISSUES.md` KI-4.
         .modifier(DocumentEditorScenePhaseHandler())
-        // Consolidated phase change handler (was two separate .onChange)
+        // The results replacing the running checks: the moment the bar's
+        // trailing button turns from Stop into Settings.
         .onChange(of: documentState.phaseKind) { oldKind, newKind in
-            // Brief status flash for .verifying → .verified transition
-            if oldKind == .verifying, newKind == .verified,
-               case .verified(let report) = documentState.phase {
-                withAnimation(ResectaTokens.Anim.colorTransition) {
-                    briefStatus = report.overallStatus
-                    showBriefStatus = true
-                }
-                dismissTask?.cancel()
-                dismissTask = Task {
-                    try? await Task.sleep(for: .seconds(1.2))
-                    guard !Task.isCancelled else { return }
-                    withAnimation(ResectaTokens.Anim.overlayDismiss) {
-                        showBriefStatus = false
-                        briefStatus = nil
-                    }
-                }
-            }
+            if oldKind == .verifying, newKind == .verified { resultsAppearedAt = Date() }
         }
         // Search is presented only while editing, importing or failed; a
         // session present in any other phase comes down, including one
@@ -289,33 +268,6 @@ struct DocumentEditorView: View {
         }
         .onChange(of: redactionState.activeSearch != nil) { _, _ in
             Self.takeDownSearchOutsideItsPhases(phase: documentState.phaseKind, redactionState: redactionState)
-        }
-        // Brief status flash overlay
-        .overlay {
-            if showBriefStatus, let status = briefStatus {
-                ZStack {
-                    Color.black.opacity(ResectaTokens.Opacity.scrim)
-                        .ignoresSafeArea()
-
-                    VStack(spacing: ResectaTokens.Spacing.sm) {
-                        Image(systemName: status.symbolName)
-                            .font(.system(size: 48))
-                            .foregroundStyle(status.color)
-                            .symbolRenderingMode(.hierarchical)
-                            .contentTransition(.symbolEffect(.replace))
-
-                        Text(status.title)
-                            .font(.title3.bold())
-                    }
-                    .padding(ResectaTokens.Spacing.lg)
-                    .containerRelativeFrame(.horizontal) { length, _ in
-                        min(length * 0.85, 320)
-                    }
-                    .background(.regularMaterial, in: RoundedRectangle(
-                        cornerRadius: ResectaTokens.CornerRadius.sheet, style: .continuous))
-                }
-                .transition(.opacity)
-            }
         }
         // P1.3: single `.sheet(item:)` slot for search / rationale.
         // Precedence search > rationale; the getter returns the
@@ -491,7 +443,6 @@ struct DocumentEditorView: View {
             beginExport: exportFlow.beginExport, concealedPages: shareConcealedPages
         ))
         .onDisappear {
-            dismissTask?.cancel()
             // The per-window UndoManager outlives this document; clear
             // its stack on close so stale registrations (and the prior
             // RedactionState they retain) don't bleed into the next document.
@@ -542,8 +493,19 @@ struct DocumentEditorView: View {
             documentOverride: documentOverride, redactButtonDisabled: redactButtonDisabled,
             redactButtonHint: redactButtonHint, handleHomeTap: handleHomeTap,
             homeButton: AnyView(homeButton), pipelineModePicker: AnyView(pipelineModePicker),
-            openSettings: openSettings
+            openSettings: openSettings,
+            resultsAppearedAt: resultsAppearedAt
         )
+    }
+
+    /// The phase switch's animation: the running checks and the results
+    /// cross-fade over `ResectaTokens.Results.handOff` (a shorter fade
+    /// under Reduce Motion); every other change keeps the mode transition.
+    static func phaseAnimation(to kind: DocumentState.PhaseKind, reduceMotion: Bool) -> Animation? {
+        guard kind == .verified else {
+            return ResectaTokens.Anim.resolved(ResectaTokens.Anim.modeTransition, reduceMotion: reduceMotion)
+        }
+        return .easeInOut(duration: reduceMotion ? ResectaTokens.Results.handOffReduced : ResectaTokens.Results.handOff)
     }
 
     /// Phase 1 redesign: gate for the `.empty`-case auto-return-home.

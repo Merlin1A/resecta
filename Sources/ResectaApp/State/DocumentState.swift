@@ -44,6 +44,23 @@ class DocumentState {
         var layerName: String
         var completedLayers: [LayerResult]
         var subPhase: SubPhase = .verifying
+        /// The check announced last and not yet finished; nil once a
+        /// result is published after it.
+        var running: Running? = nil
+        /// Whether the run applied a typed search (a Scan is not one).
+        var typedSearchApplied: Bool = false
+        /// When the checks began, and when the figure or the running check
+        /// last changed.
+        var checksBegan: Date? = nil
+        var lastChange: Date? = nil
+
+        /// A check announced as started: which, whether it was announced
+        /// as the first of the group that runs at once, and when.
+        struct Running: Sendable, Equatable {
+            var layer: VerificationLayer
+            var opensGroup: Bool
+            var since: Date
+        }
 
         // The OCR post-processing path was scaffolded
         // but never wired to a production writer; `ocrReturnReport` +
@@ -94,6 +111,10 @@ class DocumentState {
         var stepDescription: String    // "Processing page 3…" or layer name
         var completedLayers: [LayerResult] = []
         var verificationSubPhase: VerificationProgress.SubPhase = .verifying
+        var running: VerificationProgress.Running? = nil
+        var typedSearchApplied: Bool = false
+        var checksBegan: Date? = nil
+        var lastChange: Date? = nil
     }
 
     var pipelineProgress: PipelineProgress?
@@ -570,11 +591,7 @@ class DocumentState {
                 current: p.currentPage, total: p.totalPages,
                 stepDescription: p.currentStep)
         case .verifying(let p):
-            pipelineProgress = PipelineProgress(
-                current: p.currentLayer, total: p.totalLayers,
-                stepDescription: p.layerName,
-                completedLayers: p.completedLayers,
-                verificationSubPhase: p.subPhase)
+            pipelineProgress = PipelineProgress(verifying: p)
         default:
             pipelineProgress = nil
         }
@@ -765,3 +782,12 @@ extension DocumentState.PhaseKind {
     }
 }
 
+extension DocumentState.PipelineProgress {
+    /// The checks' progress as the screens read it.
+    init(verifying p: DocumentState.VerificationProgress) {
+        self.init(current: p.currentLayer, total: p.totalLayers, stepDescription: p.layerName,
+                  completedLayers: p.completedLayers, verificationSubPhase: p.subPhase,
+                  running: p.running, typedSearchApplied: p.typedSearchApplied,
+                  checksBegan: p.checksBegan, lastChange: p.lastChange)
+    }
+}

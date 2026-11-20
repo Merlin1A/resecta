@@ -1,0 +1,18 @@
+Property: The editor raises no verdict card after the checks.
+Area: verification (the screen while the checks run)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationProgressLineTests
+Must go red: ResectaAppTests/VerificationProgressLineTests noVerdictCardNoSlide
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/DocumentEditorView.swift b/Sources/ResectaApp/Views/DocumentEditorView.swift
+index 42d21fe7..1c779dca 100644
+--- a/Sources/ResectaApp/Views/DocumentEditorView.swift
++++ b/Sources/ResectaApp/Views/DocumentEditorView.swift
+@@ -43,6 +43,7 @@ struct DocumentEditorView: View {
+     /// When the results last replaced the running checks: the bar's
+     /// trailing button ignores taps for a moment after (it was Stop).
+     @State private var resultsAppearedAt: Date?
++    @State private var showBriefStatus = false
+ 
+     // Batch delete confirmation
+ 

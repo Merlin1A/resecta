@@ -1,0 +1,19 @@
+Property: The running screen fades in; it does not slide in from the edge.
+Area: verification (the screen while the checks run)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationProgressLineTests
+Must go red: ResectaAppTests/VerificationProgressLineTests noVerdictCardNoSlide
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/DocumentEditorView.swift b/Sources/ResectaApp/Views/DocumentEditorView.swift
+index 42d21fe7..00691ce4 100644
+--- a/Sources/ResectaApp/Views/DocumentEditorView.swift
++++ b/Sources/ResectaApp/Views/DocumentEditorView.swift
+@@ -221,7 +221,7 @@ struct DocumentEditorView: View {
+                 // workflow phase. It and the results cross-fade, with the
+                 // ring in one place.
+                 VerificationProgressView()
+-                    .transition(.opacity)
++                    .transition(.move(edge: .trailing).combined(with: .opacity))
+ 
+             case .verified(let report):
+                 VerificationResultsView(
