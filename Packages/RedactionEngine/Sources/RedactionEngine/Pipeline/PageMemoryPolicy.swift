@@ -38,6 +38,23 @@ public func selectDPI(
     return nil
 }
 
+/// The budget the run's tier test reads (KI-5: `os_proc_available_memory()`
+/// does not reflect CGImage memory, so the run does not read memory here).
+/// A page that does not fit is refused by `validatePageMemory` instead.
+let runTierBudget: Int = Int.max / 4
+
+/// The quality a run rasterizes a page at: the highest tier at or below the
+/// chosen quality under the cap (`dpiCap`, 150 after a memory warning), on
+/// the page's sides as turned. The tier test runs over `runTierBudget`, so a
+/// page's quality is the same whenever it is read. The run's pre-flight and
+/// the editor's kept plan (`DrawnPlan`) both read this one function. Nil
+/// where `selectDPI` is nil.
+public func runQuality(chosenDPI: Int, dpiCap: Int, cropBox: CGSize, rotation: Int) -> Int? {
+    let size = effectiveBounds(CGRect(origin: .zero, size: cropBox), rotation: rotation).size
+    return selectDPI(availableMemory: runTierBudget, userMaxDPI: min(chosenDPI, dpiCap),
+                     pageWidth: size.width, pageHeight: size.height)
+}
+
 // MARK: - Input Validation
 
 // A page is validated before rendering in two halves, the geometry half

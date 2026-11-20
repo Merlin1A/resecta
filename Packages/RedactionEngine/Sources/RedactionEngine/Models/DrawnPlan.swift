@@ -14,7 +14,9 @@ public struct DrawnPlan: Equatable, Sendable {
     /// The switch the plan was made under (the plan reads it only under the
     /// switch's policy).
     public let switchOn: Bool
-    /// The quality the page was drawn under, in dots per inch.
+    /// The quality the page was drawn under, in dots per inch: the quality a
+    /// run started now rasterizes it at (`runQuality`, the chosen quality
+    /// under the run's cap), as the editor passes it.
     public let exportDPI: Int
     /// The fill colour the page was drawn under.
     public let fillColor: FillColor
@@ -24,6 +26,16 @@ public struct DrawnPlan: Equatable, Sendable {
     /// The rectangles the overlay draws, one for each box of the plan, in
     /// the plan's order.
     public let boxes: [Box]
+    /// The pixels each admitted region is filled with on the page's raster
+    /// at `exportDPI`, by region id, in the fill bitmap's frame (origin
+    /// bottom-left). Made by the run's own fill rule, not a copy of it: the
+    /// run's `applyRedactionFills` fills each region with
+    /// `normalizedToFillPixels(_:content:)` on the content basis
+    /// `PageRasterizer.rasterContentSize(bounds:rotation:dpi:)`, and these
+    /// are the same two functions on the same clamped rectangle. Under "as
+    /// placed" each box covers one region, so a box is filled with its
+    /// region's rectangle. Empty when the plan was given whole.
+    public let filledPixels: [UUID: CGRect]
 
     /// One box of the plan as the overlay draws it: rectangles as a share of
     /// the page (0 to 1, origin bottom-left) in the frame its regions are
@@ -45,15 +57,33 @@ public struct DrawnPlan: Equatable, Sendable {
                 switchOn: Bool, exportDPI: Int, fillColor: FillColor) {
         let plan = RunRecord.Page.makePlan(regions: regions.map(RunRecord.DrawnRegion.init(region:)),
                                            cropBox: cropBox, rotation: rotation, switchOn: switchOn)
-        self.init(pageIndex: pageIndex, switchOn: switchOn, exportDPI: exportDPI, fillColor: fillColor, plan: plan)
+        self.init(pageIndex: pageIndex, switchOn: switchOn, exportDPI: exportDPI, fillColor: fillColor, plan: plan,
+                  filledPixels: Self.filledPixels(regions: regions, cropBox: cropBox, rotation: rotation,
+                                                  dpi: exportDPI))
     }
 
-    package init(pageIndex: Int, switchOn: Bool, exportDPI: Int, fillColor: FillColor, plan: PaintPlan?) {
+    /// Each admitted region's fill on the page's raster at `dpi`, as the run
+    /// fills it: admitted and clamped as the run's inputs admit and clamp it
+    /// (`RunInputs`), then the run's fill rule on the run's content basis.
+    static func filledPixels(regions: [RedactionRegion], cropBox: CGSize, rotation: Int,
+                             dpi: Int) -> [UUID: CGRect] {
+        guard let content = PageRasterizer.rasterContentSize(
+            bounds: CGRect(origin: .zero, size: cropBox), rotation: rotation, dpi: CGFloat(dpi)) else { return [:] }
+        var filled: [UUID: CGRect] = [:]
+        for region in regions where RedactionRegion.isAdmitted(normalizedRect: region.normalizedRect) {
+            filled[region.id] = normalizedToFillPixels(region.normalizedRect.clampedToNormalized(), content: content)
+        }
+        return filled
+    }
+
+    package init(pageIndex: Int, switchOn: Bool, exportDPI: Int, fillColor: FillColor, plan: PaintPlan?,
+                 filledPixels: [UUID: CGRect] = [:]) {
         self.pageIndex = pageIndex
         self.switchOn = switchOn
         self.exportDPI = exportDPI
         self.fillColor = fillColor
         self.plan = plan
+        self.filledPixels = filledPixels
         guard let plan else { boxes = []; return }
         let w = Double(plan.widthSixtyFourths), h = Double(plan.heightSixtyFourths)
         func share(_ r: PageRect64) -> CGRect {

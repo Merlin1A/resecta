@@ -24,6 +24,20 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
     }
     /// The settings a drawn page's plan is kept with (`noteDrawn`).
     var settingsState: SettingsState?
+    /// The run's quality cap (`PipelineCoordinator.dpiCap`: 300, then 150
+    /// after a memory warning), set by the view. A drawn page's plan is kept
+    /// at the quality a run started now uses, `runQuality` of the chosen
+    /// quality under this cap. A change redraws the pages on screen, and
+    /// each keeps its plan at the new quality.
+    var qualityCap: Int = defaultDPICap {
+        didSet {
+            guard qualityCap != oldValue else { return }
+            for (pageIndex, overlay) in activeOverlays {
+                noteDrawn(pageIndex: pageIndex, regions: redactionState?.regions[pageIndex] ?? [])
+                overlay.setNeedsDisplay()
+            }
+        }
+    }
     /// Toast surface for the too-small-draw notice, the selection delete's
     /// notice and the lasso's 500-region warning. Optional so the
     /// coordinator stays usable in tests that don't wire the toast manager.
@@ -461,14 +475,20 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
     /// Keep the plan `pageIndex` is drawn from: made by the one maker
     /// the run's entry uses (`DrawnPlan`, `RunRecord.Page.makePlan`), from the
     /// regions the overlay draws and the source document's crop box and
-    /// rotation, which the run's entry reads too, with the settings now. No
-    /// user switch exists yet, so the switch is passed off, as at run entry.
+    /// rotation, which the run's entry reads too, with the settings now, at
+    /// the quality a run started now uses (`runQuality`, the run's own
+    /// function, under `qualityCap`). No user switch exists yet, so the switch
+    /// is passed off, as at run entry.
     func noteDrawn(pageIndex: Int, regions: [RedactionRegion]) {
         guard let state = redactionState, let settings = settingsState,
               let page = documentState?.sourceDocument?.page(at: pageIndex) else { return }
-        let drawn = DrawnPlan(pageIndex: pageIndex, regions: regions, cropBox: page.bounds(for: .cropBox).size,
+        let cropBox = page.bounds(for: .cropBox).size
+        // Nil where the run refuses the page for its size; no run fills it.
+        let quality = runQuality(chosenDPI: settings.exportDPI, dpiCap: qualityCap, cropBox: cropBox,
+                                 rotation: page.rotation) ?? min(settings.exportDPI, qualityCap)
+        let drawn = DrawnPlan(pageIndex: pageIndex, regions: regions, cropBox: cropBox,
                               rotation: page.rotation, switchOn: false,
-                              exportDPI: settings.exportDPI, fillColor: settings.fillColor)
+                              exportDPI: quality, fillColor: settings.fillColor)
         if state.drawnPlans[pageIndex] != drawn { state.drawnPlans[pageIndex] = drawn }
     }
 

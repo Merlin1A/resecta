@@ -64,4 +64,69 @@ struct OverlayDrawnPlanTests {
         _ = UIGraphicsImageRenderer(size: overlay.bounds.size).image { overlay.drawCommittedRegions(ctx: $0.cgContext, in: overlay.bounds) }
         #expect(state.drawnPlans[0]?.fillColor == .black)
     }
+
+    /// A coordinator wired to `pdf` and `state`, with the chosen quality 300.
+    static func coordinator(_ pdf: PDFDocument, _ state: RedactionState, suite: String) throws -> PDFViewCoordinator {
+        let documentState = DocumentState()
+        documentState.sourceDocument = pdf
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defaults.removePersistentDomain(forName: suite)
+        let settings = SettingsState(defaults: defaults)
+        settings.exportDPI = 300
+        let coordinator = PDFViewCoordinator()
+        coordinator.documentState = documentState
+        coordinator.redactionState = state
+        coordinator.settingsState = settings
+        return coordinator
+    }
+
+    @Test("Under the cap of 150 a drawn page keeps its plan at 150, the quality the run uses")
+    func keptPlanReadsTheCap() throws {
+        let pdf = try Self.document()
+        let state = RedactionState()
+        let coordinator = try Self.coordinator(pdf, state, suite: "OverlayDrawnPlanTests.keptPlanReadsTheCap")
+        #expect(coordinator.qualityCap == 300)
+        let regions = [RedactionRegion(id: UUID(), normalizedRect: CGRect(x: 0.1, y: 0.2, width: 0.3, height: 0.04), source: .manual)]
+        coordinator.noteDrawn(pageIndex: 0, regions: regions)
+        #expect(state.drawnPlans[0]?.exportDPI == 300)
+        coordinator.qualityCap = 150
+        coordinator.noteDrawn(pageIndex: 0, regions: regions)
+        let page = try #require(pdf.page(at: 0))
+        let kept = try #require(state.drawnPlans[0])
+        #expect(kept.exportDPI == 150)
+        #expect(kept.exportDPI == runQuality(chosenDPI: 300, dpiCap: 150, cropBox: page.bounds(for: .cropBox).size,
+                                             rotation: page.rotation))
+        #expect(kept.filledPixels == DrawnPlan(pageIndex: 0, regions: regions, cropBox: page.bounds(for: .cropBox).size,
+                                               rotation: page.rotation, switchOn: false, exportDPI: 150,
+                                               fillColor: kept.fillColor).filledPixels)
+    }
+
+    @Test("A cap that changes while a page is on screen keeps that page's plan at the new quality")
+    func aCapChangeRedrawsThePagesOnScreen() throws {
+        let pdf = try Self.document()
+        let state = RedactionState()
+        let region = RedactionRegion(id: UUID(), normalizedRect: CGRect(x: 0.5, y: 0.6, width: 0.2, height: 0.03), source: .manual)
+        state.regions[0] = [region]
+        let coordinator = try Self.coordinator(pdf, state, suite: "OverlayDrawnPlanTests.aCapChangeRedraws")
+        let view = PDFView(frame: CGRect(x: 0, y: 0, width: 300, height: 420))
+        view.document = pdf
+        let page = try #require(pdf.page(at: 0))
+        let overlay = try #require(coordinator.pdfView(view, overlayViewFor: page))
+        #expect(overlay is RedactionOverlayView)
+        coordinator.noteDrawn(pageIndex: 0, regions: [region])
+        #expect(state.drawnPlans[0]?.exportDPI == 300)
+        coordinator.qualityCap = 150
+        #expect(state.drawnPlans[0]?.exportDPI == 150, "the page on screen keeps its plan at the cap")
+        coordinator.pdfView(view, willEndDisplayingOverlayView: overlay, for: page)
+        coordinator.qualityCap = 300
+        #expect(state.drawnPlans[0]?.exportDPI == 150, "a page off screen is kept until it is drawn again")
+    }
+
+    @Test("Source pin: the editor's view hands the coordinator the run's cap")
+    func theViewHandsOnTheCap() throws {
+        let source = try String(contentsOf: URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/ResectaApp/Views/PDFDocumentView.swift"), encoding: .utf8)
+        #expect(source.contains("coordinator.qualityCap = pipelineCoordinator.dpiCap"))
+    }
 }
