@@ -30,7 +30,7 @@ enum RunInputs {
             exportDPI: snapshot.exportDPI,
             pages: (0..<pageCount).map { page in
                 let drawn = (regions[page] ?? []).map {
-                    RunRecord.DrawnRegion(id: $0.id, normalizedRect: $0.normalizedRect)
+                    RunRecord.DrawnRegion(region: $0)
                 }
                 guard let sides = geometry[page] else { return RunRecord.Page(pageIndex: page, regions: drawn) }
                 return RunRecord.Page(pageIndex: page, regions: drawn,
