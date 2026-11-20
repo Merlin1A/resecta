@@ -1,0 +1,19 @@
+Property: A letter's middle follows its line on a page stored with a quarter turn, so the same words leave as on its upright twin.
+Area: hidden text (paint marks)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter "PaintAndKindsCasesTests"
+Must go red: RedactionEngineTests/PaintAndKindsCasesTests quarterTurn [2.5]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextPathPaintMarks.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextPathPaintMarks.swift
+index 848fe8f4..fe8dc73d 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextPathPaintMarks.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextPathPaintMarks.swift
+@@ -27,7 +27,7 @@ enum TextPathPaintMarks {
+     /// with no width or no height has no middle and shares area with
+     /// nothing, as `LetterBoxMiddle` reads it: it shows no ink to cover.
+     static func middleUnder(_ rect: CGRect, _ entry: CharacterInfo, frame: PageFrame) -> Bool {
+-        guard let middle = LetterBoxMiddle.middle(of: entry.bounds, rotation: frame.rotation) else {
++        guard let middle = LetterBoxMiddle.middle(of: entry.bounds, rotation: 0) else {
+             return false
+         }
+         return sharesArea(rect, middle)

@@ -1,0 +1,21 @@
+Property: A box's own rectangle takes every letter it touches, by any overlap and its margin, not by the letter's middle: a box drawn over the top of a word takes the word.
+Area: hidden text (the filter by kind)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter "PaintAndKindsCasesTests"
+Must go red: RedactionEngineTests/PaintAndKindsCasesTests caseRow [5: a hand box through the top third of a line takes every word it touches]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextPathFilter.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextPathFilter.swift
+index cd16962c..2cef9709 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextPathFilter.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextPathFilter.swift
+@@ -12,8 +12,8 @@ enum TextPathFilter {
+     static func filter(
+         _ entries: [CharacterInfo], _ rectangles: [TextPathRectangle], frame: PageFrame
+     ) async throws -> FilterResult {
+-        let ordinary = rectangles.filter { $0.kind == .ordinary }.map(\.rect)
+-        let plans = rectangles.filter { $0.kind == .plansRectangle }.map(\.rect)
++        let ordinary: [CGRect] = []
++        let plans = rectangles.filter { $0.kind != .underWidenedBox }.map(\.rect)
+         let byBox = try await filterCharacters(characters: entries, redactionRects: ordinary)
+         guard !plans.isEmpty else { return byBox }
+         let kept = byBox.surviving.filter { entry in

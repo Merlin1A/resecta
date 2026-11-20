@@ -1,0 +1,28 @@
+Property: For a widened box the plan's rectangle takes the place of the box's own rectangle in the filter and the layout, so the hidden text does not depend on the selected value's width.
+Area: hidden text (the widened box)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter "PaintAndKindsCasesTests"
+Must go red: RedactionEngineTests/PaintAndKindsCasesTests widthDoesNotShow; asWideAsItsLine
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
+index 2cfafd88..44723b41 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
+@@ -107,13 +107,15 @@ enum PageTextPath {
+         safetyMargin: CGFloat = safetyMarginPoints
+     ) async throws -> Result {
+         let steps = Self.steps
+-        let rects = textPathRectangles.filter { $0.kind != .underWidenedBox }.map(\.rect)
++        let rects = textPathRectangles.filter { $0.kind != .plansRectangle }.map(\.rect)
+ 
+         // A step that returns nothing writes no text: the page is a picture.
+         guard let folded = try steps.fold(entries) else {
+             return Result(outcome: .picture(.extractionFailed), runsLeftOut: 0, drawnCellDropped: 0)
+         }
+-        guard let filtered = try await steps.filter(folded, textPathRectangles, frame) else {
++        let ownRectangles = textPathRectangles.filter { $0.kind != .plansRectangle }
++            .map { TextPathRectangle(rect: $0.rect, kind: .ordinary) }
++        guard let filtered = try await steps.filter(folded, ownRectangles, frame) else {
+             return Result(outcome: .picture(.extractionFailed), runsLeftOut: 0, drawnCellDropped: 0)
+         }
+         guard let alphabet = try steps.alphabetMarks(filtered.surviving) else {
