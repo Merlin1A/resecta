@@ -213,31 +213,24 @@ struct MetaReadBackTests {
         }
     }
 
-    // iOS only: on the Mac the hidden layer is drawn in Courier alone, so
-    // the export carries no large fallback font and its dictionary stays
-    // near the end; the case this test is for is not made there.
-    #if os(iOS)
-    @Test("A large Chinese Searchable export, its dictionary past the old window, is kept with its read-back held")
-    func largeCJKSearchable() async throws {
-        let glyphs = (UInt32(0x4E00)..<UInt32(0x4E00 + 6_000)).compactMap { Unicode.Scalar($0).map(Character.init) }
-        let lines = stride(from: 0, to: glyphs.count, by: 60).map { String(glyphs[$0..<min($0 + 60, glyphs.count)]) }
-        let data = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 612, height: 792)).pdfData { context in
-            context.beginPage()
-            let attrs: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 7), .foregroundColor: UIColor.black]
-            for (i, line) in lines.enumerated() {
-                (line as NSString).draw(at: CGPoint(x: 20, y: 20 + CGFloat(i) * 7.5), withAttributes: attrs)
-            }
-        }
-        let run = try await TestPipeline.productionRun(data, mode: .searchableRedaction, regions: nil)
-        defer { try? FileManager.default.removeItem(at: run.url) }
-        let bytes = try Data(contentsOf: run.url)
+    // The dictionary past the old 256 KiB window, made directly as the
+    // index-way tests make it (`InfoDictionaryThroughIndexTests`): no export
+    // measured at this head puts it there (the runtime's writer decides; a
+    // CJK Searchable export on the iOS 26.4.1 simulator kept Courier alone,
+    // its dictionary 4,648 bytes from the end).
+    @Test("A dictionary 300 KB before the end, past the old window, is rewritten through the index and its read-back holds")
+    func farDictionaryHolds() throws {
+        let url = try InfoDictionaryThroughIndexTests.write(MadeInfoFile(padding: 300_000).build().data)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let before = try Data(contentsOf: url)
         var distance = -1
-        if case .found(let found) = PDFTrailerLocator.locate(in: bytes) { distance = bytes.count - found.dictionary.lowerBound }
-        print("READBACK cjk bytes=\(bytes.count) infoFromEnd=\(distance) past256KiB=\(distance > 262_144)")
-        try #require(distance > 262_144, "the dictionary lies past the old 256 KiB window")
-        #expect(run.outcome.produced.metaReadBack == .held)
+        if case .found(let found) = PDFTrailerLocator.locate(in: before) { distance = before.count - found.dictionary.lowerBound }
+        try #require(distance > 262_144, "the dictionary lies past the old 256 KiB window (\(distance) bytes from the end)")
+        let originals = MetaReadBack.originals(of: url)
+        PDFStreamReconstructor.overwriteInfoLiterals(at: url)
+        PDFStreamReconstructor.overwriteFileIdentifier(at: url)
+        #expect(MetaReadBack.check(url: url, originals: originals) == .held)
     }
-    #endif
 
     // MARK: - The writer's values stay in memory
 
