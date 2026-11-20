@@ -22,6 +22,7 @@ struct DebugLaunchHookTests {
         "detectionError.ocrUnavailable", "detectionError.timeout", "detectionError.visionError",
         "detectionError.detectionCorpusInvalid",
         "redactionError.insufficientMemory", "redactionError.unsupportedPageGeometry",
+        "redactionError.boxCannotShowLength",
         "redactionError.bitmapCreationFailed", "redactionError.fillVerificationFailed",
         "redactionError.renderTimeout", "redactionError.pageTooLarge",
         "redactionError.reconstructionFailed", "redactionError.pageSidesNotAsRecorded",

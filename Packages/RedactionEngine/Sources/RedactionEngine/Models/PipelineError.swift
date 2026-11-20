@@ -50,6 +50,11 @@ public enum PipelineError: Sendable, LocalizedError {
         // refused at redaction; it used to be reported under the memory
         // label.
         case unsupportedPageGeometry(pageIndex: Int)
+        // The run's plan for the page holds a box that cannot be applied as
+        // planned: its exposure is not the one every rule of this release
+        // gives (`RunRecord.Confirmed.firstPageWithBoxThatCannotShowLength`).
+        // The run is refused at its start, before any page is built.
+        case boxCannotShowLength(pageIndex: Int)
         case bitmapCreationFailed(pageIndex: Int)
         case fillVerificationFailed(pageIndex: Int)
         case renderTimeout(pageIndex: Int)
@@ -101,6 +106,7 @@ public enum PipelineError: Sendable, LocalizedError {
             // Mechanism-description copy — no outcome-promise language.
             case .insufficientMemory(let p): "Page \(p + 1) could not be processed with the memory available; reducing output quality in Settings may help."
             case .unsupportedPageGeometry(let p): "Page \(p + 1) uses a page size or scale factor that is not processed. Pages must be between 10 and 5,000 points per side at the standard scale."
+            case .boxCannotShowLength(let p): "Page \(p + 1) has a box that cannot be applied as planned. The redaction did not start, and nothing was exported."
             case .bitmapCreationFailed(let p): "Could not create image buffer for page \(p + 1)."
             case .fillVerificationFailed(let p): "Redaction fill verification failed for page \(p + 1). The page may not be fully redacted."
             case .renderTimeout(let p): "Page \(p + 1) could not be rendered within the time limit."

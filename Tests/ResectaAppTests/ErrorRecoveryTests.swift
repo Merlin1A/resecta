@@ -118,6 +118,7 @@ struct ErrorRecoveryTests {
             PipelineError.redactionError(.renderTimeout(pageIndex: 0)),
             PipelineError.redactionError(.insufficientMemory(pageIndex: 0)),
             PipelineError.redactionError(.unsupportedPageGeometry(pageIndex: 0)),
+            PipelineError.redactionError(.boxCannotShowLength(pageIndex: 0)),
           ])
     func redactionErrorDescriptions(error: PipelineError) {
         #expect(!error.localizedDescription.isEmpty)

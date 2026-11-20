@@ -291,6 +291,11 @@ struct PipelineRunner {
             pageCount: coordinator.documentState.pageCount,
             geometry: coordinator.documentState.sourceDocument.map(RunInputs.pageGeometry(of:)) ?? [:],
             regions: redactionState.regions, settings: runSettings)
+        // A box the release cannot apply as planned refuses the run here,
+        // before any page is built or rasterised.
+        if let page = confirmed.firstPageWithBoxThatCannotShowLength {
+            throw PipelineError.redactionError(.boxCannotShowLength(pageIndex: page))
+        }
         let pages = coordinator.buildPDFPageData(
             effectiveMode: effectiveMode, runSettings: runSettings, inkPlans: sensitiveTerms.inkPlans,
             record: confirmed)

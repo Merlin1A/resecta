@@ -40,6 +40,17 @@ public struct RunRecord: Equatable, Sendable {
             self.exportDPI = exportDPI
             self.pages = pages
         }
+
+        /// The first page, from 0, whose plan holds a box that cannot be
+        /// applied as planned: one whose exposure is not "can show the
+        /// value's length", the one exposure every rule of this release
+        /// gives. Nil when every planned box can be applied. The run does
+        /// not start while it is not nil.
+        public var firstPageWithBoxThatCannotShowLength: Int? {
+            pages.first { page in
+                page.plan?.boxes.contains { $0.exposure != .canShowLength } ?? false
+            }?.pageIndex
+        }
     }
 
     /// One page as the user confirmed it.
