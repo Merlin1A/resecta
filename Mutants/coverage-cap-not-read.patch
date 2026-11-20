@@ -5,14 +5,14 @@ Must go red: RedactionEngineTests/RegionCoverageCapAndCategoryTests cappedReRunL
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/RegionCoverage.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/RegionCoverage.swift
-index 2ae06e58..c4684513 100644
+index c2b68761..869f0b7b 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/RegionCoverage.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/RegionCoverage.swift
-@@ -270,7 +270,7 @@ struct RegionCoverage: Sendable {
+@@ -271,7 +271,7 @@ struct RegionCoverage: Sendable {
              // stopped on and every page after it were not read whole, and a
              // page never reached reports nothing to the sinks. The searcher
              // walks pages in order, so the pages before were read.
--            if yielded >= DocumentSearcher.maxResults {
+-            if yielded.count >= DocumentSearcher.maxResults {
 +            if false {  // mutant: the cap is not read
                  unread.formUnion(candidates.filter { $0 >= lastPage })
              }
