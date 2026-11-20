@@ -90,8 +90,81 @@ struct SearchListLimitOccurrenceTests {
         if row.atLimit { #expect(state.capUnscannedPageCount == 28, "the unscanned remainder, snapshot once") }
     }
 
+    // MARK: a run that stopped at the limit ends as a cancelled run
+
+    /// The engine stops at the limit and ends its stream, so a run at the
+    /// limit reaches its end with its task not cancelled. It ends as a
+    /// cancelled run all the same (`SearchState.runEndsCancelled`, run
+    /// through the view's own end, `SearchAndRedactSheet.endRunState`):
+    /// flushed and stopped, the completed flag down, and for a Scan no
+    /// coverage report and no run record, so neither the deselection facts
+    /// behind "You left N of M" nor a staged outcome can follow it.
+    struct EndRow: Sendable, CustomTestStringConvertible {
+        let name: String
+        let scan: Bool
+        let matches: Int
+        let successorStarted: Bool
+        let completes: Bool
+        let staged: Bool
+        var testDescription: String { name }
+    }
+
+    nonisolated static let endRows: [EndRow] = [
+        EndRow(name: "Search, stopped at the limit: it ends as a cancelled run, the completed flag down",
+               scan: false, matches: limit, successorStarted: false, completes: false, staged: false),
+        EndRow(name: "Scan, stopped at the limit: it ends as a cancelled run, with no report, no run record and no left-unredacted line",
+               scan: true, matches: limit, successorStarted: false, completes: false, staged: false),
+        EndRow(name: "Search, under the limit: it completes",
+               scan: false, matches: 3, successorStarted: false, completes: true, staged: false),
+        EndRow(name: "Scan, under the limit: it completes, with its report and a staged run record",
+               scan: true, matches: 3, successorStarted: false, completes: true, staged: true),
+        EndRow(name: "Scan, stopped at the limit, its task cancelled by a successor: the successor's run is left as it stands",
+               scan: true, matches: limit, successorStarted: true, completes: false, staged: false),
+    ]
+
+    @Test("A run that stopped at the limit ends as a cancelled run, in Search and in Scan", arguments: endRows)
+    func runEnd(_ row: EndRow) {
+        let state = SearchState()
+        let redaction = RedactionState()
+        redaction.activeSearch = state
+        state.clearResults()
+        state.searchModeType = row.scan ? .piiScan : .text
+        let run = state.beginRun()
+        state.isSearching = true
+        state.activeSearchTask = Task {}
+        state.totalPages = 40
+        state.currentSearchPage = 12
+        for _ in 0..<row.matches { state.appendResult(Self.single(), run: run) }
+        #expect(state.resultsAtCap == (row.matches == Self.limit), "the limit marked")
+        #expect(state.isSearching, "the limit alone does not stop the run")
+        if row.successorStarted {
+            // A successor cancels this run's task, then clears and begins its own.
+            state.clearResults()
+            _ = state.beginRun()
+            state.isSearching = true
+            state.activeSearchTask = Task {}
+        }
+        let scan = row.scan ? SearchAndRedactSheet.ScanRunFacts(enabled: [], startedAt: Date()) : nil
+        let completed = SearchAndRedactSheet.endRunState(
+            run: run, taskCancelled: row.successorStarted, scan: scan,
+            searchState: state, redactionState: redaction)
+        #expect(completed == row.completes, "the cleanup tail ran")
+        #expect(state.hasCompletedRunSinceClear == row.completes, "the completed flag")
+        #expect(state.pendingResults.isEmpty, "what the run holds is flushed")
+        #expect(state.results.count == (row.successorStarted ? 0 : row.matches), "rows listed")
+        #expect(state.isSearching == row.successorStarted, "still searching: only a successor's run")
+        #expect((state.activeSearchTask == nil) == (!row.completes && !row.successorStarted),
+                "the run's task let go at the limit; a successor's kept")
+        #expect((state.lastCoverageReport != nil) == row.staged, "the Scan coverage report")
+        #expect((redaction.lastDetectionRun?.outcome == .staged) == row.staged, "a staged run record")
+        #expect((redaction.lastDetectionRun == nil) == !row.staged, "any run record")
+        #expect(VerificationResultsView.shouldShowDeselectionRow(snapshot: redaction.runEntryDeselectionSnapshot()) == row.staged,
+                "what the left-unredacted line reads")
+    }
+
     @Test("The case table's row count")
     func rowCount() {
         #expect(Self.rows.count == 5)
+        #expect(Self.endRows.count == 5)
     }
 }
