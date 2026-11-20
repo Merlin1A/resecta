@@ -1,0 +1,19 @@
+Property: A message too tall for its space is stepped down no further than the third accessibility size, and a person at or below that size keeps their own size.
+Area: the brief messages (text size)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/MessageSizingTests
+Must go red: ResectaAppTests/MessageSizingTests drawSizeByTable ("The size a message is drawn at, by table": rows S-3 and S-4)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/Messages/MessageSizing.swift b/Sources/ResectaApp/Views/Messages/MessageSizing.swift
+index 3b8cec85..096b23e6 100644
+--- a/Sources/ResectaApp/Views/Messages/MessageSizing.swift
++++ b/Sources/ResectaApp/Views/Messages/MessageSizing.swift
+@@ -19,7 +19,7 @@ nonisolated enum MessageSizing {
+     static let readableShare: CGFloat = 0.4
+ 
+     /// The smallest size a message is stepped down to.
+-    static let typeFloor: DynamicTypeSize = .accessibility3
++    static let typeFloor: DynamicTypeSize = .accessibility1
+ 
+     /// The tallest a message may be in `space` points: 40 % of it.
+     static func limit(space: CGFloat) -> CGFloat {

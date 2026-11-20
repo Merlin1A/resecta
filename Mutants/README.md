@@ -436,3 +436,4 @@ with its reason and the mutant that is caught in its place.
 | `page-image-deep-form-skipped.patch` | A form nested deeper than eight refuses the page; an image inside it never goes unseen. | RedactionEngineTests/PageImageCraftedInputTests formsNestedPastTheLimit |
 | `page-image-first-coefficient-limit-one-past.patch` | A running sum of the first coefficient past 2,047 either way is refused. | RedactionEngineTests/PageImageCraftedInputTests firstCoefficientLimit |
 | `page-image-forms-counted-without-limit.patch` | A page that names more than 64 forms, a form named twice counting twice, is refused. | RedactionEngineTests/PageImageCraftedInputTests formsNamedPastTheLimit |
+| `message-size-floor.patch` | A message too tall for its space is stepped down no further than the third accessibility size, and a person at or below that size keeps their own size. | ResectaAppTests/MessageSizingTests drawSizeByTable (rows S-3, S-4) |
