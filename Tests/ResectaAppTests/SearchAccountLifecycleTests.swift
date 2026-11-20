@@ -93,9 +93,19 @@ struct SearchAccountLifecycleTests {
     func superseded() {
         let store = Store()
         let (search, _) = Self.running(store)
-        search.closeAccount(.dropped)
+        search.closeAccount(.replaced)
         #expect(store.order.isEmpty)
         #expect(search.lastAccount == nil)
+    }
+
+    @Test("Applied mid-run, then replaced by a new run: kept, stopped on the page in hand, under the record's token")
+    func appliedThenReplaced() throws {
+        let store = Store()
+        let (search, _) = Self.running(store)
+        let token = try #require(search.appliedSearchRecord()?.accountToken)
+        search.closeAccount(.replaced)
+        #expect(store.closed[token]?.ending == .stopped(page: 5))
+        #expect(search.accountInHandApplied == false)
     }
 
     @Test("The query cleared mid-run: stopped, kept in the store, and the session's last account cleared")

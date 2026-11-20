@@ -472,6 +472,8 @@ final class SearchState: Identifiable {
     var accountInHand: SearchAccount?
     var accountInHandRun: Int = 0
     var accountInHandToken: UUID?
+    /// True once an Apply took a record from the run in hand.
+    var accountInHandApplied = false
     /// The last run's closed account, its run and its token.
     var lastAccount: SearchAccount?
     var lastAccountRun: Int = 0

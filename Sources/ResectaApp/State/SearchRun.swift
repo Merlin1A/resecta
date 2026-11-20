@@ -136,8 +136,9 @@ import RedactionEngine
     /// such exit has already surfaced its notice and, for a Scan, its
     /// failed run record.
     private func prepareSearchRun() async -> PreparedRun? {
-        // A run this one replaces keeps no account: its pages are read again here.
-        searchState.closeAccount(.dropped)
+        // A run this one replaces keeps no account, unless an Apply took a
+        // record from it while it was open (its boxes are on the document).
+        searchState.closeAccount(.replaced)
         await searchState.cancelSearch()
         // Snapshot the just-completed scan's
         // results (if any) into `priorScanFingerprints` BEFORE

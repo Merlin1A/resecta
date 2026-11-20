@@ -37,6 +37,9 @@ extension SearchState {
             kind = .piiScan(categories: effectiveScanCategories)
             scanConfiguration = configuration
         }
+        // An Apply takes this record: boxes from the run in hand are then on
+        // the document, so a run that replaces it keeps its account.
+        if accountInHand != nil { accountInHandApplied = true }
         return AppliedSearchRecord(
             query: AppliedSearchQuery(kind: kind, options: lastRunOptions ?? options),
             foundCount: results.count,

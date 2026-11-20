@@ -17,14 +17,19 @@ extension SearchState {
         case completed
         /// A cancel: at the result limit when the results reached it, otherwise stopped.
         case cancelled
-        /// The run was replaced, or its results were cleared while it was open: nothing is kept.
+        /// The run's results were cleared while it was open: nothing is kept.
         case dropped
+        /// A new run replaces it. Kept as a cancel when an Apply took a record
+        /// while it was open, since boxes from it are on the document;
+        /// otherwise nothing is kept.
+        case replaced
     }
 
     func beginAccount(run: Int, pageCount: Int) {
         accountInHand = SearchAccount(pageCount: pageCount)
         accountInHandRun = run
         accountInHandToken = UUID()
+        accountInHandApplied = false
     }
 
     func recordCoverage(_ coverage: PageSearchCoverage, run: Int) {
@@ -62,14 +67,18 @@ extension SearchState {
     func closeAccount(_ how: AccountClose, run: Int? = nil) {
         guard var account = accountInHand, let token = accountInHandToken else { return }
         if let run, run != accountInHandRun { return }
+        let applied = accountInHandApplied
         accountInHand = nil
         accountInHandToken = nil
+        accountInHandApplied = false
         switch how {
         case .dropped:
             return
+        case .replaced where !applied:
+            return
         case .completed:
             account.end(.completed)
-        case .cancelled:
+        case .cancelled, .replaced:
             // The progress count is set as each page starts, so the page in hand is one less.
             let page = max(0, currentSearchPage - 1)
             account.end(resultsAtCap ? .stoppedAtResultLimit(page: page) : .stopped(page: page))
