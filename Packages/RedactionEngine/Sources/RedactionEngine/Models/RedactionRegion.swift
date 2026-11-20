@@ -41,8 +41,17 @@ public struct RedactionRegion: Sendable, Identifiable, Equatable, Codable {
     /// region (drawn, duplicated, read from the page's picture, or edited);
     /// on a page that is not plain such a region sends a Searchable page
     /// image-only (`PageContentFacts.keepsTextLayer`). An encoded region
-    /// without it decodes as false.
-    public var textAnchored: Bool
+    /// without it decodes as false. It is never true where
+    /// `placedFromPageText` is false: setting it true there leaves it false.
+    public var textAnchored: Bool {
+        didSet { if textAnchored && !placedFromPageText { textAnchored = false } }
+    }
+    /// Placed from a match in the page's own text layer: set once where the
+    /// region is made and never changed. A move or a resize leaves it as it
+    /// is (only `textAnchored` turns false); a duplicate is drawn by hand.
+    /// False for a region drawn, duplicated or read from the page's picture.
+    /// An encoded region without it takes it from `textAnchored`.
+    public let placedFromPageText: Bool
     /// For one run only: the hidden glyphs' boxes of the words whose printed
     /// ink this region covers on a page whose text is a hidden layer over a
     /// picture of the page (`InkStripPlan`), wherever they sit. A Searchable
@@ -60,11 +69,15 @@ public struct RedactionRegion: Sendable, Identifiable, Equatable, Codable {
         self.normalizedRect = normalizedRect
         self.source = source
         self.textLayerRect = textLayerRect
+        // Both marks from one expression: a region is made anchored exactly
+        // when it is placed from the page's text, so "anchored and not
+        // placed from text" cannot be made.
+        self.placedFromPageText = textAnchored
         self.textAnchored = textAnchored
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, normalizedRect, source, textLayerRect, textAnchored
+        case id, normalizedRect, source, textLayerRect, textAnchored, placedFromPageText
     }
 
     public init(from decoder: Decoder) throws {
@@ -73,7 +86,10 @@ public struct RedactionRegion: Sendable, Identifiable, Equatable, Codable {
         normalizedRect = try container.decode(CGRect.self, forKey: .normalizedRect)
         source = try container.decode(Source.self, forKey: .source)
         textLayerRect = try container.decodeIfPresent(CGRect.self, forKey: .textLayerRect)
-        textAnchored = try container.decodeIfPresent(Bool.self, forKey: .textAnchored) ?? false
+        let anchored = try container.decodeIfPresent(Bool.self, forKey: .textAnchored) ?? false
+        let placed = try container.decodeIfPresent(Bool.self, forKey: .placedFromPageText) ?? anchored
+        placedFromPageText = placed
+        textAnchored = anchored && placed
     }
 
     /// The rects a Searchable export strips the text layer under: the box,
