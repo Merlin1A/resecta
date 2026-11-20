@@ -1,0 +1,19 @@
+Property: A file holding a whole writer value anywhere in its bytes is not kept.
+Area: the read-back of the finished file (Engine)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --package-path Packages/RedactionEngine --filter MetaReadBackTests
+Must go red: RedactionEngineTests/MetaReadBackTests originalElsewhereStops; RedactionEngineTests/MetaReadBackTests originalIdentifierElsewhereStops
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/MetaReadBack.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/MetaReadBack.swift
+index e74efa51..bf553a0b 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/MetaReadBack.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/MetaReadBack.swift
+@@ -111,7 +111,7 @@ package enum MetaReadBack {
+         }
+ 
+         // M3 (a): no whole value anywhere.
+-        for needle in originals.needles where data.range(of: needle) != nil { return .originalLeft }
++        for needle in originals.needles where needle.isEmpty { return .originalLeft }
+         // M3 (b): only white space after each fixed value, up to the next key.
+         for (key, value) in zip(fixedKeys, fixed) {
+             guard onlySpaceAfter(key: key, value: value, in: data) else { return .originalLeft }

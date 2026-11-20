@@ -1,0 +1,19 @@
+Property: An /Author key in the information dictionary fails the metadata check.
+Area: the metadata check (Engine)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --package-path Packages/RedactionEngine --filter AdversarialVerificationTests
+Must go red: RedactionEngineTests/AdversarialVerificationTests "Layer 5 FAILs when /Author metadata is present"
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Structural.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Structural.swift
+index 26a7489e..280b3e9c 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Structural.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Structural.swift
+@@ -181,7 +181,7 @@ extension VerificationEngine {
+         // CGPDFContext (Apple's writer) never emits these keys, so any presence
+         // is suspicious.
+         // Never include metadata values in status messages.
+-        let sensitiveKeys = ["Title", "Author", "Subject", "Keywords", "Creator"]
++        let sensitiveKeys = ["Title", "Subject", "Keywords", "Creator"]
+         for key in sensitiveKeys {
+             var obj: CGPDFObjectRef?
+             if CGPDFDictionaryGetObject(infoDict, key, &obj) {

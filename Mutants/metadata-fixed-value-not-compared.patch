@@ -1,0 +1,18 @@
+Property: A fixed field that is not the fixed value is never passed by the metadata check.
+Area: the metadata check (Engine)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --package-path Packages/RedactionEngine --filter InfoDictionaryThroughIndexTests
+Must go red: RedactionEngineTests/InfoDictionaryThroughIndexTests row [case 7]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Structural.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Structural.swift
+index 26a7489e..2238eff7 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Structural.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Structural.swift
+@@ -273,7 +273,6 @@ extension VerificationEngine {
+                 continue
+             }
+             while value.hasSuffix(" ") { value.removeLast() }
+-            if value != fixedValue { notRewritten = true }
+         }
+         if undecodable || notRewritten {
+             let conditions = undecodable
