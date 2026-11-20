@@ -5,7 +5,7 @@ Must go red: ResectaAppTests/SearchListLimitOccurrenceTests runEnd (the rows "Se
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/State/SearchState+RunLifecycle.swift b/Sources/ResectaApp/State/SearchState+RunLifecycle.swift
-index 398d3e63..cf8c38c8 100644
+index ec02e60c..824f6988 100644
 --- a/Sources/ResectaApp/State/SearchState+RunLifecycle.swift
 +++ b/Sources/ResectaApp/State/SearchState+RunLifecycle.swift
 @@ -79,10 +79,7 @@ extension SearchState {

@@ -5,10 +5,10 @@ Must go red: ResectaAppTests/SearchListLimitOccurrenceTests listLimit (the rows 
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/State/SearchState+RunLifecycle.swift b/Sources/ResectaApp/State/SearchState+RunLifecycle.swift
-index 38c6cb68..35b33d52 100644
+index ec02e60c..5b1543d9 100644
 --- a/Sources/ResectaApp/State/SearchState+RunLifecycle.swift
 +++ b/Sources/ResectaApp/State/SearchState+RunLifecycle.swift
-@@ -132,16 +132,13 @@ extension SearchState {
+@@ -152,16 +152,13 @@ extension SearchState {
          // Matches never outnumber rows, so they are counted only once
          // the rows reach the limit.
          if results.count + pendingResults.count >= DocumentSearcher.maxResults {
