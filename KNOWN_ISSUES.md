@@ -207,7 +207,9 @@ Some scanned PDFs carry an invisible layer of text over the picture of each page
 ### KI-26: Some Searchable Exports Keep the Real Export Time and iOS Version (Low)
 **Affects:** Searchable Redaction
 
-On Searchable exports that need a large fallback font, such as Chinese or Japanese text, the file keeps the real export time and iOS version instead of the fixed values: its Producer field names the iOS version and build, and its creation and change dates are the time of the export. No document content is affected. Metadata Check reports this as a warning: "Producer or timestamp fields were not rewritten to the fixed values". The results of such an export read Checks Failed, because Font Verification reports the fallback font in the hidden text.
+On Searchable exports that need a large fallback font, such as Chinese or Japanese text, the file keeps the real export time and iOS version instead of the fixed values: its Producer field names the iOS version and build, and its creation and change dates are the time of the export. Resecta looks for these values only in the last 256 KB of the file, and the large font can push them further from the end. No document content is affected. Document Metadata reports this as a warning: "Producer or timestamp fields were not rewritten to the fixed values". The results of such an export read Checks Failed, because Monospace Fonts reports the fallback font in the hidden text. When Verify Before Export is off, nothing reports it.
+
+**Workaround:** Export the document again with Secure Rasterization (**More → Switch Mode**), or treat the iOS version and the export time as visible to whoever receives the file.
 
 ---
 
