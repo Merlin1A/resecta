@@ -168,7 +168,7 @@ extension DocumentSearcher {
     /// Install the per-page coverage sink — the search-side seam for the
     /// verification search re-check. Reporting-only; pass nil
     /// to disable. See `PageSearchCoverage`.
-    func setPageCoverageSink(_ sink: (@Sendable (PageSearchCoverage) -> Void)?) {
+    public func setPageCoverageSink(_ sink: (@Sendable (PageSearchCoverage) -> Void)?) {
         self.pageCoverageSink = sink
     }
 
