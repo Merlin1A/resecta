@@ -5,10 +5,10 @@ Must go red: ResectaAppTests/ToastQueueManagerTests sameWordsTwoEvents
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/State/ToastQueueManager.swift b/Sources/ResectaApp/State/ToastQueueManager.swift
-index 2babadab..ab7ace7f 100644
+index c682b155..143147b9 100644
 --- a/Sources/ResectaApp/State/ToastQueueManager.swift
 +++ b/Sources/ResectaApp/State/ToastQueueManager.swift
-@@ -305,6 +305,7 @@ final class ToastQueueManager {
+@@ -313,6 +313,7 @@ final class ToastQueueManager {
  
      private func admit(_ item: ToastItem, layer: UUID?) {
          let at = now()

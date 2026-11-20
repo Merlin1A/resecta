@@ -5,10 +5,10 @@ Must go red: ResectaAppTests/ToastQueueManagerTests hiddenSurfaceEndsNothing
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/State/ToastQueueManager.swift b/Sources/ResectaApp/State/ToastQueueManager.swift
-index 2babadab..1154fb03 100644
+index c682b155..896bef6f 100644
 --- a/Sources/ResectaApp/State/ToastQueueManager.swift
 +++ b/Sources/ResectaApp/State/ToastQueueManager.swift
-@@ -507,9 +507,8 @@ final class ToastQueueManager {
+@@ -517,9 +517,8 @@ final class ToastQueueManager {
      func setLayerSurface(_ layer: UUID, visible: Bool) {
          guard let index = layers.firstIndex(where: { $0.id == layer }),
                layers[index].surfaceVisible != visible else { return }
