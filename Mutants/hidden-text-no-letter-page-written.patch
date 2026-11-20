@@ -1,0 +1,20 @@
+Property: A page left with no letter (white space at most) is a picture with no searchable text left, both when the alphabet rule left a word out and when the page had no letter to begin with; only a page whose boxes took every word is written empty.
+Area: hidden text (whole source words)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter "WholeSourceWordsTests"
+Must go red: RedactionEngineTests/WholeSourceWordsTests "A page left with white space alone is a picture with no searchable text left" (both arguments: a word no face draws then a space, and a lone object mark)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
+index 2cfafd88..60d3bac8 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
+@@ -175,8 +175,7 @@ enum PageTextPath {
+         // no searchable text left when the alphabet rule left a word out, or
+         // when the page had no letter to begin with (a lone object mark reads
+         // as a space). A page whose boxes took every word is written empty.
+-        let noLetterLeft = !validated.result.surviving.contains { Self.isLetter($0) }
+-        if noLetterLeft, !alphabet.wordIndices.isEmpty || !folded.contains(where: { Self.isLetter($0) }) {
++        if validated.result.surviving.isEmpty, !alphabet.wordIndices.isEmpty {
+             return Result(outcome: .picture(alphabet.reasonIfNoWordLeft ?? .noWritableText),
+                           runsLeftOut: alphabet.runsLeftOut, drawnCellDropped: validated.dropped)
+         }
