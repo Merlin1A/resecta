@@ -328,7 +328,9 @@ final class ToastQueueManager {
             reconcile()
             return
         }
-        waiting.removeAll { $0.clock == nil && ReceiptRules.givesWayToANewerMessage($0.item.facts) }
+        let kept = Set(ReceiptRules.waiting(
+            waiting.map(\.item.facts), after: item.facts, arrivalWaits: false).map(\.event))
+        waiting.removeAll { !kept.contains($0.item.event) }
         let entry = Entry(item: item, postedAt: at, layer: layer)
         waiting.append(entry)
         if var shown = current, layer == nil || layer == layers.last?.id {

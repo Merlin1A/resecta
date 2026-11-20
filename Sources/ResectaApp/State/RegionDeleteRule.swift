@@ -35,7 +35,8 @@ enum RegionDeleteRule {
             let versionAfterDelete = redactionState.regionVersion
             // The guard: the regions are as the delete left them and the
             // step is still there to undo. A tap runs the Undo only while it
-            // holds, and the queue ends the notice once it does not.
+            // holds. The queue's revalidate() ends the notice once it does
+            // not; nothing in the app calls revalidate() yet.
             toastManager.post(
                 .deletedBoxes(count: count),
                 action: { [weak undoManager] in undoManager?.undo() },

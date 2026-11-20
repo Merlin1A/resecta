@@ -578,21 +578,46 @@ struct ToastQueueManagerTests {
         #expect(free.activeToasts.isEmpty, "with no layer registered it leaves on its clock")
 
         // A registered layer draws it: it stays until it has had focus once,
-        // then it has what is left of its life.
-        let held = queue(clock)
-        held.voiceOverRunning = { true }
-        held.registerLayer(UUID(), role: .root)
-        held.post(.deletedBoxes(count: 3), action: {})
-        let undo = try #require(held.activeToasts.first)
-        #expect(held.receiptClock(of: undo.id)?.isRunning == false)
-        clock.advance(60)
-        held.settleClocks()
-        #expect(held.activeToasts.map(\.id) == [undo.id], "it stays until it has had focus once")
-        held.noteFocused(undo.id)
-        #expect(held.receiptClock(of: undo.id)?.remaining(at: clock.now) == 8.0)
-        clock.advance(8)
-        held.settleClocks()
-        #expect(held.activeToasts.isEmpty)
+        // then it has what is left of its life. Switch Control alone waits too.
+        for (voiceOver, switchControl) in [(true, false), (false, true)] {
+            let held = queue(clock)
+            held.voiceOverRunning = { voiceOver }
+            held.switchControlRunning = { switchControl }
+            held.registerLayer(UUID(), role: .root)
+            held.post(.deletedBoxes(count: 3), action: {})
+            let undo = try #require(held.activeToasts.first)
+            #expect(held.receiptClock(of: undo.id)?.isRunning == false)
+            clock.advance(60)
+            held.settleClocks()
+            #expect(held.activeToasts.map(\.id) == [undo.id], "it stays until it has had focus once")
+            held.noteFocused(undo.id)
+            #expect(held.receiptClock(of: undo.id)?.remaining(at: clock.now) == 8.0)
+            clock.advance(8)
+            held.settleClocks()
+            #expect(held.activeToasts.isEmpty)
+        }
+    }
+
+    @Test("A plain message that waited over 10 s is dropped at its turn; one that waited less is shown")
+    func plainWaitLimitAtItsTurn() throws {
+        let clock = QueueTestClock()
+        for (heldFor, shown) in [(0.0, ["All good"]), (11.0, [])] {
+            let mgr = queue(clock)
+            mgr.post(.deletedBoxes(count: 2), action: {})
+            let undo = try #require(mgr.activeToasts.first)
+            mgr.holdClock(undo.id, .touch, true)
+            mgr.enqueue(ToastItem(message: "All good", severity: .success))
+            clock.advance(heldFor)
+            mgr.settleClocks()
+            mgr.holdClock(undo.id, .touch, false)
+            clock.advance(8)
+            mgr.settleClocks()
+            #expect(mgr.waitingToasts.map(\.message) == ["All good"], "it waits through the gap")
+            clock.advance(0.3)
+            mgr.settleClocks()
+            #expect(mgr.activeToasts.map(\.message) == shown, "waited \(heldFor + 8.3) s")
+            #expect(mgr.waitingToasts.isEmpty)
+        }
     }
 
     // MARK: - The slot
