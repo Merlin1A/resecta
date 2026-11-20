@@ -265,6 +265,9 @@ struct OutputRecheck: Sendable {
             await searcher.setUserTerms(configuration?.userTermsIndex)
 
             var remaining = 0
+            // The search stops a page at maxResults matches; a match over two
+            // lines is two rows, so the page's stop is read from its matches.
+            var matches = Set<UUID>()
             var perTerm: [String: Int] = [:]
             var items: [RecheckObservation.RemainingItem] = []
             // A pattern the safety gate refuses finishes the stream empty;
@@ -282,6 +285,7 @@ struct OutputRecheck: Sendable {
             for await result in stream {
                 try Task.checkCancellation()
                 remaining += 1
+                matches.insert(DocumentSearcher.occurrenceKey(result))
                 perTerm[result.term, default: 0] += 1
                 if query.isScan {
                     items.append(RecheckObservation.RemainingItem(
@@ -293,7 +297,7 @@ struct OutputRecheck: Sendable {
             }
             observation.counts[requestIndex] = RecheckObservation.Count(
                 remaining: remaining,
-                hitCap: remaining >= DocumentSearcher.maxResults,
+                hitCap: matches.count >= DocumentSearcher.maxResults,
                 perTerm: perTerm,
                 rejected: rejection.value,
                 timedOut: timeout.value,
