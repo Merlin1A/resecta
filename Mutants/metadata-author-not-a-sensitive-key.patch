@@ -1,7 +1,7 @@
 Property: An /Author key in the information dictionary fails the metadata check.
 Area: the metadata check (Engine)
 Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --package-path Packages/RedactionEngine --filter AdversarialVerificationTests
-Must go red: RedactionEngineTests/AdversarialVerificationTests "Layer 5 FAILs when /Author metadata is present"
+Must go red: RedactionEngineTests/AdversarialVerificationTests layer5FailsAuthorString, layer5FailsAuthorUndecodable, layer5FailsAuthorName
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Structural.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Structural.swift
