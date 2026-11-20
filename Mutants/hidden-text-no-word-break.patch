@@ -5,10 +5,10 @@ Must go red: RedactionEngineTests/WholeSourceWordsTests breakWithoutASpaceEntry
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextLayerReconstructor.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextLayerReconstructor.swift
-index 841e96a4..bca175b1 100644
+index 5d8381da..343bda44 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextLayerReconstructor.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextLayerReconstructor.swift
-@@ -327,7 +327,7 @@ enum TextLayerReconstructor {
+@@ -343,7 +343,7 @@ enum TextLayerReconstructor {
  
      /// Whether the writer puts a space between `a` and the next entry `b`.
      static func wordBreak(between a: CharacterInfo, and b: CharacterInfo) -> Bool {

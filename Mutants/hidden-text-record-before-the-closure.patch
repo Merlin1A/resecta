@@ -5,10 +5,10 @@ Must go red: RedactionEngineTests/WholeSourceWordsTests wholeWords [part of a nu
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
-index a1fda75e..526aad8f 100644
+index 2cfafd88..37642367 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
-@@ -117,7 +117,7 @@ enum PageTextPath {
+@@ -182,7 +182,7 @@ enum PageTextPath {
          }
  
          // The record.

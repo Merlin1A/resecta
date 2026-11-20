@@ -2,6 +2,7 @@ Property: A widened box's region keeps its hidden letters' box as an ordinary re
 Area: hidden text (the widened box)
 Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter "PaintAndKindsCasesTests"
 Must go red: RedactionEngineTests/PaintAndKindsCasesTests caseRow [19: a widened box whose region has a hidden letters' box takes the letters under that box]
+Note: the fault drops every ordinary rectangle from the filter on a page that holds any plan's rectangle, not the hidden letters' box alone: the box's own rectangle, a Search box's, and the ink strips of every region on that page go too. Case 19 turns red through its drawn-cell count (drawnCellDropped == 0); other cases on such a page may go red as well.
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextPathFilter.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextPathFilter.swift

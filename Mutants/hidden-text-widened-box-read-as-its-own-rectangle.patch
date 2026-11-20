@@ -2,6 +2,7 @@ Property: For a widened box the plan's rectangle takes the place of the box's ow
 Area: hidden text (the widened box)
 Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter "PaintAndKindsCasesTests"
 Must go red: RedactionEngineTests/PaintAndKindsCasesTests widthDoesNotShow; asWideAsItsLine
+Note: the text path's one rectangle list feeds the filter, the drawn-cell rule's shapes, the record's rectangles and the writer's line breaks (removalRects), so the fault moves all four, not the filter alone.
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
