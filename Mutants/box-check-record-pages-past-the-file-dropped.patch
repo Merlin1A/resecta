@@ -5,10 +5,10 @@ Must go red: RedactionEngineTests/BoxCheckRuleTests recordPagesTheFileLacks
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
-index 950ac094..321b1c07 100644
+index dfcc4110..d386c89e 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
-@@ -194,11 +194,6 @@ enum ExactFillCheck {
+@@ -198,11 +198,6 @@ enum ExactFillCheck {
              judged.outsidePlan = page?.outsidePlan ?? []
              pages.append(judged)
          }

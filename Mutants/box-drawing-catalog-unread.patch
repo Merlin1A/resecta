@@ -1,0 +1,18 @@
+Property: The catalog holds the writer's keys alone, for every page.
+Area: the box check's own reading of what each page draws
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/BoxCheckDrawingTests (or on the host: cd Packages/RedactionEngine && swift test --filter BoxCheckDrawingTests)
+Must go red: RedactionEngineTests/BoxCheckDrawingTests eachCase [D80: a form the viewer fills]; RedactionEngineTests/BoxCheckDrawingTests eachCase [D81: optional content in the catalog]; RedactionEngineTests/BoxCheckDrawingTests eachCase [D82: an action on opening]; RedactionEngineTests/BoxCheckDrawingTests eachCase [D83: named files and scripts]; RedactionEngineTests/BoxCheckDrawingTests eachCase [D84: a portfolio]; RedactionEngineTests/BoxCheckDrawingTests notAFileAndEveryPage
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+index 1038a83b..10feb373 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+@@ -87,7 +87,6 @@ enum PageDrawingReader {
+         guard count(of: startxref, in: data) == 1, let t = data.range(of: trailer, options: .backwards) else { return .fileRevised }
+         let tail = data[t.upperBound...]
+         if tail.range(of: Data("/Prev".utf8)) != nil || tail.range(of: Data("/XRefStm".utf8)) != nil { return .fileRevised }
+-        guard let catalog = document.catalog, keys(catalog).isSubset(of: catalogKeys) else { return .documentKeyNotListed }
+         return nil
+     }
+ 

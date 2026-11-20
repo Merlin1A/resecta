@@ -1,0 +1,18 @@
+Property: A bracket escaped in a string does not end it, so the words after it are the string's.
+Area: the box check's own reading of what each page draws
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/BoxCheckDrawingTests (or on the host: cd Packages/RedactionEngine && swift test --filter BoxCheckDrawingTests)
+Must go red: RedactionEngineTests/BoxCheckDrawingTests eachCase [D6: operator words inside a shown string, one after an escaped bracket]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+index 1038a83b..628a126b 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+@@ -275,7 +275,6 @@ enum PageDrawingReader {
+                 repeat {
+                     guard i < b.count else { return nil }
+                     switch b[i] {
+-                    case UInt8(ascii: "\\"): i += 1
+                     case UInt8(ascii: "("): depth += 1
+                     case UInt8(ascii: ")"): depth -= 1
+                     default: break

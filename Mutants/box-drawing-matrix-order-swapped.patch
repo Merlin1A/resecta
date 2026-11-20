@@ -1,0 +1,19 @@
+Property: A cm applies its matrix before the one in force.
+Area: the box check's own reading of what each page draws
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/BoxCheckDrawingTests (or on the host: cd Packages/RedactionEngine && swift test --filter BoxCheckDrawingTests)
+Must go red: RedactionEngineTests/BoxCheckDrawingTests eachCase [D4: the page-box matrix made in two steps whose order counts]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+index 1038a83b..9ca737c9 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+@@ -362,7 +362,7 @@ enum PageDrawingReader {
+             var v = [CGPDFReal](repeating: 0, count: 6)
+             for k in (0..<6).reversed() where !CGPDFScannerPopNumber(s, &v[k]) { scan.refuse(.drawingNotRead, s); return }
+             let m = Matrix(a: Double(v[0]), b: Double(v[1]), c: Double(v[2]), d: Double(v[3]), e: Double(v[4]), f: Double(v[5]))
+-            scan.ctm = scan.ctm.after(m)
++            scan.ctm = m.after(scan.ctm)
+         }
+         CGPDFOperatorTableSetCallback(table, "Tr") { s, info in
+             let scan = Unmanaged<Scan>.fromOpaque(info!).takeUnretainedValue()

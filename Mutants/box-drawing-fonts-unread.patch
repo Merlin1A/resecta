@@ -1,0 +1,18 @@
+Property: Every font is the writer's kind: TrueType, with a TrueType program.
+Area: the box check's own reading of what each page draws
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/BoxCheckDrawingTests (or on the host: cd Packages/RedactionEngine && swift test --filter BoxCheckDrawingTests)
+Must go red: RedactionEngineTests/BoxCheckDrawingTests eachCase [D45: a Type3 font, whose glyphs are drawings]; RedactionEngineTests/BoxCheckDrawingTests eachCase [D46: a Type1 font]; RedactionEngineTests/BoxCheckDrawingTests eachCase [D47: a TrueType font whose program is not a TrueType one]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+index 1038a83b..813b6f7f 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+@@ -112,7 +112,6 @@ enum PageDrawingReader {
+         }
+         guard let resources = dictionary(dict, "Resources") else { return .failure(refused(.resourceNotListed)) }
+         guard keys(resources).isSubset(of: resourceKeys) else { return .failure(refused(.resourceNotListed)) }
+-        if let fonts = dictionary(resources, "Font"), let reason = fontReason(fonts) { return .failure(refused(reason)) }
+         guard let pictures = dictionary(resources, "XObject"), CGPDFDictionaryGetCount(pictures) == 1,
+               let name = keys(pictures).first else { return .failure(refused(.pictureNotDrawnOnce)) }
+         var stream: CGPDFStreamRef?

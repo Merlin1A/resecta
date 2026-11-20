@@ -1,0 +1,19 @@
+Property: The page holds the writer's keys alone: no annotation, group or thumbnail.
+Area: the box check's own reading of what each page draws
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/BoxCheckDrawingTests (or on the host: cd Packages/RedactionEngine && swift test --filter BoxCheckDrawingTests)
+Must go red: RedactionEngineTests/BoxCheckDrawingTests eachCase [D70: an annotation]; RedactionEngineTests/BoxCheckDrawingTests eachCase [D71: a transparency group]; RedactionEngineTests/BoxCheckDrawingTests eachCase [D72: a thumbnail]; RedactionEngineTests/BoxCheckDrawingTests runRefusesWhatThePageDraws
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+index 1038a83b..616bab12 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+@@ -24,7 +24,7 @@ enum PageDrawingReader {
+     // The writer's form. Each list holds what its exports were measured to hold.
+     static let catalogKeys: Set<String> = ["Type", "Pages"]
+     static let pageTreeKeys: Set<String> = ["Type", "Kids", "Count", "MediaBox", "Parent"]
+-    static let pageKeys: Set<String> = ["Type", "Parent", "Resources", "Contents", "MediaBox"]
++    static let pageKeys: Set<String> = ["Type", "Parent", "Resources", "Contents", "MediaBox", "Annots", "Group", "Thumb"]
+     static let resourceKeys: Set<String> = ["ProcSet", "XObject", "Font"]
+     static let pictureKeys: Set<String> = ["Type", "Subtype", "Width", "Height", "BitsPerComponent", "ColorSpace",
+                                            "Filter", "Interpolate", "Length"]

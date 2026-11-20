@@ -1,0 +1,21 @@
+Property: The file is one revision.
+Area: the box check's own reading of what each page draws
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/BoxCheckDrawingTests (or on the host: cd Packages/RedactionEngine && swift test --filter BoxCheckDrawingTests)
+Must go red: RedactionEngineTests/BoxCheckDrawingTests eachCase [D85: a second revision appended]; RedactionEngineTests/BoxCheckDrawingTests eachCase [D86: a trailer that names an earlier one]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+index 1038a83b..cd3c3663 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+@@ -84,9 +84,7 @@ enum PageDrawingReader {
+     /// One revision, and a catalog and page tree of the writer's keys alone.
+     static func fileReason(_ data: Data, _ document: CGPDFDocument) -> Reason? {
+         let startxref = Data("startxref".utf8), trailer = Data("trailer".utf8)
+-        guard count(of: startxref, in: data) == 1, let t = data.range(of: trailer, options: .backwards) else { return .fileRevised }
+-        let tail = data[t.upperBound...]
+-        if tail.range(of: Data("/Prev".utf8)) != nil || tail.range(of: Data("/XRefStm".utf8)) != nil { return .fileRevised }
++        _ = (startxref, trailer)
+         guard let catalog = document.catalog, keys(catalog).isSubset(of: catalogKeys) else { return .documentKeyNotListed }
+         return nil
+     }

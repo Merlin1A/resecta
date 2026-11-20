@@ -1,0 +1,19 @@
+Property: The picture is drawn exactly once.
+Area: the box check's own reading of what each page draws
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/BoxCheckDrawingTests (or on the host: cd Packages/RedactionEngine && swift test --filter BoxCheckDrawingTests)
+Must go red: RedactionEngineTests/BoxCheckDrawingTests eachCase [D30: the picture drawn twice]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+index 1038a83b..3a825b98 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+@@ -130,7 +130,7 @@ enum PageDrawingReader {
+         switch scan(page) {
+         case .failure(let reason): return .failure(reason)
+         case .success(let draws):
+-            guard draws.count == 1, draws[0].name == name else { return .failure(refused(.pictureNotDrawnOnce)) }
++            guard !draws.isEmpty, draws[0].name == name else { return .failure(refused(.pictureNotDrawnOnce)) }
+             let pageBox = Matrix(a: Double(box.width), b: 0, c: 0, d: Double(box.height), e: Double(box.minX), f: Double(box.minY))
+             guard draws[0].ctm == pageBox else { return .failure(refused(.pictureNotOverThePage)) }
+         }

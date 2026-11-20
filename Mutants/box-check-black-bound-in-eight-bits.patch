@@ -1,0 +1,19 @@
+Property: A flat block past the 8-bit range below black is black.
+Area: the box check
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/BoxCheckRuleTests (or on the host: cd Packages/RedactionEngine && swift test --filter BoxCheckRuleTests)
+Must go red: RedactionEngineTests/BoxCheckRuleTests levelsPastTheEightBitRange
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
+index be216273..b7cfdd90 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
+@@ -156,7 +156,7 @@ enum ExactFillCheck {
+     static func isExactFill(_ b: CodedBlock, _ fill: FillColor) -> Bool {
+         guard b.flat else { return false }
+         switch fill {
+-        case .black: return b.dcTimesStep <= -1021
++        case .black: return (-1024)...(-1021) ~= b.dcTimesStep
+         case .white: return b.dcTimesStep >= 1013
+         }
+     }
