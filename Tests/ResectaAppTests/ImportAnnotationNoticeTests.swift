@@ -397,6 +397,27 @@ struct ImportAnnotationNoticeTests {
                 == "This document contains 1 filled form field; its value is not carried into the output. Check the preview before sharing.")
     }
 
+    @Test("The notice's id from the staged record gives the shipped paragraph")
+    func messageIDGivesTheShippedParagraph() {
+        let square = PDFFinding(id: "annotation-square", summary: "Square", severity: .warning)
+        let link = PDFFinding(id: "annotation-link", summary: "Link", severity: .info)
+        let entry = PDFFinding(id: ImportAnnotationNoticeBanner.formDataOrAttachmentsFindingID,
+                               summary: "Form data", severity: .warning)
+        // Annotations with the document-level entry: the entry is its own
+        // sentence, not one more annotation; the link draws nothing over the page.
+        let withEntry = ImportAnnotationNoticeBanner.messageID(findings: [square, link, entry], filledFormFieldCount: 2)
+        #expect(withEntry == .importAnnotations(annotationCount: 1, filledFormFieldCount: 2, carriesFormDataOrAttachments: true))
+        #expect(MessageCatalog.row(for: withEntry).text == ImportAnnotationNoticeBanner.noticeMessage(
+            annotationCount: 1, filledFormFieldCount: 2, carriesFormDataOrAttachments: true))
+        // Annotations alone.
+        let alone = ImportAnnotationNoticeBanner.messageID(findings: [square], filledFormFieldCount: 0)
+        #expect(MessageCatalog.row(for: alone).text == ImportAnnotationNoticeBanner.noticeMessage)
+        // A filled form field alone.
+        let field = ImportAnnotationNoticeBanner.messageID(findings: [], filledFormFieldCount: 1)
+        #expect(MessageCatalog.row(for: field).text
+                == "This document contains 1 filled form field; its value is not carried into the output. Check the preview before sharing.")
+    }
+
     // MARK: - Copy
 
     @Test("Notice copy is the pinned mechanism description")

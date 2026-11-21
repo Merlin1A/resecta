@@ -16,7 +16,8 @@ struct MessageCatalogTests {
     // MARK: - The frozen table
 
     struct Frozen {
-        let severity: ToastSeverity
+        /// Nil for a notice drawn in its place, which is never posted.
+        let severity: ToastSeverity?
         let kind: MessageKind
         let tone: MessageTone
         let phases: Set<DocumentState.PhaseKind>
@@ -119,9 +120,19 @@ struct MessageCatalogTests {
         .searchPreparationFailed: Frozen(
             severity: .warning, kind: .receipt, tone: .stop, phases: [.editing], mustBeSeen: true,
             coalescesRepeats: true, showsInRemainingLayer: false),
+        .pausedRun: Frozen(
+            severity: nil, kind: .notice, tone: .caution, phases: [.editing], mustBeSeen: true,
+            coalescesRepeats: true, showsInRemainingLayer: false),
+        .importAnnotations: Frozen(
+            severity: nil, kind: .notice, tone: .caution, phases: [.editing], mustBeSeen: true,
+            coalescesRepeats: true, showsInRemainingLayer: false),
+        .runInProgressSettings: Frozen(
+            severity: nil, kind: .notice, tone: .note, phases: [.detecting, .redacting, .verifying], mustBeSeen: false,
+            coalescesRepeats: true, showsInRemainingLayer: false),
     ]
 
-    /// The 29 names, in the table's order: what `--showToast=<name>` takes.
+    /// The 32 names, in the table's order: what `--showToast=<name>` takes
+    /// (the hook's post of a notice drawn in its place stops a debug build).
     nonisolated static let messageNames: [String] = [
         "textLayerDetected", "imagePagesNote", "encryptedSource", "droppedFilesFirstOpened",
         "unsupportedFormatDropped", "importBlockedDuringRun", "importBlockedOnThisScreen", "outputReclaimed",
@@ -130,7 +141,7 @@ struct MessageCatalogTests {
         "selectionLimit", "nearbyMatch", "marked", "searchClosedCleared", "searchRerunCleared",
         "modeSwitchCleared", "modeSwitchClearedAllApplied", "recallCleared", "searchResultsTruncated",
         "savedRegexSaved", "detectionDegraded", "customTermTimeout", "scannedRegionsNotAnalyzed",
-        "searchPreparationFailed",
+        "searchPreparationFailed", "pausedRun", "importAnnotations", "runInProgressSettings",
     ]
 
     /// The shipped sentence for a message: the constant or builder beside
@@ -198,14 +209,22 @@ struct MessageCatalogTests {
             return "Some pages hold scanned regions that weren't text-analyzed because OCR is off. Turn on Include OCR Pages to search scanned content."
         case .searchPreparationFailed:
             return "Could not prepare the document for search. Try again."
+        case .pausedRun:
+            return "Processing was paused. Your drawn regions are preserved."
+        case .importAnnotations(let annotationCount, let filledFormFieldCount, let carries):
+            return ImportAnnotationNoticeBanner.noticeMessage(
+                annotationCount: annotationCount, filledFormFieldCount: filledFormFieldCount,
+                carriesFormDataOrAttachments: carries)
+        case .runInProgressSettings:
+            return SettingsView.runInProgressTitle
         }
     }
 
     // MARK: - The table
 
-    @Test("Every message has an example, and there are 29")
+    @Test("Every message has an example, and there are 32")
     func everyMessageHasAnExample() {
-        #expect(MessageID.Name.allCases.count == 29)
+        #expect(MessageID.Name.allCases.count == 32)
         #expect(Set(MessageID.examples.map(\.name)) == Set(MessageID.Name.allCases))
         for name in MessageID.Name.allCases {
             #expect(MessageID.example(named: name).name == name)
@@ -214,7 +233,7 @@ struct MessageCatalogTests {
 
     @Test("Each row has the kind, tone, today's severity, phases and must-be-seen of the frozen table")
     func rowsMatchTheFrozenTable() {
-        #expect(Self.frozen.count == 29)
+        #expect(Self.frozen.count == 32)
         for id in MessageID.examples {
             guard let want = Self.frozen[id.name] else {
                 Issue.record("\(id.name) is not in the frozen table")
@@ -233,22 +252,23 @@ struct MessageCatalogTests {
         #expect(rows.filter { $0.todaySeverity == .info }.count == 12)
         #expect(rows.filter { $0.todaySeverity == .warning }.count == 14)
         #expect(rows.filter { $0.todaySeverity == .success }.count == 3)
+        #expect(rows.filter { $0.todaySeverity == nil }.count == 3)
         #expect(rows.filter { $0.kind == .receipt }.count == 21)
-        #expect(rows.filter { $0.kind == .notice }.count == 8)
-        #expect(rows.filter { $0.tone == .caution }.count == 20)
+        #expect(rows.filter { $0.kind == .notice }.count == 11)
+        #expect(rows.filter { $0.tone == .caution }.count == 22)
         #expect(rows.filter { $0.tone == .done }.count == 4)
-        #expect(rows.filter { $0.tone == .note }.count == 3)
+        #expect(rows.filter { $0.tone == .note }.count == 4)
         #expect(rows.filter { $0.tone == .stop }.count == 2)
-        #expect(rows.filter(\.mustBeSeen).count == 18)
+        #expect(rows.filter(\.mustBeSeen).count == 20)
         #expect(rows.filter(\.showsInRemainingLayer).count == 5)
     }
 
-    @Test("Every row is either one message while it is up or a new event each time, and the split is 19 and 10")
+    @Test("Every row is either one message while it is up or a new event each time, and the split is 22 and 10")
     func everyRowCoalescesOrNot() {
         let rows = MessageID.Name.allCases.map { (name: $0, row: MessageCatalog.row(for: .example(named: $0))) }
         let oneWhileUp = Set(rows.filter { $0.row.coalescesRepeats }.map { $0.name })
         let newEachTime = Set(rows.filter { !$0.row.coalescesRepeats }.map { $0.name })
-        #expect(oneWhileUp.count == 19)
+        #expect(oneWhileUp.count == 22)
         #expect(newEachTime.count == 10)
         // Each post of these reports one thing the person did or lost.
         #expect(newEachTime == [
@@ -278,6 +298,7 @@ struct MessageCatalogTests {
             .nearbyMatch: EditorAnnouncementObservers.nudgeToastActionLabel,
             .modeSwitchCleared: SearchAndRedactSheet.discardUndoActionLabel,
             .modeSwitchClearedAllApplied: SearchAndRedactSheet.discardUndoActionLabel,
+            .pausedRun: "Restart",
         ]
         for id in MessageID.examples {
             let row = MessageCatalog.row(for: id)
@@ -358,7 +379,8 @@ struct MessageCatalogTests {
 
     @Test("Posting a row shows today's toast")
     func postingShowsTodaysToast() {
-        for id in MessageID.examples {
+        // A notice drawn in its place has no severity and is never posted.
+        for id in MessageID.examples where MessageCatalog.row(for: id).todaySeverity != nil {
             let row = MessageCatalog.row(for: id)
             let queue = ToastQueueManager()
             var action: (@MainActor () -> Void)?
@@ -426,6 +448,34 @@ struct MessageCatalogTests {
         #expect(builders.isEmpty, "a toast built outside the queue: \(builders)")
     }
 
+    @Test("Messages drawn in their place have no call site that posts them")
+    func drawnInPlaceIsNeverPosted() throws {
+        let sources = URL(fileURLWithPath: "\(#filePath)")
+            .deletingLastPathComponent()   // Tests/ResectaAppTests
+            .deletingLastPathComponent()   // Tests
+            .deletingLastPathComponent()   // <repo root>
+            .appendingPathComponent("Sources/ResectaApp")
+        let files = try #require(FileManager.default.enumerator(atPath: sources.path))
+            .compactMap { $0 as? String }
+            .filter { $0.hasSuffix(".swift") }
+        #expect(files.count > 100, "the source tree was not found")
+        let drawnInPlace = MessageID.Name.allCases
+            .filter { MessageCatalog.row(for: .example(named: $0)).todaySeverity == nil }
+        #expect(Set(drawnInPlace) == [.pausedRun, .importAnnotations, .runInProgressSettings])
+        var posts: [String] = []
+        for file in files {
+            let text = try String(contentsOf: sources.appendingPathComponent(file), encoding: .utf8)
+            for (index, line) in text.components(separatedBy: "\n").enumerated() {
+                let code = line.trimmingCharacters(in: .whitespaces)
+                if code.hasPrefix("//") { continue }
+                for name in drawnInPlace where code.contains(".post(.\(name.rawValue)") {
+                    posts.append("\(file):\(index + 1)")
+                }
+            }
+        }
+        #expect(posts.isEmpty, "a notice drawn in its place is posted: \(posts)")
+    }
+
     // MARK: - The DEBUG hook
 
     @Test("Each message name parses from --showToast=", arguments: MessageCatalogTests.messageNames)
@@ -438,9 +488,9 @@ struct MessageCatalogTests {
         #expect(MessageID.example(named: parsed).name == parsed)
     }
 
-    @Test("The hook takes the table's 29 names")
+    @Test("The hook takes the table's 32 names")
     func hookTakesEveryName() {
-        #expect(Self.messageNames.count == 29)
+        #expect(Self.messageNames.count == 32)
         #expect(Set(Self.messageNames) == Set(MessageID.Name.allCases.map(\.rawValue)))
     }
 }

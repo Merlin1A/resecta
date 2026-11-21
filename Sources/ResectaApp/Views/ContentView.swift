@@ -94,7 +94,7 @@ struct ContentView: View {
         .messageHost(toastManager, place: .root)
         .messageLayer(toastManager, role: .root)
         // Cancel pipeline on .background.
-        // wasPausedByBackground stays true — user dismisses via InlineWarningBanner.
+        // wasPausedByBackground stays true — the person closes the paused notice.
         // The .inactive/.active obscure-and-reveal flip lives at the
         // WindowGroup root (see ResectaApp.swift). This handler only owns
         // the cancellation side effect.
@@ -105,7 +105,7 @@ struct ContentView: View {
                 Self.cancelForBackground(documentState: ws.documentState, redactionState: ws.redactionState)
             }
             // Do NOT clear wasPausedByBackground on .active here.
-            // The InlineWarningBanner in DocumentEditorView handles dismissal.
+            // The paused notice in the editor's band handles its closing.
         }
         // Drain the toast queue on every workspace switch.
         // Workspace tear-down (AppCoordinator.tearDownCurrentWorkspace)

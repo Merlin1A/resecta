@@ -6,8 +6,7 @@ import SwiftUI
 // Pins the VoiceOver labels, hints, and values added by the
 // Wave 1 accessibility sweep.
 // The strings are exposed as `static` constants on each view so they can
-// be unit-tested without rendering, mirroring the contract for
-// `InlineWarningBanner.lineLimit(for:)`.
+// be unit-tested without rendering.
 
 @Suite("Accessibility labels and hints")
 struct AccessibilityLabelTests {
