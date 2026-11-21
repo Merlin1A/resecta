@@ -9,12 +9,13 @@
 # runner without a build. The categories are the default setup's
 # (`/language:<language>`) and the query suite is the default one. Runs on
 # pull requests to main, on every push to main (the baseline a pull
-# request's results are compared with) and weekly; about one macOS job per
+# request's results are compared with), weekly and by hand; about one macOS job per
 # pull request. An analysis from this workflow is rejected while the
 # repository's CodeQL default setup is enabled (Settings → Code security).
 name: codeql
 
 on:
+  workflow_dispatch:
   pull_request:
     branches: [main]
   push:
