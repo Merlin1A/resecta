@@ -120,6 +120,12 @@ nonisolated final class ReceiptPlacementUITests: XCTestCase {
         app.launch()
         let warning = labelled("Search results truncated")
         XCTAssertTrue(warning.waitForExistence(timeout: 45), "The truncation warning never showed.")
+        // It slides in first. A receipt stays in the layer that drew it, so
+        // one drawn under the sheet never becomes hittable.
+        let deadline = Date().addingTimeInterval(5)
+        while !warning.isHittable, Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.25)
+        }
         XCTAssertTrue(warning.isHittable, "The warning is drawn under the sheet.")
         let footer = app.buttons["footerSelectAllButton"].firstMatch
         XCTAssertTrue(footer.waitForExistence(timeout: 5), "Search's footer is missing.")
