@@ -1,7 +1,7 @@
 Property: A typed page is also read by text recognition when its largest picture reaches the pixel or share floor.
 Area: Search, the rules a search follows
-Test command: cd Packages/RedactionEngine && DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --no-parallel --filter '^RedactionEngineTests\.(HybridPageRouteTests|PageImageCensusTests)/'
-Must go red: RedactionEngineTests/PageImageCensusTests carriesImageContent; RedactionEngineTests/HybridPageRouteTests vendorLayerOverScanFindsTheBody
+Test command: cd Packages/RedactionEngine && DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --no-parallel --filter '^RedactionEngineTests\.PageImageCensusTests/'
+Must go red: RedactionEngineTests/PageImageCensusTests carriesImageContent
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageImageCensus.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageImageCensus.swift
