@@ -157,6 +157,9 @@ struct ResectaApp: App {
         // (/Rotate 90), one word on it (Scripts/generate_uitest_turned.py):
         // where boxes are drawn on a turned page.
         "--turnedDoc": "uitest_turned",
+        // One page carrying one note annotation and no popup
+        // (Scripts/generate_uitest_annotated.py): the import notice.
+        "--annotatedDoc": "uitest_annotated",
     ]
 
     /// The `--loadTestDocument` fixture name for a launch-argument list.
