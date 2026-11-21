@@ -12,7 +12,7 @@ diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RedactionRe
      /// `placedFromPageText` is false: setting it true there leaves it false.
      public var textAnchored: Bool {
 -        didSet { if textAnchored && !placedFromPageText { textAnchored = false } }
-+
++        didSet { }
      }
      /// Placed from a match in the page's own text layer: set once where the
      /// region is made and never changed. A move or a resize leaves it as it
