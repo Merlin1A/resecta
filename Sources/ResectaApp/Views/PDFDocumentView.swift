@@ -72,6 +72,16 @@ struct PDFDocumentView: UIViewRepresentable {
         return pdfView
     }
 
+    /// A shown-frame normalized rect (a region's) in `page`'s own space, for
+    /// scrolling to it: the page's bounds are the stored page, so the rect
+    /// is turned back first (`CanvasTurn`).
+    static func pageRect(forShown normalized: CGRect, on page: PDFPage, box: PDFDisplayBox) -> CGRect {
+        normalizedToPDFPageCoordinates(
+            CanvasTurn.stored(fromShown: normalized, rotation: page.rotation),
+            pageRect: page.bounds(for: box)
+        )
+    }
+
     func updateUIView(_ pdfView: FitFlooredPDFView, context: Context) {
         let coordinator = context.coordinator
 
@@ -97,7 +107,8 @@ struct PDFDocumentView: UIViewRepresentable {
         // through the engine's canonical
         // `normalizedToPDFPageCoordinates` — the same mapping the burn
         // path uses, so the scroll target and the drawn redaction
-        // agree by construction.
+        // agree by construction. The page's bounds are the stored page,
+        // so the shown-frame rect is turned back first (`CanvasTurn`).
         if let target = documentState.pendingCanvasScrollTarget,
            coordinator.lastHandledCanvasScrollToken != target.token {
             coordinator.lastHandledCanvasScrollToken = target.token
@@ -111,10 +122,7 @@ struct PDFDocumentView: UIViewRepresentable {
             if target.zoom == .readability,
                let doc = pdfView.document,
                let page = doc.page(at: target.pageIndex) {
-                let pageRect = normalizedToPDFPageCoordinates(
-                    target.normalizedRect,
-                    pageRect: page.bounds(for: pdfView.displayBox)
-                )
+                let pageRect = Self.pageRect(forShown: target.normalizedRect, on: page, box: pdfView.displayBox)
                 pdfView.frameForReadability(
                     rectInPage: pageRect, on: page, anchor: target.anchor)
             } else if let doc = pdfView.document,
@@ -123,10 +131,7 @@ struct PDFDocumentView: UIViewRepresentable {
                    scaleFactor: pdfView.scaleFactor,
                    fitScaleFactor: pdfView.scaleFactorForSizeToFit
                ) {
-                let pageRect = normalizedToPDFPageCoordinates(
-                    target.normalizedRect,
-                    pageRect: page.bounds(for: pdfView.displayBox)
-                )
+                let pageRect = Self.pageRect(forShown: target.normalizedRect, on: page, box: pdfView.displayBox)
                 pdfView.go(to: pageRect, on: page)
             }
         }

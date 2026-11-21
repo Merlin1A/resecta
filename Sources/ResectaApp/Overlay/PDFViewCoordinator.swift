@@ -168,6 +168,7 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
 
         let overlay = RedactionOverlayView()
         overlay.pageIndex = pageIndex
+        overlay.pageRotation = page.rotation
         overlay.coordinator = self
         overlay.isUserInteractionEnabled = isDrawingEnabled
         overlay.isDrawingMode = isDrawingMode

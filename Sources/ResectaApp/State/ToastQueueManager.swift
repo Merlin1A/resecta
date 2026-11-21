@@ -177,8 +177,10 @@ final class ToastQueueManager {
     private struct Entry: Equatable {
         var item: ToastItem
         let postedAt: ContinuousClock.Instant
-        /// The layer it belongs to; nil while no layer is registered, and
-        /// for a waiting one, until it is shown in the front layer.
+        /// The layer it belongs to: the one named at its post (a run's sheet,
+        /// or the remaining layer for a message about leaving one), else nil
+        /// until it is shown in the front layer; nil again when its layer
+        /// leaves before it was shown. Nil while no layer is registered.
         var layer: UUID?
         /// Nil until it is first shown.
         var clock: ReceiptClock?
@@ -430,8 +432,10 @@ final class ToastQueueManager {
     // MARK: - Layers
 
     /// The layer registered last is in front. A receipt belongs to the
-    /// layer in front when it is shown and never moves to another; a layer
-    /// registered over it ends a plain one and pauses one that must be seen.
+    /// layer named at its post, else to the layer in front when it is
+    /// shown, and moves only when that layer leaves before it was shown; a
+    /// layer registered over it ends a plain one and pauses one that must
+    /// be seen.
     /// A layer that only holds draws nothing: receipts wait under it.
     func registerLayer(_ layer: UUID, role: MessageLayerRole) {
         guard !layers.contains(where: { $0.id == layer }) else { return }
@@ -457,7 +461,9 @@ final class ToastQueueManager {
         reconcile()
     }
 
-    /// The layer is gone: its receipts, shown, paused or waiting, end.
+    /// The layer is gone: its receipts end, shown, paused or waiting, except
+    /// one that must be seen and was never shown, which is handed on and
+    /// takes the front when shown.
     func unregisterLayer(_ layer: UUID) {
         guard let index = layers.firstIndex(where: { $0.id == layer }) else { return }
         layers.remove(at: index)
@@ -467,7 +473,6 @@ final class ToastQueueManager {
         }
         // What is left of that layer's messages is handed on.
         for index in waiting.indices where waiting[index].layer == layer { waiting[index].layer = nil }
-        if current?.layer == layer { current?.layer = nil }
         reconcile()
     }
 

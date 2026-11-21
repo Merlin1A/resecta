@@ -153,6 +153,10 @@ struct ResectaApp: App {
         // filled text field (Scripts/generate_uitest_annotated_form.py):
         // the import notice, the covered text under a box, and its confirm.
         "--annotatedFormDoc": "uitest_annotated_form",
+        // One Letter page stored upright and shown turned a quarter
+        // (/Rotate 90), one word on it (Scripts/generate_uitest_turned.py):
+        // where boxes are drawn on a turned page.
+        "--turnedDoc": "uitest_turned",
     ]
 
     /// The `--loadTestDocument` fixture name for a launch-argument list.
