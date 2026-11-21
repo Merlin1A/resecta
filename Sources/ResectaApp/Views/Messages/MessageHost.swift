@@ -122,7 +122,8 @@ struct MessageHostModifier: ViewModifier {
                                 standard: .asymmetric(
                                     insertion: .move(edge: .bottom).combined(with: .opacity),
                                     removal: .opacity),
-                                reduceMotion: reduceMotion))
+                                reduceMotion: reduceMotion)
+                                .combined(with: .leavingTakesNoTouches))
                             .id(item.id)
                     }
                 }
@@ -162,6 +163,23 @@ struct MessageHostModifier: ViewModifier {
         return MessageSizing.drawSize(person: dynamicTypeSize, limit: MessageSizing.limit(space: readableSpace)) {
             ReceiptView.height(of: item, size: $0, width: hostSize.width)
         }
+    }
+}
+
+/// A receipt that is leaving takes no touches: while it fades, a tap or
+/// a drag meant for what lies under it reaches that view instead.
+private struct TakesTouches: ViewModifier {
+    let takes: Bool
+    func body(content: Content) -> some View {
+        content.allowsHitTesting(takes)
+    }
+}
+
+private extension AnyTransition {
+    static var leavingTakesNoTouches: AnyTransition {
+        .asymmetric(
+            insertion: .identity,
+            removal: .modifier(active: TakesTouches(takes: false), identity: TakesTouches(takes: true)))
     }
 }
 
