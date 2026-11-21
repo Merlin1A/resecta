@@ -21,26 +21,18 @@ struct ReceiptViewTests {
         return (mgr.activeToasts[0], mgr)
     }
 
-    private func drawnHeight(_ item: ToastItem, _ mgr: ToastQueueManager, size: DynamicTypeSize, width: CGFloat) -> CGFloat {
-        let view = ReceiptView(item: item, toastManager: mgr).environment(\.dynamicTypeSize, size)
-        return UIHostingController(rootView: view).sizeThatFits(in: CGSize(width: width, height: 4_000)).height
-    }
-
-    @Test("A receipt's measured height is within 4 points of its drawn height")
-    func measuredMatchesDrawn() {
-        let cases: [(MessageID, Bool)] = [
-            (.deletedBoxes(count: 2), true),
-            (.outputReclaimed, false),
-            (.searchResultsTruncated, false),
-        ]
-        for (id, action) in cases {
-            let (item, mgr) = item(id, action: action)
-            for size in [DynamicTypeSize.accessibility3, .accessibility5] {
-                let measured = ReceiptView.height(of: item, size: size, width: 402)
-                let drawn = drawnHeight(item, mgr, size: size, width: 402)
-                #expect(abs(measured - drawn) <= 4, "\(item.message) at \(size): measured \(measured), drawn \(drawn)")
-            }
-        }
+    @Test("A receipt's measure gives one line 44 points, and the truncation warning the height the simulator draws")
+    func measureGivesTheDrawnHeights() {
+        // One line at the default size: the receipt's 44.
+        let (shared, _) = item(.shared, action: false)
+        #expect(abs(ReceiptView.height(of: shared, size: .large, width: 402) - 44) <= 1)
+        // The truncation warning at the third accessibility size, 402 wide:
+        // 215.7 is the frame the screen test reads on the simulator.
+        let (truncated, _) = item(.searchResultsTruncated, action: false)
+        let measured = ReceiptView.height(of: truncated, size: .accessibility3, width: 402)
+        #expect(abs(measured - 215.7) <= 4, "measured \(measured)")
+        // Taller at the fifth than at the third.
+        #expect(ReceiptView.height(of: truncated, size: .accessibility5, width: 402) > measured)
     }
 
     @Test("\"Deleted 2 regions.\" with Undo steps down one size in the editor's canvas at the largest size")

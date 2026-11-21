@@ -110,6 +110,25 @@ struct MessageHostTests {
         #expect(Self.count(share, ["toastManager.setHold(attempt, false)"]) == 2, "released by the share's end and by its abandon")
     }
 
+    @Test("The source scans leave comment lines out")
+    func scansLeaveCommentLinesOut() {
+        // The two lines the dialog scan was first written against, as they
+        // read when they were comments, and the same calls as code.
+        let commented = [
+            "    // .alert(\"Import Error\", isPresented: $showImportError) {",
+            "\t\t// .alert(\"Redaction Applied\", isPresented: $showApplied) {",
+        ]
+        let code = [
+            "        .alert(\"Import Error\", isPresented: $showImportError) {",
+            "        .holdsMessages(toastManager, while: showImportError)",
+        ]
+        #expect(commented.allSatisfy(Self.isComment))
+        #expect(!code.contains(where: Self.isComment))
+        let kept = (commented + code).filter { !Self.isComment($0) }
+        #expect(Self.count(kept, [".alert("]) == 1)
+        #expect(Self.count(kept, [".holdsMessages("]) == 1)
+    }
+
     /// Per file, the announcements posted past the queue: each a line that
     /// names `notification: .announcement` or builds an
     /// `AccessibilityNotification.Announcement(`. The queue's own is the one

@@ -91,6 +91,17 @@ nonisolated final class ReceiptPlacementUITests: XCTestCase {
         search.tap()
         XCTAssertTrue(app.textFields["Search text"].waitForExistence(timeout: 10), "Search never opened.")
         XCTAssertFalse(element("toastMessageWithAction").exists, "The editor's Undo must not be drawn over Search.")
+        // It must be seen, so Search over it pauses it: closing Search
+        // brings it back, and the toolbar's Undo still undoes.
+        let close = app.buttons["searchDismissButton"].firstMatch
+        XCTAssertTrue(close.waitForExistence(timeout: 5), "Search's close is missing.")
+        close.tap()
+        XCTAssertTrue(app.buttons["Undo action"].firstMatch.waitForExistence(timeout: 10),
+                      "The paused Undo receipt did not come back after Search.")
+        let toolbarUndo = app.buttons["undoButton"].firstMatch
+        XCTAssertTrue(toolbarUndo.waitForExistence(timeout: 5), "The toolbar's Undo is missing.")
+        toolbarUndo.tap()
+        XCTAssertTrue(waitForLabel(counter, containing: "2 regions"), "The toolbar's Undo did not undo the delete.")
     }
 
     // 2
@@ -180,9 +191,8 @@ nonisolated final class ReceiptPlacementUITests: XCTestCase {
         let receipt = labelled("Marked")
         XCTAssertTrue(receipt.waitForExistence(timeout: 10), "Apply showed no receipt.")
         let keyboard = app.keyboards.firstMatch
-        if keyboard.exists {
-            XCTAssertLessThanOrEqual(receipt.frame.maxY, keyboard.frame.minY, "The receipt is under the keyboard.")
-        }
+        XCTAssertTrue(keyboard.exists, "The keyboard went away after Apply, so its place was not read.")
+        XCTAssertLessThanOrEqual(receipt.frame.maxY, keyboard.frame.minY, "The receipt is under the keyboard.")
         XCTAssertTrue(receipt.isHittable, "The receipt is not drawn in Search.")
     }
 
