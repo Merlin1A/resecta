@@ -5,7 +5,7 @@ Must go red: RedactionEngineTests/FillCoverageBasisTests contentBasisSitsBetween
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
-index bf781ea2..e1c34028 100644
+index 06cd4910..fd240149 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
 @@ -113,7 +113,7 @@ extension PageRasterizer {

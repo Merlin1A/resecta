@@ -5,7 +5,7 @@ Must go red: RedactionEngineTests/FillCoverageBasisTests rasterizedPageFarEdgeCo
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
-index bf781ea2..5cf4324b 100644
+index 06cd4910..e8696d8c 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
 @@ -128,7 +128,7 @@ extension PageRasterizer {
