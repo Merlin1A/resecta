@@ -247,9 +247,12 @@ final class ToastQueueManager {
     /// the action only while it holds, and `revalidate()` ends the message
     /// once it does not. No `event` means a new one, except for a row that
     /// coalesces repeats: the same row with the same words already shown,
-    /// paused or waiting is that message, and nothing restarts.
+    /// paused or waiting is that message, and nothing restarts. With
+    /// `runLayer`, the layer whose run raised the message, the message
+    /// belongs to that layer while it is registered (`layerAtPost`).
     @discardableResult
-    func post(_ id: MessageID, event: MessageEvent? = nil, action: (@MainActor () -> Void)? = nil,
+    func post(_ id: MessageID, event: MessageEvent? = nil, runLayer: UUID? = nil,
+              action: (@MainActor () -> Void)? = nil,
               stillValid: (@MainActor () -> Bool)? = nil) -> MessageEvent {
         let row = MessageCatalog.row(for: id)
         if event == nil, row.coalescesRepeats,
@@ -266,7 +269,8 @@ final class ToastQueueManager {
             tone: row.tone, event: event ?? MessageEvent(), messageID: id,
             mustBeSeen: row.mustBeSeen, stillValid: stillValid,
             phases: row.phases, actionChangesState: row.actionChangesState)
-        admit(item, layer: row.showsInRemainingLayer ? ReceiptRules.remainingLayer(in: layers) : nil)
+        admit(item, layer: ReceiptRules.layerAtPost(
+            named: runLayer, showsInRemainingLayer: row.showsInRemainingLayer, in: layers))
         return item.event
     }
 

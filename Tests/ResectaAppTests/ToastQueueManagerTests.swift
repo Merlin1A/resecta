@@ -327,6 +327,38 @@ struct ToastQueueManagerTests {
         #expect(mgr.receiptClock(of: item.id)?.remaining(at: clock.now) == 4.0, "the time left is kept")
     }
 
+    @Test("A warning a run raises belongs to the sheet that ran it: raised under the saved list, it waits and is drawn on Search once the list is gone")
+    func runWarningBelongsToItsSheet() throws {
+        let clock = QueueTestClock()
+        let mgr = queue(clock)
+        let root = UUID(), search = UUID(), saved = UUID()
+        mgr.registerLayer(root, role: .root)
+        mgr.registerLayer(search, role: .draws)
+        mgr.registerLayer(saved, role: .draws)
+        // A recall closes the saved list and starts Search's run at once:
+        // the list is still in front when the run's first warning is posted.
+        mgr.post(.scannedRegionsNotAnalyzed, runLayer: search)
+        #expect(mgr.receipt(drawnBy: saved) == nil, "not drawn in the list that is leaving")
+        #expect(mgr.activeToasts.isEmpty)
+        #expect(mgr.waitingToasts.count == 1)
+        clock.advance(0.4)
+        mgr.settleClocks()
+        mgr.unregisterLayer(saved)
+        let warning = try #require(mgr.activeToasts.first, "the list's leaving does not end it")
+        #expect(warning.message == MessageCatalog.row(for: .scannedRegionsNotAnalyzed).text)
+        #expect(mgr.receipt(drawnBy: search)?.id == warning.id)
+
+        // A layer named at a post that is no longer registered gives the
+        // message today's rule: the layer in front when it is shown.
+        let other = QueueTestClock()
+        let second = queue(other)
+        second.registerLayer(root, role: .root)
+        second.registerLayer(saved, role: .draws)
+        second.post(.searchResultsTruncated, runLayer: search)
+        let shown = try #require(second.activeToasts.first)
+        #expect(second.receipt(drawnBy: saved)?.id == shown.id)
+    }
+
     @Test("A sheet over a receipt ends a plain one; one that must be seen comes back for the rest of its life")
     func sheetOverAReceipt() throws {
         let clock = QueueTestClock()

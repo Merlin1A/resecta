@@ -154,6 +154,17 @@ enum ReceiptRules {
         stack.count >= 2 ? stack[stack.count - 2].id : stack.last?.id
     }
 
+    /// The layer a message belongs to from its post. A message raised by a
+    /// run belongs to the layer that ran it, named at the post, while that
+    /// layer is registered: a sheet opened over it, or leaving, does not
+    /// take the message. Else a message about leaving a layer belongs to the
+    /// remaining layer; else to none yet (it takes the front when shown).
+    static func layerAtPost(named runLayer: UUID?, showsInRemainingLayer: Bool,
+                            in stack: [MessageLayerFacts]) -> UUID? {
+        if let runLayer, stack.contains(where: { $0.id == runLayer }) { return runLayer }
+        return showsInRemainingLayer ? remainingLayer(in: stack) : nil
+    }
+
     /// Whether a receipt belonging to `layer` is drawn, or a waiting one may
     /// be shown (a waiting one that belongs to no layer yet takes the front):
     /// only while no hold is set, its layer is in front and draws, and the

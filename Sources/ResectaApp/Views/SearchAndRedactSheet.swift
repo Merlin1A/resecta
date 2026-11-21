@@ -27,6 +27,9 @@ struct SearchAndRedactSheet: View {
     @Environment(RedactionState.self) var redactionState
     @Environment(DocumentState.self) var documentState
     @Environment(ToastQueueManager.self) var toastManager
+    /// This sheet's message layer, set by its presenter's `.messageLayer`:
+    /// the warnings a run raises belong to it, whatever sheet is in front.
+    @Environment(\.messageLayerID) var messageLayerID
     @Environment(SettingsState.self) var settingsState
     @Environment(UserTermsStore.self) var userTermsStore
     @Environment(SavedRegexStore.self) var savedRegexStore
@@ -401,7 +404,7 @@ struct SearchAndRedactSheet: View {
         // Notify when results are truncated.
         .onChange(of: searchState.resultsAtCap) { _, atCap in
             if atCap {
-                toastManager.post(.searchResultsTruncated)
+                toastManager.post(.searchResultsTruncated, runLayer: messageLayerID)
             }
         }
         // Mode switch cleanup: clear stale results and mode-specific state.
