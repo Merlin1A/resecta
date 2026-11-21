@@ -19,6 +19,10 @@ struct RunRecordInfoDictionaryTests {
         let record = try #require(coord.redactionState.lastRunInputs?.record, "the run keeps its record")
         #expect(record.produced.infoDictionary == .byIndex,
                 "the record says \(String(describing: record.produced.infoDictionary))")
+        // The writer's account joins the rasterizer's, never replaces it: the
+        // same record still holds the box the run painted on page 0.
+        #expect(record.produced.paintedRectangles.count == 1,
+                "the record holds \(record.produced.paintedRectangles.count) painted boxes")
     }
 
     @Test("A literal left part-written by the rewrite, and not written again whole, promotes no output",
