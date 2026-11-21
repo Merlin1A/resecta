@@ -14,7 +14,9 @@ import PDFKit
 struct RegionCoverageCapAndCategoryTests {
 
     /// Two pages: the first holds `dense` occurrences of SEED in small type,
-    /// twenty to a line; the second holds one SEED.
+    /// twenty to a line; the second holds one SEED and a line of body text,
+    /// so the page reads as a full text layer and is searched as text, not
+    /// left for recognition (a page of under ten letters is sparse).
     static func densePageThenOne(dense: Int) -> Data {
         var lines: [String] = []
         var left = dense
@@ -24,7 +26,7 @@ struct RegionCoverageCapAndCategoryTests {
             left -= n
         }
         let first = "BT /F1 6 Tf 7 TL 20 770 Td\n" + lines.joined(separator: "\n") + "\nET"
-        let second = "BT /F1 24 Tf 72 700 Td (SEED) Tj ET"
+        let second = "BT /F1 24 Tf 72 700 Td (SEED) Tj ET\nBT /F1 12 Tf 72 600 Td (Second page body) Tj ET"
         func page(_ id: Int, contents: Int) -> PDFObject {
             PDFObject(id: id, content: """
                 << /Type /Page /Parent 2 0 R \
@@ -66,7 +68,9 @@ struct RegionCoverageCapAndCategoryTests {
         #expect(atCap.unreadPages == [1], "the page past the cap is unread; got \(atCap.unreadPages)")
         #expect(atCap.shortfalls.isEmpty, "\(atCap.shortfalls)")
 
-        let under = try #require(PDFDocument(data: Self.densePageThenOne(dense: DocumentSearcher.maxResults - 1)))
+        // The first page's matches and the second page's one come to one
+        // short of the cap, so the re-run reads both pages whole.
+        let under = try #require(PDFDocument(data: Self.densePageThenOne(dense: DocumentSearcher.maxResults - 2)))
         let compared = try await RegionCoverage.check(
             source: SendablePDFDocument(under), requests: [request], regions: [1: [try shortBox(on: under)]])
         #expect(compared.unreadPages.isEmpty, "got \(compared.unreadPages)")
