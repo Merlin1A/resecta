@@ -1,0 +1,19 @@
+Property: A box drawn, moved or resized on a turned page is stored in the page as shown, not as stored.
+Area: canvas overlay (turned pages)
+Test command: xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/CanvasTurnedPageTests
+Must go red: ResectaAppTests/CanvasTurnedPageTests dragIsStoredInTheShownFrame; ResectaAppTests/CanvasTurnedPageTests dragMoveIsStoredWhereDropped; ResectaAppTests/CanvasTurnedPageTests resizeFollowsTheShownEdge
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Coordinates.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Coordinates.swift
+index fbb98e5c..bbfd8cfe 100644
+--- a/Sources/ResectaApp/Overlay/RedactionOverlayView+Coordinates.swift
++++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+Coordinates.swift
+@@ -21,7 +21,7 @@ extension RedactionOverlayView {
+             width: rect.width / w,
+             height: rect.height / h
+         )
+-        return CanvasTurn.shown(fromStored: stored, rotation: pageRotation)
++        return stored
+     }
+ 
+     /// Convert normalized PDF coordinates back to overlay-view rect.

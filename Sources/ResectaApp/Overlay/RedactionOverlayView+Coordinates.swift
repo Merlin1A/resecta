@@ -13,23 +13,27 @@ extension RedactionOverlayView {
         let w = bounds.width
         let h = bounds.height
         guard w > 0, h > 0 else { return .zero }
-        return CGRect(
+        // The bounds are the STORED page (PDFKit turns this view with the
+        // page); a region lives in the SHOWN frame (`CanvasTurn`).
+        let stored = CGRect(
             x: rect.minX / w,
             y: 1.0 - (rect.maxY / h),   // Flip Y: UIKit top-left -> PDF bottom-left
             width: rect.width / w,
             height: rect.height / h
         )
+        return CanvasTurn.shown(fromStored: stored, rotation: pageRotation)
     }
 
     /// Convert normalized PDF coordinates back to overlay-view rect.
     func pdfNormalizedToOverlay(_ normalized: CGRect) -> CGRect {
         let w = bounds.width
         let h = bounds.height
+        let stored = CanvasTurn.stored(fromShown: normalized, rotation: pageRotation)
         return CGRect(
-            x: normalized.minX * w,
-            y: (1.0 - normalized.minY - normalized.height) * h,  // Flip Y back
-            width: normalized.width * w,
-            height: normalized.height * h
+            x: stored.minX * w,
+            y: (1.0 - stored.minY - stored.height) * h,  // Flip Y back
+            width: stored.width * w,
+            height: stored.height * h
         )
     }
 

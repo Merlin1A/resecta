@@ -12,6 +12,9 @@ import RedactionEngine
 class RedactionOverlayView: UIView {
 
     var pageIndex: Int = 0
+    /// The page's `/Rotate`, set when PDFKit asks for this overlay; the
+    /// app never turns a page, so it holds for the overlay's life.
+    var pageRotation: Int = 0
     weak var coordinator: PDFViewCoordinator?
 
     /// When true, dragging on empty space creates new regions.

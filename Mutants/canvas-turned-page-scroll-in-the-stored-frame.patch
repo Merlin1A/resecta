@@ -1,0 +1,19 @@
+Property: The scroll target for a box on a turned page is the box's own place on the page.
+Area: canvas overlay (turned pages)
+Test command: xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/CanvasTurnedPageTests
+Must go red: ResectaAppTests/CanvasTurnedPageTests scrollTargetIsTheBoxesPlace
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/PDFDocumentView.swift b/Sources/ResectaApp/Views/PDFDocumentView.swift
+index f014d541..733c72f8 100644
+--- a/Sources/ResectaApp/Views/PDFDocumentView.swift
++++ b/Sources/ResectaApp/Views/PDFDocumentView.swift
+@@ -77,7 +77,7 @@ struct PDFDocumentView: UIViewRepresentable {
+     /// is turned back first (`CanvasTurn`).
+     static func pageRect(forShown normalized: CGRect, on page: PDFPage, box: PDFDisplayBox) -> CGRect {
+         normalizedToPDFPageCoordinates(
+-            CanvasTurn.stored(fromShown: normalized, rotation: page.rotation),
++            normalized,
+             pageRect: page.bounds(for: box)
+         )
+     }
