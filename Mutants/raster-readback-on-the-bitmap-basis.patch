@@ -1,14 +1,14 @@
-Property: A page's fills are read back on the basis they were painted on.
-Area: the raster's content basis (fills, readback, ink growth and the hidden-text ink test)
-Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/FillCoverageBasisTests (or on the host: cd Packages/RedactionEngine && swift test --no-parallel --filter FillCoverageBasisTests)
+Property: A page on the region path reads each fill back on the basis it was painted on.
+Area: the region path's readback (PageRasterizer.readBack)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter FillCoverageBasisTests
 Must go red: RedactionEngineTests/FillCoverageBasisTests rasterizedPageReadsBackItsFill [height 302.626 pt at 300 DPI, bar from 280.5 to 295.4]
 Apply in a scratch worktree with `git apply`; discard after.
 
-diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift
-index 93fc474c..e22d12a5 100644
---- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift
-+++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift
-@@ -472,7 +472,7 @@ public final class PageRasterizer: @unchecked Sendable {
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
+index 06cd4910..e5670b75 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
+@@ -144,7 +144,7 @@ extension PageRasterizer {
          // 6. Verify fills, on the basis they were painted on. 256-row band
          // cancellation checks happen inside; a thrown CancellationError propagates here.
          for region in page.regions {

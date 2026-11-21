@@ -152,7 +152,7 @@ struct PipelineCoordinatorRunSettingsTests {
 
         let pages = coord.buildPDFPageData(
             effectiveMode: .secureRasterization,
-            runSettings: snapshot)
+            runSettings: snapshot, record: nil)
         let first = pages.first
 
         #expect(first?.fillColor == .white,
@@ -172,7 +172,7 @@ struct PipelineCoordinatorRunSettingsTests {
         coord.settingsState.fillColor = .white
         coord.settingsState.exportDPI = 200
 
-        let pages = coord.buildPDFPageData(effectiveMode: .secureRasterization)
+        let pages = coord.buildPDFPageData(effectiveMode: .secureRasterization, record: nil)
         #expect(pages.first?.fillColor == .white)
         #expect(pages.first?.targetDPI == 200)
     }

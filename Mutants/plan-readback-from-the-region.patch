@@ -1,0 +1,20 @@
+Property: The readback reads exactly the rectangles the plan's boxes were filled as, block ring included.
+Area: the plan's readback (PageRasterizer.paintPlan)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter PlanPaintTests
+Must go red: RedactionEngineTests/PlanPaintTests readbackReadsTheBlockRing
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
+index 06cd4910..2f6a57ad 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
+@@ -233,7 +233,8 @@ extension PageRasterizer {
+         #endif
+ 
+         // 6. The readback, of the rectangles filled.
+-        let filled = rects.map(\.rect)
++        let filled = page.regions.filter { painted.contains($0.id) }
++            .map { normalizedToFillPixels($0.normalizedRect, content: content).intersection(bitmap) }
+             + strays.map { normalizedToFillPixels($0.normalizedRect, content: content).intersection(bitmap) }
+             + strayGrowth
+         for rect in filled where !rect.isEmpty {

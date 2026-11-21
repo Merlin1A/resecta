@@ -25,7 +25,7 @@ struct ImageImportPipelineTests {
             document: loaded.document.document, regions: [:],
             textLayerStatus: loaded.facts.textLayerStatus,
             sourceHasHiddenOCG: loaded.facts.hasHiddenOCG,
-            settings: Self.settings, effectiveMode: .searchableRedaction)
+            settings: Self.settings, effectiveMode: .searchableRedaction, record: nil)
         #expect(pages.count == 2)
         for page in pages {
             #expect(page.pipelineMode == .secureRasterization)

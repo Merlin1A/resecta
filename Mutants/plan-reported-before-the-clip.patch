@@ -1,0 +1,24 @@
+Property: The rectangle reported for a box is the one painted, clipped at the image's edge.
+Area: the plan's report (PageRasterizer.paintPlan)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter PlanPaintTests
+Must go red: RedactionEngineTests/PlanPaintTests fillsOnPixelBoxes [pastLeft]; RedactionEngineTests/PlanPaintTests fillsOnPixelBoxes [pastBottom]; RedactionEngineTests/PlanPaintTests recordBoxPastAnEdge [pastLeft]; RedactionEngineTests/PlanPaintTests recordBoxPastAnEdge [pastBottom]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
+index bf781ea2..628a61f8 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
+@@ -228,7 +228,12 @@ extension PageRasterizer {
+         }
+ 
+         var result = PlanPaint()
+-        for (box, rect) in rects { result.painted[box] = PixelPlan.PixelRect(bitmapRect: rect) }
++        for (box, rect) in rects {
++            var r = rect
++            if r.minX == 0 { r = CGRect(x: -8, y: r.minY, width: r.width + 8, height: r.height) }
++            if r.minY == 0 { r = CGRect(x: r.minX, y: -8, width: r.width, height: r.height + 8) }
++            result.painted[box] = PixelPlan.PixelRect(bitmapRect: r)
++        }
+         result.outsidePlan = Set(strays.map(\.id))
+         return result
+     }

@@ -90,6 +90,28 @@ struct RunEntryPendingRunGateTests {
         }
     }
 
+    @Test("Source pin: the run hands its confirmed record to the page builder, so the producer paints the record's boxes")
+    func runHandsTheRecordToThePageBuilder() throws {
+        let source = try loadRepoFile("Sources/ResectaApp/State/PipelineRunner.swift")
+        let start = try #require(source.range(of: "static func captureRunEntry("))
+        let body = source[start.upperBound...]
+        let end = try #require(body.range(of: "return RunEntry("))
+        let function = body[..<end.lowerBound]
+        let confirmed = try #require(function.range(of: "let confirmed = RunInputs.confirmedRecord("))
+        let call = try #require(function.range(of: "coordinator.buildPDFPageData("))
+        #expect(confirmed.lowerBound < call.lowerBound, "the record is made before the pages")
+        let args = try #require(function[call.upperBound...].range(of: ")"))
+        #expect(function[call.upperBound..<args.lowerBound].contains("record: confirmed"),
+                "the pages carry the run's record (PipelineRunner's one page-builder call)")
+        // No default: a caller that leaves the record out does not compile.
+        let coordinator = try loadRepoFile("Sources/ResectaApp/State/PipelineCoordinator.swift")
+        #expect(coordinator.contains("record: RunRecord.Confirmed?\n    ) -> [PDFPageData]"),
+                "buildPDFPageData's record has no default")
+        let inputs = try loadRepoFile("Sources/ResectaApp/State/RunInputs.swift")
+        #expect(inputs.contains("record: RunRecord.Confirmed?\n    ) -> [PDFPageData]"),
+                "RunInputs.pageData's record has no default")
+    }
+
     @Test("Source pin: the capture is awaited first; the snapshot that follows, and the run up to `.redacting`, do not suspend")
     func captureFirstThenNoSuspension() throws {
         let source = try loadRepoFile("Sources/ResectaApp/State/PipelineRunner.swift")

@@ -64,7 +64,7 @@ struct ApplyPhaseMemoryStressTests {
         // residency bound 2*bound+1 ≤ 5 cannot false-red on a many-core host.
         coord.parallelismOverride = 2
 
-        let pageData = coord.buildPDFPageData(effectiveMode: .secureRasterization)
+        let pageData = coord.buildPDFPageData(effectiveMode: .secureRasterization, record: nil)
         #expect(pageData.count == pageCount)
 
         // Real reconstructor so the callback exercises the true append path.
@@ -112,7 +112,7 @@ struct ApplyPhaseMemoryStressTests {
         addRegionToAllPages(coord, pageCount: pageCount)
         coord.parallelismOverride = 4
 
-        let pageData = coord.buildPDFPageData(effectiveMode: .secureRasterization)
+        let pageData = coord.buildPDFPageData(effectiveMode: .secureRasterization, record: nil)
         #expect(pageData.count == pageCount)
 
         let reconstructor = try await makeStartedReconstructor()
@@ -259,7 +259,7 @@ struct ApplyPhaseMemoryStressTests {
         let preWarningBound = 4
         coord.parallelismOverride = preWarningBound
 
-        let pageData = coord.buildPDFPageData(effectiveMode: .secureRasterization)
+        let pageData = coord.buildPDFPageData(effectiveMode: .secureRasterization, record: nil)
 
         // Let the coordinator's async memory-warning observer reach its
         // `for await` so a posted notification is actually delivered.

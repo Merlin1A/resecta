@@ -293,6 +293,14 @@ extension VerificationCorpusRunnerTests {
             )
             let hasText = pageMode == .searchableRedaction
                 ? (page.string?.isEmpty == false) : false
+            // The page's plan, by the app's own maker (`RunRecord.Page`'s
+            // page init), so the runner paints the plan the app paints.
+            // Its regions are the runner's own, already clamped where the
+            // app keeps them as drawn.
+            let confirmed = RunRecord.Page(
+                pageIndex: i,
+                regions: pageRegions.map { RunRecord.DrawnRegion(id: $0.id, normalizedRect: $0.normalizedRect) },
+                cropBox: cropBoxBounds.size, rotation: page.rotation)
 
             return PDFPageData(
                 page: page, pageIndex: i, regions: pageRegions,
@@ -304,7 +312,8 @@ extension VerificationCorpusRunnerTests {
                 cropBoxBounds: cropBoxBounds,
                 cgPage: cgPage,
                 hasText: hasText,
-                fallbackReason: fallbackReason)
+                fallbackReason: fallbackReason,
+                confirmedPage: confirmed)
         }
     }
 

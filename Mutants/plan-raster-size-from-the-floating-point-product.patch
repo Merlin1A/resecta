@@ -1,0 +1,19 @@
+Property: A page's raster is the raster rule's count of pixels, ⌈S·d / 4608⌉ of the sides the page's data carries, never the ceiling of a floating-point product.
+Area: the page's pixels (PageRasterizer.pagePixels)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter RasterSizeRuleTests
+Must go red: RedactionEngineTests/RasterSizeRuleTests pagePixelsFromTheRecord [432 pt (a 4 by 6 inch page's height) at 300 dpi: 1800]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
+index bf781ea2..9b40108f 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
+@@ -76,7 +76,7 @@ extension PageRasterizer {
+         guard let raster = PixelPlan.Raster(
+             widthSixtyFourths: sides.width, heightSixtyFourths: sides.height, dpi: dpi) else { return nil }
+         return PagePixels(
+-            width: raster.pixelWidth, height: raster.pixelHeight,
++            width: Int((size.width * (CGFloat(dpi) / 72.0)).rounded(.up)), height: Int((size.height * (CGFloat(dpi) / 72.0)).rounded(.up)),
+             content: CGSize(width: contentSpan(sides.width, dpi: dpi), height: contentSpan(sides.height, dpi: dpi)),
+             plan: fromRecord ? raster : nil,
+             recordDisagrees: disagrees)

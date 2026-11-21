@@ -51,6 +51,32 @@ struct RasterSizeRuleTests {
         #expect(Self.cases.count == 17)
     }
 
+    @Test("A page's raster from its data (the record's sides S) is the rule's count of pixels", arguments: cases)
+    func pagePixelsFromTheRecord(_ c: Case) throws {
+        let bounds = CGRect(x: 0, y: 0, width: c.width, height: c.height)
+        let turned = c.rotation % 180 != 0
+        let w = try #require(PixelPlan.sixtyFourths(ofSide: Double(turned ? c.height : c.width)))
+        let h = try #require(PixelPlan.sixtyFourths(ofSide: Double(turned ? c.width : c.height)))
+        let pixels = try #require(PageRasterizer.pagePixels(
+            cropBox: bounds, rotation: c.rotation, hasRecord: true, recorded: (w, h), dpi: Int(c.dpi)))
+        #expect(pixels.width == c.pixels.width && pixels.height == c.pixels.height,
+                "\(c.label): got \(pixels.width) × \(pixels.height)")
+        #expect(pixels.plan != nil && !pixels.recordDisagrees, "the record's sides are the page's own")
+    }
+
+    @Test("A record whose sides are not the page's own: the region path, and every region named")
+    func recordSidesDisagree() throws {
+        let pixels = try #require(PageRasterizer.pagePixels(
+            cropBox: CGRect(x: 0, y: 0, width: 612, height: 792), rotation: 0, hasRecord: true,
+            recorded: (612 * 64, 792 * 64 + 1), dpi: 300))
+        #expect(pixels.plan == nil && pixels.recordDisagrees)
+        #expect(pixels.width == 2_550 && pixels.height == 3_300, "the page's own raster")
+        let none = try #require(PageRasterizer.pagePixels(
+            cropBox: CGRect(x: 0, y: 0, width: 612, height: 792), rotation: 0, hasRecord: false,
+            recorded: nil, dpi: 300))
+        #expect(none.plan == nil && !none.recordDisagrees, "no record: the region path, nothing named")
+    }
+
     @Test("Each side's raster is the rule's count of pixels", arguments: cases)
     func rasterSize(_ c: Case) throws {
         let size = try #require(PageRasterizer.rasterPixelSize(

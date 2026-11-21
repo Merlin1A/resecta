@@ -130,7 +130,7 @@ struct ScannedPageBoxFloorTests {
     /// The page's mode and fallback reason in a Searchable run.
     static func outcome(_ doc: PDFDocument, _ regions: [RedactionRegion]) -> PDFPageData {
         RunInputs.pageData(document: doc, regions: [0: regions], textLayerStatus: [0: .rich],
-                           sourceHasHiddenOCG: false, settings: settings(), effectiveMode: .searchableRedaction)[0]
+                           sourceHasHiddenOCG: false, settings: settings(), effectiveMode: .searchableRedaction, record: nil)[0]
     }
 
     static func expectImageOnly(_ page: PDFPageData, _ comment: Comment) {
@@ -309,7 +309,7 @@ struct ScannedPageBoxFloorTests {
     func secureRunUnchanged() {
         let page = RunInputs.pageData(document: Self.imagePage(), regions: [0: [Self.hand()]], textLayerStatus: [0: .rich],
                                       sourceHasHiddenOCG: false, settings: Self.settings(),
-                                      effectiveMode: .secureRasterization)[0]
+                                      effectiveMode: .secureRasterization, record: nil)[0]
         #expect(page.pipelineMode == .secureRasterization)
         #expect(page.fallbackReason == nil)
     }
