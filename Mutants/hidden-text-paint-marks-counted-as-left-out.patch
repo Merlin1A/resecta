@@ -1,0 +1,19 @@
+Property: A word marked by paint leaves without entering the count of runs left out.
+Area: hidden text (paint marks)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter "PaintAndKindsCasesTests"
+Must go red: RedactionEngineTests/PaintAndKindsCasesTests caseRow [17: a word marked by paint leaves and the count of runs left out does not move]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
+index 2cfafd88..e7d2205b 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
+@@ -190,7 +190,7 @@ enum PageTextPath {
+             frame: frame)
+         return Result(
+             outcome: .written(entries: validated.result.surviving, digest: digest, removalRects: rects),
+-            runsLeftOut: alphabet.runsLeftOut, drawnCellDropped: validated.dropped,
++            runsLeftOut: alphabet.runsLeftOut + painted.count, drawnCellDropped: validated.dropped,
+             hiddenTextLines: validated.lines)
+     }
+ 

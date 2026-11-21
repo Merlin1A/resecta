@@ -5,9 +5,10 @@ Must go red: RedactionEngineTests/FillCoverageBasisTests contentBasisSitsBetween
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift
+index 93fc474c..5218caaa 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift
-@@ -770,7 +770,7 @@
+@@ -762,7 +762,7 @@ extension PageRasterizer {
                PixelPlan.Raster(widthSixtyFourths: w, heightSixtyFourths: h, dpi: Int(dpi)) != nil
          else { return nil }
          let perInch = Double(PixelPlan.sixtyFourthsPerInch)

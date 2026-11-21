@@ -5,9 +5,10 @@ Must go red: RedactionEngineTests/FillCoverageBasisTests rasterizedPageReadsBack
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift
+index 93fc474c..e22d12a5 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift
-@@ -481,7 +481,7 @@
+@@ -472,7 +472,7 @@ public final class PageRasterizer: @unchecked Sendable {
          // 6. Verify fills, on the basis they were painted on. 256-row band
          // cancellation checks happen inside; a thrown CancellationError propagates here.
          for region in page.regions {

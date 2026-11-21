@@ -114,11 +114,13 @@ public enum TextLayerDetector {
         /// outside it. Recorded by the run's page bridge, never by the
         /// pre-flight trigger check.
         case unanchoredRegion
-        /// After the filter and the alphabet rule, no word of the page is
-        /// left to write, and the alphabet rule left out at least one run:
-        /// text none of the hidden text's three faces can draw, or that the
-        /// hidden text never holds. Recorded by the text path, never by the
-        /// pre-flight trigger check.
+        /// The page has no searchable text left to write: after the filter
+        /// and the alphabet rule no letter is left and the alphabet rule left
+        /// out at least one run (text none of the hidden text's three faces
+        /// can draw, or that the hidden text never holds), or the page had no
+        /// letter at all; or a line of the page cannot be laid out in the
+        /// three faces. Recorded by the text path, never by the pre-flight
+        /// trigger check.
         case noWritableText
     }
 

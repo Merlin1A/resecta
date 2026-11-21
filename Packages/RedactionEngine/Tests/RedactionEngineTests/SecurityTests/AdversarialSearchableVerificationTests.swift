@@ -160,6 +160,20 @@ struct AdversarialSearchableVerificationTests {
         )
     }
 
+    @Test("RT-5/H3b: Layer 9 round-trip — a composed sequence the hidden text's faces draw",
+          .tags(.critical))
+    func rt5Layer9RoundTripDrawableComposedSequence() async throws {
+        // A letter with a combining accent, one composed sequence of two
+        // scalars, in ASCII context: the faces draw it, so nothing is left
+        // out and the record and the written page agree on it.
+        let word = "e\u{0301}clair"
+        try #require(HiddenTextFonts.canBeWritten(word), "the faces draw \(word)")
+        try await assertLayer9RoundTripAgreement(
+            sourceData: TestFixtures.multiLineTextLayerPDF(lines: ["ABC \(word) XYZ"], fontName: "Helvetica", fontSize: 16),
+            throughTextPathLeavingOut: 0
+        )
+    }
+
     @Test("RT-5/H3: Layer 9 round-trip helper drives a non-tautological agreement test")
     func rt5Layer9RoundTripHelperIsNotTautological() async throws {
         // Sanity guard for the round-trip helper itself: a non-empty

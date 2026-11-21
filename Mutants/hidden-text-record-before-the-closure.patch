@@ -1,0 +1,19 @@
+Property: The record is taken after the whole-word closure, so the count and the lineage read the list that is written.
+Area: hidden text (whole source words)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter "WholeSourceWordsTests"
+Must go red: RedactionEngineTests/WholeSourceWordsTests wholeWords [part of a number boxed]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
+index 2cfafd88..37642367 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
+@@ -182,7 +182,7 @@ enum PageTextPath {
+         }
+ 
+         // The record.
+-        let digest = validated.result.toDigest(
++        let digest = filtered.toDigest(
+             pageIndex: pageIndex,
+             redactionRects: rects,
+             safetyMargin: safetyMargin,

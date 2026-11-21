@@ -44,7 +44,7 @@ jobs:
   analyze-swift:
     name: Analyze (swift)
     runs-on: macos-26
-    timeout-minutes: 60
+    timeout-minutes: 90
     permissions:
       contents: read
       security-events: write

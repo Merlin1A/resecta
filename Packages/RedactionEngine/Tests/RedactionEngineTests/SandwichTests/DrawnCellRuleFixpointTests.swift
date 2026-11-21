@@ -51,6 +51,7 @@ struct DrawnCellRuleFixpointTests {
             entries: v.result.surviving, pageWidth: 612, regionShapes: shapes).isEmpty,
             "no survivor is drawn inside a region, whatever the pass limit; got \(v.result.surviving.map(\.character))")
         #expect(!v.settled, "the limit left the colon inside the box: the set is reported unsettled")
+        #expect(v.laidOut, "every line was laid out: unsettled, not unlaid, so the page's reason is a fault's")
         #expect(v.dropped == 1 && v.result.excludedCount == 12 && v.result.surviving.count == 8,
                 "the colon is dropped and counted even so")
     }

@@ -1,0 +1,19 @@
+Property: A page whose last words leave by boxes and paint, with no alphabet mark, is a Searchable page with an empty hidden text and no reason: paint marks never decide that a page is a picture.
+Area: hidden text (paint marks)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter "PaintAndKindsCasesTests"
+Must go red: RedactionEngineTests/PaintAndKindsCasesTests caseRow [18: a page whose last words leave by a box and the paint is written with no text and no reason]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
+index 2cfafd88..a76d247f 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
+@@ -176,7 +176,7 @@ enum PageTextPath {
+         // when the page had no letter to begin with (a lone object mark reads
+         // as a space). A page whose boxes took every word is written empty.
+         let noLetterLeft = !validated.result.surviving.contains { Self.isLetter($0) }
+-        if noLetterLeft, !alphabet.wordIndices.isEmpty || !folded.contains(where: { Self.isLetter($0) }) {
++        if noLetterLeft, !alphabet.wordIndices.union(painted).isEmpty || !folded.contains(where: { Self.isLetter($0) }) {
+             return Result(outcome: .picture(alphabet.reasonIfNoWordLeft ?? .noWritableText),
+                           runsLeftOut: alphabet.runsLeftOut, drawnCellDropped: validated.dropped)
+         }
