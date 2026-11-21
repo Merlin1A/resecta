@@ -376,6 +376,19 @@ Boxes placed by Search or Scan, and left where they were placed, are exported ov
 
 ---
 
+### KI-48: On a Very Large Page, a Very Thin Box Can Be Left Out of the Export (Medium)
+**Affects:** Resecta 1.0 through 1.3.1, mostly on pages much larger than paper sizes, when the document has more than one box. Both export modes.
+
+When you export, Resecta leaves out any box less than one thousandth of the page's height tall, or of its width wide. As long as the document has another box, it does this without saying so. The box stays on the page and in the count, and the text under it stays readable in the export. The checks after export may not report it.
+
+On paper sizes up to A3, no box you draw is that thin. A box Search or Scan places is that thin only over one or two characters of print smaller than about 2 points. On a much larger page, such as one about 70 inches across, a box under about 5 points tall can be left out: a box Search or Scan places over small print, or, from 1.1, a box you draw at high zoom.
+
+**Workaround:** On a large page, make each box at least as tall as normal text, and draw it with room around the words. Drag a Search or Scan box's handles out over the words around it. If the page is turned, see KI-47 first. Before you share the export, zoom in on it and check each small box.
+
+**Fix:** 1.4.0 keeps every box at or above the size the export can fill, and does not start an export while any box would be left out; it names the box.
+
+---
+
 ## Fixed
 
 ### KI-8: Duplicate Regions from Multiple Scan Runs (Low) — FIXED (entry moved 2026-10-01)
