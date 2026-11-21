@@ -51,7 +51,10 @@ struct JPEGHuffmanTable: Sendable {
             minCode[length] = code
             code += counts[length]
             k += counts[length]
-            guard code <= (1 << length) else { return nil }
+            // The code of all ones is reserved (the standard's Annex C;
+            // libjpeg refuses a table that uses it), so the codes of each
+            // length end below it.
+            guard code < (1 << length) else { return nil }
             maxCode[length] = counts[length] > 0 ? code - 1 : -1
             code <<= 1
         }

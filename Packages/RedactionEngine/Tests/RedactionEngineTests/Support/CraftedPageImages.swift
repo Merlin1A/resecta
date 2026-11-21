@@ -49,15 +49,17 @@ enum CraftedPageImages {
     }
 
     /// Every segment up to the scan's header, for a picture of `columns` by
-    /// `rows` blocks whose every step is `step`.
-    static func header(columns: Int, rows: Int, step: UInt8) -> [UInt8] {
+    /// `rows` blocks whose every step is `step`. The first-coefficient table
+    /// holds `dcFourBitCodes` codes of four bits (sizes 0 on), 12 by default;
+    /// at 16 its last code is all ones.
+    static func header(columns: Int, rows: Int, step: UInt8, dcFourBitCodes: Int = 12) -> [UInt8] {
         let width = 8 * columns, height = 8 * rows
         var out: [UInt8] = [0xFF, 0xD8]
         out += segment(0xE0, Array("JFIF\0".utf8) + [1, 1, 0, 0, 1, 0, 1, 0, 0])
         out += segment(0xDB, [0x00] + [UInt8](repeating: step, count: 64))
         var dcCounts = [UInt8](repeating: 0, count: 16)
-        dcCounts[3] = 12 // twelve codes of four bits: size n is coded as n
-        out += segment(0xC4, [0x00] + dcCounts + (0...11).map { UInt8($0) })
+        dcCounts[3] = UInt8(dcFourBitCodes) // codes of four bits: size n is coded as n
+        out += segment(0xC4, [0x00] + dcCounts + (0..<dcFourBitCodes).map { UInt8($0) })
         var acCounts = [UInt8](repeating: 0, count: 16)
         acCounts[1] = 2 // 00: end of block; 01: run 0, size 1
         out += segment(0xC4, [0x10] + acCounts + [0x00, 0x01])
@@ -67,7 +69,7 @@ enum CraftedPageImages {
     }
 
     /// A whole picture of `columns` by `rows` blocks, in raster order.
-    static func picture(columns: Int, rows: Int, step: UInt8, blocks: [Block]) -> Data {
+    static func picture(columns: Int, rows: Int, step: UInt8, blocks: [Block], dcFourBitCodes: Int = 12) -> Data {
         precondition(blocks.count == columns * rows)
         var w = BitWriter()
         for block in blocks {
@@ -83,7 +85,8 @@ enum CraftedPageImages {
         }
         w.finish()
         let scan = segment(0xDA, [1, 1, 0x00, 0, 63, 0])
-        return Data(header(columns: columns, rows: rows, step: step) + scan + w.bytes + [0xFF, 0xD9])
+        return Data(header(columns: columns, rows: rows, step: step, dcFourBitCodes: dcFourBitCodes)
+                    + scan + w.bytes + [0xFF, 0xD9])
     }
 
     // MARK: - A file whose page names forms
@@ -97,8 +100,10 @@ enum CraftedPageImages {
 
     /// A one-page file whose page draws `picture` and names `pageForms`
     /// (indices into `forms`). Written by hand: a system writer makes no
-    /// form that names itself.
-    static func formsPage(picture: Data, columns: Int, rows: Int, pageForms: [Int], forms: [Form]) -> Data {
+    /// form that names itself. The picture's stream is stored as given under
+    /// `filter` (the writer's own is /DCTDecode alone).
+    static func formsPage(picture: Data, columns: Int, rows: Int, pageForms: [Int], forms: [Form],
+                          filter: String = "/DCTDecode") -> Data {
         // Objects: 1 catalog, 2 pages, 3 page, 4 picture, 5 content, 6... forms.
         func formRef(_ i: Int) -> String { "\(6 + i) 0 R" }
         func xobjects(_ names: [Int], picture: Bool) -> String {
@@ -112,7 +117,7 @@ enum CraftedPageImages {
         objects.append(Data(("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 5 0 R "
                              + "/Resources << /XObject \(xobjects(pageForms, picture: true)) >> >>").utf8))
         var image = Data(("<< /Type /XObject /Subtype /Image /Width \(8 * columns) /Height \(8 * rows) "
-                          + "/ColorSpace /DeviceGray /BitsPerComponent 8 /Filter /DCTDecode /Length \(picture.count) >>\nstream\n").utf8)
+                          + "/ColorSpace /DeviceGray /BitsPerComponent 8 /Filter \(filter) /Length \(picture.count) >>\nstream\n").utf8)
         image += picture
         image += Data("\nendstream".utf8)
         objects.append(image)
@@ -137,4 +142,24 @@ enum CraftedPageImages {
     }
 
     static func sha256(_ data: Data) -> Data { Data(SHA256.hash(data: data)) }
+
+    /// `data` as a zlib stream of stored (uncompressed) blocks, as /FlateDecode
+    /// reads it: header, blocks of at most 65,535 bytes, Adler-32.
+    static func zlibStored(_ data: Data) -> Data {
+        var out: [UInt8] = [0x78, 0x01]
+        let bytes = [UInt8](data)
+        var start = 0
+        repeat {
+            let n = min(65_535, bytes.count - start)
+            let last: UInt8 = start + n == bytes.count ? 1 : 0
+            out += [last, UInt8(n & 0xFF), UInt8(n >> 8), UInt8(~n & 0xFF), UInt8((~n >> 8) & 0xFF)]
+            out += bytes[start..<(start + n)]
+            start += n
+        } while start < bytes.count
+        var a: UInt32 = 1, b: UInt32 = 0
+        for byte in bytes { a = (a + UInt32(byte)) % 65_521; b = (b + a) % 65_521 }
+        let adler = (b << 16) | a
+        out += [UInt8(adler >> 24), UInt8((adler >> 16) & 0xFF), UInt8((adler >> 8) & 0xFF), UInt8(adler & 0xFF)]
+        return Data(out)
+    }
 }
