@@ -100,8 +100,9 @@ struct RegexTimeoutBannerTests {
         }
         let sink = source[start.upperBound..<end.lowerBound]
         #expect(!sink.contains("\\("), "the sink interpolates nothing — no term, no page number")
-        // The sink posts the table's row by name; that row's text is the fixed message.
-        #expect(sink.contains("toastManager?.post(.customTermTimeout)"))
+        // The sink posts the table's row by name, with the layer of the run
+        // that raised it; that row's text is the fixed message.
+        #expect(sink.contains("toastManager?.post(.customTermTimeout, runLayer: runLayer)"))
         let table = try loadRepoFile("Sources/ResectaApp/State/MessageCatalog.swift")
         guard let row = table.range(of: "case .customTermTimeout:\n") else {
             Issue.record("Could not locate the custom-term timeout row")
