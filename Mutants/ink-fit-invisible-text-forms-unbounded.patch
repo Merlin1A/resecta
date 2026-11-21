@@ -7,7 +7,7 @@ Apply in a scratch worktree with `git apply`; discard after.
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
-@@ -163,7 +163,7 @@
+@@ -171,7 +171,7 @@
              guard CGPDFDictionaryGetName(dictionary, "Subtype", &subtype), let subtype,
                    String(cString: subtype) == "Form" else { return }
              state.drawn += 1

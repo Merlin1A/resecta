@@ -28,6 +28,9 @@ public enum PageModeDecision {
         pageRegions: [RedactionRegion],
         inkPlanCovers: Bool
     ) -> (mode: PipelineMode, fallbackReason: TextLayerDetector.FallbackReason?) {
+        // `showsInvisibleText: false` holds because the invisible-text arm
+        // runs before the box rule: a page the box rule reads shows none.
+        // PageModeDecisionTests pins that order.
         decide(effectiveMode: effectiveMode, textLayerStatus: textLayerStatus, page: page,
                pageRegions: pageRegions, inkPlanCovers: inkPlanCovers,
                readFacts: { PageContentFacts.read($0, showsInvisibleText: false) })

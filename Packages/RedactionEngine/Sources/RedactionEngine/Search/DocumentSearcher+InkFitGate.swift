@@ -112,14 +112,20 @@ extension DocumentSearcher {
 
     /// The page's content read for text in render mode 3 or 7: `Tr` tracked
     /// through `q`/`Q` and into Form XObjects (to a depth of 8); any
-    /// text-showing operator while it is set reads `shows`. A stream the
-    /// scanner cannot read, a form chain past the depth, or more than
-    /// `PagePictureMap.formLimit` forms drawn, reads `unreadable`; the walk
+    /// text-showing operator while it is set reads `shows`. The operand is
+    /// read as any PDF number, integer or real, and compared exactly with 3
+    /// and 7. A form draws inside its own saved state: a `Q` in it never
+    /// restores a state saved before it, and the caller's mode and saved
+    /// states are as they were once it is drawn, however its `q` and `Q`
+    /// pair. A `Tr` whose operand is not a number, a stream the scanner
+    /// cannot read, a form chain past the depth, or more than
+    /// `PagePictureMap.formLimit` forms drawn reads `unreadable`; the walk
     /// stops at the first of the two.
     nonisolated static func invisibleTextReading(_ cgPage: CGPDFPage) -> InvisibleTextReading {
         final class State {
-            var mode: Int = 0
-            var saved: [Int] = []
+            var mode: CGPDFReal = 0
+            var saved: [CGPDFReal] = []
+            var floor = 0
             var found = false
             var unreadable = false
             var depth = 0
@@ -129,9 +135,11 @@ extension DocumentSearcher {
         guard let table = CGPDFOperatorTableCreate() else { return .unreadable }
         defer { CGPDFOperatorTableRelease(table) }
         CGPDFOperatorTableSetCallback(table, "Tr") { scanner, info in
-            var value: CGPDFInteger = 0
-            guard let info, CGPDFScannerPopInteger(scanner, &value) else { return }
-            Unmanaged<State>.fromOpaque(info).takeUnretainedValue().mode = Int(value)
+            guard let info else { return }
+            let state = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
+            var value: CGPDFReal = 0
+            guard CGPDFScannerPopNumber(scanner, &value) else { state.unreadable = true; CGPDFScannerStop(scanner); return }
+            state.mode = value
         }
         CGPDFOperatorTableSetCallback(table, "q") { _, info in
             guard let info else { return }
@@ -141,7 +149,7 @@ extension DocumentSearcher {
         CGPDFOperatorTableSetCallback(table, "Q") { _, info in
             guard let info else { return }
             let state = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
-            if let mode = state.saved.popLast() { state.mode = mode }
+            if state.saved.count > state.floor, let mode = state.saved.popLast() { state.mode = mode }
         }
         let show: CGPDFOperatorCallback = { scanner, info in
             guard let info else { return }
@@ -170,11 +178,14 @@ extension DocumentSearcher {
             _ = CGPDFDictionaryGetDictionary(dictionary, "Resources", &resources)
             let inner = CGPDFContentStreamCreateWithStream(stream, resources ?? dictionary, content)
             let innerScanner = CGPDFScannerCreate(inner, table, info)
-            let mode = state.mode
+            let (mode, savedCount, floor) = (state.mode, state.saved.count, state.floor)
             state.depth += 1
+            state.floor = savedCount
             if !CGPDFScannerScan(innerScanner) && !state.found && !state.unreadable { state.unreadable = true }
             state.depth -= 1
             state.mode = mode
+            state.saved.removeLast(state.saved.count - savedCount)
+            state.floor = floor
             CGPDFScannerRelease(innerScanner)
             CGPDFContentStreamRelease(inner)
             if state.found || state.unreadable { CGPDFScannerStop(scanner) }

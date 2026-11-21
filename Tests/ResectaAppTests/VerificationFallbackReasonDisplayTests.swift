@@ -55,6 +55,12 @@ struct VerificationFallbackReasonDisplayTests {
         #expect(Set(phrases).count == phrases.count, "\(phrases)")
     }
 
+    @Test("The invisible-text reason shows its approved words")
+    func invisibleTextPin() {
+        #expect(TextLayerDetector.FallbackReason.invisibleText.shortReasonText
+            == "text with no ink of its own")
+    }
+
     @Test("Chip reason row copy: page number + mode + reason")
     func chipReasonRowText() {
         let row = VerificationResultsView.fallbackReasonRowText(

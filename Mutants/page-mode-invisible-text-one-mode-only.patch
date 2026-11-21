@@ -1,7 +1,7 @@
 Property: Both invisible render modes, 3 and 7, are read.
 Area: page mode (Detection)
 Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/InvisibleTextPageTests (or on the host: cd Packages/RedactionEngine && swift test --no-parallel --filter InvisibleTextPageTests)
-Must go red: RedactionEngineTests/InvisibleTextPageTests reading [a hidden layer over a scan, mode 7]; RedactionEngineTests/InvisibleTextPageTests exported [a hidden layer over a scan, mode 7]; RedactionEngineTests/InvisibleTextPageTests exported [an invisible layer 2 pt off its ink, mode 7]
+Must go red: RedactionEngineTests/InvisibleTextPageTests reading [a hidden layer over a scan, mode 7]; RedactionEngineTests/InvisibleTextPageTests exported [a hidden layer over a scan, mode 7]; RedactionEngineTests/InvisibleTextPageTests reading [a line in mode 7 with a fill painted through its clip: the words show]; RedactionEngineTests/InvisibleTextPageTests exported [a line in mode 7 with a fill painted through its clip: the words show]
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift

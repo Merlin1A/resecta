@@ -13,6 +13,9 @@ import PDFKit
 // decision) and the production export; a picture page's file holds no
 // text-showing operator. Every page is given rich text, so it reaches the
 // test.
+// The mode is read as any PDF number; a form's own saves and restores stay
+// inside it. Where that matters, Quartz draws the page too, and the case says
+// whether the line shows ink.
 
 @Suite("A page that shows invisible text is a picture")
 struct InvisibleTextPageTests {
@@ -38,9 +41,9 @@ struct InvisibleTextPageTests {
              reading: .shows, mode: .secureRasterization, reason: .invisibleText),
         Case(name: "an invisible layer 5 pt off its ink, mode 3", make: { TestFixtures.layerOverScanPDF(mode: 3, drift: 5) },
              reading: .shows, mode: .secureRasterization, reason: .invisibleText),
-        Case(name: "an invisible layer 2 pt off its ink, mode 7", make: { TestFixtures.layerOverScanPDF(mode: 7, drift: 2) },
+        Case(name: "an invisible layer 2 pt off its ink, mode 3", make: { TestFixtures.layerOverScanPDF(mode: 3, drift: 2) },
              reading: .shows, mode: .secureRasterization, reason: .invisibleText),
-        Case(name: "an invisible layer 8 pt off its ink, mode 7", make: { TestFixtures.layerOverScanPDF(mode: 7, drift: 8) },
+        Case(name: "an invisible layer 8 pt off its ink, mode 3", make: { TestFixtures.layerOverScanPDF(mode: 3, drift: 8) },
              reading: .shows, mode: .secureRasterization, reason: .invisibleText),
         Case(name: "one invisible word on a typed page", make: { TestFixtures.typedPageWithOneInvisibleWordPDF() },
              reading: .shows, mode: .secureRasterization, reason: .invisibleText),
@@ -51,12 +54,80 @@ struct InvisibleTextPageTests {
              reading: .unreadable, mode: .secureRasterization, reason: .extractionFailed),
         Case(name: "the mode set and unset with no text shown", make: { TestFixtures.invisibleModeSetAndUnsetPDF() },
              reading: .showsNone, mode: .searchableRedaction, reason: nil),
+        Case(name: "one invisible word whose mode is written as the real number 3.0",
+             make: { TestFixtures.typedPageWithOneInvisibleWordPDF(operand: "3.0") },
+             reading: .shows, mode: .secureRasterization, reason: .invisibleText),
+        Case(name: "a mode given as a name, not a number: content that could not be read",
+             make: { TestFixtures.modeNotANumberPDF() },
+             reading: .unreadable, mode: .secureRasterization, reason: .extractionFailed),
+        Case(name: "a form that saves the state and never restores it, inside a save the page restores to mode 3",
+             make: { TestFixtures.lineAfterPDF(prefix: "3 Tr q 0 Tr /Fx1 Do Q", form: "q") },
+             reading: .shows, mode: .secureRasterization, reason: .invisibleText),
+        Case(name: "a form that restores a state it never saved, drawn in mode 3",
+             make: { TestFixtures.formInModeThreePDF(form: "Q BT /F1 10 Tf 72 480 Td (\(TestFixtures.invisibleLine)) Tj ET") },
+             reading: .shows, mode: .secureRasterization, reason: .invisibleText),
+        Case(name: "mode 3 set inside a save the page restores before its last line",
+             make: { TestFixtures.lineAfterPDF(prefix: "q 3 Tr Q") },
+             reading: .showsNone, mode: .searchableRedaction, reason: nil),
+        Case(name: "a line in mode 7 with a fill painted through its clip: the words show",
+             make: { TestFixtures.clipModeWithFillPDF() },
+             reading: .shows, mode: .secureRasterization, reason: .invisibleText),
     ]
 
-    @Test("The cases are ten, nine of them picture pages")
+    @Test("The cases are sixteen, fourteen of them picture pages")
     func caseCount() {
-        #expect(Self.cases.count == 10)
-        #expect(Self.cases.filter { $0.mode == .secureRasterization }.count == 9)
+        #expect(Self.cases.count == 16)
+        #expect(Self.cases.filter { $0.mode == .secureRasterization }.count == 14)
+    }
+
+    struct Drawn: Sendable, CustomTestStringConvertible {
+        let name: String
+        let make: @Sendable () -> Data
+        let inks: Bool
+        var testDescription: String { name }
+    }
+
+    /// Pages whose line at 480 Quartz draws, or leaves without ink, as the
+    /// reading above says: the reading follows the renderer.
+    static let drawn: [Drawn] = [
+        Drawn(name: "a word in mode 3", make: { TestFixtures.typedPageWithOneInvisibleWordPDF(operand: "3") }, inks: false),
+        Drawn(name: "a word in mode 3.0", make: { TestFixtures.typedPageWithOneInvisibleWordPDF(operand: "3.0") }, inks: false),
+        Drawn(name: "control: a word in mode 0.0", make: { TestFixtures.typedPageWithOneInvisibleWordPDF(operand: "0.0") }, inks: true),
+        Drawn(name: "a form that saves and never restores, inside a save the page restores to mode 3",
+              make: { TestFixtures.lineAfterPDF(prefix: "3 Tr q 0 Tr /Fx1 Do Q", form: "q") }, inks: false),
+        Drawn(name: "a form that restores a state it never saved, drawn in mode 3",
+              make: { TestFixtures.formInModeThreePDF(form: "Q BT /F1 10 Tf 72 480 Td (\(TestFixtures.invisibleLine)) Tj ET") },
+              inks: false),
+        Drawn(name: "mode 3 inside a save the page restores", make: { TestFixtures.lineAfterPDF(prefix: "q 3 Tr Q") }, inks: true),
+        Drawn(name: "mode 7 with a fill through its clip", make: { TestFixtures.clipModeWithFillPDF() }, inks: true),
+    ]
+
+    @Test("Quartz draws the line at 480 with ink, or without, as listed", arguments: drawn)
+    func quartzDraws(_ d: Drawn) throws {
+        let doc = try #require(PDFDocument(data: d.make()))
+        let cgPage = try #require(doc.page(at: 0)?.pageRef)
+        let dark = try #require(Self.darkPixels(cgPage, band: 470...495), "\(d.name): the page could not be drawn")
+        #expect((dark > 0) == d.inks, "\(d.name): \(dark) dark pixels between 470 and 495 pt")
+    }
+
+    /// Dark pixels (grey below 128) in the band `band` (points from the page's
+    /// foot, x 60...560) when Quartz draws `page` at 1 px per point on white.
+    static func darkPixels(_ page: CGPDFPage, band: ClosedRange<Int>) -> Int? {
+        let (width, height) = (612, 792)
+        guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width,
+                                      space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue)
+        else { return nil }
+        context.setFillColor(gray: 1, alpha: 1)
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        context.drawPDFPage(page)
+        guard let data = context.data else { return nil }
+        let pixels = data.bindMemory(to: UInt8.self, capacity: width * height)
+        var dark = 0
+        for y in band {
+            let row = height - 1 - y
+            for x in 60...560 where pixels[row * width + x] < 128 { dark += 1 }
+        }
+        return dark
     }
 
     @Test("Each page reads as listed, and the yes-or-no fact is yes for all but a page that shows none",
@@ -115,7 +186,8 @@ struct InvisibleTextPageTests {
         #expect(outcome.perPageFallbackReasons == [.invisibleText])
         let written = try #require(PDFDocument(url: out)?.page(at: 0))
         #expect(Self.textOperators(try #require(written.pageRef)) == 0)
-        #expect((written.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        let writtenText = written.string ?? ""
+        #expect(writtenText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     }
 
     /// The text-showing operators (`Tj`, `TJ`, `'`, `"`) in a page's content
