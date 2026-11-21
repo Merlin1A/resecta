@@ -1,0 +1,19 @@
+Property: Each page the record names past the file's last page is refused by name, never dropped.
+Area: the reader of a page's stored picture (crafted input)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/PageImageCraftedInputTests (or on the host: cd Packages/RedactionEngine && swift test --no-parallel --filter PageImageCraftedInputTests)
+Must go red: RedactionEngineTests/PageImageCraftedInputTests recordPastThePageCount
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PageImageLocator.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PageImageLocator.swift
+index 59f7c5c6..e735d344 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PageImageLocator.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PageImageLocator.swift
+@@ -159,7 +159,7 @@ enum PageImageLocator {
+             }
+             body(index, outcome)
+         }
+-        for index in source.pageCount..<max(source.pageCount, recordedHashes.count) {
++        for index in source.pageCount..<source.pageCount {
+             if Task.isCancelled { throw CancellationError() }
+             body(index, .couldNotFinish(PageImageRefusal(reason: .pageNotInFile, offset: 0)))
+         }

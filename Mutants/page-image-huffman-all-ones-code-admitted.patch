@@ -1,0 +1,19 @@
+Property: A Huffman table whose codes of a length reach all ones is refused.
+Area: the reader of a page's stored picture (crafted input)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/PageImageCraftedInputTests (or on the host: cd Packages/RedactionEngine && swift test --no-parallel --filter PageImageCraftedInputTests)
+Must go red: RedactionEngineTests/PageImageCraftedInputTests huffmanCodeOfAllOnes
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/JPEGHeader.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/JPEGHeader.swift
+index 3f190bfe..49466069 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/JPEGHeader.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/JPEGHeader.swift
+@@ -54,7 +54,7 @@ struct JPEGHuffmanTable: Sendable {
+             // The code of all ones is reserved (the standard's Annex C;
+             // libjpeg refuses a table that uses it), so the codes of each
+             // length end below it.
+-            guard code < (1 << length) else { return nil }
++            guard code <= (1 << length) else { return nil }
+             maxCode[length] = counts[length] > 0 ? code - 1 : -1
+             code <<= 1
+         }

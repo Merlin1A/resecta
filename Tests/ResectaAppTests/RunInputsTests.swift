@@ -32,7 +32,7 @@ struct RunInputsTests {
         let pages = RunInputs.pageData(
             document: doc, regions: [0: [tiny, spill]],
             textLayerStatus: [0: .rich, 1: .rich], sourceHasHiddenOCG: true,
-            settings: snapshot, effectiveMode: .secureRasterization)
+            settings: snapshot, effectiveMode: .secureRasterization, record: nil)
 
         #expect(pages.map(\.pageIndex) == [0, 1])
         #expect(pages.map(\.pipelineMode) == [.secureRasterization, .secureRasterization])
@@ -59,7 +59,7 @@ struct RunInputsTests {
         let pages = RunInputs.pageData(
             document: doc, regions: [0: [partlyOff, sliver, whollyOff]],
             textLayerStatus: [0: .rich], sourceHasHiddenOCG: false,
-            settings: settings(), effectiveMode: .secureRasterization)
+            settings: settings(), effectiveMode: .secureRasterization, record: nil)
 
         let rects = pages[0].regions.map(\.normalizedRect)
         #expect(rects.count == 1, "the sliver and the wholly off-page box are dropped: \(rects)")
@@ -79,7 +79,7 @@ struct RunInputsTests {
         let rich = RunInputs.pageData(
             document: makeTextPDFDocument(text: "Hello run inputs"), regions: [:],
             textLayerStatus: [0: .rich], sourceHasHiddenOCG: false,
-            settings: snapshot, effectiveMode: .searchableRedaction)
+            settings: snapshot, effectiveMode: .searchableRedaction, record: nil)
         #expect(rich.count == 1)
         #expect(rich[0].pipelineMode == .searchableRedaction)
         #expect(rich[0].fallbackReason == nil)
@@ -89,7 +89,7 @@ struct RunInputsTests {
         let sparse = RunInputs.pageData(
             document: makeMultiPagePDFDocument(pages: 1), regions: [:],
             textLayerStatus: [0: .sparse], sourceHasHiddenOCG: false,
-            settings: snapshot, effectiveMode: .searchableRedaction)
+            settings: snapshot, effectiveMode: .searchableRedaction, record: nil)
         #expect(sparse.count == 1)
         #expect(sparse[0].pipelineMode == .secureRasterization)
         #expect(sparse[0].fallbackReason == .noExtractableText)

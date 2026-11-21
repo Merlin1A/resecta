@@ -117,7 +117,7 @@ struct PageParallelRasterizationScheduleTests {
         let coord = makeLoadedCoordinator(document: doc)
         addRegionToAllPages(coord, pageCount: pageCount)
 
-        let pageData = coord.buildPDFPageData(effectiveMode: .secureRasterization)
+        let pageData = coord.buildPDFPageData(effectiveMode: .secureRasterization, record: nil)
         #expect(pageData.count == pageCount)
 
         // The dict-return collect-then-drain is superseded by
@@ -151,7 +151,7 @@ struct PageParallelRasterizationScheduleTests {
         // Before the warning, parallelismOverride is nil so the bound
         // floats up to min(cores-1, memoryBudgetPages).
         #expect(coord.parallelismOverride == nil)
-        let pages = coord.buildPDFPageData(effectiveMode: .secureRasterization)
+        let pages = coord.buildPDFPageData(effectiveMode: .secureRasterization, record: nil)
         let preWarnBound = coord.computeParallelismBound(
             remainingPages: pages[0...], dpiCap: coord.dpiCap
         )
@@ -202,7 +202,7 @@ struct PageParallelRasterizationScheduleTests {
     )
     func testParallelismOverrideClampsBound() async throws {
         let coord = makeLoadedCoordinator(document: makeMultiPagePDFDocument(pages: 4))
-        let pages = coord.buildPDFPageData(effectiveMode: .secureRasterization)
+        let pages = coord.buildPDFPageData(effectiveMode: .secureRasterization, record: nil)
 
         let beforeOverride = coord.computeParallelismBound(
             remainingPages: pages[0...], dpiCap: coord.dpiCap
@@ -237,7 +237,7 @@ struct PageParallelRasterizationScheduleTests {
         // assert observed bound behavior matches the formula given
         // the live process memory.
         let coord = makeLoadedCoordinator(document: makeMultiPagePDFDocument(pages: 4))
-        let pages = coord.buildPDFPageData(effectiveMode: .secureRasterization)
+        let pages = coord.buildPDFPageData(effectiveMode: .secureRasterization, record: nil)
 
         let cores = max(1, ProcessInfo.processInfo.activeProcessorCount - 1)
 
@@ -316,7 +316,7 @@ struct PageParallelRasterizationScheduleTests {
         // Serialize submissions (one page in flight, drained in order) so the
         // "before vs after the warning" split is deterministic.
         coord.parallelismOverride = 1
-        let pageData = coord.buildPDFPageData(effectiveMode: .secureRasterization)
+        let pageData = coord.buildPDFPageData(effectiveMode: .secureRasterization, record: nil)
         #expect(pageData.count == pageCount)
 
         // Let the coordinator's memory-warning observer reach its `for await`
@@ -413,7 +413,7 @@ struct PageParallelRasterizationTimingTests {
         let seqCoord = makeLoadedCoordinator(document: doc)
         addRegionToAllPages(seqCoord, pageCount: pageCount)
         seqCoord.parallelismOverride = 1
-        let seqPages = seqCoord.buildPDFPageData(effectiveMode: .secureRasterization)
+        let seqPages = seqCoord.buildPDFPageData(effectiveMode: .secureRasterization, record: nil)
         let seqClock = ContinuousClock.now
         // No-op callback: this test measures rasterize wall-clock only; the
         // append work parity is the same ignored result as the old dict call.
@@ -426,7 +426,7 @@ struct PageParallelRasterizationTimingTests {
         // --- Parallel run: default bound (cores - 1, memory permitting).
         let parCoord = makeLoadedCoordinator(document: doc)
         addRegionToAllPages(parCoord, pageCount: pageCount)
-        let parPages = parCoord.buildPDFPageData(effectiveMode: .secureRasterization)
+        let parPages = parCoord.buildPDFPageData(effectiveMode: .secureRasterization, record: nil)
         let parClock = ContinuousClock.now
         try await parCoord.rasterizePagesInParallel(
             pages: parPages, rasterizer: PageRasterizer()

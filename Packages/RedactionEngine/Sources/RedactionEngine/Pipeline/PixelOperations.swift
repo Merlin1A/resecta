@@ -155,9 +155,8 @@ extension CGRect {
 /// `CancellationLatencyTests` and the engine performance baseline.
 internal let cancellationBandRows: Int = 256
 
-/// Apply opaque fills over redaction regions. Uses bitmap dimensions only —
-/// no PDF page geometry needed because the bitmap already contains the
-/// correctly-rendered visual content.
+/// Apply opaque fills over redaction regions, mapped on the page's content
+/// basis (`content`); the region path, for a page the plan does not paint.
 ///
 /// Each region's pixel rect is split into 256-row scanline bands so
 /// `Task.checkCancellation()` can run between bands. The bands tile exactly
@@ -183,23 +182,37 @@ func applyRedactionFills(
         // Fill in 256-row bands with a cancellation check between
         // bands. Region rects are already pixel-aligned (see
         // normalizedToFillPixels → pixelAligned), so integer banding is safe.
-        let minY = Int(pixelRect.minY)
-        let maxY = Int(pixelRect.maxY)
-        guard maxY > minY else { continue }
+        try fillBands(context: context, rect: pixelRect)
+    }
+}
 
-        var bandStart = minY
-        while bandStart < maxY {
-            try Task.checkCancellation()
-            let bandEnd = min(bandStart + cancellationBandRows, maxY)
-            let band = CGRect(
-                x: pixelRect.minX,
-                y: CGFloat(bandStart),
-                width: pixelRect.width,
-                height: CGFloat(bandEnd - bandStart)
-            )
-            context.fill(band)
-            bandStart = bandEnd
-        }
+/// One rectangle of whole pixels filled opaque in 256-row bands, with a
+/// cancellation check between bands (as `applyRedactionFills` fills).
+func fillInBands(context: CGContext, rect: CGRect, fillColor: FillColor) throws {
+    context.setBlendMode(.copy)
+    context.setShouldAntialias(false)
+    context.setFillColor(fillColor.cgColor)
+    try fillBands(context: context, rect: rect)
+}
+
+/// The band loop, in the context's current fill state.
+private func fillBands(context: CGContext, rect pixelRect: CGRect) throws {
+    let minY = Int(pixelRect.minY)
+    let maxY = Int(pixelRect.maxY)
+    guard maxY > minY else { return }
+
+    var bandStart = minY
+    while bandStart < maxY {
+        try Task.checkCancellation()
+        let bandEnd = min(bandStart + cancellationBandRows, maxY)
+        let band = CGRect(
+            x: pixelRect.minX,
+            y: CGFloat(bandStart),
+            width: pixelRect.width,
+            height: CGFloat(bandEnd - bandStart)
+        )
+        context.fill(band)
+        bandStart = bandEnd
     }
 }
 
@@ -364,11 +377,18 @@ func inkGrowthRect(context: CGContext, fillRect: CGRect) throws -> CGRect? {
 func inkGrowthRects(context: CGContext, regions: [RedactionRegion], content: CGSize? = nil) throws -> [CGRect] {
     let basis = content ?? CGSize(width: context.width, height: context.height)
     return try regions.compactMap { region in
-        switch region.source {
-        case .searchMatch, .detectedPII: break
-        case .manual, .detectedFace: return nil
-        }
+        guard inkGrowthApplies(to: region) else { return nil }
         return try inkGrowthRect(context: context, fillRect: normalizedToFillPixels(
             region.normalizedRect, content: basis))
+    }
+}
+
+/// Whether a region grows over the ink crossing its edge: one placed from
+/// text (a search match, detected PII). A box the user drew, or a face, is
+/// filled as drawn.
+func inkGrowthApplies(to region: RedactionRegion) -> Bool {
+    switch region.source {
+    case .searchMatch, .detectedPII: true
+    case .manual, .detectedFace: false
     }
 }

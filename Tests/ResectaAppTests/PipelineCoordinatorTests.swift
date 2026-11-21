@@ -15,7 +15,7 @@ struct PipelineCoordinatorTests {
     @Test("Returns empty array when no document loaded")
     func emptyForNoDocument() {
         let coord = makeCoordinator()
-        let pages = coord.buildPDFPageData(effectiveMode: .secureRasterization)
+        let pages = coord.buildPDFPageData(effectiveMode: .secureRasterization, record: nil)
         #expect(pages.isEmpty)
     }
 
@@ -23,7 +23,7 @@ struct PipelineCoordinatorTests {
     func returnsPageDataForDocument() {
         let coord = makeCoordinator()
         coord.documentState.sourceDocument = makeTestPDFDocument()
-        let pages = coord.buildPDFPageData(effectiveMode: .secureRasterization)
+        let pages = coord.buildPDFPageData(effectiveMode: .secureRasterization, record: nil)
         #expect(pages.count == 1)
     }
 
@@ -31,7 +31,7 @@ struct PipelineCoordinatorTests {
     func preservesPageIndex() {
         let coord = makeCoordinator()
         coord.documentState.sourceDocument = makeTestPDFDocument()
-        let pages = coord.buildPDFPageData(effectiveMode: .secureRasterization)
+        let pages = coord.buildPDFPageData(effectiveMode: .secureRasterization, record: nil)
         #expect(pages.first?.pageIndex == 0)
     }
 
@@ -50,7 +50,7 @@ struct PipelineCoordinatorTests {
             source: .manual)
         coord.redactionState.regions[0] = [tiny, normal]
 
-        let pages = coord.buildPDFPageData(effectiveMode: .secureRasterization)
+        let pages = coord.buildPDFPageData(effectiveMode: .secureRasterization, record: nil)
         #expect(pages.first?.regions.count == 1)
         #expect(pages.first?.regions.first?.id == normal.id)
     }
@@ -60,7 +60,7 @@ struct PipelineCoordinatorTests {
         let coord = makeCoordinator()
         coord.documentState.sourceDocument = makeTestPDFDocument()
         // No regions stored for page 0
-        let pages = coord.buildPDFPageData(effectiveMode: .secureRasterization)
+        let pages = coord.buildPDFPageData(effectiveMode: .secureRasterization, record: nil)
         #expect(pages.first?.regions.isEmpty == true)
     }
 
@@ -72,7 +72,7 @@ struct PipelineCoordinatorTests {
         coord.documentState.sourceDocument = makeTestPDFDocument()
         coord.documentState.textLayerStatus[0] = .rich
 
-        let pages = coord.buildPDFPageData(effectiveMode: .secureRasterization)
+        let pages = coord.buildPDFPageData(effectiveMode: .secureRasterization, record: nil)
         #expect(pages.first?.pipelineMode == .secureRasterization)
         // A secure-raster-mode run rasterizes by choice — no reason.
         #expect(pages.first?.fallbackReason == nil)
@@ -90,7 +90,7 @@ struct PipelineCoordinatorTests {
         )
         coord.documentState.textLayerStatus[0] = .rich
 
-        let pages = coord.buildPDFPageData(effectiveMode: .searchableRedaction)
+        let pages = coord.buildPDFPageData(effectiveMode: .searchableRedaction, record: nil)
         #expect(pages.first?.pipelineMode == .searchableRedaction)
         // A page that keeps searchable mode carries no reason.
         #expect(pages.first?.fallbackReason == nil)
@@ -102,7 +102,7 @@ struct PipelineCoordinatorTests {
         coord.documentState.sourceDocument = makeTestPDFDocument()
         coord.documentState.textLayerStatus[0] = .sparse
 
-        let pages = coord.buildPDFPageData(effectiveMode: .searchableRedaction)
+        let pages = coord.buildPDFPageData(effectiveMode: .searchableRedaction, record: nil)
         #expect(pages.first?.pipelineMode == .secureRasterization)
         // A sparse page in a Searchable-mode run is a per-page
         // fallback the report explains.
@@ -115,7 +115,7 @@ struct PipelineCoordinatorTests {
         coord.documentState.sourceDocument = makeTestPDFDocument()
         // No textLayerStatus entry for page 0
 
-        let pages = coord.buildPDFPageData(effectiveMode: .searchableRedaction)
+        let pages = coord.buildPDFPageData(effectiveMode: .searchableRedaction, record: nil)
         #expect(pages.first?.pipelineMode == .secureRasterization)
         #expect(pages.first?.fallbackReason == .noExtractableText)
     }
@@ -128,7 +128,7 @@ struct PipelineCoordinatorTests {
         coord.documentState.sourceDocument = makeTestPDFDocument()
         coord.settingsState.fillColor = .white
 
-        let pages = coord.buildPDFPageData(effectiveMode: .secureRasterization)
+        let pages = coord.buildPDFPageData(effectiveMode: .secureRasterization, record: nil)
         #expect(pages.first?.fillColor == .white)
     }
 
@@ -138,7 +138,7 @@ struct PipelineCoordinatorTests {
         coord.documentState.sourceDocument = makeTestPDFDocument()
         coord.settingsState.exportDPI = 200
 
-        let pages = coord.buildPDFPageData(effectiveMode: .secureRasterization)
+        let pages = coord.buildPDFPageData(effectiveMode: .secureRasterization, record: nil)
         #expect(pages.first?.targetDPI == 200)
     }
 
@@ -148,7 +148,7 @@ struct PipelineCoordinatorTests {
     func usesPageRotation() {
         let coord = makeCoordinator()
         coord.documentState.sourceDocument = makeTestPDFDocument()
-        let pages = coord.buildPDFPageData(effectiveMode: .secureRasterization)
+        let pages = coord.buildPDFPageData(effectiveMode: .secureRasterization, record: nil)
         // Standard PDF page has rotation 0
         #expect(pages.first?.rotation == 0)
     }
@@ -161,7 +161,7 @@ struct PipelineCoordinatorTests {
         coord.documentState.sourceDocument = makeMultiPagePDFDocument(pages: 3)
         coord.documentState.sourceHasHiddenOCG = true
 
-        let pages = coord.buildPDFPageData(effectiveMode: .secureRasterization)
+        let pages = coord.buildPDFPageData(effectiveMode: .secureRasterization, record: nil)
         #expect(pages.count == 3)
         #expect(pages.allSatisfy { $0.hasHiddenOCG })
     }
@@ -171,7 +171,7 @@ struct PipelineCoordinatorTests {
         let coord = makeCoordinator()
         coord.documentState.sourceDocument = makeTestPDFDocument()
         // sourceHasHiddenOCG defaults to false
-        let pages = coord.buildPDFPageData(effectiveMode: .secureRasterization)
+        let pages = coord.buildPDFPageData(effectiveMode: .secureRasterization, record: nil)
         #expect(pages.first?.hasHiddenOCG == false)
     }
 
@@ -181,7 +181,7 @@ struct PipelineCoordinatorTests {
     func multiPagePreservesOrder() {
         let coord = makeCoordinator()
         coord.documentState.sourceDocument = makeMultiPagePDFDocument(pages: 3)
-        let pages = coord.buildPDFPageData(effectiveMode: .secureRasterization)
+        let pages = coord.buildPDFPageData(effectiveMode: .secureRasterization, record: nil)
         #expect(pages.count == 3)
         #expect(pages.map(\.pageIndex) == [0, 1, 2])
     }
@@ -195,7 +195,7 @@ struct PipelineCoordinatorTests {
             source: .manual)
         coord.redactionState.regions[1] = [region]
 
-        let pages = coord.buildPDFPageData(effectiveMode: .secureRasterization)
+        let pages = coord.buildPDFPageData(effectiveMode: .secureRasterization, record: nil)
         #expect(pages[0].regions.isEmpty)
         #expect(pages[1].regions.count == 1)
     }
@@ -204,7 +204,7 @@ struct PipelineCoordinatorTests {
     func fillColorDefault() {
         let coord = makeCoordinator()
         coord.documentState.sourceDocument = makeTestPDFDocument()
-        let pages = coord.buildPDFPageData(effectiveMode: .secureRasterization)
+        let pages = coord.buildPDFPageData(effectiveMode: .secureRasterization, record: nil)
         #expect(pages.first?.fillColor == coord.settingsState.fillColor)
     }
 
@@ -302,7 +302,7 @@ struct PipelineCoordinatorTests {
             text: "The quick brown fox jumps over the lazy dog near the river bank."
         )
         coord.documentState.textLayerStatus[0] = .rich
-        let pages = coord.buildPDFPageData(effectiveMode: .searchableRedaction)
+        let pages = coord.buildPDFPageData(effectiveMode: .searchableRedaction, record: nil)
         #expect(pages.first?.pipelineMode == .searchableRedaction)
     }
 
@@ -326,7 +326,7 @@ struct PipelineCoordinatorTests {
         coord.documentState.sourceDocument = doc
         coord.documentState.textLayerStatus[0] = .rich
 
-        let pages = coord.buildPDFPageData(effectiveMode: .searchableRedaction)
+        let pages = coord.buildPDFPageData(effectiveMode: .searchableRedaction, record: nil)
         #expect(pages.first?.pipelineMode == .searchableRedaction)
         #expect(pages.first?.rotation == rotation)
     }
@@ -341,7 +341,7 @@ struct PipelineCoordinatorTests {
             text: "هذا مستند تجريبي باللغة العربية للتحقق من مسار التراجع"
         )
         coord.documentState.textLayerStatus[0] = .rich
-        let pages = coord.buildPDFPageData(effectiveMode: .searchableRedaction)
+        let pages = coord.buildPDFPageData(effectiveMode: .searchableRedaction, record: nil)
         #expect(pages.first?.pipelineMode == .secureRasterization)
         // The trigger's reason is recorded, not discarded.
         #expect(pages.first?.fallbackReason == .rtlText)
@@ -363,7 +363,7 @@ struct PipelineCoordinatorTests {
             documentState: coord.documentState, redactionState: coord.redactionState)
         #expect(outcome == .completed)
 
-        let pages = coord.buildPDFPageData(effectiveMode: .searchableRedaction)
+        let pages = coord.buildPDFPageData(effectiveMode: .searchableRedaction, record: nil)
         #expect(pages.count == 3)
         for page in pages {
             #expect(page.pipelineMode == .searchableRedaction, "page \(page.pageIndex)")
@@ -378,7 +378,7 @@ struct PipelineCoordinatorTests {
             text: "The quick brown fox jumps over the lazy dog near the river bank."
         )
         coord.documentState.textLayerStatus[0] = .rich
-        let pages = coord.buildPDFPageData(effectiveMode: .secureRasterization)
+        let pages = coord.buildPDFPageData(effectiveMode: .secureRasterization, record: nil)
         #expect(pages.first?.pipelineMode == .secureRasterization)
         #expect(pages.first?.fallbackReason == nil)
     }

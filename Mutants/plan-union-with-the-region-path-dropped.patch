@@ -1,0 +1,19 @@
+Property: A box paints at least each region it holds as the region path fills it, so cover never shrinks against the region path (a region past the left or bottom edge is slid onto the page whole by the run's clamp).
+Area: the producer's plan paint (Engine)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter PlanPaintTests
+Must go red: RedactionEngineTests/PlanPaintTests coversTheRegionPath [pastLeft]; RedactionEngineTests/PlanPaintTests coversTheRegionPath [pastBottom]; RedactionEngineTests/PlanPaintTests recordBoxPastAnEdge [pastLeft]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
+index 06cd4910..95d26a6d 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
+@@ -207,7 +207,7 @@ extension PageRasterizer {
+             for id in box.regionIDs {
+                 guard let region = regionsByID[id] else { continue }
+                 let filled = normalizedToFillPixels(region.normalizedRect, content: content).intersection(bitmap)
+-                if !filled.isEmpty { rect = rect.union(filled) }
++                _ = filled
+             }
+             painted.formUnion(box.regionIDs)
+             if box.regionIDs.contains(where: { growsOnInk[$0] == true }),

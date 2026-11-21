@@ -1,0 +1,19 @@
+Property: A page image under any filter but DCTDecode alone is refused before its stream is copied, so no other filter is undone.
+Area: the reader of a page's stored picture (crafted input)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/PageImageCraftedInputTests (or on the host: cd Packages/RedactionEngine && swift test --no-parallel --filter PageImageCraftedInputTests)
+Must go red: RedactionEngineTests/PageImageCraftedInputTests filteredPictureNeverCopied
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PageImageLocator.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PageImageLocator.swift
+index 59f7c5c6..1d667199 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PageImageLocator.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/PageImageLocator.swift
+@@ -106,7 +106,7 @@ struct SystemPageImageSource: PageImageSource {
+                 // A stream under any other filter is not copied: copying
+                 // undoes the filter first, and a Flate stream can inflate a
+                 // thousand times over before it could be refused.
+-                guard isJPEGAlone(d) else {
++                guard isJPEGAlone(d) || true else {
+                     walk.found.append(PageImageStream(bytes: Data(), isJPEG: false))
+                     continue
+                 }

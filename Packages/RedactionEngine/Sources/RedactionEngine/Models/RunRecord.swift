@@ -123,6 +123,10 @@ public struct RunRecord: Equatable, Sendable {
         package var pageImageDigests: [Int: Data]
         /// The rectangle the rasterizer reports having painted for each box.
         package var paintedRectangles: [BoxPosition: PaintedPixels]
+        /// The regions the rasterizer painted that no box of the page's plan
+        /// holds, by page index: painted on their own, and read by the
+        /// position check as not checked.
+        package var regionsPaintedOutsideThePlan: [Int: Set<UUID>] = [:]
         /// Which way found the information dictionary for its rewrite; nil
         /// until the rewrite has run.
         package var infoDictionary: InfoDictionaryWay?
@@ -142,7 +146,23 @@ public struct RunRecord: Equatable, Sendable {
             self.infoDictionary = infoDictionary
         }
     }
+}
 
+extension RunRecord.Produced {
+    /// Records what the rasterizer reports for one page: the rectangle it
+    /// painted for each box of the page's plan, and the regions it painted
+    /// outside the plan. The one writer of both fields.
+    public mutating func record(_ result: RasterizeResult, pageIndex: Int) {
+        for (box, pixels) in result.paintedBoxes {
+            paintedRectangles[RunRecord.BoxPosition(pageIndex: pageIndex, box: box)] = pixels
+        }
+        if !result.regionsPaintedOutsideThePlan.isEmpty {
+            regionsPaintedOutsideThePlan[pageIndex] = result.regionsPaintedOutsideThePlan
+        }
+    }
+}
+
+extension RunRecord {
     /// A box of a page's plan: the page, and the box's place in that page's
     /// plan, from 0.
     package struct BoxPosition: Hashable, Sendable {

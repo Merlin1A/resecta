@@ -4,10 +4,11 @@ import Foundation
 // than by a list of byte patterns. Accepted only when the picture is
 // baseline sequential with eight bits a sample; has one component or three,
 // sampled once or twice, brightness never below colour; has one frame and
-// one scan that names every component; carries a JFIF header and no Adobe
-// segment, so three components are brightness and two colour differences;
-// defines every table before the scan uses it, once, and uses each; keeps
-// every segment inside the stream; and puts no fill byte before a marker.
+// one scan that names every component; carries a JFIF header of 16 bytes
+// whose thumbnail sides are zero, and no Adobe segment, so three components
+// are brightness and two colour differences; defines every table before the
+// scan uses it, once, and uses each; keeps every segment inside the stream;
+// and puts no fill byte before a marker.
 // Segments outside the admitted list are counted by kind and length, and
 // admitted up to a named limit. Anything else is a refusal with its reason
 // and the byte where it was met.
@@ -50,7 +51,10 @@ struct JPEGHuffmanTable: Sendable {
             minCode[length] = code
             code += counts[length]
             k += counts[length]
-            guard code <= (1 << length) else { return nil }
+            // The code of all ones is reserved (the standard's Annex C;
+            // libjpeg refuses a table that uses it), so the codes of each
+            // length end below it.
+            guard code < (1 << length) else { return nil }
             maxCode[length] = counts[length] > 0 ? code - 1 : -1
             code <<= 1
         }
@@ -122,6 +126,12 @@ struct JPEGHeader: Sendable {
             switch marker {
             case 0xE0 where starts(jfif, at: body, end: end):
                 if sawJFIF { throw refuse(.secondJFIFHeader, i) }
+                // 16 bytes, no thumbnail, as the system encoder writes it. A
+                // longer one carries bytes this reader would never read.
+                guard length == 16 else { throw refuse(.jfifHeaderLength, i) }
+                // Its last two bytes are the thumbnail's sides: a 16-byte
+                // header has room for none, so both are zero.
+                guard b[body + 12] == 0, b[body + 13] == 0 else { throw refuse(.jfifThumbnail, i) }
                 sawJFIF = true
             case 0xEE where starts(adobe, at: body, end: end):
                 throw refuse(.adobeSegment, i)
