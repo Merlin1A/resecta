@@ -476,7 +476,7 @@ If you review one path end-to-end, make it this one:
 `Verification/VerificationEngine.swift` (the layered pass over the output) →
 `SecurityTests/FakeRedactionTests.swift` (the named attack, pinned). The test
 tree is larger than the source tree — about 84,000 lines of source to about
-144,000 lines of tests; counts and structure are in the README's Testing
+149,000 lines of tests; counts and structure are in the README's Testing
 section — and the suites above are the reason I trust my own output enough to
 ship it.
 

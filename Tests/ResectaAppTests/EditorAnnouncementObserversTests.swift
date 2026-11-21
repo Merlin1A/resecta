@@ -11,12 +11,20 @@ struct EditorAnnouncementObserversTests {
 
     @Test("A delete announces the delete, not a cleared selection")
     func deleteAnnouncesItself() {
-        #expect(EditorAnnouncementObservers.selectionAnnouncement(newCount: 0, regionsRemoved: true)
+        #expect(EditorAnnouncementObservers.selectionAnnouncement(newCount: 0, regionsRemoved: 1)
                 == PDFViewCoordinator.commitAnnouncement(.deleted))
-        #expect(EditorAnnouncementObservers.selectionAnnouncement(newCount: 0, regionsRemoved: false)
+        #expect(EditorAnnouncementObservers.selectionAnnouncement(newCount: 0, regionsRemoved: 0)
                 == "Selection cleared")
-        #expect(EditorAnnouncementObservers.selectionAnnouncement(newCount: 3, regionsRemoved: false)
+        #expect(EditorAnnouncementObservers.selectionAnnouncement(newCount: 3, regionsRemoved: 0)
                 == "3 regions selected")
+    }
+
+    @Test("Deleting two boxes speaks once")
+    func deletingTwoSpeaksOnce() {
+        // "Deleted 2 regions." is the message's own words, spoken by the
+        // queue; the selection line says nothing beside it.
+        #expect(EditorAnnouncementObservers.selectionAnnouncement(newCount: 0, regionsRemoved: 2) == nil)
+        #expect(EditorAnnouncementObservers.selectionAnnouncement(newCount: 0, regionsRemoved: 5) == nil)
     }
 
     @Test("No hover popover while the search sheet is up")

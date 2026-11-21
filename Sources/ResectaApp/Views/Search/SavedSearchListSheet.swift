@@ -14,12 +14,16 @@ import RedactionEngine
 //
 // Presented through the hub's single `.sheet(item:)` slot as
 // `SearchModal.savedSearches`. The capture
-// monitor arrives as a `let` injected from the call site — never an
-// @Environment read inside a view that re-lays-out during sheet dismissal.
+// monitor and the message queue arrive as `let`s injected from the call
+// site — never an @Environment read inside a view that re-lays-out during
+// sheet dismissal.
 
 struct SavedSearchListSheet: View {
     let searchState: SearchState
     let captureMonitor: ScreenCaptureMonitor
+    /// The message queue: this sheet draws its own receipts and holds the
+    /// queue while a dialog is up.
+    let toastManager: ToastQueueManager
     /// Hub-owned recall: applies the shape to `searchState`, triggers the
     /// search, and dismisses this sheet.
     let onRecall: (SavedSearch) -> Void
@@ -116,6 +120,7 @@ struct SavedSearchListSheet: View {
                     Button("Done") { dismiss() }
                 }
             }
+            .holdsMessages(toastManager, while: renameTarget != nil)
             .alert(Self.renameTitle(for: renameTarget), isPresented: Binding(
                 get: { renameTarget != nil },
                 set: { if !$0 { renameTarget = nil } }
@@ -159,6 +164,7 @@ struct SavedSearchListSheet: View {
                 Text(renameError
                      ?? "The new name is capped at \(SavedSearch.nameLengthCap) characters.")
             }
+            .holdsMessages(toastManager, while: showSavePrompt)
             .alert(Self.savePromptTitle(for: activeInterface), isPresented: $showSavePrompt) {
                 TextField("Name", text: $savePromptName)
                 Button("Save") {
@@ -201,6 +207,7 @@ struct SavedSearchListSheet: View {
             // the app-wide confirmation-dialog pattern (Settings
             // Reset-to-Defaults / Redact N instances). Title comes from
             // `deleteConfirmTitle(for:)` so the copy is pinned by test.
+            .holdsMessages(toastManager, while: deleteTarget != nil)
             .confirmationDialog(
                 Self.deleteConfirmTitle(for: deleteTarget),
                 isPresented: Binding(
@@ -223,6 +230,7 @@ struct SavedSearchListSheet: View {
             // the other interface's list and the other stores are
             // unaffected. Strings come from the `clearAll*(for:)` statics
             // so the copy is pinned by test.
+            .holdsMessages(toastManager, while: showClearAllConfirmation)
             .confirmationDialog(
                 Self.clearAllTitle(for: activeInterface),
                 isPresented: $showClearAllConfirmation,
@@ -276,6 +284,7 @@ struct SavedSearchListSheet: View {
         // Saved query previews may themselves be PII — this sheet
         // presents modally above the search sheet's shield swap, so it
         // carries its own screen-capture shield for the same reason.
+        .messageHost(toastManager, place: .otherSheet)
         .shieldedSheetContent(monitor: captureMonitor)
         .presentationBackground(.regularMaterial)
     }

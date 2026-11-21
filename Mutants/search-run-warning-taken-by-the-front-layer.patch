@@ -1,0 +1,18 @@
+Property: A warning a run raises belongs to the sheet that ran it, so a sheet in front of it, or leaving, neither draws it nor ends it.
+Area: brief messages (the layer a run's warning belongs to)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/ToastQueueManagerTests -only-testing:ResectaAppTests/ReceiptRulesTests
+Must go red: ResectaAppTests/ToastQueueManagerTests runWarningBelongsToItsSheet; ResectaAppTests/ReceiptRulesTests layerAtPost
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/ReceiptRules.swift b/Sources/ResectaApp/State/ReceiptRules.swift
+index e5c7463b..3e157643 100644
+--- a/Sources/ResectaApp/State/ReceiptRules.swift
++++ b/Sources/ResectaApp/State/ReceiptRules.swift
+@@ -161,7 +161,6 @@ enum ReceiptRules {
+     /// remaining layer; else to none yet (it takes the front when shown).
+     static func layerAtPost(named runLayer: UUID?, showsInRemainingLayer: Bool,
+                             in stack: [MessageLayerFacts]) -> UUID? {
+-        if let runLayer, stack.contains(where: { $0.id == runLayer }) { return runLayer }
+         return showsInRemainingLayer ? remainingLayer(in: stack) : nil
+     }
+ 

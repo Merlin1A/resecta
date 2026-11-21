@@ -87,8 +87,11 @@ struct TransitionResolverTests {
         // slide-in of VerificationProgressView (DocumentEditorView.swift)
         // and each finished check's bottom-edge row slide-in
         // (VerificationProgressView.swift) went with it.
-        #expect(totalMoveEdgeSites == 6,
-                "expected 6 `.move(edge` sites under Sources/ResectaApp/Views, found \(totalMoveEdgeSites)")
+        // Four since brief messages got one host: ContentView's two toast
+        // overlays and Search's own bottom overlay became the one slide-in
+        // in Messages/MessageHost.swift.
+        #expect(totalMoveEdgeSites == 4,
+                "expected 4 `.move(edge` sites under Sources/ResectaApp/Views, found \(totalMoveEdgeSites)")
     }
 
     /// For every occurrence of a REAL `.move(edge: .something)` call in

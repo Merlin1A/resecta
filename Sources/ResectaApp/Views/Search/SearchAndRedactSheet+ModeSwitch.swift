@@ -234,9 +234,9 @@ extension SearchAndRedactSheet {
                 }
             },
             // The Undo means what it offered only while the document is
-            // being edited: a tap in any other phase runs nothing. The
-            // queue's documentPhaseDidChange(to:) ends the message when the
-            // phase leaves editing; nothing in the app calls it yet.
+            // being edited: a tap in any other phase runs nothing, and the
+            // queue ends the message when the editor tells it the phase has
+            // left editing.
             stillValid: { [weak documentState] in documentState?.phaseKind == .editing }
         )
     }

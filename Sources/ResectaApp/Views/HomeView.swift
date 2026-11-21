@@ -9,6 +9,7 @@ import SwiftUI
 struct HomeView: View {
     @Environment(AppCoordinator.self) private var appCoordinator
     @Environment(SettingsState.self) private var settingsState
+    @Environment(ToastQueueManager.self) private var toastManager
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
@@ -85,6 +86,7 @@ struct HomeView: View {
                     .accessibilityIdentifier("homeSettingsButton")
                 }
             }
+            .holdsMessages(toastManager, while: showFilePicker)
             .fileImporter(
                 isPresented: $showFilePicker,
                 allowedContentTypes: ImportService.acceptedContentTypes,
@@ -92,7 +94,7 @@ struct HomeView: View {
             ) { result in
                 handleFileImportResult(result)
             }
-            .photoImport(isPresented: $showPhotoPicker) { images, count in
+            .photoImport(isPresented: $showPhotoPicker, toastManager: toastManager) { images, count in
                 guard !isOpening else { return }
                 isOpening = true
                 Task { await appCoordinator.openRedactWithImages(images, count: count) }
@@ -100,6 +102,9 @@ struct HomeView: View {
             .sheet(isPresented: $showSettings) {
                 SettingsView()
                     .environment(settingsState)
+                    .environment(toastManager)
+                    .messageHost(toastManager, place: .otherSheet)
+                    .messageLayer(toastManager, role: .draws)
                     .presentationDetents([.medium, .large])
             }
             // The failed screen's "Choose Another File" asks for the door the

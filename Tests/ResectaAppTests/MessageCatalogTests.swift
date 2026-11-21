@@ -368,8 +368,7 @@ struct MessageCatalogTests {
             guard let toast = queue.activeToasts.first else { continue }
             #expect(toast.message == row.text, "\(id)")
             #expect(toast.severity == row.todaySeverity, "\(id)")
-            let atItsEdge = row.todaySeverity.position == .top ? queue.activeTopToasts : queue.activeBottomToasts
-            #expect(atItsEdge.map(\.id) == [toast.id], "\(id)")
+            #expect(queue.activeToasts.map(\.id) == [toast.id], "\(id)")
             #expect(toast.actionLabel == row.actionLabel, "\(id)")
             #expect((toast.actionHandler != nil) == (row.actionLabel != nil), "\(id)")
             queue.clearAll()

@@ -406,10 +406,10 @@ nonisolated final class EditorChromeUITests: XCTestCase {
     // MARK: - A bottom message above the page bar, at every text size
 
     /// The gap between a bottom message's foot and the page bar's glass at
-    /// the default text size: the 32 pt (`ResectaTokens.Spacing.xl`) the
-    /// bottom toast hosts add above their lift. Read on the unchanged tree:
-    /// the message's element reports its whole frame, padding included.
-    private static let defaultGapAbovePageBar: CGFloat = 32
+    /// every text size: the 8 pt the message host adds above the chrome
+    /// (`MessagePlacement.aboveChrome`). Read from the receipt's own
+    /// element, whose frame is its capsule.
+    private static let gapAbovePageBar: CGFloat = 8
 
     /// The page bar's padding above its content, which the bar's element
     /// does not report (its identifier sits on the content).
@@ -434,8 +434,7 @@ nonisolated final class EditorChromeUITests: XCTestCase {
     private func readBottom(_ name: String) -> BottomReading {
         let bar = element("pageNav")
         XCTAssertTrue(bar.waitForExistence(timeout: 60), "The page bar never appeared.")
-        let message = app.staticTexts
-            .matching(NSPredicate(format: "label BEGINSWITH 'Text layer detected'")).firstMatch
+        let message = element("toastMessage")
         XCTAssertTrue(message.waitForExistence(timeout: 10), "The load message never appeared.")
         var frame = message.frame
         let deadline = Date().addingTimeInterval(3)
@@ -473,7 +472,7 @@ nonisolated final class EditorChromeUITests: XCTestCase {
     func testBottomMessage_atTheDefaultSize_keepsItsGapAboveThePageBar() {
         launchEditor(textSize: nil)
         let gap = readBottom("bottom-message-default-size").gap
-        XCTAssertLessThanOrEqual(abs(gap - Self.defaultGapAbovePageBar), 2,
+        XCTAssertLessThanOrEqual(abs(gap - Self.gapAbovePageBar), 2,
                                  "The message's gap above the page bar is \(gap) pt.")
     }
 
@@ -482,13 +481,13 @@ nonisolated final class EditorChromeUITests: XCTestCase {
         XCTAssertLessThanOrEqual(abs(read.sized.bar.height - read.base.bar.height), 1,
                                  "Below the accessibility sizes the counter is on one line: the page bar is \(read.sized.bar.height) pt tall, \(read.base.bar.height) pt at the default size.")
         let gap = read.sized.gap
-        XCTAssertLessThanOrEqual(abs(gap - Self.defaultGapAbovePageBar), 2,
+        XCTAssertLessThanOrEqual(abs(gap - Self.gapAbovePageBar), 2,
                                  "The message's gap above the page bar is \(gap) pt.")
     }
 
     func testBottomMessage_atAccessibilityOne_keepsItsGapAboveThePageBar() {
         let gap = readBottomAgainstTheDefault(textSize: "UICTContentSizeCategoryAccessibilityM", "bottom-message-accessibility-one").sized.gap
-        XCTAssertLessThanOrEqual(abs(gap - Self.defaultGapAbovePageBar), 2,
+        XCTAssertLessThanOrEqual(abs(gap - Self.gapAbovePageBar), 2,
                                  "The message's gap above the page bar is \(gap) pt.")
     }
 
@@ -498,7 +497,7 @@ nonisolated final class EditorChromeUITests: XCTestCase {
                              "At the largest size the counter stacks: the page bar is \(read.sized.bar.height) pt tall, \(read.base.bar.height) pt at the default size.")
         let gap = read.sized.gap
         XCTAssertGreaterThanOrEqual(gap, 0, "The message overlaps the page bar by \(-gap) pt.")
-        XCTAssertLessThanOrEqual(abs(gap - Self.defaultGapAbovePageBar), 2,
+        XCTAssertLessThanOrEqual(abs(gap - Self.gapAbovePageBar), 2,
                                  "The message's gap above the page bar is \(gap) pt.")
     }
 

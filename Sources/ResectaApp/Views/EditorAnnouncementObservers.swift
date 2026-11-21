@@ -29,10 +29,13 @@ struct EditorAnnouncementObservers: ViewModifier {
     static let nudgeToastMessage = "1 match nearby. Mark it too?"
     static let nudgeToastActionLabel = "Mark"
 
-    /// The spoken line for a selection change; a delete names itself with
-    /// the coordinator's one delete announcement.
-    static func selectionAnnouncement(newCount: Int, regionsRemoved: Bool) -> String {
-        if regionsRemoved { return PDFViewCoordinator.commitAnnouncement(.deleted) }
+    /// The spoken line for a selection change; a delete of one region names
+    /// itself with the coordinator's one delete announcement, and a delete
+    /// of two or more says nothing here: its message ("Deleted N regions.")
+    /// speaks for it.
+    static func selectionAnnouncement(newCount: Int, regionsRemoved: Int) -> String? {
+        if regionsRemoved >= 2 { return nil }
+        if regionsRemoved == 1 { return PDFViewCoordinator.commitAnnouncement(.deleted) }
         switch newCount {
         case 0: return "Selection cleared"
         case 1: return "1 region selected"
@@ -61,17 +64,26 @@ struct EditorAnnouncementObservers: ViewModifier {
                 regions: redactionState.regions.values.reduce(0) { $0 + $1.count }
             )) { old, new in
                 guard new.selected != old.selected, UIAccessibility.isVoiceOverRunning,
-                      documentState.phaseKind == .editing else { return }
-                AccessibilityNotification.Announcement(Self.selectionAnnouncement(
-                    newCount: new.selected, regionsRemoved: new.regions < old.regions)).post()
+                      documentState.phaseKind == .editing,
+                      let line = Self.selectionAnnouncement(
+                          newCount: new.selected, regionsRemoved: max(0, old.regions - new.regions))
+                else { return }
+                toastManager.announce(line)
             }
             // After Undo or Redo, show the first page the step changed and
             // name the step with its page.
             .onChange(of: redactionState.lastUndoRedo) { _, step in
                 guard let step, let page = step.pages.min(), documentState.phaseKind == .editing else { return }
                 if page != documentState.currentPageIndex { documentState.currentPageIndex = page }
-                AccessibilityNotification.Announcement(
-                    Self.undoRedoAnnouncement(step, pageCount: documentState.pageCount)).post()
+                toastManager.announce(Self.undoRedoAnnouncement(step, pageCount: documentState.pageCount))
+            }
+            // The queue ends a message whose phase has passed, and a message
+            // whose action no longer holds once the regions change.
+            .onChange(of: documentState.phaseKind, initial: true) { _, phase in
+                toastManager.documentPhaseDidChange(to: phase)
+            }
+            .onChange(of: redactionState.regionVersion) { _, _ in
+                toastManager.revalidate()
             }
             // iPad hover popover — observe hoveredRegionID on RedactionState
             .onChange(of: redactionState.hoveredRegionID) { _, newID in

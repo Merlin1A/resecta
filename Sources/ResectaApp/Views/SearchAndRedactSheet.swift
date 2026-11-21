@@ -27,6 +27,9 @@ struct SearchAndRedactSheet: View {
     @Environment(RedactionState.self) var redactionState
     @Environment(DocumentState.self) var documentState
     @Environment(ToastQueueManager.self) var toastManager
+    /// This sheet's message layer, set by its presenter's `.messageLayer`:
+    /// the warnings a run raises belong to it, whatever sheet is in front.
+    @Environment(\.messageLayerID) var messageLayerID
     @Environment(SettingsState.self) var settingsState
     @Environment(UserTermsStore.self) var userTermsStore
     @Environment(SavedRegexStore.self) var savedRegexStore
@@ -197,6 +200,7 @@ struct SearchAndRedactSheet: View {
             requestDismiss()
             return .handled
         }
+        .holdsMessages(toastManager, while: showDismissConfirmation)
         .alert(Self.dismissTitle, isPresented: $showDismissConfirmation) {
             Button("Discard", role: .destructive) {
                 performDismiss(afterConfirmation: true)
@@ -247,8 +251,12 @@ struct SearchAndRedactSheet: View {
                 ReverseRationalePopover(request: request)
                     .environment(settingsState)
                     .environment(userTermsStore)
+                    .messageHost(toastManager, place: .otherSheet)
+                    .messageLayer(toastManager, role: .draws)
             case .rowRationale(let rowID):
                 rowRationaleSheet(rowID: rowID)
+                    .messageHost(toastManager, place: .otherSheet)
+                    .messageLayer(toastManager, role: .draws)
             case .savedSearches:
                 // Store re-injected (sheet content does not
                 // inherit the presenting hierarchy's environment) and the
@@ -256,11 +264,13 @@ struct SearchAndRedactSheet: View {
                 SavedSearchListSheet(
                     searchState: searchState,
                     captureMonitor: captureMonitor,
+                    toastManager: toastManager,
                     onRecall: { saved in
                         recallSavedSearch(saved)
                     }
                 )
                 .environment(savedSearchStore)
+                .messageLayer(toastManager, role: .draws)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
             }
@@ -270,6 +280,7 @@ struct SearchAndRedactSheet: View {
         // `RegexSentinelCheck.validate(_:)`, then commits through
         // `savedRegexStore.add(label:pattern:)`; on success a toast
         // names where the saved pattern is managed.
+        .holdsMessages(toastManager, while: showSavedRegexSavePrompt)
         .alert(Self.saveCurrentRegexAlertTitle, isPresented: $showSavedRegexSavePrompt) {
             TextField("Label", text: $savedRegexSaveLabel)
                 .textInputAutocapitalization(.words)
@@ -393,7 +404,7 @@ struct SearchAndRedactSheet: View {
         // Notify when results are truncated.
         .onChange(of: searchState.resultsAtCap) { _, atCap in
             if atCap {
-                toastManager.post(.searchResultsTruncated)
+                toastManager.post(.searchResultsTruncated, runLayer: messageLayerID)
             }
         }
         // Mode switch cleanup: clear stale results and mode-specific state.
@@ -466,45 +477,12 @@ struct SearchAndRedactSheet: View {
             // Both toast hosts clear the parked float + the page bar.
             toastManager.bottomClearance = toastBottomClearance(sheetPresented: true)
         }
-        // Observed on-sim: the app's single toast host
-        // lives on ContentView, which renders BEHIND this presented
-        // sheet — bottom toasts (the mode-switch undo and apply-success
-        // toasts this sheet enqueues) were invisible and their Undo
-        // buttons un-tappable while the sheet was up (a tap on the
-        // ContentView copy's coordinates hits the sheet/scrim instead).
-        // Mount a sheet-local bottom host so this sheet's own toasts
-        // render in the presented layer. ContentView's copy stays —
-        // it is covered while the sheet is up and takes over if the
-        // toast outlives the sheet (e.g. a dismissal toast) — and at
-        // the compact float, where this host yields (the parked strip
-        // has no room, and the uncovered ContentView copy lifts by
-        // `bottomClearance` to clear it). Both hosts read the one
-        // clearance (`ParkedChromeLayout.toastClearance`).
-        .overlay(alignment: .bottom) {
-            if selectedDetent != .compactFloat {
-            VStack(spacing: ResectaTokens.Spacing.sm) {
-                ForEach(toastManager.activeBottomToasts) { item in
-                    ToastView(item: item, toastManager: toastManager)
-                        // Routed through the resolver so Reduce Motion
-                        // swaps the slide for an opacity-only crossfade.
-                        .transition(ResectaTokens.Anim.resolvedTransition(
-                            standard: .asymmetric(
-                                insertion: .move(edge: .bottom).combined(with: .opacity),
-                                removal: .opacity
-                            ),
-                            reduceMotion: reduceMotion))
-                        .onTapGesture { toastManager.dismiss(item) }
-                }
-            }
-            .padding(.bottom, ResectaTokens.Spacing.xl + Self.sheetToastLift(
-                clearance: toastManager.bottomClearance, footerHeight: footerHeight,
-                footerShown: searchState.filteredCount > 0))
-            .animation(
-                ResectaTokens.Anim.resolved(ResectaTokens.Anim.toastIn, reduceMotion: reduceMotion),
-                value: toastManager.toastVersion
-            )
-            }
-        }
+        // Search's brief messages are drawn in the sheet, 12 above its
+        // footer, inside its capture cover. At the compact float this layer
+        // yields and the editor's host draws them above the strip.
+        .messageHost(toastManager, place: .sheetFooter(lift: Self.sheetToastLift(
+            clearance: toastManager.bottomClearance, footerHeight: footerHeight,
+            footerShown: searchState.filteredCount > 0)), yields: selectedDetent == .compactFloat)
         // This sheet presents modally ABOVE the
         // editor's shield swap, so it needs its own. Outermost modifier so
         // the entire sheet (toolbar, results, footer) swaps for the shield.

@@ -29,6 +29,10 @@ struct CustomTermsView: View {
     static let alwaysFlagFooter = "Added as matches alongside detector hits. Use for names, project codes, or identifiers your detector presets may not recognize. Literal terms match anywhere inside a word, in any case."
 
     @Environment(UserTermsStore.self) private var userTermsStore
+    /// The message queue, held while the clear-all confirm is up; a `let`
+    /// from Settings, never an environment read in a view that re-lays-out
+    /// during the sheet's dismissal.
+    let toastManager: ToastQueueManager
 
     @State private var newAlwaysPattern: String = ""
     @State private var newAlwaysIsRegex: Bool = false
@@ -56,6 +60,7 @@ struct CustomTermsView: View {
         // Destructive confirm mirroring the Settings
         // Reset-to-Defaults dialog. Copy names exactly what is cleared:
         // both lists in this store, nothing else.
+        .holdsMessages(toastManager, while: showClearAllConfirmation)
         .confirmationDialog(
             "Delete all custom terms?",
             isPresented: $showClearAllConfirmation,
