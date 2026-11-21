@@ -221,4 +221,60 @@ nonisolated final class ReceiptPlacementUITests: XCTestCase {
         XCTAssertEqual(height, 215.7, accuracy: 4, "The message is not drawn at the third accessibility size.")
         attachScreenshot(named: "receipt-largest-drawn-smaller")
     }
+
+    // 9
+    /// A recall closes the saved list and starts Search's run at once, so
+    /// the run's first warning can arrive while the list is still in front.
+    /// The warning belongs to Search's run: it is seen on Search after the
+    /// list is gone. The image has no text layer, so with Include OCR off
+    /// the run raises the scanned-page warning.
+    func testWarningOfARecalledSearchIsSeenOnSearch() {
+        app.launchArguments = ["--uitesting", "--loadTestImage", "--openSearchSheet", "--searchDetent=large"]
+        app.launch()
+        let field = app.textFields["Search text"]
+        XCTAssertTrue(field.waitForExistence(timeout: 30), "Search never opened.")
+        let imageNote = labelled("Image pages are read")
+        _ = imageNote.waitForExistence(timeout: 10)
+        XCTAssertTrue(imageNote.waitForNonExistence(timeout: 30), "The image import's message never cleared.")
+        let options = app.buttons["Options"].firstMatch
+        XCTAssertTrue(options.waitForExistence(timeout: 10), "Search's options are missing.")
+        options.tap()
+        let ocr = app.buttons["Include scanned page text"].firstMatch
+        XCTAssertTrue(ocr.waitForExistence(timeout: 5), "The Include OCR Pages chip is missing.")
+        if (ocr.value as? String) == "on" { ocr.tap() }
+        XCTAssertEqual(ocr.value as? String, "off", "Include OCR Pages did not turn off.")
+        field.tap()
+        field.typeText("Amount")
+        // The first run's own warning shows and ends before the recall, so
+        // the recalled run's warning is a new one.
+        let warning = labelled("Some pages hold scanned regions")
+        XCTAssertTrue(warning.waitForExistence(timeout: 30), "With OCR off the image raised no warning.")
+        XCTAssertTrue(warning.waitForNonExistence(timeout: 45), "The first warning never ended.")
+
+        let bookmark = app.buttons["Saved Searches"].firstMatch
+        XCTAssertTrue(bookmark.waitForExistence(timeout: 10), "The Saved Searches control is missing.")
+        bookmark.tap()
+        let saveRow = app.buttons["Save current search…"]
+        XCTAssertTrue(saveRow.waitForExistence(timeout: 10), "The saved list never opened.")
+        let clearAll = app.buttons["savedSearchClearAllButton"]
+        if clearAll.waitForExistence(timeout: 2) {
+            clearAll.tap()
+            let confirm = app.buttons["savedSearchClearAllConfirm"].firstMatch
+            XCTAssertTrue(confirm.waitForExistence(timeout: 5), "Delete All has no confirm.")
+            confirm.tap()
+            XCTAssertTrue(app.staticTexts["No Saved Searches"].waitForExistence(timeout: 10), "The list did not empty.")
+        }
+        saveRow.tap()
+        let alert = app.alerts["Save current search"]
+        XCTAssertTrue(alert.waitForExistence(timeout: 10), "The save prompt never showed.")
+        let name = alert.textFields.firstMatch.value as? String ?? ""
+        alert.buttons["Save"].tap()
+        let row = app.staticTexts[name].firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "The saved search has no row.")
+        row.tap()
+        XCTAssertTrue(saveRow.waitForNonExistence(timeout: 10), "The recall did not close the saved list.")
+        XCTAssertTrue(warning.waitForExistence(timeout: 30), "The recalled run's warning was lost with the saved list.")
+        XCTAssertTrue(warning.isHittable, "The recalled run's warning is not drawn on Search.")
+        attachScreenshot(named: "receipt-recalled-search-warning")
+    }
 }
