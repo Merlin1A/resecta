@@ -537,9 +537,12 @@ struct DocumentEditorView: View {
     /// parked-canvas inset when the bar steps aside (a live result walk
     /// at the compact float) or never mounts (single-page documents).
     /// ONE model decides the branch and the inset (`ParkedChromeLayout`);
-    /// each branch writes the toast clearance from the same value on
+    /// each branch writes the toast clearance from the model on
     /// appearance, because the bar coming or going IS the event both
     /// toast hosts wait on (the sheet writes it on its detent changes).
+    /// The write reads the model as it stands, not `layout`: the bar's
+    /// measured height can land before `onAppear` runs, and the layout
+    /// taken for this body would put the floor back over it.
     @ViewBuilder
     private var pageNavigationBarInset: some View {
         let layout = parkedChromeLayout
@@ -551,11 +554,11 @@ struct DocumentEditorView: View {
                         toastManager.bottomClearance = parkedChromeLayout.toastClearance
                     }
                     .padding(.bottom, layout.canvasBottomInset)
-                    .onAppear { toastManager.bottomClearance = layout.toastClearance }
+                    .onAppear { toastManager.bottomClearance = parkedChromeLayout.toastClearance }
             } else {
                 Color.clear
                     .frame(height: layout.canvasBottomInset)
-                    .onAppear { toastManager.bottomClearance = layout.toastClearance }
+                    .onAppear { toastManager.bottomClearance = parkedChromeLayout.toastClearance }
             }
         }
         .animation(
