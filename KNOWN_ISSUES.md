@@ -357,6 +357,23 @@ On a scanned page, Resecta fits each box to the word's ink in the scan. If a sin
 
 **Workaround:** On scanned pages, before you tap Redact, check that each box covers the whole height of the word; where one does not, drag its handle down over the rest of the word, or draw a box over it with Rectangle.
 
+On a page that is turned (see KI-47), don't use these steps; check the exported file instead.
+
+---
+
+### KI-47: On a Turned Page, a Box You Draw, Move or Resize Can Miss the Text (High)
+**Affects:** Resecta 1.0 through 1.3.1, on PDF pages saved turned inside the file. Both export modes, Secure Rasterization and Searchable Redaction.
+
+Some PDFs, often scans, store a page sideways or upside down with a note to turn it when shown. Resecta shows these pages the right way up. On such a page, a box you draw with Rectangle, or any box you move or resize, is exported in a different place from where it is drawn. With either export mode, the text under the box stays readable in the exported page, and the checks after export can report a pass.
+
+Boxes placed by Search or Scan, and left where they were placed, are exported over the right text. On the same pages, though, Resecta draws them on screen in the wrong place.
+
+**How to tell if a page is affected:** Use Search for a word on the page. If the box it places is not drawn over the word it found, the page is affected.
+
+**Workaround:** On an affected page, don't draw, move or resize boxes, and don't use KI-45's steps. Use Search and Scan, and leave their boxes where they are placed, even though they look misplaced. Before you share any export, open the exported file and check that every box covers what it should.
+
+**Fix:** 1.4.0 places every box on a turned page where it is drawn, and draws Search and Scan boxes over their text.
+
 ---
 
 ## Fixed
