@@ -90,109 +90,24 @@ struct AccessibilityLabelTests {
         )
     }
 
-    // MARK: - ToastView line-limit at AX5
+    // MARK: - The brief message at the accessibility sizes
 
-    @Test("Toast caps at 2 lines for info severity below AX5")
-    func testToastInfoBelowAX5CapsAtTwoLines() {
-        // The compact-capsule contract, amended: the original 1-line
-        // info cap truncated shipped messages mid-sentence at standard
-        // text sizes (text-layer notice, dismissal-cleared counts), so
-        // info matches the warning/error 2-line cap.
-        #expect(
-            ToastView.toastLineLimit(
-                severity: .info,
-                dynamicTypeSize: .large
-            ) == 2
-        )
-    }
-
-    @Test("Toast caps at 2 lines for success severity below AX5")
-    func testToastSuccessBelowAX5CapsAtTwoLines() {
-        #expect(
-            ToastView.toastLineLimit(
-                severity: .success,
-                dynamicTypeSize: .large
-            ) == 2
-        )
-    }
-
-    @Test("Toast caps at 2 lines for warning severity below AX5")
-    func testToastWarningBelowAX5CapsAtTwoLines() {
-        // Attention-demanding severities get a second line so the
-        // warning text isn't truncated mid-clause at standard sizes.
-        #expect(
-            ToastView.toastLineLimit(
-                severity: .warning,
-                dynamicTypeSize: .large
-            ) == 2
-        )
-    }
-
-    @Test("Toast caps at 2 lines for error severity below AX5")
-    func testToastErrorBelowAX5CapsAtTwoLines() {
-        #expect(
-            ToastView.toastLineLimit(
-                severity: .error,
-                dynamicTypeSize: .large
-            ) == 2
-        )
-    }
-
-    @Test("Toast has no line cap at the accessibility sizes, for every severity",
-          arguments: [
-            ToastSeverity.info,
-            .success,
-            .warning,
-            .error,
-          ])
-    func testToastAtAccessibilitySizesHasNoCap(severity: ToastSeverity) {
-        for size in [DynamicTypeSize.accessibility1, .accessibility2, .accessibility3, .accessibility4, .accessibility5] {
-            #expect(ToastView.toastLineLimit(severity: severity, dynamicTypeSize: size) == nil, "\(size)")
-        }
-        #expect(ToastView.toastLineLimit(severity: severity, dynamicTypeSize: .xxxLarge) == 2,
-                "the largest standard size keeps the two-line cap")
-    }
-
-    @Test("Toast has no cap at AX5 for every severity",
-          arguments: [
-            ToastSeverity.info,
-            .success,
-            .warning,
-            .error,
-          ])
-    func testToastAtAX5HasNoCap(severity: ToastSeverity) {
-        #expect(
-            ToastView.toastLineLimit(
-                severity: severity,
-                dynamicTypeSize: .accessibility5
-            ) == nil
-        )
-    }
-
-    @Test("The toast's icon stacks above the text at the accessibility sizes, beside it at the standard sizes")
-    func testToastIconStacksAtAccessibilitySizes() {
+    @Test("A receipt takes the large layout at the accessibility sizes")
+    func testReceiptTakesTheLargeLayoutAtAccessibilitySizes() {
         for size in [DynamicTypeSize.accessibility1, .accessibility3, .accessibility5] {
-            #expect(ToastView.stacksIconAboveText(size), "\(size)")
+            #expect(ReceiptView.takesLargeLayout(size), "\(size)")
         }
         for size in [DynamicTypeSize.large, .xxxLarge] {
-            #expect(!ToastView.stacksIconAboveText(size), "\(size)")
+            #expect(!ReceiptView.takesLargeLayout(size), "\(size)")
         }
     }
 
-    @Test("Toast has no cap at AX4 (the second sentence shows whole)")
-    func testToastAtAX4HasNoCap() {
-        #expect(
-            ToastView.toastLineLimit(
-                severity: .info,
-                dynamicTypeSize: .accessibility4
-            ) == nil
-        )
-        #expect(
-            ToastView.toastLineLimit(
-                severity: .warning,
-                dynamicTypeSize: .accessibility4
-            ) == nil
-        )
+    @Test("The receipt's mark is the tone's symbol in a 20-point box")
+    func testReceiptMarkBox() {
+        #expect(ReceiptView.Metrics.markSide == 20)
+        for tone in MessageTone.allCases {
+            #expect(!ReceiptView.symbol(for: tone).isEmpty, "\(tone)")
+        }
     }
 
     // MARK: - Verification results action cards (nested-control fix)
@@ -366,12 +281,6 @@ struct AccessibilityLabelTests {
           arguments: [DynamicTypeSize.xSmall, .large, .xxxLarge])
     func testHeaderRowBelowAccessibilitySizes(size: DynamicTypeSize) {
         #expect(!SearchSheetHeaderSection.stacksAtAccessibilitySizes(size))
-    }
-
-    @Test("Toast icon scales with the message and keeps a 20-pt floor, never a fixed box")
-    func testToastIconScalesWithItsText() {
-        #expect(ToastView.toastIconFont == .callout.weight(.medium))
-        #expect(ToastView.toastIconMinimumSide == 20)
     }
 
     @Test("Search result row speaks the category, the page, the tier and 'applied' — the shape 'Address, page 1, medium confidence, applied'")

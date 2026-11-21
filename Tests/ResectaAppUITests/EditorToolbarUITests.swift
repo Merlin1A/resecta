@@ -223,7 +223,7 @@ nonisolated final class EditorToolbarUITests: XCTestCase {
             .matching(NSPredicate(format: "label BEGINSWITH 'Deleted 2 regions.'")).firstMatch
         XCTAssertTrue(notice.waitForExistence(timeout: 5), "Deleting two must show the notice.")
         attachScreenshot(named: "toolbar-delete-notice")
-        // The notice's button speaks as "Undo action" (ToastView).
+        // The notice's button speaks as "Undo action" (the receipt's button).
         let undo = app.buttons["Undo action"].firstMatch
         XCTAssertTrue(undo.waitForExistence(timeout: 5), "The notice must offer Undo.")
         undo.tap()

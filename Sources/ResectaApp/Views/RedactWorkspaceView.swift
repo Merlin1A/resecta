@@ -97,6 +97,7 @@ struct RedactWorkspaceView: View {
             // The replace dialog for a drop over an open document that
             // holds work: the replace dialog's words, the Close dialog's
             // sentence from its one home.
+            .holdsMessages(toastManager, while: heldDrop != nil)
             .confirmationDialog(
                 Self.dropReplaceTitle,
                 isPresented: Binding(
@@ -129,11 +130,16 @@ struct RedactWorkspaceView: View {
                     onCancel: cancelLockedImport,
                     isSubmitting: passwordSubmitInFlight
                 )
+                .messageHost(toastManager, place: .otherSheet)
+                .messageLayer(toastManager, role: .draws)
             }
             // Settings sheet
             .sheet(isPresented: $showSettings) {
                 SettingsView()
                     .environment(settingsState)
+                    .environment(toastManager)
+                    .messageHost(toastManager, place: .otherSheet)
+                    .messageLayer(toastManager, role: .draws)
                     .presentationDetents([.medium, .large])
             }
             // Environment injection — satisfies @Environment reads in

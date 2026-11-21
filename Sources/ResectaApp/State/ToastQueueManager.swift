@@ -13,40 +13,6 @@ enum ToastSeverity: Equatable {
     case success
     case warning
     case error
-
-    var sfSymbol: String {
-        switch self {
-        case .info: "info.circle.fill"
-        case .success: "checkmark.circle.fill"
-        case .warning: "exclamationmark.triangle.fill"
-        case .error: "xmark.circle.fill"
-        }
-    }
-
-    // Routed through the WCAG-AA text tier: ToastView
-    // applies this to the action-button TEXT, the severity glyph, and a
-    // 10%-opacity background fill. The text use is what mandates the
-    // text tier; the glyph/fill ride along on the same value.
-    var tintColor: Color {
-        switch self {
-        case .info: ResectaTokens.SemanticColor.infoText
-        case .success: ResectaTokens.SemanticColor.passText
-        case .warning: ResectaTokens.SemanticColor.warnText
-        case .error: ResectaTokens.SemanticColor.failText
-        }
-    }
-
-    /// Bottom for non-blocking confirmatory toasts; top for attention-demanding alerts.
-    var position: ToastPosition {
-        switch self {
-        case .info, .success: .bottom
-        case .warning, .error: .top
-        }
-    }
-}
-
-enum ToastPosition {
-    case top, bottom
 }
 
 /// The event a brief message reports. Two posts are the same message only
@@ -202,13 +168,6 @@ final class ToastQueueManager {
     /// one-line bar's height.
     var pageBarHeight: CGFloat = 0
 
-    /// Pre-filtered active toasts by position — avoids per-render .filter allocations.
-    var activeTopToasts: [ToastItem] {
-        activeToasts.filter { $0.severity.position == .top }
-    }
-    var activeBottomToasts: [ToastItem] {
-        activeToasts.filter { $0.severity.position == .bottom }
-    }
 
     /// The document phase last pushed; nil until one is (and at Home).
     private(set) var documentPhase: DocumentState.PhaseKind?
@@ -288,9 +247,12 @@ final class ToastQueueManager {
     /// the action only while it holds, and `revalidate()` ends the message
     /// once it does not. No `event` means a new one, except for a row that
     /// coalesces repeats: the same row with the same words already shown,
-    /// paused or waiting is that message, and nothing restarts.
+    /// paused or waiting is that message, and nothing restarts. With
+    /// `runLayer`, the layer whose run raised the message, the message
+    /// belongs to that layer while it is registered (`layerAtPost`).
     @discardableResult
-    func post(_ id: MessageID, event: MessageEvent? = nil, action: (@MainActor () -> Void)? = nil,
+    func post(_ id: MessageID, event: MessageEvent? = nil, runLayer: UUID? = nil,
+              action: (@MainActor () -> Void)? = nil,
               stillValid: (@MainActor () -> Bool)? = nil) -> MessageEvent {
         let row = MessageCatalog.row(for: id)
         if event == nil, row.coalescesRepeats,
@@ -307,7 +269,8 @@ final class ToastQueueManager {
             tone: row.tone, event: event ?? MessageEvent(), messageID: id,
             mustBeSeen: row.mustBeSeen, stillValid: stillValid,
             phases: row.phases, actionChangesState: row.actionChangesState)
-        admit(item, layer: row.showsInRemainingLayer ? ReceiptRules.remainingLayer(in: layers) : nil)
+        admit(item, layer: ReceiptRules.layerAtPost(
+            named: runLayer, showsInRemainingLayer: row.showsInRemainingLayer, in: layers))
         return item.event
     }
 
@@ -498,7 +461,13 @@ final class ToastQueueManager {
     func unregisterLayer(_ layer: UUID) {
         guard let index = layers.firstIndex(where: { $0.id == layer }) else { return }
         layers.remove(at: index)
-        endEntries { $0.layer == layer }
+        endEntries { entry in
+            entry.layer == layer && !ReceiptRules.handedOnWhenItsLayerLeaves(
+                mustBeSeen: entry.item.mustBeSeen, everShown: entry.clock != nil)
+        }
+        // What is left of that layer's messages is handed on.
+        for index in waiting.indices where waiting[index].layer == layer { waiting[index].layer = nil }
+        if current?.layer == layer { current?.layer = nil }
         reconcile()
     }
 

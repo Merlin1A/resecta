@@ -12,6 +12,9 @@ import RedactionEngine
 
 struct SavedRegexLibraryView: View {
     @Environment(SavedRegexStore.self) private var savedRegexStore
+    /// The message queue, held while the clear-all confirm is up; a `let`
+    /// from Settings (see `CustomTermsView`).
+    let toastManager: ToastQueueManager
 
     @State private var newLabel: String = ""
     @State private var newPattern: String = ""
@@ -36,6 +39,7 @@ struct SavedRegexLibraryView: View {
         // Destructive confirm. Copy names exactly what is
         // cleared: user-saved patterns only — built-ins ship with the
         // app and are unaffected.
+        .holdsMessages(toastManager, while: showClearAllConfirmation)
         .confirmationDialog(
             "Delete all your patterns?",
             isPresented: $showClearAllConfirmation,

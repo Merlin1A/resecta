@@ -191,4 +191,36 @@ struct ReceiptRulesTests {
         #expect(ReceiptRules.remainingLayer(in: [root]) == root.id)
         #expect(ReceiptRules.remainingLayer(in: []) == nil)
     }
+
+    @Test("A run's message belongs to the layer named at its post while that layer is registered")
+    func layerAtPost() {
+        let root = MessageLayerFacts(id: UUID(), role: .root)
+        let search = MessageLayerFacts(id: UUID(), role: .draws)
+        let saved = MessageLayerFacts(id: UUID(), role: .draws)
+        let stack = [root, search, saved]
+        // Named and registered: that layer, under the saved list or not,
+        // and whatever the row's leaving rule says.
+        #expect(ReceiptRules.layerAtPost(named: search.id, showsInRemainingLayer: false, in: stack) == search.id)
+        #expect(ReceiptRules.layerAtPost(named: search.id, showsInRemainingLayer: true, in: stack) == search.id)
+        #expect(ReceiptRules.layerAtPost(named: search.id, showsInRemainingLayer: false, in: [root, search]) == search.id)
+        // Named but gone: the row's own rule.
+        #expect(ReceiptRules.layerAtPost(named: search.id, showsInRemainingLayer: false, in: [root, saved]) == nil)
+        #expect(ReceiptRules.layerAtPost(named: search.id, showsInRemainingLayer: true, in: [root, saved]) == root.id)
+        // None named: the row's own rule.
+        #expect(ReceiptRules.layerAtPost(named: nil, showsInRemainingLayer: false, in: stack) == nil)
+        #expect(ReceiptRules.layerAtPost(named: nil, showsInRemainingLayer: true, in: stack) == search.id)
+        #expect(ReceiptRules.layerAtPost(named: nil, showsInRemainingLayer: true, in: []) == nil)
+    }
+
+    @Test("When its layer leaves, only a message that must be seen and was never shown is handed on")
+    func handedOnWhenItsLayerLeaves() {
+        var rows: [String] = []
+        for mustBeSeen in [false, true] {
+            for everShown in [false, true]
+            where ReceiptRules.handedOnWhenItsLayerLeaves(mustBeSeen: mustBeSeen, everShown: everShown) {
+                rows.append("mustBeSeen=\(mustBeSeen) everShown=\(everShown)")
+            }
+        }
+        #expect(rows == ["mustBeSeen=true everShown=false"])
+    }
 }

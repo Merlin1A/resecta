@@ -40,6 +40,7 @@ struct SettingsView: View {
     // "no pipeline can be in flight without a document" contract.
     @Environment(DocumentState.self) private var documentState: DocumentState?
     @Environment(\.dismiss) private var dismiss
+    @Environment(ToastQueueManager.self) private var toastManager
 
     @State private var safariURL: URL?
     /// The in-app Acknowledgements sheet (the bundled NOTICE).
@@ -124,11 +125,13 @@ struct SettingsView: View {
             .sheet(item: $safariURL) { url in
                 SafariView(url: url)
                     .ignoresSafeArea()
+                    .messageLayer(toastManager, role: .holdsOnly)
             }
             // Mirrors the established
             // confirmation-dialog pattern used at Redact /
             // Delete N Regions / Pre-Export / Override-FAIL.
             // Copy is mechanism-description language only.
+            .holdsMessages(toastManager, while: showResetConfirmation)
             .confirmationDialog(
                 "Reset all settings?",
                 isPresented: $showResetConfirmation,
@@ -346,14 +349,14 @@ struct SettingsView: View {
 
             // Always-flag / never-flag custom keyword lists.
             NavigationLink("Custom Terms") {
-                CustomTermsView()
+                CustomTermsView(toastManager: toastManager)
             }
             .accessibilityHint("Add always-flag or never-flag terms applied during scans.")
 
             // App-wide saved-regex library, surfaced in the regex search
             // toolbar's saved-pattern menu.
             NavigationLink("Saved Regexes") {
-                SavedRegexLibraryView()
+                SavedRegexLibraryView(toastManager: toastManager)
             }
             .accessibilityHint("Manage the saved regex patterns surfaced in the regex search menu.")
         } header: {
@@ -470,6 +473,7 @@ struct SettingsView: View {
             .accessibilityIdentifier("settingsAcknowledgements")
             .sheet(item: $presentedLegalDocument) { document in
                 LegalDocumentView(document: document)
+                    .messageLayer(toastManager, role: .holdsOnly)
             }
         } header: {
             Label("Privacy", systemImage: "lock.shield")

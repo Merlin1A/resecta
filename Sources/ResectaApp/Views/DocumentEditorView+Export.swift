@@ -262,6 +262,8 @@ struct DocumentEditorExportFlow {
         let attempt = UUID()
         documentState.liveShareAttempt = attempt
         activityVC.completionWithItemsHandler = { _, completed, _, _ in
+            // The system share sheet held brief messages while it was up.
+            toastManager.setHold(attempt, false)
             DocumentEditorView.finishShare(
                 completed: completed, copy: exportURL, report: currentReport,
                 attempt: attempt, documentState: documentState,
@@ -270,7 +272,9 @@ struct DocumentEditorExportFlow {
                 },
                 recordSuccessfulExport: {
                     if ReviewPromptGate.standard.shouldAsk(afterSharing: currentReport.overallStatus) {
-                        Task { @MainActor in requestReview() }
+                        // Asked once the "Shared" message is gone, so the
+                        // system's prompt never sits over it.
+                        toastManager.whenGone(.shared) { requestReview() }
                     }
                 }
             )
@@ -283,6 +287,7 @@ struct DocumentEditorExportFlow {
         // Use the same foreground-active filter as the audit/verification-
         // report share paths.
         let abandon: @MainActor () -> Void = {
+            toastManager.setHold(attempt, false)
             if DocumentEditorView.abandonShare(
                 copy: exportURL, report: currentReport, attempt: attempt, documentState: documentState) {
                 toastManager.post(.shareSheetUnavailable)
@@ -293,6 +298,7 @@ struct DocumentEditorExportFlow {
             return
         }
         activityVC.popoverPresentationController?.sourceView = topVC.view
+        toastManager.setHold(attempt, true)
         topVC.present(activityVC, animated: true)
         // A present that never lands (a scene gone inactive mid-present)
         // would otherwise leave the exporting card up with no way back.

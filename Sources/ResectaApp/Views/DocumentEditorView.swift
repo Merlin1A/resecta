@@ -211,6 +211,11 @@ struct DocumentEditorView: View {
                     // The recovery CTA now lives on the results screen as the
                     // Run Verification card; see `handleRunVerificationTap`.)
                     .overlay(alignment: .bottom) { captionOverlay }
+                    // The height a brief message is read in: the canvas
+                    // between the toolbar's foot and the bottom chrome.
+                    .background { GeometryReader { canvas in
+                        Color.clear.preference(key: MessageReadableSpace.self, value: canvas.size.height)
+                    } }
 
             case .verifying:
                 // Full-screen replacement — verification is a distinct
@@ -343,6 +348,9 @@ struct DocumentEditorView: View {
             switch sheet {
             case .search(let searchState):
                 SearchAndRedactSheet(searchState: searchState, selectedDetent: $searchSheetDetent)
+                    // Search's message layer, outside its capture cover:
+                    // it leaves only when the sheet is dismissed.
+                    .messageLayer(toastManager, role: .draws)
                     // Conditional dismiss: block swipe-dismiss once the USER has
                     // modified selections this session, so the Dismiss
                     // button's confirmation dialog can't be bypassed.
@@ -398,6 +406,8 @@ struct DocumentEditorView: View {
                             redactionState.pendingCanvasRationaleRequest = nil
                         }
                     )
+                    .messageHost(toastManager, place: .otherSheet)
+                    .messageLayer(toastManager, role: .draws)
                 }
             }
         }
@@ -416,6 +426,7 @@ struct DocumentEditorView: View {
         // Presented through `doneConfirmationPresented`: the
         // binding re-presents a review parked for this dialog when it
         // goes down without Close.
+        .holdsMessages(toastManager, while: doneConfirmationPresented.wrappedValue)
         .confirmationDialog(
             "Close this document?",
             isPresented: doneConfirmationPresented,
@@ -526,9 +537,12 @@ struct DocumentEditorView: View {
     /// parked-canvas inset when the bar steps aside (a live result walk
     /// at the compact float) or never mounts (single-page documents).
     /// ONE model decides the branch and the inset (`ParkedChromeLayout`);
-    /// each branch writes the toast clearance from the same value on
+    /// each branch writes the toast clearance from the model on
     /// appearance, because the bar coming or going IS the event both
     /// toast hosts wait on (the sheet writes it on its detent changes).
+    /// The write reads the model as it stands, not `layout`: the bar's
+    /// measured height can land before `onAppear` runs, and the layout
+    /// taken for this body would put the floor back over it.
     @ViewBuilder
     private var pageNavigationBarInset: some View {
         let layout = parkedChromeLayout
@@ -540,11 +554,11 @@ struct DocumentEditorView: View {
                         toastManager.bottomClearance = parkedChromeLayout.toastClearance
                     }
                     .padding(.bottom, layout.canvasBottomInset)
-                    .onAppear { toastManager.bottomClearance = layout.toastClearance }
+                    .onAppear { toastManager.bottomClearance = parkedChromeLayout.toastClearance }
             } else {
                 Color.clear
                     .frame(height: layout.canvasBottomInset)
-                    .onAppear { toastManager.bottomClearance = layout.toastClearance }
+                    .onAppear { toastManager.bottomClearance = parkedChromeLayout.toastClearance }
             }
         }
         .animation(

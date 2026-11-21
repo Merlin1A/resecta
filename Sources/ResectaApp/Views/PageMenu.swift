@@ -37,6 +37,7 @@ enum PageMenuWords {
 struct PageMenu<Label: View>: View {
     @Environment(DocumentState.self) private var documentState
     @Environment(RedactionState.self) private var redactionState
+    @Environment(ToastQueueManager.self) private var toastManager
     let pageCount: Int
     @ViewBuilder let label: Label
 
@@ -75,6 +76,7 @@ struct PageMenu<Label: View>: View {
         .menuOrder(.fixed)
         // The counter keeps its own colours: the menu does not tint it.
         .tint(.primary)
+        .holdsMessages(toastManager, while: showsPrompt)
         .alert(PageMenuWords.promptTitle, isPresented: $showsPrompt) {
             TextField(PageMenuWords.fieldHint(pageCount: pageCount), text: $typed)
                 .keyboardType(.numberPad)

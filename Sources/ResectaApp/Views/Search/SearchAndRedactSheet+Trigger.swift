@@ -153,7 +153,7 @@ extension SearchAndRedactSheet {
     /// banner persists it).
     private func failSearchPreparation() {
         searchState.isSearching = false
-        toastManager.post(.searchPreparationFailed)
+        toastManager.post(.searchPreparationFailed, runLayer: messageLayerID)
         if searchState.searchModeType == .piiScan {
             searchState.scanStartFailed = true
             redactionState.recordDetectionRun(
@@ -321,7 +321,8 @@ extension SearchAndRedactSheet {
         if isPIIScan {
             let diagnostics = await DocumentSearcher.scanKickoffDiagnostics()
             if redactionState.noteScanKickoffDiagnostics(diagnostics) != nil {
-                toastManager.post(.detectionDegraded(failedGazetteers: diagnostics.failedGazetteers))
+                toastManager.post(.detectionDegraded(failedGazetteers: diagnostics.failedGazetteers),
+                                  runLayer: messageLayerID)
             }
         }
 
@@ -412,10 +413,14 @@ extension SearchAndRedactSheet {
         // on screen or queued, so a page that ran out later showed it
         // again (the OCR-off sink below takes the message's shape).
         let timeoutToast = ScanOnceLatch()
+        // The sinks' warnings belong to this sheet's layer, read now: a
+        // sheet over Search (the saved list as a recall starts the run)
+        // does not take them.
+        let runLayer = messageLayerID
         await searcher.setUserTermsTimeoutSink({ [weak toastManager] _, _ in
             Task { @MainActor in
                 guard timeoutToast.fire() else { return }
-                toastManager?.post(.customTermTimeout)
+                toastManager?.post(.customTermTimeout, runLayer: runLayer)
             }
         })
         // Surface the "scanned region not analyzed"
@@ -429,7 +434,7 @@ extension SearchAndRedactSheet {
         // language; it makes no outcome promise.
         await searcher.setScannedRegionNotAnalyzedSink({ [weak toastManager] _ in
             Task { @MainActor in
-                toastManager?.post(.scannedRegionsNotAnalyzed)
+                toastManager?.post(.scannedRegionsNotAnalyzed, runLayer: runLayer)
             }
         })
 
@@ -666,8 +671,9 @@ extension SearchAndRedactSheet {
     /// Apply-graying gate. The success toast goes through the one
     /// `CommitFeedback` builder so the count stays in lockstep with the
     /// review-apply toasts (nil for a no-op apply, so a held shortcut
-    /// against an all-overlap selection emits no "Marked 0" message;
-    /// `toastManager.enqueue` coalesces duplicates). The sheet's
+    /// against an all-overlap selection emits no "Marked 0" message; each
+    /// apply that posts is a new message, which the queue does not merge
+    /// with the last). The sheet's
     /// markers derive from the live regions after the apply.
     /// (Lives here with `triggerSearch()` per the M-6 hub-cap
     /// decomposition — the run-orchestration family stays together;
