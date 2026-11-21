@@ -90,8 +90,11 @@ struct TransitionResolverTests {
         // Four since brief messages got one host: ContentView's two toast
         // overlays and Search's own bottom overlay became the one slide-in
         // in Messages/MessageHost.swift.
-        #expect(totalMoveEdgeSites == 4,
-                "expected 4 `.move(edge` sites under Sources/ResectaApp/Views, found \(totalMoveEdgeSites)")
+        // Three since the paused notice moved into the editor's band: its
+        // top-edge slide in DocumentEditorView+ResumeBanner.swift became the
+        // band's one slide in DocumentEditorView+TopBanner.swift.
+        #expect(totalMoveEdgeSites == 3,
+                "expected 3 `.move(edge` sites under Sources/ResectaApp/Views, found \(totalMoveEdgeSites)")
     }
 
     /// For every occurrence of a REAL `.move(edge: .something)` call in

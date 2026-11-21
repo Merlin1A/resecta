@@ -159,8 +159,9 @@ struct NoticeViewTests {
     @Test("A notice at the default size is 44, 64 or 84 points tall at one, two or three lines")
     func heightsAtTheDefaultSize() {
         // 402 wide: the notice is 370, 16 in from each side.
+        // The paused notice beside its Restart and close takes three lines.
         let paused = NoticeView.height(of: Self.paused, size: .large, width: 402)
-        #expect(abs(paused - 64) <= 1, "the paused notice is \(paused)")
+        #expect(abs(paused - 84) <= 1, "the paused notice is \(paused)")
         let one = NoticeView.height(of: Self.oneLine, size: .large, width: 402)
         #expect(abs(one - 44) <= 1, "one line is \(one)")
     }
