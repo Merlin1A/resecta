@@ -1,7 +1,8 @@
 Property: The picture's profile is the writer's: three components over device RGB, nothing more.
 Area: the box check's own reading of what each page draws
 Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/BoxCheckDrawingTests (or on the host: cd Packages/RedactionEngine && swift test --filter BoxCheckDrawingTests)
-Must go red: RedactionEngineTests/BoxCheckDrawingTests eachCase [D62: a one-component profile]; RedactionEngineTests/BoxCheckDrawingTests eachCase [D63: a profile with a range]
+Must go red: RedactionEngineTests/BoxCheckDrawingTests eachCase [D63: a profile with a range]
+The count guard below it still refuses D62 (a one-component profile), so D62 stays green here.
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift

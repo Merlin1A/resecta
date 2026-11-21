@@ -120,6 +120,8 @@ struct BoxCheckDrawingTests {
         Case(number: 64, name: "an indexed colour space", expected: .pictureColourNotListed) {
             $0.colourSpace = "[/Indexed /DeviceRGB 1 <000000FFFFFF>]" },
         Case(number: 65, name: "16 bits a component", expected: .pictureColourNotListed) { $0.bitsPerComponent = 16 },
+        Case(number: 66, name: "a four-component profile over device RGB", expected: .pictureColourNotListed) {
+            $0.profileKeys = "/N 4 /Alternate /DeviceRGB" },
         // The page and the tree above it.
         Case(number: 70, name: "an annotation", expected: .pageKeyNotListed) { $0.page = "/Annots [<< /Type /Annot /Subtype /Square /Rect [0 0 10 10] >>]" },
         Case(number: 71, name: "a transparency group", expected: .pageKeyNotListed) { $0.page = "/Group << /S /Transparency >>" },
@@ -160,10 +162,10 @@ struct BoxCheckDrawingTests {
         Case(number: 97, name: "a Q with nothing saved", expected: .drawingNotRead) { $0.content = "Q " + content },
     ]
 
-    @Test("The table holds 76 cases, eight of them admitted")
+    @Test("The table holds 77 cases, eight of them admitted")
     func tableLength() {
-        #expect(Self.cases.count == 76)
-        #expect(Set(Self.cases.map(\.number)).count == 76)
+        #expect(Self.cases.count == 77)
+        #expect(Set(Self.cases.map(\.number)).count == 77)
         #expect(Self.cases.filter { $0.expected == nil }.count == 8)
     }
 
