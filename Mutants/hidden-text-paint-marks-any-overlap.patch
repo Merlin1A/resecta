@@ -1,0 +1,19 @@
+Property: Paint marks a word only where a painted rectangle shares area with the middle of one of its letters, so paint that reaches the edge of the lines above and below keeps them.
+Area: hidden text (paint marks)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter "PaintAndKindsCasesTests"
+Must go red: RedactionEngineTests/PaintAndKindsCasesTests caseRow [1: paint that reaches no middle on the lines above and below keeps them] (its count of unboxed words left out)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextPathPaintMarks.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextPathPaintMarks.swift
+index 848fe8f4..aecc4ff3 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextPathPaintMarks.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextPathPaintMarks.swift
+@@ -16,7 +16,7 @@ enum TextPathPaintMarks {
+         var marked = Set<Int>()
+         for entry in survivors where !marked.contains(entry.wordIndex)
+             && !SandwichMetrics.isLineageWhitespace(entry.character) {
+-            if painted.contains(where: { middleUnder($0, entry, frame: frame) }) {
++            if painted.contains(where: { $0.intersects(entry.bounds) }) {
+                 marked.insert(entry.wordIndex)
+             }
+         }

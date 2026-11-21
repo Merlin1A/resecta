@@ -1,7 +1,8 @@
 Property: Each letter of a joined glyph is written once: where the selection's text is longer than the offset's own characters, the entry's text is the page's own text at that offset.
 Area: text layer (Searchable)
 Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/JoinedGlyphExtractionTests
-Must go red: RedactionEngineTests/JoinedGlyphExtractionTests entryForEntry; RedactionEngineTests/JoinedGlyphExtractionTests bothDirections; RedactionEngineTests/JoinedGlyphExtractionTests countAndLineagePass; RedactionEngineTests/JoinedGlyphExtractionTests clustersReadBackOnce; RedactionEngineTests/JoinedGlyphExtractionTests wordSpaceAfterAJoinedGlyph
+Must go red: RedactionEngineTests/JoinedGlyphExtractionTests entryForEntry; RedactionEngineTests/JoinedGlyphExtractionTests bothDirections; RedactionEngineTests/JoinedGlyphExtractionTests countAndLineagePass; RedactionEngineTests/JoinedGlyphExtractionTests wordSpaceAfterAJoinedGlyph
+Note: the cluster pages are no longer named. Since the alphabet rule, a joined Thai syllable's page is a picture and a joined emoji is left out, so a cluster's letters never reach the export and its case (clustersAfterTheAlphabetRule) stays green under this patch; the four Latin and word-space cases hold the property.
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextLayerExtractor.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextLayerExtractor.swift

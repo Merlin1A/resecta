@@ -1,0 +1,19 @@
+Property: For a widened box the layout breaks its lines by the plan's rectangle, as the filter reads it, not by the box's own rectangle.
+Area: hidden text (the widened box)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter "PaintAndKindsCasesTests"
+Must go red: RedactionEngineTests/PaintAndKindsCasesTests widthDoesNotShow
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
+index 2cfafd88..1414fbca 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
+@@ -107,7 +107,7 @@ enum PageTextPath {
+         safetyMargin: CGFloat = safetyMarginPoints
+     ) async throws -> Result {
+         let steps = Self.steps
+-        let rects = textPathRectangles.filter { $0.kind != .underWidenedBox }.map(\.rect)
++        let rects = textPathRectangles.filter { $0.kind != .plansRectangle }.map(\.rect)
+ 
+         // A step that returns nothing writes no text: the page is a picture.
+         guard let folded = try steps.fold(entries) else {

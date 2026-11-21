@@ -1,0 +1,19 @@
+Property: The drawn-cell rule runs again after the closure until nothing more leaves: a word whose drawn cell moves into a box once another word has left leaves too.
+Area: hidden text (the drawn-cell rule)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter "PaintAndKindsCasesTests"
+Must go red: RedactionEngineTests/PaintAndKindsCasesTests nextPassTakesTheMovedWord
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
+index 2cfafd88..f9a5832f 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
+@@ -163,7 +163,7 @@ enum PageTextPath {
+             current = closed
+             // The pass that takes nothing laid out the survivors as they
+             // stand: the writer draws its lines.
+-            if ruleTook.isEmpty { lines = pass.lines; break }
++            lines = pass.lines; break
+             passes += 1
+             guard passes < TextLayerReconstructor.drawnCellRulePassLimit else {
+                 return Result(outcome: .picture(.extractionFailed), runsLeftOut: 0,

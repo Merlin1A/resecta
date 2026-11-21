@@ -10,8 +10,13 @@ import PDFKit
 // V1–V4 export the seeded page (its layer drifted 30 pt along the line) with a
 // box over a word's print through the corpus mirror's route
 // (`HiddenWordInkFixtures.mirrorRun`), which leaves the word's drifted hidden
-// copy in the export, and verify it. Today every one of those reports passes
-// the leak or flags only a neighbour; with the check, each reads Checks Failed
+// copy in the export, and verify it. Since every word that loses a letter
+// to a box leaves whole, the live route leaves that copy only where no letter
+// of it is lost (p6, p7, p9); V1, V4 and V21b make their leak with whole
+// words off (`partWordsKept`) and assert as well that the live export holds
+// no part of the word (`expectWholeWordGone`). Before the check every one
+// of those reports passed the leak or flagged only a neighbour; with the
+// check, each reads Checks Failed
 // with the check's row failing on page 1. Each case first asserts that the
 // leak is in the export, so a case that passes is never a case whose page
 // stopped leaking. Every box these cases draw is one the app marks as not
@@ -51,6 +56,22 @@ struct HiddenWordInkLayerCases {
         #expect(row.pageReferences == [0], "\(comment): on page 1")
     }
 
+    /// A run made with whole words off: the filter leaves part of a word, as
+    /// the text path did before every word that loses a letter left whole.
+    /// The leak the check has to report is made this way.
+    static func partWordsKept(_ make: () async throws -> F.Run) async throws -> F.Run {
+        try await PageTextPath.$wholeWordsOff.withValue(true) { try await make() }
+    }
+
+    /// The live text path leaves `word` whole or not at all: its hidden copy
+    /// is not in the export, and the check's row does not fail.
+    static func expectWholeWordGone(_ run: F.Run, word: String, _ comment: Comment) throws {
+        let hidden = try #require(F.hiddenRect(run.source.page(at: 0)!, word))
+        #expect(F.textInside(run.output, hidden).isEmpty, "\(comment): no part of \(word)'s hidden copy is in the export")
+        let checkRow = try row(run.report)
+        #expect(!checkRow.status.isFail, "\(comment): the check's row does not fail")
+    }
+
     /// The precondition: the export holds `word`'s hidden copy.
     static func expectLeak(_ run: F.Run, leaked word: String, _ comment: Comment) throws {
         let hidden = try #require(F.hiddenRect(run.source.page(at: 0)!, word))
@@ -73,7 +94,10 @@ struct HiddenWordInkLayerCases {
     static func p9() async throws -> F.Run { try await F.mirrorRun(seeded, paint: F.inkRect(line: 0, phrase: "The")) }
 
     @Test("V1: a hand box over a name whose fragment \"uya\" survives past the box reads Checks Failed", .timeLimit(.minutes(3)))
-    func v1() async throws { try Self.expectLeakFails(try await Self.p4(), leaked: "Vance-Oduya", "a hand box on the name") }
+    func v1() async throws {
+        try Self.expectLeakFails(try await Self.partWordsKept { try await Self.p4() }, leaked: "Vance-Oduya", "a hand box on the name")
+        try Self.expectWholeWordGone(try await Self.p4(), word: "Vance-Oduya", "a hand box on the name, whole words on")
+    }
 
     @Test("V2: a hand box over \"Lee\", its whole hidden copy past the box, reads Checks Failed", .timeLimit(.minutes(3)))
     func v2() async throws { try Self.expectLeakFails(try await Self.p6(), leaked: "Lee", "a hand box on Lee") }
@@ -85,10 +109,13 @@ struct HiddenWordInkLayerCases {
     @Test("V4: a hand box on a line's first word, and on a first word narrower than the drift, read Checks Failed",
           .timeLimit(.minutes(3)))
     func v4() async throws {
-        let p8 = try await Self.p8(), p9 = try await Self.p9()
+        // On p9 the hidden copy of "The" lies wholly past the box: no letter
+        // is lost, so it is written whole and the leak needs no switch.
+        let p8 = try await Self.partWordsKept { try await Self.p8() }, p9 = try await Self.p9()
         try Self.expectLeak(p9, leaked: "The", "a hand box on The")
         try Self.expectLeakFails(p8, leaked: "Signed", "a hand box on Signed")
         try Self.expectLeakFails(p9, leaked: "The", "a hand box on The")
+        try Self.expectWholeWordGone(try await Self.p8(), word: "Signed", "a hand box on Signed, whole words on")
     }
 
     // MARK: - Clean, Secure
@@ -237,11 +264,13 @@ struct HiddenWordInkLayerCases {
         // The name's print, in the region's frame: its hidden box on the drift-0 twin of the same rotated page.
         let twin = try #require(PDFDocument(data: F.seededPage(drift: 0, rotate: 90, cropBox: crop))?.page(at: 0))
         let paint = try #require(F.hiddenRect(twin, "Marisol Vance-Oduya"))
-        let run = try await F.mirrorRun(data, paint: paint)
+        let run = try await Self.partWordsKept { try await F.mirrorRun(data, paint: paint) }
         let source = try #require(run.source.page(at: 0))
         let marisol = try #require(F.hiddenRect(source, "Marisol"))
         #expect(F.textInside(run.source, marisol).contains("Marisol"),
                 "precondition: the helper reads the rotated page's frame")
         try Self.expectLeakFails(run, leaked: "Vance-Oduya", "a hand box on the name of the rotated page")
+        try Self.expectWholeWordGone(try await F.mirrorRun(data, paint: paint), word: "Vance-Oduya",
+                                     "a hand box on the name of the rotated page, whole words on")
     }
 }

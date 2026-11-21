@@ -1,0 +1,19 @@
+Property: A word whose letter has its middle under paint leaves the hidden text whole.
+Area: hidden text (paint marks)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter "PaintAndKindsCasesTests"
+Must go red: RedactionEngineTests/PaintAndKindsCasesTests caseRow [2: small print under the paint of 150 dpi leaves whole]; caseRow [3: two boxes merged into one painted rectangle take the word between them]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
+index 2cfafd88..4a9ca576 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
+@@ -43,7 +43,7 @@ enum PageTextPath {
+             fold: { TextPathFold.fold($0) },
+             filter: { try await TextPathFilter.filter($0, $1, frame: $2) },
+             alphabetMarks: { TextPathAlphabetMarks.marks($0) },
+-            paintMarks: { TextPathPaintMarks.marks($0, painted: $1, frame: $2) },
++            paintMarks: { _, _, _ in [] },
+             closure: { PageTextPath.closeOverMarkedWords($0, marked: $1) })
+     }
+ 

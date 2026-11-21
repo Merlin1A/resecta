@@ -5,10 +5,10 @@ Must go red: RedactionEngineTests/TextPathAlphabetFaultTests faultRow
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
-index c63f8dbf..9b4eb957 100644
+index 2cfafd88..330e505b 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageTextPath.swift
-@@ -71,13 +71,9 @@ enum PageTextPath {
+@@ -110,15 +110,11 @@ enum PageTextPath {
          let rects = textPathRectangles.filter { $0.kind != .underWidenedBox }.map(\.rect)
  
          // A step that returns nothing writes no text: the page is a picture.
@@ -16,11 +16,13 @@ index c63f8dbf..9b4eb957 100644
 -            return Result(outcome: .picture(.extractionFailed), runsLeftOut: 0, drawnCellDropped: 0)
 -        }
 +        let folded = ((try? steps.fold(entries)) ?? nil) ?? entries
-         let filtered = try await steps.filter(folded, rects)
+         guard let filtered = try await steps.filter(folded, textPathRectangles, frame) else {
+             return Result(outcome: .picture(.extractionFailed), runsLeftOut: 0, drawnCellDropped: 0)
+         }
 -        guard let alphabet = try steps.alphabetMarks(filtered.surviving) else {
 -            return Result(outcome: .picture(.extractionFailed), runsLeftOut: 0, drawnCellDropped: 0)
 -        }
 +        let alphabet = ((try? steps.alphabetMarks(filtered.surviving)) ?? nil) ?? .none
-         let painted = try steps.paintMarks(filtered.surviving, paintedRectangles)
- 
-         // The whole-word closure over every marked word, then the drawn-cell
+         guard let painted = try steps.paintMarks(filtered.surviving, paintedRectangles, frame) else {
+             return Result(outcome: .picture(.extractionFailed), runsLeftOut: 0, drawnCellDropped: 0)
+         }

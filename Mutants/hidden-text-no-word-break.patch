@@ -1,0 +1,19 @@
+Property: Where the page's text has a break between two words, the hidden text has one.
+Area: hidden text (whole source words)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter "WholeSourceWordsTests"
+Must go red: RedactionEngineTests/WholeSourceWordsTests breakWithoutASpaceEntry
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextLayerReconstructor.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextLayerReconstructor.swift
+index 5d8381da..343bda44 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextLayerReconstructor.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/TextLayerReconstructor.swift
+@@ -343,7 +343,7 @@ enum TextLayerReconstructor {
+ 
+     /// Whether the writer puts a space between `a` and the next entry `b`.
+     static func wordBreak(between a: CharacterInfo, and b: CharacterInfo) -> Bool {
+-        a.wordIndex != b.wordIndex
++        false && a.wordIndex != b.wordIndex
+             && !SandwichMetrics.isLineageWhitespace(a.character)
+             && !SandwichMetrics.isLineageWhitespace(b.character)
+     }

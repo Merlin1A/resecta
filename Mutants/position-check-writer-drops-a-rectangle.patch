@@ -5,18 +5,19 @@ Must go red: RedactionEngineTests/PositionCheckListTests "Five exports: the writ
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift
-index d56f7253..981ad415 100644
+index 93fc474c..94c9222a 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift
-@@ -324,9 +324,9 @@ public final class PageRasterizer: @unchecked Sendable {
-                     // A region over a hidden layer strips under its hidden
-                     // glyphs' box too (`textRemovalRects`); the fill below
-                     // paints `normalizedRect` alone.
--                    let redactionRectsInPoints = page.regions.flatMap(\.textRemovalRects).map {
-+                    let redactionRectsInPoints = Array(page.regions.flatMap(\.textRemovalRects).map {
-                         normalizedToPDFPageCoordinates($0, pageRect: pageBounds)
--                    }
-+                    }.dropLast())
+@@ -320,10 +320,10 @@ public final class PageRasterizer: @unchecked Sendable {
+                     // The page's text-path rectangles, by the function the
+                     // position check calls too; the plan's boxes fill `boxes`.
+                     let points = { (r: CGRect) in normalizedToPDFPageCoordinates(r, pageRect: pageBounds) }
+-                    let textPathRectangles = TextPathRectangle.forPage(regions: page.regions.map {
++                    let textPathRectangles = Array(TextPathRectangle.forPage(regions: page.regions.map {
+                         TextPathRegion(id: $0.id, rect: points($0.normalizedRect),
+                                        hiddenLettersRect: $0.textLayerRect.map(points), inkStrips: $0.inkStripRects.map(points))
+-                    }, boxes: [])
++                    }, boxes: []).dropLast())
+                     let redactionRectsInPoints = textPathRectangles.filter { $0.kind != .underWidenedBox }.map(\.rect)
                      // The frame carries the page's rotation: the drawn-cell
                      // rule, the writer and the lineage digest all work in the
-                     // SOURCE frame of a rotated page.
