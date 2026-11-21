@@ -211,4 +211,16 @@ struct ReceiptRulesTests {
         #expect(ReceiptRules.layerAtPost(named: nil, showsInRemainingLayer: true, in: stack) == search.id)
         #expect(ReceiptRules.layerAtPost(named: nil, showsInRemainingLayer: true, in: []) == nil)
     }
+
+    @Test("When its layer leaves, only a message that must be seen and was never shown is handed on")
+    func handedOnWhenItsLayerLeaves() {
+        var rows: [String] = []
+        for mustBeSeen in [false, true] {
+            for everShown in [false, true]
+            where ReceiptRules.handedOnWhenItsLayerLeaves(mustBeSeen: mustBeSeen, everShown: everShown) {
+                rows.append("mustBeSeen=\(mustBeSeen) everShown=\(everShown)")
+            }
+        }
+        #expect(rows == ["mustBeSeen=true everShown=false"])
+    }
 }

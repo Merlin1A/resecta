@@ -461,7 +461,13 @@ final class ToastQueueManager {
     func unregisterLayer(_ layer: UUID) {
         guard let index = layers.firstIndex(where: { $0.id == layer }) else { return }
         layers.remove(at: index)
-        endEntries { $0.layer == layer }
+        endEntries { entry in
+            entry.layer == layer && !ReceiptRules.handedOnWhenItsLayerLeaves(
+                mustBeSeen: entry.item.mustBeSeen, everShown: entry.clock != nil)
+        }
+        // What is left of that layer's messages is handed on.
+        for index in waiting.indices where waiting[index].layer == layer { waiting[index].layer = nil }
+        if current?.layer == layer { current?.layer = nil }
         reconcile()
     }
 

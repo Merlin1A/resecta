@@ -165,6 +165,13 @@ enum ReceiptRules {
         return showsInRemainingLayer ? remainingLayer(in: stack) : nil
     }
 
+    /// When the layer a message belongs to leaves: one that must be seen
+    /// and was never shown is handed on, and takes the front when shown
+    /// (never dropped, only delayed); any other ends with its layer.
+    static func handedOnWhenItsLayerLeaves(mustBeSeen: Bool, everShown: Bool) -> Bool {
+        mustBeSeen && !everShown
+    }
+
     /// Whether a receipt belonging to `layer` is drawn, or a waiting one may
     /// be shown (a waiting one that belongs to no layer yet takes the front):
     /// only while no hold is set, its layer is in front and draws, and the
