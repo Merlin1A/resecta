@@ -90,15 +90,88 @@ struct PageImageCraftedInputTests {
         #expect(try Self.reasonName(jpeg) == "coefficientSize")
     }
 
+    // MARK: - The JFIF header
+
+    /// `jpeg` with `extra` bytes after its 16-byte JFIF header, inside it,
+    /// and the thumbnail's sides set when given.
+    static func longerJFIF(_ jpeg: Data, extra: Int, thumbnail: (Int, Int)? = nil) -> Data {
+        var b = [UInt8](jpeg)
+        precondition(b[2] == 0xFF && b[3] == 0xE0 && b[4] == 0 && b[5] == 16)
+        let length = 16 + extra
+        b[4] = UInt8(length >> 8); b[5] = UInt8(length & 0xFF)
+        if let (w, h) = thumbnail { b[18] = UInt8(w); b[19] = UInt8(h) }
+        b.insert(contentsOf: [UInt8](repeating: 0x7F, count: extra), at: 20)
+        return Data(b)
+    }
+
+    @Test("A JFIF header past 16 bytes is refused by name: one byte more, a thumbnail, the longest segment")
+    func jfifHeaderPastSixteenBytes() throws {
+        let plain = C.picture(columns: 1, rows: 1, step: 1, blocks: [C.Block(difference: 3)])
+        #expect(try Self.reasonName(plain) == nil, "the 16-byte header is read")
+        for (extra, thumbnail) in [(1, nil), (12, (2, 2)), (65_535 - 16, nil)] as [(Int, (Int, Int)?)] {
+            let r = try #require(try { if case .failure(let r) = try Self.walk(Self.longerJFIF(plain, extra: extra, thumbnail: thumbnail)) { return r }; return nil }(),
+                                 "\(extra) bytes past 16 were read as a picture")
+            #expect(r.reason.rawValue == "jfifHeaderLength", "\(extra) bytes past 16")
+            #expect(r.offset == 2, "\(extra) bytes past 16")
+        }
+    }
+
+    /// `jpeg` with its 16-byte JFIF header cut to `length` bytes, the bytes
+    /// past it removed, so the next segment starts where the shorter one ends.
+    static func shorterJFIF(_ jpeg: Data, length: Int) -> Data {
+        var b = [UInt8](jpeg)
+        precondition(b[2] == 0xFF && b[3] == 0xE0 && b[4] == 0 && b[5] == 16 && (7..<16).contains(length))
+        b[5] = UInt8(length)
+        b.removeSubrange((4 + length)..<20)
+        return Data(b)
+    }
+
+    @Test("A JFIF header shorter than 16 bytes is refused by name, at every length from 7 to 15")
+    func jfifHeaderShorterThanSixteenBytes() throws {
+        let plain = C.picture(columns: 1, rows: 1, step: 1, blocks: [C.Block(difference: 3)])
+        for length in 7...15 {
+            let r = try #require(try { if case .failure(let r) = try Self.walk(Self.shorterJFIF(plain, length: length)) { return r }; return nil }(),
+                                 "a JFIF header of \(length) bytes was read as a picture")
+            #expect(r.reason.rawValue == "jfifHeaderLength", "\(length) bytes")
+            #expect(r.offset == 2, "\(length) bytes")
+        }
+    }
+
+    @Test("A 16-byte JFIF header that names a thumbnail is refused by name: 2 by 2, and either side alone")
+    func jfifThumbnailInSixteenBytes() throws {
+        let plain = C.picture(columns: 1, rows: 1, step: 1, blocks: [C.Block(difference: 3)])
+        #expect([UInt8](plain)[18...19] == [0, 0], "the plain header names no thumbnail")
+        for (w, h) in [(2, 2), (1, 0), (0, 1)] {
+            var b = [UInt8](plain)
+            b[18] = UInt8(w); b[19] = UInt8(h)
+            let r = try #require(try { if case .failure(let r) = try Self.walk(Data(b)) { return r }; return nil }(),
+                                 "a \(w) by \(h) thumbnail in 16 bytes was read as a picture")
+            #expect(r.reason.rawValue == "jfifThumbnail", "\(w) by \(h)")
+            #expect(r.offset == 2, "\(w) by \(h)")
+        }
+    }
+
     // MARK: - The scan header at the end of the stream
 
-    @Test("A scan header with no byte after its length, at the very end of the stream, is refused within the stream")
-    func scanHeaderCutAtTheEnd() throws {
+    /// The scan header cut at the end: refused, by name, at the segment.
+    static func scanHeaderCutAtTheEndIsRefused() throws -> Bool {
         let head = C.header(columns: 1, rows: 1, step: 1)
-        let jpeg = Data(head + [0xFF, 0xDA, 0x00, 0x02])
-        let r = try #require(try { if case .failure(let r) = try Self.walk(jpeg) { return r }; return nil }())
-        #expect(r.reason.rawValue == "scanNotEveryComponent")
-        #expect(r.offset == head.count)
+        guard case .failure(let r) = try JPEGEntropyWalk.walk(Data(head + [0xFF, 0xDA, 0x00, 0x02])) else { return false }
+        return r.reason.rawValue == "scanNotEveryComponent" && r.offset == head.count
+    }
+
+    // Read in a child process where it can be: a reader that reads past the
+    // stream stops a build that checks bounds, and the child's stop fails
+    // this test instead of the whole run.
+    @Test("A scan header with no byte after its length, at the very end of the stream, is refused within the stream")
+    func scanHeaderCutAtTheEnd() async throws {
+        #if os(macOS)
+        await #expect(processExitsWith: .success) {
+            guard (try? PageImageCraftedInputTests.scanHeaderCutAtTheEndIsRefused()) == true else { exit(1) }
+        }
+        #else
+        #expect(try Self.scanHeaderCutAtTheEndIsRefused())
+        #endif
     }
 
     // MARK: - Forms
@@ -126,6 +199,17 @@ struct PageImageCraftedInputTests {
         let sixtyFour = C.formsPage(picture: Self.picture, columns: 1, rows: 1, pageForms: Array(0..<64), forms: empty)
         #expect(try Self.pageOutcome(sixtyFour, picture: Self.picture).completed)
         let sixtyFive = C.formsPage(picture: Self.picture, columns: 1, rows: 1, pageForms: Array(0..<65), forms: empty)
+        #expect(try Self.pageOutcome(sixtyFive, picture: Self.picture).reason == "formsOverLimit")
+    }
+
+    @Test("One form named 65 times refuses the page; named 64 times it is read")
+    func oneFormNamedPastTheLimit() throws {
+        let one = [C.Form()]
+        let sixtyFour = C.formsPage(picture: Self.picture, columns: 1, rows: 1,
+                                    pageForms: [Int](repeating: 0, count: 64), forms: one)
+        #expect(try Self.pageOutcome(sixtyFour, picture: Self.picture).completed)
+        let sixtyFive = C.formsPage(picture: Self.picture, columns: 1, rows: 1,
+                                    pageForms: [Int](repeating: 0, count: 65), forms: one)
         #expect(try Self.pageOutcome(sixtyFive, picture: Self.picture).reason == "formsOverLimit")
     }
 

@@ -1,0 +1,19 @@
+Property: A scan header cut at the end of the stream is refused without reading past the stream.
+Area: the reader of a page's stored picture (crafted input)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter PageImageCraftedInputTests (on the host: the case runs in a child process there, and a build that checks bounds stops that child)
+Must go red: RedactionEngineTests/PageImageCraftedInputTests scanHeaderCutAtTheEnd
+Stays green in a build that does not check bounds: the read past the stream gives the same reason at the same byte.
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/JPEGHeader.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/JPEGHeader.swift
+index f92292d2..07471b72 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/JPEGHeader.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/JPEGHeader.swift
+@@ -205,7 +205,6 @@ struct JPEGHeader: Sendable {
+             case 0xDA:
+                 guard sawFrame else { throw refuse(.scanBeforeFrame, i) }
+                 // The component count is read only from inside the segment.
+-                guard length >= 3 else { throw refuse(.scanNotEveryComponent, i) }
+                 let count = Int(b[body])
+                 guard count == header.components.count, length == 6 + 2 * count else {
+                     throw refuse(.scanNotEveryComponent, i)
