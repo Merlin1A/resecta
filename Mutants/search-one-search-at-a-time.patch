@@ -1,0 +1,37 @@
+Property: More searches than the task pool has threads run side by side, not one at a time.
+Area: search (the ink fit on a busy task pool)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter InkFitBusyPoolTests
+Must go red: RedactionEngineTests/InkFitBusyPoolTests busyPoolLeavesOtherWorkMoving
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Run.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Run.swift
+index 4ceb245e..8930309f 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Run.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Run.swift
+@@ -40,7 +40,7 @@ extension DocumentSearcher {
+         // corrupting that scan's suppression counts and banners. The
+         // per-page `Task.isCancelled` checks read THIS task's flag, so
+         // termination must propagate to it.
+-        let producer = Task {
++        let producer = OneSearchAtATime.after { () async -> Void in
+             await searcher.performSearch(
+                 sendableDoc, mode: mode,
+                 progress: progress, continuation: continuation
+@@ -100,3 +100,17 @@ extension DocumentSearcher {
+         }
+     }
+ }
++
++/// Each search starts only once the one before it has ended.
++private enum OneSearchAtATime {
++    static let lock = NSLock()
++    nonisolated(unsafe) static var last: Task<Void, Never>?
++    static func after(_ body: @escaping @Sendable () async -> Void) -> Task<Void, Never> {
++        lock.withLock {
++            let before = last
++            let next = Task { await before?.value; await body() }
++            last = next
++            return next
++        }
++    }
++}
