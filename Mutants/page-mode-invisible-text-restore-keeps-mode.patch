@@ -1,0 +1,19 @@
+Property: A restore puts back the mode saved with the state.
+Area: page mode (Detection)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/InvisibleTextPageTests (or on the host: cd Packages/RedactionEngine && swift test --no-parallel --filter InvisibleTextPageTests)
+Must go red: RedactionEngineTests/InvisibleTextPageTests reading [mode 3 set inside a save the page restores before its last line]; RedactionEngineTests/InvisibleTextPageTests exported [mode 3 set inside a save the page restores before its last line]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
+index 82920236..d3d6a9f3 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
+@@ -68,7 +68,7 @@ extension DocumentSearcher {
+         CGPDFOperatorTableSetCallback(table, "Q") { _, info in
+             guard let info else { return }
+             let state = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
+-            if state.saved.count > state.floor, let mode = state.saved.popLast() { state.mode = mode }
++            if state.saved.count > state.floor { _ = state.saved.popLast() }
+         }
+         let show: CGPDFOperatorCallback = { scanner, info in
+             guard let info else { return }

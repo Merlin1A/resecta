@@ -1,0 +1,23 @@
+Property: The render mode is read as any PDF number: a real 3.0 is mode 3.
+Area: page mode (Detection)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/InvisibleTextPageTests (or on the host: cd Packages/RedactionEngine && swift test --no-parallel --filter InvisibleTextPageTests)
+Must go red: RedactionEngineTests/InvisibleTextPageTests reading [one invisible word whose mode is written as the real number 3.0]; RedactionEngineTests/InvisibleTextPageTests exported [one invisible word whose mode is written as the real number 3.0]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
+index 82920236..6b4efdd9 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
+@@ -56,9 +56,9 @@ extension DocumentSearcher {
+         CGPDFOperatorTableSetCallback(table, "Tr") { scanner, info in
+             guard let info else { return }
+             let state = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
+-            var value: CGPDFReal = 0
+-            guard CGPDFScannerPopNumber(scanner, &value) else { state.unreadable = true; CGPDFScannerStop(scanner); return }
+-            state.mode = value
++            var value: CGPDFInteger = 0
++            guard CGPDFScannerPopInteger(scanner, &value) else { return }
++            state.mode = CGPDFReal(value)
+         }
+         CGPDFOperatorTableSetCallback(table, "q") { _, info in
+             guard let info else { return }

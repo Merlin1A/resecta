@@ -1,0 +1,18 @@
+Property: A form's saves stay inside it: after it is drawn the page's saved states are as they were.
+Area: page mode (Detection)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/InvisibleTextPageTests (or on the host: cd Packages/RedactionEngine && swift test --no-parallel --filter InvisibleTextPageTests)
+Must go red: RedactionEngineTests/InvisibleTextPageTests reading [a form that saves the state and never restores it, inside a save the page restores to mode 3]; RedactionEngineTests/InvisibleTextPageTests exported [a form that saves the state and never restores it, inside a save the page restores to mode 3]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
+index 82920236..67a46bf4 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
+@@ -100,7 +100,6 @@ extension DocumentSearcher {
+             if !CGPDFScannerScan(innerScanner) && !state.found && !state.unreadable { state.unreadable = true }
+             state.depth -= 1
+             state.mode = mode
+-            state.saved.removeLast(state.saved.count - savedCount)
+             state.floor = floor
+             CGPDFScannerRelease(innerScanner)
+             CGPDFContentStreamRelease(inner)
