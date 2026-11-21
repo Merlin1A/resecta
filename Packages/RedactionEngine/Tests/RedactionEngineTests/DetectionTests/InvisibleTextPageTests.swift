@@ -88,10 +88,15 @@ struct InvisibleTextPageTests {
     }
 
     /// Pages whose line at 480 Quartz draws, or leaves without ink, as the
-    /// reading above says: the reading follows the renderer.
+    /// reading above says: the reading follows the renderer, with one
+    /// exception. Quartz drops a mode written as a real number and draws the
+    /// words in the mode before it, while the reading takes 3.0 as 3 and makes
+    /// the page a picture. A picture page holds no text, so nothing hidden
+    /// survives in a viewer that takes 3.0 as invisible.
     static let drawn: [Drawn] = [
         Drawn(name: "a word in mode 3", make: { TestFixtures.typedPageWithOneInvisibleWordPDF(operand: "3") }, inks: false),
-        Drawn(name: "a word in mode 3.0", make: { TestFixtures.typedPageWithOneInvisibleWordPDF(operand: "3.0") }, inks: false),
+        Drawn(name: "a word in mode 3.0: Quartz drops a real-number mode and draws it",
+              make: { TestFixtures.typedPageWithOneInvisibleWordPDF(operand: "3.0") }, inks: true),
         Drawn(name: "control: a word in mode 0.0", make: { TestFixtures.typedPageWithOneInvisibleWordPDF(operand: "0.0") }, inks: true),
         Drawn(name: "a form that saves and never restores, inside a save the page restores to mode 3",
               make: { TestFixtures.lineAfterPDF(prefix: "3 Tr q 0 Tr /Fx1 Do Q", form: "q") }, inks: false),
