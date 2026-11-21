@@ -1,0 +1,19 @@
+Property: A message that must be seen and was never shown is handed on when its layer leaves, never ended unseen.
+Area: brief messages (a layer leaving)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/ToastQueueLayerLeavingTests -only-testing:ResectaAppTests/ReceiptRulesTests
+Must go red: ResectaAppTests/ToastQueueLayerLeavingTests unseenRunWarningOutlivesItsSheet; ResectaAppTests/ReceiptRulesTests handedOnWhenItsLayerLeaves
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/ReceiptRules.swift b/Sources/ResectaApp/State/ReceiptRules.swift
+index cc02cdc2..4ac7b074 100644
+--- a/Sources/ResectaApp/State/ReceiptRules.swift
++++ b/Sources/ResectaApp/State/ReceiptRules.swift
+@@ -169,7 +169,7 @@ enum ReceiptRules {
+     /// and was never shown is handed on, and takes the front when shown
+     /// (never dropped, only delayed); any other ends with its layer.
+     static func handedOnWhenItsLayerLeaves(mustBeSeen: Bool, everShown: Bool) -> Bool {
+-        mustBeSeen && !everShown
++        false
+     }
+ 
+     /// Whether a receipt belonging to `layer` is drawn, or a waiting one may
