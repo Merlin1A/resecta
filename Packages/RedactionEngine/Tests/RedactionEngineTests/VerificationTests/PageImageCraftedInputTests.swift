@@ -116,6 +116,41 @@ struct PageImageCraftedInputTests {
         }
     }
 
+    /// `jpeg` with its 16-byte JFIF header cut to `length` bytes, the bytes
+    /// past it removed, so the next segment starts where the shorter one ends.
+    static func shorterJFIF(_ jpeg: Data, length: Int) -> Data {
+        var b = [UInt8](jpeg)
+        precondition(b[2] == 0xFF && b[3] == 0xE0 && b[4] == 0 && b[5] == 16 && (7..<16).contains(length))
+        b[5] = UInt8(length)
+        b.removeSubrange((4 + length)..<20)
+        return Data(b)
+    }
+
+    @Test("A JFIF header shorter than 16 bytes is refused by name, at every length from 7 to 15")
+    func jfifHeaderShorterThanSixteenBytes() throws {
+        let plain = C.picture(columns: 1, rows: 1, step: 1, blocks: [C.Block(difference: 3)])
+        for length in 7...15 {
+            let r = try #require(try { if case .failure(let r) = try Self.walk(Self.shorterJFIF(plain, length: length)) { return r }; return nil }(),
+                                 "a JFIF header of \(length) bytes was read as a picture")
+            #expect(r.reason.rawValue == "jfifHeaderLength", "\(length) bytes")
+            #expect(r.offset == 2, "\(length) bytes")
+        }
+    }
+
+    @Test("A 16-byte JFIF header that names a thumbnail is refused by name: 2 by 2, and either side alone")
+    func jfifThumbnailInSixteenBytes() throws {
+        let plain = C.picture(columns: 1, rows: 1, step: 1, blocks: [C.Block(difference: 3)])
+        #expect([UInt8](plain)[18...19] == [0, 0], "the plain header names no thumbnail")
+        for (w, h) in [(2, 2), (1, 0), (0, 1)] {
+            var b = [UInt8](plain)
+            b[18] = UInt8(w); b[19] = UInt8(h)
+            let r = try #require(try { if case .failure(let r) = try Self.walk(Data(b)) { return r }; return nil }(),
+                                 "a \(w) by \(h) thumbnail in 16 bytes was read as a picture")
+            #expect(r.reason.rawValue == "jfifThumbnail", "\(w) by \(h)")
+            #expect(r.offset == 2, "\(w) by \(h)")
+        }
+    }
+
     // MARK: - The scan header at the end of the stream
 
     /// The scan header cut at the end: refused, by name, at the segment.
