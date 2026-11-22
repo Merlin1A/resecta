@@ -51,7 +51,8 @@ nonisolated final class NoticeBandUITests: XCTestCase {
             XCTAssertFalse(app.buttons["redactButton"].firstMatch.exists, "Redact is on the bar at the largest size.")
             app.editorOverflowButton.tap()
         }
-        let redact = app.buttons["redactButton"].firstMatch
+        // In the … menu the item is found by its label; on the bar, by its identifier.
+        let redact = extra == Self.largest ? app.buttons["Redact"].firstMatch : app.buttons["redactButton"].firstMatch
         XCTAssertTrue(redact.waitForExistence(timeout: 10), "Redact is missing.")
         redact.tap()
         guard app.buttons["stopProcessing"].firstMatch.waitForExistence(timeout: 10) else {
@@ -61,6 +62,10 @@ nonisolated final class NoticeBandUITests: XCTestCase {
         sleep(2)
         app.activate()
         guard notice.waitForExistence(timeout: 20) else {
+            // The run was seen going, so a mark in the notice's place is the
+            // notice folded on its arrival, not a run that ended first.
+            XCTAssertFalse(mark.exists, "The paused notice arrived folded to its mark.")
+            if mark.exists { return }
             throw XCTSkip("not reached: the run ended before the app left")
         }
     }
