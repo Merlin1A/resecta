@@ -4,15 +4,16 @@ Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter '
 Must go red: RedactionEngineTests/ContentGlyphScanTests assembledAddressGrows
 Apply in a scratch worktree with `git apply`; discard after.
 
-diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift
---- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift
-+++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift
-@@ -75,7 +75,7 @@
-             guard rect != line.normalizedRect else { return line }
-             return OCREngine.TextLine(text: line.text, normalizedRect: rect, confidence: line.confidence,
-                                       textLayerRect: line.textLayerRect, inkFitDegraded: line.inkFitDegraded,
--                                      identityRect: line.identityRect ?? line.normalizedRect,
-+                                      identityRect: line.identityRect,
-                                       ungrownRect: line.normalizedRect, wordBoxes: line.wordBoxes)
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/OCREngine.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/OCREngine.swift
+index 26e5bf63..16e54456 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/OCREngine.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/OCREngine.swift
+@@ -43,7 +43,7 @@ public struct OCREngine: Sendable {
+         func grown(to rect: CGRect) -> TextLine {
+             TextLine(text: text, normalizedRect: rect, confidence: confidence,
+                      textLayerRect: textLayerRect, inkFitDegraded: inkFitDegraded,
+-                     identityRect: identityRect ?? normalizedRect,
++                     identityRect: identityRect,
+                      ungrownRect: normalizedRect, wordBoxes: wordBoxes)
          }
      }

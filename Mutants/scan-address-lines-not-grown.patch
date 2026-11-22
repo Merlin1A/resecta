@@ -5,14 +5,15 @@ Must go red: RedactionEngineTests/ContentGlyphScanTests assembledAddressGrows; R
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift
+index fa1e6957..e10276f6 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift
-@@ -71,7 +71,7 @@
+@@ -71,7 +71,7 @@ extension DocumentSearcher {
                  guard let own = Self.ownGlyphs(for: range, page: page) else { glyphs = nil; break }
                  glyphs?.append(contentsOf: own)
              }
 -            let rect = grown(line.normalizedRect, line: span.pageRect, by: glyphs, page: page)
 +            let rect = line.normalizedRect
              guard rect != line.normalizedRect else { return line }
-             return OCREngine.TextLine(text: line.text, normalizedRect: rect, confidence: line.confidence,
-                                       textLayerRect: line.textLayerRect, inkFitDegraded: line.inkFitDegraded,
+             return line.grown(to: rect)
+         }
