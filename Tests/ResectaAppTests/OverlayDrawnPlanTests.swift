@@ -30,6 +30,9 @@ struct OverlayDrawnPlanTests {
         let documentState = DocumentState()
         documentState.sourceDocument = pdf
         let state = RedactionState()
+        // The page's stored regions, as the editor holds them: two changes to
+        // page 0, so the page is at version 2.
+        for region in regions { state.addRegion(region, page: 0, undoManager: nil) }
         let defaults = try #require(UserDefaults(suiteName: "OverlayDrawnPlanTests.drawingKeepsThePlan"))
         defaults.removePersistentDomain(forName: "OverlayDrawnPlanTests.drawingKeepsThePlan")
         let settings = SettingsState(defaults: defaults)
@@ -50,12 +53,16 @@ struct OverlayDrawnPlanTests {
         let kept = try #require(state.drawnPlans[0])
         let page = try #require(pdf.page(at: 0))
         // The engine's DrawnPlanTests pin this maker's plan to the run entry's.
+        // Kept at the page's version (2: its two stored regions) and drawn
+        // from the stored regions.
         let expected = DrawnPlan(pageIndex: 0, regions: regions, cropBox: page.bounds(for: .cropBox).size,
                                  rotation: page.rotation, switchOn: false, exportDPI: 150, fillColor: .white)
+            .stamped(pageVersion: 2, fromStoredRegions: true)
         #expect(page.rotation == 90)
         #expect(kept == expected)
         #expect(kept != DrawnPlan(pageIndex: 0, regions: regions, cropBox: page.bounds(for: .cropBox).size,
-                                  rotation: 0, switchOn: false, exportDPI: 150, fillColor: .white))
+                                  rotation: 0, switchOn: false, exportDPI: 150, fillColor: .white)
+            .stamped(pageVersion: 2, fromStoredRegions: true))
         #expect(kept.boxes.map(\.regionIDs) == regions.map { [$0.id] })
         #expect(kept.exportDPI == 150 && kept.fillColor == .white && kept.switchOn == false)
 
