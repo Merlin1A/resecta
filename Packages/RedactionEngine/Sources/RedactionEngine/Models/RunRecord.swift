@@ -65,6 +65,13 @@ public struct RunRecord: Equatable, Sendable {
         /// boxes of its plan, made once at run entry. Nil until the run
         /// entry makes them.
         package let plan: PaintPlan?
+        /// The page's crop box and rotation as the run reads them at entry:
+        /// the frame its boxes are painted in. Nil when the run could not
+        /// read them.
+        public let geometry: RunRecord.PageGeometry?
+        /// The page's crop box and rotation as they were when its boxes were
+        /// stored. Nil when none was noted.
+        public let geometryAtStore: RunRecord.PageGeometry?
 
         /// The page's regions that admission refuses, each with its reason,
         /// in the order they were drawn. Given by the regions as drawn, so it
@@ -79,6 +86,18 @@ public struct RunRecord: Equatable, Sendable {
 
         public init(pageIndex: Int, regions: [DrawnRegion]) {
             self.init(pageIndex: pageIndex, regions: regions, plan: nil)
+        }
+
+        /// One page as confirmed, with its plan made at run entry from the
+        /// page's geometry as the run reads it (as the initialiser below), and
+        /// the geometry noted when its boxes were stored, for the box-place
+        /// check.
+        public init(pageIndex: Int, regions: [DrawnRegion], geometry: RunRecord.PageGeometry,
+                    geometryAtStore: RunRecord.PageGeometry?, switchOn: Bool) {
+            let planned = Page(pageIndex: pageIndex, regions: regions,
+                               cropBox: geometry.cropBox.size, rotation: geometry.rotation, switchOn: switchOn)
+            self.init(pageIndex: pageIndex, regions: regions, plan: planned.plan,
+                      geometry: geometry, geometryAtStore: geometryAtStore)
         }
 
         /// One page as confirmed, with its plan made at run entry from the
@@ -140,10 +159,13 @@ public struct RunRecord: Equatable, Sendable {
                 policy: .release, source: choice.source, switchOn: choice.switchOn).plan
         }
 
-        package init(pageIndex: Int, regions: [DrawnRegion], plan: PaintPlan?) {
+        package init(pageIndex: Int, regions: [DrawnRegion], plan: PaintPlan?,
+                     geometry: RunRecord.PageGeometry? = nil, geometryAtStore: RunRecord.PageGeometry? = nil) {
             self.pageIndex = pageIndex
             self.regions = regions
             self.plan = plan
+            self.geometry = geometry
+            self.geometryAtStore = geometryAtStore
         }
     }
 
@@ -158,17 +180,24 @@ public struct RunRecord: Equatable, Sendable {
         /// The characters its match selected on the page's string
         /// (`RedactionRegion.pageCharacters`).
         package let pageCharacters: Range<Int>?
+        /// Where PDFKit put the box on the page when a finger last drew,
+        /// moved or resized it: page space, unrotated, the crop box's origin
+        /// included (`RedactionRegion.drawnPageRect`). Nil for a box no
+        /// gesture placed.
+        public let drawnPageRect: CGRect?
 
         public init(region: RedactionRegion) {
             self.init(id: region.id, normalizedRect: region.normalizedRect, kind: RegionKind(of: region),
-                      pageCharacters: region.pageCharacters)
+                      pageCharacters: region.pageCharacters, drawnPageRect: region.drawnPageRect)
         }
 
-        package init(id: UUID, normalizedRect: CGRect, kind: RegionKind, pageCharacters: Range<Int>? = nil) {
+        package init(id: UUID, normalizedRect: CGRect, kind: RegionKind, pageCharacters: Range<Int>? = nil,
+                     drawnPageRect: CGRect? = nil) {
             self.id = id
             self.normalizedRect = normalizedRect
             self.kind = kind
             self.pageCharacters = pageCharacters
+            self.drawnPageRect = drawnPageRect
         }
     }
 

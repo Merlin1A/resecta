@@ -62,6 +62,14 @@ public struct RedactionRegion: Sendable, Identifiable, Equatable, Codable {
     /// for every other region. Encoded; a region encoded without it reads as
     /// nil. Read only while the region is anchored to its text.
     package var pageCharacters: Range<Int>? = nil
+    /// Where PDFKit put the box on the page at the end of the gesture that
+    /// last drew, moved or resized it, read through UIKit's and PDFKit's own
+    /// conversions, not the canvas's maps: page space, unrotated, the crop
+    /// box's origin included. Any other change to the box clears it, so it
+    /// never describes an older place. Nil for a box no gesture placed (a
+    /// found box, a duplicate, an arrow step). The run's box-place check
+    /// compares it with the stored share. Never encoded.
+    public var drawnPageRect: CGRect?
 
     public init(
         id: UUID,
