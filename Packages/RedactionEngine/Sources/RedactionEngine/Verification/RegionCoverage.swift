@@ -174,8 +174,9 @@ struct RegionCoverage: Sendable {
         /// 0-based, sorted, deduplicated: a page with boxes (within the
         /// request's `appliedPages` when it names any) that the searcher
         /// reported it could not read — a render over the OCR pixel caps,
-        /// OCR that did not run, a page it could not open, a pattern that
-        /// ran out of time on it, or a pattern the safety gate refused.
+        /// OCR that did not run, a scanned page left unread with OCR off, a
+        /// page it could not open, a pattern that ran out of time on it, or
+        /// a pattern the safety gate refused.
         let unreadPages: [Int]
         /// How many re-run matches on pages with boxes were compared.
         let comparedMatches: Int
@@ -228,6 +229,9 @@ struct RegionCoverage: Sendable {
             // own sink. Installed fresh per request so nothing crosses over.
             let reads = PageReadLog()
             await searcher.setPageCoverageSink { coverage in reads.record(coverage) }
+            // A scanned page (`.sparse`/`.none`) re-run with OCR off is read
+            // by nothing and reports only through this sink: unread.
+            await searcher.setScannedRegionNotAnalyzedSink { page in reads.notAnalysed(page) }
             await searcher.setRegexTimeoutSink { page in reads.timedOut(page) }
             await searcher.setUserTermsTimeoutSink { page, _ in reads.timedOut(page) }
             await searcher.setRegexRejectionSink { _ in reads.refused() }
@@ -263,6 +267,7 @@ struct RegionCoverage: Sendable {
             }
             pieces.append(contentsOf: strays.filter { $0.match.occurrence.map(comparedOccurrences.contains) ?? false })
             await searcher.setPageCoverageSink(nil)
+            await searcher.setScannedRegionNotAnalyzedSink(nil)
             await searcher.setRegexTimeoutSink(nil)
             await searcher.setUserTermsTimeoutSink(nil)
             await searcher.setRegexRejectionSink(nil)
@@ -306,6 +311,10 @@ struct RegionCoverage: Sendable {
         }
 
         func timedOut(_ page: Int) {
+            lock.lock(); unread.insert(page); lock.unlock()
+        }
+
+        func notAnalysed(_ page: Int) {
             lock.lock(); unread.insert(page); lock.unlock()
         }
 
