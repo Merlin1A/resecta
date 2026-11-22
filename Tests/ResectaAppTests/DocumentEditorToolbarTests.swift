@@ -18,7 +18,7 @@ struct DocumentEditorToolbarTests {
             activeTool: .constant(nil), isMultiSelectActive: .constant(false),
             searchSheetDetent: .constant(.medium),
             documentOverride: nil, redactButtonDisabled: true, redactButtonHint: "",
-            handleHomeTap: {}, homeButton: AnyView(EmptyView()), pipelineModePicker: AnyView(EmptyView()),
+            handleHomeTap: {}, homeButton: AnyView(EmptyView()),
             openSettings: {}
         )
     }
@@ -44,7 +44,7 @@ struct DocumentEditorToolbarTests {
             isMultiSelectActive: Binding(get: { addToSelection }, set: { addToSelection = $0 }),
             searchSheetDetent: .constant(.medium),
             documentOverride: nil, redactButtonDisabled: true, redactButtonHint: "",
-            handleHomeTap: {}, homeButton: AnyView(EmptyView()), pipelineModePicker: AnyView(EmptyView()),
+            handleHomeTap: {}, homeButton: AnyView(EmptyView()),
             openSettings: {}
         )
         toolbar.resetCanvasTools()

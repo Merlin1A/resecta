@@ -13,14 +13,14 @@ struct EditorToolbarLayoutTests {
 
     private typealias C = EditorToolbarLayout.Control
 
-    @Test("Default sizes: Undo, Redact and … in the bar; the … menu lists the selection actions, then Switch Mode and Settings, then Home")
+    @Test("Default sizes: Undo, Redact and … in the bar; the … menu lists the selection actions, then Settings, then Home")
     func defaultSizes() {
         for size in [DynamicTypeSize.large, .xLarge, .xxLarge] {
             let layout = EditorToolbarLayout(dynamicTypeSize: size, canUndo: true, canRedo: false)
             #expect(layout.trailing == [C.undo, .redact, .overflow], "at \(size)")
             #expect(layout.overflowSections == [
                 [.selectRegions, .addToSelection, .delete, .markWholePage],
-                [.switchMode, .settings],
+                [.settings],
                 [.home],
             ], "at \(size)")
         }
@@ -31,7 +31,7 @@ struct EditorToolbarLayoutTests {
         for size in [DynamicTypeSize.xxxLarge, .accessibility1, .accessibility3, .accessibility5] {
             let layout = EditorToolbarLayout(dynamicTypeSize: size, canUndo: true, canRedo: true)
             #expect(layout.trailing == [C.undo, .overflow], "at \(size)")
-            #expect(layout.overflowSections[1] == [C.redact, .switchMode, .settings], "at \(size)")
+            #expect(layout.overflowSections[1] == [C.redact, .settings], "at \(size)")
             #expect(layout.overflowSections.flatMap { $0 }.filter { $0 == .undo }.isEmpty,
                     "Undo never folds, at \(size)")
         }

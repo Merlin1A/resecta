@@ -60,7 +60,7 @@ nonisolated final class EditorToolbarUITests: XCTestCase {
         overflow.tap()
 
         // The page is marked, so the whole-page row reads Unmark.
-        let expected = ["Select Regions", "Add to Selection", "Unmark Whole Page", "Switch Mode", "Settings", "Home"]
+        let expected = ["Select Regions", "Add to Selection", "Unmark Whole Page", "Settings", "Home"]
         var ys: [CGFloat] = []
         for label in expected {
             let row = app.buttons[label].firstMatch.exists ? app.buttons[label].firstMatch
@@ -74,32 +74,28 @@ nonisolated final class EditorToolbarUITests: XCTestCase {
         attachScreenshot(named: "toolbar-overflow-order")
     }
 
-    func testSwitchModeList_namesAreWholeWordsOnIOS27() throws {
-        guard #available(iOS 27, *) else {
-            throw XCTSkip("the fault is in iOS 27's menu layout; this simulator runs an earlier system")
-        }
+    /// Secure Rasterization is the only mode: the … menu has no Switch Mode
+    /// row and Settings has no mode picker, so neither offers Searchable
+    /// Redaction.
+    func testNoModeChoice_menuAndSettingsOfferNoSearchable() {
         app.launchArguments = ["--uitesting", "--loadTestDocument", "--multipageDoc"]
         app.launch()
         let overflow = app.editorOverflowButton
         XCTAssertTrue(overflow.waitForExistence(timeout: 30), "The … menu button is missing.")
         overflow.tap()
-        let switchMode = app.buttons["Switch Mode"].firstMatch
-        XCTAssertTrue(switchMode.waitForExistence(timeout: 5), "The … menu has no Switch Mode row.")
-        switchMode.tap()
-        let secure = app.buttons["Secure Rasterization"].firstMatch
-        let searchable = app.buttons["Searchable Redaction"].firstMatch
-        XCTAssertTrue(secure.waitForExistence(timeout: 5), "The list has no Secure Rasterization, by its spoken name.")
-        XCTAssertTrue(searchable.waitForExistence(timeout: 5), "The list has no Searchable Redaction, by its spoken name.")
-        attachScreenshot(named: "switch-mode-list-ios27")
-        let (chosen, other) = secure.isSelected ? (secure, searchable) : (searchable, secure)
-        XCTAssertTrue(chosen.isSelected, "One mode must be ticked.")
-        other.tap()
-        overflow.tap()
-        XCTAssertTrue(switchMode.waitForExistence(timeout: 5))
-        switchMode.tap()
-        XCTAssertTrue(other.waitForExistence(timeout: 5))
-        XCTAssertTrue(other.isSelected, "A tap on the other mode must move the tick to it.")
-        XCTAssertFalse(chosen.isSelected, "The mode tapped away from must lose the tick.")
+        let settings = app.buttons["Settings"].firstMatch
+        XCTAssertTrue(settings.waitForExistence(timeout: 5), "The … menu has no Settings row, so it did not open.")
+        XCTAssertFalse(app.buttons["Switch Mode"].exists, "The … menu still has a Switch Mode row.")
+        XCTAssertFalse(app.buttons["Searchable Redaction"].exists, "The … menu still offers Searchable Redaction.")
+        attachScreenshot(named: "overflow-no-switch-mode")
+        settings.tap()
+        let heading = app.navigationBars["Settings"]
+        XCTAssertTrue(heading.waitForExistence(timeout: 10), "Settings did not open.")
+        let secureLine = app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH %@", "Produces image-only output")).firstMatch
+        XCTAssertTrue(secureLine.waitForExistence(timeout: 5), "Settings no longer says what every export is.")
+        XCTAssertFalse(app.descendants(matching: .any)["Default Mode"].exists, "Settings still has the mode picker.")
+        XCTAssertFalse(app.descendants(matching: .any)["Searchable Redaction"].exists, "Settings still offers Searchable Redaction.")
+        attachScreenshot(named: "settings-no-mode-picker")
     }
 
     // MARK: - The Undo control

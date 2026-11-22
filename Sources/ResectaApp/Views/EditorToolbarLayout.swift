@@ -9,7 +9,8 @@ import SwiftUI
 // (measured at 390 pt, Large: every control fits in the bar with room to
 // spare between the leading group and Undo). At the largest sizes the bar
 // cannot hold all three, so Redact folds into the … menu first and Undo
-// never folds. Settings always lives in the … menu.
+// never folds. Settings always lives in the … menu. Switch Mode is placed
+// nowhere: Secure Rasterization is the only mode, so there is no choice.
 
 struct EditorToolbarLayout: Equatable {
 
@@ -17,7 +18,7 @@ struct EditorToolbarLayout: Equatable {
     enum Control: Hashable {
         case undo, redact, overflow
         case selectRegions, addToSelection, delete, markWholePage
-        case switchMode, settings
+        case settings
         case home
     }
 
@@ -42,7 +43,7 @@ struct EditorToolbarLayout: Equatable {
         trailing = redactFolds ? [.undo, .overflow] : [.undo, .redact, .overflow]
         overflowSections = [
             [.selectRegions, .addToSelection, .delete, .markWholePage],
-            (redactFolds ? [.redact] : []) + [.switchMode, .settings],
+            (redactFolds ? [.redact] : []) + [.settings],
             [.home],
         ]
         undoMode = Self.undoMode(canUndo: canUndo, canRedo: canRedo)

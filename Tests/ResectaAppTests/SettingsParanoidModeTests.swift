@@ -9,13 +9,15 @@ import Foundation
 // the remaining behavior overrides apply as a bundle (no per-behavior
 // sub-toggles):
 //
-//   1. Pipeline mode is forced to `.secureRasterization`, overriding the
-//      user's `pipelineMode` setting AND any per-document override.
+//   1. Pipeline mode is `.secureRasterization`. Secure Rasterization is
+//      the only mode, so the run's rule gives it with Paranoid Mode on or
+//      off, over a stored `pipelineMode` setting and any per-document
+//      override.
 //   2. `autoVerify` reads as `true` and the Settings UI toggle is
 //      disabled.
 //
 // `testParanoidModeOffPreservesNormalBehavior` is the explicit negative
-// counterpart: with paranoid off, none of the remaining overrides apply.
+// counterpart: with paranoid off, the stored `autoVerify` is honored.
 
 @Suite("SettingsState.paranoidMode")
 @MainActor
@@ -92,18 +94,20 @@ final class SettingsParanoidModeTests {
 
     // MARK: - Negative — both overrides off when paranoid is off
 
-    @Test("With paranoid OFF, neither override applies (mode, autoVerify)")
+    @Test("With paranoid OFF, the stored autoVerify is honored and the mode is still Secure Rasterization")
     func testParanoidModeOffPreservesNormalBehavior() {
         let settings = SettingsState(defaults: defaults)
         settings.paranoidMode = false
         settings.pipelineMode = .searchableRedaction
         settings.autoVerify = false
 
-        // Override #1: stored `.searchableRedaction` is honored.
+        // A stored `.searchableRedaction` is left as stored and read as
+        // Secure Rasterization, the only mode.
         let effectiveMode = computeEffectiveMode(
             settings: settings, documentOverride: nil
         )
-        #expect(effectiveMode == .searchableRedaction)
+        #expect(settings.pipelineMode == .searchableRedaction)
+        #expect(effectiveMode == .secureRasterization)
 
         // Override #2: stored `autoVerify = false` is honored.
         #expect(effectiveAutoVerify(settings: settings) == false)
@@ -113,7 +117,9 @@ final class SettingsParanoidModeTests {
 
     // MARK: - Overrides copy guard
 
-    /// Paranoid mode lists TWO behaviors. The
+    /// Paranoid mode lists ONE behavior: Secure Rasterization is the only
+    /// mode, so forcing it is no longer a behavior of Paranoid Mode, and the
+    /// hint that counted the behaviors is gone with the count. The
     /// "verification-report copy step" was parked on the overflow menu and
     /// never shipped (VerificationResultsView), so the copy that claimed
     /// paranoid mode suppresses it was a false mechanism claim. This guard
@@ -121,10 +127,9 @@ final class SettingsParanoidModeTests {
     /// `#filePath` loader posture) and pins the corrected copy so a future
     /// string edit cannot re-introduce the phantom fourth override. The
     /// Live Photo auxiliary-metadata strip left the listed behaviors when
-    /// import became PDF-only, and its code has since been deleted, so the
-    /// hint counts two.
-    @Test("Paranoid-mode copy describes two overrides, not the parked copy step or the Live Photo strip")
-    func testParanoidModeHasTwoOverrides() throws {
+    /// import became PDF-only, and its code has since been deleted.
+    @Test("Paranoid-mode copy names no count of overrides, no forced mode, no parked copy step and no Live Photo strip")
+    func testParanoidModeHasOneOverride() throws {
         let source = try loadSettingsViewSource()
         #expect(
             !source.contains("verification-report copy"),
@@ -133,8 +138,12 @@ final class SettingsParanoidModeTests {
             !source.contains("applies four behavior overrides"),
             "Paranoid-mode accessibility hint still says 'four' behavior overrides.")
         #expect(
-            source.contains("applies two behavior overrides"),
-            "Paranoid-mode accessibility hint should say 'two' behavior overrides.")
+            !source.contains("behavior overrides"),
+            "Paranoid-mode copy still counts its behavior overrides.")
+        #expect(
+            !source.contains("forces secure-rasterization") && !source.contains("forces Secure Rasterization")
+                && !source.contains("forced to Secure Rasterization"),
+            "Paranoid-mode copy still says it forces a mode, the only one there is.")
         #expect(
             !source.contains("imported Live Photo"),
             "Paranoid-mode copy still describes the Live Photo metadata strip.")
@@ -151,17 +160,14 @@ final class SettingsParanoidModeTests {
 
     // MARK: - Helpers (mirror runtime decision points)
 
-    /// Mirror the `effectiveMode` decision in
-    /// `PipelineCoordinator.runFullPipeline`. Keeping the rule in one
-    /// place avoids hand-rolling the runtime check inside the test.
+    /// The `effectiveMode` decision in `PipelineCoordinator.runFullPipeline`:
+    /// the rule itself, so the test cannot keep a copy the app has left.
     private func computeEffectiveMode(
         settings: SettingsState,
         documentOverride: PipelineMode?
     ) -> PipelineMode {
-        if settings.paranoidMode {
-            return .secureRasterization
-        }
-        return documentOverride ?? settings.pipelineMode
+        PipelineMode.effective(
+            paranoid: settings.paranoidMode, override: documentOverride, setting: settings.pipelineMode)
     }
 
     /// Mirror the `verifyForRun` decision in
