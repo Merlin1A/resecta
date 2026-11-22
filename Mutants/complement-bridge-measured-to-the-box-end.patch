@@ -1,7 +1,7 @@
 Property: A closed room is bridged by a run that covers it from the word before to the word after, never by one measured to the box's own ends, so a short value and a long one in the same room read the same.
 Area: the page's complement (lines, runs, stacks, columns, bridges, direction)
 Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/ComplementReadingTests (or on the host: cd Packages/RedactionEngine && swift test --filter ComplementReadingTests)
-Must go red: RedactionCoreTests/ComplementReadingTests shortAndLongValueReadTheSame
+Must go red: RedactionCoreTests/ComplementReadingTests shortAndLongValueReadTheSame; RedactionCoreTests/ComplementReadingTests selectedTextChangesNothingButTheTightRectangle
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift
