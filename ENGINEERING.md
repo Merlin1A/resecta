@@ -304,7 +304,7 @@ concurrent entry points. The working rules, checkable by grep:
   convention is a written rationale at the declaration site saying why the
   access is safe.
 - Logging goes through `os.Logger`, and what a log line may carry is
-  counted: 64 log interpolations are marked `privacy: .public` across the
+  counted: 63 log interpolations are marked `privacy: .public` across the
   app and engine source, each one a mechanism value — an asset, file or
   preference-key name, a metadata key name, a pipeline phase, a page index,
   a count or a pixel size, a detector or table name, an issuer or state code
@@ -434,16 +434,12 @@ search, rebuild, verify and export without the app's view code:
   `layers(for:)` · `VerificationOrchestrator` · `VerificationReport` ·
   `LayerResult` · `VerificationLayer` · `AppliedSearchQuery` ·
   `AppliedSearchRecord` · `ScanRunConfiguration` · `SearchRecheckRequest`
-- Export: `TempExportDirectory` · `TempFileHardening` · `ExportMetadata` ·
-  `MatchAuditExporter`
+- Export: `TempExportDirectory` · `TempFileHardening`
 
 These are public because the app consumes them, along with the types their
-signatures carry and whatever else the app names. `ExportMetadata` and
-`MatchAuditExporter` are the exception: a client outside the app needs them
-to write an audit record, and the app itself does not call those two today.
-Everything else in the package is `internal` or on its way there, and the
-test suites reach it through `@testable import`, so narrowing the surface
-costs no coverage.
+signatures carry and whatever else the app names. Everything else in the
+package is `internal` or on its way there, and the test suites reach it
+through `@testable import`, so narrowing the surface costs no coverage.
 
 The check: `EnginePublicSurfaceTests` names every symbol in the list through a
 plain `import RedactionEngine`, so making one of them `internal` stops the
