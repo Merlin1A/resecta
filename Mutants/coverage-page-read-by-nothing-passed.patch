@@ -1,0 +1,18 @@
+Property: The coverage check's re-run counts a page under a box that it read with nothing (a scanned page with text recognition off, which reports only through the searcher's not-analysed signal) as unread, never as a page with no match.
+Area: Search Re-check coverage check (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --package-path Packages/RedactionEngine --no-parallel --filter RegionCoverageNotAnalysedPageTests
+Must go red: RedactionEngineTests/RegionCoverageNotAnalysedPageTests scannedPageWithRecognitionOff, onlyThePagesWithTheRequestsBoxes
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/RegionCoverage.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/RegionCoverage.swift
+index 37625ccb..6ec498c4 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/RegionCoverage.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/RegionCoverage.swift
+@@ -218,7 +218,6 @@ struct RegionCoverage: Sendable {
+             await searcher.setPageCoverageSink { coverage in reads.record(coverage) }
+             // A scanned page (`.sparse`/`.none`) re-run with OCR off is read
+             // by nothing and reports only through this sink: unread.
+-            await searcher.setScannedRegionNotAnalyzedSink { page in reads.notAnalysed(page) }
+             await searcher.setRegexTimeoutSink { page in reads.timedOut(page) }
+             await searcher.setUserTermsTimeoutSink { page, _ in reads.timedOut(page) }
+             await searcher.setRegexRejectionSink { _ in reads.refused() }
