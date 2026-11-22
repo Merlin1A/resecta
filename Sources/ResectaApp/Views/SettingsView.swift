@@ -10,7 +10,7 @@ struct SettingsView: View {
     // constants so the contract can be pinned by unit tests without
     // rendering the form.
     /// What every export is: the line under the Processing header.
-    static let secureModeDescription = "Produces image-only output with all text removed, so the PDF has no text to search or copy. The simplest approach — recommended when redaction confidence is the top priority. A court or regulator that requires searchable PDFs may refuse an image-only PDF."
+    static let secureModeDescription = "Produces image-only output with all text removed, so the PDF has no text to search or copy. A court or regulator that requires searchable PDFs may refuse an image-only PDF."
     /// The banner shown while a run is in progress: its title and body.
     static let runInProgressTitle = "Redaction in progress"
     static let runInProgressBody = "A redaction is running. Changes apply to the next one."
@@ -359,9 +359,8 @@ struct SettingsView: View {
 
     /// Paranoid-mode toggle. Off by default. Copy uses
     /// mechanism-description language only: each item
-    /// describes what the app does, not an outcome promise. The two
-    /// listed behaviors land as a bundle — there are no per-behavior
-    /// sub-toggles by locked design.
+    /// describes what the app does, not an outcome promise. The listed
+    /// behavior has no sub-toggle by locked design.
     ///
     /// The never-shipped
     /// report-copy behavior was removed from the paranoid copy — that mechanism

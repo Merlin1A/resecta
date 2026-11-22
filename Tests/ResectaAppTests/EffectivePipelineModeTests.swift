@@ -7,8 +7,11 @@ import RedactionEngine
 // read one rule, `PipelineMode.effective`, and it gives Secure Rasterization
 // for every input: Paranoid Mode on or off, any document override, and any
 // setting, including a stored Searchable setting, which is left as stored.
-// A launch argument reaches the app as the same defaults key. No control
-// offers a mode: the … menu has no Switch Mode row and Settings no picker.
+// A launch argument reaches the app as the same defaults key, so the
+// stored-setting and run cases cover it; it is not set here, because the
+// argument domain is the whole test process's. The screen test launches the
+// app with it. No control offers a mode: the … menu has no Switch Mode row
+// and Settings no picker.
 
 @Suite("Effective pipeline mode", .serialized)
 @MainActor
@@ -33,26 +36,6 @@ struct EffectivePipelineModeTests {
         #expect(settings.pipelineMode == .searchableRedaction, "the stored value is read back, not migrated")
         #expect(defaults.string(forKey: "pipelineMode.v2") == "searchableRedaction", "the stored value is left")
         #expect(PipelineMode.effective(paranoid: settings.paranoidMode, override: nil, setting: settings.pipelineMode)
-                == .secureRasterization)
-    }
-
-    @Test("A launch argument for the Searchable setting is read as Secure Rasterization")
-    func launchArgumentReadsAsSecure() throws {
-        // A process launcher's `-pipelineMode.v2 searchableRedaction` lands in
-        // the argument domain, which the defaults read before the stored one.
-        let suiteName = "effective-mode-argument-\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suiteName))
-        defer {
-            defaults.removeVolatileDomain(forName: UserDefaults.argumentDomain)
-            defaults.removePersistentDomain(forName: suiteName)
-        }
-        defaults.set("secureRasterization", forKey: "pipelineMode.v2")
-        defaults.setVolatileDomain(["pipelineMode.v2": "searchableRedaction"], forName: UserDefaults.argumentDomain)
-        try #require(defaults.string(forKey: "pipelineMode.v2") == "searchableRedaction",
-                     "the argument domain must win over the stored value, or this case reads nothing")
-        let settings = SettingsState(defaults: defaults)
-        #expect(settings.pipelineMode == .searchableRedaction)
-        #expect(PipelineMode.effective(paranoid: false, override: nil, setting: settings.pipelineMode)
                 == .secureRasterization)
     }
 

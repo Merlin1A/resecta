@@ -76,9 +76,11 @@ nonisolated final class EditorToolbarUITests: XCTestCase {
 
     /// Secure Rasterization is the only mode: the … menu has no Switch Mode
     /// row and Settings has no mode picker, so neither offers Searchable
-    /// Redaction.
+    /// Redaction, even when launched with the Searchable setting as an
+    /// argument.
     func testNoModeChoice_menuAndSettingsOfferNoSearchable() {
-        app.launchArguments = ["--uitesting", "--loadTestDocument", "--multipageDoc"]
+        app.launchArguments = ["--uitesting", "--loadTestDocument", "--multipageDoc",
+                               "-pipelineMode.v2", "searchableRedaction"]
         app.launch()
         let overflow = app.editorOverflowButton
         XCTAssertTrue(overflow.waitForExistence(timeout: 30), "The … menu button is missing.")
