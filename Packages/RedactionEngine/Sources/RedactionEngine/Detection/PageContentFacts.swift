@@ -47,6 +47,21 @@ public struct PageContentFacts: Equatable, Sendable {
             usesType3Font: walk.type3Font)
     }
 
+    /// Whether a page draws an inline image, by the content walk alone; a
+    /// page that cannot be read answers true, as `read` does.
+    static func drawsInlineImage(_ page: CGPDFPage) -> Bool {
+        guard let dictionary = page.dictionary else { return true }
+        let resources: CGPDFDictionaryRef?
+        switch TextLayerExtractor.inheritedResources(of: dictionary) {
+        case .found(let found): resources = found
+        case .none: resources = nil
+        case .unreadable: return true
+        }
+        var walk = ContentWalk()
+        walk.visit(contents: dictionary, resources: resources, depth: 0)
+        return walk.inlineImage
+    }
+
     /// Whether a Searchable page keeps its text layer under these regions.
     /// It does when every region was placed from a match in the page's own
     /// text layer and has not been moved or resized since (`textAnchored`),

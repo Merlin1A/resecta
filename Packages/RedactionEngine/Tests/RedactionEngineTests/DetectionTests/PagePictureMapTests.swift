@@ -285,6 +285,89 @@ struct PagePictureMapTests {
         #expect(pictureTook < .seconds(10), "took \(pictureTook)")
     }
 
+    @Test("More lines of visible text than the limit and the painting is not followed")
+    func textStartsAreBounded() throws {
+        let shows = { (n: Int) in "BT " + String(repeating: "(a) Tj ", count: n) + "ET" }
+        let atLimit = try Self.read(shows(16_384))
+        #expect(atLimit.followed && atLimit.visibleTextStarts.count == 16_384, "16,384 starts are followed")
+        let past = try Self.read(shows(16_385))
+        #expect(!past.followed, "16,385 starts: not followed")
+        #expect(past.visibleTextStarts.count == 16_384, "and no start past the limit is kept")
+        // A form drawn 64 times (two at each of six levels) adds its starts
+        // each time: 64 x 200 is within the limit, 64 x 300 is past it.
+        for (each, followed) in [(200, true), (300, false)] {
+            let (content, objects) = Self.formTree(times: 2, last: shows(each))
+            let map = try Self.read(content, resources: "/XObject << /F @0@ >>", objects: objects)
+            #expect(map.followed == followed, "64 draws of \(each) starts")
+            #expect(map.visibleTextStarts.count <= Map.textStartLimit)
+        }
+        #expect(Map.textStartLimit == 16_384)
+    }
+
+    @Test("More operators than the limit on one page and the painting is not followed")
+    func operatorsAreBounded() throws {
+        // BT and each T* are read: 1 + 999,999 is the limit.
+        let moves = { (n: Int) in "BT " + String(repeating: "T* ", count: n) + "ET" }
+        #expect(try Self.read(moves(999_999)).followed, "1,000,000 operators are followed")
+        #expect(try !Self.read(moves(1_000_000)).followed, "1,000,001: not followed")
+        #expect(Map.operationLimit == 1_000_000)
+    }
+
+    @Test("Each pattern stream is read once however many names it has, and the patterns share one record of forms")
+    func patternStreamsReadOnce() throws {
+        // Seven forms, each naming the next four times; three pattern cells
+        // that reach the first, one of them under 10,000 names.
+        var objects: [S.Object] = []
+        for k in 0..<7 {
+            let many = (0..<4).map { "/F\($0) @\(k + 1)@" }.joined(separator: " ")
+            objects.append(k < 6 ? S.form("", resources: "/XObject << \(many) >>") : S.form("0 0 1 1 re f", resources: ""))
+        }
+        let cell = { S.Object(dictionary: "/Type /Pattern /PatternType 1 /PaintType 1 /TilingType 1 /BBox [0 0 10 10] /XStep 10 /YStep 10 /Resources << /XObject << /F @0@ >> >>",
+                              stream: Data("/F Do".utf8)) }
+        let first = objects.count
+        objects += [cell(), cell(), cell()]
+        let names = (0..<10_000).map { "/P\($0) @\(first)@" }.joined(separator: " ") + " /Q1 @\(first + 1)@ /Q2 @\(first + 2)@"
+        let data = S.document([S.Page("/Pattern cs /P0 scn 0 0 10 10 re f", resources: "/Pattern << \(names) >>", objects: objects)])
+        let (document, _, cgPage) = try #require(S.pdfPage(data))
+        defer { withExtendedLifetime(document) {} }
+        let seen = PictureWalk.FormsSeen()
+        let clock = ContinuousClock()
+        let start = clock.now
+        #expect(!PictureWalk.patternsHoldPicture(cgPage, seen: seen), "no picture is reached")
+        #expect(clock.now - start < .seconds(10), "took \(clock.now - start)")
+        #expect(seen.patternsRead == 3, "three streams read once each, not \(seen.patternsRead) times")
+        #expect(seen.looked == 7, "the seven forms looked into once over the page, not \(seen.looked) times")
+    }
+
+    @Test("More pattern names than the limit and a picture is taken to be held")
+    func patternNamesAreBounded() throws {
+        let cell = S.Object(dictionary: "/Type /Pattern /PatternType 1 /PaintType 1 /TilingType 1 /BBox [0 0 10 10] /XStep 10 /YStep 10 /Resources << >>",
+                            stream: Data("0 0 1 1 re f".utf8))
+        for (count, held) in [(65_536, false), (65_537, true)] {
+            let names = (0..<count).map { "/P\($0) @0@" }.joined(separator: " ")
+            let data = S.document([S.Page("0 0 1 1 re f", resources: "/Pattern << \(names) >>", objects: [cell])])
+            let (document, _, cgPage) = try #require(S.pdfPage(data))
+            #expect(PictureWalk.patternsHoldPicture(cgPage) == held, "\(count) names")
+            withExtendedLifetime(document) {}
+        }
+        #expect(Map.entryLimit == 65_536)
+    }
+
+    @Test("Forms that draw each other many times are read for invisible text in bounded time, and answer true")
+    func invisibleTextFormsBounded() throws {
+        let clock = ContinuousClock()
+        for (times, answer) in [(2, false), (3, true)] {
+            // 127 forms drawn, then 1,093: past the limit.
+            let (content, objects) = Self.formTree(times: times, last: "BT (a) Tj ET")
+            let data = S.document([S.Page(content, resources: "/XObject << /F @0@ >>", objects: objects)])
+            let (document, _, cgPage) = try #require(S.pdfPage(data))
+            let start = clock.now
+            #expect(DocumentSearcher.showsInvisibleText(cgPage) == answer, "\(times) draws at each level")
+            #expect(clock.now - start < .seconds(10), "took \(clock.now - start)")
+            withExtendedLifetime(document) {}
+        }
+    }
+
     @Test("A crop box beyond any page is read without leaving an Int")
     func cropBoxOutOfRange() throws {
         let (document, _, cgPage) = try #require(S.pdfPage(S.document([S.Page("q 10 0 0 10 0 0 cm /I0 Do Q", resources: Self.dotNames, objects: [Self.dot])])))

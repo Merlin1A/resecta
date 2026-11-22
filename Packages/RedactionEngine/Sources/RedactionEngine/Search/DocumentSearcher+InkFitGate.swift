@@ -21,7 +21,7 @@ extension DocumentSearcher {
         // The last facts matter only without invisible text, and each only
         // when the ones before it found no picture: they are read only then.
         let reaches = !invisible && PageImageCensus.largestImagePixelArea(of: cgPage) != nil
-        let inline = !invisible && !reaches && PageContentFacts.read(cgPage).drawsInlineImage
+        let inline = !invisible && !reaches && PageContentFacts.drawsInlineImage(cgPage)
         // A picture inside a tiling pattern is seen by neither fact above.
         let patterned = !invisible && !reaches && !inline && PictureWalk.patternsHoldPicture(cgPage)
         let answer: Bool
@@ -87,14 +87,16 @@ extension DocumentSearcher {
     /// Whether the page's content shows text in render mode 3 or 7 (no fill,
     /// no stroke): `Tr` tracked through `q`/`Q` and into Form XObjects (to a
     /// depth of 8), any text-showing operator while it is set answers true. A
-    /// stream the scanner cannot read, or a form chain past the depth, answers
-    /// true as well: a page not known to be clean is fitted.
+    /// stream the scanner cannot read, a form chain past the depth, or more
+    /// than `PagePictureMap.formLimit` forms drawn, answers true as well: a
+    /// page not known to be clean is fitted.
     nonisolated static func showsInvisibleText(_ cgPage: CGPDFPage) -> Bool {
         final class State {
             var mode: Int = 0
             var saved: [Int] = []
             var found = false
             var depth = 0
+            var drawn = 0
             var table: CGPDFOperatorTableRef?
         }
         guard let table = CGPDFOperatorTableCreate() else { return true }
@@ -133,7 +135,10 @@ extension DocumentSearcher {
             var subtype: UnsafePointer<CChar>?
             guard CGPDFDictionaryGetName(dictionary, "Subtype", &subtype), let subtype,
                   String(cString: subtype) == "Form" else { return }
-            guard state.depth < 8, let table = state.table else { state.found = true; CGPDFScannerStop(scanner); return }
+            state.drawn += 1
+            guard state.depth < 8, state.drawn <= PagePictureMap.formLimit, let table = state.table else {
+                state.found = true; CGPDFScannerStop(scanner); return
+            }
             var resources: CGPDFDictionaryRef?
             _ = CGPDFDictionaryGetDictionary(dictionary, "Resources", &resources)
             let inner = CGPDFContentStreamCreateWithStream(stream, resources ?? dictionary, content)

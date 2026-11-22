@@ -18,6 +18,17 @@ struct PagePictureMap: Equatable, Sendable {
     /// many times would otherwise be walked a number of times that grows with
     /// each level.
     static let formLimit = 1_024
+    /// More lines of visible text started than this on one page and its
+    /// painting is not followed: the starts the map keeps, and the checks of
+    /// each start against the page's pictures, stay bounded.
+    static let textStartLimit = 16_384
+    /// More operators read than this on one page, counted over its content
+    /// and every form it draws, and its painting is not followed.
+    static let operationLimit = 1_000_000
+    /// More names looked at than this in one page's search for a picture
+    /// (its pattern names and the names in each XObject dictionary the search
+    /// reads), and a picture is taken to be reached.
+    static let entryLimit = 65_536
     /// The furthest a crop box's edge is taken from the origin, in points, so
     /// whole points and the areas made from them stay within an Int.
     static let coordinateLimit: CGFloat = 0x1p28
@@ -229,6 +240,11 @@ final class PictureWalk {
     var drawing: Set<CGPDFStreamRef> = []
     /// Each tiling pattern's answer, read once: whether it can be followed.
     var patterns: [CGPDFStreamRef: Bool] = [:]
+    /// The forms the page's pattern searches have looked into, shared by
+    /// them all.
+    let seen = FormsSeen()
+    /// Operators read so far on the page.
+    var operations = 0
     var followed = true
     var pictures: [PagePictureMap.Picture] = []
     var starts: [PagePictureMap.TextStart] = []
@@ -236,8 +252,17 @@ final class PictureWalk {
 
     init(crop: CGRect) { self.crop = crop }
 
-    static func walk(_ info: UnsafeMutableRawPointer?) -> PictureWalk? {
-        info.map { Unmanaged<PictureWalk>.fromOpaque($0).takeUnretainedValue() }
+    /// The walk an operator is read for, counting the operator; nil past
+    /// `operationLimit`, where the painting is not followed and the scan stops.
+    static func walk(_ info: UnsafeMutableRawPointer?, _ scanner: CGPDFScannerRef) -> PictureWalk? {
+        guard let w = info.map({ Unmanaged<PictureWalk>.fromOpaque($0).takeUnretainedValue() }) else { return nil }
+        w.operations += 1
+        guard w.operations <= PagePictureMap.operationLimit else {
+            w.followed = false
+            CGPDFScannerStop(scanner)
+            return nil
+        }
+        return w
     }
 
     /// Scans one content stream with the walk's table; a stream the scanner
@@ -278,10 +303,11 @@ final class PictureWalk {
 
     // MARK: Text
 
-    func showText() {
+    func showText(_ scanner: CGPDFScannerRef) {
         guard state.renderMode != 3, state.renderMode != 7 else { return }
         let origin = CGPoint(x: lineMatrix.tx, y: lineMatrix.ty).applying(state.ctm)
         guard origin.x.isFinite, origin.y.isFinite, abs(origin.x) < 0x1p40, abs(origin.y) < 0x1p40 else { return }
+        guard starts.count < PagePictureMap.textStartLimit else { followed = false; CGPDFScannerStop(scanner); return }
         order += 1
         starts.append(.init(order: order, x: Int(origin.x.rounded(.down)), y: Int(origin.y.rounded(.down))))
     }
@@ -326,51 +352,68 @@ final class PictureWalk {
             if !known { followed = false }
             return
         }
-        let canFollow = Self.patternCanBeFollowed(stream, content: content)
+        let canFollow = Self.patternCanBeFollowed(stream, content: content, seen: seen)
         patterns[stream] = canFollow
         if !canFollow { followed = false }
     }
 
     /// Whether the page's resources (own or inherited) hold a tiling pattern
     /// that holds a picture or cannot be read: a picture the page may draw
-    /// that no image census sees. Each pattern is read once.
-    static func patternsHoldPicture(_ page: CGPDFPage) -> Bool {
+    /// that no image census sees.
+    static func patternsHoldPicture(_ page: CGPDFPage) -> Bool { patternsHoldPicture(page, seen: FormsSeen()) }
+
+    /// `patternsHoldPicture` with the search's record given: each pattern
+    /// stream is read once however many names it has, the patterns share one
+    /// record of the forms looked into, and past `entryLimit` names looked
+    /// at a picture is taken to be held.
+    static func patternsHoldPicture(_ page: CGPDFPage, seen: FormsSeen) -> Bool {
         guard let dictionary = page.dictionary,
               case .found(let resources) = TextLayerExtractor.inheritedResources(of: dictionary) else { return false }
         var patterns: CGPDFDictionaryRef?
         guard CGPDFDictionaryGetDictionary(resources, "Pattern", &patterns), let patterns else { return false }
         var streams: [CGPDFStreamRef] = []
+        var known: Set<CGPDFStreamRef> = []
+        var tooMany = false
         CGPDFDictionaryApplyBlock(patterns, { _, value, _ in
+            seen.entries += 1
+            guard seen.entries <= PagePictureMap.entryLimit else { tooMany = true; return false }
             var stream: CGPDFStreamRef?
-            if CGPDFObjectGetValue(value, .stream, &stream), let stream { streams.append(stream) }
+            if CGPDFObjectGetValue(value, .stream, &stream), let stream, known.insert(stream).inserted { streams.append(stream) }
             return true
         }, nil)
+        guard !tooMany else { return true }
         let content = CGPDFContentStreamCreateWithPage(page)
         defer { CGPDFContentStreamRelease(content) }
-        return streams.contains { !patternCanBeFollowed($0, content: content) }
+        return streams.contains { !patternCanBeFollowed($0, content: content, seen: seen) }
     }
 
-    /// Whether a tiling pattern holds no picture and can be read.
-    static func patternCanBeFollowed(_ stream: CGPDFStreamRef, content: CGPDFContentStreamRef) -> Bool {
+    /// Whether a tiling pattern holds no picture and can be read, its forms
+    /// looked into under the page's one record.
+    static func patternCanBeFollowed(_ stream: CGPDFStreamRef, content: CGPDFContentStreamRef, seen: FormsSeen) -> Bool {
+        seen.patternsRead += 1
         guard let dictionary = CGPDFStreamGetDictionary(stream) else { return false }
         var resources: CGPDFDictionaryRef?
         _ = CGPDFDictionaryGetDictionary(dictionary, "Resources", &resources)
-        if let resources, reachesImage(resources, depth: 0, seen: FormsSeen()) { return false }
+        if let resources, reachesImage(resources, depth: 0, seen: seen) { return false }
         let inner = CGPDFContentStreamCreateWithStream(stream, resources ?? dictionary, content)
         defer { CGPDFContentStreamRelease(inner) }
         return drawsInlineImage(inner) == false
     }
 
-    /// The forms one search for an image has looked into.
+    /// The forms one page's search for an image has looked into.
     final class FormsSeen {
         var forms: Set<CGPDFStreamRef> = []
         /// How many forms were looked into.
         var looked = 0
+        /// How many names were looked at, against `PagePictureMap.entryLimit`.
+        var entries = 0
+        /// How many pattern streams were read.
+        var patternsRead = 0
     }
 
     /// Whether resources reach an image object, through forms to the depth,
-    /// each form looked into once; more forms than `formLimit`, or forms
-    /// deeper than the depth, are taken to reach one.
+    /// each form looked into once; more forms than `formLimit`, more names
+    /// than `entryLimit`, or forms deeper than the depth, are taken to reach one.
     static func reachesImage(_ resources: CGPDFDictionaryRef, depth: Int, seen: FormsSeen) -> Bool {
         guard depth < PageImageCensus.maxFormDepth else { return true }
         var xobjects: CGPDFDictionaryRef?
@@ -381,6 +424,8 @@ final class PictureWalk {
         CGPDFDictionaryApplyBlock(xobjects, { _, object, info in
             guard let info else { return false }
             let found = Unmanaged<Found>.fromOpaque(info).takeUnretainedValue()
+            found.seen.entries += 1
+            guard found.seen.entries <= PagePictureMap.entryLimit else { found.value = true; return false }
             var stream: CGPDFStreamRef?
             guard CGPDFObjectGetValue(object, .stream, &stream), let stream,
                   let dictionary = CGPDFStreamGetDictionary(stream) else { return true }
@@ -440,20 +485,20 @@ final class PictureWalk {
 
     static func makeTable() -> CGPDFOperatorTableRef? {
         guard let table = CGPDFOperatorTableCreate() else { return nil }
-        CGPDFOperatorTableSetCallback(table, "q") { _, info in
-            guard let w = PictureWalk.walk(info) else { return }
+        CGPDFOperatorTableSetCallback(table, "q") { scanner, info in
+            guard let w = PictureWalk.walk(info, scanner) else { return }
             w.saved.append(w.state)
         }
-        CGPDFOperatorTableSetCallback(table, "Q") { _, info in
-            guard let w = PictureWalk.walk(info) else { return }
+        CGPDFOperatorTableSetCallback(table, "Q") { scanner, info in
+            guard let w = PictureWalk.walk(info, scanner) else { return }
             if let back = w.saved.popLast() { w.state = back }
         }
         CGPDFOperatorTableSetCallback(table, "cm") { scanner, info in
-            guard let w = PictureWalk.walk(info), let v = PictureWalk.popNumbers(scanner, 6) else { return }
+            guard let w = PictureWalk.walk(info, scanner), let v = PictureWalk.popNumbers(scanner, 6) else { return }
             w.state.ctm = CGAffineTransform(a: v[0], b: v[1], c: v[2], d: v[3], tx: v[4], ty: v[5]).concatenating(w.state.ctm)
         }
         CGPDFOperatorTableSetCallback(table, "gs") { scanner, info in
-            guard let w = PictureWalk.walk(info) else { return }
+            guard let w = PictureWalk.walk(info, scanner) else { return }
             var name: UnsafePointer<CChar>?
             guard CGPDFScannerPopName(scanner, &name), let name,
                   let object = CGPDFContentStreamGetResource(CGPDFScannerGetContentStream(scanner), "ExtGState", name)
@@ -479,7 +524,7 @@ final class PictureWalk {
             }
         }
         CGPDFOperatorTableSetCallback(table, "Do") { scanner, info in
-            guard let w = PictureWalk.walk(info) else { return }
+            guard let w = PictureWalk.walk(info, scanner) else { return }
             var name: UnsafePointer<CChar>?
             guard CGPDFScannerPopName(scanner, &name), let name else { return }
             let content = CGPDFScannerGetContentStream(scanner)
@@ -496,14 +541,14 @@ final class PictureWalk {
             }
         }
         CGPDFOperatorTableSetCallback(table, "EI") { scanner, info in
-            guard let w = PictureWalk.walk(info) else { return }
+            guard let w = PictureWalk.walk(info, scanner) else { return }
             var stream: CGPDFStreamRef?
             let opaque = CGPDFScannerPopStream(scanner, &stream) && stream.flatMap(CGPDFStreamGetDictionary)
                 .map(PictureWalk.imageIsOpaque) ?? false
             w.paint(hides: opaque, scanner: scanner)
         }
         let pattern: CGPDFOperatorCallback = { scanner, info in
-            guard let w = PictureWalk.walk(info) else { return }
+            guard let w = PictureWalk.walk(info, scanner) else { return }
             var name: UnsafePointer<CChar>?
             guard CGPDFScannerPopName(scanner, &name), let name else { return }
             w.setPattern(name, content: CGPDFScannerGetContentStream(scanner))
@@ -512,41 +557,41 @@ final class PictureWalk {
         CGPDFOperatorTableSetCallback(table, "SCN", pattern)
         CGPDFOperatorTableSetCallback(table, "Tr") { scanner, info in
             var mode: CGPDFInteger = 0
-            guard let w = PictureWalk.walk(info), CGPDFScannerPopInteger(scanner, &mode) else { return }
+            guard let w = PictureWalk.walk(info, scanner), CGPDFScannerPopInteger(scanner, &mode) else { return }
             w.state.renderMode = Int(mode)
         }
         CGPDFOperatorTableSetCallback(table, "TL") { scanner, info in
-            guard let w = PictureWalk.walk(info), let v = PictureWalk.popNumbers(scanner, 1) else { return }
+            guard let w = PictureWalk.walk(info, scanner), let v = PictureWalk.popNumbers(scanner, 1) else { return }
             w.state.leading = v[0]
         }
-        CGPDFOperatorTableSetCallback(table, "BT") { _, info in
-            PictureWalk.walk(info)?.lineMatrix = .identity
+        CGPDFOperatorTableSetCallback(table, "BT") { scanner, info in
+            PictureWalk.walk(info, scanner)?.lineMatrix = .identity
         }
         CGPDFOperatorTableSetCallback(table, "Tm") { scanner, info in
-            guard let w = PictureWalk.walk(info), let v = PictureWalk.popNumbers(scanner, 6) else { return }
+            guard let w = PictureWalk.walk(info, scanner), let v = PictureWalk.popNumbers(scanner, 6) else { return }
             w.lineMatrix = CGAffineTransform(a: v[0], b: v[1], c: v[2], d: v[3], tx: v[4], ty: v[5])
         }
         CGPDFOperatorTableSetCallback(table, "Td") { scanner, info in
-            guard let w = PictureWalk.walk(info), let v = PictureWalk.popNumbers(scanner, 2) else { return }
+            guard let w = PictureWalk.walk(info, scanner), let v = PictureWalk.popNumbers(scanner, 2) else { return }
             w.moveLine(v[0], v[1])
         }
         CGPDFOperatorTableSetCallback(table, "TD") { scanner, info in
-            guard let w = PictureWalk.walk(info), let v = PictureWalk.popNumbers(scanner, 2) else { return }
+            guard let w = PictureWalk.walk(info, scanner), let v = PictureWalk.popNumbers(scanner, 2) else { return }
             w.state.leading = -v[1]
             w.moveLine(v[0], v[1])
         }
-        CGPDFOperatorTableSetCallback(table, "T*") { _, info in
-            guard let w = PictureWalk.walk(info) else { return }
+        CGPDFOperatorTableSetCallback(table, "T*") { scanner, info in
+            guard let w = PictureWalk.walk(info, scanner) else { return }
             w.moveLine(0, -w.state.leading)
         }
-        let show: CGPDFOperatorCallback = { _, info in PictureWalk.walk(info)?.showText() }
+        let show: CGPDFOperatorCallback = { scanner, info in PictureWalk.walk(info, scanner)?.showText(scanner) }
         CGPDFOperatorTableSetCallback(table, "Tj", show)
         CGPDFOperatorTableSetCallback(table, "TJ", show)
         // ' and " move to the next line before they show.
-        let nextLineShow: CGPDFOperatorCallback = { _, info in
-            guard let w = PictureWalk.walk(info) else { return }
+        let nextLineShow: CGPDFOperatorCallback = { scanner, info in
+            guard let w = PictureWalk.walk(info, scanner) else { return }
             w.moveLine(0, -w.state.leading)
-            w.showText()
+            w.showText(scanner)
         }
         CGPDFOperatorTableSetCallback(table, "'", nextLineShow)
         CGPDFOperatorTableSetCallback(table, "\"", nextLineShow)
