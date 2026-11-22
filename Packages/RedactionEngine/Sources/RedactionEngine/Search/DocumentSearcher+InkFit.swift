@@ -4,7 +4,7 @@ import OSLog
 import PDFKit
 import PDFKitGuard
 
-// A text-layer box on a page whose text lies over a page-scale image is fitted
+// A text-layer box on a page whose text does not sit on its own print is fitted
 // to the ink it names. Such a text layer was laid down over a picture of the
 // page (an earlier Searchable export, a vendor OCR layer) and its glyph boxes
 // need not sit on the printed letters: a monospaced layer on a snapped grid sits
@@ -12,9 +12,11 @@ import PDFKitGuard
 // ends outside the fill (SECURITY: ink outside the box survives the redaction).
 // The fitted box is the selection's box united with the ink of the word under
 // it, read from a render of the box's neighbourhood: the hidden glyphs stay
-// covered, and so does the ink. Only a page whose glyphs are inkless — text
-// shown in an invisible render mode over a page-scale image — is fitted; every
-// other page keeps its selection boxes as they are.
+// covered, and so does the ink. Only a page the fit's gate takes is fitted
+// (`DocumentSearcher+InkFitGate.swift`): text shown in an invisible render mode
+// over a picture of the page, visible text under later pictures that hide it,
+// or a picture drawn by painting that cannot be followed; every other page
+// keeps its selection boxes as they are.
 
 extension DocumentSearcher {
 
@@ -87,8 +89,8 @@ extension DocumentSearcher {
     static let inkFitLogger = Logger(subsystem: "com.resecta.app", category: "search")
 
     /// `rect` (normalized, post-rotation, bottom-left) — the selection box of
-    /// `text` — united with the ink of that text, on a page whose glyphs are
-    /// inkless over a page-scale image; `rect` itself on any other page.
+    /// `text` — united with the ink of that text, on a page the fit's gate
+    /// takes (`carriesHiddenTextOverImage`); `rect` itself on any other page.
     /// The ink is found by the words Vision reads on the page (`inkTokens`):
     /// the token on the box's line that holds each word of `text`, the
     /// nearest when it repeats, cut to the word's share (a character wider each side) when the token is

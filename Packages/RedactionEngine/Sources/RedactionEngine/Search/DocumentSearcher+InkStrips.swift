@@ -127,9 +127,11 @@ extension DocumentSearcher {
         return plan
     }
 
-    /// The plan for the regions on one page, or nil when the page's text is
-    /// not a hidden layer over a picture of the page (there is nothing to
-    /// match; the run's page-facts floor decides such a page). Reads the
+    /// The plan for the regions on one page, or nil when the plan is not made
+    /// for it (`planIsMade`): the page's text is not a hidden layer over a
+    /// picture of the page, or the page only the wider gate takes carries a
+    /// box not placed from its text and is to stay a picture (there is
+    /// nothing to match; the run's page-facts floor decides such a page). Reads the
     /// page's print once (`prepareInkFit`) and fits only the candidate words
     /// of each region. Nonisolated and async, so it runs off the main thread,
     /// where the fit would read only a cache and return the hidden box itself.
