@@ -54,21 +54,22 @@ extension DocumentSearcher {
         return (Self.paddedNormalizedRect(union, in: page), overlapping)
     }
 
-    /// A Vision line rect (normalized 0–1, bottom-left origin) padded by
-    /// 2 pt in normalized coordinates for OCR imprecision and clamped to
-    /// the unit square — the one padding arithmetic for every OCR result
-    /// rect (the PII scan's union rect, the literal OCR search's line rect
-    /// and the regex fallback's line rect).
+    /// A Vision line rect (normalized 0–1, bottom-left origin, in the page
+    /// as displayed) padded by 2 pt on each side for OCR imprecision and
+    /// clamped to the unit square — the one padding arithmetic for every OCR
+    /// result rect (the PII scan's union rect, the literal OCR search's line
+    /// rect and the regex fallback's line rect). Each edge is clamped on its
+    /// own: an edge the clamp holds at 0 or 1 does not move the edge across
+    /// from it, which keeps its 2 pt. The pad is read on the displayed sides,
+    /// so a page turned a quarter is padded 2 pt in each direction too.
     nonisolated static func paddedNormalizedRect(_ rect: CGRect, in page: PDFPage) -> CGRect {
-        let pageBounds = page.bounds(for: .cropBox)
-        let padX = 2.0 / pageBounds.width
-        let padY = 2.0 / pageBounds.height
-        return CGRect(
-            x: max(0, rect.minX - padX),
-            y: max(0, rect.minY - padY),
-            width: min(1, rect.width + padX * 2),
-            height: min(1, rect.height + padY * 2)
-        )
+        let crop = page.bounds(for: .cropBox)
+        let turned = abs(page.rotation) % 180 == 90
+        let padX = 2.0 / (turned ? crop.height : crop.width)
+        let padY = 2.0 / (turned ? crop.width : crop.height)
+        let x0 = max(0, rect.minX - padX), x1 = min(1, rect.maxX + padX)
+        let y0 = max(0, rect.minY - padY), y1 = min(1, rect.maxY + padY)
+        return CGRect(x: x0, y: y0, width: max(0, x1 - x0), height: max(0, y1 - y0))
     }
 
     /// Average OCR confidence across a set of lines. Returns 0 for an empty

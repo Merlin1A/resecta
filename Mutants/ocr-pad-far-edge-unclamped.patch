@@ -1,0 +1,21 @@
+Property: A line at the right or top edge is padded to the page's edge, never past it.
+Area: the OCR line pad (Search)
+Test command: cd Packages/RedactionEngine && swift test --skip-build --no-parallel --filter OCRPadEdgeTests (after swift build --build-tests)
+Must go red: RedactionEngineTests/OCRPadEdgeTests "A line at the right edge: held at 1, its left side padded 2 pt"; RedactionEngineTests/OCRPadEdgeTests "A line at the top edge: held at 1, its bottom padded 2 pt"
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
+index db438d7a..d9a47005 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
+@@ -67,8 +67,8 @@ extension DocumentSearcher {
+         let turned = abs(page.rotation) % 180 == 90
+         let padX = 2.0 / (turned ? crop.height : crop.width)
+         let padY = 2.0 / (turned ? crop.width : crop.height)
+-        let x0 = max(0, rect.minX - padX), x1 = min(1, rect.maxX + padX)
+-        let y0 = max(0, rect.minY - padY), y1 = min(1, rect.maxY + padY)
++        let x0 = max(0, rect.minX - padX), x1 = rect.maxX + padX
++        let y0 = max(0, rect.minY - padY), y1 = rect.maxY + padY
+         return CGRect(x: x0, y: y0, width: max(0, x1 - x0), height: max(0, y1 - y0))
+     }
+ 
