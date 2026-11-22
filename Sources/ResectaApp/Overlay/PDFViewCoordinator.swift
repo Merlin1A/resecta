@@ -10,10 +10,18 @@ import RedactionEngine
 /// PDFViewDelegate (the link policy), NotificationCenter observer for
 /// page/scale changes, and Scribble suppressor.
 @MainActor
-class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate, UIScribbleInteractionDelegate {
+class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate, UIScribbleInteractionDelegate,
+                          CanvasTouchHolding {
 
     weak var pdfView: PDFView?
-    var redactionState: RedactionState?
+    /// The region state. The coordinator sets itself as the state's canvas,
+    /// so the run door can ask whether a finger is down on a page.
+    var redactionState: RedactionState? {
+        didSet {
+            if oldValue !== redactionState, oldValue?.canvas === self { oldValue?.canvas = nil }
+            redactionState?.canvas = self
+        }
+    }
     /// Toast surface for the too-small-draw notice, the selection delete's
     /// notice and the lasso's 500-region warning. Optional so the
     /// coordinator stays usable in tests that don't wire the toast manager.
@@ -429,6 +437,13 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
     /// handle, a draw, a marquee), reported by its hit test at each
     /// touch-down and cleared when the touch ends.
     private var canvasHoldsTouch = false
+
+    /// The run door's question: does any live page overlay hold a touch?
+    /// Read from the overlays PDFKit has handed out and not yet ended, so
+    /// no flag is kept that a lost lift could leave set.
+    var holdsATouch: Bool {
+        activeOverlays.values.contains { $0.holdsATouch }
+    }
 
     func setCanvasHoldsTouch(_ held: Bool) {
         guard held != canvasHoldsTouch else { return }

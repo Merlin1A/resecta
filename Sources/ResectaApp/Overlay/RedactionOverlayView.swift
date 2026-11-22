@@ -101,6 +101,9 @@ class RedactionOverlayView: UIView {
     /// while a gesture is in flight to prevent corruption of
     /// marquee state. Cleared in resetDragState.
     var primaryTouch: UITouch?
+    /// True while a finger is down on this page: the run door reads it
+    /// (`PDFViewCoordinator.holdsATouch`).
+    var holdsATouch: Bool { primaryTouch != nil }
     /// True when dragging multiple selected regions as a group.
     var isGroupMoving: Bool = false
     /// Pre-drag normalized rects for all regions in the group move, for cancel restoration.
@@ -260,6 +263,12 @@ class RedactionOverlayView: UIView {
         // Context menu for region info + delete
         let contextMenu = UIContextMenuInteraction(delegate: self)
         addInteraction(contextMenu)
+
+        // A held gesture ends when the app goes to the background, as a
+        // cancel, so a lost lift never leaves the run door shut.
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(cancelHeldGestureForBackground),
+            name: UIApplication.didEnterBackgroundNotification, object: nil)
     }
 
     @available(*, unavailable)
