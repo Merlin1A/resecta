@@ -1,7 +1,7 @@
 Property: Each kept box's fill is the run's box rule, PageRasterizer.boxFill: its projection joined with the fill of each region it holds. Here the kept plan passes the box no regions, so where a region's fill reaches past the box's projection the preview shows less than the run fills.
 Area: kept plan
 Test command: cd Packages/RedactionEngine && swift test --filter PreviewFillsAsTheRunTests
-Must go red: RedactionEngineTests/PreviewFillsAsTheRunTests keptPlanFillsAsTheRunWithARecord
+Must go red: RedactionEngineTests/PreviewFillsAsTheRunTests aBoxHoldsItsRegionsFills
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift

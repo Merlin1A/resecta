@@ -702,7 +702,7 @@ with its reason and the mutant that is caught in its place.
 | `name-field-writing-tools-on-save-label.patch` | The field where a pattern is saved under a label has Writing Tools off, so the label is not offered to a rewrite tool. | ResectaAppTests/TypingFieldCorrectionTests "A term, pattern or name field has autocorrection and Writing Tools disabled" |
 | `preview-kept-plan-ignores-the-cap.patch` | A drawn page's plan is kept at the run's quality, under the run's cap. | ResectaAppTests/OverlayDrawnPlanTests keptPlanReadsTheCap |
 | `preview-fill-rounded-by-a-copy-without-the-growth.patch` | The kept plan's fills are made by the run's own fill rule, not a copy. | RedactionEngineTests/PreviewFillsAsTheRunTests keptPlanFillsAsTheRun |
-| `kept-box-fill-without-its-regions.patch` | Each kept box's fill is the run's box rule: its projection joined with its regions' fills. | RedactionEngineTests/PreviewFillsAsTheRunTests keptPlanFillsAsTheRunWithARecord |
+| `kept-box-fill-without-its-regions.patch` | Each kept box's fill is the run's box rule: its projection joined with its regions' fills. | RedactionEngineTests/PreviewFillsAsTheRunTests aBoxHoldsItsRegionsFills |
 | `kept-box-not-projected-kept-empty.patch` | A kept box that does not project keeps its regions' own fills, as the run fills them then. | RedactionEngineTests/PreviewFillsAsTheRunTests aBoxThatDoesNotProject |
 | `page-version-moves-for-every-page.patch` | A page's version moves only when that page's stored regions change. | ResectaAppTests/OverlayDrawnPlanTests pageVersionsMoveByPage |
 | `kept-plan-always-from-the-stored-regions.patch` | A kept plan says whether it was drawn from the stored regions or a working copy. | ResectaAppTests/OverlayDrawnPlanTests keptPlanIsStamped |

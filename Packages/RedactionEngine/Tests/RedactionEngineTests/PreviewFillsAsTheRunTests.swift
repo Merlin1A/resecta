@@ -181,6 +181,34 @@ struct PreviewFillsAsTheRunTests {
         #expect(fills == [[try #require(made.filledPixels[region.id])]])
     }
 
+    @Test("A box's fill holds the fill of each region it covers, where it reaches past the projection")
+    func aBoxHoldsItsRegionsFills() throws {
+        let page = try Self.blankPage(width: "612", height: "792", rotate: 0)
+        let region = Self.regions()[0]
+        let cropBox = page.bounds(for: .cropBox).size
+        let made = DrawnPlan(pageIndex: 0, regions: [region], cropBox: cropBox, rotation: 0, switchOn: false,
+                             exportDPI: 300, fillColor: .black)
+        let plan = try #require(made.plan)
+        // The same box, its inner and paint the left half of the region only.
+        var box = try #require(plan.boxes.first)
+        let half = box.inner.minX + (box.inner.maxX - box.inner.minX) / 2
+        box.inner = PageRect64(minX: box.inner.minX, minY: box.inner.minY, maxX: half, maxY: box.inner.maxY)
+        box.paint = PageRect64(minX: box.paint.minX, minY: box.paint.minY, maxX: half, maxY: box.paint.maxY)
+        let halfPlan = PaintPlan(widthSixtyFourths: plan.widthSixtyFourths, heightSixtyFourths: plan.heightSixtyFourths,
+                                 boxes: [box])
+        let fills = DrawnPlan.boxFills(plan: halfPlan, regions: [region], cropBox: cropBox, rotation: 0, dpi: 300)
+        let fill = try #require(fills.first?.first)
+        let regionFill = try #require(made.filledPixels[region.id])
+        let pixels = try #require(PageRasterizer.pagePixels(
+            cropBox: CGRect(origin: .zero, size: cropBox), rotation: 0, hasRecord: true,
+            recorded: (plan.widthSixtyFourths, plan.heightSixtyFourths), dpi: 300))
+        let raster = try #require(pixels.plan)
+        let projected = try #require(PageRasterizer.boxFill(box: box, regions: [:], raster: raster,
+                                                            content: pixels.content)).bitmapRect
+        #expect(projected.maxX < regionFill.maxX, "the region reaches past the projection")
+        #expect(fill == projected.union(regionFill))
+    }
+
     @Test("Chosen 300 under the cap of 150: the kept plan fills as the run at 150, not as at 300")
     func cappedQuality() async throws {
         let page = try Self.blankPage(width: "595.2756", height: "841.8898", rotate: 90)
@@ -230,6 +258,9 @@ struct PreviewFillsAsTheRunTests {
         #expect(!rasterizer.contains("min(page.targetDPI, dpiCap)\n        guard let dpi = selectDPI("))
         let fills = try read("Pipeline/PixelOperations.swift")
         #expect(fills.contains("let pixelRect = normalizedToFillPixels(region.normalizedRect, content: basis)"))
+        let painter = try read("Pipeline/PageRasterizer+Plan.swift")
+        #expect(painter.contains("guard let (fill, projection) = Self.boxFillAndProjection("),
+                "the run paints each box by the one box rule the kept plan reads")
         let plan = try read("Models/DrawnPlan.swift")
         #expect(plan.contains("PageRasterizer.rasterContentSize("))
         #expect(plan.contains("normalizedToFillPixels(region.normalizedRect.clampedToNormalized(), content: content)"))
