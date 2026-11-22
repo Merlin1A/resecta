@@ -5,10 +5,10 @@ Must go red: ResectaAppTests/BoxPlaceCheckTests witnessFromTheGestureRect
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+BoxPlace.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+BoxPlace.swift
-index fab91c9a..4fce9ae8 100644
+index f7c18d0e..4c8cd44c 100644
 --- a/Sources/ResectaApp/Overlay/RedactionOverlayView+BoxPlace.swift
 +++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+BoxPlace.swift
-@@ -36,7 +36,11 @@ extension RedactionOverlayView {
+@@ -46,7 +46,11 @@ extension RedactionOverlayView {
      func drawnPageRects(for ids: [UUID]) -> [UUID: CGRect] {
          var rects: [UUID: CGRect] = [:]
          for id in ids {
@@ -19,5 +19,5 @@ index fab91c9a..4fce9ae8 100644
 +                    .pageRect(ofDisplayedShare: region.normalizedRect)
 +            }
          }
-         return rects
-     }
+         for index in regions.indices where ids.contains(regions[index].id) {
+             regions[index].drawnPageRect = rects[regions[index].id]
