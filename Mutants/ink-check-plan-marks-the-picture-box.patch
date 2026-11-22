@@ -1,0 +1,20 @@
+Property: The plan marks a box for the ink check only when it is placed from typed text and still anchored.
+Area: the plan maker
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter PaintPlanMakeTests
+Must go red: RedactionCoreTests/PaintPlanMakeTests inkCheckableOnlyOnTypedText
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+index d7212be5..aeda8417 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+@@ -255,8 +255,7 @@ private struct Maker {
+             Made(box: PaintedBox(regionIDs: ids, inner: inner, paint: paint, tight: tight, limitAbove: above,
+                                  limitBelow: below, exposure: rule.exposure, treatment: treatment, bandMade: band,
+                                  inkEnlargedCovered: false, inkEnlargedToCap: false, asDrawn: asDrawn,
+-                                 inkCheckable: anchored && !asDrawn
+-                                     && (lineReading == .column || lineReading == .noColumn)),
++                                 inkCheckable: !asDrawn),
+                  regions: group)
+         }
+         let outcome: SwitchTreatment = switch rule.outcome {
