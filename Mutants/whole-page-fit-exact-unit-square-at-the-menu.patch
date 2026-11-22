@@ -1,0 +1,19 @@
+Property: The menu reads the whole-page mark through the one predicate, within the maps' rounding.
+Area: the canvas long-press menu on the whole-page mark
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/WholePageFitTests
+Must go red: ResectaAppTests/WholePageFitTests noExactUnitSquareComparison
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+ContextMenu.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+ContextMenu.swift
+index 493140c3..ccb9effd 100644
+--- a/Sources/ResectaApp/Overlay/RedactionOverlayView+ContextMenu.swift
++++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+ContextMenu.swift
+@@ -64,7 +64,7 @@ extension RedactionOverlayView: UIContextMenuInteractionDelegate {
+     ) -> [ContextMenuRow] {
+         let held = selectedIDs.contains(region.id)
+         let onGroup = held && selectedIDs.count > 1
+-        let wholePage = RedactionState.isWholePage(region.normalizedRect)
++        let wholePage = region.normalizedRect == CGRect(x: 0, y: 0, width: 1, height: 1)
+         var rows: [ContextMenuRow] = []
+         if let infoTitle { rows.append(.info(infoTitle)) }
+         rows.append(.selectAllOnPage(enabled: canSelectAllOnPage))

@@ -1,0 +1,63 @@
+Property: Every gesture cuts or holds a box in the page as PDFKit places it on the canvas, the rectangle the maps divide by, not the canvas's rounded bounds.
+Area: the canvas: draw, resize, move and group move on a page of fractional size
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/WholePageFitTests
+Must go red: ResectaAppTests/WholePageFitTests doorsStoreOnThePage; ResectaAppTests/WholePageFitTests wholePageMarkKeptAfterADrag
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Move.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Move.swift
+index f4a9f223..57c41205 100644
+--- a/Sources/ResectaApp/Overlay/RedactionOverlayView+Move.swift
++++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+Move.swift
+@@ -96,7 +96,7 @@ extension RedactionOverlayView {
+         }
+         guard !union.isNull else { return }
+         // Held so the group stays on the page as PDFKit places it.
+-        let page = pageRectOnCanvas
++        let page = bounds
+         let dx = min(max(point.x - start.x, page.minX - union.minX), page.maxX - union.maxX)
+         let dy = min(max(point.y - start.y, page.minY - union.minY), page.maxY - union.maxY)
+ 
+@@ -125,7 +125,7 @@ extension RedactionOverlayView {
+             touchPoint: point,
+             dragOffset: dragOffset,
+             regionSize: regionSize,
+-            page: pageRectOnCanvas
++            page: CGRect(origin: .zero, size: bounds.size)
+         )
+ 
+         var newRect = CGRect(origin: newOrigin, size: regionSize)
+@@ -133,7 +133,7 @@ extension RedactionOverlayView {
+         // Apply snap guides during move, then keep the region on the page:
+         // a guide near the edge may pull it past.
+         newRect = snapEngine.applySnapping(to: newRect, excluding: selectedID, in: snapPage)
+-        let page = pageRectOnCanvas
++        let page = bounds
+         newRect.origin = CGPoint(x: max(page.minX, min(newRect.minX, page.maxX - newRect.width)),
+                                  y: max(page.minY, min(newRect.minY, page.maxY - newRect.height)))
+ 
+diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Resize.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Resize.swift
+index a5d7e843..17c1ddc9 100644
+--- a/Sources/ResectaApp/Overlay/RedactionOverlayView+Resize.swift
++++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+Resize.swift
+@@ -42,7 +42,7 @@ extension RedactionOverlayView {
+         newRect = Self.flooredRect(newRect, handle: resized.handle, fingerScale: fingerScale)
+ 
+         // Clamp to the page as PDFKit places it, which the maps divide by
+-        newRect = newRect.intersection(pageRectOnCanvas)
++        newRect = newRect.intersection(bounds)
+         guard !newRect.isNull else { return }
+ 
+         storeFromGesture(idx, overlayRect: newRect)
+diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Touches.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Touches.swift
+index 99882227..b7a01bb4 100644
+--- a/Sources/ResectaApp/Overlay/RedactionOverlayView+Touches.swift
++++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+Touches.swift
+@@ -182,7 +182,7 @@ extension RedactionOverlayView {
+                 // A band entirely off-page leaves the last rect in place.
+                 // The page is where PDFKit puts it (`pageRectOnCanvas`),
+                 // which the maps divide by, not the overlay's rounded bounds.
+-                rect = rect.intersection(pageRectOnCanvas)
++                rect = rect.intersection(bounds)
+                 guard !rect.isNull else { return }
+                 currentDragRect = rect
+                 setNeedsDisplay()
