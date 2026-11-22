@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import PDFKit
 import Testing
 @testable import RedactionEngine
 
@@ -76,6 +77,49 @@ struct RunRecordBoxPlaceTests {
             least = min(least, moved)
         }
         #expect(abs(least - 0.2) < 1e-12, "the anti-diagonal is the least, at 0.2 of a side")
+    }
+
+    /// A one-page file with `crop` as its crop box and `rotation` as its
+    /// /Rotate, written and read back so CoreGraphics' page carries both.
+    static func page(crop: CGRect, rotation: Int) throws -> (PDFPage, CGPDFPage) {
+        let data = NSMutableData()
+        // A media box that holds every crop here (A4 is taller than Letter).
+        var media = CGRect(x: 0, y: 0, width: 1000, height: 1000)
+        let consumer = try #require(CGDataConsumer(data: data as CFMutableData))
+        let context = try #require(CGContext(consumer: consumer, mediaBox: &media, nil))
+        context.beginPDFPage(nil); context.endPDFPage(); context.closePDF()
+        let document = try #require(PDFDocument(data: data as Data))
+        let first = try #require(document.page(at: 0))
+        first.setBounds(crop, for: .cropBox)
+        first.rotation = rotation
+        let written = try #require(document.dataRepresentation())
+        let page = try #require(PDFDocument(data: written)?.page(at: 0))
+        return (page, try #require(page.pageRef))
+    }
+
+    @Test("Where the run's frame puts a box on the page is where the painter's own transform paints it",
+          arguments: turns)
+    func frameMatchesThePainter(rotation: Int) throws {
+        for crop in Self.crops {
+            let (page, cgPage) = try Self.page(crop: crop, rotation: rotation)
+            // Written and read back, the crop box keeps its place to a
+            // thousandth of a point (the file writes its numbers rounded).
+            #expect(page.rotation == rotation)
+            #expect(RunRecord.sideGap(page.bounds(for: .cropBox), crop) < 0.001,
+                    "\(crop) read back as \(page.bounds(for: .cropBox))")
+            let geometry = RunRecord.PageGeometry(cropBox: page.bounds(for: .cropBox), rotation: page.rotation)
+            let size = geometry.frame.displayedSize
+            let target = CGRect(origin: .zero, size: size)
+            let transform = PageRasterizer.drawingTransform(
+                for: cgPage, box: .cropBox, rotation: page.rotation, targetRect: target)
+            for share in [Self.share, CGRect(x: 0.71, y: 0.08, width: 0.2, height: 0.31)] {
+                let painted = geometry.pageRect(ofDisplayedShare: share).applying(transform)
+                let expected = CGRect(x: share.minX * size.width, y: share.minY * size.height,
+                                      width: share.width * size.width, height: share.height * size.height)
+                #expect(RunRecord.sideGap(painted, expected) < 1e-6,
+                        "\(rotation)° over \(crop): the frame's place \(painted), the painter's \(expected)")
+            }
+        }
     }
 
     // MARK: - The rule
