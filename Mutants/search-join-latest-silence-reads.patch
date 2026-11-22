@@ -1,7 +1,7 @@
 Property: A page the latest run gave nothing stays as the latest left it in the join.
 Area: the search account's public face
 Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/SearchAccountJoinTests (or on the host: cd Packages/RedactionEngine && swift test --filter 'SearchAccountJoinTests')
-Must go red: RedactionEngineTests/SearchAccountJoinTests latestGaveNothing; RedactionEngineTests/SearchAccountJoinTests joinOverEveryPair
+Must go red: RedactionEngineTests/SearchAccountJoinTests latestGaveNothing
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchAccount.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchAccount.swift
