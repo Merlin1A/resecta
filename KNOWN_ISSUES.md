@@ -389,6 +389,17 @@ On paper sizes up to A3, no box you draw is that thin. A box Search or Scan plac
 
 ---
 
+### KI-49: When an Address Appears Twice on One Page, Scan Can Miss the Second Copy (Medium)
+**Affects:** Scan (an address that appears twice on one page, on typed or scanned pages)
+
+When the same address appears twice on one page, Scan can place a box on the first copy and none on the second. No box is placed on the second copy, so it stays readable in the export. Not every page with a repeated address is affected.
+
+**Workaround:** Where an address appears more than once on a page, check before you tap Redact that each copy has its own box, and draw a box with Rectangle over any copy that has none. Check each such page in the preview before sharing.
+
+**Fix:** This is being fixed in a later version of Resecta.
+
+---
+
 ## Fixed
 
 ### KI-8: Duplicate Regions from Multiple Scan Runs (Low) — FIXED (entry moved 2026-10-01)
