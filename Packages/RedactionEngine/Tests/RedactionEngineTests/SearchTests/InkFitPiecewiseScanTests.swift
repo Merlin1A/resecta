@@ -99,6 +99,9 @@ struct InkFitPiecewiseScanTests {
             Row(key: "G20", pages: [typed(S.picture(0, at: full) + S.typedText + S.picture(1, at: CGRect(x: 95, y: 665, width: 80, height: 20)),
                                           pictures: [S.print(dpi: 100, shift: 0), S.shade(width: 111, height: 28)])], fitted: false),
             Row(key: "G21", pages: [S.scan(.inlineStrips(rows: 128), shift: half, layer: .visibleBefore)], fitted: true),
+            // A one-image scan at 60 dpi: its image is under the page-scale share,
+            // so only where its picture is painted takes it.
+            Row(key: "G22", pages: [S.scan(.one, dpi: 60, shift: half)], fitted: true),
         ]
     }
 
@@ -109,8 +112,8 @@ struct InkFitPiecewiseScanTests {
         // read: no made page gives one (the platform reads malformed streams
         // and reports success), so the gate's answer for it, fitted, is held
         // by the code alone.
-        #expect(rows.count == 21)
-        #expect(rows.reduce(0) { $0 + $1.pages.count } == 23)
+        #expect(rows.count == 22)
+        #expect(rows.reduce(0) { $0 + $1.pages.count } == 24)
         for row in rows {
             for (k, data) in row.pages.enumerated() {
                 let (document, page, cgPage) = try #require(S.pdfPage(data), "\(row.key) page \(k + 1) opens")
