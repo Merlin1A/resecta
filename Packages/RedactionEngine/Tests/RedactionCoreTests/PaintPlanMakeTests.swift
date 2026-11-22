@@ -56,8 +56,8 @@ import RedactionCore
 
     /// The plan of a page. Every plan any case makes is checked for the
     /// rules that hold of every plan: each region is in exactly one box,
-    /// `inner` holds every covered region and selected letter, and no box
-    /// fell back.
+    /// `inner` holds every covered region and selected letter, no box fell
+    /// back, and every box can show length.
     static func plan(_ sheet: Sheet, _ regions: [PlanRegion], on: Bool = false, facts: PageTextFacts = plain,
                      source: PlanSource = .switchPolicy, words wordSource: WordSource = .textLayer,
                      sourceLocation: SourceLocation = #_sourceLocation) -> Made {
@@ -66,6 +66,8 @@ import RedactionCore
                                   widthSixtyFourths: W, heightSixtyFourths: H, policy: policy, source: source, switchOn: on)
         checkContainment(made.plan, regions, sheet, sourceLocation: sourceLocation)
         #expect(!made.plan.boxes.contains { $0.treatment == .fellBack }, "no box falls back", sourceLocation: sourceLocation)
+        #expect(made.plan.boxes.allSatisfy { $0.exposure == .canShowLength }, "every box can show length",
+                sourceLocation: sourceLocation)
         return Made(plan: made.plan, facts: made.facts)
     }
 
