@@ -40,6 +40,10 @@ enum MessageID: Equatable {
     case customTermTimeout
     case scannedRegionsNotAnalyzed
     case searchPreparationFailed
+    // Notices drawn in their place, never posted through the queue.
+    case pausedRun
+    case importAnnotations(annotationCount: Int, filledFormFieldCount: Int, carriesFormDataOrAttachments: Bool)
+    case runInProgressSettings
 
     /// The cases without their values: the names `--showToast=<name>` takes
     /// and the tests walk. The raw value is the case's name.
@@ -73,6 +77,9 @@ enum MessageID: Equatable {
         case customTermTimeout
         case scannedRegionsNotAnalyzed
         case searchPreparationFailed
+        case pausedRun
+        case importAnnotations
+        case runInProgressSettings
     }
 
     var name: Name {
@@ -106,6 +113,9 @@ enum MessageID: Equatable {
         case .customTermTimeout: .customTermTimeout
         case .scannedRegionsNotAnalyzed: .scannedRegionsNotAnalyzed
         case .searchPreparationFailed: .searchPreparationFailed
+        case .pausedRun: .pausedRun
+        case .importAnnotations: .importAnnotations
+        case .runInProgressSettings: .runInProgressSettings
         }
     }
 
@@ -143,6 +153,10 @@ enum MessageID: Equatable {
         case .customTermTimeout: .customTermTimeout
         case .scannedRegionsNotAnalyzed: .scannedRegionsNotAnalyzed
         case .searchPreparationFailed: .searchPreparationFailed
+        case .pausedRun: .pausedRun
+        case .importAnnotations:
+            .importAnnotations(annotationCount: 1, filledFormFieldCount: 0, carriesFormDataOrAttachments: false)
+        case .runInProgressSettings: .runInProgressSettings
         }
     }
 
@@ -201,6 +215,9 @@ enum MessageID: Equatable {
             .customTermTimeout,
             .scannedRegionsNotAnalyzed,
             .searchPreparationFailed,
+            .pausedRun,
+            .importAnnotations(annotationCount: 1, filledFormFieldCount: 0, carriesFormDataOrAttachments: false),
+            .runInProgressSettings,
         ]
         let waysBack: [FailedStateView.PrimaryAction] = [
             .reopenDocument, .chooseAnotherFile, .returnToEditor, .returnToResults,
@@ -227,10 +244,11 @@ enum MessageTone: Equatable, CaseIterable {
 }
 
 /// One message's row. `todaySeverity` is the severity its site posted it
-/// with before the table, so it appears where, how long and how it did.
+/// with before the table, so it appears where, how long and how it did; nil
+/// for a notice drawn in its own place, which is never posted.
 struct MessageRow: Equatable {
     let text: String
-    let todaySeverity: ToastSeverity
+    let todaySeverity: ToastSeverity?
     let kind: MessageKind
     let tone: MessageTone
     /// The toast's button title; nil for a message without one.
@@ -252,7 +270,7 @@ struct MessageRow: Equatable {
 
     init(
         text: String,
-        todaySeverity: ToastSeverity,
+        todaySeverity: ToastSeverity?,
         kind: MessageKind,
         tone: MessageTone,
         actionLabel: String? = nil,
@@ -447,6 +465,26 @@ enum MessageCatalog {
                 text: "Could not prepare the document for search. Try again.",
                 todaySeverity: .warning, kind: .receipt, tone: .stop,
                 phases: [.editing], mustBeSeen: true, coalescesRepeats: true)
+        // The three below are drawn in their place (the editor's band and
+        // Settings' form) while their condition holds, and never posted.
+        case .pausedRun:
+            return MessageRow(
+                text: DocumentEditorView.pausedMessage,
+                todaySeverity: nil, kind: .notice, tone: .caution,
+                actionLabel: DocumentEditorView.pausedRestartLabel, actionChangesState: true,
+                phases: [.editing], mustBeSeen: true, coalescesRepeats: true)
+        case .importAnnotations(let annotationCount, let filledFormFieldCount, let carries):
+            return MessageRow(
+                text: ImportAnnotationNoticeBanner.noticeMessage(
+                    annotationCount: annotationCount, filledFormFieldCount: filledFormFieldCount,
+                    carriesFormDataOrAttachments: carries),
+                todaySeverity: nil, kind: .notice, tone: .caution,
+                phases: [.editing], mustBeSeen: true, coalescesRepeats: true)
+        case .runInProgressSettings:
+            return MessageRow(
+                text: SettingsView.runInProgressTitle,
+                todaySeverity: nil, kind: .notice, tone: .note,
+                phases: [.detecting, .redacting, .verifying], mustBeSeen: false, coalescesRepeats: true)
         }
     }
 

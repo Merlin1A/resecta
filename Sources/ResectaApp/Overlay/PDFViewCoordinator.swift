@@ -82,21 +82,37 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
     // exactly once without a state write during the update pass.
     var lastHandledCanvasScrollToken: UUID?
 
-    // nonisolated(unsafe): tokens written once in setupObservers (main),
-    // read once in deinit (nonisolated). No concurrent access.
-    private nonisolated(unsafe) var pageChangeObserver: Any?
+    /// The tokens of what this coordinator observes: the page and scale
+    /// notices, and the inner scroll view's offset with the view it was
+    /// taken on (a new scroll view is observed afresh).
+    private nonisolated struct Observations {
+        var notices: [NSObjectProtocol] = []
+        var offset: NSKeyValueObservation?
+        weak var offsetScrollView: UIScrollView?
+    }
+
+    // nonisolated(unsafe): every token this coordinator takes, written on
+    // the main actor where the observers are set, read once in deinit
+    // (nonisolated). No concurrent access.
+    private nonisolated(unsafe) var observations = Observations()
+
+    /// The page frames' writes, counted for the hosted test of the rule
+    /// that nothing is written while no notice wants them.
+    private(set) var pageFramePublishCount = 0
+    /// A publish is waiting for the next main-actor turn.
+    private var pageFramePublishPending = false
 
     // MARK: - Observer Setup
 
     func setupObservers(for pdfView: PDFView) {
-        guard pageChangeObserver == nil else { return }
+        guard observations.notices.isEmpty else { return }
         self.pdfView = pdfView
 
         // Page change — sync currentPageIndex back to DocumentState.
         // nonisolated(unsafe) bridges isolation; the notification always
         // fires on the main queue, so MainActor.assumeIsolated is sound here.
         nonisolated(unsafe) let docState = documentState
-        pageChangeObserver = NotificationCenter.default.addObserver(
+        let pageChangeObserver = NotificationCenter.default.addObserver(
             forName: .PDFViewPageChanged,
             object: pdfView,
             queue: .main
@@ -119,19 +135,102 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
                 if docState?.currentPageIndex != index {
                     docState?.currentPageIndex = index
                 }
+                self?.requestPageFramePublish()
             }
         }
+
+        // Scale change: the overlays resize with the view's transform and
+        // need nothing; the band's page frames move with the page.
+        let scaleChangeObserver = NotificationCenter.default.addObserver(
+            forName: .PDFViewScaleChanged,
+            object: pdfView,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.requestPageFramePublish()
+            }
+        }
+        observations.notices = [pageChangeObserver, scaleChangeObserver]
 
         // Suppress Scribble in draw mode — add interaction to the PDF view
         let scribbleInteraction = UIScribbleInteraction(delegate: self)
         pdfView.addInteraction(scribbleInteraction)
-
-        // Scale change: overlays auto-resize via PDFView transform.
-        // No observer needed — coordinate system scales automatically.
     }
 
     deinit {
-        if let o = pageChangeObserver { NotificationCenter.default.removeObserver(o) }
+        for o in observations.notices { NotificationCenter.default.removeObserver(o) }
+        observations.offset?.invalidate()
+    }
+
+    // MARK: - Page frames for the notice band
+
+    /// Asks for the page frames to be published on the next main-actor
+    /// turn, so no state is written inside a view update or a layout pass
+    /// (a page change, a zoom and an offset can each come from one). With
+    /// no notice wanting them it does nothing. Several asks in one turn
+    /// publish once.
+    func requestPageFramePublish() {
+        guard documentState?.canvasPageFramesWanted == true, !pageFramePublishPending else { return }
+        pageFramePublishPending = true
+        Task { [weak self] in
+            self?.pageFramePublishPending = false
+            self?.publishPageFrames()
+        }
+    }
+
+    /// Writes the visible pages' frames for the editor's band: each page's
+    /// rectangle in the canvas's coordinates, clipped to the canvas, in
+    /// whole points rounded outward, and which page each one is. It returns
+    /// at once while no notice wants them, and writes only when the
+    /// whole-point values or the pages change: a page change at a zoom that
+    /// fills the canvas leaves the same rectangle, and is still a move.
+    /// Each publish also keeps the scroll offset observed on the scroll
+    /// view the canvas has now.
+    func publishPageFrames() {
+        guard let documentState, documentState.canvasPageFramesWanted, let pdfView else { return }
+        observeScrollOffset(of: pdfView)
+        let shown = Self.visiblePages(in: pdfView)
+        guard shown.frames != documentState.canvasPageFrames || shown.indices != documentState.canvasPageIndices else { return }
+        documentState.canvasPageFrames = shown.frames
+        documentState.canvasPageIndices = shown.indices
+        pageFramePublishCount += 1
+    }
+
+    /// Each visible page's rectangle in `pdfView`'s coordinates, clipped to
+    /// its bounds and rounded outward, with the document's index of each
+    /// page in the same order (-1 for a page the view's document does not
+    /// hold); a page with no area on the canvas gives neither.
+    static func visiblePages(in pdfView: PDFView) -> (frames: [CanvasRect], indices: [Int]) {
+        let canvas = pdfView.bounds
+        var frames: [CanvasRect] = [], indices: [Int] = []
+        for page in pdfView.visiblePages {
+            let frame = pdfView.convert(page.bounds(for: pdfView.displayBox), from: page).intersection(canvas)
+            guard !frame.isEmpty, let rect = CanvasRect(outward: frame) else { continue }
+            frames.append(rect)
+            indices.append(pdfView.document.map { $0.index(for: page) } ?? -1)
+        }
+        return (frames, indices)
+    }
+
+    /// Observes the inner scroll view's offset, so a scroll of a zoomed
+    /// page moves the band's frames. The scroll view is looked up afresh
+    /// each time; a different one than the observed view ends the old
+    /// observation and takes a new one.
+    private func observeScrollOffset(of pdfView: PDFView) {
+        guard let scrollView = Self.innerScrollView(of: pdfView),
+              scrollView !== observations.offsetScrollView else { return }
+        observations.offset?.invalidate()
+        observations.offsetScrollView = scrollView
+        observations.offset = scrollView.observe(\.contentOffset, options: []) { [weak self] _, _ in
+            MainActor.assumeIsolated {
+                self?.requestPageFramePublish()
+            }
+        }
+    }
+
+    /// PDFKit's inner scroll view: the first subview that is one.
+    private static func innerScrollView(of pdfView: PDFView) -> UIScrollView? {
+        pdfView.subviews.first(where: { $0 is UIScrollView }) as? UIScrollView
     }
 
     // MARK: - Link policy (PDFViewDelegate)
@@ -456,7 +555,7 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
     /// finger draws, moves or resizes, so PDFKit's scroll pan needs two
     /// fingers. The pinch is untouched.
     private func applyScrollFingers() {
-        if let scrollView = pdfView?.subviews.first(where: { $0 is UIScrollView }) as? UIScrollView {
+        if let pdfView, let scrollView = Self.innerScrollView(of: pdfView) {
             scrollView.panGestureRecognizer.minimumNumberOfTouches = isDrawingMode || canvasHoldsTouch ? 2 : 1
         }
     }

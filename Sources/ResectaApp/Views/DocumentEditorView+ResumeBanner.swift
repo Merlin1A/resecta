@@ -1,51 +1,49 @@
 import SwiftUI
 import RedactionEngine
 
-// The editing-phase background-resume banner, moved out of
-// `DocumentEditorView.swift` (the hub) along its `// InlineWarningBanner
-// for background resume` seam: the overlay content.
-// The editor's top-banner slot (`+TopBanner`) mounts `resumeBannerOverlay`
-// when a paused run wins it; `documentOverride` forwards to the
+// The paused notice: a run left unfinished when the app went to the
+// background. The editor's band (`+TopBanner`) shows it while the pause
+// holds and the editor is editing; `documentOverride` forwards to the
 // document's state (`+ModeOverride`) and is read from here.
 
 extension DocumentEditorView {
 
-    // MARK: - Background-resume banner
+    // MARK: - The paused notice
 
-    /// The banner the editor shows after a run was paused by a
+    /// The paused notice's words.
+    static let pausedMessage = "Processing was paused. Your drawn regions are preserved."
+    /// The paused notice's action.
+    static let pausedRestartLabel = "Restart"
+
+    /// The paused notice's words, from its row.
+    var pausedNoticeContent: NoticeContent {
+        NoticeContent(id: .pausedRun, closes: true, identifier: "pausedNotice")
+    }
+
+    /// The notice the editor shows after a run was paused by a
     /// backgrounding (cancel-from-redacting or -verifying): offers the
     /// pipeline again.
     /// It is a record of a run that did not finish, so neither a timer nor
-    /// its leaving the screen ends it: the pause ends when the banner is
+    /// its leaving the screen ends it: the pause ends when the notice is
     /// closed, when a full run starts (`runFullPipeline`, after its refusal
-    /// check), or when the document is closed or replaced. Mounted by the
-    /// top-banner slot, which shows it only while editing.
-    @ViewBuilder
+    /// check), or when the document is closed or replaced. A refused
+    /// Restart leaves it up. Shown by the band, only while editing.
     var resumeBannerOverlay: some View {
-        InlineWarningBanner(
-            message: "Processing was paused. Your drawn regions are preserved.",
-            primaryAction: (
-                label: "Restart",
-                action: {
-                    coordinator.runFullPipeline(documentOverride: documentOverride)
-                }
-            ),
-            onDismiss: {
+        NoticeView(
+            content: pausedNoticeContent,
+            onAction: {
+                coordinator.runFullPipeline(documentOverride: documentOverride)
+            },
+            onClose: {
                 Self.clearBackgroundPause(documentState)
-            }
+            },
+            placement: .band
         )
-        // Routed through the resolver so Reduce
-        // Motion swaps the slide for an opacity-only
-        // crossfade.
-        .transition(ResectaTokens.Anim.resolvedTransition(
-            standard: .move(edge: .top).combined(with: .opacity),
-            reduceMotion: reduceMotion))
-        .padding(.top, ResectaTokens.Spacing.toolbarClearance)
     }
 
-    /// What the banner's close clears: the pause flag and the phase it was
+    /// What the notice's close clears: the pause flag and the phase it was
     /// paused from, the same pair a full run's start clears. Left set, the
-    /// banner shows again whenever the editor is in `.editing`. Static so
+    /// notice shows again whenever the editor is in `.editing`. Static so
     /// the pin is testable without a SwiftUI host.
     static func clearBackgroundPause(_ documentState: DocumentState) {
         documentState.wasPausedByBackground = false

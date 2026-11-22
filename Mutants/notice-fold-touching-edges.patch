@@ -1,0 +1,19 @@
+Property: A notice meets a page only when they share a point inside both; a notice whose edge touches a page's edge stays open.
+Area: notice band
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/NoticeRulesTests
+Must go red: ResectaAppTests/NoticeRulesTests meetsOnlyInside; ResectaAppTests/NoticeRulesTests touchingCornerTable
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/Messages/NoticeRules.swift b/Sources/ResectaApp/Views/Messages/NoticeRules.swift
+index fd531643..b33aca82 100644
+--- a/Sources/ResectaApp/Views/Messages/NoticeRules.swift
++++ b/Sources/ResectaApp/Views/Messages/NoticeRules.swift
+@@ -63,7 +63,7 @@ nonisolated enum NoticeRules {
+     /// Whether two rectangles share a point inside both. Touching edges do
+     /// not meet.
+     static func meets(_ a: CanvasRect, _ b: CanvasRect) -> Bool {
+-        a.minX < b.maxX && b.minX < a.maxX && a.minY < b.maxY && b.minY < a.maxY
++        a.minX <= b.maxX && b.minX <= a.maxX && a.minY <= b.maxY && b.minY <= a.maxY
+     }
+ 
+     /// Whether the notice meets any of the visible pages.

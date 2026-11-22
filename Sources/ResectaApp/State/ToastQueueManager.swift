@@ -257,6 +257,12 @@ final class ToastQueueManager {
               action: (@MainActor () -> Void)? = nil,
               stillValid: (@MainActor () -> Bool)? = nil) -> MessageEvent {
         let row = MessageCatalog.row(for: id)
+        // A notice drawn in its own place has no severity and is never
+        // posted: a post of one shows nothing (and stops a debug build).
+        guard let severity = row.todaySeverity else {
+            assertionFailure("\(id.name.rawValue) is drawn in its place and is never posted")
+            return event ?? MessageEvent()
+        }
         if event == nil, row.coalescesRepeats,
            let same = entries.first(where: { $0.item.messageID?.name == id.name && $0.item.message == row.text }) {
             return same.item.event
@@ -266,7 +272,7 @@ final class ToastQueueManager {
             handler = { if stillValid() { given() } }
         }
         let item = ToastItem(
-            id: UUID(), message: row.text, severity: row.todaySeverity,
+            id: UUID(), message: row.text, severity: severity,
             actionLabel: handler == nil ? nil : row.actionLabel, actionHandler: handler,
             tone: row.tone, event: event ?? MessageEvent(), messageID: id,
             mustBeSeen: row.mustBeSeen, stillValid: stillValid,

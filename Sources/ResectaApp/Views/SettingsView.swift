@@ -8,8 +8,7 @@ import RedactionEngine
 struct SettingsView: View {
     // VoiceOver hint strings are exposed as `static`
     // constants so the contract can be pinned by unit tests without
-    // rendering the form. Mirrors the `InlineWarningBanner.lineLimit(for:)`
-    // pattern used for the AX5 line-cap predicate.
+    // rendering the form.
     static let defaultModeAccessibilityHint = "Choose how redacted output is produced. Secure Rasterization produces image-only output, with no text to search or copy. Searchable Redaction keeps a searchable copy of the text you did not box, less some words. A page whose text is invisible or shows no ink is exported as a picture. Text under a picture, bar, or cover already in the page, or stored as different words from those the page prints, can still enter the searchable copy."
     /// The line under the mode picker for each mode.
     static let secureModeDescription = "Produces image-only output with all text removed, so the PDF has no text to search or copy. The simplest approach — recommended when redaction confidence is the top priority. A court or regulator that requires searchable PDFs may refuse an image-only PDF."
@@ -159,23 +158,18 @@ struct SettingsView: View {
     /// Mechanism-description language only.
     private var pipelineActiveBanner: some View {
         Section {
-            HStack(alignment: .top, spacing: ResectaTokens.Spacing.sm) {
-                Image(systemName: "clock.arrow.circlepath")
-                    .foregroundStyle(.secondary)
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(Self.runInProgressTitle)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                    Text(Self.runInProgressBody)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .accessibilityElement(children: .combine)
-            .accessibilityIdentifier("settingsPipelineActiveBanner")
-            .accessibilityLabel(Self.runInProgressTitle)
-            .accessibilityHint(Self.runInProgressBody)
+            // The notice's surface as the section's first row: no close, no
+            // action; it leaves with its condition.
+            NoticeView(
+                content: NoticeContent(id: .runInProgressSettings, detail: Self.runInProgressBody,
+                                       closes: false, identifier: "settingsPipelineActiveBanner"),
+                placement: .formRow)
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("settingsPipelineActiveBanner")
+                .accessibilityLabel(Self.runInProgressTitle)
+                .accessibilityHint(Self.runInProgressBody)
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets())
         }
     }
 
