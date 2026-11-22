@@ -201,10 +201,31 @@ extension SearchState {
     /// (`appliedResultIDs`) or was dedup-skipped as already covered
     /// (`coveredResultIDs`; a covered result counts as
     /// applied for graying, though it earns no badge). Folded over the
-    /// selection by `selectionFullyApplied`; read for the current
-    /// result by the compact handle's per-item Apply.
+    /// selection by `selectionFullyApplied`; folded over the current
+    /// match's lines for the compact handle's per-item Apply
+    /// (`currentMatchAppliedOrCovered`).
     func isAppliedOrCovered(_ id: UUID) -> Bool {
         appliedResultIDs.contains(id) || coveredResultIDs.contains(id)
+    }
+
+    /// The match the result `id` is a line of has nothing left for the
+    /// apply path: every one of its lines with a box is applied or covered
+    /// (`isAppliedOrCovered`). A match wrapped onto two lines is applied
+    /// only when both are, so a first line covered by an earlier box does
+    /// not read the second as done. A result with no box reads as itself.
+    func isMatchAppliedOrCovered(_ id: UUID) -> Bool {
+        let boxed = pieces(of: id).filter(\.hasBox)
+        guard !boxed.isEmpty else { return isAppliedOrCovered(id) }
+        return boxed.allSatisfy { isAppliedOrCovered($0.id) }
+    }
+
+    /// `isMatchAppliedOrCovered` for the walk's current match; false
+    /// before the first step. The walk stops once per match, at its lead
+    /// line, so the current result alone does not say whether the match
+    /// is done.
+    var currentMatchAppliedOrCovered: Bool {
+        guard let current = currentResult else { return false }
+        return isMatchAppliedOrCovered(current.id)
     }
 
     /// Count of matches the user left un-checked in triage, by occurrence

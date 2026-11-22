@@ -135,23 +135,25 @@ extension SearchAndRedactSheet {
 
     // MARK: - The search origin's reads
 
-    /// The applied read for the one result — `SearchState.isAppliedOrCovered`
-    /// (applied ∪ dedup-covered), the header Apply's graying predicate.
+    /// The applied read for the current match —
+    /// `SearchState.currentMatchAppliedOrCovered`: every line of the match
+    /// with a box applied or dedup-covered, the header Apply's graying
+    /// predicate folded over the match's lines.
     private var applyCurrentResultApplied: Bool {
-        guard let current = searchState.currentResult else { return false }
-        return searchState.isAppliedOrCovered(current.id)
+        searchState.currentMatchAppliedOrCovered
     }
 
     /// Live only with a current match on board that the apply path
-    /// still has work for, while regions can mutate. "Applied" is the
-    /// header Apply's graying predicate (applied ∪ dedup-covered)
-    /// read for the one result — `SearchState.isAppliedOrCovered`
-    /// — so the applied-filter rows, the header button and this one
-    /// agree by construction; the walk's "current" is
-    /// `SearchState.currentResult` (nil until the first step).
+    /// still has work for, while regions can mutate. The walk's "current"
+    /// is `SearchState.currentResult` (nil until the first step), the lead
+    /// line of its match; the apply (`.searchResult(id:)`) takes every line
+    /// of that match, so "Applied" is read over every line too
+    /// (`currentMatchAppliedOrCovered`). A match wrapped onto two lines
+    /// whose first line an earlier box covers is not applied until the
+    /// second is.
     private var applyCurrentResultDisabled: Bool {
-        guard let current = searchState.currentResult else { return true }
-        return searchState.isAppliedOrCovered(current.id)
+        guard searchState.currentResult != nil else { return true }
+        return searchState.currentMatchAppliedOrCovered
             || !documentState.canMutateRegions
     }
 
