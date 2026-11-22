@@ -141,7 +141,8 @@ extension DocumentEditorView {
                     content: content,
                     count: TopBannerSlot.waitingCount(of: holding),
                     toolOn: activeTool != nil,
-                    pageFrames: documentState.canvasPageFrames
+                    pageFrames: documentState.canvasPageFrames,
+                    pageIndices: documentState.canvasPageIndices
                 ) {
                     openNotice(for: slot)
                 }
@@ -244,6 +245,9 @@ struct NoticeBand<Open: View>: View {
     let count: Int?
     let toolOn: Bool
     let pageFrames: [CanvasRect]
+    /// Which page each of `pageFrames` is: a page change that leaves the
+    /// same rectangles is a page move too.
+    let pageIndices: [Int]
     @ViewBuilder let open: () -> Open
 
     @State private var fold: BandFold = .open(timed: false)
@@ -287,6 +291,7 @@ struct NoticeBand<Open: View>: View {
             .padding(.top, NoticeView.Metrics.gapUnderToolbar)
         }
         .onChange(of: pageFrames, initial: true) { _, _ in measureChanged(framesMoved: true) }
+        .onChange(of: pageIndices) { _, _ in measureChanged(framesMoved: true) }
         .onChange(of: noticeRect) { _, _ in measureChanged(framesMoved: false) }
         .task(id: fold) {
             guard NoticeRules.readingClockRuns(fold: fold, voiceOverRunning: voiceOverRunning) else { return }

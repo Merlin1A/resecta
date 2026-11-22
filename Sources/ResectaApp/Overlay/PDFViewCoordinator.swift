@@ -180,28 +180,36 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
 
     /// Writes the visible pages' frames for the editor's band: each page's
     /// rectangle in the canvas's coordinates, clipped to the canvas, in
-    /// whole points rounded outward. It returns at once while no notice
-    /// wants them, and writes only when the whole-point values change.
+    /// whole points rounded outward, and which page each one is. It returns
+    /// at once while no notice wants them, and writes only when the
+    /// whole-point values or the pages change: a page change at a zoom that
+    /// fills the canvas leaves the same rectangle, and is still a move.
     /// Each publish also keeps the scroll offset observed on the scroll
     /// view the canvas has now.
     func publishPageFrames() {
         guard let documentState, documentState.canvasPageFramesWanted, let pdfView else { return }
         observeScrollOffset(of: pdfView)
-        let frames = Self.visiblePageFrames(in: pdfView)
-        guard frames != documentState.canvasPageFrames else { return }
-        documentState.canvasPageFrames = frames
+        let shown = Self.visiblePages(in: pdfView)
+        guard shown.frames != documentState.canvasPageFrames || shown.indices != documentState.canvasPageIndices else { return }
+        documentState.canvasPageFrames = shown.frames
+        documentState.canvasPageIndices = shown.indices
         pageFramePublishCount += 1
     }
 
     /// Each visible page's rectangle in `pdfView`'s coordinates, clipped to
-    /// its bounds and rounded outward; a page with no area on the canvas
-    /// gives none.
-    static func visiblePageFrames(in pdfView: PDFView) -> [CanvasRect] {
+    /// its bounds and rounded outward, with the document's index of each
+    /// page in the same order (-1 for a page the view's document does not
+    /// hold); a page with no area on the canvas gives neither.
+    static func visiblePages(in pdfView: PDFView) -> (frames: [CanvasRect], indices: [Int]) {
         let canvas = pdfView.bounds
-        return pdfView.visiblePages.compactMap { page in
+        var frames: [CanvasRect] = [], indices: [Int] = []
+        for page in pdfView.visiblePages {
             let frame = pdfView.convert(page.bounds(for: pdfView.displayBox), from: page).intersection(canvas)
-            return frame.isEmpty ? nil : CanvasRect(outward: frame)
+            guard !frame.isEmpty, let rect = CanvasRect(outward: frame) else { continue }
+            frames.append(rect)
+            indices.append(pdfView.document.map { $0.index(for: page) } ?? -1)
         }
+        return (frames, indices)
     }
 
     /// Observes the inner scroll view's offset, so a scroll of a zoomed

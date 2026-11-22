@@ -143,8 +143,16 @@ class DocumentState {
     var pageCount: Int { sourceDocument?.pageCount ?? 0 }
     /// The canvas's visible pages in its own space, rounded outward: written only while a notice wants them.
     var canvasPageFrames: [CanvasRect] = []
-    /// Set while the editor's band holds a notice; turning it off empties the frames.
-    var canvasPageFramesWanted = false { didSet { if !canvasPageFramesWanted, !canvasPageFrames.isEmpty { canvasPageFrames = [] } } }
+    /// The document's index of each page in `canvasPageFrames`, in the same order: a page change that leaves the same rectangles on the canvas (a zoom that fills it) still changes these.
+    var canvasPageIndices: [Int] = []
+    /// Set while the editor's band holds a notice; turning it off empties the frames and their indices.
+    var canvasPageFramesWanted = false {
+        didSet {
+            guard !canvasPageFramesWanted else { return }
+            if !canvasPageFrames.isEmpty { canvasPageFrames = [] }
+            if !canvasPageIndices.isEmpty { canvasPageIndices = [] }
+        }
+    }
 
     // Rect-level scroll-to-match. Page-granular
     // navigation leaves a match off-screen when the canvas is zoomed

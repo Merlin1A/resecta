@@ -113,14 +113,33 @@ struct CanvasPageFrameTests {
         #expect(state.canvasPageFrames != atFit)
     }
 
+    @Test("A page change at a zoom that fills the canvas is published: the same rectangle, another page")
+    func pageChangeAtAFillingZoomIsPublished() async throws {
+        let (coordinator, state, view, _) = mounted()
+        view.scaleFactor = view.scaleFactorForSizeToFit * 3
+        view.layoutIfNeeded()
+        state.canvasPageFramesWanted = true
+        coordinator.publishPageFrames()
+        let frames = state.canvasPageFrames, count = coordinator.pageFramePublishCount
+        #expect(state.canvasPageIndices == [0])
+        view.go(to: try #require(view.document?.page(at: 1)))
+        view.layoutIfNeeded()
+        await settle(until: { state.canvasPageIndices == [1] })
+        #expect(state.canvasPageFrames == frames, "precondition: the zoomed page fills the canvas, so its rectangle is the same")
+        #expect(state.canvasPageIndices == [1], "the page change is published")
+        #expect(coordinator.pageFramePublishCount > count)
+    }
+
     @Test("Turning the page frames off empties them, and a new document's state starts with none")
     func turningOffEmptiesTheFrames() {
         let state = DocumentState()
-        #expect(state.canvasPageFrames.isEmpty)
+        #expect(state.canvasPageFrames.isEmpty && state.canvasPageIndices.isEmpty)
         #expect(!state.canvasPageFramesWanted)
         state.canvasPageFramesWanted = true
         state.canvasPageFrames = [CanvasRect(minX: 0, minY: 82, maxX: 402, maxY: 602)]
+        state.canvasPageIndices = [0]
         state.canvasPageFramesWanted = false
         #expect(state.canvasPageFrames.isEmpty)
+        #expect(state.canvasPageIndices.isEmpty)
     }
 }

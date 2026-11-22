@@ -44,6 +44,13 @@ nonisolated final class NoticeBandUITests: XCTestCase {
         next.tap()
         app.buttons["pageNavMarkWholePage"].firstMatch.tap()
         app.buttons["pageNavPrevious"].firstMatch.tap()
+        if extra == Self.largest {
+            // At the largest sizes Redact is in the … menu, not on the bar
+            // (`EditorToolbarLayout`'s fold).
+            XCTAssertTrue(app.editorOverflowButton.waitForExistence(timeout: 10), "The … menu button is missing.")
+            XCTAssertFalse(app.buttons["redactButton"].firstMatch.exists, "Redact is on the bar at the largest size.")
+            app.editorOverflowButton.tap()
+        }
         let redact = app.buttons["redactButton"].firstMatch
         XCTAssertTrue(redact.waitForExistence(timeout: 10), "Redact is missing.")
         redact.tap()
@@ -116,16 +123,27 @@ nonisolated final class NoticeBandUITests: XCTestCase {
         XCTAssertTrue(mark.waitForExistence(timeout: 5), "The mark did not come back when the tool went off.")
     }
 
-    func testADragThatStartsOnTheFoldedMarkMovesThePage() throws {
+    /// The mark is a button: a drag that starts on it does not reach the
+    /// page (a named limit, the mark's own 46-point frame); one that starts
+    /// just beside it moves the page. Read on the canvas's own picture, so
+    /// the status bar's clock cannot move it.
+    func testADragOnTheFoldedMarkKeepsThePageAndOneBesideItMovesIt() throws {
         try raisePausedNotice()
         canvas.pinch(withScale: 2.5, velocity: 2)
         XCTAssertTrue(mark.waitForExistence(timeout: 5), "The zoom did not fold the notice.")
-        let before = app.screenshot().pngRepresentation
+        sleep(1)
+        let before = canvas.screenshot().pngRepresentation
         let start = mark.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: -150, dy: 150)))
         sleep(1)
-        XCTAssertNotEqual(app.screenshot().pngRepresentation, before, "A drag from the mark did not move the page.")
+        XCTAssertEqual(canvas.screenshot().pngRepresentation, before, "A drag from the mark moved the page.")
         XCTAssertFalse(notice.exists, "A drag from the mark opened the notice.")
+        // 30 left of the mark's centre: outside its 46 frame, on the page.
+        let beside = start.withOffset(CGVector(dx: -30, dy: 0))
+        beside.press(forDuration: 0.05, thenDragTo: beside.withOffset(CGVector(dx: -150, dy: 150)))
+        sleep(1)
+        XCTAssertNotEqual(canvas.screenshot().pngRepresentation, before, "A drag beside the mark did not move the page.")
+        XCTAssertFalse(notice.exists, "A drag beside the mark opened the notice.")
     }
 
     func testAtTheLargestTextSizeThePausedNoticeIsWholeWithRestartAndDismissOnScreen() throws {
