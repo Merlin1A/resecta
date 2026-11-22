@@ -95,30 +95,34 @@ struct ContentGlyphBoxTests {
 
     @Test("A match that wraps onto the next line at tight leading: each line keeps its box, never reaching the other line's words")
     func wrappedAtTightLeading() throws {
-        // 12 pt type on 9 pt leading: each line's glyphs reach into the
-        // other line's band.
-        let content = "BT /F1 12 Tf 72 700 Td (Paid to John) Tj 0 -9 Td (Smith on Friday) Tj ET"
-        let doc = try ContentGlyphWalkTests.document(content, font: ContentGlyphWalkTests.helvetica)
-        let page = try #require(doc.page(at: 0))
-        let text = (try #require(page.string)) as NSString
-        let john = text.range(of: "John"), smith = text.range(of: "Smith")
-        try #require(john.location != NSNotFound && smith.location != NSNotFound && smith.location > john.location)
-        let range = NSRange(location: john.location, length: NSMaxRange(smith) - john.location)
-        let today = try #require(page.selection(for: range)).selectionsByLine().map { $0.bounds(for: page) }
-        try #require(today.count == 2, "precondition: the match wraps onto two lines")
-        let first = try #require(today.max { $0.midY < $1.midY }), second = try #require(today.min { $0.midY < $1.midY })
-        // Precondition: the whole range's glyphs would move an edge. One of
-        // Smith's glyphs lies in the first line's band, left of its box.
-        let all = try #require(DocumentSearcher.ownGlyphs(for: range, page: page))
-        try #require(all.contains { $0.unit >= smith.location && $0.box.maxY > first.minY && $0.box.minY < first.maxY
-                                     && $0.box.minX < first.minX - DocumentSearcher.growthSlack },
-                     "precondition: Smith's glyphs reach into the first line's band (\(first))")
-        let boxes = try #require(DocumentSearcher().lineRects(for: range, page: page))
-            .map { CGRect(x: $0.minX * 612, y: $0.minY * 792, width: $0.width * 612, height: $0.height * 792) }
-        #expect(boxes.count == 2)
-        let top = try #require(boxes.max { $0.midY < $1.midY }), bottom = try #require(boxes.min { $0.midY < $1.midY })
-        #expect(Self.close(top, first, 0.001), "the first line: \(top) against PDFKit's \(first)")
-        #expect(Self.close(bottom, second, 0.001), "the second line: \(bottom) against PDFKit's \(second)")
+        // 12 pt type at a leading tight enough that each line's glyphs reach
+        // into the other line's band, yet PDFKit still reads two lines (at
+        // 9 pt it reads one): the first such leading is the case.
+        for leading in [11.0, 11.5, 12.0, 10.5, 10.0] {
+            let content = "BT /F1 12 Tf 72 700 Td (Paid to John) Tj 0 -\(leading) Td (Smith on Friday) Tj ET"
+            let doc = try ContentGlyphWalkTests.document(content, font: ContentGlyphWalkTests.helvetica)
+            let page = try #require(doc.page(at: 0))
+            let text = (try #require(page.string)) as NSString
+            let john = text.range(of: "John"), smith = text.range(of: "Smith")
+            try #require(john.location != NSNotFound && smith.location != NSNotFound && smith.location > john.location)
+            let range = NSRange(location: john.location, length: NSMaxRange(smith) - john.location)
+            let today = try #require(page.selection(for: range)).selectionsByLine().map { $0.bounds(for: page) }
+            guard today.count == 2 else { continue }
+            let first = try #require(today.max { $0.midY < $1.midY }), second = try #require(today.min { $0.midY < $1.midY })
+            // One of Smith's glyphs lies in the first line's band, left of its
+            // box: the whole range's glyphs would move that edge.
+            let all = try #require(DocumentSearcher.ownGlyphs(for: range, page: page))
+            guard all.contains(where: { $0.unit >= smith.location && $0.box.maxY > first.minY && $0.box.minY < first.maxY
+                                        && $0.box.minX < first.minX - DocumentSearcher.growthSlack }) else { continue }
+            let boxes = try #require(DocumentSearcher().lineRects(for: range, page: page))
+                .map { CGRect(x: $0.minX * 612, y: $0.minY * 792, width: $0.width * 612, height: $0.height * 792) }
+            #expect(boxes.count == 2, "at \(leading) pt leading")
+            let top = try #require(boxes.max { $0.midY < $1.midY }), bottom = try #require(boxes.min { $0.midY < $1.midY })
+            #expect(Self.close(top, first, 0.001), "the first line at \(leading) pt: \(top) against PDFKit's \(first)")
+            #expect(Self.close(bottom, second, 0.001), "the second line at \(leading) pt: \(bottom) against PDFKit's \(second)")
+            return
+        }
+        Issue.record("no leading tried reads as two lines with a glyph of one in the other's band: the case was not reached")
     }
 
     @Test("An undrawn word keeps PDFKit's box (no box is taken away here), and adds nothing to its neighbours")
