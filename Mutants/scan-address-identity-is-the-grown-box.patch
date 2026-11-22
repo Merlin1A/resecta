@@ -1,0 +1,18 @@
+Property: A grown address line is told by its box before the growth. Planted: it is told by the grown box.
+Area: Search, the match boxes from the page's own drawing
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'ContentGlyphScanTests|ContentGlyphExportTests|ContentGlyphBoxTests|ContentGlyphRouteTests'
+Must go red: RedactionEngineTests/ContentGlyphScanTests assembledAddressGrows
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift
+@@ -75,7 +75,7 @@
+             guard rect != line.normalizedRect else { return line }
+             return OCREngine.TextLine(text: line.text, normalizedRect: rect, confidence: line.confidence,
+                                       textLayerRect: line.textLayerRect, inkFitDegraded: line.inkFitDegraded,
+-                                      identityRect: line.identityRect ?? line.normalizedRect,
++                                      identityRect: line.identityRect,
+                                       ungrownRect: line.normalizedRect, wordBoxes: line.wordBoxes)
+         }
+     }

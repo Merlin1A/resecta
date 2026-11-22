@@ -1,0 +1,18 @@
+Property: A Scan address's lines grow to their own drawn glyphs. Planted: each line keeps the box it was given.
+Area: Search, the match boxes from the page's own drawing
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'ContentGlyphScanTests|ContentGlyphExportTests|ContentGlyphBoxTests|ContentGlyphRouteTests'
+Must go red: RedactionEngineTests/ContentGlyphScanTests assembledAddressGrows; RedactionEngineTests/ContentGlyphExportTests scanAddressInkCovered
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift
+@@ -71,7 +71,7 @@
+                 guard let own = Self.ownGlyphs(for: range, page: page) else { glyphs = nil; break }
+                 glyphs?.append(contentsOf: own)
+             }
+-            let rect = grown(line.normalizedRect, line: span.pageRect, by: glyphs, page: page)
++            let rect = line.normalizedRect
+             guard rect != line.normalizedRect else { return line }
+             return OCREngine.TextLine(text: line.text, normalizedRect: rect, confidence: line.confidence,
+                                       textLayerRect: line.textLayerRect, inkFitDegraded: line.inkFitDegraded,

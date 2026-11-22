@@ -1,0 +1,18 @@
+Property: On a page with a hidden layer over a page image, a drawn word's paint grows to its own glyphs. Planted: the paint is the ink fit alone.
+Area: Search, the match boxes from the page's own drawing
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'ContentGlyphScanTests|ContentGlyphExportTests|ContentGlyphBoxTests|ContentGlyphRouteTests'
+Must go red: RedactionEngineTests/ContentGlyphScanTests hiddenLayerPaintHoldsItsGlyphs
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
+@@ -160,7 +160,7 @@
+             let fit = Self.inkFit(raw, page: page, text: line.string, range: lineRange, paintOnly: true)
+             strip.append(raw)
+             // Its own line's glyphs only, as in `lineBoxes`.
+-            let box = grown(fit.rect, line: line.bounds(for: page), by: Self.ownGlyphs(for: lineRange, page: page), page: page)
++            let box = fit.rect
+             paint.append(box)
+             identity.append(fit.identity ?? (box == fit.rect ? nil : fit.rect))
+             degraded = degraded || fit.degraded
