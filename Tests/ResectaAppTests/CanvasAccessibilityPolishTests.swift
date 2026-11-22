@@ -25,16 +25,6 @@ struct CanvasAccessibilityPolishTests {
         #expect(RedactionOverlayView.badgeOuterStrokeWidth == 0.5)
     }
 
-    // MARK: - Resize-handle outer stroke
-
-    @Test("Resize-handle outer ring is a 1pt mid-gray stroke")
-    func selectionHandleOuterStrokeIsOnePoint() {
-        // 1pt mid-gray ring drawn beneath the white-fill / blue-stroke
-        // handle disc. Visible against white page margins where the
-        // 1.5pt blue stroke alone can wash out.
-        #expect(RedactionOverlayView.selectionHandleOuterStrokeWidth == 1.0)
-    }
-
     // MARK: - Handle animation tokens
 
     @Test("Handle-in duration matches the SwiftUI selectionIn timing")

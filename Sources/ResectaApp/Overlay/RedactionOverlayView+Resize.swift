@@ -159,14 +159,48 @@ extension RedactionOverlayView {
         case topCenter, bottomCenter, leftCenter, rightCenter
     }
 
+    /// The handle centres of a region, in overlay points: the one list the
+    /// drawing and the hit test both read. Four corners; a handle at the
+    /// middle of each side at least `Canvas.edgeHandleShortestSide`
+    /// on-screen points long. On an axis shorter on screen than
+    /// `Canvas.handlesStepOutBelow`, the handles at its two ends (the
+    /// corners, and that axis's middle handles) step outward by half the
+    /// shortfall, at most `Canvas.handleLargestStep`, so they stand clear
+    /// of a thin box. `fingerScale` is overlay points per on-screen point.
+    static func handleCentres(for rect: CGRect, fingerScale: CGFloat = 1) -> [(ResizeHandle, CGPoint)] {
+        typealias C = ResectaTokens.Canvas
+        func step(_ length: CGFloat) -> CGFloat {
+            let onScreen = length / fingerScale
+            guard onScreen < C.handlesStepOutBelow else { return 0 }
+            return min(C.handleLargestStep, (C.handlesStepOutBelow - onScreen) / 2) * fingerScale
+        }
+        let dx = step(rect.width), dy = step(rect.height)
+        let left = rect.minX - dx, right = rect.maxX + dx, top = rect.minY - dy, bottom = rect.maxY + dy
+        var centres: [(ResizeHandle, CGPoint)] = [
+            (.topLeft, CGPoint(x: left, y: top)),
+            (.topRight, CGPoint(x: right, y: top)),
+            (.bottomLeft, CGPoint(x: left, y: bottom)),
+            (.bottomRight, CGPoint(x: right, y: bottom)),
+        ]
+        if rect.width / fingerScale >= C.edgeHandleShortestSide {
+            centres.append((.topCenter, CGPoint(x: rect.midX, y: top)))
+            centres.append((.bottomCenter, CGPoint(x: rect.midX, y: bottom)))
+        }
+        if rect.height / fingerScale >= C.edgeHandleShortestSide {
+            centres.append((.leftCenter, CGPoint(x: left, y: rect.midY)))
+            centres.append((.rightCenter, CGPoint(x: right, y: rect.midY)))
+        }
+        return centres
+    }
+
     /// Pure hit-test resolver — the exact geometry `hitTest(_:with:)`
     /// and `touchesBegan` consult (via `hitTestResizeHandle` below) at
     /// the single touch-down instant, with zero recognizer slop: a
     /// touch starting outside every box this returns falls straight
     /// through `hitTest` to PDFView's own pan/zoom recognizer for that
     /// touch's whole lifetime — there is no renegotiation as the
-    /// finger moves, and the drawn handle dot (`drawResizeHandles`) is
-    /// cosmetic and contributes nothing to this test. `targetHandleSize`
+    /// finger moves. The handles it tests are `handleCentres`, the same
+    /// list `drawResizeHandles` draws. `targetHandleSize`
     /// is clamped to at most HALF the region's shorter side (never
     /// past the region's own center, so opposite-edge handles stay
     /// distinguishable) and at least the 22pt floor, so
@@ -178,6 +212,9 @@ extension RedactionOverlayView {
     /// Two more rules. A point inside the region past every handle box's
     /// inward reach (at most a quarter of that side) is the region's body,
     /// for a move, even on a thin region whose boxes overlap its middle.
+    /// The body's reach on each side is measured from where that side's
+    /// middle handle sits on the side itself, whether or not it is drawn,
+    /// so the move area does not depend on which handles a region shows.
     /// And with `containerBounds` (the page), a box that would cross the
     /// page edge slides inward so all of it can be touched.
     internal static func resolveResizeHandle(
@@ -185,42 +222,37 @@ extension RedactionOverlayView {
         regionRect: CGRect,
         targetHandleSize: CGFloat = ResectaTokens.TouchTarget.minimum,
         minimumHandleSize: CGFloat = 22,
-        containerBounds: CGRect? = nil
+        containerBounds: CGRect? = nil,
+        fingerScale: CGFloat = 1
     ) -> ResizeHandle? {
         let clamped = min(
             targetHandleSize,
             max(minimumHandleSize, min(regionRect.width, regionRect.height) / 2)
         )
 
-        let centers: [(ResizeHandle, CGPoint)] = [
-            (.topLeft,     CGPoint(x: regionRect.minX, y: regionRect.minY)),
-            (.topRight,    CGPoint(x: regionRect.maxX, y: regionRect.minY)),
-            (.bottomLeft,  CGPoint(x: regionRect.minX, y: regionRect.maxY)),
-            (.bottomRight, CGPoint(x: regionRect.maxX, y: regionRect.maxY)),
-            (.topCenter,   CGPoint(x: regionRect.midX, y: regionRect.minY)),
-            (.bottomCenter, CGPoint(x: regionRect.midX, y: regionRect.maxY)),
-            (.leftCenter,  CGPoint(x: regionRect.minX, y: regionRect.midY)),
-            (.rightCenter, CGPoint(x: regionRect.maxX, y: regionRect.midY)),
-        ]
-        let boxes: [(handle: ResizeHandle, box: CGRect)] = centers.map { handle, center in
+        func handleBox(at center: CGPoint) -> CGRect {
             var box = CGRect(x: center.x - clamped / 2, y: center.y - clamped / 2,
                              width: clamped, height: clamped)
             if let page = containerBounds {
                 box.origin.x = max(page.minX, min(box.origin.x, page.maxX - clamped))
                 box.origin.y = max(page.minY, min(box.origin.y, page.maxY - clamped))
             }
-            return (handle, box)
+            return box
         }
-        func box(_ handle: ResizeHandle) -> CGRect {
-            boxes.first { $0.handle == handle }?.box ?? .null
-        }
+        let boxes: [(handle: ResizeHandle, box: CGRect)] = handleCentres(for: regionRect, fingerScale: fingerScale)
+            .map { handle, center in (handle, handleBox(at: center)) }
 
         // The body zone: past each side's handle-box reach, capped at a
-        // quarter of that side.
-        let left = min(box(.leftCenter).maxX - regionRect.minX, regionRect.width / 4)
-        let right = min(regionRect.maxX - box(.rightCenter).minX, regionRect.width / 4)
-        let top = min(box(.topCenter).maxY - regionRect.minY, regionRect.height / 4)
-        let bottom = min(regionRect.maxY - box(.bottomCenter).minY, regionRect.height / 4)
+        // quarter of that side. Each reach is measured from a box at the
+        // middle of that side, drawn there or not.
+        let left = min(handleBox(at: CGPoint(x: regionRect.minX, y: regionRect.midY)).maxX - regionRect.minX,
+                       regionRect.width / 4)
+        let right = min(regionRect.maxX - handleBox(at: CGPoint(x: regionRect.maxX, y: regionRect.midY)).minX,
+                        regionRect.width / 4)
+        let top = min(handleBox(at: CGPoint(x: regionRect.midX, y: regionRect.minY)).maxY - regionRect.minY,
+                      regionRect.height / 4)
+        let bottom = min(regionRect.maxY - handleBox(at: CGPoint(x: regionRect.midX, y: regionRect.maxY)).minY,
+                         regionRect.height / 4)
         let body = CGRect(x: regionRect.minX + left, y: regionRect.minY + top,
                           width: regionRect.width - left - right,
                           height: regionRect.height - top - bottom)
@@ -260,13 +292,15 @@ extension RedactionOverlayView {
         halo: CGFloat,
         handleSize: CGFloat,
         minimumHandleSize: CGFloat,
-        containerBounds: CGRect?
+        containerBounds: CGRect?,
+        fingerScale: CGFloat = 1
     ) -> CanvasHitTarget? {
         if let selected,
            !regions.contains(where: { $0.id != selected.id && $0.rect.contains(point) }),
            let handle = resolveResizeHandle(
                at: point, regionRect: selected.rect, targetHandleSize: handleSize,
-               minimumHandleSize: minimumHandleSize, containerBounds: containerBounds) {
+               minimumHandleSize: minimumHandleSize, containerBounds: containerBounds,
+               fingerScale: fingerScale) {
             return .handle(handle)
         }
         var best: (id: UUID, key: CGFloat)?
@@ -299,7 +333,8 @@ extension RedactionOverlayView {
             halo: 8 * fingerScale,
             handleSize: ResectaTokens.TouchTarget.minimum * fingerScale,
             minimumHandleSize: 22 * fingerScale,
-            containerBounds: bounds)
+            containerBounds: bounds,
+            fingerScale: fingerScale)
     }
 
     func hitTestRegion(at point: CGPoint) -> RedactionRegion? {

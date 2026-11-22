@@ -241,12 +241,16 @@ struct CanvasResizeOutcomeTests {
         drag(c.overlay, from: bottom, through: [CGPoint(x: bottom.x, y: bottom.y - 20), CGPoint(x: bottom.x, y: long.minY + 1)])
         #expect(abs((c.rect(r.id)?.height ?? 0) - Self.overlay(8)) < 0.01, "8 across a long box")
 
-        // A one-line box 10 points tall: its width floors at 20 when the right edge is dragged to the left one.
+        // A one-line box 10 points tall: its width floors at 20 when its
+        // right side is dragged to the left one. Its short sides have no
+        // middle handle, so the bottom-right corner handle is dragged, from
+        // where it is drawn (stepped clear of the thin box).
         let thin = CGRect(x: 60, y: 600, width: 160, height: Self.overlay(10))
         let t = Self.region(thin)
         let d = try mount([t], selected: [t.id])
-        let right = CGPoint(x: thin.maxX, y: thin.midY)
-        drag(d.overlay, from: right, through: [CGPoint(x: right.x - 20, y: right.y), CGPoint(x: thin.minX + 1, y: right.y)])
+        let corner = try #require(RedactionOverlayView.handleCentres(for: thin, fingerScale: d.overlay.fingerScale)
+            .first { $0.0 == .bottomRight }?.1, "the bottom-right handle")
+        drag(d.overlay, from: corner, through: [CGPoint(x: corner.x - 20, y: corner.y), CGPoint(x: thin.minX + 1, y: corner.y)])
         #expect(abs((d.rect(t.id)?.width ?? 0) - Self.overlay(20)) < 0.01, "20 along a one-line box")
         withExtendedLifetime((c, d)) {}
     }
