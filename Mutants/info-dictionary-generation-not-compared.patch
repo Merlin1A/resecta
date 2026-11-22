@@ -1,0 +1,19 @@
+Property: An /Info entry of another generation than the trailer names is refused.
+Area: the information dictionary rewrite and the metadata check (Engine)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --package-path Packages/RedactionEngine --filter InfoDictionaryThroughIndexTests
+Must go red: RedactionEngineTests/InfoDictionaryThroughIndexTests row [case 10] (the other generation)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/PDFTrailerLocator.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/PDFTrailerLocator.swift
+index 75562987..3066cf10 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/PDFTrailerLocator.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/PDFTrailerLocator.swift
+@@ -91,7 +91,7 @@ enum PDFTrailerLocator {
+             guard let (number, generation) = reference(info) else { return .refused(.noInfoEntry) }
+             // The table's entry for it, in use, of the generation named.
+             guard let entry = entries[number], entry.inUse else { return .refused(.entryNotInUse) }
+-            guard entry.generation == generation, entry.offset < b.count,
++            guard entry.offset < b.count,
+                   let header = objectHeader(at: entry.offset), header.number == number,
+                   header.generation == generation else {
+                 return .refused(.wrongObjectHeader)

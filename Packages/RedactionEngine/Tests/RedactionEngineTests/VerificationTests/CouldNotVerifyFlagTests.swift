@@ -187,10 +187,10 @@ struct CouldNotVerifyFlagTests {
         expectFlag(r, false, "L4 structural notes")
     }
 
-    @Test("Layer 5: metadata present and the attestation WARN → false")
+    @Test("Layer 5: metadata present warns, fields not rewritten read Needs review → false")
     func layer5RoutineWarns() async throws {
         let (trapped, u1) = try TestFixtures.writeTempPDF(
-            TestFixtures.withMetadataRaw(infoDictBody: "/Trapped /True"), prefix: "cnv_l5t_")
+            TestFixtures.writerShapedMetadata(infoDictBody: "/Trapped /True"), prefix: "cnv_l5t_")
         defer { try? FileManager.default.removeItem(at: u1) }
         let present = await run(4, trapped, mode: .secureRasterization)
         #expect(message(present).contains("Metadata present"), "got \(present.status)")
@@ -201,7 +201,8 @@ struct CouldNotVerifyFlagTests {
         defer { try? FileManager.default.removeItem(at: u2) }
         let attest = await run(4, producer, mode: .secureRasterization)
         #expect(message(attest).contains("not rewritten"), "got \(attest.status)")
-        expectFlag(attest, false, "L5 attestation")
+        if case .attention = attest.status {} else { Issue.record("L5 not rewritten: Needs review expected, got \(attest.status)") }
+        expectFlag(attest, false, "L5 not rewritten")
     }
 
     // MARK: - Layer 6 (Spatial Verification)
@@ -453,12 +454,12 @@ struct CouldNotVerifyFlagTests {
     // MARK: - Source census
 
     /// Every `.warn(` construction in the verification files is classified
-    /// here — the could-not-verify family (27 sites) and the routine-note
+    /// here — the could-not-verify family (30 sites) and the routine-note
     /// WARNs — and so is every could-not-verify condition and joined warning
     /// a check hands the row composer (`UnverifiedCondition(`,
     /// `CheckWarning(`), so a new site cannot land silently: an
     /// unclassified construction, a moved message or a changed count fails.
-    @Test("source census: the could-not-verify family is exactly 27 sites and every WARN construction is classified")
+    @Test("source census: the could-not-verify family is exactly 30 sites and every WARN construction is classified")
     func warnSiteCensus() throws {
         struct Marker { let text: String; let family: Bool; let sites: Int; let lines: Int }
         let markers: [String: [Marker]] = [
@@ -485,15 +486,17 @@ struct CouldNotVerifyFlagTests {
             // The Layer 7/8 per-page fold: passes the verifier's WARN through
             // (the classifying sites are the verifier's, in
             // `SandwichVerification.swift` below).
-            // Layers 4 and 5, in their own file. Each could-not-inspect
-            // sentence has two sites: a document that could not be loaded,
-            // and a file with no end marker or a fixed field that did not
-            // decode.
+            // Layers 4 and 5, in their own file. Could not inspect document
+            // structure has two sites: a document that could not be loaded,
+            // and a file with no end marker. Could not inspect metadata has
+            // five: a document that could not be loaded, a file with no
+            // information dictionary, a fixed field that did not decode, a
+            // file with no identifier, and an identifier that cannot be
+            // recomputed. The four whole-row ones share one constant.
             "VerificationEngine+Structural.swift": [
                 Marker(text: "Could not inspect document structure", family: true, sites: 2, lines: 2),
-                Marker(text: "Could not inspect metadata", family: true, sites: 2, lines: 2),
+                Marker(text: "Could not inspect metadata", family: true, sites: 5, lines: 2),
                 Marker(text: "Structural findings:", family: false, sites: 0, lines: 1),  // LegalPhrases:safe (the engine message)
-                Marker(text: "Auto-injected metadata present: XMP metadata", family: false, sites: 0, lines: 1),
                 Marker(text: "Producer or timestamp fields were not rewritten", family: false, sites: 0, lines: 1),
                 Marker(text: "File identifier was not derived from the file contents", family: false, sites: 0, lines: 1),
                 Marker(text: "\\(prefix): \\(warnings.joined", family: false, sites: 0, lines: 1),
@@ -559,7 +562,7 @@ struct CouldNotVerifyFlagTests {
         // Pinned `.warn(` construction counts (pattern matches excluded),
         // and pinned condition / joined-warning construction counts.
         let constructionCounts = [
-            "VerificationEngine.swift": 3, "VerificationEngine+Structural.swift": 5,
+            "VerificationEngine.swift": 3, "VerificationEngine+Structural.swift": 3,
             "VerificationEngine+SandwichDispatch.swift": 0,
             "VerificationEngine+CouldNotVerify.swift": 1,
             "VerificationEngine+Layer3.swift": 3,
@@ -581,7 +584,7 @@ struct CouldNotVerifyFlagTests {
             "CheckRowComposition.swift": 0,
         ]
         let joinedWarningCounts = [
-            "VerificationEngine+Structural.swift": 2, "VerificationEngine+SandwichDispatch.swift": 1,
+            "VerificationEngine+Structural.swift": 1, "VerificationEngine+SandwichDispatch.swift": 1,
             "VerificationEngine+Layer3.swift": 1, "Layer2OCRCheck+Sweep.swift": 1,
         ]
 
@@ -611,6 +614,6 @@ struct CouldNotVerifyFlagTests {
                 familySites += m.sites
             }
         }
-        #expect(familySites == 27, "the could-not-verify family is \(familySites) sites; the contract says 27")
+        #expect(familySites == 30, "the could-not-verify family is \(familySites) sites; the contract says 30")
     }
 }

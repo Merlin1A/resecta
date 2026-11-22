@@ -1,0 +1,25 @@
+Property: The dictionary the index way rewrites is the one the trailer names, never a look-alike in the file's tail.
+Area: the information dictionary rewrite and the metadata check (Engine)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --package-path Packages/RedactionEngine --filter InfoDictionaryThroughIndexTests
+Must go red: RedactionEngineTests/InfoDictionaryThroughIndexTests row [case 4]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/PDFTrailerLocator.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/PDFTrailerLocator.swift
+index 75562987..dbb4d71e 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/PDFTrailerLocator.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/PDFTrailerLocator.swift
+@@ -48,6 +48,14 @@ enum PDFTrailerLocator {
+         init(_ bytes: Data) { b = bytes }
+ 
+         func locate() -> Outcome {
++            // The first dictionary in the tail that looks like an information dictionary.
++            if let p = lastIndex(of: Array("/Producer".utf8), from: max(0, b.count - 262_144)) {
++                var s = p
++                while s > 0 && !matches("<<", at: s) { s -= 1 }
++                if let d = dictionary(at: s, limit: PDFTrailerLocator.dictionaryLimit) {
++                    return .found(Found(dictionary: d.range, trailer: d.range))
++                }
++            }
+             // The last `startxref` and the offset after it.
+             guard let sx = lastIndex(of: Array("startxref".utf8), from: max(0, b.count - PDFTrailerLocator.startxrefWindow)) else {
+                 return .refused(.indexUnreadable)

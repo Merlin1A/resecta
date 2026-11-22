@@ -1,0 +1,19 @@
+Property: A fixed field that is not the fixed value reads Needs review, never an ordinary warning.
+Area: the information dictionary rewrite and the metadata check (Engine)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --package-path Packages/RedactionEngine --filter InfoDictionaryThroughIndexTests
+Must go red: RedactionEngineTests/InfoDictionaryThroughIndexTests row [case 7], [case 13] (and [case 8])
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Structural.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Structural.swift
+index 26a7489e..6289433e 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Structural.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Structural.swift
+@@ -279,7 +279,7 @@ extension VerificationEngine {
+             let conditions = undecodable
+                 ? [UnverifiedCondition(sentence: "Could not inspect metadata", pages: [])] : []
+             let issue: (status: VerificationStatus, pages: [Int]?)? = notRewritten
+-                ? (.attention("Producer or timestamp fields were not rewritten to the fixed values"), nil) : nil
++                ? (.warn("Producer or timestamp fields were not rewritten to the fixed values"), nil) : nil
+             if let composed = CheckRowComposition.compose(issue: issue, conditions: conditions, warnings: []) {
+                 // The file ID is not checked after this return; a line says so
+                 // only where a field was read as not rewritten (an issue), not
