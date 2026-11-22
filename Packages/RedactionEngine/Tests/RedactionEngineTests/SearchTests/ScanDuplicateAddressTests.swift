@@ -37,6 +37,20 @@ struct ScanDuplicateAddressTests {
                 "one on the lower copy: \(assembled.map { ContentGlyphScanTests.points($0.normalizedRect) })")
     }
 
+    @Test("On the picture leg too, two copies drawn in order: each assembled address is boxed on its own copy")
+    func stackedCopiesOnThePictureLeg() async throws {
+        let doc = try Self.page(cityFirst: false)
+        let page = try #require(doc.page(at: 0))
+        let hits = await DocumentSearcher()._testScanPagePIIViaOCR(page: SendablePDFPage(page), pageIndex: 0, categories: [.address])
+        let assembled = hits.filter { !$0.matchedText.contains("\n") && $0.matchedText.contains("62704") }
+        let upper = Self.copy(top: 709), lower = Self.copy(top: 509)
+        let at = assembled.map { "\($0.matchedText.debugDescription) \(ContentGlyphScanTests.points($0.normalizedRect))" }
+        #expect(!assembled.isEmpty && assembled.allSatisfy { Self.covers($0, upper) != Self.covers($0, lower) },
+                "each assembled address sits on one copy: \(at)")
+        #expect(assembled.contains { Self.covers($0, upper) }, "the upper copy has its own: \(at)")
+        #expect(assembled.contains { Self.covers($0, lower) }, "the lower copy has its own: \(at)")
+    }
+
     @Test("Two copies drawn ZIP line first: the lower copy's ZIP line has a box of its own")
     func lowerCopyDrawnZipFirstIsBoxed() async throws {
         let doc = try Self.page(cityFirst: true)
