@@ -1,0 +1,19 @@
+Property: The coverage check's re-run routes a page whose text layer Search cannot read as Search does (as sparse: by OCR, or not analysed with recognition off), never through the garbled layer that holds none of its words.
+Area: Search Re-check coverage check (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --package-path Packages/RedactionEngine --no-parallel --filter RegionCoverageUnreadableLayerTests
+Must go red: RedactionEngineTests/RegionCoverageUnreadableLayerTests shortBoxIsAShortfall, recognitionOffIsUnread
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/RegionCoverage.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/RegionCoverage.swift
+index f5ce05ab..682b859b 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/RegionCoverage.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/RegionCoverage.swift
+@@ -196,7 +196,7 @@ struct RegionCoverage: Sendable {
+         for index in 0..<source.document.pageCount {
+             if let page = source.document.page(at: index) {
+                 let detected = TextLayerDetector.detectTextLayer(page)
+-                status[index] = detected == .rich && TextLayerDetector.unreadableForSearch(page) ? .sparse : detected
++                status[index] = detected
+             }
+         }
+         let searcher = DocumentSearcher(textLayerStatusByPage: status)
