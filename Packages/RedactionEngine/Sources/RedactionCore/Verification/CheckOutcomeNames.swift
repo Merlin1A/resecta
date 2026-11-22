@@ -14,6 +14,9 @@ package enum CheckUnit: Hashable, Sendable {
     /// A box: its page (0-based) and its position in the run's plan for that
     /// page.
     case box(page: Int, planIndex: Int)
+    /// A region the producer painted on its own, outside its page's plan:
+    /// its page (0-based) and its id.
+    case region(page: Int, id: UUID)
 }
 
 /// The rule by which a check could not judge a unit. Each check declares the

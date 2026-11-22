@@ -183,8 +183,8 @@ extension PageRasterizer {
     /// A region with no box (the plan's admission and the run's disagreeing),
     /// or held only by a box that does not project, is never left unpainted:
     /// it is filled as the region path fills it and returned in
-    /// `outsidePlan`, which the record carries to the position check as
-    /// "could not be checked".
+    /// `outsidePlan`, which the record carries to the box check
+    /// (`ExactFillCheck`), where each is its own unit it cannot judge.
     func paintPlan(context ctx: CGContext, page: PDFPageData, raster: PixelPlan.Raster,
                    content: CGSize) throws -> PlanPaint {
         let bitmap = CGRect(x: 0, y: 0, width: ctx.width, height: ctx.height)

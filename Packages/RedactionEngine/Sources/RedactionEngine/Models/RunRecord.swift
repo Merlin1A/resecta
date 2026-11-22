@@ -124,8 +124,8 @@ public struct RunRecord: Equatable, Sendable {
         /// The rectangle the rasterizer reports having painted for each box.
         package var paintedRectangles: [BoxPosition: PaintedPixels]
         /// The regions the rasterizer painted that no box of the page's plan
-        /// holds, by page index: painted on their own, and read by the
-        /// position check as not checked.
+        /// holds, by page index: painted on their own, and read by the box
+        /// check (`ExactFillCheck`), each as its own unit it cannot judge.
         package var regionsPaintedOutsideThePlan: [Int: Set<UUID>] = [:]
         /// Which way found the information dictionary for its rewrite; nil
         /// until the rewrite has run.
