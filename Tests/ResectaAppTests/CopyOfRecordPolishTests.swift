@@ -84,7 +84,7 @@ struct CopyOfRecordPolishTests {
         #expect(admission.contains("case .refused: .refused(message: storeRejectedMessage)"))
         let toolbar = try source("Sources/ResectaApp/Views/Search/SearchToolbarSection.swift")
         #expect(toolbar.contains("optionChip(\"Include OCR Pages\""))
-        let trigger = try source("Sources/ResectaApp/Views/Search/SearchAndRedactSheet+Trigger.swift")
+        let trigger = try source("Sources/ResectaApp/State/SearchRun.swift")
         // The sentence lives in the message table; the trigger posts its row by
         // name, with the layer of the Search run that raised it.
         #expect(trigger.contains("toastManager?.post(.scannedRegionsNotAnalyzed, runLayer: runLayer)"))

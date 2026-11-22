@@ -2,8 +2,8 @@ import Foundation
 import RedactionEngine
 
 // The state half of a search run's end, lifted from `finishSearchRun`
-// (SearchAndRedactSheet+Trigger.swift) so a hosted test runs the decision
-// and the tail it gates; the view keeps the sink teardown and the
+// (now in State/SearchRun.swift) so a hosted test runs the decision
+// and the tail it gates; the run keeps the sink teardown and the
 // VoiceOver completion line. No line inside the moved body changes but
 // the three that read the Scan facts from `scan`.
 

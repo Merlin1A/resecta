@@ -24,6 +24,7 @@ struct WalkSeamTests {
             "Sources/ResectaApp/Views/SearchAndRedactSheet.swift",
             "Sources/ResectaApp/Views/Search/SearchResultsSection.swift",
             "Sources/ResectaApp/Views/Search/SearchAndRedactSheet+Trigger.swift",
+            "Sources/ResectaApp/State/SearchRun.swift",
             "Sources/ResectaApp/Views/Search/SearchAndRedactSheet+CompactApply.swift",
             "Sources/ResectaApp/Views/Search/SearchAndRedactSheet+CompactStrip.swift",
             "Sources/ResectaApp/Views/Search/SearchAndRedactSheet+SearchBar.swift",

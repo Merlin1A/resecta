@@ -16,9 +16,9 @@ import Foundation
 struct SearchReturnRuleSourcePinTests {
 
     /// The file that holds the run's setup (`prepareSearchRun()`).
-    static let runSetupFile = "Views/Search/SearchAndRedactSheet+Trigger.swift"
+    static let runSetupFile = "State/SearchRun.swift"
     /// The file that holds `buildSearchMode()`.
-    static let queryBuilderFile = "Views/Search/SearchAndRedactSheet+DegradeBanner.swift"
+    static let queryBuilderFile = "State/SearchQuery.swift"
     /// The file that holds `currentRunShape`.
     static let shapeFile = "State/SearchState+ReturnRule.swift"
 
