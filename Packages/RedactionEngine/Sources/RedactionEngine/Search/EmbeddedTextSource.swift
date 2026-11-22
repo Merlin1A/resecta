@@ -79,6 +79,28 @@ public struct EmbeddedTextSource: Sendable {
 
     /// Variant that takes a pre-computed cropBox (avoids redundant PDFKit
     /// trips in callers that already have it).
+    /// A word's pieces on the lines it is drawn on: the word whole where it
+    /// is drawn on one line, or where a line's piece cannot be read inside
+    /// the word; otherwise one piece for each line, with its own range and
+    /// box.
+    static func linePieces(
+        of selection: PDFSelection, word: NSRange, bounds: CGRect, page: PDFPage
+    ) -> [(range: NSRange, bounds: CGRect)] {
+        let byLine = selection.selectionsByLine()
+        guard byLine.count > 1 else { return [(word, bounds)] }
+        var pieces: [(range: NSRange, bounds: CGRect)] = []
+        for line in byLine {
+            guard line.numberOfTextRanges(on: page) == 1 else { return [(word, bounds)] }
+            let range = line.range(at: 0, on: page)
+            let box = line.bounds(for: page)
+            guard range.location != NSNotFound, range.length > 0,
+                  NSIntersectionRange(range, word) == range,
+                  box.width > 0, box.height > 0 else { return [(word, bounds)] }
+            pieces.append((range, box))
+        }
+        return pieces
+    }
+
     public static func make(
         from page: PDFPage, cropBox: CGRect, fitLines: Bool = false
     ) -> EmbeddedTextSource? {
@@ -137,15 +159,22 @@ public struct EmbeddedTextSource: Sendable {
                 range: safeRange, normalizedRect: normalized
             ))
 
-            let yMid = bounds.midY
-            let wordText = nsText.substring(with: safeRange)
-            let lineTolerance = max(bounds.height * 0.5, 2.0)
-            if let idx = lineBuckets.firstIndex(where: {
-                abs($0.yMid - yMid) <= lineTolerance
-            }) {
-                lineBuckets[idx].words.append((bounds, wordText, safeRange))
-            } else {
-                lineBuckets.append((yMid, [(bounds, wordText, safeRange)]))
+            // A word PDFKit runs on from one drawn line into the next
+            // ("StreetSpringfield", where no break was drawn between them)
+            // is one selection over both lines: each line takes its own
+            // piece of it, so neither line loses its word to a box as tall
+            // as the two.
+            for piece in Self.linePieces(of: sel, word: safeRange, bounds: bounds, page: page) {
+                let yMid = piece.bounds.midY
+                let pieceText = nsText.substring(with: piece.range)
+                let lineTolerance = max(piece.bounds.height * 0.5, 2.0)
+                if let idx = lineBuckets.firstIndex(where: {
+                    abs($0.yMid - yMid) <= lineTolerance
+                }) {
+                    lineBuckets[idx].words.append((piece.bounds, pieceText, piece.range))
+                } else {
+                    lineBuckets.append((yMid, [(piece.bounds, pieceText, piece.range)]))
+                }
             }
         }
 
