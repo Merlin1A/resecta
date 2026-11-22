@@ -16,7 +16,9 @@ struct RegionCoverageCapAndCategoryTests {
     /// Two pages: the first holds `dense` occurrences of SEED in small type,
     /// twenty to a line; the second holds one SEED and a line of body text,
     /// so the page reads as a full text layer and is searched as text, not
-    /// left for recognition (a page of under ten letters is sparse).
+    /// left for recognition (a page of under ten letters is sparse). The first
+    /// page ends with a line of body text, so it has ten or more distinct
+    /// characters and Search reads its layer as text, not as a garbled one.
     static func densePageThenOne(dense: Int) -> Data {
         var lines: [String] = []
         var left = dense
@@ -25,7 +27,7 @@ struct RegionCoverageCapAndCategoryTests {
             lines.append("(" + Array(repeating: "SEED", count: n).joined(separator: " ") + ") Tj T*")
             left -= n
         }
-        let first = "BT /F1 6 Tf 7 TL 20 770 Td\n" + lines.joined(separator: "\n") + "\nET"
+        let first = "BT /F1 6 Tf 7 TL 20 770 Td\n" + lines.joined(separator: "\n") + "\n(Dense page body text) Tj T*\nET"
         let second = "BT /F1 24 Tf 72 700 Td (SEED) Tj ET\nBT /F1 12 Tf 72 600 Td (Second page body) Tj ET"
         func page(_ id: Int, contents: Int) -> PDFObject {
             PDFObject(id: id, content: """
@@ -48,7 +50,8 @@ struct RegionCoverageCapAndCategoryTests {
     /// One SEED and a line of body text: a full text page.
     static let oneSeedPage = "BT /F1 24 Tf 72 700 Td (SEED) Tj ET\nBT /F1 12 Tf 72 600 Td (A page of body text) Tj ET"
 
-    /// `dense` occurrences of SEED in small type, twenty to a line.
+    /// `dense` occurrences of SEED in small type, twenty to a line, then a
+    /// line of body text (ten or more distinct characters: read as text).
     static func denseSeedPage(_ dense: Int) -> String {
         var lines: [String] = []
         var left = dense
@@ -57,7 +60,7 @@ struct RegionCoverageCapAndCategoryTests {
             lines.append("(" + Array(repeating: "SEED", count: n).joined(separator: " ") + ") Tj T*")
             left -= n
         }
-        return "BT /F1 6 Tf 7 TL 20 770 Td\n" + lines.joined(separator: "\n") + "\nET"
+        return "BT /F1 6 Tf 7 TL 20 770 Td\n" + lines.joined(separator: "\n") + "\n(Dense page body text) Tj T*\nET"
     }
 
     /// Letter-size text pages, one content stream each, in one font.
