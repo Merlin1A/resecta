@@ -1,0 +1,18 @@
+Property: A page the fit takes because its painting cannot be followed is told by that reason, not as another app's text.
+Area: ink fit (Search), the account of what was read
+Test command: cd Packages/RedactionEngine && swift test --filter 'InkFitPiecewiseScanTests|AccountOfWhatWasReadTests'
+Must go red: RedactionEngineTests/InkFitPiecewiseScanTests fitReasonNamesUnfollowedPainting (A page taken because its painting cannot be followed has that reason, not another app's text)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
+@@ -46,7 +46,7 @@
+     nonisolated static func fitReason(_ page: PDFPage, cgPage: CGPDFPage) -> FitReason? {
+         guard carriesHiddenTextOverImage(page, cgPage: cgPage) else { return nil }
+         if carriesPageScaleImage(page, cgPage: cgPage) { return .anotherAppsText }
+-        return PagePictureMap.cached(page, cgPage: cgPage).followed ? .anotherAppsText : .paintingNotFollowed
++        return .anotherAppsText
+     }
+ 
+     /// A page with no invisible text that draws a picture: its visible text

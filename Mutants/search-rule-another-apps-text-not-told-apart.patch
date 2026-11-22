@@ -5,10 +5,9 @@ Must go red: RedactionEngineTests/InkFitPageIdentityTests pagesWithOneTextAreFit
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
-index e81653e2..06427f1f 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
-@@ -32,8 +32,8 @@ extension DocumentSearcher {
+@@ -32,8 +32,8 @@
          } else {
              answer = invisible && pageScale
          }
@@ -18,4 +17,4 @@ index e81653e2..06427f1f 100644
 +        return false
      }
  
-     /// A page with no invisible text that draws a picture: its visible text
+     /// Why the fit takes the page, as the account of what was read tells it;

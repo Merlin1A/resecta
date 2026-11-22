@@ -5,16 +5,16 @@ Must go red: RedactionEngineTests/PageCoverageReportTests fullPagePicture, anoth
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+HybridRoute.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+HybridRoute.swift
-index 7cacbac8..cad2cfde 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+HybridRoute.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+HybridRoute.swift
-@@ -31,8 +31,7 @@ extension DocumentSearcher {
+@@ -32,9 +32,7 @@
          }
          if let sink = pageCoverageSink {
-             let anotherAppsLayer = page.pageRef.map { Self.carriesHiddenTextOverImage(page, cgPage: $0) } ?? false
+             let reason = page.pageRef.flatMap { Self.fitReason(page, cgPage: $0) }
 -            sink(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer, pictures: .required,
--                                    throughAnotherAppsLayer: anotherAppsLayer))
-+            _ = (sink, anotherAppsLayer)
+-                                    throughAnotherAppsLayer: reason == .anotherAppsText,
+-                                    paintingNotFollowed: reason == .paintingNotFollowed))
++            _ = (sink, reason)
          }
          guard includeOCR else {
              if reportsWhenOff { scannedRegionNotAnalyzedSink?(pageIndex) }

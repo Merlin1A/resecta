@@ -1,0 +1,17 @@
+Property: A page whose text is searched where its painting cannot be followed reads with that reason, never as another app's text or its own.
+Area: the account of what was read
+Test command: cd Packages/RedactionEngine && swift test --filter 'InkFitPiecewiseScanTests|AccountOfWhatWasReadTests'
+Must go red: RedactionEngineTests/AccountOfWhatWasReadTests row (Account of what was read): A page whose painting cannot be followed is read with that reason, not as another app's text; C-25 every set of facts at every place gives exactly one state, and a failure never a better one
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/AccountOfWhatWasRead.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/AccountOfWhatWasRead.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/AccountOfWhatWasRead.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/AccountOfWhatWasRead.swift
+@@ -172,7 +172,6 @@
+         let reasons = partReasons(of: facts, position: position)
+         if !reasons.isEmpty { return .partlyRead(reasons) }                   // 10
+         if ownText {
+-            if facts.contains(.paintingNotFollowed) { return .readWherePaintingIsNotFollowed }
+             return facts.contains(.anotherAppsLayer) ? .readThroughAnotherAppsText : .readFromOwnText // 11, 12
+         }
+         return facts.contains(.recognised) ? .readByRecognition : .readBlank // 13, 14
