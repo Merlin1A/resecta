@@ -32,6 +32,9 @@ class RedactionOverlayView: UIView {
     /// rectangle (`RedactionRegion.drawnPageRect`). Emptied when the gesture
     /// ends.
     var gestureOverlayRects: [UUID: CGRect] = [:]
+    /// Each box's page rectangle from before the gesture in progress, so
+    /// a cancel puts it back with the box's place.
+    var preGestureDrawnPageRects: [UUID: CGRect?] = [:]
     /// Whether the box-place probe has run since PDFKit handed this canvas
     /// its page (`RedactionOverlayView+BoxPlace.swift`).
     var boxPlaceProbed = false

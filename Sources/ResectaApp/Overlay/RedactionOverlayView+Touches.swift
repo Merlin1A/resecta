@@ -304,6 +304,10 @@ extension RedactionOverlayView {
             // Restore the pre-resize rect (nothing was committed)
             regions[idx].normalizedRect = preResizeNormalizedRect
         }
+        // The page rectangles the gesture's steps took go back with the places.
+        for i in regions.indices {
+            if let before = preGestureDrawnPageRects[regions[i].id] { regions[i].drawnPageRect = before }
+        }
         resetDragState()
         setNeedsDisplay()
     }
@@ -311,6 +315,7 @@ extension RedactionOverlayView {
     private func resetDragState() {
         coordinator?.setCanvasHoldsTouch(false)
         gestureOverlayRects = [:]
+        preGestureDrawnPageRects = [:]
         primaryTouch = nil
         dragOrigin = nil
         currentDragRect = nil

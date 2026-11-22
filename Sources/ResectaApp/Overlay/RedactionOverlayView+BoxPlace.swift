@@ -25,9 +25,16 @@ extension RedactionOverlayView {
     }
 
     /// Stores a box placed by the gesture in progress from its rect in this
-    /// canvas's points, and keeps the rect for the commit.
+    /// canvas's points, with the page rectangle PDFKit gives that rect, and
+    /// keeps the rect for the commit. The box on screen carries what the
+    /// commit will store, so after the lift the stored box is the one shown.
     func storeFromGesture(_ index: Int, overlayRect: CGRect) {
+        let id = regions[index].id
+        if preGestureDrawnPageRects[id] == nil {
+            preGestureDrawnPageRects[id] = .some(regions[index].drawnPageRect)
+        }
         regions[index].normalizedRect = overlayToPDFNormalized(overlayRect)
+        regions[index].drawnPageRect = pageRectByPDFKit(overlayRect)
         gestureOverlayRects[regions[index].id] = overlayRect
     }
 
