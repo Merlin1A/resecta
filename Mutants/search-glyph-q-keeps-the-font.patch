@@ -1,0 +1,20 @@
+Property: Q restores the font and size that q saved.
+Area: Search, the match boxes from the page's own drawing
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'ContentGlyphWalkTests|ContentGlyphFontTests|ContentGlyphBoxTests|ContentGlyphMapTests|ContentGlyphExportTests|ContentGlyphRouteTests'
+Must go red: RedactionEngineTests/ContentGlyphWalkTests graphicsState
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphWalk.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphWalk.swift
+index a055f4f7..145ac2c7 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphWalk.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphWalk.swift
+@@ -122,7 +122,8 @@ enum ContentGlyphWalk {
+         }
+         CGPDFOperatorTableSetCallback(table, "Q") { scanner, info in
+             guard let s = State.from(info), s.count(scanner) else { return }
+-            guard let g = s.saved.popLast() else { s.fail(scanner); return }
++            guard var g = s.saved.popLast() else { s.fail(scanner); return }
++            g.font = s.g.font; g.size = s.g.size
+             s.g = g
+         }
+         CGPDFOperatorTableSetCallback(table, "cm") { scanner, info in

@@ -21,7 +21,8 @@ extension DocumentSearcher {
         var degraded = false
         /// The box a hybrid page tells this match's OCR repeat by, where it is
         /// not `rect`: the box the word's tallest band alone paints, when the
-        /// fit took more bands (`SearchResult.identityRect`); nil otherwise.
+        /// fit took more bands, or its box before the growth to the match's own
+        /// glyphs (`SearchResult.identityRect`); nil otherwise.
         var identity: CGRect? = nil
         /// The box the hybrid merge compares (`mergeHybridResults`).
         var mergeIdentity: CGRect { identity ?? rect }
@@ -35,7 +36,7 @@ extension DocumentSearcher {
                 TextLayerBox(rect: split.paint[$0], textLayerRect: split.strip[$0], degraded: split.degraded, identity: split.identity[$0])
             }
         }
-        return lineRects(for: nsRange, page: page)?.map { TextLayerBox(rect: $0, textLayerRect: nil) }
+        return lineBoxes(for: nsRange, page: page)?.map { TextLayerBox(rect: $0.rect, textLayerRect: nil, identity: $0.identity) }
     }
 
     /// One box for the whole range (the `boundingRect` rule, used by the PII
@@ -50,6 +51,6 @@ extension DocumentSearcher {
                                 textLayerRect: split.strip.dropFirst().reduce(strip) { $0.union($1) },
                                 degraded: split.degraded, identity: identity == rect ? nil : identity)
         }
-        return boundingRect(for: nsRange, page: page).map { TextLayerBox(rect: $0, textLayerRect: nil) }
+        return boundingBox(for: nsRange, page: page).map { TextLayerBox(rect: $0.rect, textLayerRect: nil, identity: $0.identity) }
     }
 }

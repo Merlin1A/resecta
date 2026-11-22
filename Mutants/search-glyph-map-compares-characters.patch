@@ -1,0 +1,20 @@
+Property: The page text and the glyphs are compared as UTF-16 units, never normalised.
+Area: Search, the match boxes from the page's own drawing
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'ContentGlyphWalkTests|ContentGlyphFontTests|ContentGlyphBoxTests|ContentGlyphMapTests|ContentGlyphExportTests|ContentGlyphRouteTests'
+Must go red: RedactionEngineTests/ContentGlyphMapTests notNormalised
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphMap.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphMap.swift
+index ec64a848..fbc0993d 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphMap.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphMap.swift
+@@ -16,6 +16,9 @@ struct ContentGlyphMap {
+     static let whitespace: Set<UInt16> = [0x20, 0x09, 0x0A, 0x0D, 0xA0]
+ 
+     static func make(pageText: String, glyphs: [ShownGlyph]) -> ContentGlyphMap? {
++        if pageText.filter({ !$0.isWhitespace }) == glyphs.map(\.text).joined().filter({ !$0.isWhitespace }), pageText.utf16.count != glyphs.map(\.text).joined().utf16.count {
++            return ContentGlyphMap(glyphs: glyphs, glyphOfUnit: Array(repeating: nil, count: pageText.utf16.count))
++        }
+         var shown: [(unit: UInt16, glyph: Int)] = []
+         for (index, glyph) in glyphs.enumerated() {
+             for unit in glyph.text.utf16 where !whitespace.contains(unit) { shown.append((unit, index)) }

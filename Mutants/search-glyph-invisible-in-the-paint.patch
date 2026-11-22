@@ -1,0 +1,19 @@
+Property: Glyphs drawn in an invisible mode add nothing to the paint.
+Area: Search, the match boxes from the page's own drawing
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'ContentGlyphWalkTests|ContentGlyphFontTests|ContentGlyphBoxTests|ContentGlyphMapTests|ContentGlyphExportTests|ContentGlyphRouteTests'
+Must go red: RedactionEngineTests/ContentGlyphBoxTests invisibleAddsNothing
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphMap.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphMap.swift
+index ec64a848..eb20cba4 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphMap.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphMap.swift
+@@ -87,7 +87,7 @@ extension DocumentSearcher {
+         for unit in nsRange.location..<NSMaxRange(nsRange) {
+             guard let index = map.glyphOfUnit[unit], seen.insert(index).inserted else { continue }
+             let glyph = map.glyphs[index]
+-            guard !glyph.singular, glyph.upright, [0, 1, 2, 4, 5, 6].contains(glyph.renderMode) else { continue }
++            guard !glyph.singular, glyph.upright, (0...7).contains(glyph.renderMode) else { continue }
+             guard let own = page.selection(for: NSRange(location: unit, length: 1))?.bounds(for: page),
+                   glyph.box.insetBy(dx: -anchorSlack, dy: -anchorSlack).intersects(own) else { return nil }
+             out.append(OwnGlyph(unit: unit, box: glyph.box))

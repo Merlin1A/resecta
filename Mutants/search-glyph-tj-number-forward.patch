@@ -1,0 +1,19 @@
+Property: A TJ number moves the next glyph back by its thousandths of the size.
+Area: Search, the match boxes from the page's own drawing
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'ContentGlyphWalkTests|ContentGlyphFontTests|ContentGlyphBoxTests|ContentGlyphMapTests|ContentGlyphExportTests|ContentGlyphRouteTests'
+Must go red: RedactionEngineTests/ContentGlyphWalkTests tjMovesBack; RedactionEngineTests/ContentGlyphBoxTests backwardTJ
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphWalk.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphWalk.swift
+index a055f4f7..640467fa 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphWalk.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphWalk.swift
+@@ -220,7 +220,7 @@ enum ContentGlyphWalk {
+                     s.show(string, scanner)
+                     if s.unknown { return }
+                 } else if CGPDFArrayGetNumber(array, index, &number) {
+-                    let tx = -CGFloat(number) / 1000 * s.g.size * s.g.scale / 100
++                    let tx = CGFloat(number) / 1000 * s.g.size * s.g.scale / 100
+                     s.tm = CGAffineTransform(translationX: tx, y: 0).concatenating(s.tm)
+                 } else {
+                     s.fail(scanner); return

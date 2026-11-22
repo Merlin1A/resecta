@@ -52,7 +52,9 @@ extension DocumentSearcher {
     /// the text layer does not hold, keeps its OCR result. An OCR result whose
     /// box a merge of two readings grew is told by the box its read gave it
     /// (`identityRect`), not the grown one, which can reach over a text-layer
-    /// word it does not name.
+    /// word it does not name. A text-layer match whose box grew to its own
+    /// glyphs is told by its box before that growth (`mergeIdentity`), so a
+    /// box grown for cover never widens what counts as a repeat along its line.
     static func mergeHybridResults(textLayerRects: [CGRect], ocr: [SearchResult]) -> [SearchResult] {
         func area(_ rect: CGRect) -> CGFloat { rect.isNull ? 0 : rect.width * rect.height }
         func repeats(_ rect: CGRect, _ ocrRect: CGRect) -> Bool {
