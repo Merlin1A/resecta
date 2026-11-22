@@ -1,0 +1,19 @@
+Property: A box partly over a match is a neighbour's box only through a match of its own term or category.
+Area: the coverage check's neighbour excuse
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter RegionCoverageCapAndCategoryTests
+Must go red: RedactionEngineTests/RegionCoverageCapAndCategoryTests neighbourExcuseOwnCategoryOnly
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/RegionCoverage.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/RegionCoverage.swift
+index 2ae06e58..a8cba3aa 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/RegionCoverage.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/RegionCoverage.swift
+@@ -139,7 +139,7 @@ struct RegionCoverage: Sendable {
+             if fraction >= touchedThreshold {
+                 let touching = boxes.indices.filter { touches[m][$0] }
+                 let onlyNeighbours = touching.allSatisfy { b in
+-                    all.indices.contains { $0 != m && covers[$0][b] && vouches(all[$0], for: boxes[b]) }
++                    all.indices.contains { $0 != m && covers[$0][b] /* mutant: any match makes a neighbour box */ }
+                 }
+                 if !onlyNeighbours {
+                     found.append(Shortfall(pageIndex: page, requestIndex: match.requestIndex, coveredFraction: fraction))

@@ -99,14 +99,25 @@ struct RegionCoverage: Sendable {
         }
     }
 
+    /// Whether `match` can speak for `region` in the two excuses below: a
+    /// box a search or scan placed speaks only through a match of the term
+    /// or category it records, so another category's match lying under it
+    /// never makes it a neighbour's box or keeps it from reading as
+    /// drifted; a manual or face box records no term and any match it
+    /// covers speaks for it.
+    static func vouches(_ match: PageMatch, for region: RedactionRegion) -> Bool {
+        isSearchPlaced(region) ? placed(region, forTerm: match.term) : true
+    }
+
     /// The shortfalls on one page, from every applied request's matches
     /// there and the boxes on the page. A match the boxes cover at least
     /// `coveredThreshold` is covered. A match touched between the two
     /// thresholds is a shortfall — unless every box touching it covers
-    /// another match on the page at `coveredThreshold` (a neighbour's box
-    /// grazing a match left unselected is not a box placed for it). A match
-    /// no box touches was left unselected — unless the page also carries a
-    /// search-placed box that touches none of the page's matches: a box
+    /// another match on the page at `coveredThreshold` that `vouches` for it
+    /// (a neighbour's box grazing a match left unselected is not a box
+    /// placed for it). A match no box touches was left unselected — unless
+    /// the page also carries a search-placed box that touches no match of
+    /// its own term or category (`vouches`): a box
     /// placed for a match and drifted clear of it; each such box pairs with
     /// one untouched match OF THE TERM IT RECORDS, in request then page
     /// order, as a shortfall — a box placed for one term never vouches for
@@ -128,7 +139,7 @@ struct RegionCoverage: Sendable {
             if fraction >= touchedThreshold {
                 let touching = boxes.indices.filter { touches[m][$0] }
                 let onlyNeighbours = touching.allSatisfy { b in
-                    all.indices.contains { $0 != m && covers[$0][b] }
+                    all.indices.contains { $0 != m && covers[$0][b] && vouches(all[$0], for: boxes[b]) }
                 }
                 if !onlyNeighbours {
                     found.append(Shortfall(pageIndex: page, requestIndex: match.requestIndex, coveredFraction: fraction))
@@ -138,7 +149,7 @@ struct RegionCoverage: Sendable {
             }
         }
         let driftedBoxes = boxes.indices.filter { b in
-            isSearchPlaced(boxes[b]) && !all.indices.contains { touches[$0][b] }
+            isSearchPlaced(boxes[b]) && !all.indices.contains { touches[$0][b] && vouches(all[$0], for: boxes[b]) }
         }
         var ordered = untouched.sorted {
             ($0.1.requestIndex, $0.1.rect.minY, $0.1.rect.minX) < ($1.1.requestIndex, $1.1.rect.minY, $1.1.rect.minX)
@@ -176,7 +187,9 @@ struct RegionCoverage: Sendable {
     /// request's `appliedPages` (when it names any) are not read. A page the
     /// searcher could not read is reported in `unreadPages`, never passed
     /// by silence: the searcher's own coverage and timeout sinks say which
-    /// pages it read and why it could not read one. A cancellation throws:
+    /// pages it read and why it could not read one, and a re-run that
+    /// reached the searcher's result cap leaves the page it stopped on and
+    /// every later page unread. A cancellation throws:
     /// a re-run cut short is never an outcome.
     static func check(
         source: SendablePDFDocument,
@@ -221,8 +234,16 @@ struct RegionCoverage: Sendable {
             let stream = searcher.search(source, mode: request.record.query.searchMode, progress: { _, _ in })
             var strays: [PlacedPiece] = []
             var comparedOccurrences = Set<UUID>()
+            // Every match the re-run yields counts toward the searcher's
+            // cap, boxed or not, on any page, once however many lines it
+            // runs over (the searcher counts matches, `emitCapped`); the
+            // last page one came from is where a capped re-run stopped.
+            var yielded = Set<UUID>()
+            var lastPage = 0
             for await result in stream {
                 try Task.checkCancellation()
+                yielded.insert(DocumentSearcher.occurrenceKey(result))
+                lastPage = max(lastPage, result.pageIndex)
                 // A match with no box has nothing to measure a box's cover
                 // against; the Search Re-check counts it as remaining.
                 guard result.hasBox else { continue }
@@ -246,6 +267,13 @@ struct RegionCoverage: Sendable {
             await searcher.setUserTermsTimeoutSink(nil)
             await searcher.setRegexRejectionSink(nil)
             unread.formUnion(reads.unreadPages(among: candidates))
+            // A re-run that reached the cap stopped part-way: the page it
+            // stopped on and every page after it were not read whole, and a
+            // page never reached reports nothing to the sinks. The searcher
+            // walks pages in order, so the pages before were read.
+            if yielded.count >= DocumentSearcher.maxResults {
+                unread.formUnion(candidates.filter { $0 >= lastPage })
+            }
         }
         let occurrences = occurrenceShortfalls(pieces: pieces, regions: regions)
         var found = occurrences.shortfalls
