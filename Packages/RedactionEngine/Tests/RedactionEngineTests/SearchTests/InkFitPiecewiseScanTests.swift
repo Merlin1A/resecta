@@ -156,6 +156,32 @@ struct InkFitPiecewiseScanTests {
         }
     }
 
+    @Test("A page taken because its painting cannot be followed has that reason, not another app's text")
+    func fitReasonNamesUnfollowedPainting() throws {
+        let dot = S.image(S.Gray(width: 2, height: 2, value: 0))
+        // Forms seven deep, each drawing the next three times, the last drawing
+        // the picture: 1,093 forms drawn, past the limit.
+        var objects = [dot]
+        for k in 0..<7 {
+            objects.append(k < 6 ? S.form(String(repeating: "/F Do ", count: 3), resources: "/XObject << /F @\(k + 2)@ >>")
+                                 : S.form("q 10 0 0 10 20 20 cm /I0 Do Q", resources: "/XObject << /I0 @0@ >>"))
+        }
+        let half = Self.half
+        let rows: [(String, Data, DocumentSearcher.FitReason?)] = [
+            ("a typed page whose painting cannot be followed",
+             S.document([S.Page(S.typedText + "/F Do", resources: "/XObject << /F @1@ >>", objects: objects)]), .paintingNotFollowed),
+            ("a one-image scan under invisible text", S.scan(.one, shift: half), .anotherAppsText),
+            ("a strip scan under invisible text", S.scan(.strips(rows: 128), shift: half), .anotherAppsText),
+            ("visible text under a later strip scan", S.scan(.strips(rows: 128), shift: half, layer: .visibleBefore), .anotherAppsText),
+            ("a typed page", S.document([S.Page(S.typedText, resources: "", objects: [])]), nil),
+        ]
+        for (key, data, reason) in rows {
+            let (document, page, cgPage) = try #require(S.pdfPage(data))
+            defer { withExtendedLifetime(document) {} }
+            #expect(DocumentSearcher.fitReason(page, cgPage: cgPage) == reason, "\(key)")
+        }
+    }
+
     // MARK: - The box on the print
 
     static func hits(_ document: PDFDocument, _ word: String) async -> [SearchResult] {

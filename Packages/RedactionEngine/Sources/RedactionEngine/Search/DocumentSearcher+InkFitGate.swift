@@ -36,6 +36,19 @@ extension DocumentSearcher {
         return answer
     }
 
+    /// Why the fit takes the page, as the account of what was read tells it;
+    /// nil when it does not. A page whose largest image is page-scale, or
+    /// whose painting was followed, has another app's text over a picture of
+    /// it; a page taken while its painting cannot be followed has that reason
+    /// alone, since where its print lies is not known.
+    enum FitReason: Equatable, Sendable { case anotherAppsText, paintingNotFollowed }
+
+    nonisolated static func fitReason(_ page: PDFPage, cgPage: CGPDFPage) -> FitReason? {
+        guard carriesHiddenTextOverImage(page, cgPage: cgPage) else { return nil }
+        if carriesPageScaleImage(page, cgPage: cgPage) { return .anotherAppsText }
+        return PagePictureMap.cached(page, cgPage: cgPage).followed ? .anotherAppsText : .paintingNotFollowed
+    }
+
     /// A page with no invisible text that draws a picture: its visible text
     /// lies under pictures that hide it, or its painting cannot be followed,
     /// so where its print lies is not known.

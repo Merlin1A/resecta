@@ -42,13 +42,17 @@ public struct PageSearchCoverage: Sendable, Equatable {
     /// The searched text is hidden text over a page-size picture: another
     /// app's recognition.
     public let throughAnotherAppsLayer: Bool
+    /// The page is fitted because its painting cannot be followed, so where
+    /// its print lies is not known; it is not said to be another app's text.
+    public let paintingNotFollowed: Bool
 
     init(pageIndex: Int, route: Route, emptyRead: EmptyRead? = nil, pictures: Pictures? = nil,
-         throughAnotherAppsLayer: Bool = false) {
+         throughAnotherAppsLayer: Bool = false, paintingNotFollowed: Bool = false) {
         self.pageIndex = pageIndex
         self.route = route
         self.emptyRead = emptyRead
         self.pictures = pictures
         self.throughAnotherAppsLayer = throughAnotherAppsLayer
+        self.paintingNotFollowed = paintingNotFollowed
     }
 }

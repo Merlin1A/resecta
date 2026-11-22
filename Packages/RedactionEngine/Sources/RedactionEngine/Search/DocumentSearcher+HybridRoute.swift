@@ -18,7 +18,8 @@ extension DocumentSearcher {
     /// text-layer rect already covers. Either way the page's pictures are
     /// reported: required when the census counts them, below the floors when
     /// the page has a picture it does not count, and whether the text is
-    /// another app's hidden layer over a page-size picture.
+    /// another app's hidden layer over a page-size picture, or a page the
+    /// fit takes because its painting cannot be followed.
     func hybridOCRLeg(
         page: PDFPage, pageIndex: Int, textLayerRects: [CGRect], includeOCR: Bool,
         reportsWhenOff: Bool = true, ocr: () async -> [SearchResult]
@@ -30,9 +31,10 @@ extension DocumentSearcher {
             return []
         }
         if let sink = pageCoverageSink {
-            let anotherAppsLayer = page.pageRef.map { Self.carriesHiddenTextOverImage(page, cgPage: $0) } ?? false
+            let reason = page.pageRef.flatMap { Self.fitReason(page, cgPage: $0) }
             sink(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer, pictures: .required,
-                                    throughAnotherAppsLayer: anotherAppsLayer))
+                                    throughAnotherAppsLayer: reason == .anotherAppsText,
+                                    paintingNotFollowed: reason == .paintingNotFollowed))
         }
         guard includeOCR else {
             if reportsWhenOff { scannedRegionNotAnalyzedSink?(pageIndex) }
