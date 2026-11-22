@@ -18,18 +18,15 @@ struct ContentGlyphExportTests {
         /// The band the match's ink is read in, in points.
         let x0: CGFloat, x1: CGFloat
         /// Letters of other words the Searchable layer drops beside the
-        /// match: as on main, except where a grown box meets a neighbour's
-        /// glyph (the TJ case: "ce" on main, "ceio" here, named in what may
-        /// move).
+        /// match, as measured (see `cases`).
         let dropped: [Character]
         var description: String { label }
     }
 
-    // The drops are pinned as measured at this base, the same with the
-    // growth removed: Searchable leaves out whole words beside the box
-    // here, wider than the single letters measured at an earlier base.
-    // That widening is owed as its own item (named in the owed list as
-    // the wider drop); a change in these sets is a change to the strip.
+    // The drops are pinned as measured, and they are the same with the
+    // growth removed, so they are the Searchable strip's own: it leaves out
+    // whole words beside the box here, wider than the single letters it
+    // left out earlier. A change in these sets is a change to the strip.
     static let cases: [Case] = [
         Case(label: "the line's last word, its t past PDFKit's box", term: "account",
              full: ContentGlyphWalkTests.visible + plant,

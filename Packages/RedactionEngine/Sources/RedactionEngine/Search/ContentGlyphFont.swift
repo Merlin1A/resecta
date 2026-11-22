@@ -48,16 +48,18 @@ struct ContentGlyphFont {
         var system: CTFont?
         var widths: CGPDFArrayRef?
         if CGPDFDictionaryGetArray(font, "Widths", &widths), let widths {
+            // A simple font's codes are one byte: a first code outside 0-255
+            // is a font this does not read (and the sum below cannot overflow).
             var first: CGPDFInteger = 0
-            guard CGPDFDictionaryGetInteger(font, "FirstChar", &first) else { return nil }
+            guard CGPDFDictionaryGetInteger(font, "FirstChar", &first), (0..<256).contains(first) else { return nil }
             var missing: CGPDFReal = 0
             if let descriptor { _ = CGPDFDictionaryGetNumber(descriptor, "MissingWidth", &missing) }
             for code in 0..<256 { advances[code] = CGFloat(missing) }
-            for index in 0..<CGPDFArrayGetCount(widths) {
+            // Only the widths of codes 0-255 are read.
+            for index in 0..<min(CGPDFArrayGetCount(widths), 256 - Int(first)) {
                 var width: CGPDFReal = 0
                 guard CGPDFArrayGetNumber(widths, index, &width) else { return nil }
-                let code = Int(first) + index
-                if (0..<256).contains(code) { advances[code] = CGFloat(width) }
+                advances[Int(first) + index] = CGFloat(width)
             }
         } else {
             guard descriptorIsAbsentOrUnembedded(descriptor), standardFonts.contains(baseFont),
