@@ -5,18 +5,18 @@ Must go red: RedactionCoreTests/PaintedBoxTests boxesAlikeButForOneLimitLineAreN
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintedBox.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintedBox.swift
-index e9b0e2df..d6ab9e05 100644
+index f3b2a6ee..f5aa7d19 100644
 --- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintedBox.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintedBox.swift
-@@ -132,6 +132,13 @@ package struct PaintedBox: Hashable, Sendable {
-     /// The box is painted as it was drawn: no margin, no limit.
-     package var asDrawn: Bool
+@@ -138,6 +138,13 @@ package struct PaintedBox: Hashable, Sendable {
+     /// picture. The plan sets it; the producer reads it.
+     package var inkCheckable: Bool
  
 +    package static func == (lhs: PaintedBox, rhs: PaintedBox) -> Bool {
 +        lhs.regionIDs == rhs.regionIDs && lhs.inner == rhs.inner && lhs.paint == rhs.paint && lhs.tight == rhs.tight
 +            && lhs.exposure == rhs.exposure && lhs.treatment == rhs.treatment && lhs.bandMade == rhs.bandMade
 +            && lhs.inkEnlargedCovered == rhs.inkEnlargedCovered && lhs.inkEnlargedToCap == rhs.inkEnlargedToCap
-+            && lhs.asDrawn == rhs.asDrawn
++            && lhs.asDrawn == rhs.asDrawn && lhs.inkCheckable == rhs.inkCheckable
 +    }
 +
      package init(
