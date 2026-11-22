@@ -1,0 +1,19 @@
+Property: Only the overlays PDFKit has handed out and not ended are asked, so an ended page's touch never holds the door.
+Area: the run door, while a finger is down on the canvas
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/RunDoorHeldTouchTests
+Must go red: ResectaAppTests/RunDoorHeldTouchTests endedOverlayHoldsNothing
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
+index f6e294dd..384d6b4d 100644
+--- a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
++++ b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
+@@ -213,7 +213,7 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
+                  willEndDisplayingOverlayView overlayView: UIView,
+                  for page: PDFPage) {
+         guard let pageIndex = view.document?.index(for: page) else { return }
+-        activeOverlays.removeValue(forKey: pageIndex)
++        _ = pageIndex
+     }
+ 
+     // MARK: - Region Management (called from overlay touch handlers)

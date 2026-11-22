@@ -271,6 +271,18 @@ extension RedactionOverlayView {
         // Only the primary touch's cancel discards the gesture;
         // a system cancel of the primary still cancels.
         guard let primaryTouch, touches.contains(primaryTouch) else { return }
+        cancelHeldGesture()
+    }
+
+    /// Going to the background cancels the gesture in flight, if any.
+    @objc func cancelHeldGestureForBackground() {
+        guard primaryTouch != nil else { return }
+        cancelHeldGesture()
+    }
+
+    /// Discard the gesture in flight without committing it: the boxes go
+    /// back to where they were, and the touch is let go.
+    private func cancelHeldGesture() {
         // Discard without committing — restore pre-drag region state
         if isGroupMoving {
             for i in regions.indices {

@@ -364,7 +364,7 @@ class DocumentState {
     enum RedactRefusal: Equatable {
         case selectedMatches  // unapplied search selections; a run would drop them
         case noRegions        // no region survives the minimum-dimension filter
-        case busy             // another phase, a run in flight or a pending review; no hint
+        case busy             // another phase, a run in flight, a pending review or a touch held on the canvas; no hint
 
         /// The hint the button speaks and the funnel shows.
         var hint: String {
@@ -386,11 +386,13 @@ class DocumentState {
     }
 
     /// The refusal that holds now, or nil when Redact may start. The
-    /// selected matches come first, then the missing regions.
+    /// selected matches come first, then the missing regions. A finger held
+    /// on the canvas refuses as busy: the run would burn the stored place of
+    /// a box the screen shows elsewhere.
     func redactRefusal(with redactionState: RedactionState) -> RedactRefusal? {
         if Self.hasUnappliedSelections(redactionState) { return .selectedMatches }
         if !redactionState.hasEffectiveRegions { return .noRegions }
-        if !canStartPipeline { return .busy }
+        if !canStartPipeline || redactionState.canvasHoldsATouch { return .busy }
         return nil
     }
 
