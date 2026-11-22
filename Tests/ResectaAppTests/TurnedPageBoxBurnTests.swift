@@ -44,7 +44,9 @@ struct TurnedPageBoxBurnTests {
 
     static let word = "Marigold"
     nonisolated static let turns = [0, 90, 180, 270]
-    nonisolated static let modes: [PipelineMode] = [.secureRasterization, .searchableRedaction]
+    // Secure Rasterization only: Searchable Redaction is not offered, and the
+    // app's run is Secure Rasterization for every input.
+    nonisolated static let modes: [PipelineMode] = [.secureRasterization]
 
     /// One Letter page holding the word in bold 40, shown turned by `rotation`.
     static func document(rotation: Int) throws -> PDFDocument {

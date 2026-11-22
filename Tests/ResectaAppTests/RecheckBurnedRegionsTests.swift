@@ -53,9 +53,9 @@ struct RecheckBurnedRegionsTests {
         let coordinator: PipelineCoordinator
     }
 
-    /// A Searchable run of the hidden-layer page of `InkStripRunEntryTests`
-    /// with three regions: a hand box over a name, whose run strips the
-    /// name's hidden copy by its ink; a box that reaches past the page's
+    /// The app's run (Secure Rasterization, the only mode) of the hidden-layer
+    /// page of `InkStripRunEntryTests` with three regions: a hand box over a
+    /// name; a box that reaches past the page's
     /// right edge, below the text; and a box under the size floor inside a
     /// line of text. Then the Run Verification card's re-check.
     static func runThenRecheck() async throws -> Observed {
@@ -73,7 +73,7 @@ struct RecheckBurnedRegionsTests {
         var received: [[Int: [RedactionRegion]]] = []
         coord.verificationRegionsSeam = { received.append($0) }
 
-        coord.runFullPipeline(documentOverride: .searchableRedaction)
+        coord.runFullPipeline(documentOverride: nil)
         let run = try #require(coord.documentState.activePipelineTask, "the run started")
         await run.value
         guard case .verified(let runReport) = coord.documentState.phase else {

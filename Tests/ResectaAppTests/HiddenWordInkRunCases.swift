@@ -199,7 +199,7 @@ struct HiddenWordInkRunCases {
     // MARK: - V15
 
     @Test("V15 precondition: today the run keeps the page's layer and no check other than this one reads could-not-verify",
-          .timeLimit(.minutes(3)))
+          .timeLimit(.minutes(3)), .disabled("Searchable Redaction is not offered: the app's run is Secure Rasterization for every input, so it keeps no text layer to check"))
     func v15Precondition() async throws {
         let report = try await Self.approvalRun()
         #expect(report.perPageModes == [.searchableRedaction], "the run keeps the page's text layer")
@@ -209,7 +209,7 @@ struct HiddenWordInkRunCases {
     }
 
     @Test("V15: through the app's run, a word beside the box that cannot be placed reads Some Checks Incomplete, from this check",
-          .timeLimit(.minutes(3)))
+          .timeLimit(.minutes(3)), .disabled("Searchable Redaction is not offered: the app's run is Secure Rasterization for every input, so it keeps no text layer to check"))
     func v15() async throws {
         let report = try await PageTextPath.$wholeWordsOff.withValue(true) { try await Self.approvalRun() }
         #expect(report.perPageModes == [.searchableRedaction], "STOP if not: the run no longer keeps this page's layer")
@@ -284,7 +284,7 @@ struct HiddenWordInkRunCases {
     // MARK: - The cross-check over the strip-by-ink cells
 
     @Test("Cross-check: through the app's run, the check passes or notes where the run kept the layer, and is not applicable at the floor",
-          .timeLimit(.minutes(6)))
+          .timeLimit(.minutes(6)), .disabled("Searchable Redaction is not offered: the app's run is Secure Rasterization for every input, so it keeps no text layer to check"))
     func crossCheck() async throws {
         let lines = Self.seededLines
         let data = Self.page(lines, drift: 30)
