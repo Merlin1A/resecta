@@ -5,11 +5,11 @@ Must go red: RedactionEngineTests/NoBoxHitTests offVisiblePage
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
-index 9f68f67e..593e1c2c 100644
+index bc0c7e84..cc1616db 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
-@@ -151,7 +151,7 @@ extension DocumentSearcher {
-         // or leave it with no area); a rect partly on the page is clamped.
+@@ -184,7 +184,7 @@ extension DocumentSearcher {
+         guard let visual = visualBounds(forPageRect: absoluteBounds, page: page) else { return nil }
          let visiblePage = CGRect(x: 0, y: 0, width: visual.width, height: visual.height)
          let overlap = visual.bounds.intersection(visiblePage)
 -        guard !overlap.isNull, !overlap.isEmpty else { return nil }
