@@ -64,7 +64,8 @@ struct ScannedCourierPageSearchTests {
     @Test("Text search, regex search and the PII Scan match the page's values")
     func valuesMatchOnTheScannedPage() async throws {
         let doc = try scannedCourierPage()
-        #expect((doc.page(at: 0)?.string ?? "").isEmpty, "the page is a picture with no text layer")
+        let pageText = try #require(doc.page(at: 0), "the fixture has a first page").string ?? ""
+        #expect(pageText.isEmpty, "the page is a picture with no text layer")
         let searcher = DocumentSearcher()
         await searcher.setTextLayerStatus([0: TextLayerStatus.none])
         for value in ["INV-00731", "2026-CV-0042", "1-800-555-0199"] {

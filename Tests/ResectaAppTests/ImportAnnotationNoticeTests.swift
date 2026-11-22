@@ -104,7 +104,8 @@ struct ImportAnnotationNoticeTests {
             forType: .link,
             withProperties: nil
         )
-        link.url = try #require(URL(string: "https://example.com"))
+        let url = try #require(URL(string: "https://example.com"))
+        link.url = url
         page.addAnnotation(link)
         let data = try #require(doc.dataRepresentation())
         // Round-trip guard: the Link must survive serialization, or the
@@ -128,7 +129,8 @@ struct ImportAnnotationNoticeTests {
             forType: .link,
             withProperties: nil
         )
-        link.url = try #require(URL(string: "https://example.com"))
+        let url = try #require(URL(string: "https://example.com"))
+        link.url = url
         page.addAnnotation(link)
         let square = PDFAnnotation(
             bounds: CGRect(x: 60, y: 690, width: 260, height: 40),
