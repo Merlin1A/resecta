@@ -1,0 +1,19 @@
+Property: The pad is read on the page's sides as displayed: 2 pt each way on a page turned a quarter.
+Area: the OCR line pad (Search)
+Test command: cd Packages/RedactionEngine && swift test --skip-build --no-parallel --filter OCRPadEdgeTests (after swift build --build-tests)
+Must go red: RedactionEngineTests/OCRPadEdgeTests "A line at the left edge: held at 0, its right side padded 2 pt"; RedactionEngineTests/OCRPadEdgeTests "A line at the right edge: held at 1, its left side padded 2 pt"; RedactionEngineTests/OCRPadEdgeTests "A line at the bottom edge: held at 0, its top padded 2 pt"; RedactionEngineTests/OCRPadEdgeTests "A line at the top edge: held at 1, its bottom padded 2 pt"; RedactionEngineTests/OCRPadEdgeTests "A line clear of the edges is padded 2 pt on every side of the page as displayed"
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
+index db438d7a..4ac3e0bd 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
+@@ -64,7 +64,7 @@ extension DocumentSearcher {
+     /// so a page turned a quarter is padded 2 pt in each direction too.
+     nonisolated static func paddedNormalizedRect(_ rect: CGRect, in page: PDFPage) -> CGRect {
+         let crop = page.bounds(for: .cropBox)
+-        let turned = abs(page.rotation) % 180 == 90
++        let turned = false
+         let padX = 2.0 / (turned ? crop.height : crop.width)
+         let padY = 2.0 / (turned ? crop.width : crop.height)
+         let x0 = max(0, rect.minX - padX), x1 = min(1, rect.maxX + padX)
