@@ -342,7 +342,7 @@ nonisolated func prepareApply(
 
         // Thread the SearchResult rationale into
         // the region's Source so downstream surfaces (RegionInfoPopover
-        // disclosure, canvas long-press action sheet, audit export) can
+        // disclosure, canvas long-press action sheet) can
         // read it without re-querying MatchAuditSnapshot.
         let region = RedactionRegion(
             id: UUID(),

@@ -26,8 +26,6 @@ struct EnginePublicSurfaceTests {
             VerificationOrchestrator.self,
             TempExportDirectory.self,
             TempFileHardening.self,
-            ExportMetadata.self,
-            MatchAuditExporter.self,
             AppliedSearchQuery.self,
             AppliedSearchRecord.self,
             SearchRecheckRequest.self,
@@ -43,7 +41,7 @@ struct EnginePublicSurfaceTests {
             PageSearchCoverage.self,
             RunRecord.self,
         ]
-        #expect(types.count == 24)
+        #expect(types.count == 22)
         #expect(DocumentSearcher.maxResults > 0)
         #expect(DocumentSearcher.validateRegexPattern("[a-z]+") != nil)
     }

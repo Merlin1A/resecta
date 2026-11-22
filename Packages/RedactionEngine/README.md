@@ -90,9 +90,7 @@ runtime.
 - **Document-derived data does not persist.** Matched-text strings,
   context snippets, page indices, and normalized rectangles are
   produced per scan and held in memory; no engine API writes them to
-  disk. The audit exporter returns CSV / JSON bytes that can carry matched
-  text and page indices; no app surface calls it (the search sheet's
-  disabled audit-export surface was removed in 1.3.0). In the app target,
+  disk. In the app target,
   the intra-session result-diff fingerprint is composed from page, geometry
   and category only — never a hash or copy of matched text.
 - **Saved-search payloads carry query shape only.** In the app target,
