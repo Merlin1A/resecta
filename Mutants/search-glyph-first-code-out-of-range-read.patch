@@ -1,0 +1,30 @@
+Property: A simple font whose first code lies outside 0-255 leaves its page unread; no first code, however large, makes the widths' codes overflow.
+Area: Search, the match boxes from the page's own drawing
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter ContentGlyphFontTests
+Must go red: RedactionEngineTests/ContentGlyphFontTests firstCodeOutOfRange
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphFont.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphFont.swift
+index a460a75f..eefb852c 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphFont.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphFont.swift
+@@ -51,15 +51,16 @@ struct ContentGlyphFont {
+             // A simple font's codes are one byte: a first code outside 0-255
+             // is a font this does not read (and the sum below cannot overflow).
+             var first: CGPDFInteger = 0
+-            guard CGPDFDictionaryGetInteger(font, "FirstChar", &first), (0..<256).contains(first) else { return nil }
++            guard CGPDFDictionaryGetInteger(font, "FirstChar", &first) else { return nil }
+             var missing: CGPDFReal = 0
+             if let descriptor { _ = CGPDFDictionaryGetNumber(descriptor, "MissingWidth", &missing) }
+             for code in 0..<256 { advances[code] = CGFloat(missing) }
+             // Only the widths of codes 0-255 are read.
+-            for index in 0..<min(CGPDFArrayGetCount(widths), 256 - Int(first)) {
++            for index in 0..<CGPDFArrayGetCount(widths) {
+                 var width: CGPDFReal = 0
+                 guard CGPDFArrayGetNumber(widths, index, &width) else { return nil }
+-                advances[Int(first) + index] = CGFloat(width)
++                let code = Int(first) &+ index
++                if (0..<256).contains(code) { advances[code] = CGFloat(width) }
+             }
+         } else {
+             guard descriptorIsAbsentOrUnembedded(descriptor), standardFonts.contains(baseFont),
