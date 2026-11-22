@@ -1,7 +1,7 @@
 Property: Words beside a box's room are taken into its band only when two lines bridge the room.
 Area: the plan, the own run
 Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/PaintPlanBandTests (or on the host: cd Packages/RedactionEngine && swift test --filter 'PaintPlanBandTests')
-Must go red: RedactionCoreTests/PaintPlanBandTests twoColumnsUnderATitle
+Must go red: RedactionCoreTests/PaintPlanBandTests twoColumnsUnderATitle; RedactionCoreTests/PaintPlanBandTests twoLineParagraphTakesNothingIn
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/Complement.swift

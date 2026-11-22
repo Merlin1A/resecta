@@ -463,6 +463,10 @@ import RedactionCore
         }
         for k in 0..<3 { b.line(count: 14, y: 564 - 14 * Double(k)) }
         #expect(Self.withoutTight(r1) == Self.withoutTight(try Self.read(b, sb)))
+        // A label row with a second field, its value short or long: the rows
+        // beside it hold values that reach past the short one and not the long.
+        let (short, ss) = Self.labelRows(value: "Ann"), (long, sl) = Self.labelRows(value: "Annabellexyz")
+        #expect(Self.withoutTight(try Self.read(short, ss)) == Self.withoutTight(try Self.read(long, sl)))
     }
 
     // MARK: - Direction (K.3, AB.4)
