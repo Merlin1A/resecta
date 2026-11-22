@@ -160,6 +160,13 @@ extension RunRecord.Produced {
             regionsPaintedOutsideThePlan[pageIndex] = result.regionsPaintedOutsideThePlan
         }
     }
+
+    /// Records what the writer reports for the file: which way found the
+    /// information dictionary for its rewrite. The one writer of that field
+    /// in a run; what the rasterizer recorded is kept.
+    public mutating func record(writer account: RunRecord.Produced) {
+        infoDictionary = account.infoDictionary
+    }
 }
 
 extension RunRecord {
@@ -198,9 +205,24 @@ extension RunRecord {
 
     /// Which way found the information dictionary: by the file's index, or
     /// by the search of the file's tail where the index refused, or neither.
+    /// The tail search runs after the index way on every exit; where the
+    /// index named the dictionary, the record says what the index way did.
     package enum InfoDictionaryWay: Hashable, Sendable {
+        /// The index named the dictionary and at least one literal in it
+        /// was rewritten.
         case byIndex
+        /// The index named the dictionary and every literal in it declined
+        /// (the guards of `overwriteInfoLiterals`); nothing in it was
+        /// rewritten.
+        case byIndexNothingRewritten
+        /// The index named the dictionary and at least one literal in it was
+        /// rewritten, or a write to one had begun, before an I/O error stopped
+        /// that way. A write that began is written again whole.
+        case byIndexCutShort
+        /// The index way rewrote nothing, for the reason given, and the tail
+        /// search rewrote at least one literal.
         case byTail(indexRefused: IndexRefusal)
+        /// Neither way rewrote a literal.
         case neither(indexRefused: IndexRefusal)
     }
 
@@ -221,5 +243,13 @@ extension RunRecord {
         case dictionaryNotClosed
         /// A key occurs twice in the dictionary.
         case repeatedKey
+        /// The index could not be read: no `startxref` near the end, an
+        /// offset that is not a number or lies past the end, a table whose
+        /// entries do not parse, or a trailer that does not close.
+        case indexUnreadable
+        /// The file could not be read or written through the index (an I/O
+        /// error on the mapped read, the handle, the seek or the write)
+        /// before any literal was rewritten.
+        case readOrWriteFailed
     }
 }

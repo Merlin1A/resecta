@@ -1,0 +1,19 @@
+Property: The writer's account of the export joins the rasterizer's in the run's record and never replaces it.
+Area: the run's record (App)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/RunRecordInfoDictionaryTests
+Must go red: ResectaAppTests/RunRecordInfoDictionaryTests ordinaryExportFoundByIndex
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/PipelineCoordinator+Rasterization.swift b/Sources/ResectaApp/State/PipelineCoordinator+Rasterization.swift
+index 7302baa2..d0eb31d2 100644
+--- a/Sources/ResectaApp/State/PipelineCoordinator+Rasterization.swift
++++ b/Sources/ResectaApp/State/PipelineCoordinator+Rasterization.swift
+@@ -126,7 +126,7 @@ extension PipelineCoordinator {
+ 
+         // What the writer says it did joins what the rasterizer said: which
+         // way found the information dictionary for the fixed-value rewrite.
+-        produced.record(writer: await reconstructor.produced)
++        produced = await reconstructor.produced
+         return PipelineRunContext(
+             outputURL: outputURL,
+             filterDigests: filterDigests,

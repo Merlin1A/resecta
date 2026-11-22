@@ -200,7 +200,7 @@ struct SearchListLimitOccurrenceTests {
     /// VoiceOver completion line.
     @Test("The view's run end asks endRunState first and stops there for a cancelled run (source pin)")
     func finishSearchRunSourcePin() throws {
-        let source = try Self.loadRepoFile("Sources/ResectaApp/Views/Search/SearchAndRedactSheet+Trigger.swift")
+        let source = try Self.loadRepoFile("Sources/ResectaApp/State/SearchRun.swift")
         #expect(source.contains("await finishSearchRun(prepared, cancelled: Task.isCancelled)"),
                 "the run task ends through finishSearchRun")
         guard let start = source.range(of: "private func finishSearchRun("),
@@ -210,7 +210,7 @@ struct SearchListLimitOccurrenceTests {
             return
         }
         let body = String(source[start.upperBound..<end.lowerBound])
-        guard let gate = body.range(of: "guard Self.endRunState("),
+        guard let gate = body.range(of: "guard SearchAndRedactSheet.endRunState("),
               let stop = body.range(of: ") else { return }", range: gate.upperBound..<body.endIndex),
               let teardown = body.range(of: "await tearDownEngineSinks()"),
               let line = body.range(of: "UIAccessibility.post(")

@@ -157,6 +157,12 @@ struct SearchRecheckPipelineTests {
                 leftoverOnPage: leftoverOnPage)
             : textPagesPDFData(["Account holder page one", "Balance for page two"])
         try outputData.write(to: outputURL)
+        // The stand-in is drawn by UIKit, so it carried Quartz's /Producer,
+        // dates and random /ID, which no export carries. It ends with the
+        // writer's last two steps, in finalize()'s order: the fixed fields,
+        // then an identifier derived from the file.
+        _ = PDFStreamReconstructor.overwriteInfoLiterals(at: outputURL)
+        PDFStreamReconstructor.overwriteFileIdentifier(at: outputURL)
         // After the apply (a region mutation nils the output URL).
         redactionState.outputURL = outputURL
         documentState.lastUsedPipelineMode = mode

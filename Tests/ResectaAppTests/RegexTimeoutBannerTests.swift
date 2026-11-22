@@ -90,7 +90,7 @@ struct RegexTimeoutBannerTests {
     @Test("The custom-term time-limit sink interpolates neither the term nor the page (source pin)")
     func customTermTimeoutSinkIsContentFree() throws {
         let source = try loadRepoFile(
-            "Sources/ResectaApp/Views/Search/SearchAndRedactSheet+Trigger.swift")
+            "Sources/ResectaApp/State/SearchRun.swift")
         guard let start = source.range(of: "setUserTermsTimeoutSink("),
               let end = source.range(of: "setScannedRegionNotAnalyzedSink(",
                                      range: start.upperBound..<source.endIndex)

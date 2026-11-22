@@ -299,9 +299,16 @@ struct CouldNotReadRowTests {
     static func metadataUndecodableAndNotRewritten() async throws {
         let doc = try open(rawPDF([RawPage()], info: "/Producer <\(unreadHex)> \(fixedDates(creation: "D:19990101000000Z"))"))
         defer { remove(doc) }
-        expectWarn(await whereUnreadHexDoesNotDecode { await run(.metadataCheck, doc, mode: .secureRasterization) },
-                   "Could not inspect metadata; Producer or timestamp fields were not rewritten to the fixed values",
-                   mark: true, pages: nil)
+        // A field not rewritten is an issue that reads Needs review; the
+        // field that could not be read rides beside it as the row's part.
+        let r = await whereUnreadHexDoesNotDecode { await run(.metadataCheck, doc, mode: .secureRasterization) }
+        guard case .attention(let message) = r.status else {
+            Issue.record("Needs review expected, got \(r.status)")
+            return
+        }
+        #expect(message == "Producer or timestamp fields were not rewritten to the fixed values")
+        #expect(!r.couldNotVerify)
+        #expect(r.couldNotVerifyPart == "Could not inspect metadata" && r.couldNotVerifyPartPages == [])
     }
 
     static func digest(_ page: Int, lineage: Data = Data(), surviving: Int = 0) -> PageFilterDigest {

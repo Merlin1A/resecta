@@ -1,0 +1,19 @@
+Property: An I/O error in the index way falls back to the tail search; no file fares worse than before the index was read.
+Area: the information dictionary rewrite and the metadata check (Engine)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --package-path Packages/RedactionEngine --filter InfoDictionaryThroughIndexTests
+Must go red: RedactionEngineTests/InfoDictionaryThroughIndexTests row [case 16] (and [case 17])
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
+index beef9798..6d58c429 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
+@@ -363,6 +363,8 @@ public actor PDFStreamReconstructor {
+         // rewritten here too, so no file fares worse. A literal the first way
+         // already rewrote reads as the fixed value and is written again
+         // unchanged.
++        if case .refused(.readOrWriteFailed) = first { return (.neither(indexRefused: .readOrWriteFailed), firstWhole) }
++        if case .cutShort = first { return (.byIndexCutShort, firstWhole) }
+         let (tailRewrote, tailWhole) = tailWay(at: url)
+         let whole = firstWhole && tailWhole
+         switch first {

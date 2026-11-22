@@ -118,7 +118,7 @@ struct LayerResultHasDetailTests {
     @Test("PASS with detail: Layer 5's fixed writer fields keep the generic short line and add one sentence")
     func layer5FixedFieldsPassCarriesDetail() async throws {
         let (doc, url) = try TestFixtures.writeTempPDF(
-            TestFixtures.withMetadataRaw(
+            TestFixtures.writerShapedMetadata(
                 infoDictBody: "/Producer (\(PDFStreamReconstructor.fixedProducerValue))"),
             prefix: "hd_pass_detail_")
         defer { try? FileManager.default.removeItem(at: url) }

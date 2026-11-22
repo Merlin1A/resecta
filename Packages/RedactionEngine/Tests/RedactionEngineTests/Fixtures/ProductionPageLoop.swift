@@ -14,6 +14,8 @@ enum ProductionPageLoop {
         let filterDigests: [PageFilterDigest?]
         let perPageModes: [PipelineMode]
         let perPageFallbackReasons: [TextLayerDetector.FallbackReason?]
+        /// What the producer says it did, as the app's run takes it.
+        var produced = RunRecord.Produced()
     }
 
     /// Mirror of `PipelineCoordinator.processDocument` + `rasterizeWithRetry`:
@@ -61,12 +63,14 @@ enum ProductionPageLoop {
         }
         await reconstructor.finalize()
         let written = await reconstructor.writtenPageCount
-        guard written == pages.count else {
+        // The coordinator's gate before the rename, both conditions: every
+        // page written, and no information-dictionary literal left part-written.
+        guard written == pages.count, await reconstructor.infoPatchesWhole else {
             throw PipelineError.redactionError(.reconstructionFailed)
         }
         _ = try FileManager.default.replaceItemAt(outputURL, withItemAt: tempURL)
         return RedactionOutcome(
             filterDigests: digests, perPageModes: modes,
-            perPageFallbackReasons: reasons)
+            perPageFallbackReasons: reasons, produced: await reconstructor.produced)
     }
 }

@@ -80,22 +80,8 @@ extension SearchAndRedactSheet {
         }
     }
 
-    func buildSearchMode() -> SearchMode {
-        let options = searchState.options
-        switch searchState.searchModeType {
-        case .text:
-            return .text(searchState.queryText, options: options)
-        case .regex:
-            return .regex(searchState.queryText, options: options)
-        case .multiTerm:
-            return .multiTerm(searchState.searchTerms, options: options)
-        case .piiScan:
-            // Empty chip selection = scan everything (the one-tap
-            // contract needs no configuration) — the effective set
-            // maps no-selection to the full category set.
-            return .piiScan(categories: searchState.effectiveScanCategories, options: options)
-        }
-    }
+    /// The query, built from the session alone (`SearchQuery`).
+    func buildSearchMode() -> SearchMode { SearchQuery(searchState: searchState).buildSearchMode() }
 
     /// Pure decision for the results-arrival detent raise. True only
     /// on the empty → non-empty transition while the sheet sits at

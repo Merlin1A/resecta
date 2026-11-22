@@ -4,12 +4,12 @@ Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcod
 Must go red: ResectaAppTests/SearchReturnRuleSourcePinTests shapeHoldsTheQueryInputs
 Apply in a scratch worktree with `git apply`; discard after.
 
-diff --git a/Sources/ResectaApp/Views/Search/SearchAndRedactSheet+DegradeBanner.swift b/Sources/ResectaApp/Views/Search/SearchAndRedactSheet+DegradeBanner.swift
-index bc7a3a04..3118d5f2 100644
---- a/Sources/ResectaApp/Views/Search/SearchAndRedactSheet+DegradeBanner.swift
-+++ b/Sources/ResectaApp/Views/Search/SearchAndRedactSheet+DegradeBanner.swift
-@@ -81,7 +81,7 @@ extension SearchAndRedactSheet {
-     }
+diff --git a/Sources/ResectaApp/State/SearchQuery.swift b/Sources/ResectaApp/State/SearchQuery.swift
+index 57546f91..e63f09b1 100644
+--- a/Sources/ResectaApp/State/SearchQuery.swift
++++ b/Sources/ResectaApp/State/SearchQuery.swift
+@@ -10,7 +10,7 @@ import RedactionEngine
+     let searchState: SearchState
  
      func buildSearchMode() -> SearchMode {
 -        let options = searchState.options

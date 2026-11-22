@@ -88,10 +88,6 @@ CORE_TARGET = re.compile(r'\.target\s*\(\s*name\s*:\s*"RedactionCore"')
 # ------------------------------------------------------------- the lists
 
 F1_LIST = {
-    A + "Views/Search/SearchAndRedactSheet+Trigger.swift": [
-        "let stream = searcher.search(",
-        "let classifier = DocumentTypeClassifier()",
-    ],
     A + "Views/SearchAndRedactSheet.swift": [
         "@State var searcher = DocumentSearcher()",
     ],

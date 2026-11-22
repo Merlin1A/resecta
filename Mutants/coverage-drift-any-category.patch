@@ -1,0 +1,19 @@
+Property: A search-placed box that touches no match of its own term or category is drifted, whatever other match it lies over.
+Area: the coverage check's drifted-box test
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter RegionCoverageCapAndCategoryTests
+Must go red: RedactionEngineTests/RegionCoverageCapAndCategoryTests driftedOntoAnotherCategory
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/RegionCoverage.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/RegionCoverage.swift
+index 2ae06e58..5422cfa0 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/RegionCoverage.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/RegionCoverage.swift
+@@ -149,7 +149,7 @@ struct RegionCoverage: Sendable {
+             }
+         }
+         let driftedBoxes = boxes.indices.filter { b in
+-            isSearchPlaced(boxes[b]) && !all.indices.contains { touches[$0][b] && vouches(all[$0], for: boxes[b]) }
++            isSearchPlaced(boxes[b]) && !all.indices.contains { touches[$0][b] /* mutant: any match keeps a box from reading as drifted */ }
+         }
+         var ordered = untouched.sorted {
+             ($0.1.requestIndex, $0.1.rect.minY, $0.1.rect.minX) < ($1.1.requestIndex, $1.1.rect.minY, $1.1.rect.minX)

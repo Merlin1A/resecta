@@ -32,7 +32,7 @@ extension VerificationEngineTests {
         // /Trapped is workflow-set, not auto-injected — the mixed-warning
         // message must not claim auto-injection when it names /Trapped.
         let (doc, url) = try TestFixtures.writeTempPDF(
-            TestFixtures.withMetadataRaw(infoDictBody: "/Trapped /True"),
+            TestFixtures.writerShapedMetadata(infoDictBody: "/Trapped /True"),
             prefix: "trapped_copy_")
         defer { try? FileManager.default.removeItem(at: url) }
 
@@ -56,7 +56,7 @@ extension VerificationEngineTests {
         // path keeps the auto-injected wording once the producer literal
         // reads back as the writer's fixed value.
         let (doc, url) = try TestFixtures.writeTempPDF(
-            TestFixtures.withMetadataRaw(
+            TestFixtures.writerShapedMetadata(
                 infoDictBody: "/Producer (\(PDFStreamReconstructor.fixedProducerValue))"),
             prefix: "producer_info_")
         defer { try? FileManager.default.removeItem(at: url) }
@@ -75,14 +75,14 @@ extension VerificationEngineTests {
         #expect(result.shortDescription == "No issues found.")
     }
 
-    @Test("Layer 5 WARNs when the producer field was not rewritten to the fixed value")
+    @Test("Layer 5 reads Needs review when the producer field was not rewritten to the fixed value")
     func producerNotRewrittenWarns() async throws {
         // A producer literal that still carries a writer's own string means
         // the post-write rewrite did not happen (it leaves the file untouched
         // on any anomaly and only logs). Layer 5 reports that instead of
         // filing the key under auto-injected metadata.
         let (doc, url) = try TestFixtures.writeTempPDF(
-            TestFixtures.withMetadataRaw(infoDictBody: "/Producer (SyntheticWriter)"),
+            TestFixtures.writerShapedMetadata(infoDictBody: "/Producer (SyntheticWriter)"),
             prefix: "producer_not_rewritten_")
         defer { try? FileManager.default.removeItem(at: url) }
 
@@ -93,19 +93,19 @@ extension VerificationEngineTests {
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
         )
-        #expect(result.status.isWarn,
-                "A producer value other than the fixed one must WARN; got \(result.status)")
-        if case .warn(let msg) = result.status {
+        #expect(result.status == .attention(""),
+                "A producer value other than the fixed one must read Needs review; got \(result.status)")
+        if case .attention(let msg) = result.status {
             #expect(msg == "Producer or timestamp fields were not rewritten to the fixed values",
-                    "Attestation WARN copy; got \(msg)")
+                    "Attestation copy; got \(msg)")
         }
     }
 
-    @Test("Layer 5 producer WARN never echoes the producer value")
+    @Test("Layer 5 producer result never echoes the producer value")
     func producerWarnNeverEchoesValue() async throws {
         let writerString = "SyntheticWriter 99.9 (Build ZZ999) PDFContext"
         let (doc, url) = try TestFixtures.writeTempPDF(
-            TestFixtures.withMetadataRaw(infoDictBody: "/Producer (\(writerString))"),
+            TestFixtures.writerShapedMetadata(infoDictBody: "/Producer (\(writerString))"),
             prefix: "producer_no_echo_")
         defer { try? FileManager.default.removeItem(at: url) }
 
@@ -116,11 +116,11 @@ extension VerificationEngineTests {
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
         )
-        #expect(result.status.isWarn, "got \(result.status)")
-        if case .warn(let msg) = result.status {
+        #expect(result.status == .attention(""), "got \(result.status)")
+        if case .attention(let msg) = result.status {
             for fragment in ["SyntheticWriter", "99.9", "ZZ999", "PDFContext"] {
                 #expect(!msg.contains(fragment),
-                        "the WARN must not carry the producer value; got \(msg)")
+                        "the message must not carry the producer value; got \(msg)")
             }
         }
         #expect(result.detailDescription.contains("SyntheticWriter") == false)
@@ -132,7 +132,7 @@ extension VerificationEngineTests {
         // to the bare fixed value; padding inside the literal is still the
         // fixed value and stays INFO.
         let (doc, url) = try TestFixtures.writeTempPDF(
-            TestFixtures.withMetadataRaw(
+            TestFixtures.writerShapedMetadata(
                 infoDictBody: "/Producer (\(PDFStreamReconstructor.fixedProducerValue)    )"),
             prefix: "producer_padded_")
         defer { try? FileManager.default.removeItem(at: url) }
@@ -171,11 +171,11 @@ extension VerificationEngineTests {
                 "the fixed-value case carries the detail; got \(result.detailDescription)")
     }
 
-    @Test("Layer 5 WARNs when a timestamp field was not rewritten to the fixed value")
+    @Test("Layer 5 reads Needs review when a timestamp field was not rewritten to the fixed value")
     func timestampNotRewrittenWarns() async throws {
         // A date literal still carrying the writer's export moment means the
         // post-write rewrite left it untouched (an unexpected length, or a
-        // future writer change). Either date alone is enough to WARN; the
+        // future writer change). Either date alone is enough for Needs review; the
         // producer beside it carries the fixed value.
         let fixedProducer = PDFStreamReconstructor.fixedProducerValue
         let fixedDate = PDFStreamReconstructor.fixedDateValue
@@ -186,7 +186,7 @@ extension VerificationEngineTests {
         ]
         for body in bodies {
             let (doc, url) = try TestFixtures.writeTempPDF(
-                TestFixtures.withMetadataRaw(infoDictBody: body),
+                TestFixtures.writerShapedMetadata(infoDictBody: body),
                 prefix: "timestamp_not_rewritten_")
             defer { try? FileManager.default.removeItem(at: url) }
 
@@ -197,20 +197,20 @@ extension VerificationEngineTests {
                 pipelineMode: .secureRasterization,
                 filterDigests: [], perPageModes: [.secureRasterization]
             )
-            #expect(result.status.isWarn,
-                    "A date other than the fixed one must WARN; got \(result.status)")
-            if case .warn(let msg) = result.status {
+            #expect(result.status == .attention(""),
+                    "A date other than the fixed one must read Needs review; got \(result.status)")
+            if case .attention(let msg) = result.status {
                 #expect(msg == "Producer or timestamp fields were not rewritten to the fixed values",
-                        "Attestation WARN copy; got \(msg)")
+                        "Attestation copy; got \(msg)")
             }
         }
     }
 
-    @Test("Layer 5 timestamp WARN never echoes the date value")
+    @Test("Layer 5 timestamp result never echoes the date value")
     func timestampWarnNeverEchoesValue() async throws {
         let liveDate = "D:20260906212041Z00'00'"
         let (doc, url) = try TestFixtures.writeTempPDF(
-            TestFixtures.withMetadataRaw(
+            TestFixtures.writerShapedMetadata(
                 infoDictBody: "/Producer (\(PDFStreamReconstructor.fixedProducerValue)) "
                     + "/CreationDate (\(liveDate)) /ModDate (\(liveDate))"),
             prefix: "timestamp_no_echo_")
@@ -223,11 +223,11 @@ extension VerificationEngineTests {
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
         )
-        #expect(result.status.isWarn, "got \(result.status)")
-        if case .warn(let msg) = result.status {
+        #expect(result.status == .attention(""), "got \(result.status)")
+        if case .attention(let msg) = result.status {
             for fragment in ["2026", "0906", "212041", "D:"] {
                 #expect(!msg.contains(fragment),
-                        "the WARN must not carry the date; got \(msg)")
+                        "the message must not carry the date; got \(msg)")
             }
         }
         #expect(result.detailDescription.contains("212041") == false)
@@ -241,7 +241,7 @@ extension VerificationEngineTests {
         let fixedProducer = PDFStreamReconstructor.fixedProducerValue
         let fixedDate = PDFStreamReconstructor.fixedDateValue
         let (doc, url) = try TestFixtures.writeTempPDF(
-            TestFixtures.withMetadataRaw(
+            TestFixtures.writerShapedMetadata(
                 infoDictBody: "/CreationDate (\(fixedDate)) /Producer (\(fixedProducer)) /ModDate (\(fixedDate))"),
             prefix: "fixed_fields_info_")
         defer { try? FileManager.default.removeItem(at: url) }
@@ -262,10 +262,12 @@ extension VerificationEngineTests {
 
     // MARK: - Layer 5: XMP-without-/Info and non-string key presence
 
-    @Test("Layer 5 scans XMP even when /Info is absent")
+    @Test("Layer 5 never passes a file with XMP and no /Info: it could not be verified")
     func xmpScannedWhenInfoAbsent() async throws {
         // Fixture has an XMP /Metadata stream but no /Info dictionary. Pre-fix
-        // the nil-/Info guard returned .pass before the XMP scan ran (red).
+        // the nil-/Info guard returned .pass (red). The writer always writes
+        // an information dictionary, so a file without one could not be
+        // verified, whatever else it carries.
         let (doc, url) = try TestFixtures.writeTempPDF(
             TestFixtures.withXMPNoInfo(), prefix: "xmp_no_info_")
         defer { try? FileManager.default.removeItem(at: url) }
@@ -277,10 +279,10 @@ extension VerificationEngineTests {
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
         )
-        #expect(result.status.isWarn,
-                "XMP present with no /Info must WARN, not silently pass; got \(result.status)")
+        #expect(result.status.isWarn && result.couldNotVerify,
+                "no /Info must read could not verify, never pass; got \(result.status)")
         if case .warn(let msg) = result.status {
-            #expect(msg.contains("XMP"), "WARN message should name XMP; got \(msg)")
+            #expect(msg == "Could not inspect metadata", "got \(msg)")
         }
     }
 
@@ -289,7 +291,7 @@ extension VerificationEngineTests {
         // /Title is an INTEGER (42). Pre-fix the GetString/GetName pair both
         // returned false for an integer value → fell through as "absent" (red).
         let (doc, url) = try TestFixtures.writeTempPDF(
-            TestFixtures.withMetadataRaw(infoDictBody: "/Title 42"),
+            TestFixtures.writerShapedMetadata(infoDictBody: "/Title 42"),
             prefix: "title_int_")
         defer { try? FileManager.default.removeItem(at: url) }
 
@@ -304,7 +306,7 @@ extension VerificationEngineTests {
                 "Integer /Title value must FAIL on key presence; got \(result.status)")
     }
 
-    @Test("Layer 5 WARNs when the /ID pair was not derived from the file's contents")
+    @Test("Layer 5 reads Needs review when the /ID pair was not derived from the file's contents")
     func layer5WarnsOnFileIdentifierNotDerived() async throws {
         // A real output attests (the INFO path stays, pinned by
         // producerAttestedOnReconstructedOutput). Flip one hex character of
@@ -329,11 +331,11 @@ extension VerificationEngineTests {
             pipelineMode: .secureRasterization,
             filterDigests: [], perPageModes: [.secureRasterization]
         )
-        #expect(result.status.isWarn, "a pair that is not the content digest must WARN; got \(result.status)")
-        if case .warn(let msg) = result.status {
+        #expect(result.status == .attention(""), "a pair that is not the content digest must read Needs review; got \(result.status)")
+        if case .attention(let msg) = result.status {
             #expect(msg == "File identifier was not derived from the file contents", "\(msg)")
             #expect(!msg.contains(FileIdentifierOracle.hex(data, pair.first)))
         }
-        #expect(result.couldNotVerify == false, "an attestation mismatch is a note, not a could-not-verify")
+        #expect(result.couldNotVerify == false, "an attestation mismatch is an issue, not a could-not-verify")
     }
 }

@@ -111,11 +111,26 @@ enum PDFFileIdentifier {
         return out
     }
 
+    /// The payload ranges of the pair in a whole file, in `fileData`'s
+    /// indices: looked for inside the trailer the file's own index names
+    /// (`PDFTrailerLocator`), and, where the index cannot be followed or
+    /// the trailer it names holds no pair in the writer's shape, in the
+    /// file's tail as before, so no file fares worse than before.
+    static func location(in fileData: Data) -> Location? {
+        if case .found(let found) = PDFTrailerLocator.locate(in: fileData) {
+            let base = fileData.startIndex
+            if let inTrailer = locate(in: fileData[(base + found.trailer.lowerBound)..<(base + found.trailer.upperBound)]) {
+                return inTrailer
+            }
+        }
+        let tailStart = max(fileData.startIndex, fileData.endIndex - tailWindowLength)
+        return locate(in: fileData[tailStart...])
+    }
+
     /// The identifier recomputed from a whole file, or nil when the file
     /// carries no pair in the writer's shape.
     static func recomputedIdentifier(for fileData: Data) -> Data? {
-        let tailStart = max(fileData.startIndex, fileData.endIndex - tailWindowLength)
-        guard let location = locate(in: fileData[tailStart...]) else { return nil }
+        guard let location = location(in: fileData) else { return nil }
         return identifier(from: digest(of: fileData, zeroing: location))
     }
 

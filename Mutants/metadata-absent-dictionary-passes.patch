@@ -1,0 +1,19 @@
+Property: A file with no information dictionary could not be verified; it never passes.
+Area: the information dictionary rewrite and the metadata check (Engine)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --package-path Packages/RedactionEngine --filter InfoDictionaryThroughIndexTests
+Must go red: RedactionEngineTests/InfoDictionaryThroughIndexTests row [case 12]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Structural.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Structural.swift
+index 26a7489e..236686b6 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Structural.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationEngine+Structural.swift
+@@ -167,7 +167,7 @@ extension VerificationEngine {
+         // without one is a read that failed or a file that is not the
+         // writer's: it could not be verified, never a pass.
+         guard let infoDict = cgDoc.info else {
+-            return (Self.metadataNotInspected, nil)
++            return (row(.pass), nil)
+         }
+ 
+         // Standard metadata keys to check. FAIL on key presence regardless of
