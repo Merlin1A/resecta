@@ -5,16 +5,17 @@ Must go red: RedactionEngineTests/RunRecordBoxPlaceTests storedOffItsDrawnPlace
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord+BoxPlace.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord+BoxPlace.swift
-index d87ca2dd..73b34ef2 100644
+index d87ca2dd..32cfe05e 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord+BoxPlace.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord+BoxPlace.swift
-@@ -116,7 +116,8 @@ extension RunRecord.Page {
-         guard !regions.isEmpty else { return true }
+@@ -117,8 +117,8 @@ extension RunRecord.Page {
          guard !canvasFailed, let geometry, geometryAtStore == geometry else { return false }
          return regions.allSatisfy { region in
--            guard let drawn = region.drawnPageRect else { return true }
-+            guard region.drawnPageRect != nil else { return true }
+             guard let drawn = region.drawnPageRect else { return true }
+-            return RunRecord.sideGap(geometry.pageRect(ofDisplayedShare: region.normalizedRect), drawn)
+-                <= RunRecord.boxPlaceTolerance
++            _ = drawn
 +            return true
-             return RunRecord.sideGap(geometry.pageRect(ofDisplayedShare: region.normalizedRect), drawn)
-                 <= RunRecord.boxPlaceTolerance
          }
+     }
+ }
