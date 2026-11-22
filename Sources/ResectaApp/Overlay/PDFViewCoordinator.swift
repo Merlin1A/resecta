@@ -27,13 +27,21 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
     /// The run's quality cap (`PipelineCoordinator.dpiCap`: 300, then 150
     /// after a memory warning), set by the view. A drawn page's plan is kept
     /// at the quality a run started now uses, `runQuality` of the chosen
-    /// quality under this cap. A change redraws the pages on screen, and
-    /// each keeps its plan at the new quality.
+    /// quality under this cap. A change keeps every kept page's plan at the
+    /// new quality, on screen or not, and redraws the pages on screen. A
+    /// kept plan of an older version of its page, or of a working copy, is
+    /// not made again from the stored regions: that would keep a plan of
+    /// regions the page was not drawn with. The pages on screen redraw, and
+    /// keep a plan of what they draw.
     var qualityCap: Int = defaultDPICap {
         didSet {
-            guard qualityCap != oldValue else { return }
+            guard qualityCap != oldValue, let state = redactionState else { return }
+            for (pageIndex, kept) in state.drawnPlans
+            where kept.pageVersion == state.pageVersion(pageIndex) && kept.fromStoredRegions == true {
+                noteDrawn(pageIndex: pageIndex, regions: state.regions[pageIndex] ?? [])
+            }
             for (pageIndex, overlay) in activeOverlays {
-                noteDrawn(pageIndex: pageIndex, regions: redactionState?.regions[pageIndex] ?? [])
+                noteDrawn(pageIndex: pageIndex, regions: state.regions[pageIndex] ?? [])
                 overlay.setNeedsDisplay()
             }
         }
@@ -489,6 +497,8 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
         let drawn = DrawnPlan(pageIndex: pageIndex, regions: regions, cropBox: cropBox,
                               rotation: page.rotation, switchOn: false,
                               exportDPI: quality, fillColor: settings.fillColor)
+            .stamped(pageVersion: state.pageVersion(pageIndex),
+                     fromStoredRegions: regions == state.regions[pageIndex] ?? [])
         if state.drawnPlans[pageIndex] != drawn { state.drawnPlans[pageIndex] = drawn }
     }
 

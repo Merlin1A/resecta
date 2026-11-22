@@ -119,7 +119,69 @@ struct OverlayDrawnPlanTests {
         #expect(state.drawnPlans[0]?.exportDPI == 150, "the page on screen keeps its plan at the cap")
         coordinator.pdfView(view, willEndDisplayingOverlayView: overlay, for: page)
         coordinator.qualityCap = 300
-        #expect(state.drawnPlans[0]?.exportDPI == 150, "a page off screen is kept until it is drawn again")
+        #expect(state.drawnPlans[0]?.exportDPI == 300, "a page off screen is kept at the new quality too")
+        #expect(state.drawnPlans[0]?.pageVersion == state.pageVersion(0))
+    }
+
+    @Test("A page's version moves with its own stored regions only, Undo included")
+    func pageVersionsMoveByPage() {
+        let state = RedactionState()
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        let a = RedactionRegion(id: UUID(), normalizedRect: CGRect(x: 0.1, y: 0.1, width: 0.2, height: 0.03), source: .manual)
+        let b = RedactionRegion(id: UUID(), normalizedRect: CGRect(x: 0.4, y: 0.5, width: 0.2, height: 0.03), source: .manual)
+        #expect(state.pageVersion(0) == 0 && state.pageVersion(4) == 0)
+        state.addRegion(a, page: 0, undoManager: nil)
+        #expect(state.pageVersion(0) == 1 && state.pageVersion(4) == 0)
+        undo.beginUndoGrouping()
+        state.addRegion(b, page: 4, undoManager: undo)
+        undo.endUndoGrouping()
+        #expect(state.pageVersion(0) == 1 && state.pageVersion(4) == 1, "a change on page 5 leaves page 1's version")
+        undo.undo()
+        #expect(state.regions[4] ?? [] == [])
+        #expect(state.pageVersion(4) == 2, "an Undo is a change of the page")
+        #expect(state.pageVersion(0) == 1)
+        undo.redo()
+        #expect(state.pageVersion(4) == 3)
+    }
+
+    @Test("A kept plan carries the page's version and whether it was drawn from the stored regions")
+    func keptPlanIsStamped() throws {
+        let pdf = try Self.document()
+        let state = RedactionState()
+        let region = RedactionRegion(id: UUID(), normalizedRect: CGRect(x: 0.5, y: 0.6, width: 0.2, height: 0.03), source: .manual)
+        state.addRegion(region, page: 0, undoManager: nil)
+        let coordinator = try Self.coordinator(pdf, state, suite: "OverlayDrawnPlanTests.keptPlanIsStamped")
+        coordinator.noteDrawn(pageIndex: 0, regions: [region])
+        #expect(state.drawnPlans[0]?.pageVersion == 1)
+        #expect(state.drawnPlans[0]?.fromStoredRegions == true)
+        // A drag draws a working copy.
+        var moved = region
+        moved.normalizedRect = region.normalizedRect.offsetBy(dx: 0.05, dy: 0)
+        coordinator.noteDrawn(pageIndex: 0, regions: [moved])
+        #expect(state.drawnPlans[0]?.pageVersion == 1)
+        #expect(state.drawnPlans[0]?.fromStoredRegions == false)
+        // A change off screen leaves the kept plan at the version it was made at.
+        state.removeRegion(region.id, page: 0, undoManager: nil)
+        #expect(state.pageVersion(0) == 2)
+        #expect(state.drawnPlans[0]?.pageVersion == 1)
+    }
+
+    @Test("A cap change keeps no plan of regions a page was not drawn with")
+    func aCapChangeKeepsOnlyWhatWasDrawn() throws {
+        let pdf = try Self.document()
+        let state = RedactionState()
+        let region = RedactionRegion(id: UUID(), normalizedRect: CGRect(x: 0.5, y: 0.6, width: 0.2, height: 0.03), source: .manual)
+        state.addRegion(region, page: 0, undoManager: nil)
+        let coordinator = try Self.coordinator(pdf, state, suite: "OverlayDrawnPlanTests.aCapChangeKeepsOnlyWhatWasDrawn")
+        coordinator.noteDrawn(pageIndex: 0, regions: [region])
+        let other = RedactionRegion(id: UUID(), normalizedRect: CGRect(x: 0.1, y: 0.1, width: 0.2, height: 0.03), source: .manual)
+        state.addRegion(other, page: 0, undoManager: nil)
+        coordinator.qualityCap = 150
+        let kept = try #require(state.drawnPlans[0])
+        #expect(kept.exportDPI == 300, "a plan of an older version is left as it was")
+        #expect(kept.pageVersion == 1)
+        #expect(kept.boxes.count == 1)
     }
 
     @Test("Source pin: the editor's view hands the coordinator the run's cap")

@@ -9,15 +9,37 @@ private let logger = Logger(subsystem: "com.resecta.app", category: "state")
 /// Redaction regions and detection results. MainActor by SE-0466 default.
 @Observable
 class RedactionState {
-    var regions: [Int: [RedactionRegion]] = [:]          // pageIndex → regions
+    var regions: [Int: [RedactionRegion]] = [:] {        // pageIndex → regions
+        didSet { notePagesChanged(from: oldValue) }
+    }
+
+    /// Each page's version: bumped by every change to that page's stored
+    /// regions, Undo and Redo included, since every one of them writes
+    /// `regions`. A kept plan (`drawnPlans`) carries the version it was made
+    /// at, so a reader tells a plan of the page as it is from one made before
+    /// its last change. A page never changed reads 0. The document's
+    /// `regionVersion` stays for its O(1) dirty check.
+    @ObservationIgnored private(set) var pageVersions: [Int: Int] = [:]
+
+    func pageVersion(_ page: Int) -> Int { pageVersions[page] ?? 0 }
+
+    /// Bumps the version of each page whose regions differ from `old`. An
+    /// unchanged page's array shares its storage with the old one, so its
+    /// comparison is one identity check.
+    private func notePagesChanged(from old: [Int: [RedactionRegion]]) {
+        for page in Set(old.keys).union(regions.keys) where old[page] ?? [] != regions[page] ?? [] {
+            pageVersions[page, default: 0] += 1
+        }
+    }
 
     /// Monotonic counter incremented on every region mutation.
     /// Enables O(1) dirty checking in PDFViewCoordinator overlay refresh.
     var regionVersion: Int = 0
 
     /// The plan each page was last drawn from, with the switch, the quality
-    /// and the fill it was drawn under, kept so a run can be compared with
-    /// it. Written while the editor draws, so nothing observes it.
+    /// and the fill it was drawn under, the page's version then and whether
+    /// it was drawn from the stored regions, kept so a run can be compared
+    /// with it. Written while the editor draws, so nothing observes it.
     @ObservationIgnored var drawnPlans: [Int: DrawnPlan] = [:]
 
     /// Multi-region selection set. Single selection is the common case.
