@@ -33,10 +33,11 @@ struct RunRecordBoxPlaceTests {
             let geometry = RunRecord.PageGeometry(cropBox: crop, rotation: rotation)
             let corner = geometry.displayedShare(ofPagePoint: CGPoint(x: crop.minX, y: crop.minY))
             #expect(Self.near(corner, expected[rotation]!), "\(rotation)° over \(crop): \(corner)")
-            // The crop's right edge runs along the shown page's top at 90°.
+            // The bottom-right corner: clockwise, 90 takes it to the bottom-left,
+            // 180 to the top-left, 270 to the top-right.
             let right = geometry.displayedShare(ofPagePoint: CGPoint(x: crop.maxX, y: crop.minY))
-            let expectedRight: [Int: CGPoint] = [0: CGPoint(x: 1, y: 0), 90: CGPoint(x: 1, y: 1),
-                                                 180: CGPoint(x: 0, y: 1), 270: CGPoint(x: 0, y: 0)]
+            let expectedRight: [Int: CGPoint] = [0: CGPoint(x: 1, y: 0), 90: CGPoint(x: 0, y: 0),
+                                                 180: CGPoint(x: 0, y: 1), 270: CGPoint(x: 1, y: 1)]
             #expect(Self.near(right, expectedRight[rotation]!), "\(rotation)° over \(crop): \(right)")
         }
     }

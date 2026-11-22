@@ -253,6 +253,40 @@ struct BoxPlaceCheckTests {
         withExtendedLifetime((c.coordinator, c.window)) {}
     }
 
+    @Test("Undo of a resize, a move and a group move puts each whole region back, and Redo the edited one")
+    func undoRestoresWholeRegions() throws {
+        let state = RedactionState()
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        var a = RedactionRegion(id: UUID(), normalizedRect: CGRect(x: 0.1, y: 0.1, width: 0.2, height: 0.05),
+                                source: .searchMatch(term: "Marigold"), textAnchored: true)
+        a.drawnPageRect = CGRect(x: 61, y: 79, width: 122, height: 40)
+        var b = RedactionRegion(id: UUID(), normalizedRect: CGRect(x: 0.5, y: 0.5, width: 0.1, height: 0.05),
+                                source: .manual)
+        b.drawnPageRect = CGRect(x: 306, y: 396, width: 61, height: 40)
+        state.regions[0] = [a, b]
+        func step(_ edit: () -> Void) throws -> ([RedactionRegion], [RedactionRegion]) {
+            let before = state.regions[0] ?? []
+            undo.beginUndoGrouping(); edit(); undo.endUndoGrouping()
+            let after = state.regions[0] ?? []
+            #expect(after != before, "the edit changed the page")
+            undo.undo()
+            #expect(state.regions[0] == before, "Undo puts every field of every region back")
+            undo.redo()
+            #expect(state.regions[0] == after, "Redo puts the edited regions back")
+            undo.undo()
+            return (before, after)
+        }
+        _ = try step { state.resizeRegion(a.id, page: 0, newRect: CGRect(x: 0.1, y: 0.1, width: 0.3, height: 0.05),
+                                          undoManager: undo, drawnPageRect: CGRect(x: 61, y: 79, width: 183, height: 40)) }
+        _ = try step { state.moveRegion(a.id, page: 0, newRect: CGRect(x: 0.2, y: 0.1, width: 0.2, height: 0.05),
+                                        undoManager: undo) }
+        _ = try step { state.moveRegions([(a.id, CGRect(x: 0.15, y: 0.1, width: 0.2, height: 0.05)),
+                                          (b.id, CGRect(x: 0.55, y: 0.5, width: 0.1, height: 0.05))],
+                                         page: 0, undoManager: undo) }
+        #expect(state.regions[0] == [a, b])
+    }
+
     @Test("Boxes no finger placed carry no page rectangle and are confirmed: found, duplicated, arrow-stepped, whole page",
           arguments: [1, 4, 6])
     func boxesNoGesturePlaced(pageIndex: Int) throws {
