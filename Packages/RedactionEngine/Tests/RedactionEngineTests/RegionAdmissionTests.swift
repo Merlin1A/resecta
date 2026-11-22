@@ -79,7 +79,7 @@ struct RegionAdmissionTests {
         #expect(admitted.count == 2 && refused.count == 5)
 
         let drawn = regions.map { RunRecord.DrawnRegion(id: $0.id, normalizedRect: $0.normalizedRect) }
-        let page = RunRecord.Page(pageIndex: 0, regions: drawn, cropBox: CGSize(width: 612, height: 792), rotation: 0)
+        let page = RunRecord.Page(pageIndex: 0, regions: drawn, cropBox: CGSize(width: 612, height: 792), rotation: 0, switchOn: false)
         let plan = try #require(page.plan)
         #expect(plan.boxes.map(\.regionIDs) == admitted.map { Set([$0]) }, "the record's plan")
         #expect(page.refusedRegions.map(\.id) == refused.map(\.0), "the record's refused list")
@@ -91,7 +91,7 @@ struct RegionAdmissionTests {
     @Test("On a page, the admitted and the refused are together the record's regions, and none is both")
     func admittedAndRefusedPartitionTheRecord() throws {
         let regions = Case.allCases.map { RunRecord.DrawnRegion(id: UUID(), normalizedRect: $0.rect) }
-        let page = RunRecord.Page(pageIndex: 0, regions: regions, cropBox: CGSize(width: 612, height: 792), rotation: 0)
+        let page = RunRecord.Page(pageIndex: 0, regions: regions, cropBox: CGSize(width: 612, height: 792), rotation: 0, switchOn: false)
         let plan = try #require(page.plan)
         let admitted = Set(plan.boxes.flatMap(\.regionIDs))
         let refused = Set(page.refusedRegions.map(\.id))

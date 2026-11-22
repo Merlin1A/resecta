@@ -131,11 +131,18 @@ package struct PaintedBox: Hashable, Sendable {
     package var inkEnlargedToCap: Bool
     /// The box is painted as it was drawn: no margin, no limit.
     package var asDrawn: Bool
+    /// The ink check may judge the box: it was placed from the page's own
+    /// text, is still anchored to it, and stands on a typed line (one the plan
+    /// reads as a column or as no column), and it is not painted as drawn.
+    /// Never a box drawn by hand, edited since, or placed from the page's
+    /// picture. The plan sets it; the producer reads it.
+    package var inkCheckable: Bool
 
     package init(
         regionIDs: Set<UUID>, inner: PageRect64, paint: PageRect64, tight: PageRect64,
         limitAbove: Int?, limitBelow: Int?, exposure: Exposure, treatment: SwitchTreatment,
-        bandMade: Bool, inkEnlargedCovered: Bool, inkEnlargedToCap: Bool, asDrawn: Bool
+        bandMade: Bool, inkEnlargedCovered: Bool, inkEnlargedToCap: Bool, asDrawn: Bool,
+        inkCheckable: Bool = false
     ) {
         self.regionIDs = regionIDs
         self.inner = inner
@@ -149,6 +156,7 @@ package struct PaintedBox: Hashable, Sendable {
         self.inkEnlargedCovered = inkEnlargedCovered
         self.inkEnlargedToCap = inkEnlargedToCap
         self.asDrawn = asDrawn
+        self.inkCheckable = inkCheckable
     }
 
     /// A limit line above a box at `points`, in whole sixty-fourths rounded

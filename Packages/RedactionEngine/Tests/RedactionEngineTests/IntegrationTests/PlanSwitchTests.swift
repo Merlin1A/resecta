@@ -91,14 +91,17 @@ struct PlanSwitchTests {
 
     /// The page rasterized under `source` with a hand-made plan of the four
     /// boxes, each box as placed, and the check's inputs for `inputsFor`.
-    static func run(source: PlanSource, inputsFor: Set<Int>) async throws -> Run {
+    /// Each Search box is marked checkable, as the plan marks one placed from
+    /// typed text, except those in `uncheckable` (as for a box placed from
+    /// the page's picture).
+    static func run(source: PlanSource, inputsFor: Set<Int>, uncheckable: Set<Int> = []) async throws -> Run {
         let doc = try #require(PDFDocument(data: pdf()))
         defer { withExtendedLifetime(doc) {} }
         let page = try #require(doc.page(at: 0))
         var regions: [RedactionRegion] = []
         var drawn: [RunRecord.DrawnRegion] = []
         var planBoxes: [PaintedBox] = []
-        for box in boxes {
+        for (index, box) in boxes.enumerated() {
             var ids: Set<UUID> = []
             for r in box.regions {
                 let id = UUID()
@@ -111,7 +114,7 @@ struct PlanSwitchTests {
             planBoxes.append(PaintedBox(regionIDs: ids, inner: r, paint: r, tight: r, limitAbove: nil, limitBelow: nil,
                                         exposure: GeometryPolicy.release.asPlaced.exposure, treatment: .notAsked,
                                         bandMade: false, inkEnlargedCovered: false, inkEnlargedToCap: false,
-                                        asDrawn: false))
+                                        asDrawn: false, inkCheckable: box.search && !uncheckable.contains(index)))
         }
         let plan = PaintPlan(widthSixtyFourths: Int(width) * 64, heightSixtyFourths: Int(height) * 64,
                              boxes: planBoxes)
@@ -189,6 +192,11 @@ struct PlanSwitchTests {
         // Its page is written as a picture, for the new reason.
         #expect(run.result.fallbackReason == .inkEscapesBox)
         #expect(run.result.pageOutput.textLayerEntries == nil)
+        // The drop clears every field the writer reads, its laid-out lines
+        // too; the same page as placed keeps them, so the drop is what clears them.
+        let asPlaced = try await Self.run(source: .asPlaced, inputsFor: [0, 1, 2])
+        #expect(asPlaced.result.pageOutput.hiddenTextLines != nil, "the page as placed has hidden text laid out")
+        #expect(run.result.pageOutput.hiddenTextLines == nil, "the widened page writes no hidden text lines")
     }
 
     @Test("A box the check has nothing to read for paints as at \"as placed\", growth and all, marked not judged")
@@ -199,6 +207,18 @@ struct PlanSwitchTests {
         #expect(bare.result.inkVerdicts == [0: .indeterminate, 1: .indeterminate, 2: .indeterminate])
         #expect(bare.result.fallbackReason == placed.result.fallbackReason)
         #expect(bare.result.fallbackReason != .inkEscapesBox)
+    }
+
+    @Test("A box the plan does not mark checkable, as one placed from the page's picture, is never judged and paints as at \"as placed\"")
+    func uncheckableBoxNeverJudged() async throws {
+        let picture = try await Self.run(source: .switchPolicy, inputsFor: [0, 1, 2], uncheckable: [0, 1, 2])
+        let placed = try await Self.run(source: .asPlaced, inputsFor: [])
+        #expect(picture.result.inkVerdicts.isEmpty, "\(picture.result.inkVerdicts)")
+        for i in 0...3 { #expect(try picture.reported(i) == placed.reported(i), "box \(i)") }
+        #expect(picture.result.fallbackReason != .inkEscapesBox)
+        // The same page with its Search boxes checkable: box 0 is judged and widened.
+        let typed = try await Self.run(source: .switchPolicy, inputsFor: [0, 1, 2])
+        #expect(typed.result.inkVerdicts[0] == .escaped)
     }
 
     @Test("At \"as placed\" the check never runs, even with its inputs handed in")

@@ -221,7 +221,7 @@ extension PageRasterizer {
 
         // 4c. Each box's projection, with its regions as the region path
         // fills them, then its growth, read before any fill.
-        // At the switch's policy a Search or Scan box not painted as drawn
+        // At the switch's policy a Search or Scan box the plan marks checkable
         // takes the ink check in place of growth. A box the check cannot
         // judge (no inputs, or `indeterminate`) is painted as at "as placed",
         // growth and all: the check only ever adds paint. A judged box keeps
@@ -244,7 +244,10 @@ extension PageRasterizer {
         }
         for (index, box) in page.boxes.enumerated() {
             let grows = box.regionIDs.contains(where: { growsOnInk[$0] == true })
-            if atSwitch, grows, !box.asDrawn {
+            // Only a box the plan marks checkable: placed from typed text,
+            // still anchored, not painted as drawn. A box placed from the
+            // page's picture is never judged.
+            if atSwitch, grows, !box.asDrawn, box.inkCheckable {
                 var verdict = InkCheck.Verdict.indeterminate
                 if let inputs = page.inkCheckInputs[index] {
                     if grid == nil { grid = Self.greyGrid(context: ctx) }
@@ -314,19 +317,15 @@ extension PageRasterizer {
         return result
     }
 
-    /// The page's text layer dropped after the render, before any fill, when
+    /// The page's text layer dropped after the render and the fills, when
     /// a box the ink check widened leaves the text-layer copies of its words
-    /// outside the box as placed: the
-    /// page takes the secure path with `reason`. Nothing to drop on a page
+    /// outside the box as placed: the page takes the secure path with
+    /// `reason`, through the text layer's one drop. Nothing to drop on a page
     /// that has no text layer, or one already dropped.
     static func dropTextLayer(_ textLayer: inout TextLayerState, reason: TextLayerDetector.FallbackReason,
                               page: PDFPageData) {
         guard textLayer.entries != nil else { return }
-        textLayer.entries = nil
-        textLayer.removalRects = []
-        textLayer.digest = nil
-        textLayer.runsLeftOut = 0
-        textLayer.fallbackReason = reason
+        textLayer.drop(reason: reason)
         planLogger.log(
             "page \(page.pageIndex) fell back to secure rasterization at runtime (\(String(describing: reason), privacy: .public))"
         )
