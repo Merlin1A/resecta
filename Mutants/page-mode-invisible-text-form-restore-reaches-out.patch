@@ -2,10 +2,11 @@ Property: A restore in a form never restores a state saved before the form.
 Area: page mode (Detection)
 Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/InvisibleTextPageTests (or on the host: cd Packages/RedactionEngine && swift test --no-parallel --filter InvisibleTextPageTests)
 Must go red: RedactionEngineTests/InvisibleTextPageTests reading [a form that restores a state it never saved, drawn in mode 3]; RedactionEngineTests/InvisibleTextPageTests exported [a form that restores a state it never saved, drawn in mode 3]
+Note: the form's exit also removes nothing when the form has left fewer saved states than it found, so the run reaches the named cases; without that second change the restore below the form's floor stops the test process (Number of elements to remove should be non-negative) before they run.
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
-index 82920236..f0457461 100644
+index 82920236..277b56e0 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
 @@ -68,7 +68,7 @@ extension DocumentSearcher {
@@ -17,3 +18,12 @@ index 82920236..f0457461 100644
          }
          let show: CGPDFOperatorCallback = { scanner, info in
              guard let info else { return }
+@@ -100,7 +100,7 @@ extension DocumentSearcher {
+             if !CGPDFScannerScan(innerScanner) && !state.found && !state.unreadable { state.unreadable = true }
+             state.depth -= 1
+             state.mode = mode
+-            state.saved.removeLast(state.saved.count - savedCount)
++            state.saved.removeLast(max(0, state.saved.count - savedCount))
+             state.floor = floor
+             CGPDFScannerRelease(innerScanner)
+             CGPDFContentStreamRelease(inner)
