@@ -54,9 +54,9 @@ extension DocumentSearcher {
     /// fit took before the gate was widened; on a page only the wider gate
     /// takes, unless it carries a box not placed from its text and such a box
     /// is to leave the page a picture.
-    nonisolated static func planIsMade(fittedToday: Bool, fittedByRuleG: Bool, hasUnanchoredBox: Bool,
+    nonisolated static func planIsMade(fittedToday: Bool, fittedByWiderGate: Bool, hasUnanchoredBox: Bool,
                                        drawnBoxKeepsTextLayer: Bool) -> Bool {
-        fittedToday || (fittedByRuleG && (!hasUnanchoredBox || drawnBoxKeepsTextLayer))
+        fittedToday || (fittedByWiderGate && (!hasUnanchoredBox || drawnBoxKeepsTextLayer))
     }
 
     /// Whether the gate's answer depends on where the page's pictures are

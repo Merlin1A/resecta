@@ -406,11 +406,11 @@ struct InkFitPiecewiseScanTests {
         ]
         #expect(rows.count == 5)
         for (key, today, ruleG, unanchored, keeps, made) in rows {
-            #expect(DocumentSearcher.planIsMade(fittedToday: today, fittedByRuleG: ruleG, hasUnanchoredBox: unanchored,
+            #expect(DocumentSearcher.planIsMade(fittedToday: today, fittedByWiderGate: ruleG, hasUnanchoredBox: unanchored,
                                                 drawnBoxKeepsTextLayer: keeps) == made, "\(key)")
         }
         // P1 under either value.
-        #expect(DocumentSearcher.planIsMade(fittedToday: true, fittedByRuleG: true, hasUnanchoredBox: true, drawnBoxKeepsTextLayer: true))
+        #expect(DocumentSearcher.planIsMade(fittedToday: true, fittedByWiderGate: true, hasUnanchoredBox: true, drawnBoxKeepsTextLayer: true))
     }
 
     // MARK: - The plan's page facts
