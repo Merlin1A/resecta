@@ -103,28 +103,25 @@ extension RedactionState {
     /// rect changed.
     ///
     /// An edit leaves the region no longer anchored to the text it was
-    /// placed from (`RedactionRegion.textAnchored`); its Undo puts the rect
-    /// and the anchoring back together (`anchored`, the undo leg only).
+    /// placed from (`RedactionRegion.textAnchored`); its Undo puts the whole
+    /// region back (`restoreRegions`), the anchoring with the rect.
     @discardableResult
     func resizeRegion(
         _ id: UUID, page: Int,
-        newRect: CGRect, undoManager: UndoManager?, anchored: Bool = false, drawnPageRect: CGRect? = nil
+        newRect: CGRect, undoManager: UndoManager?, drawnPageRect: CGRect? = nil
     ) -> Bool {
         guard var pageRegions = regions[page],
               let index = pageRegions.firstIndex(where: { $0.id == id }),
               pageRegions[index].normalizedRect != newRect else { return false }
         bumpRegionVersion()
-        let oldRect = pageRegions[index].normalizedRect
-        let oldAnchored = pageRegions[index].textAnchored
-        let oldDrawn = pageRegions[index].drawnPageRect
+        let old = pageRegions[index]
         pageRegions[index].normalizedRect = newRect
-        pageRegions[index].textAnchored = anchored
+        pageRegions[index].textAnchored = false
         pageRegions[index].drawnPageRect = drawnPageRect
         regions[page] = pageRegions
         markRegionsModified()
         registerUndo(undoManager, UndoName.resize) { target in
-            target.resizeRegion(id, page: page, newRect: oldRect, undoManager: undoManager, anchored: oldAnchored,
-                                drawnPageRect: oldDrawn)
+            target.restoreRegions([old], page: page, undoManager: undoManager, actionName: UndoName.resize)
         }
         return true
     }
@@ -135,23 +132,20 @@ extension RedactionState {
     @discardableResult
     func moveRegion(
         _ id: UUID, page: Int,
-        newRect: CGRect, undoManager: UndoManager?, anchored: Bool = false, drawnPageRect: CGRect? = nil
+        newRect: CGRect, undoManager: UndoManager?, drawnPageRect: CGRect? = nil
     ) -> Bool {
         guard var pageRegions = regions[page],
               let index = pageRegions.firstIndex(where: { $0.id == id }),
               pageRegions[index].normalizedRect != newRect else { return false }
         bumpRegionVersion()
-        let oldRect = pageRegions[index].normalizedRect
-        let oldAnchored = pageRegions[index].textAnchored
-        let oldDrawn = pageRegions[index].drawnPageRect
+        let old = pageRegions[index]
         pageRegions[index].normalizedRect = newRect
-        pageRegions[index].textAnchored = anchored
+        pageRegions[index].textAnchored = false
         pageRegions[index].drawnPageRect = drawnPageRect
         regions[page] = pageRegions
         markRegionsModified()
         registerUndo(undoManager, UndoName.move) { target in
-            target.moveRegion(id, page: page, newRect: oldRect, undoManager: undoManager, anchored: oldAnchored,
-                              drawnPageRect: oldDrawn)
+            target.restoreRegions([old], page: page, undoManager: undoManager, actionName: UndoName.move)
         }
         return true
     }
@@ -161,33 +155,50 @@ extension RedactionState {
     @discardableResult
     func moveRegions(
         _ moves: [(id: UUID, newRect: CGRect)], page: Int, undoManager: UndoManager?,
-        anchored: [UUID: Bool] = [:], drawnPageRects: [UUID: CGRect] = [:]
+        drawnPageRects: [UUID: CGRect] = [:]
     ) -> Bool {
         guard var pageRegions = regions[page] else { return false }
-        var mutableOldRects: [(id: UUID, oldRect: CGRect, oldAnchored: Bool, oldDrawn: CGRect?)] = []
+        var olds: [RedactionRegion] = []
         for move in moves {
             guard let index = pageRegions.firstIndex(where: { $0.id == move.id }),
                   pageRegions[index].normalizedRect != move.newRect else { continue }
-            mutableOldRects.append((move.id, pageRegions[index].normalizedRect, pageRegions[index].textAnchored,
-                                    pageRegions[index].drawnPageRect))
+            olds.append(pageRegions[index])
             pageRegions[index].normalizedRect = move.newRect
-            pageRegions[index].textAnchored = anchored[move.id] ?? false
+            pageRegions[index].textAnchored = false
             pageRegions[index].drawnPageRect = drawnPageRects[move.id]
         }
-        guard !mutableOldRects.isEmpty else { return false }
+        guard !olds.isEmpty else { return false }
         bumpRegionVersion()
         regions[page] = pageRegions
         markRegionsModified()
-        let snapshot = mutableOldRects
+        let snapshot = olds
         registerUndo(undoManager, UndoName.moveMany) { target in
-            let restoreMoves = snapshot.map { (id: $0.id, newRect: $0.oldRect) }
-            let restoreAnchored = Dictionary(uniqueKeysWithValues: snapshot.map { ($0.id, $0.oldAnchored) })
-            let restoreDrawn = Dictionary(uniqueKeysWithValues: snapshot.compactMap { item in
-                item.oldDrawn.map { (item.id, $0) } })
-            target.moveRegions(restoreMoves, page: page, undoManager: undoManager, anchored: restoreAnchored,
-                               drawnPageRects: restoreDrawn)
+            target.restoreRegions(snapshot, page: page, undoManager: undoManager, actionName: UndoName.moveMany)
         }
         return true
+    }
+
+    /// The Undo of a resize or a move: puts each region back to its whole
+    /// earlier value, by id, so every stored field returns with its share
+    /// (the anchoring, the page rectangle PDFKit gave it). It captures the
+    /// values it replaces and registers itself with them, so Redo puts the
+    /// edit back. It never skips a region whose share is unchanged: another
+    /// field may differ. A region no longer on the page is left out.
+    func restoreRegions(_ values: [RedactionRegion], page: Int, undoManager: UndoManager?, actionName: String) {
+        guard var pageRegions = regions[page] else { return }
+        var replaced: [RedactionRegion] = []
+        for value in values {
+            guard let index = pageRegions.firstIndex(where: { $0.id == value.id }) else { continue }
+            replaced.append(pageRegions[index])
+            pageRegions[index] = value
+        }
+        guard !replaced.isEmpty else { return }
+        bumpRegionVersion()
+        regions[page] = pageRegions
+        markRegionsModified()
+        registerUndo(undoManager, actionName) { target in
+            target.restoreRegions(replaced, page: page, undoManager: undoManager, actionName: actionName)
+        }
     }
 
     /// Batch remove multiple regions from a single page. Single undo action.
