@@ -66,7 +66,7 @@ import RedactionCore
                                   widthSixtyFourths: W, heightSixtyFourths: H, policy: policy, source: source, switchOn: on)
         checkContainment(made.plan, regions, sheet, sourceLocation: sourceLocation)
         #expect(!made.plan.boxes.contains { $0.treatment == .fellBack }, "no box falls back", sourceLocation: sourceLocation)
-        #expect(made.plan.boxes.allSatisfy { $0.exposure == .canShowLength }, "every box can show length (check H1)",
+        #expect(made.plan.boxes.allSatisfy { $0.exposure == .canShowLength }, "every box can show length",
                 sourceLocation: sourceLocation)
         return Made(plan: made.plan, facts: made.facts)
     }

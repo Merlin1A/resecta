@@ -2,13 +2,14 @@ import Foundation
 import Testing
 import RedactionCore
 
-/// Check H1 in the repository: every box of every plan carries the one value
-/// "can show length", and none fell back. The sweep makes plans over a fixed
+/// Every box of every plan carries the one value "can show length", and none
+/// fell back. The sweep makes plans over a fixed
 /// set of hand-built pages (a paragraph, two columns under a title, a table,
 /// label rows, a line alone, and a page of boxes drawn by hand), with every
 /// other word placed by Search, under both plan sources, with the switch off
 /// and on, on a typed page and on a scan, and counts the boxes it checked.
-/// The bench's H1 (Part R's pages, the corpus) is run by the test's own steps.
+/// The same check over the bench's made pages and the corpus runs outside the
+/// repository.
 @Suite struct PlanExposureCheckTests {
     typealias Sheet = ComplementReadingTests.Sheet
     typealias T = PaintPlanMakeTests
@@ -75,7 +76,7 @@ import RedactionCore
     /// boxes a plan, times 2 sources, 2 switch states and 2 kinds of page.
     static let boxesChecked = 664
 
-    @Test("H1: every box of every plan in the sweep can show length, none fell back, and the count is the sweep's")
+    @Test("Every box of every plan in the sweep can show length, none fell back, and the count is the sweep's")
     func everyBoxCanShowLength() {
         var checked = 0
         let pages = Self.pages()

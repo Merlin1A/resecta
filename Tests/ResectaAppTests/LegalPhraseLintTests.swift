@@ -48,7 +48,7 @@ struct LegalPhraseLintTests {
         }
     }
 
-    /// Check H3's list half: the stems for a claim that a box hides how long
+    /// The stems for a claim that a box hides how long
     /// its text is, the switch's old name among them, are on the one list
     /// the claims lint reads. This test reads the list; it never edits it.
     static let lengthClaimStems = [
