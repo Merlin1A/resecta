@@ -5,11 +5,11 @@ Must go red: ResectaAppTests/BoxPlaceCheckTests probePassesEverywhere; ResectaAp
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Coordinates.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Coordinates.swift
-index fbb98e5c..bbf56c6b 100644
+index d9aaf63b..dda98a04 100644
 --- a/Sources/ResectaApp/Overlay/RedactionOverlayView+Coordinates.swift
 +++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+Coordinates.swift
 @@ -16,7 +16,7 @@ extension RedactionOverlayView {
-         // The bounds are the STORED page (PDFKit turns this view with the
+         // The page size is the STORED page (PDFKit turns this view with the
          // page); a region lives in the SHOWN frame (`CanvasTurn`).
          let stored = CGRect(
 -            x: rect.minX / w,

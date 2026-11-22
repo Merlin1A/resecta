@@ -18,12 +18,12 @@ index e40e23853..3bf5c7c0b 100644
          guard let doc = documentState.sourceDocument else { return [] }
          return RunInputs.pageData(
 diff --git a/Sources/ResectaApp/State/PipelineRunner.swift b/Sources/ResectaApp/State/PipelineRunner.swift
-index 08a64d1cf..8ebcf9c4c 100644
+index 3cf2e0125..b1e7b5454 100644
 --- a/Sources/ResectaApp/State/PipelineRunner.swift
 +++ b/Sources/ResectaApp/State/PipelineRunner.swift
-@@ -304,8 +304,7 @@ struct PipelineRunner {
-             throw PipelineError.redactionError(.boxPlaceUnconfirmed(pageIndex: page))
-         }
+@@ -313,8 +313,7 @@ struct PipelineRunner {
+         let unconfirmedBoxPage = confirmed.firstPageWithUnconfirmedBoxPlace(
+             canvasFailures: redactionState.canvasProbeFailuresAtRunEntry())
          let pages = coordinator.buildPDFPageData(
 -            effectiveMode: effectiveMode, runSettings: runSettings, inkPlans: sensitiveTerms.inkPlans,
 -            record: confirmed)

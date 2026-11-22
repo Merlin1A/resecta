@@ -5,15 +5,15 @@ Must go red: ResectaAppTests/BoxPlaceCheckTests runRefusesByName
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/State/PipelineRunner.swift b/Sources/ResectaApp/State/PipelineRunner.swift
-index bb73972f..f0013fdd 100644
+index 7e2cc0ba..3d05ceb0 100644
 --- a/Sources/ResectaApp/State/PipelineRunner.swift
 +++ b/Sources/ResectaApp/State/PipelineRunner.swift
-@@ -292,7 +292,7 @@ struct PipelineRunner {
-         // own frame, or the run stops here, before any page is drawn.
-         if let page = confirmed.firstPageWithUnconfirmedBoxPlace(
-             canvasFailures: redactionState.canvasProbeFailuresAtRunEntry()) {
--            throw PipelineError.redactionError(.boxPlaceUnconfirmed(pageIndex: page))
-+            _ = page
-         }
-         let pages = coordinator.buildPDFPageData(
-             effectiveMode: effectiveMode, runSettings: runSettings, inkPlans: sensitiveTerms.inkPlans,
+@@ -169,7 +169,7 @@ struct PipelineRunner {
+             // The box-place check refuses here: the phase table leaves
+             // editing only for redacting, and no page has been drawn yet.
+             if let page = entry.unconfirmedBoxPage {
+-                throw PipelineError.redactionError(.boxPlaceUnconfirmed(pageIndex: page))
++                _ = page
+             }
+ 
+             let runContext = try await coordinator.processDocument(
