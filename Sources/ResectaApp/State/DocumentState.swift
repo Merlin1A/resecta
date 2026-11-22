@@ -141,6 +141,18 @@ class DocumentState {
     private(set) var sourceDocumentToken = UUID()
     var currentPageIndex: Int = 0
     var pageCount: Int { sourceDocument?.pageCount ?? 0 }
+    /// The canvas's visible pages in its own space, rounded outward: written only while a notice wants them.
+    var canvasPageFrames: [CanvasRect] = []
+    /// The document's index of each page in `canvasPageFrames`, in the same order: a page change that leaves the same rectangles on the canvas (a zoom that fills it) still changes these.
+    var canvasPageIndices: [Int] = []
+    /// Set while the editor's band holds a notice; turning it off empties the frames and their indices.
+    var canvasPageFramesWanted = false {
+        didSet {
+            guard !canvasPageFramesWanted else { return }
+            if !canvasPageFrames.isEmpty { canvasPageFrames = [] }
+            if !canvasPageIndices.isEmpty { canvasPageIndices = [] }
+        }
+    }
 
     // Rect-level scroll-to-match. Page-granular
     // navigation leaves a match off-screen when the canvas is zoomed
@@ -650,6 +662,7 @@ class DocumentState {
         sourceFilledFormFieldCount = 0
         annotationNoticeDismissed = false
         currentPageIndex = 0
+        canvasPageFramesWanted = false  // and the page frames with it
         lastUsedPipelineMode = nil
         documentOverride = nil
         wasPausedByBackground = false

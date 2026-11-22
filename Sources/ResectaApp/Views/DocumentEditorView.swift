@@ -28,6 +28,9 @@ struct DocumentEditorView: View {
     // canvas (.editing/.detecting/.redacting/.exporting) and verification
     // results (.verified) never reach a screen recorder or external display.
     @Environment(ScreenCaptureMonitor.self) private var captureMonitor
+    /// Read by the band's speech: a notice is spoken only while the scene
+    /// is active (`+TopBanner`).
+    @Environment(\.scenePhase) var scenePhase
 
     // View-local tool state — purely UI, no cross-view observation needed.
     // Persistent — toggled only by explicit tap, Escape, or Done.
@@ -38,6 +41,10 @@ struct DocumentEditorView: View {
     /// the selection — iPhone parity for the iPad Shift+tap path. iPad
     /// Shift+tap continues to work whether the toggle is on or off.
     @State var isMultiSelectActive: Bool = false
+
+    /// The band's places whose notice has been spoken and still holds.
+    /// Cleared when another document replaces this one.
+    @State var announcedNotices: Set<TopBannerSlot> = []
 
 
     /// When the results last replaced the running checks: the bar's
@@ -203,6 +210,9 @@ struct DocumentEditorView: View {
                         }
                     }
                     .overlay(alignment: .top) { topBannerSlot }
+                    // The space the canvas publishes its page frames in and
+                    // the band reads its notice's frame in.
+                    .coordinateSpace(.named(Self.noticeCanvasSpace))
                     // (Note: the mid-verify background-resume
                     // banner that used to chain here was structurally
                     // unreachable — it gated on `.verified(report: .skipped)`,
@@ -490,7 +500,11 @@ struct DocumentEditorView: View {
             if RedactWorkspaceView.isDocumentSwap(from: oldDocument, to: newDocument) {
                 editorToolbar.resetCanvasTools()
             }
+            announcedNotices = []
         }
+        // The band's notice is spoken once when shown, and again when its
+        // condition has ended and holds again.
+        .onChange(of: noticeSpeechInput, initial: true) { _, input in speakNotice(input) }
     }
 
     /// The toolbar TYPE over this editor's state, bindings and actions.

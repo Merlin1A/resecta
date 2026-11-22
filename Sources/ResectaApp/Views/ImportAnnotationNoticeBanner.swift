@@ -14,23 +14,13 @@ import RedactionEngine
 // sharing. One surface for all of them: the paragraph grows a sentence, it
 // never becomes a second notice.
 //
-// A sibling of `InlineWarningBanner` rather than a reuse: the mechanism
-// copy is a full paragraph, and the shared banner's 2-line cap (3 at
-// AX5) would truncate it. Same visual grammar — warning triangle,
-// tinted card, icon-only dismiss.
+// The words, the count policy and the visibility rule live here; the notice
+// is drawn by `NoticeView` in the editor's band (`+TopBanner`), whole.
 //
 // Copy is mechanism-description only: it states what
 // the app builds and what the export contains, never an outcome promise.
 
-struct ImportAnnotationNoticeBanner: View {
-    /// Notice-worthy findings in the source (`noticeWorthyCount`): the
-    /// annotation subtypes, plus the document-level entry for XFA form
-    /// data or embedded files when the loader staged one.
-    let annotationCount: Int
-    /// Form fields in the source that carry a value (`filledFormFieldCount(in:)`).
-    let filledFormFieldCount: Int
-    let onDismiss: () -> Void
-
+enum ImportAnnotationNoticeBanner {
     /// Mechanism copy for a source with annotations and no filled form
     /// fields, exposed for the unit pin. The banner does not enumerate
     /// annotation subtypes; the count and kinds do not change what the
@@ -179,52 +169,15 @@ struct ImportAnnotationNoticeBanner: View {
             && !dismissed
     }
 
-    @Environment(DocumentState.self) private var documentState
-
-    /// The paragraph for the staged record: `annotationCount` is the view's
-    /// notice-worthy count, which includes the document-level entry when
-    /// the loader staged one; the sentence for it is composed from the
-    /// entry, not from that count.
-    private var message: String {
-        let findings = documentState.sourceAnnotationFindings
-        let carries = Self.carriesFormDataOrAttachments(findings)
-        return Self.noticeMessage(
-            annotationCount: max(0, annotationCount - (carries ? 1 : 0)),
+    /// The notice's id for the staged record: the notice-worthy count less
+    /// the document-level entry when the loader staged one (the sentence
+    /// for that entry is composed from the entry, not from the count), and
+    /// the form fields that carry a value.
+    static func messageID(findings: [PDFFinding], filledFormFieldCount: Int) -> MessageID {
+        let carries = carriesFormDataOrAttachments(findings)
+        return .importAnnotations(
+            annotationCount: max(0, noticeWorthyCount(findings) - (carries ? 1 : 0)),
             filledFormFieldCount: filledFormFieldCount,
             carriesFormDataOrAttachments: carries)
-    }
-
-    var body: some View {
-        HStack(alignment: .top, spacing: ResectaTokens.Spacing.sm) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.orange)
-                .accessibilityHidden(true)
-
-            Text(message)
-                .font(.subheadline)
-                .fixedSize(horizontal: false, vertical: true)
-
-            Spacer(minLength: 0)
-
-            Button("Dismiss", systemImage: "xmark.circle.fill") {
-                onDismiss()
-            }
-            .labelStyle(.iconOnly)
-            .foregroundStyle(.secondary)
-        }
-        .padding(ResectaTokens.Spacing.sm)
-        // Chained backgrounds stack behind what precedes them: the tint
-        // stays on top of an opaque base so the document under the
-        // banner cannot show through the card and overprint the copy.
-        .background(ResectaTokens.SemanticColor.warningTint.opacity(0.12),
-                    in: .rect(cornerRadius: ResectaTokens.CornerRadius.medium))
-        .background(Color(.systemBackground),
-                    in: .rect(cornerRadius: ResectaTokens.CornerRadius.medium))
-        .padding(.horizontal, ResectaTokens.Spacing.md)
-        // Container id + header trait mirror `InlineWarningBanner`; the
-        // dismiss Button stays its own accessibility element so it is
-        // individually hittable.
-        .accessibilityIdentifier("importAnnotationNotice")
-        .accessibilityAddTraits(.isHeader) // VoiceOver announces on appearance
     }
 }

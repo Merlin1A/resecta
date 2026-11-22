@@ -69,6 +69,11 @@ struct PDFDocumentView: UIViewRepresentable {
             guard let pdfView else { return }
             coordinator?.handleCanvasTap(at: point, in: pdfView)
         }
+        // After each layout the band's page frames may have moved; the
+        // coordinator publishes them only while a notice wants them.
+        pdfView.onLayout = { [weak coordinator = context.coordinator] in
+            coordinator?.requestPageFramePublish()
+        }
         return pdfView
     }
 
@@ -155,6 +160,13 @@ struct PDFDocumentView: UIViewRepresentable {
 
         // Refresh overlays only when regions or selection actually changed
         coordinator.refreshAllOverlaysIfNeeded()
+
+        // The band's page frames: read here so the turn to wanted publishes
+        // once without waiting for the page to move. Nothing while no
+        // notice wants them.
+        if documentState.canvasPageFramesWanted {
+            coordinator.requestPageFramePublish()
+        }
     }
 }
 
@@ -210,6 +222,7 @@ final class FitFlooredPDFView: PDFView {
         super.layoutSubviews()
         applyFitFloor()
         reassertReadabilityFramingIfNeeded()
+        onLayout?()
     }
 
 
@@ -416,6 +429,9 @@ final class FitFlooredPDFView: PDFView {
     /// The canvas's single tap, in this view's coordinates. The editor's
     /// coordinator decides whether it clears the region selection.
     var onSingleTap: (@MainActor (CGPoint) -> Void)?
+
+    /// Called at the end of each layout pass, after the fit floor.
+    var onLayout: (@MainActor () -> Void)?
 
     /// Return a zoomed-in page to the fit scale, animated — the double
     /// tap's action. At fit it does nothing.
