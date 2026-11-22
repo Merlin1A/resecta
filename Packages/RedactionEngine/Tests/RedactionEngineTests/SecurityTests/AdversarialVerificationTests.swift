@@ -117,13 +117,10 @@ struct AdversarialVerificationTests {
 
     // MARK: - Layer 5: Metadata FAIL/WARN
 
-    @Test("Layer 5 FAILs when /Author metadata is present")
-    func layer5FailsAuthor() async throws {
-        _ = TestFixtures.withMetadata(["Author": "John Doe"])
-        // The /Info dict needs to be referenced from the trailer.
-        // Our simple builder doesn't support trailer /Info ref,
-        // so test with a reconstructed PDF where we verify clean output.
-        // For now, test that a clean reconstructed PDF does NOT fail:
+    @Test("Layer 5 does not FAIL a clean reconstructed file, which has no /Author")
+    func layer5PassesWithoutAuthor() async throws {
+        // An /Author entry is pinned by the layer5FailsAuthor* cases below;
+        // this case checks the clean side.
         let (doc, url) = try await makeCleanReconstructedPDF()
         defer { try? FileManager.default.removeItem(at: url) }
 

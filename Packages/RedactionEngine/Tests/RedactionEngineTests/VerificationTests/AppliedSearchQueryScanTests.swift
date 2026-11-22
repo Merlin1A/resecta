@@ -67,16 +67,16 @@ struct AppliedSearchQueryScanTests {
     }
 
     @Test("The configuration compiles its user terms; empty inputs compile to no index")
-    func configurationUserTerms() {
+    func configurationUserTerms() throws {
         let empty = ScanRunConfiguration(thresholdVector: nil)
         #expect(empty.userTermsIndex == nil)
         let terms = ScanRunConfiguration(
             thresholdVector: nil,
             alwaysFlag: [UserTerm(pattern: "ACME", isRegex: false)],
             neverFlag: [UserTerm(pattern: "public", isRegex: false)])
-        let index = try? #require(terms.userTermsIndex)
-        #expect(index?.isEmpty == false)
-        #expect(index?.decision(for: "ACME") == .alwaysFlag(pattern: "ACME"))
+        let index = try #require(terms.userTermsIndex)
+        #expect(index.isEmpty == false)
+        #expect(index.decision(for: "ACME") == .alwaysFlag(pattern: "ACME"))
     }
 
     @Test("A request defaults to the applied origin with nothing deselected; a sweep request carries its origin")

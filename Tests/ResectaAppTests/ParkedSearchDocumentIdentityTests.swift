@@ -26,7 +26,8 @@ struct ParkedSearchDocumentIdentityTests {
     func freedAddressReuseDoesNotMatch() throws {
         let data = pdfData()
         let documentState = DocumentState()
-        documentState.sourceDocument = try #require(PDFDocument(data: data))
+        let source = try #require(PDFDocument(data: data))
+        documentState.sourceDocument = source
         let oldAddress = ObjectIdentifier(documentState.sourceDocument!)
         let parked = documentState.sourceDocumentToken   // what the park records
         documentState.sourceDocument = nil

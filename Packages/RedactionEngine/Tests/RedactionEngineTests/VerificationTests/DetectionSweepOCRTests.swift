@@ -25,7 +25,8 @@ struct DetectionSweepOCRTests {
     private func ssnImagePage() async throws -> (SendablePDFDocument, URL) {
         let img = try TestFixtures.renderedTextImage("SSN 123-45-6789", width: 1200, height: 1500, fontSize: 90)
         let (doc, url) = try await TestFixtures.imagePagesPDF([img], size: CGSize(width: 1200, height: 1500))
-        #expect((doc.page(at: 0)?.string ?? "").isEmpty, "the fixture must carry no text layer")
+        let pageText = try #require(doc.page(at: 0), "the fixture has a first page").string ?? ""
+        #expect(pageText.isEmpty, "the fixture must carry no text layer")
         return (SendablePDFDocument(doc), url)
     }
 
