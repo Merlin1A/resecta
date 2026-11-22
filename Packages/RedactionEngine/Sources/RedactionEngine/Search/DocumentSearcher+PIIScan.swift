@@ -45,12 +45,15 @@ extension DocumentSearcher {
                 // geometry for the same page; each line grown to its own
                 // drawn glyphs (`addressLines(on:)`).
                 var spatialRectByText: [String: TextLayerBox] = [:]
+                var boxesByPlace: [AddressPlace: [TextLayerBox]] = [:]
                 if categories.contains(.address),
                    let lines = addressLines(on: page) {
                     let assembly = assembledAddressMatches(
-                        lines: lines, haystack: pageText as NSString)
+                        lines: lines, haystack: pageText as NSString,
+                        boxOf: { [self] in textLayerBox(for: $0, page: page)?.rect })
                     rawMatches.append(contentsOf: assembly.matches)
                     spatialRectByText = assembly.spatialRectByText
+                    boxesByPlace = assembly.boxesByPlace
                 }
                 // Cross-category overlap resolution before the threshold filter.
                 let resolution = DetectionOrchestrator.resolveOverlaps(rawMatches)
@@ -77,8 +80,8 @@ extension DocumentSearcher {
                     // selection would cover only part of the block). Every
                     // other match keeps PDFKit selection geometry unchanged.
                     let found: TextLayerBox?
-                    if let spatialBox =
-                        (match.kind == .address ? spatialRectByText[match.text] : nil) {
+                    if let spatialBox = match.kind == .address
+                        ? Self.takeBox(for: match, from: &boxesByPlace) ?? spatialRectByText[match.text] : nil {
                         found = spatialBox
                     } else {
                         found = textLayerBox(for: match.range, page: page)
@@ -292,6 +295,7 @@ extension DocumentSearcher {
         // the normalized concatenation so a located
         // range stays consistent with `lineOffsets`.
         var spatialRectByText: [String: TextLayerBox] = [:]
+        var boxesByPlace: [AddressPlace: [TextLayerBox]] = [:]
         if categories.contains(.address) {
             let assemblerLines = lineOffsets.map { entry in
                 OCREngine.TextLine(
@@ -300,10 +304,13 @@ extension DocumentSearcher {
                     confidence: entry.confidence
                 )
             }
+            let boxLines = Self.boxLookupLines(lineOffsets)
             let assembly = assembledAddressMatches(
-                lines: assemblerLines, haystack: concatenated as NSString)
+                lines: assemblerLines, haystack: concatenated as NSString,
+                boxOf: { [self] in ocrUnionRect(forUTF16Range: $0, lineOffsets: boxLines, page: page)?.rect })
             rawMatches.append(contentsOf: assembly.matches)
             spatialRectByText = assembly.spatialRectByText
+            boxesByPlace = assembly.boxesByPlace
         }
         // The overlap resolver runs on the OCR path too. Resolver is a
         // pure static function on DetectionOrchestrator.
@@ -349,7 +356,8 @@ extension DocumentSearcher {
             for match: PIIDetector.PIIMatch
         ) -> (rect: CGRect, window: ContextWindow, ocrConfidence: Float)? {
             guard let spatialRect =
-                (match.kind == .address ? spatialRectByText[match.text]?.rect : nil) else {
+                (match.kind == .address
+                    ? (Self.takeBox(for: match, from: &boxesByPlace) ?? spatialRectByText[match.text])?.rect : nil) else {
                 return mapToOCR(match.range)
             }
             if let mapped = mapToOCR(match.range) {

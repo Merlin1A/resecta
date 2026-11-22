@@ -18,31 +18,31 @@ extension DocumentSearcher {
     /// own, so the haystack is searched for the assembled text — a sentinel
     /// range past the end stands in when the text is not present verbatim
     /// (multi-line assemblies join with ", ", so the sentinel is the common
-    /// case). The union rect is returned keyed by assembled text so
-    /// SearchResult creation can use it in place of character-range geometry
-    /// (the text-keyed lookup mirrors the orchestrator's `spatialRectByText`;
-    /// duplicate assembled text on one page gracefully degrades to the first
-    /// candidate's rect, as at Site A).
+    /// case). Each address is placed at the occurrence of its text whose own
+    /// box (`boxOf`, the leg's range-to-box reader) meets the address's union
+    /// box, and at the sentinel when none meets: never at another copy's
+    /// occurrence, where the overlap step would fold it into that copy. Each
+    /// address's union box is kept by its place (`boxesByPlace`, text and
+    /// range, a list where copies share the sentinel), so two copies of one
+    /// address are each boxed on their own lines; `spatialRectByText` keeps
+    /// the first copy's box by text alone, for a match no place names.
     func assembledAddressMatches(
         lines: [OCREngine.TextLine],
-        haystack: NSString
-    ) -> (matches: [PIIDetector.PIIMatch], spatialRectByText: [String: TextLayerBox]) {
+        haystack: NSString,
+        boxOf: (NSRange) -> CGRect?
+    ) -> (matches: [PIIDetector.PIIMatch], spatialRectByText: [String: TextLayerBox], boxesByPlace: [AddressPlace: [TextLayerBox]]) {
         let assembled = addressAssembler.assemble(lines: lines)
-        guard !assembled.isEmpty else { return ([], [:]) }
+        guard !assembled.isEmpty else { return ([], [:], [:]) }
 
         var matches: [PIIDetector.PIIMatch] = []
         var spatialRectByText: [String: TextLayerBox] = [:]
-        let sentinelLocation = haystack.length
+        var boxesByPlace: [AddressPlace: [TextLayerBox]] = [:]
         for address in assembled {
-            if spatialRectByText[address.text] == nil {
-                spatialRectByText[address.text] = TextLayerBox(rect: address.unionRect, textLayerRect: address.textLayerUnionRect, degraded: address.inkFitDegraded,
-                                                             identity: address.identityUnionRect)
-            }
-            let searchRange = NSRange(location: 0, length: sentinelLocation)
-            let located = haystack.range(of: address.text, options: [], range: searchRange)
-            let matchRange = located.location != NSNotFound
-                ? located
-                : NSRange(location: sentinelLocation, length: 0)
+            let box = TextLayerBox(rect: address.unionRect, textLayerRect: address.textLayerUnionRect, degraded: address.inkFitDegraded,
+                                   identity: address.identityUnionRect)
+            if spatialRectByText[address.text] == nil { spatialRectByText[address.text] = box }
+            let matchRange = Self.place(address.text, meeting: address.unionRect, in: haystack, boxOf: boxOf)
+            boxesByPlace[AddressPlace(text: address.text, range: matchRange), default: []].append(box)
             matches.append(PIIDetector.PIIMatch(
                 text: address.text,
                 range: matchRange,
@@ -50,7 +50,47 @@ extension DocumentSearcher {
                 confidence: address.confidence
             ))
         }
-        return (matches, spatialRectByText)
+        return (matches, spatialRectByText, boxesByPlace)
+    }
+
+    /// Where an assembled address's box is kept: its text and the range it
+    /// was placed at.
+    struct AddressPlace: Hashable, Sendable {
+        let text: String
+        let location: Int
+        let length: Int
+        init(text: String, range: NSRange) {
+            self.text = text
+            location = range.location
+            length = range.length
+        }
+    }
+
+    /// The occurrence of `text` in `haystack` whose own box meets `union`,
+    /// else the sentinel past the end.
+    nonisolated static func place(_ text: String, meeting union: CGRect, in haystack: NSString,
+                                  boxOf: (NSRange) -> CGRect?) -> NSRange {
+        let end = haystack.length
+        var from = 0
+        while from < end {
+            let found = haystack.range(of: text, options: [], range: NSRange(location: from, length: end - from))
+            guard found.location != NSNotFound else { break }
+            if let box = boxOf(found), box.intersects(union) { return found }
+            from = found.location + 1
+        }
+        return NSRange(location: end, length: 0)
+    }
+
+    /// The next box kept at a surviving address match's place, taken so
+    /// that two copies at one place each get their own; nil where no box is
+    /// kept there.
+    nonisolated static func takeBox(for match: PIIDetector.PIIMatch,
+                                    from boxes: inout [AddressPlace: [TextLayerBox]]) -> TextLayerBox? {
+        let key = AddressPlace(text: match.text, range: match.range)
+        guard var kept = boxes[key], !kept.isEmpty else { return nil }
+        let box = kept.removeFirst()
+        boxes[key] = kept
+        return box
     }
 
     /// The text layer's lines for the address assembly
