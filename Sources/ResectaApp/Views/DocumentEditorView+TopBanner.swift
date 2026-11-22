@@ -250,6 +250,12 @@ struct NoticeBand<Open: View>: View {
     let pageIndices: [Int]
     @ViewBuilder let open: () -> Open
 
+    /// The visible pages' rectangles and which page each is, watched as one.
+    private struct PageLayout: Equatable {
+        let frames: [CanvasRect]
+        let indices: [Int]
+    }
+
     @State private var fold: BandFold = .open(timed: false)
     /// The open notice's frame in the canvas's space, rounded outward.
     @State private var noticeRect: CanvasRect?
@@ -290,8 +296,12 @@ struct NoticeBand<Open: View>: View {
             }
             .padding(.top, NoticeView.Metrics.gapUnderToolbar)
         }
-        .onChange(of: pageFrames, initial: true) { _, _ in measureChanged(framesMoved: true) }
-        .onChange(of: pageIndices) { _, _ in measureChanged(framesMoved: true) }
+        // One watch over both: the canvas writes the frames and their pages
+        // in one update, and two watches would take the notice's arrival as
+        // its first measure and then as a page move, folding it at once.
+        .onChange(of: PageLayout(frames: pageFrames, indices: pageIndices), initial: true) { _, _ in
+            measureChanged(framesMoved: true)
+        }
         .onChange(of: noticeRect) { _, _ in measureChanged(framesMoved: false) }
         .task(id: fold) {
             guard NoticeRules.readingClockRuns(fold: fold, voiceOverRunning: voiceOverRunning) else { return }
