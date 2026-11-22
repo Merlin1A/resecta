@@ -431,7 +431,7 @@ struct InkFitPiecewiseScanTests {
                 index = rest.index(after: index)
             }
             let call = String(rest[start.lowerBound..<index])
-            if !call.contains("printIsAPicture(") { out.append(call) }
+            if !call.contains("printIsAPicture(") || call.contains("printIsAPicture(pageScale:") { out.append(call) }
             rest = rest[index...]
         }
         return out
@@ -454,5 +454,7 @@ struct InkFitPiecewiseScanTests {
         #expect(Self.factsWithoutPrintAnswer(variable).count == 1, "a call that passes a variable fails the rule")
         let call = "PageTextFacts(showsInvisibleText: invisible,\n carriesPageScaleImage: DocumentSearcher.printIsAPicture(page, cgPage: cgPage))"
         #expect(Self.factsWithoutPrintAnswer(call).isEmpty)
+        let literal = "PageTextFacts(showsInvisibleText: invisible,\n carriesPageScaleImage: DocumentSearcher.printIsAPicture(pageScale: true, page: page, cgPage: cgPage))"
+        #expect(Self.factsWithoutPrintAnswer(literal).count == 1, "an answer given in place of the page's own fails the rule")
     }
 }
