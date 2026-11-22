@@ -1,0 +1,20 @@
+Property: Going to the background cancels a held gesture, as a system cancel does.
+Area: the run door, while a finger is down on the canvas
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/RunDoorHeldTouchTests
+Must go red: ResectaAppTests/RunDoorHeldTouchTests backgroundOpensTheDoor
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView.swift
+index ae006ff6..d5413d40 100644
+--- a/Sources/ResectaApp/Overlay/RedactionOverlayView.swift
++++ b/Sources/ResectaApp/Overlay/RedactionOverlayView.swift
+@@ -266,9 +266,6 @@ class RedactionOverlayView: UIView {
+ 
+         // A held gesture ends when the app goes to the background, as a
+         // cancel, so a lost lift never leaves the run door shut.
+-        NotificationCenter.default.addObserver(
+-            self, selector: #selector(cancelHeldGestureForBackground),
+-            name: UIApplication.didEnterBackgroundNotification, object: nil)
+     }
+ 
+     @available(*, unavailable)

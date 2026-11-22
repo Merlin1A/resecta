@@ -279,6 +279,10 @@ struct PipelineRunner {
             try Task.checkCancellation()
             captureRuns = 2
         }
+        // A finger that came down on the canvas while the capture ran holds a
+        // box away from its stored place: the run ends here, silently, as the
+        // funnel's refusal would have (`DocumentState.redactRefusal(with:)`).
+        if redactionState.canvasHoldsATouch { throw CancellationError() }
 
         // Synchronous from here: one region state.
         // The record's confirmed part first, from the live regions as drawn

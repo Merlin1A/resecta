@@ -1,0 +1,19 @@
+Property: Every touch the canvas holds shuts the run door, not only a draw: a move, a group move and a resize too.
+Area: the run door, while a finger is down on the canvas
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/RunDoorHeldTouchTests
+Must go red: ResectaAppTests/RunDoorHeldTouchTests heldTouchRefusesTheRun; ResectaAppTests/RunDoorHeldTouchTests touchDuringTheRunEntryEndsTheRun
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView.swift
+index ae006ff6..42b7621d 100644
+--- a/Sources/ResectaApp/Overlay/RedactionOverlayView.swift
++++ b/Sources/ResectaApp/Overlay/RedactionOverlayView.swift
+@@ -103,7 +103,7 @@ class RedactionOverlayView: UIView {
+     var primaryTouch: UITouch?
+     /// True while a finger is down on this page: the run door reads it
+     /// (`PDFViewCoordinator.holdsATouch`).
+-    var holdsATouch: Bool { primaryTouch != nil }
++    var holdsATouch: Bool { dragOrigin != nil }
+     /// True when dragging multiple selected regions as a group.
+     var isGroupMoving: Bool = false
+     /// Pre-drag normalized rects for all regions in the group move, for cancel restoration.

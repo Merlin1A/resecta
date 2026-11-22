@@ -622,4 +622,22 @@ class RedactionState {
     var lastUndoRedo: UndoRedoStep?
     @ObservationIgnored var undoRedoStepOpen = false
     @ObservationIgnored weak var mutationGate: DocumentState?  // whether a region step may run now (+MutationGuard)
+
+    // MARK: - The canvas's touch (the run door)
+
+    /// The editor's canvas, which sets itself here when it is given this
+    /// state. Not observed: the run door asks it when a run would start.
+    @ObservationIgnored weak var canvas: (any CanvasTouchHolding)?
+
+    /// True while a finger is down on the canvas. During a draw, a move, a
+    /// group move or a resize the box on screen is the overlay's working
+    /// copy and `regions` changes only at the lift, so no run starts until
+    /// then (`DocumentState.redactRefusal(with:)`).
+    var canvasHoldsATouch: Bool { canvas?.holdsATouch ?? false }
+}
+
+/// What the editor's canvas tells the run door: whether any of its live
+/// page overlays holds a touch now.
+protocol CanvasTouchHolding: AnyObject {
+    var holdsATouch: Bool { get }
 }
