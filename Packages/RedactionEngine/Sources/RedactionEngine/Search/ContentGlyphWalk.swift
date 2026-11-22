@@ -21,7 +21,8 @@ struct ShownGlyph: Equatable, Sendable {
 /// place or text cannot be read exactly: a font other than a simple one, a
 /// code without an advance or text, a `gs` that sets the font, text shown
 /// outside `BT`, marked content carrying /ActualText, an unresolved resource,
-/// a form past the depth, or more operators than `operatorLimit`.
+/// a form past the depth, or more than `operatorLimit` of the operators it
+/// reads (path, image and other operators it does not read are not counted).
 enum ContentGlyphWalk {
     static let operatorLimit = 200_000
     static let formDepthLimit = 8

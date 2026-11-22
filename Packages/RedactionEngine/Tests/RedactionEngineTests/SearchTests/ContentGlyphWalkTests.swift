@@ -147,6 +147,25 @@ struct ContentGlyphWalkTests {
 
 @Suite("Fonts as the page draws them")
 struct ContentGlyphFontTests {
+    /// Helvetica with its own two widths from `first`, and a descriptor
+    /// that gives its height.
+    static func twoWidths(from first: String) -> String {
+        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding /FirstChar \(first) /Widths [600 600] "
+            + "/FontDescriptor << /Type /FontDescriptor /FontName /Helvetica /Flags 32 /Ascent 718 /Descent -207 "
+            + "/FontBBox [-166 -225 1000 931] /ItalicAngle 0 /CapHeight 718 /StemV 88 >> >>"
+    }
+
+    @Test("A first code outside 0-255 leaves the page unread, however large the number; one inside reads")
+    func firstCodeOutOfRange() throws {
+        let glyphs = try #require(try ContentGlyphWalkTests.glyphs("BT /F1 12 Tf (XY) Tj ET", font: Self.twoWidths(from: "88")),
+                                  "the control: codes 88 and 89 read")
+        #expect(glyphs.count == 2)
+        for first in ["256", "-1", "9223372036854775806"] {
+            #expect(try ContentGlyphWalkTests.glyphs("BT /F1 12 Tf (XY) Tj ET", font: Self.twoWidths(from: first)) == nil,
+                    "/FirstChar \(first)")
+        }
+    }
+
     /// Helvetica's descent at `size`, from the system font the walker reads it from.
     static func helveticaDescent(_ size: CGFloat) -> CGFloat {
         -CTFontGetDescent(CTFontCreateWithName("Helvetica" as CFString, 1000, nil)) / 1000 * size
