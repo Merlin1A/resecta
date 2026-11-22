@@ -160,9 +160,23 @@ struct ContentGlyphFontTests {
         let glyphs = try #require(try ContentGlyphWalkTests.glyphs("BT /F1 12 Tf (XY) Tj ET", font: Self.twoWidths(from: "88")),
                                   "the control: codes 88 and 89 read")
         #expect(glyphs.count == 2)
-        for first in ["256", "-1", "9223372036854775806"] {
+        // 2^63 - 1 is the largest integer; -2^63 the smallest.
+        for first in ["256", "-1", "9223372036854775806", "9223372036854775807", "-9223372036854775808"] {
             #expect(try ContentGlyphWalkTests.glyphs("BT /F1 12 Tf (XY) Tj ET", font: Self.twoWidths(from: first)) == nil,
                     "/FirstChar \(first)")
+        }
+    }
+
+    @Test("At the end of the code range the last codes take their own widths; a width that would be code 256 neither stops the walk nor refuses the font")
+    func firstCodeAtTheEdge() throws {
+        let both = try #require(try ContentGlyphWalkTests.glyphs("BT /F1 12 Tf (\\376\\377) Tj ET", font: Self.twoWidths(from: "254")),
+                                "codes 254 and 255 read")
+        #expect(both.count == 2)
+        let last = try #require(try ContentGlyphWalkTests.glyphs("BT /F1 12 Tf (\\377) Tj ET", font: Self.twoWidths(from: "255")),
+                                "code 255 reads; the second width would be code 256")
+        #expect(last.count == 1)
+        for glyph in both + last {
+            #expect(abs(glyph.box.width - 7.2) < 0.05, "\(glyph.text): width \(glyph.box.width), 600 at 12 pt")
         }
     }
 
