@@ -88,7 +88,8 @@ struct ContentGlyphRouteTests {
         // The grown box covers its word; what it is told by is today's box.
         let page = try #require(doc.page(at: 0))
         let range = ((try #require(page.string)) as NSString).range(of: "Total")
-        let today = try #require(DocumentSearcher().normalizedRect(for: try #require(page.selection(for: range)), page: page))
+        let selection = try #require(page.selection(for: range))
+        let today = try #require(DocumentSearcher().normalizedRect(for: selection, page: page))
         #expect(ContentGlyphBoxTests.close(identity, Self.points(today), 0.5), "identity \(identity), today's box \(Self.points(today))")
         func ocr(_ r: CGRect) -> SearchResult {
             SearchResult(pageIndex: 0, normalizedRect: CGRect(x: r.minX / 612, y: r.minY / 792, width: r.width / 612, height: r.height / 792),
