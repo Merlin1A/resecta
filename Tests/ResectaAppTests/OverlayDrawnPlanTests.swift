@@ -167,6 +167,43 @@ struct OverlayDrawnPlanTests {
         #expect(state.drawnPlans[0]?.pageVersion == 1)
     }
 
+    @Test("A cap change during a drag, then the lift: the kept plan is at the new quality")
+    func aCapChangeMidDragThenLift() throws {
+        let pdf = try Self.document()
+        let state = RedactionState()
+        let region = RedactionRegion(id: UUID(), normalizedRect: CGRect(x: 0.5, y: 0.6, width: 0.2, height: 0.03), source: .manual)
+        state.addRegion(region, page: 0, undoManager: nil)
+        let coordinator = try Self.coordinator(pdf, state, suite: "OverlayDrawnPlanTests.aCapChangeMidDragThenLift")
+        let view = PDFView(frame: CGRect(x: 0, y: 0, width: 300, height: 420))
+        view.document = pdf
+        let page = try #require(pdf.page(at: 0))
+        let overlay = try #require(coordinator.pdfView(view, overlayViewFor: page) as? RedactionOverlayView)
+        overlay.frame = CGRect(x: 0, y: 0, width: 300, height: 420)
+        func draw() {
+            _ = UIGraphicsImageRenderer(size: overlay.bounds.size).image {
+                overlay.drawCommittedRegions(ctx: $0.cgContext, in: overlay.bounds)
+            }
+        }
+        // The drag draws a working copy.
+        var moved = region
+        moved.normalizedRect = region.normalizedRect.offsetBy(dx: 0.05, dy: 0)
+        overlay.configure(with: [moved], selectedIDs: [])
+        draw()
+        #expect(state.drawnPlans[0]?.fromStoredRegions == false && state.drawnPlans[0]?.exportDPI == 300)
+        // The cap falls mid-drag; the page on screen redraws its working copy.
+        coordinator.qualityCap = 150
+        draw()
+        #expect(state.drawnPlans[0]?.fromStoredRegions == false && state.drawnPlans[0]?.exportDPI == 150)
+        // The lift stores the move; the page draws the stored regions.
+        #expect(state.moveRegion(region.id, page: 0, newRect: moved.normalizedRect, undoManager: nil))
+        coordinator.refreshOverlay(for: 0)
+        draw()
+        let kept = try #require(state.drawnPlans[0])
+        #expect(kept.exportDPI == 150, "no plan from before the cap change survives the lift")
+        #expect(kept.fromStoredRegions == true)
+        #expect(kept.pageVersion == state.pageVersion(0))
+    }
+
     @Test("A cap change keeps no plan of regions a page was not drawn with")
     func aCapChangeKeepsOnlyWhatWasDrawn() throws {
         let pdf = try Self.document()
