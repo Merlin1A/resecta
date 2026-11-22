@@ -170,9 +170,6 @@ public final class PageRasterizer: @unchecked Sendable {
             } else {
                 try self.paint(context: ctx, page: page, content: content)
                 try self.readBack(context: ctx, page: page, width: width, height: height, content: content)
-                // A record whose sides are not the page's: its regions were
-                // painted outside the plan, and the record says so.
-                if raster.pixels.recordDisagrees { planPaint.outsidePlan = Set(page.regions.map(\.id)) }
             }
 
             // 7. Extract final image
@@ -201,8 +198,9 @@ public final class PageRasterizer: @unchecked Sendable {
         let pixels: PagePixels
     }
 
-    /// The front gate, the test seam, the mode check and the DPI. Throws
-    /// the page's refusal.
+    /// The front gate, the test seam, the mode check, the DPI and the
+    /// page's pixels, which refuse a page whose sides are not its record's.
+    /// Throws the page's refusal.
     private func preflight(_ page: PDFPageData, dpiCap: Int) throws -> Raster {
         try Task.checkCancellation()
 
@@ -270,6 +268,12 @@ public final class PageRasterizer: @unchecked Sendable {
         }
         guard let pixels = Self.pagePixels(page, dpi: dpi) else {
             throw PipelineError.redactionError(.bitmapCreationFailed(pageIndex: page.pageIndex))
+        }
+        // A page whose record's sides are not its own (both read at run
+        // entry, the record first): refused by name, before it is rendered
+        // or painted.
+        guard !pixels.recordDisagrees else {
+            throw PipelineError.redactionError(.pageSidesNotAsRecorded(pageIndex: page.pageIndex))
         }
         return Raster(effectiveSize: effectiveSize, dpi: dpi, pixels: pixels)
     }

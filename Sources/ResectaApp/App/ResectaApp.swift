@@ -254,6 +254,7 @@ struct ResectaApp: App {
         .redactionError(.fillVerificationFailed(pageIndex: 0)),
         .redactionError(.renderTimeout(pageIndex: 0)),
         .redactionError(.pageTooLarge(pageIndex: 0)),
+        .redactionError(.pageSidesNotAsRecorded(pageIndex: 0)),
         .redactionError(.reconstructionFailed),
         .verificationError(.engineCrash(layerIndex: 0)),
     ] + PipelineError.ExportFailure.allCases.map(PipelineError.exportError)
@@ -287,6 +288,7 @@ struct ResectaApp: App {
             case .fillVerificationFailed: "redactionError.fillVerificationFailed"
             case .renderTimeout: "redactionError.renderTimeout"
             case .pageTooLarge: "redactionError.pageTooLarge"
+            case .pageSidesNotAsRecorded: "redactionError.pageSidesNotAsRecorded"
             case .reconstructionFailed: "redactionError.reconstructionFailed"
             }
         case .verificationError(let failure):
