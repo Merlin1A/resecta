@@ -1,0 +1,18 @@
+Property: A match's box grows to its own drawn glyphs where PDFKit places them short.
+Area: Search, the match boxes from the page's own drawing
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'ContentGlyphWalkTests|ContentGlyphFontTests|ContentGlyphBoxTests|ContentGlyphMapTests|ContentGlyphExportTests|ContentGlyphRouteTests'
+Must go red: RedactionEngineTests/ContentGlyphBoxTests lineEndSliver; RedactionEngineTests/ContentGlyphBoxTests backwardTJ; RedactionEngineTests/ContentGlyphExportTests ownInkCovered [the line's last word]; RedactionEngineTests/ContentGlyphExportTests ownInkCovered [a TJ that draws Total back]; RedactionEngineTests/ContentGlyphRouteTests acrossTheSeam
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
+index f49c73e3..02ffc674 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
+@@ -163,6 +163,7 @@ extension DocumentSearcher {
+     /// `rect` itself when `glyphs` is nil.
+     nonisolated func grown(_ rect: CGRect, line: CGRect, by glyphs: [OwnGlyph]?, page: PDFPage) -> CGRect {
+         guard let glyphs else { return rect }
++        if !glyphs.isEmpty { return rect }
+         let crop = page.bounds(for: .cropBox)
+         let turned = page.rotation == 90 || page.rotation == 270
+         let width = turned ? crop.height : crop.width, height = turned ? crop.width : crop.height

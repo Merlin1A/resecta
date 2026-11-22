@@ -1,0 +1,19 @@
+Property: Word spacing moves only after byte 32.
+Area: Search, the match boxes from the page's own drawing
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'ContentGlyphWalkTests|ContentGlyphFontTests|ContentGlyphBoxTests|ContentGlyphMapTests|ContentGlyphExportTests|ContentGlyphRouteTests'
+Must go red: RedactionEngineTests/ContentGlyphWalkTests spacingAndScale
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphWalk.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphWalk.swift
+index a055f4f7..a4ab0f96 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphWalk.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphWalk.swift
+@@ -79,7 +79,7 @@ enum ContentGlyphWalk {
+                 glyphs.append(ShownGlyph(text: text, box: quad.applying(trm),
+                                          singular: trm.a * trm.d - trm.b * trm.c == 0, renderMode: g.renderMode,
+                                          upright: trm.b == 0 && trm.c == 0 && trm.a > 0 && trm.d > 0))
+-                let tx = (advance / 1000 * g.size + g.charSpacing + (code == 32 ? g.wordSpacing : 0)) * th
++                let tx = (advance / 1000 * g.size + g.charSpacing + g.wordSpacing) * th
+                 tm = CGAffineTransform(translationX: tx, y: 0).concatenating(tm)
+             }
+         }
