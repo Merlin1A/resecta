@@ -123,12 +123,15 @@ extension DocumentSearcher {
     nonisolated func lineBoxes(for nsRange: NSRange, page: PDFPage) -> [(rect: CGRect, identity: CGRect?)]? {
         guard let selection = page.selection(for: nsRange) else { return nil }
         let lines = selection.selectionsByLine()
-        let own = Self.ownGlyphs(for: nsRange, page: page)
         let boxes = lines.compactMap { line -> (rect: CGRect, identity: CGRect?)? in
             normalizedRect(for: line, page: page).map {
-                let fitted = Self.inkFittedRect($0, page: page, text: line.string,
-                                                range: lines.count == 1 ? nsRange : line.range(at: 0, on: page), paintOnly: true)
-                let rect = grown(fitted, line: line.bounds(for: page), by: own, page: page)
+                // Each line grows only to the glyphs of its own part of the
+                // range: at tight leading another line's glyphs reach into
+                // this line's band, and the whole range's would pull its edge
+                // across to them.
+                let lineRange = lines.count == 1 ? nsRange : line.range(at: 0, on: page)
+                let fitted = Self.inkFittedRect($0, page: page, text: line.string, range: lineRange, paintOnly: true)
+                let rect = grown(fitted, line: line.bounds(for: page), by: Self.ownGlyphs(for: lineRange, page: page), page: page)
                 return (rect, rect == fitted ? nil : fitted)
             }
         }
@@ -150,14 +153,14 @@ extension DocumentSearcher {
         guard let cgPage = page.pageRef, Self.carriesHiddenTextOverImage(page, cgPage: cgPage),
               let selection = page.selection(for: nsRange) else { return nil }
         let lines = selection.selectionsByLine()
-        let own = Self.ownGlyphs(for: nsRange, page: page)
         var paint: [CGRect] = [], strip: [CGRect] = [], degraded = false, identity: [CGRect?] = []
         for line in lines {
             guard let raw = normalizedRect(for: line, page: page) else { continue }
-            let fit = Self.inkFit(raw, page: page, text: line.string,
-                                  range: lines.count == 1 ? nsRange : line.range(at: 0, on: page), paintOnly: true)
+            let lineRange = lines.count == 1 ? nsRange : line.range(at: 0, on: page)
+            let fit = Self.inkFit(raw, page: page, text: line.string, range: lineRange, paintOnly: true)
             strip.append(raw)
-            let box = grown(fit.rect, line: line.bounds(for: page), by: own, page: page)
+            // Its own line's glyphs only, as in `lineBoxes`.
+            let box = grown(fit.rect, line: line.bounds(for: page), by: Self.ownGlyphs(for: lineRange, page: page), page: page)
             paint.append(box)
             identity.append(fit.identity ?? (box == fit.rect ? nil : fit.rect))
             degraded = degraded || fit.degraded
