@@ -299,7 +299,7 @@ extension VerificationCorpusRunnerTests {
             // app keeps them as drawn.
             let confirmed = RunRecord.Page(
                 pageIndex: i,
-                regions: pageRegions.map { RunRecord.DrawnRegion(id: $0.id, normalizedRect: $0.normalizedRect) },
+                regions: pageRegions.map(RunRecord.DrawnRegion.init(region:)),
                 cropBox: cropBoxBounds.size, rotation: page.rotation, switchOn: false)
 
             return PDFPageData(
