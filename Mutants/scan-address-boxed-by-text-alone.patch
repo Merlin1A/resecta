@@ -1,7 +1,7 @@
 Property: Each copy of a repeated address keeps its own box, kept by its place. Planted: every copy takes the first copy's box, kept by text alone.
 Area: Search, Scan's address assembly
 Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'ScanDuplicateAddressTests'
-Must go red: RedactionEngineTests/ScanDuplicateAddressTests stackedCopiesEachOnTheirOwnLines; RedactionEngineTests/ScanDuplicateAddressTests copiesAtOnePlaceTakeOneBoxEach
+Must go red: RedactionEngineTests/ScanDuplicateAddressTests stackedCopiesEachOnTheirOwnLines; RedactionEngineTests/ScanDuplicateAddressTests stackedCopiesOnThePictureLeg; RedactionEngineTests/ScanDuplicateAddressTests copiesAtOnePlaceTakeOneBoxEach
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift
