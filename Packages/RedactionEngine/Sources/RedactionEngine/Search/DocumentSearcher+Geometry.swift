@@ -191,11 +191,14 @@ extension DocumentSearcher {
         return Self.normalized(visual)
     }
 
-    /// A paint box (normalized) grown sideways to the match's own drawn
-    /// glyphs on this line (`ownGlyphs`): each glyph's box is first cut to
-    /// the line's height (`line`, page space), so a box grows along its line
-    /// and never into the next; a glyph that does not reach the line's height,
-    /// or whose cut box is empty once normalized, adds nothing. An edge moves
+    /// A paint box (normalized) grown to the match's own drawn glyphs on this
+    /// line (`ownGlyphs`): each glyph's box is first cut to the line's height
+    /// (`line`, page space), so a box grows along its line and never into the
+    /// next. It grows sideways; its top and bottom move only where the paint
+    /// is shorter than the line, as on a page with hidden text over an image
+    /// that also draws text, and then no further than the line's own height.
+    /// A glyph that does not reach the line's height, or whose cut box is
+    /// empty once normalized, adds nothing. An edge moves
     /// only to a glyph that lies past it by more than `growthSlack`; a box no
     /// edge of which moves is `rect` exactly. Never smaller than `rect`;
     /// `rect` itself when `glyphs` is nil.
