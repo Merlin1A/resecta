@@ -16,7 +16,7 @@ struct SavedListNotSavedLineTests {
 
         var file: String {
             switch self {
-            case .saveFromSearch: "Views/SearchAndRedactSheet.swift"
+            case .saveFromSearch: "Views/Search/SearchAndRedactSheet+SaveRegex.swift"
             case .savedPatternsAdd: "Views/SavedRegexLibraryView.swift"
             case .alwaysFlagAdd, .neverFlagAdd: "Views/CustomTermsView.swift"
             case .savedSearchSave, .savedSearchRename: "Views/Search/SavedSearchListSheet.swift"
