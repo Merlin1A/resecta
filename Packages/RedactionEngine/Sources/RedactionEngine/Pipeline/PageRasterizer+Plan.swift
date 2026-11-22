@@ -64,6 +64,37 @@ extension PixelPlan.PixelRect {
 }
 
 extension PageRasterizer {
+    /// A box's fill before ink growth at "as placed", the one rule the run
+    /// paints a box by there and the editor's kept plan reads: its projection
+    /// on the raster, joined with each of its regions as the region path
+    /// fills it, within the bitmap. At the switch's policy a box the ink
+    /// check judges is painted with this as its floor, so the run never
+    /// paints less than this. Nil when the box does not project; the run
+    /// then fills its regions as strays, each by the region path.
+    package static func boxFill(box: PaintedBox, regions: [UUID: RedactionRegion], raster: PixelPlan.Raster,
+                                content: CGSize) -> PixelPlan.PixelRect? {
+        boxFillAndProjection(box: box, regions: regions, raster: raster, content: content)?.fill
+    }
+
+    /// `boxFill` with the projection it was made from (the run's growth reads
+    /// the projection's margin edge).
+    static func boxFillAndProjection(box: PaintedBox, regions: [UUID: RedactionRegion], raster: PixelPlan.Raster,
+                                     content: CGSize) -> (fill: PixelPlan.PixelRect, projection: PixelPlan.Projection)? {
+        guard let projection = PixelPlan.project(
+            inner: box.inner, paint: box.paint,
+            limitAbove: box.limitAbove, limitBelow: box.limitBelow, raster: raster) else { return nil }
+        let bitmap = CGRect(x: 0, y: 0, width: raster.pixelWidth, height: raster.pixelHeight)
+        var rect = projection.painted.bitmapRect
+        for id in box.regionIDs {
+            guard let region = regions[id] else { continue }
+            let filled = normalizedToFillPixels(region.normalizedRect, content: content).intersection(bitmap)
+            if !filled.isEmpty { rect = rect.union(filled) }
+        }
+        return (PixelPlan.PixelRect(bitmapRect: rect), projection)
+    }
+}
+
+extension PageRasterizer {
     #if DEBUG
     /// Test seam: runs on the bitmap after the plan's fills and before their
     /// readback, so a test can unpaint a pixel the readback then reads as unpainted.
@@ -245,10 +276,9 @@ extension PageRasterizer {
         // A box's paint at "as placed": its projection, its regions' own
         // fills, and its growth over the ink that crosses its edge.
         func asPlacedRect(_ box: PaintedBox, grows: Bool) throws -> CGRect? {
-            guard let projection = PixelPlan.project(
-                inner: box.inner, paint: box.paint,
-                limitAbove: box.limitAbove, limitBelow: box.limitBelow, raster: raster) else { return nil }
-            var rect = withRegionFills(projection.painted.bitmapRect, of: box)
+            guard let (fill, projection) = Self.boxFillAndProjection(
+                box: box, regions: regionsByID, raster: raster, content: content) else { return nil }
+            var rect = fill.bitmapRect
             if grows,
                let grown = try inkGrowthRect(context: ctx, fillRect: projection.marginEdge.bitmapRect) {
                 rect = rect.union(grown)

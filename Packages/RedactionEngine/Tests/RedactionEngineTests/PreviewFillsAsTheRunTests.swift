@@ -1,6 +1,7 @@
 import CoreGraphics
 import Foundation
 import PDFKit
+import RedactionCore
 import Testing
 @testable import RedactionEngine
 
@@ -45,7 +46,8 @@ struct PreviewFillsAsTheRunTests {
             .map { RedactionRegion(id: UUID(), normalizedRect: $0, source: .manual) }
     }
 
-    static func pageData(_ page: PDFPage, regions: [RedactionRegion], chosen: Int) -> PDFPageData {
+    static func pageData(_ page: PDFPage, regions: [RedactionRegion], chosen: Int,
+                         record: Bool = false) -> PDFPageData {
         PDFPageData(page: page, pageIndex: 0, regions: regions.map { region in
                         var clamped = region
                         clamped.normalizedRect = region.normalizedRect.clampedToNormalized()
@@ -53,7 +55,12 @@ struct PreviewFillsAsTheRunTests {
                     },
                     fillColor: .black, targetDPI: chosen, pipelineMode: .secureRasterization,
                     rotation: page.rotation, cropBoxBounds: page.bounds(for: .cropBox), cgPage: page.pageRef,
-                    hasText: false)
+                    hasText: false,
+                    confirmedPage: record
+                        ? RunRecord.Page(pageIndex: 0, regions: regions.map(RunRecord.DrawnRegion.init(region:)),
+                                         cropBox: page.bounds(for: .cropBox).size, rotation: page.rotation,
+                                         switchOn: false)
+                        : nil)
     }
 
     /// The run's filled rectangle for each region: the black pixels in a
@@ -116,6 +123,62 @@ struct PreviewFillsAsTheRunTests {
         }
         print("[preview-fills] \(dpi) dpi: \(compared) boxes compared on \(Self.pages.count) pages")
         #expect(compared == 12)
+    }
+
+    @Test("With a record, at 300, 200 and 150 each box's fill is the run's, pixel for pixel", arguments: [300, 200, 150])
+    func keptPlanFillsAsTheRunWithARecord(_ dpi: Int) async throws {
+        var compared = 0
+        for spec in Self.pages {
+            let page = try Self.blankPage(width: spec.width, height: spec.height, rotate: spec.rotate)
+            let regions = Self.regions()
+            let cropBox = page.bounds(for: .cropBox).size
+            let kept = DrawnPlan(pageIndex: 0, regions: regions, cropBox: cropBox, rotation: page.rotation,
+                                 switchOn: false, exportDPI: dpi, fillColor: .black)
+            #expect(kept.boxes.count == regions.count)
+            #expect(kept.widthSixtyFourths != nil && kept.heightSixtyFourths != nil)
+            let result = try await PageRasterizer().rasterize(Self.pageData(page, regions: regions, chosen: dpi,
+                                                                            record: true))
+            let image = result.pageOutput.image
+            var expected: [UUID: CGRect] = [:]
+            for box in kept.boxes {
+                #expect(box.fill.count == 1, "every box projects")
+                let id = try #require(box.regionIDs.first)
+                expected[id] = try #require(box.fill.first)
+            }
+            // The run's own record of what it painted, by box.
+            let painted = result.paintedBoxes
+            #expect(painted.count == kept.boxes.count)
+            for (index, box) in kept.boxes.enumerated() {
+                let px = try #require(painted[index])
+                let ran = CGRect(x: px.firstColumn, y: px.firstRowFromBottom, width: px.columns, height: px.rows)
+                #expect(ran == box.fill.first, "page \(spec.width) turned \(spec.rotate) at \(dpi), box \(index)")
+            }
+            let run = Self.runFills(image, around: Self.onImage(expected, image))
+            for region in regions {
+                #expect(run[region.id] == Self.onImage(expected, image)[region.id],
+                        "page \(spec.width)x\(spec.height) turned \(spec.rotate) at \(dpi): run \(String(describing: run[region.id])), kept \(String(describing: expected[region.id]))")
+                compared += 1
+            }
+        }
+        print("[preview-fills] record, \(dpi) dpi: \(compared) boxes compared on \(Self.pages.count) pages")
+        #expect(compared == 12)
+    }
+
+    @Test("A box that does not project is kept as its regions' own fills, as the run fills it then")
+    func aBoxThatDoesNotProject() throws {
+        let page = try Self.blankPage(width: "612", height: "792", rotate: 0)
+        let region = Self.regions()[0]
+        let cropBox = page.bounds(for: .cropBox).size
+        let made = DrawnPlan(pageIndex: 0, regions: [region], cropBox: cropBox, rotation: 0, switchOn: false,
+                             exportDPI: 300, fillColor: .black)
+        let plan = try #require(made.plan)
+        // The same box with an empty inner, which no raster projects.
+        var box = try #require(plan.boxes.first)
+        box.inner = PageRect64(minX: box.inner.minX, minY: box.inner.minY, maxX: box.inner.minX, maxY: box.inner.maxY)
+        let empty = PaintPlan(widthSixtyFourths: plan.widthSixtyFourths, heightSixtyFourths: plan.heightSixtyFourths,
+                              boxes: [box])
+        let fills = DrawnPlan.boxFills(plan: empty, regions: [region], cropBox: cropBox, rotation: 0, dpi: 300)
+        #expect(fills == [[try #require(made.filledPixels[region.id])]])
     }
 
     @Test("Chosen 300 under the cap of 150: the kept plan fills as the run at 150, not as at 300")

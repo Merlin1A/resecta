@@ -36,6 +36,27 @@ public struct DrawnPlan: Equatable, Sendable {
     /// placed" each box covers one region, so a box is filled with its
     /// region's rectangle. Empty when the plan was given whole.
     public let filledPixels: [UUID: CGRect]
+    /// The page's two sides S in whole sixty-fourths, in the frame as it is
+    /// rasterised, as the plan was made with them. Nil when a side cannot be
+    /// read.
+    public var widthSixtyFourths: Int? { plan?.widthSixtyFourths }
+    public var heightSixtyFourths: Int? { plan?.heightSixtyFourths }
+    /// The page's version when the editor kept this plan, and whether the
+    /// regions it was made from were the page's stored regions then (not a
+    /// working copy, as during a drag). Nil until the editor stamps it
+    /// (`stamped(pageVersion:fromStoredRegions:)`); a reader treats a plan
+    /// at another version than the page's as one made before the page last
+    /// changed.
+    public private(set) var pageVersion: Int?
+    public private(set) var fromStoredRegions: Bool?
+
+    /// This plan as kept at a page version, from the stored regions or not.
+    public func stamped(pageVersion: Int, fromStoredRegions: Bool) -> DrawnPlan {
+        var kept = self
+        kept.pageVersion = pageVersion
+        kept.fromStoredRegions = fromStoredRegions
+        return kept
+    }
 
     /// One box of the plan as the overlay draws it: rectangles as a share of
     /// the page (0 to 1, origin bottom-left) in the frame its regions are
@@ -49,6 +70,13 @@ public struct DrawnPlan: Equatable, Sendable {
         /// The rectangle outlined: the box's `tight`, its selected letters
         /// and covered regions.
         public let outline: CGRect
+        /// The pixels a run fills the box with before ink growth, on the
+        /// page's raster at `exportDPI`, in the fill bitmap's frame (origin
+        /// bottom-left), when the run paints from the plan (a page with a
+        /// record): one rectangle, the run's own `PageRasterizer.boxFill`;
+        /// for a box that does not project, its regions' own fills, as the
+        /// run fills them then. Empty when the plan was given whole.
+        public let fill: [CGRect]
     }
 
     /// The page's plan from `regions` as drawn, the page's crop box and
@@ -59,7 +87,37 @@ public struct DrawnPlan: Equatable, Sendable {
                                            cropBox: cropBox, rotation: rotation, switchOn: switchOn)
         self.init(pageIndex: pageIndex, switchOn: switchOn, exportDPI: exportDPI, fillColor: fillColor, plan: plan,
                   filledPixels: Self.filledPixels(regions: regions, cropBox: cropBox, rotation: rotation,
-                                                  dpi: exportDPI))
+                                                  dpi: exportDPI),
+                  boxFills: plan.map { Self.boxFills(plan: $0, regions: regions, cropBox: cropBox,
+                                                     rotation: rotation, dpi: exportDPI) } ?? [])
+    }
+
+    /// Each box's fill as a run with a record paints it: the page's pixels
+    /// by the run's own `PageRasterizer.pagePixels` (the plan's raster and
+    /// the content span), the regions admitted and clamped as the run's
+    /// inputs make them, then `PageRasterizer.boxFill`; a box that does not
+    /// project gets its regions' own fills. Empty when the raster rule
+    /// refuses the quality.
+    static func boxFills(plan: PaintPlan, regions: [RedactionRegion], cropBox: CGSize, rotation: Int,
+                         dpi: Int) -> [[CGRect]] {
+        guard let pixels = PageRasterizer.pagePixels(
+            cropBox: CGRect(origin: .zero, size: cropBox), rotation: rotation, hasRecord: true,
+            recorded: (plan.widthSixtyFourths, plan.heightSixtyFourths), dpi: dpi),
+            let raster = pixels.plan else { return [] }
+        var byID: [UUID: RedactionRegion] = [:]
+        for region in regions where RedactionRegion.isAdmitted(normalizedRect: region.normalizedRect) {
+            var clamped = region
+            clamped.normalizedRect = region.normalizedRect.clampedToNormalized()
+            byID[region.id] = clamped
+        }
+        return plan.boxes.map { box in
+            if let fill = PageRasterizer.boxFill(box: box, regions: byID, raster: raster, content: pixels.content) {
+                return [fill.bitmapRect]
+            }
+            return box.regionIDs.sorted { $0.uuidString < $1.uuidString }.compactMap { id in
+                byID[id].map { normalizedToFillPixels($0.normalizedRect, content: pixels.content) }
+            }
+        }
     }
 
     /// Each admitted region's fill on the page's raster at `dpi`, as the run
@@ -77,7 +135,7 @@ public struct DrawnPlan: Equatable, Sendable {
     }
 
     package init(pageIndex: Int, switchOn: Bool, exportDPI: Int, fillColor: FillColor, plan: PaintPlan?,
-                 filledPixels: [UUID: CGRect] = [:]) {
+                 filledPixels: [UUID: CGRect] = [:], boxFills: [[CGRect]] = []) {
         self.pageIndex = pageIndex
         self.switchOn = switchOn
         self.exportDPI = exportDPI
@@ -90,6 +148,9 @@ public struct DrawnPlan: Equatable, Sendable {
             CGRect(x: Double(r.minX) / w, y: Double(r.minY) / h,
                    width: Double(r.maxX - r.minX) / w, height: Double(r.maxY - r.minY) / h)
         }
-        boxes = plan.boxes.map { Box(regionIDs: $0.regionIDs, paint: share($0.paint), outline: share($0.tight)) }
+        boxes = plan.boxes.enumerated().map { i, box in
+            Box(regionIDs: box.regionIDs, paint: share(box.paint), outline: share(box.tight),
+                fill: i < boxFills.count ? boxFills[i] : [])
+        }
     }
 }
