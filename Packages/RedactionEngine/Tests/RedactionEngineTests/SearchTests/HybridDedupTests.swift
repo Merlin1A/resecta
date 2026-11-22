@@ -176,6 +176,12 @@ struct HybridDedupTests {
                 "text-layer boxes made from a fit \(fitted)")
         // The address lines, fitted whole: their identity rides into the assembled union and its box.
         #expect(texts["EmbeddedTextSource.swift"]?.contains("identityRect: fit.identity") == true, "an address line carries its identity")
+        // An address line grown to its own glyphs keeps the identity it had: Scan grows it
+        // through the line's own copy, which carries the box before the growth as identity.
+        #expect(texts["DocumentSearcher+ScanGate.swift"]?.contains("return line.grown(to: rect)") == true,
+                "Scan grows an address line through its identity-keeping copy")
+        #expect(texts["OCREngine.swift"]?.contains("identityRect: identityRect ?? normalizedRect") == true,
+                "a grown line keeps its identity")
         #expect(texts["DocumentSearcher+ScanGate.swift"]?.contains("identity: address.identityUnionRect)") == true,
                 "an assembled address's box carries its lines' identities")
     }

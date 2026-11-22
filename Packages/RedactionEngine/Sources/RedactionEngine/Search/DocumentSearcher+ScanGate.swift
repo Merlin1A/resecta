@@ -73,10 +73,7 @@ extension DocumentSearcher {
             }
             let rect = grown(line.normalizedRect, line: span.pageRect, by: glyphs, page: page)
             guard rect != line.normalizedRect else { return line }
-            return OCREngine.TextLine(text: line.text, normalizedRect: rect, confidence: line.confidence,
-                                      textLayerRect: line.textLayerRect, inkFitDegraded: line.inkFitDegraded,
-                                      identityRect: line.identityRect ?? line.normalizedRect,
-                                      ungrownRect: line.normalizedRect, wordBoxes: line.wordBoxes)
+            return line.grown(to: rect)
         }
     }
 

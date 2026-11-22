@@ -36,6 +36,16 @@ public struct OCREngine: Sendable {
         /// where Vision gave none. A match that crosses lines is boxed on
         /// these, not on the whole line.
         var wordBoxes: [WordBox] = []
+
+        /// This line with its box grown to `rect`, every other field kept:
+        /// its identity stays the box it had (or the identity it already
+        /// carried), and the box before the growth is kept for the join.
+        func grown(to rect: CGRect) -> TextLine {
+            TextLine(text: text, normalizedRect: rect, confidence: confidence,
+                     textLayerRect: textLayerRect, inkFitDegraded: inkFitDegraded,
+                     identityRect: identityRect ?? normalizedRect,
+                     ungrownRect: normalizedRect, wordBoxes: wordBoxes)
+        }
     }
 
     /// One word of a recognised line: its UTF-16 range in the line's text and
