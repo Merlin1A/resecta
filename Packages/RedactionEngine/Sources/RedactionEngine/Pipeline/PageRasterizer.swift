@@ -121,7 +121,8 @@ public final class PageRasterizer: @unchecked Sendable {
     @concurrent
     public func rasterize(_ page: PDFPageData, dpiCap: Int = defaultDPICap) async throws -> RasterizeResult {
         let raster = try preflight(page, dpiCap: dpiCap)
-        // Written before the render; after it, only the ink test changes it.
+        // Written before the render; after it, only the ink test and the
+        // plan's widened boxes change it, each through its one drop.
         var textLayer = await prepareTextLayer(page, effectiveSize: raster.effectiveSize)
         let renderedImage = try await render(page, raster: raster)
 
@@ -449,20 +450,15 @@ public final class PageRasterizer: @unchecked Sendable {
                context: ctx, entries: entries, pageSize: effectiveSize,
                rotation: page.rotation, content: content
            ) {
-            textLayer.entries = nil
-            textLayer.removalRects = []
-            textLayer.digest = nil
-            textLayer.runsLeftOut = 0
-            textLayer.hiddenTextLines = nil
             if Self.inkTestCanRun(context: ctx, pageSize: effectiveSize) {
-                textLayer.fallbackReason = .hiddenText
+                textLayer.drop(reason: .hiddenText)
                 pageRasterizerLogger.log(
                     "page \(page.pageIndex) fell back to secure rasterization at runtime (hidden text)"
                 )
             } else {
                 // The test could not run: not known clean, so the secure
                 // path, with the reason that reads true for it.
-                textLayer.fallbackReason = .extractionFailed
+                textLayer.drop(reason: .extractionFailed)
                 pageRasterizerLogger.log(
                     "page \(page.pageIndex) fell back to secure rasterization at runtime (the ink test could not run)"
                 )
