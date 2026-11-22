@@ -10,10 +10,10 @@ extension RedactionOverlayView {
 
     /// Convert overlay-view rect to normalized PDF coordinates (0–1, bottom-left origin).
     func overlayToPDFNormalized(_ rect: CGRect) -> CGRect {
-        let w = bounds.width
-        let h = bounds.height
+        let w = pageSize?.width ?? bounds.width
+        let h = pageSize?.height ?? bounds.height
         guard w > 0, h > 0 else { return .zero }
-        // The bounds are the STORED page (PDFKit turns this view with the
+        // The page size is the STORED page (PDFKit turns this view with the
         // page); a region lives in the SHOWN frame (`CanvasTurn`).
         let stored = CGRect(
             x: rect.minX / w,
@@ -26,8 +26,8 @@ extension RedactionOverlayView {
 
     /// Convert normalized PDF coordinates back to overlay-view rect.
     func pdfNormalizedToOverlay(_ normalized: CGRect) -> CGRect {
-        let w = bounds.width
-        let h = bounds.height
+        let w = pageSize?.width ?? bounds.width
+        let h = pageSize?.height ?? bounds.height
         let stored = CanvasTurn.stored(fromShown: normalized, rotation: pageRotation)
         return CGRect(
             x: stored.minX * w,
