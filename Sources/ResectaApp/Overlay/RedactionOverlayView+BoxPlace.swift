@@ -32,11 +32,17 @@ extension RedactionOverlayView {
     }
 
     /// The page rectangles PDFKit gives the rects the gesture in progress
-    /// placed, for the boxes named.
+    /// placed, for the boxes named, read at the commit. This canvas's own
+    /// copy of each box takes the same rectangle (none where none was read,
+    /// as the commit stores it), so after the lift the canvas shows the
+    /// stored page exactly.
     func drawnPageRects(for ids: [UUID]) -> [UUID: CGRect] {
         var rects: [UUID: CGRect] = [:]
         for id in ids {
             if let rect = gestureOverlayRects[id], let page = pageRectByPDFKit(rect) { rects[id] = page }
+        }
+        for index in regions.indices where ids.contains(regions[index].id) {
+            regions[index].drawnPageRect = rects[regions[index].id]
         }
         return rects
     }
