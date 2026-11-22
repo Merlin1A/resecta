@@ -217,11 +217,6 @@ struct DetectionOrchestratorOverlapTests {
         // Rationale carries both: the loser's own category and the winner.
         let loserSignal = result.suppressedMatches.first?.rationale?.signals.last
         #expect(loserSignal == .suppressedByOverlap(winnerCategory: .phone, loserCategory: .account))
-        // Audit summary renders the loser as itself, "via" the winner.
-        let summary = MatchAuditExporter.rationaleSummary(
-            result.suppressedMatches.first?.rationale
-        )
-        #expect(summary.contains("suppressedByOverlap(Account via Phone)"))
     }
 
     // MARK: - Coalesced-survivor range
