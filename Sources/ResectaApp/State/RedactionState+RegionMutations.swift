@@ -108,7 +108,7 @@ extension RedactionState {
     @discardableResult
     func resizeRegion(
         _ id: UUID, page: Int,
-        newRect: CGRect, undoManager: UndoManager?, anchored: Bool = false
+        newRect: CGRect, undoManager: UndoManager?, anchored: Bool = false, drawnPageRect: CGRect? = nil
     ) -> Bool {
         guard var pageRegions = regions[page],
               let index = pageRegions.firstIndex(where: { $0.id == id }),
@@ -116,21 +116,26 @@ extension RedactionState {
         bumpRegionVersion()
         let oldRect = pageRegions[index].normalizedRect
         let oldAnchored = pageRegions[index].textAnchored
+        let oldDrawn = pageRegions[index].drawnPageRect
         pageRegions[index].normalizedRect = newRect
         pageRegions[index].textAnchored = anchored
+        pageRegions[index].drawnPageRect = drawnPageRect
         regions[page] = pageRegions
         markRegionsModified()
         registerUndo(undoManager, UndoName.resize) { target in
-            target.resizeRegion(id, page: page, newRect: oldRect, undoManager: undoManager, anchored: oldAnchored)
+            target.resizeRegion(id, page: page, newRect: oldRect, undoManager: undoManager, anchored: oldAnchored,
+                                drawnPageRect: oldDrawn)
         }
         return true
     }
 
-    // Move region to new position. Follows resizeRegion undo pattern.
+    // Move region to new position. Follows resizeRegion undo pattern. A
+    // move with no page rectangle from a gesture (an arrow step) clears the
+    // box's `drawnPageRect`, so it never describes an older place.
     @discardableResult
     func moveRegion(
         _ id: UUID, page: Int,
-        newRect: CGRect, undoManager: UndoManager?, anchored: Bool = false
+        newRect: CGRect, undoManager: UndoManager?, anchored: Bool = false, drawnPageRect: CGRect? = nil
     ) -> Bool {
         guard var pageRegions = regions[page],
               let index = pageRegions.firstIndex(where: { $0.id == id }),
@@ -138,12 +143,15 @@ extension RedactionState {
         bumpRegionVersion()
         let oldRect = pageRegions[index].normalizedRect
         let oldAnchored = pageRegions[index].textAnchored
+        let oldDrawn = pageRegions[index].drawnPageRect
         pageRegions[index].normalizedRect = newRect
         pageRegions[index].textAnchored = anchored
+        pageRegions[index].drawnPageRect = drawnPageRect
         regions[page] = pageRegions
         markRegionsModified()
         registerUndo(undoManager, UndoName.move) { target in
-            target.moveRegion(id, page: page, newRect: oldRect, undoManager: undoManager, anchored: oldAnchored)
+            target.moveRegion(id, page: page, newRect: oldRect, undoManager: undoManager, anchored: oldAnchored,
+                              drawnPageRect: oldDrawn)
         }
         return true
     }
@@ -153,16 +161,18 @@ extension RedactionState {
     @discardableResult
     func moveRegions(
         _ moves: [(id: UUID, newRect: CGRect)], page: Int, undoManager: UndoManager?,
-        anchored: [UUID: Bool] = [:]
+        anchored: [UUID: Bool] = [:], drawnPageRects: [UUID: CGRect] = [:]
     ) -> Bool {
         guard var pageRegions = regions[page] else { return false }
-        var mutableOldRects: [(id: UUID, oldRect: CGRect, oldAnchored: Bool)] = []
+        var mutableOldRects: [(id: UUID, oldRect: CGRect, oldAnchored: Bool, oldDrawn: CGRect?)] = []
         for move in moves {
             guard let index = pageRegions.firstIndex(where: { $0.id == move.id }),
                   pageRegions[index].normalizedRect != move.newRect else { continue }
-            mutableOldRects.append((move.id, pageRegions[index].normalizedRect, pageRegions[index].textAnchored))
+            mutableOldRects.append((move.id, pageRegions[index].normalizedRect, pageRegions[index].textAnchored,
+                                    pageRegions[index].drawnPageRect))
             pageRegions[index].normalizedRect = move.newRect
             pageRegions[index].textAnchored = anchored[move.id] ?? false
+            pageRegions[index].drawnPageRect = drawnPageRects[move.id]
         }
         guard !mutableOldRects.isEmpty else { return false }
         bumpRegionVersion()
@@ -172,7 +182,10 @@ extension RedactionState {
         registerUndo(undoManager, UndoName.moveMany) { target in
             let restoreMoves = snapshot.map { (id: $0.id, newRect: $0.oldRect) }
             let restoreAnchored = Dictionary(uniqueKeysWithValues: snapshot.map { ($0.id, $0.oldAnchored) })
-            target.moveRegions(restoreMoves, page: page, undoManager: undoManager, anchored: restoreAnchored)
+            let restoreDrawn = Dictionary(uniqueKeysWithValues: snapshot.compactMap { item in
+                item.oldDrawn.map { (item.id, $0) } })
+            target.moveRegions(restoreMoves, page: page, undoManager: undoManager, anchored: restoreAnchored,
+                               drawnPageRects: restoreDrawn)
         }
         return true
     }

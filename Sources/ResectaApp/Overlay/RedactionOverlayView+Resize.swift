@@ -45,7 +45,7 @@ extension RedactionOverlayView {
         newRect = newRect.intersection(bounds)
         guard !newRect.isNull else { return }
 
-        regions[idx].normalizedRect = overlayToPDFNormalized(newRect)
+        storeFromGesture(idx, overlayRect: newRect)
         setNeedsDisplay()
     }
 

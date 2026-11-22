@@ -16,6 +16,14 @@ class RedactionOverlayView: UIView {
     /// app never turns a page, so it holds for the overlay's life.
     var pageRotation: Int = 0
     weak var coordinator: PDFViewCoordinator?
+    /// The rect, in this canvas's points, that the gesture in progress gave
+    /// each box it placed: PDFKit reads it at the commit for the box's page
+    /// rectangle (`RedactionRegion.drawnPageRect`). Emptied when the gesture
+    /// ends.
+    var gestureOverlayRects: [UUID: CGRect] = [:]
+    /// Whether the box-place probe has run since PDFKit handed this canvas
+    /// its page (`RedactionOverlayView+BoxPlace.swift`).
+    var boxPlaceProbed = false
 
     /// When true, dragging on empty space creates new regions.
     /// When false, only selection and resize are active.

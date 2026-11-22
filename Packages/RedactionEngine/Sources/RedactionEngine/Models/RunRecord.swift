@@ -91,11 +91,13 @@ public struct RunRecord: Equatable, Sendable {
         /// One page as confirmed, with its plan made at run entry from the
         /// page's geometry as the run reads it (as the initialiser below), and
         /// the geometry noted when its boxes were stored, for the box-place
-        /// check.
+        /// check. The page's read, when there is one, goes to its plan as in
+        /// the initialiser below.
         public init(pageIndex: Int, regions: [DrawnRegion], geometry: RunRecord.PageGeometry,
-                    geometryAtStore: RunRecord.PageGeometry?, switchOn: Bool) {
+                    geometryAtStore: RunRecord.PageGeometry?, switchOn: Bool, read: PageRead? = nil) {
             let planned = Page(pageIndex: pageIndex, regions: regions,
-                               cropBox: geometry.cropBox.size, rotation: geometry.rotation, switchOn: switchOn)
+                               cropBox: geometry.cropBox.size, rotation: geometry.rotation, switchOn: switchOn,
+                               read: read)
             self.init(pageIndex: pageIndex, regions: regions, plan: planned.plan,
                       geometry: geometry, geometryAtStore: geometryAtStore)
         }

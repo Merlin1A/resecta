@@ -24,6 +24,7 @@ struct DebugLaunchHookTests {
         "redactionError.insufficientMemory", "redactionError.unsupportedPageGeometry",
         "redactionError.boxCannotShowLength",
         "redactionError.bitmapCreationFailed", "redactionError.fillVerificationFailed",
+        "redactionError.boxPlaceUnconfirmed",
         "redactionError.renderTimeout", "redactionError.pageTooLarge",
         "redactionError.reconstructionFailed", "redactionError.pageSidesNotAsRecorded",
         "verificationError.engineCrash",

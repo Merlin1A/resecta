@@ -256,6 +256,7 @@ struct ResectaApp: App {
         .redactionError(.boxCannotShowLength(pageIndex: 0)),
         .redactionError(.bitmapCreationFailed(pageIndex: 0)),
         .redactionError(.fillVerificationFailed(pageIndex: 0)),
+        .redactionError(.boxPlaceUnconfirmed(pageIndex: 0)),
         .redactionError(.renderTimeout(pageIndex: 0)),
         .redactionError(.pageTooLarge(pageIndex: 0)),
         .redactionError(.pageSidesNotAsRecorded(pageIndex: 0)),
@@ -291,6 +292,7 @@ struct ResectaApp: App {
             case .boxCannotShowLength: "redactionError.boxCannotShowLength"
             case .bitmapCreationFailed: "redactionError.bitmapCreationFailed"
             case .fillVerificationFailed: "redactionError.fillVerificationFailed"
+            case .boxPlaceUnconfirmed: "redactionError.boxPlaceUnconfirmed"
             case .renderTimeout: "redactionError.renderTimeout"
             case .pageTooLarge: "redactionError.pageTooLarge"
             case .pageSidesNotAsRecorded: "redactionError.pageSidesNotAsRecorded"

@@ -303,11 +303,18 @@ struct PipelineRunner {
         let confirmed = RunInputs.confirmedRecord(
             pageCount: coordinator.documentState.pageCount,
             geometry: coordinator.documentState.sourceDocument.map(RunInputs.pageGeometry(of:)) ?? [:],
+            geometryAtStore: redactionState.geometryAtStore,
             regions: redactionState.regions, reads: coordinator.documentState.pageReads, settings: runSettings)
         // A box the release cannot apply as planned refuses the run here,
         // before any page is built or rasterised.
         if let page = confirmed.firstPageWithBoxThatCannotShowLength {
             throw PipelineError.redactionError(.boxCannotShowLength(pageIndex: page))
+        }
+        // The box-place check: every box is where it was drawn, by the run's
+        // own frame, or the run stops here, before any page is drawn.
+        if let page = confirmed.firstPageWithUnconfirmedBoxPlace(
+            canvasFailures: redactionState.canvasProbeFailuresAtRunEntry()) {
+            throw PipelineError.redactionError(.boxPlaceUnconfirmed(pageIndex: page))
         }
         let pages = coordinator.buildPDFPageData(
             effectiveMode: effectiveMode, runSettings: runSettings, inkPlans: sensitiveTerms.inkPlans,

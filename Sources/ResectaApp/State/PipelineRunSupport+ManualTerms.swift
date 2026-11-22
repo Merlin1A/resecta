@@ -99,7 +99,17 @@ extension PipelineCoordinator {
             // the canvas draw, the whole-page region and Duplicate all make
             // one without it), so its one rect is all the filter removes under.
             for region in pageRegions where region.source == .manual {
-                let rect = region.normalizedRect.clampedToNormalized()
+                // A box a finger placed is read where PDFKit put it on the
+                // page (`drawnPageRect`), not where its share is stored, so a
+                // share stored off its drawn place leaves its word a term that
+                // Layer 2 then reads outside the boxes.
+                let drawnShare = region.drawnPageRect.flatMap { drawn in
+                    page.map {
+                        RunRecord.PageGeometry(cropBox: $0.bounds(for: .cropBox), rotation: $0.rotation)
+                            .displayedShare(ofPageRect: drawn)
+                    }
+                }
+                let rect = (drawnShare ?? region.normalizedRect).clampedToNormalized()
                 if rect.width * rect.height >= Self.wholePageRegionArea {
                     withoutText += 1
                     continue
