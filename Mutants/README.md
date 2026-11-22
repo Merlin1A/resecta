@@ -723,3 +723,4 @@ with its reason and the mutant that is caught in its place.
 | `redact-stop-button-latest-only.patch` | Search These Pages re-runs at once every typed text of the group that can share one run. | ResectaAppTests/RedactStopGroupsTests k720 |
 | `redact-stop-rerun-inherits-all-terms.patch` | The button's run lets any term match, whatever the user's all-terms setting. | ResectaAppTests/RedactStopGroupsTests k720; ResectaAppTests/RedactStopGroupsTests k732 |
 | `redact-stop-not-reached-as-range.patch` | At the stop, not reached is the pages still not reached after the join, as a list; never every page after the latest stop. | ResectaAppTests/RedactStopTests k733k736; ResectaAppTests/RedactStopGroupsTests k727 |
+| `run-log-named-in-a-log-line.patch` | No log line names the run log, the answered set or their types. | ResectaAppTests/RunLogStaysInMemoryTests noLogLineNamesThem() |

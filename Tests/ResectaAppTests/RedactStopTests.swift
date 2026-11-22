@@ -100,7 +100,7 @@ struct RedactStopTests {
 
     @Test("K7-07: the result limit on page 8 of 200: page 8 searched in part, pages 9 to 200 not reached")
     func k707() {
-        let pages = (0..<200).map { $0 <= 7 ? [Facts.ownText] : [] }
+        let pages: [Facts] = (0..<200).map { $0 <= 7 ? [.ownText] : [] }
         let named = RedactStop.pagesToName(runs: [(Self.text("Delia"), Self.account(pages, .stoppedAtResultLimit(page: 7)))], answered: [])
         let expected = Set([RedactStop.Page(page: 7, reason: .searchedInPart)])
             .union((8..<200).map { RedactStop.Page(page: $0, reason: .line(.notReached)) })
