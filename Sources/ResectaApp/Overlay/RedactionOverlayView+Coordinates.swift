@@ -65,7 +65,7 @@ extension RedactionOverlayView {
     var snapPage: SnapGuideEngine.Page {
         SnapGuideEngine.Page(
             regions: regions,
-            bounds: bounds,
+            bounds: pageRectOnCanvas,
             fingerScale: fingerScale,
             toOverlay: pdfNormalizedToOverlay
         )

@@ -270,6 +270,20 @@ class RedactionState {
     /// this constant.
     static let manualDrawNudgeProximityNormalized: CGFloat = 0.082
 
+    /// How far a stored share may lie from an exact value by the maps'
+    /// rounding: the store map divides by the page's rectangle on the
+    /// canvas, whose corner need not be 0, so a full side can come back a
+    /// few units in the last place off.
+    nonisolated static let shareSlack: CGFloat = 1e-12
+
+    /// Whether a share is the whole page: each edge within `shareSlack` of
+    /// the unit square's. A whole-page mark moved or resized back to its
+    /// place on a page of fractional size comes back that close, not exact.
+    nonisolated static func isWholePage(_ rect: CGRect) -> Bool {
+        abs(rect.minX) <= shareSlack && abs(rect.minY) <= shareSlack
+            && abs(rect.maxX - 1) <= shareSlack && abs(rect.maxY - 1) <= shareSlack
+    }
+
     // Per-document audit of search matches that the user applied as
     // redactions. Keyed by the created RedactionRegion.id so undo/redo can
     // drop and restore entries in lockstep with the regions themselves.

@@ -41,8 +41,8 @@ extension RedactionOverlayView {
             to: resized.rect, handle: resized.handle, excluding: selectedID, in: snapPage)
         newRect = Self.flooredRect(newRect, handle: resized.handle, fingerScale: fingerScale)
 
-        // Clamp to overlay bounds
-        newRect = newRect.intersection(bounds)
+        // Clamp to the page as PDFKit places it, which the maps divide by
+        newRect = newRect.intersection(pageRectOnCanvas)
         guard !newRect.isNull else { return }
 
         storeFromGesture(idx, overlayRect: newRect)
