@@ -1,0 +1,18 @@
+Property: Each gesture step's box carries the page rectangle the commit will store, so the stored box is the one shown.
+Area: the canvas, a move, resize or group move in progress
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/RunDoorHeldTouchTests
+Must go red: ResectaAppTests/RunDoorHeldTouchTests liftedTouchOpensTheDoor
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+BoxPlace.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+BoxPlace.swift
+index f7c18d0e..0c9eb49f 100644
+--- a/Sources/ResectaApp/Overlay/RedactionOverlayView+BoxPlace.swift
++++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+BoxPlace.swift
+@@ -34,7 +34,6 @@ extension RedactionOverlayView {
+             preGestureDrawnPageRects[id] = .some(regions[index].drawnPageRect)
+         }
+         regions[index].normalizedRect = overlayToPDFNormalized(overlayRect)
+-        regions[index].drawnPageRect = pageRectByPDFKit(overlayRect)
+         gestureOverlayRects[regions[index].id] = overlayRect
+     }
+ 
