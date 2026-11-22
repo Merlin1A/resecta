@@ -5,13 +5,13 @@ Must go red: ResectaAppTests/RunRecordTests "Each case" (regionsAsDrawn)
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/State/PipelineRunner.swift b/Sources/ResectaApp/State/PipelineRunner.swift
-index c528c5b3..15271ba4 100644
+index d1b65b29f..b69106ecd 100644
 --- a/Sources/ResectaApp/State/PipelineRunner.swift
 +++ b/Sources/ResectaApp/State/PipelineRunner.swift
-@@ -303,7 +303,14 @@ struct PipelineRunner {
-         let confirmed = RunInputs.confirmedRecord(
+@@ -304,7 +304,14 @@ struct PipelineRunner {
              pageCount: coordinator.documentState.pageCount,
              geometry: coordinator.documentState.sourceDocument.map(RunInputs.pageGeometry(of:)) ?? [:],
+             geometryAtStore: redactionState.geometryAtStore,
 -            regions: redactionState.regions, reads: coordinator.documentState.pageReads, settings: runSettings)
 +            regions: redactionState.regions.mapValues { regions in
 +                regions.filter { RedactionRegion.isAdmitted(normalizedRect: $0.normalizedRect) }.map { region in

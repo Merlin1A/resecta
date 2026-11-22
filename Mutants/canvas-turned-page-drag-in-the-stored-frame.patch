@@ -1,7 +1,7 @@
 Property: A box drawn, moved or resized on a turned page is stored in the page as shown, not as stored.
 Area: canvas overlay (turned pages)
 Test command: xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/CanvasTurnedPageTests
-Must go red: ResectaAppTests/CanvasTurnedPageTests dragIsStoredInTheShownFrame; ResectaAppTests/CanvasTurnedPageTests dragMoveIsStoredWhereDropped; ResectaAppTests/CanvasTurnedPageTests resizeFollowsTheShownEdge
+Must go red: ResectaAppTests/CanvasTurnedPageTests dragIsStoredInTheShownFrame; ResectaAppTests/CanvasTurnedPageTests dragMoveIsStoredWhereDropped; ResectaAppTests/CanvasTurnedPageTests resizeFollowsTheShownEdge; ResectaAppTests/BoxPlaceCheckTests probePassesEverywhere
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Coordinates.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Coordinates.swift
