@@ -1,0 +1,19 @@
+Property: Each copy of a repeated address is placed in the page's text where its own box is. Planted: it is placed at the first occurrence of its text.
+Area: Search, Scan's address assembly
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'ScanDuplicateAddressTests'
+Must go red: RedactionEngineTests/ScanDuplicateAddressTests lowerCopyDrawnZipFirstIsBoxed; RedactionEngineTests/ScanDuplicateAddressTests placedWhereItsBoxIs
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift
+index 67c05d6d..917004a8 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift
+@@ -75,7 +75,7 @@ extension DocumentSearcher {
+         while from < end {
+             let found = haystack.range(of: text, options: [], range: NSRange(location: from, length: end - from))
+             guard found.location != NSNotFound else { break }
+-            if let box = boxOf(found), box.intersects(union) { return found }
++            return found
+             from = found.location + 1
+         }
+         return NSRange(location: end, length: 0)
