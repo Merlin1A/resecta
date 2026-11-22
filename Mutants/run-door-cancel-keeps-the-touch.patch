@@ -1,0 +1,20 @@
+Property: A cancelled gesture (a system gesture, an alert, the background) lets the touch go, so Redact is not left refused.
+Area: the run door, while a finger is down on the canvas
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/RunDoorHeldTouchTests
+Must go red: ResectaAppTests/RunDoorHeldTouchTests cancelledTouchOpensTheDoor; ResectaAppTests/RunDoorHeldTouchTests backgroundOpensTheDoor
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Touches.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Touches.swift
+index 0fd7714f..89604bb5 100644
+--- a/Sources/ResectaApp/Overlay/RedactionOverlayView+Touches.swift
++++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+Touches.swift
+@@ -300,7 +300,9 @@ extension RedactionOverlayView {
+             // Restore the pre-resize rect (nothing was committed)
+             regions[idx].normalizedRect = preResizeNormalizedRect
+         }
++        let held = primaryTouch
+         resetDragState()
++        primaryTouch = held
+         setNeedsDisplay()
+     }
+ 

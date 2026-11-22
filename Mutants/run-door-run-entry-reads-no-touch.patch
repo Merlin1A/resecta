@@ -1,0 +1,18 @@
+Property: The run reads the canvas once more where it fixes its boxes: a finger that came down after the funnel let the run in ends it.
+Area: the run door, while a finger is down on the canvas
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/RunDoorHeldTouchTests
+Must go red: ResectaAppTests/RunDoorHeldTouchTests touchDuringTheRunEntryEndsTheRun
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/PipelineRunner.swift b/Sources/ResectaApp/State/PipelineRunner.swift
+index ceb5c2a3..76be72e1 100644
+--- a/Sources/ResectaApp/State/PipelineRunner.swift
++++ b/Sources/ResectaApp/State/PipelineRunner.swift
+@@ -282,7 +282,6 @@ struct PipelineRunner {
+         // A finger that came down on the canvas while the capture ran holds a
+         // box away from its stored place: the run ends here, silently, as the
+         // funnel's refusal would have (`DocumentState.redactRefusal(with:)`).
+-        if redactionState.canvasHoldsATouch { throw CancellationError() }
+ 
+         // Synchronous from here: one region state.
+         // The record's confirmed part first, from the live regions as drawn
