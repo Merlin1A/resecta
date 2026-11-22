@@ -1,0 +1,19 @@
+Property: A page's version moves only when that page's stored regions change. Here every page's version moves on any change, so a change on one page makes every other page's kept plan read as made before its last change.
+Area: kept plan
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/OverlayDrawnPlanTests
+Must go red: ResectaAppTests/OverlayDrawnPlanTests pageVersionsMoveByPage
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/RedactionState.swift b/Sources/ResectaApp/State/RedactionState.swift
+index 5ffb6f59..e655a5d9 100644
+--- a/Sources/ResectaApp/State/RedactionState.swift
++++ b/Sources/ResectaApp/State/RedactionState.swift
+@@ -27,7 +27,7 @@ class RedactionState {
+     /// unchanged page's array shares its storage with the old one, so its
+     /// comparison is one identity check.
+     private func notePagesChanged(from old: [Int: [RedactionRegion]]) {
+-        for page in Set(old.keys).union(regions.keys) where old[page] ?? [] != regions[page] ?? [] {
++        for page in Set(old.keys).union(regions.keys) {
+             pageVersions[page, default: 0] += 1
+         }
+     }
