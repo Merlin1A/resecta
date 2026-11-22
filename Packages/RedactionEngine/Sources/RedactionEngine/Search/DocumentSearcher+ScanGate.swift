@@ -53,6 +53,33 @@ extension DocumentSearcher {
         return (matches, spatialRectByText)
     }
 
+    /// The text layer's lines for the address assembly
+    /// (`EmbeddedTextSource.make(from:fitLines:)`, each line boxed on its ink
+    /// over a page image), each grown to its own words' drawn glyphs by the
+    /// rule a text match's box grows by (`grown`): a line whose last letter
+    /// PDFKit boxes short, or whose first word a TJ draws back, is covered to
+    /// its glyphs. A line any of whose words the page's drawing does not
+    /// place (`ownGlyphs` nil) keeps its box. A grown line keeps its box
+    /// before the growth as `ungrownRect` (the join) and as its identity
+    /// (what a hybrid page tells its repeat by). Nil where `make` is nil.
+    nonisolated func addressLines(on page: PDFPage) -> [OCREngine.TextLine]? {
+        guard let embedded = EmbeddedTextSource.make(from: page, fitLines: true) else { return nil }
+        guard embedded.lineSpans.count == embedded.lines.count else { return embedded.lines }
+        return zip(embedded.lines, embedded.lineSpans).map { line, span in
+            var glyphs: [OwnGlyph]? = []
+            for range in span.ranges {
+                guard let own = Self.ownGlyphs(for: range, page: page) else { glyphs = nil; break }
+                glyphs?.append(contentsOf: own)
+            }
+            let rect = grown(line.normalizedRect, line: span.pageRect, by: glyphs, page: page)
+            guard rect != line.normalizedRect else { return line }
+            return OCREngine.TextLine(text: line.text, normalizedRect: rect, confidence: line.confidence,
+                                      textLayerRect: line.textLayerRect, inkFitDegraded: line.inkFitDegraded,
+                                      identityRect: line.identityRect ?? line.normalizedRect,
+                                      ungrownRect: line.normalizedRect, wordBoxes: line.wordBoxes)
+        }
+    }
+
     // MARK: - Site-B gate (both PII-scan legs)
 
     /// The Site-B gate over one page's resolved matches: partition, then

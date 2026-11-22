@@ -27,6 +27,10 @@ public struct OCREngine: Sendable {
         /// The box the line's tallest band alone paints where its fit took
         /// more (`DocumentSearcher.inkFit`'s identity); nil otherwise.
         var identityRect: CGRect? = nil
+        /// The line's box before it grew to its own drawn glyphs
+        /// (`DocumentSearcher.addressLines(on:)`), where that growth moved it;
+        /// nil otherwise. The address join reads it, never the grown box.
+        var ungrownRect: CGRect? = nil
         /// The line's whitespace-separated words with their own boxes
         /// (Vision's `boundingBox(for:)`), by UTF-16 range in `text`; empty
         /// where Vision gave none. A match that crosses lines is boxed on

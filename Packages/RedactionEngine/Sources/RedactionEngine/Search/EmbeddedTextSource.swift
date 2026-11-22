@@ -22,6 +22,11 @@ public struct EmbeddedTextSource: Sendable {
     public let wordBounds: [WordBound]
     /// Per-line records used by `AddressSpatialAssembler`.
     public let lines: [OCREngine.TextLine]
+    /// Index-aligned with `lines`: each line's words by their ranges in the
+    /// page's text, and the union of their boxes in the page's absolute,
+    /// unrotated space (what a line's glyphs are cut to when its box grows to
+    /// them, `DocumentSearcher.addressLines(on:)`).
+    var lineSpans: [LineSpan] = []
     /// Selectable-text coverage as a fraction of cropBox area in [0, 1].
     /// Surfaced for tests; no production path reads it.
     public let coverage: Double
@@ -36,6 +41,12 @@ public struct EmbeddedTextSource: Sendable {
         self.wordBounds = wordBounds
         self.lines = lines
         self.coverage = coverage
+    }
+
+    /// One line's words in the page's text, and their boxes' union in page space.
+    struct LineSpan: Sendable {
+        let ranges: [NSRange]
+        let pageRect: CGRect
     }
 
     /// `(NSRange, CGRect)` is not directly Sendable in Swift 6.2 strict mode,
@@ -93,7 +104,7 @@ public struct EmbeddedTextSource: Sendable {
         let totalCodeUnits = page.numberOfCharacters
 
         var wordBounds: [WordBound] = []
-        var lineBuckets: [(yMid: CGFloat, words: [(rect: CGRect, text: String)])] = []
+        var lineBuckets: [(yMid: CGFloat, words: [(rect: CGRect, text: String, range: NSRange)])] = []
         var areaSum: CGFloat = 0
 
         nsText.enumerateSubstrings(
@@ -132,9 +143,9 @@ public struct EmbeddedTextSource: Sendable {
             if let idx = lineBuckets.firstIndex(where: {
                 abs($0.yMid - yMid) <= lineTolerance
             }) {
-                lineBuckets[idx].words.append((bounds, wordText))
+                lineBuckets[idx].words.append((bounds, wordText, safeRange))
             } else {
-                lineBuckets.append((yMid, [(bounds, wordText)]))
+                lineBuckets.append((yMid, [(bounds, wordText, safeRange)]))
             }
         }
 
@@ -143,8 +154,9 @@ public struct EmbeddedTextSource: Sendable {
         // Build OCREngine.TextLine entries from line buckets. Each line is
         // the union of its words' rects (in normalized coords) plus the
         // concatenated text. Used by AddressSpatialAssembler.
-        let lines: [OCREngine.TextLine] = lineBuckets
+        let sortedBuckets = lineBuckets
             .sorted { $0.yMid > $1.yMid }  // top-to-bottom in PDF (bottom-left origin)
+        let lines: [OCREngine.TextLine] = sortedBuckets
             .map { bucket in
                 let sortedWords = bucket.words.sorted { $0.rect.minX < $1.rect.minX }
                 let lineText = sortedWords.map(\.text).joined(separator: " ")
@@ -173,12 +185,18 @@ public struct EmbeddedTextSource: Sendable {
                 )
             }
 
-        return EmbeddedTextSource(
+        var source = EmbeddedTextSource(
             text: text,
             wordBounds: wordBounds,
             lines: lines,
             coverage: coverage
         )
+        source.lineSpans = sortedBuckets.map { bucket in
+            let sortedWords = bucket.words.sorted { $0.rect.minX < $1.rect.minX }
+            return LineSpan(ranges: sortedWords.map(\.range),
+                            pageRect: sortedWords.map(\.rect).reduce(CGRect.null) { $0.union($1) })
+        }
+        return source
     }
 
     /// Land a source-absolute `sel.bounds(for:)` rect in the zero-origin,
