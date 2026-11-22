@@ -18,10 +18,14 @@ class RedactionOverlayView: UIView {
     /// The page's own size in points (its display box, before the turn),
     /// set when PDFKit asks for this overlay. PDFKit sizes the overlay to
     /// the page rounded to the screen's pixels (A4's 595.276 x 841.89 pt
-    /// becomes 595.333 x 842), from the page's top-left corner, so the maps
-    /// read this size, never the bounds. Nil for an overlay no page made:
-    /// the bounds stand in.
+    /// becomes 595.333 x 842), and on a turned page the rounding falls at
+    /// another corner, so the maps never read the bounds: they read the
+    /// page's rectangle on the canvas (`pageRectOnCanvas`). Nil for an
+    /// overlay no page made: the bounds stand in.
     var pageSize: CGSize?
+    /// The page's rectangle in this canvas's points, as PDFKit places it;
+    /// kept once read, and read again when the canvas is laid out.
+    var cachedPageRectOnCanvas: CGRect?
     weak var coordinator: PDFViewCoordinator?
     /// The rect, in this canvas's points, that the gesture in progress gave
     /// each box it placed: PDFKit reads it at the commit for the box's page

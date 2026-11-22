@@ -18,6 +18,7 @@ extension RedactionOverlayView {
     override func layoutSubviews() {
         super.layoutSubviews()
         cachedAccessibilityElements = nil
+        cachedPageRectOnCanvas = nil
         reportBoxPlaceProbeOnce()
     }
 

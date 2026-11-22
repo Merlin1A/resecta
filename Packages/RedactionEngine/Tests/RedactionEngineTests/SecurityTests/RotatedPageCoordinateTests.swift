@@ -61,19 +61,27 @@ struct RotatedPageCoordinateTests {
         return ctx.makeImage()!
     }
 
-    // --- Overlay bounds match post-rotation ---
-    @Test("Overlay bounds match post-rotation dimensions",
+    // --- The run's frame on a turned page ---
+    // The canvas's overlay is sized to the page BEFORE its turn (PDFKit
+    // turns the view with the page); the run reads a box through its own
+    // frame, the page AFTER the turn. This pins that frame on a real page.
+    @Test("The run's frame shows a turned page with its crop box's sides swapped, its corners turned clockwise",
           arguments: [0, 90, 180, 270])
-    func overlayBoundsMatchPostRotation(rotation: Int) {
+    func runFrameOfATurnedPage(rotation: Int) {
         let doc = makePDFDocument(rotation: rotation)
         let page = doc.page(at: 0)!
-        let rawBounds = page.bounds(for: .cropBox)
-
-        if rotation == 90 || rotation == 270 {
-            // Effective dimensions are swapped
-            #expect(rawBounds.height > 0)
-            #expect(rawBounds.width > 0)
-        }
+        #expect(page.rotation == rotation, "the fixture is turned \(rotation)")
+        let crop = page.bounds(for: .cropBox)
+        let geometry = RunRecord.PageGeometry(cropBox: crop, rotation: page.rotation)
+        let turned = rotation == 90 || rotation == 270
+        #expect(geometry.frame.displayedSize
+            == (turned ? CGSize(width: crop.height, height: crop.width) : crop.size))
+        // The crop box's top-right corner, turned clockwise: at 90 it is
+        // shown bottom-right, at 180 bottom-left, at 270 top-left.
+        let expected: [Int: CGPoint] = [0: CGPoint(x: 1, y: 1), 90: CGPoint(x: 1, y: 0),
+                                        180: CGPoint(x: 0, y: 0), 270: CGPoint(x: 0, y: 1)]
+        let corner = geometry.displayedShare(ofPagePoint: CGPoint(x: crop.maxX, y: crop.maxY))
+        #expect(RunRecord.axisGap(corner, expected[rotation]!) < 1e-9, "\(rotation)°: \(corner)")
     }
 
     // --- Rendered bitmap correctness for rotated pages ---

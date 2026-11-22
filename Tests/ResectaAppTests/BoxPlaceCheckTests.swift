@@ -423,7 +423,7 @@ struct BoxPlaceCheckTests {
         let error = PipelineError.redactionError(.boxPlaceUnconfirmed(pageIndex: 1))
         #expect(error.localizedTitle == "Redaction Verification Failed")
         #expect(error.localizedRecovery
-            == "A box on page 2 could not be confirmed where it was drawn. The redaction did not start, and nothing was exported.")
+            == "A box on page 2 could not be confirmed where it was drawn. Redaction stopped before any file was written.")
     }
 
     // MARK: - The hand box's terms
