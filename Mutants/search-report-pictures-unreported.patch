@@ -1,7 +1,7 @@
 Property: A page whose text was searched reports the pictures the rule requires read.
 Area: the searcher's coverage reports
 Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/PageCoverageReportTests (or on the host: cd Packages/RedactionEngine && swift test --filter PageCoverageReportTests)
-Must go red: RedactionEngineTests/PageCoverageReportTests fullPagePicture, anotherAppsLayer
+Must go red: RedactionEngineTests/PageCoverageReportTests fullPagePicture; RedactionEngineTests/PageCoverageReportTests anotherAppsLayer
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+HybridRoute.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+HybridRoute.swift
