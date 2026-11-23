@@ -219,4 +219,40 @@ struct PageContentFactsTests {
         #expect(old.textAnchored == false)
         #expect(old.normalizedRect == anchored.normalizedRect)
     }
+
+    // MARK: - A picture inside a tiling pattern
+
+    /// The typed line, then a small square filled with tiling pattern 6, whose
+    /// cell holds image 7 when `picture`, else a filled square.
+    static func patternPage(picture: Bool) throws -> PDFDocument {
+        let cell = picture ? "q 10 0 0 10 0 0 cm /I0 Do Q" : "0 0 5 5 re f"
+        let cellResources = picture ? "/XObject << /I0 7 0 R >>" : ""
+        let objects = [
+            stream(6, cell, dictionary: "/Type /Pattern /PatternType 1 /PaintType 1 /TilingType 1 /BBox [0 0 10 10] /XStep 10 /YStep 10 /Resources << \(cellResources) >>"),
+            stream(7, "00000000>", dictionary: "/Type /XObject /Subtype /Image /Width 2 /Height 2 /ColorSpace /DeviceGray /BitsPerComponent 8 /Filter /ASCIIHexDecode"),
+        ]
+        return try page(text + " q /Pattern cs /P0 scn 20 20 10 10 re f Q", resources: "/Font << /F1 5 0 R >> /Pattern << /P0 6 0 R >>", extra: objects)
+    }
+
+    @Test("a picture in a tiling pattern is read: a box drawn by hand flattens the page")
+    func pictureInPatternIsRead() throws {
+        let withPicture = try Self.facts(Self.patternPage(picture: true))
+        #expect(withPicture.reachesImage && !withPicture.isPlain, "a picture in a pattern: \(withPicture)")
+        #expect(!PageContentFacts.keepsTextLayer(regions: [Self.region()], facts: { withPicture }), "a hand box flattens it")
+        let withoutPicture = try Self.facts(Self.patternPage(picture: false))
+        #expect(withoutPicture.isPlain, "a pattern of paths only is plain: \(withoutPicture)")
+        #expect(PageContentFacts.keepsTextLayer(regions: [Self.region()], facts: { withoutPicture }), "a hand box keeps its text layer")
+    }
+
+    @Test("a picture in a tiling pattern is read: the hidden-word check reads the source page", .timeLimit(.minutes(3)))
+    func pictureInPatternIsChecked() async throws {
+        for (picture, reads) in [(true, true), (false, false)] {
+            let document = try Self.patternPage(picture: picture)
+            let reader = InkCaseReader()
+            let row = await HiddenWordInkSeam.runLayer(output: document, source: document, regions: [0: [Self.region()]],
+                                                       mode: .searchableRedaction, reader: reader)
+            _ = try #require(row, "the check is built")
+            #expect((reader.calls > 0) == reads, "picture \(picture): the source read \(reader.calls) times")
+        }
+    }
 }
