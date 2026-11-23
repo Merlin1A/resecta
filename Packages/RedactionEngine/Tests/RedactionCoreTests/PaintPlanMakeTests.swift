@@ -390,6 +390,37 @@ import RedactionCore
         }
     }
 
+    @Test("Only a box placed from typed text and still anchored is marked for the ink check: never by hand, edited, on a scan, by recognition or on turned print")
+    func inkCheckableOnlyOnTypedText() {
+        var sheet = Sheet()
+        let lines = ComplementReadingTests.paragraph(&sheet, counts: [6, 6, 6])
+        let typed = Self.matched(sheet, lines[0][1])
+        let edited = Self.matched(sheet, lines[0][4], kind: .placedFromTextThenEdited, right: 9)
+        let hand = Self.drawn(PointRect(minX: 100, minY: 684, maxX: 150, maxY: 698))
+        let recognised = Self.matched(sheet, lines[2][3], kind: .placedFromPicture)
+        for on in [false, true] {
+            let made = Self.plan(sheet, [typed, edited, hand, recognised], on: on)
+            #expect(made.box(typed).inkCheckable, "a Search box on a typed line (switch \(on))")
+            #expect(!made.box(edited).inkCheckable && !made.box(hand).inkCheckable)
+            #expect(!made.box(recognised).inkCheckable, "a box placed from the page's picture")
+            let picture = PageTextFacts(showsInvisibleText: false, carriesPageScaleImage: true)
+            #expect(!Self.plan(sheet, [typed], on: on, facts: picture).box(typed).inkCheckable, "a Search box on a scan")
+        }
+        // As placed, no box is marked: the check runs only at the switch's policy.
+        #expect(!Self.plan(sheet, [typed], source: .asPlaced).box(typed).inkCheckable)
+        // Turned print reads no layout.
+        var turned = Sheet()
+        turned.line(count: 6, y: 700)
+        var box: Set<Int> = []
+        for k in 0..<6 {
+            let w = turned.word("abcd", x: 72 + 28 * Double(k), y: 680, dy: 1.5)
+            if k == 2 { box = w }
+        }
+        turned.line(count: 6, y: 650)
+        let region = Self.matched(turned, box)
+        #expect(!Self.plan(turned, [region], on: true).box(region).inkCheckable, "turned print")
+    }
+
     @Test("A hand-drawn box with the switch on: as drawn, by hand")
     func handDrawnWithTheSwitch() {
         var sheet = Sheet()

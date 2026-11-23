@@ -1,9 +1,14 @@
 import CoreGraphics
 import Foundation
+import os
 
 // The pixel step's second half: the page's raster read from the page's data,
 // and the plan's boxes painted, read back and reported. The arithmetic is the
 // core's (`PixelPlan`); this file only applies it to a rendered bitmap.
+
+/// A runtime fallback of this file, logged as the rasterizer logs its own:
+/// the page index and the reason only, never document content.
+private let planLogger = Logger(subsystem: "com.resecta.engine", category: "PageRasterizer")
 
 /// A page's pixels at its quality: the raster's size, the span its content
 /// takes on it, and the raster of its plan when the producer paints the plan.
@@ -27,6 +32,25 @@ struct PagePixels: Sendable, Equatable {
 struct PlanPaint: Sendable, Equatable {
     var painted: [Int: PixelPlan.PixelRect] = [:]
     var outsidePlan: Set<UUID> = []
+    /// The ink check's verdict for each box it was asked about, by the box's
+    /// place in the plan. Empty at "as placed".
+    var inkVerdicts: [Int: InkCheck.Verdict] = [:]
+    /// Some box was made larger by the ink check.
+    var inkWidened: Bool { !inkWidenedBoxes.isEmpty }
+    var inkWidenedBoxes: Set<Int> = []
+}
+
+/// The ink check's inputs for one box of a page's plan.
+package struct InkCheckInputs: Hashable, Sendable {
+    /// The height of the box's line of text, in sixty-fourths of a point.
+    package var lineHeight: Int
+    /// The boxes of the page's words the box does not cover.
+    package var others: [PageRect64]
+
+    package init(lineHeight: Int, others: [PageRect64]) {
+        self.lineHeight = lineHeight
+        self.others = others
+    }
 }
 
 extension PixelPlan.PixelRect {
@@ -197,23 +221,73 @@ extension PageRasterizer {
 
         // 4c. Each box's projection, with its regions as the region path
         // fills them, then its growth, read before any fill.
+        // At the switch's policy a Search or Scan box the plan marks checkable
+        // takes the ink check in place of growth. A box the check cannot
+        // judge (no inputs, or `indeterminate`) is painted as at "as placed",
+        // growth and all: the check only ever adds paint. A judged box keeps
+        // its "as placed" paint too, its regions' own fills and growth
+        // included, so no box paints less than it would at "as placed".
         var rects: [(box: Int, rect: CGRect)] = []
         var painted = Set<UUID>()
-        for (index, box) in page.boxes.enumerated() {
-            guard let projection = PixelPlan.project(
-                inner: box.inner, paint: box.paint,
-                limitAbove: box.limitAbove, limitBelow: box.limitBelow, raster: raster) else { continue }
-            var rect = projection.painted.bitmapRect
+        var verdicts: [Int: InkCheck.Verdict] = [:]
+        var widened: Set<Int> = []
+        let atSwitch = page.planSource == .switchPolicy
+        var grid: InkCheck.Grid?
+        func withRegionFills(_ rect: CGRect, of box: PaintedBox) -> CGRect {
+            var rect = rect
             for id in box.regionIDs {
                 guard let region = regionsByID[id] else { continue }
                 let filled = normalizedToFillPixels(region.normalizedRect, content: content).intersection(bitmap)
                 if !filled.isEmpty { rect = rect.union(filled) }
             }
-            painted.formUnion(box.regionIDs)
-            if box.regionIDs.contains(where: { growsOnInk[$0] == true }),
+            return rect
+        }
+        // A box's paint at "as placed": its projection, its regions' own
+        // fills, and its growth over the ink that crosses its edge.
+        func asPlacedRect(_ box: PaintedBox, grows: Bool) throws -> CGRect? {
+            guard let projection = PixelPlan.project(
+                inner: box.inner, paint: box.paint,
+                limitAbove: box.limitAbove, limitBelow: box.limitBelow, raster: raster) else { return nil }
+            var rect = withRegionFills(projection.painted.bitmapRect, of: box)
+            if grows,
                let grown = try inkGrowthRect(context: ctx, fillRect: projection.marginEdge.bitmapRect) {
                 rect = rect.union(grown)
             }
+            return rect
+        }
+        for (index, box) in page.boxes.enumerated() {
+            let grows = box.regionIDs.contains(where: { growsOnInk[$0] == true })
+            // Only a box the plan marks checkable: placed from typed text,
+            // still anchored, not painted as drawn. A box placed from the
+            // page's picture is never judged.
+            if atSwitch, grows, !box.asDrawn, box.inkCheckable {
+                var verdict = InkCheck.Verdict.indeterminate
+                if let inputs = page.inkCheckInputs[index] {
+                    if grid == nil { grid = Self.greyGrid(context: ctx) }
+                    if let grid {
+                        let result = InkCheck.evaluate(box: box, lineHeight: inputs.lineHeight,
+                                                       others: inputs.others, grid: grid, raster: raster)
+                        verdict = result.verdict
+                        let checked = box.applying(result)
+                        if verdict != .indeterminate,
+                           let projection = PixelPlan.project(
+                               inner: checked.inner, paint: checked.paint, limitAbove: checked.limitAbove,
+                               limitBelow: checked.limitBelow, raster: raster) {
+                            verdicts[index] = verdict
+                            if checked.inkEnlargedCovered || checked.inkEnlargedToCap { widened.insert(index) }
+                            var rect = withRegionFills(projection.painted.bitmapRect, of: box)
+                            if let floor = try asPlacedRect(box, grows: grows) { rect = rect.union(floor) }
+                            rects.append((index, rect))
+                            painted.formUnion(box.regionIDs)
+                            continue
+                        }
+                    }
+                }
+                // Not judged: painted as at "as placed", below.
+                verdicts[index] = .indeterminate
+            }
+            guard let rect = try asPlacedRect(box, grows: grows) else { continue }
+            painted.formUnion(box.regionIDs)
             rects.append((index, rect))
         }
         let strays = page.regions.filter { !painted.contains($0.id) }
@@ -245,6 +319,41 @@ extension PageRasterizer {
         var result = PlanPaint()
         for (box, rect) in rects { result.painted[box] = PixelPlan.PixelRect(bitmapRect: rect) }
         result.outsidePlan = Set(strays.map(\.id))
+        result.inkVerdicts = verdicts
+        result.inkWidenedBoxes = widened
         return result
+    }
+
+    /// The page's text layer dropped after the render and the fills, when
+    /// a box the ink check widened leaves the text-layer copies of its words
+    /// outside the box as placed: the page takes the secure path with
+    /// `reason`, through the text layer's one drop. Nothing to drop on a page
+    /// that has no text layer, or one already dropped.
+    static func dropTextLayer(_ textLayer: inout TextLayerState, reason: TextLayerDetector.FallbackReason,
+                              page: PDFPageData) {
+        guard textLayer.entries != nil else { return }
+        textLayer.drop(reason: reason)
+        planLogger.log(
+            "page \(page.pageIndex) fell back to secure rasterization at runtime (\(String(describing: reason), privacy: .public))"
+        )
+    }
+
+    /// The bitmap as grey values before any fill, rows from the bottom, as
+    /// the ink check reads a page. Nil when the bitmap has no data.
+    static func greyGrid(context ctx: CGContext) -> InkCheck.Grid? {
+        guard let data = ctx.data else { return nil }
+        let buffer = data.assumingMemoryBound(to: UInt8.self)
+        let width = ctx.width, height = ctx.height, bytesPerRow = ctx.bytesPerRow
+        var values = [UInt8](repeating: 0, count: width * height)
+        for y in 0..<height {
+            // The bitmap's memory runs from its top row; the grid's from its bottom.
+            let row = buffer + (height - 1 - y) * bytesPerRow
+            for x in 0..<width {
+                // 32-bit little-endian, alpha first: blue, green, red, alpha in memory.
+                let p = row + x * 4
+                values[y * width + x] = UInt8((Int(p[2]) * 77 + Int(p[1]) * 150 + Int(p[0]) * 29) >> 8)
+            }
+        }
+        return InkCheck.Grid(width: width, height: height, values: values)
     }
 }

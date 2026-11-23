@@ -1,0 +1,19 @@
+Property: The producer runs the ink check only on a box the plan marks checkable, so a box placed from the page's picture is never judged.
+Area: the producer, at the switch policy
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter PlanSwitchTests
+Must go red: RedactionEngineTests/PlanSwitchTests uncheckableBoxNeverJudged
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
+index 5b89aa1e..b97b8acd 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
+@@ -247,7 +247,7 @@ extension PageRasterizer {
+             // Only a box the plan marks checkable: placed from typed text,
+             // still anchored, not painted as drawn. A box placed from the
+             // page's picture is never judged.
+-            if atSwitch, grows, !box.asDrawn, box.inkCheckable {
++            if atSwitch, grows, !box.asDrawn {
+                 var verdict = InkCheck.Verdict.indeterminate
+                 if let inputs = page.inkCheckInputs[index] {
+                     if grid == nil { grid = Self.greyGrid(context: ctx) }

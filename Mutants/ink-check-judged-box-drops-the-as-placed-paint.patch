@@ -1,0 +1,18 @@
+Property: At the switch policy a box the ink check judges paints at least its "as placed" paint, its regions' own fills and its growth over the ink that crosses its edge included, so no verdict paints less than "as placed".
+Area: the producer, at the switch policy
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter PlanSwitchTests
+Must go red: RedactionEngineTests/PlanSwitchTests judgedBoxKeepsTheAsPlacedPaint [residual]; RedactionEngineTests/PlanSwitchTests judgedBoxKeepsTheAsPlacedPaint [absent]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
+index f49660db..2277ced6 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
+@@ -276,7 +276,6 @@ extension PageRasterizer {
+                             verdicts[index] = verdict
+                             if checked.inkEnlargedCovered || checked.inkEnlargedToCap { widened.insert(index) }
+                             var rect = withRegionFills(projection.painted.bitmapRect, of: box)
+-                            if let floor = try asPlacedRect(box, grows: grows) { rect = rect.union(floor) }
+                             rects.append((index, rect))
+                             painted.formUnion(box.regionIDs)
+                             continue

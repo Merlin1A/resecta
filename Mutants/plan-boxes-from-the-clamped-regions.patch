@@ -5,19 +5,19 @@ Must go red: RedactionEngineTests/PlanPaintTests boxesComeFromThePageData
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
-index 06cd4910..49a16edb 100644
+index 5b89aa1e..e054e5bf 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
-@@ -199,7 +199,11 @@ extension PageRasterizer {
-         // fills them, then its growth, read before any fill.
-         var rects: [(box: Int, rect: CGRect)] = []
-         var painted = Set<UUID>()
+@@ -242,7 +242,11 @@ extension PageRasterizer {
+             }
+             return rect
+         }
 -        for (index, box) in page.boxes.enumerated() {
 +        let remade = PaintPlan.asPlaced(
 +            regions: page.regions.map { ($0.id, PointRect(minX: Double($0.normalizedRect.minX), minY: Double($0.normalizedRect.minY),
 +                                                          maxX: Double($0.normalizedRect.maxX), maxY: Double($0.normalizedRect.maxY))) },
 +            widthSixtyFourths: raster.widthSixtyFourths, heightSixtyFourths: raster.heightSixtyFourths).boxes
 +        for (index, box) in remade.enumerated() {
-             guard let projection = PixelPlan.project(
-                 inner: box.inner, paint: box.paint,
-                 limitAbove: box.limitAbove, limitBelow: box.limitBelow, raster: raster) else { continue }
+             let grows = box.regionIDs.contains(where: { growsOnInk[$0] == true })
+             // Only a box the plan marks checkable: placed from typed text,
+             // still anchored, not painted as drawn. A box placed from the

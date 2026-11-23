@@ -33,7 +33,7 @@ struct PageSidesNotAsRecordedTests {
         let id = UUID()
         let drawn = [RunRecord.DrawnRegion(id: id, normalizedRect: P.share(box))]
         let confirmed = RunRecord.Page(pageIndex: 0, regions: drawn, cropBox: page.bounds(for: .cropBox).size,
-                                       rotation: page.rotation)
+                                       rotation: page.rotation, switchOn: false)
         switch change {
         case .turnedAQuarter: page.rotation = 90
         case .cropCut: page.setBounds(CGRect(x: 0, y: 0, width: P.width - 36, height: P.height), for: .cropBox)

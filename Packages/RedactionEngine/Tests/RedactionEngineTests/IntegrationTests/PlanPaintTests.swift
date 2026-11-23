@@ -141,7 +141,7 @@ struct PlanPaintTests {
                                    source: text ? .searchMatch(term: "x") : .manual)
         }
         let crop = page.bounds(for: .cropBox)
-        let confirmed = RunRecord.Page(pageIndex: 0, regions: drawn, cropBox: crop.size, rotation: page.rotation)
+        let confirmed = RunRecord.Page(pageIndex: 0, regions: drawn, cropBox: crop.size, rotation: page.rotation, switchOn: false)
         let data = PDFPageData(
             page: page, pageIndex: 0, regions: regions, fillColor: fill, targetDPI: dpi,
             pipelineMode: .secureRasterization, rotation: page.rotation,

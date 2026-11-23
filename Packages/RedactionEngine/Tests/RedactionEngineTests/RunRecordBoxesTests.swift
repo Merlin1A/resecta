@@ -23,7 +23,7 @@ struct RunRecordBoxesTests {
     }
 
     static func plan(_ regions: [RunRecord.DrawnRegion], cropBox: CGSize = letter, rotation: Int = 0) throws -> PaintPlan {
-        try #require(RunRecord.Page(pageIndex: 0, regions: regions, cropBox: cropBox, rotation: rotation).plan)
+        try #require(RunRecord.Page(pageIndex: 0, regions: regions, cropBox: cropBox, rotation: rotation, switchOn: false).plan)
     }
 
     /// Each case, with what it builds and expects.

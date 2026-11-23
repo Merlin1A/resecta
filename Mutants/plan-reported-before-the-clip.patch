@@ -5,10 +5,10 @@ Must go red: RedactionEngineTests/PlanPaintTests fillsOnPixelBoxes [pastLeft]; R
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
-index bf781ea2..628a61f8 100644
+index 768d77f6..e809ca7e 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
-@@ -228,7 +228,12 @@ extension PageRasterizer {
+@@ -284,7 +284,12 @@ extension PageRasterizer {
          }
  
          var result = PlanPaint()
@@ -20,5 +20,5 @@ index bf781ea2..628a61f8 100644
 +            result.painted[box] = PixelPlan.PixelRect(bitmapRect: r)
 +        }
          result.outsidePlan = Set(strays.map(\.id))
-         return result
-     }
+         result.inkVerdicts = verdicts
+         result.inkWidenedBoxes = widened

@@ -1,4 +1,5 @@
 import PDFKit
+import RedactionCore
 import CoreGraphics
 
 /// Wrapper providing the engine with all per-page data needed for processing.
@@ -65,6 +66,18 @@ public struct PDFPageData: @unchecked Sendable {
     package var sidesSixtyFourths: (width: Int, height: Int)? {
         confirmedPage?.plan.map { ($0.widthSixtyFourths, $0.heightSixtyFourths) }
     }
+
+    /// The plan source the producer paints under: the run's, which is "as
+    /// placed". Only a test, inside the package, sets the switch's policy,
+    /// together with a plan it made under that policy.
+    package var planSource: PlanSource = RunRecord.planSource
+
+    /// What the ink check reads for a box, by the box's place in the plan:
+    /// the height of its line and the boxes of the page's other words. Empty
+    /// until the run reads the page's words at entry; a test fills it. A box
+    /// the check would read with nothing here is painted as placed, its ink
+    /// growth as today, and recorded as not judged.
+    package var inkCheckInputs: [Int: InkCheckInputs] = [:]
 
     public init(page: PDFPage, pageIndex: Int, regions: [RedactionRegion],
                 fillColor: FillColor, targetDPI: Int, pipelineMode: PipelineMode,
