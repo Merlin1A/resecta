@@ -121,6 +121,13 @@ struct PageImageCensusPiecesTests {
         return S.document([S.Page(S.typedText + visibleFiller, resources: "/Pattern << /T1 @1@ >>", objects: [tile, pattern])])
     }
 
+    /// A page with no picture that shows the builder's lines in an invisible
+    /// mode and starts more lines of visible text than the map follows.
+    static func invisibleTextPastTheStartLimit() -> Data {
+        let shows = "BT /F1 10 Tf 0 Tr 72 400 Td " + String(repeating: "(a) Tj ", count: PagePictureMap.textStartLimit + 1) + "ET "
+        return S.document([S.Page(S.text(mode: 3) + shows)])
+    }
+
     static func carries(_ data: Data) throws -> Bool {
         let (_, page, _) = try #require(S.pdfPage(data))
         return PageImageCensus.carriesImageContent(page)
@@ -169,6 +176,7 @@ struct PageImageCensusPiecesTests {
             Row(name: "C17 a letter with a logo and a fill set to a pattern that holds a picture", data: Self.letterWithPatternFill(logo: true), carries: true),
             Row(name: "C18 a typed letter whose only picture is inside a pattern it fills with", data: Self.letterWithPatternFill(logo: false), carries: true),
             Row(name: "C19 a scan printed inside a pattern, under invisible text", data: InkFitPiecewiseScanTests.patternScan(), carries: true),
+            Row(name: "C23 invisible text, and more lines of visible text than the map follows", data: Self.invisibleTextPastTheStartLimit(), carries: true),
         ])
     }
 

@@ -394,19 +394,19 @@ final class PictureWalk {
         return false
     }
 
-    /// The streams one resource category names, each once however many names
-    /// it has; nil past `entryLimit` names looked at.
+    /// The streams one resource category names, a stream once for each name;
+    /// nil past `entryLimit` names looked at. Each form and pattern is looked
+    /// into once by the page's record (`FormsSeen`), however many names it has.
     static func streams(in resources: CGPDFDictionaryRef, _ category: String, seen: FormsSeen) -> [CGPDFStreamRef]? {
         var dictionary: CGPDFDictionaryRef?
         guard CGPDFDictionaryGetDictionary(resources, category, &dictionary), let dictionary else { return [] }
         var streams: [CGPDFStreamRef] = []
-        var known: Set<CGPDFStreamRef> = []
         var tooMany = false
         CGPDFDictionaryApplyBlock(dictionary, { _, value, _ in
             seen.entries += 1
             guard seen.entries <= PagePictureMap.entryLimit else { tooMany = true; return false }
             var stream: CGPDFStreamRef?
-            if CGPDFObjectGetValue(value, .stream, &stream), let stream, known.insert(stream).inserted { streams.append(stream) }
+            if CGPDFObjectGetValue(value, .stream, &stream), let stream { streams.append(stream) }
             return true
         }, nil)
         return tooMany ? nil : streams
