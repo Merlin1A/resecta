@@ -5,14 +5,14 @@ Must go red: RedactionEngineTests/ScanDuplicateAddressTests stackedCopiesEachOnT
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift
-index 67c05d6d..3ed8ca99 100644
+index 0301c38d..79e996f2 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift
-@@ -86,6 +86,7 @@ extension DocumentSearcher {
-     /// kept there.
+@@ -91,6 +91,7 @@ extension DocumentSearcher {
+     /// a sentinel's, united. Nil where none is kept.
      nonisolated static func takeBox(for match: PIIDetector.PIIMatch,
                                      from boxes: inout [AddressPlace: [TextLayerBox]]) -> TextLayerBox? {
 +        return nil
          let key = AddressPlace(text: match.text, range: match.range)
-         guard var kept = boxes[key], !kept.isEmpty else { return nil }
-         let box = kept.removeFirst()
+         if var kept = boxes[key], !kept.isEmpty {
+             let box = kept.removeFirst()

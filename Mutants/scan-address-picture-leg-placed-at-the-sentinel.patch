@@ -1,0 +1,19 @@
+Property: On the picture leg, each copy of an address is placed at the line its own box meets. Planted: the leg reads no box, so every copy goes to the sentinel.
+Area: Search, Scan's address assembly
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'ScanDuplicateAddressTests'
+Must go red: RedactionEngineTests/ScanDuplicateAddressTests oneLineCopiesPlacedOnThePictureLeg
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift
+index 0d5b00f3..62f0a914 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift
+@@ -308,7 +308,7 @@ extension DocumentSearcher {
+             let boxLines = Self.boxLookupLines(lineOffsets)
+             let assembly = assembledAddressMatches(
+                 lines: assemblerLines, haystack: concatenated as NSString,
+-                boxOf: { [self] in ocrUnionRect(forUTF16Range: $0, lineOffsets: boxLines, page: page)?.rect })
++                boxOf: { _ in nil })
+             rawMatches.append(contentsOf: assembly.matches)
+             spatialRectByText = assembly.spatialRectByText
+             boxesByPlace = assembly.boxesByPlace

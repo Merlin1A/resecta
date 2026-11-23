@@ -1,0 +1,18 @@
+Property: A copy the overlap step widened takes the boxes kept for its text inside its range. Planted: it misses its place and takes the first copy's box, kept by text alone.
+Area: Search, Scan's address assembly
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'ScanDuplicateAddressTests'
+Must go red: RedactionEngineTests/ScanDuplicateAddressTests widenedCopyIsBoxedOnItsOwnLine; RedactionEngineTests/ScanDuplicateAddressTests widenedSurvivorTakesEveryBoxInside
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift
+index 0301c38d..febdd465 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift
+@@ -97,6 +97,7 @@ extension DocumentSearcher {
+             boxes[key] = kept
+             return box
+         }
++        return nil
+         let start = match.range.location, end = NSMaxRange(match.range)
+         let inside = boxes.keys
+             .filter { $0.text == match.text && $0.length > 0 && $0.location >= start && $0.location + $0.length <= end }
