@@ -5,12 +5,12 @@ Must go red: RedactionEngineTests/BoxCheckDrawingTests eachCase [D80: a form the
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
-index 1038a83b..10feb373 100644
+index 1debada2..c3528630 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
-@@ -87,7 +87,6 @@ enum PageDrawingReader {
-         guard count(of: startxref, in: data) == 1, let t = data.range(of: trailer, options: .backwards) else { return .fileRevised }
-         let tail = data[t.upperBound...]
+@@ -91,7 +91,6 @@ enum PageDrawingReader {
+         guard let t = data.range(of: trailer, options: .backwards, in: data.startIndex..<e.lowerBound) else { return .fileRevised }
+         let tail = nameEscapesRead(data[t.upperBound..<e.lowerBound])
          if tail.range(of: Data("/Prev".utf8)) != nil || tail.range(of: Data("/XRefStm".utf8)) != nil { return .fileRevised }
 -        guard let catalog = document.catalog, keys(catalog).isSubset(of: catalogKeys) else { return .documentKeyNotListed }
          return nil

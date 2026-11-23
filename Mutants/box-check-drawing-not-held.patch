@@ -5,16 +5,16 @@ Must go red: RedactionEngineTests/BoxCheckDrawingTests runRefusesWhatThePageDraw
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
-index be216273..f386abd5 100644
+index dfcc4110..c4c8c1a8 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
-@@ -176,7 +176,8 @@ enum ExactFillCheck {
+@@ -193,7 +193,8 @@ enum ExactFillCheck {
          try PageImageLocator.readEach(fileData: fileData, source: source, recordedHashes: input.pageImageDigests) { index, outcome in
              let page = index < input.pages.count ? input.pages[index] : nil
              let drawing = index < drawings.count ? drawings[index] : .failure(PageImageRefusal(reason: .drawingNotRead, offset: 0))
 -            let admitted = PageDrawingReader.admit(outcome, drawing: drawing)
 +            let admitted = outcome
 +            _ = drawing
-             pages.append(judge(page: page, picture: admitted, fill: input.fill, chosenDPI: input.chosenDPI))
-         }
-         for page in input.pages.dropFirst(pages.count) {
+             var judged = judge(page: page, picture: admitted, fill: input.fill, chosenDPI: input.chosenDPI)
+             judged.outsidePlan = page?.outsidePlan ?? []
+             pages.append(judged)
