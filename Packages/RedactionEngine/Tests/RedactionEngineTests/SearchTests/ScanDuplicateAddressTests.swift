@@ -124,7 +124,22 @@ struct ScanDuplicateAddressTests {
         #expect(unread == NSRange(location: 5, length: 0), "no box read: the sentinel: \(unread)")
     }
 
-    @Test("Two copies kept at one place are taken one each, in order")
+    @Test("Two copies kept at one real place are both taken by its one survivor, united")
+    func copiesAtOneRealPlaceAreTakenTogether() {
+        let place = NSRange(location: 9, length: 19)
+        let upper = DocumentSearcher.TextLayerBox(rect: CGRect(x: 0.1, y: 0.8, width: 0.2, height: 0.02), textLayerRect: nil)
+        let lower = DocumentSearcher.TextLayerBox(rect: CGRect(x: 0.4, y: 0.79, width: 0.2, height: 0.02), textLayerRect: nil)
+        var boxes: [DocumentSearcher.AddressPlace: [DocumentSearcher.TextLayerBox]] =
+            [DocumentSearcher.AddressPlace(text: "1 Main St, IL 62704", range: place): [upper, lower]]
+        // The overlap step leaves one survivor for the two copies' matches:
+        // one text, one range.
+        let match = PIIDetector.PIIMatch(text: "1 Main St, IL 62704", range: place, kind: .address, confidence: 0.8)
+        let box = DocumentSearcher.takeBox(for: match, from: &boxes)
+        #expect(box?.rect == upper.rect.union(lower.rect), "both copies covered: \(String(describing: box?.rect))")
+        #expect(DocumentSearcher.takeBox(for: match, from: &boxes) == nil, "each box is taken once")
+    }
+
+    @Test("Two copies kept at the stand-in are taken one each, in order")
     func copiesAtOnePlaceTakeOneBoxEach() {
         let place = NSRange(location: 9, length: 0)
         let upper = DocumentSearcher.TextLayerBox(rect: CGRect(x: 0, y: 0.8, width: 0.2, height: 0.04), textLayerRect: nil)
@@ -144,10 +159,12 @@ struct ScanDuplicateAddressTests {
         let lower = DocumentSearcher.TextLayerBox(rect: CGRect(x: 0.1, y: 0.7, width: 0.2, height: 0.02), textLayerRect: nil)
         let standIn = DocumentSearcher.TextLayerBox(rect: CGRect(x: 0.6, y: 0.1, width: 0.2, height: 0.02), textLayerRect: nil)
         let other = DocumentSearcher.TextLayerBox(rect: CGRect(x: 0.6, y: 0.5, width: 0.2, height: 0.02), textLayerRect: nil)
+        let outside = DocumentSearcher.TextLayerBox(rect: CGRect(x: 0.1, y: 0.3, width: 0.2, height: 0.02), textLayerRect: nil)
         var boxes: [DocumentSearcher.AddressPlace: [DocumentSearcher.TextLayerBox]] = [
             DocumentSearcher.AddressPlace(text: text, range: NSRange(location: 20, length: 19)): [upper],
             DocumentSearcher.AddressPlace(text: text, range: NSRange(location: 40, length: 19)): [lower],
-            DocumentSearcher.AddressPlace(text: text, range: NSRange(location: 200, length: 0)): [standIn],
+            DocumentSearcher.AddressPlace(text: text, range: NSRange(location: 59, length: 0)): [standIn],
+            DocumentSearcher.AddressPlace(text: text, range: NSRange(location: 70, length: 19)): [outside],
             DocumentSearcher.AddressPlace(text: "9 Elm St, IL 62704", range: NSRange(location: 45, length: 5)): [other],
         ]
         // The overlap step's survivor: the same text, its range widened from
@@ -156,8 +173,12 @@ struct ScanDuplicateAddressTests {
         let box = DocumentSearcher.takeBox(for: widened, from: &boxes)
         #expect(box?.rect == upper.rect.union(lower.rect), "both copies' boxes, united: \(String(describing: box?.rect))")
         #expect(DocumentSearcher.takeBox(for: widened, from: &boxes) == nil, "each box is taken once")
-        let atStandIn = PIIDetector.PIIMatch(text: text, range: NSRange(location: 200, length: 0), kind: .address, confidence: 0.8)
+        // The stand-in sits at the widened range's end, inside its bounds by
+        // location alone, and a copy of the same text lies past the range.
+        let atStandIn = PIIDetector.PIIMatch(text: text, range: NSRange(location: 59, length: 0), kind: .address, confidence: 0.8)
         #expect(DocumentSearcher.takeBox(for: atStandIn, from: &boxes)?.rect == standIn.rect, "the stand-in's box is left to its own match")
+        let past = PIIDetector.PIIMatch(text: text, range: NSRange(location: 70, length: 19), kind: .address, confidence: 0.8)
+        #expect(DocumentSearcher.takeBox(for: past, from: &boxes)?.rect == outside.rect, "a copy past the range is left to its own match")
         let elsewhere = PIIDetector.PIIMatch(text: "9 Elm St, IL 62704", range: NSRange(location: 45, length: 5), kind: .address, confidence: 0.8)
         #expect(DocumentSearcher.takeBox(for: elsewhere, from: &boxes)?.rect == other.rect, "another text's box is left to it")
     }
