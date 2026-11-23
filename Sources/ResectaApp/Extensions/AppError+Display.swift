@@ -53,6 +53,8 @@ extension PipelineError {
                 "Rendering Timed Out"
             case .pageTooLarge:
                 "Page Dimensions Exceeded"
+            case .pageSidesNotAsRecorded:
+                "Redaction Stopped"
             case .reconstructionFailed:
                 "Document Assembly Failed"
             }
@@ -139,6 +141,8 @@ extension PipelineError {
                 "Page \(p + 1) could not be rendered within the time limit. Try reducing output quality in Settings."
             case .pageTooLarge(let p):
                 "Page \(p + 1) has dimensions that exceed the safe rendering limit. This may indicate a non-standard or damaged PDF."
+            case .pageSidesNotAsRecorded(let p):
+                "Page \(p + 1)'s size could not be confirmed. The page was not redacted, and nothing was exported."
             case .reconstructionFailed:
                 "The redacted document could not be assembled. Your redaction regions are preserved — you can try again."
             }

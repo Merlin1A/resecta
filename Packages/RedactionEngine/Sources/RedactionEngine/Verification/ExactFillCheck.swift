@@ -2,8 +2,9 @@ import CryptoKit
 import Foundation
 
 /// What the box check is given: the record's fill and chosen quality, and for
-/// each page its two sides in sixty-fourths, its boxes and the rectangles the
-/// producer reports having painted for them. Read from the record only.
+/// each page its two sides in sixty-fourths, its boxes, the rectangles the
+/// producer reports having painted for them and the regions it reports having
+/// painted outside the plan. Read from the record only.
 struct BoxCheckInput: Sendable {
     struct Page: Sendable {
         let widthSixtyFourths: Int
@@ -11,6 +12,9 @@ struct BoxCheckInput: Sendable {
         let boxes: [PaintedBox]
         /// The producer's rectangle for a box, by its place in the page's plan.
         let reported: [Int: RunRecord.PaintedPixels]
+        /// The regions the producer painted that no box of the plan holds,
+        /// in the order they were drawn.
+        var outsidePlan: [UUID] = []
     }
 
     let fill: FillColor
@@ -34,8 +38,13 @@ extension BoxCheckInput {
             for (position, pixels) in record.produced.paintedRectangles where position.pageIndex == page.pageIndex {
                 reported[position.box] = pixels
             }
+            // In the order drawn; an id the page's drawn regions lack still
+            // has its unit, after them, by its text.
+            let named = record.produced.regionsPaintedOutsideThePlan[page.pageIndex] ?? []
+            let drawn = page.regions.map(\.id).filter { named.contains($0) }
+            let rest = named.subtracting(drawn).sorted { $0.uuidString < $1.uuidString }
             pages.append(Page(widthSixtyFourths: plan.widthSixtyFourths, heightSixtyFourths: plan.heightSixtyFourths,
-                              boxes: plan.boxes, reported: reported))
+                              boxes: plan.boxes, reported: reported, outsidePlan: drawn + rest))
         }
         var digests: [Data] = []
         while let d = record.produced.pageImageDigests[digests.count] { digests.append(d) }
@@ -111,6 +120,9 @@ struct BoxCheckPage: Equatable, Sendable {
     /// A one-component picture: no colour to judge.
     let noColour: Bool
     let boxes: [BoxOutcome]
+    /// The regions the producer painted outside the plan: no rule places
+    /// their paint, so each is its own unit the check cannot judge.
+    var outsidePlan: [UUID] = []
 }
 
 enum BoxCheckReport: Equatable, Sendable {
@@ -118,7 +130,8 @@ enum BoxCheckReport: Equatable, Sendable {
     case noRecord
 
     /// Every unit the check was given and how it ended on it: each page's
-    /// picture, then each box of that page's plan.
+    /// picture, then each box of that page's plan, then each region the
+    /// producer painted outside that plan.
     var outcomes: [(unit: CheckUnit, kind: OutcomeKind)] {
         switch self {
         case .noRecord:
@@ -128,6 +141,9 @@ enum BoxCheckReport: Equatable, Sendable {
             for (i, page) in pages.enumerated() {
                 out.append((.page(i), page.picture))
                 for (j, box) in page.boxes.enumerated() { out.append((.box(page: i, planIndex: j), box.kind)) }
+                for id in page.outsidePlan {
+                    out.append((.region(page: i, id: id), .inconclusive(ExactFillCheck.paintedOutsideThePlan)))
+                }
             }
             return out
         }
@@ -149,6 +165,7 @@ enum ExactFillCheck {
     static let reportDoesNotHoldThePaint = CheckRule("the reported rectangle does not contain the rule's paint")
     static let noReport = CheckRule("the record holds no reported rectangle for the box")
     static let tooManyBoxes = CheckRule("more boxes on the page than the check reads")
+    static let paintedOutsideThePlan = CheckRule("the region was painted outside the plan, where no rule places its paint")
 
     /// A brightness block that is exactly the fill: flat, and its DC value
     /// times its step at most −1021 (black) or at least 1013 (white), the
@@ -173,11 +190,14 @@ enum ExactFillCheck {
         var pages: [BoxCheckPage] = []
         try PageImageLocator.readEach(fileData: fileData, source: source, recordedHashes: input.pageImageDigests) { index, outcome in
             let page = index < input.pages.count ? input.pages[index] : nil
-            pages.append(judge(page: page, picture: outcome, fill: input.fill, chosenDPI: input.chosenDPI))
+            var judged = judge(page: page, picture: outcome, fill: input.fill, chosenDPI: input.chosenDPI)
+            judged.outsidePlan = page?.outsidePlan ?? []
+            pages.append(judged)
         }
         for page in input.pages.dropFirst(pages.count) {
             pages.append(BoxCheckPage(picture: .fault(.wrongSubject), quality: nil, belowChosen: false, noColour: false,
-                                      boxes: page.boxes.map { _ in .couldNotFinish(.wrongSubject, nil) }))
+                                      boxes: page.boxes.map { _ in .couldNotFinish(.wrongSubject, nil) },
+                                      outsidePlan: page.outsidePlan))
         }
         return .pages(pages)
     }

@@ -141,6 +141,13 @@ struct BoxCheckRuleTests {
         let report = try ExactFillCheck.run(fileData: file, source: source, input: two)
         #expect(report.outcomes.map(\.unit) == [.page(0), .box(page: 0, planIndex: 0), .page(1), .box(page: 1, planIndex: 0)])
         #expect(report.outcomes.map(\.kind) == [.completed, .completed, .fault(.wrongSubject), .fault(.wrongSubject)], "\(report.outcomes)")
+        // The record's digests stop at its first page without one, so a page
+        // past them and past the file's last is answered by the check itself.
+        let undigested = BoxCheckInput(fill: .black, chosenDPI: 300, pages: [page, page],
+                                       pageImageDigests: [PageImageFixtures.sha256(jpeg)])
+        let short = try ExactFillCheck.run(fileData: file, source: source, input: undigested)
+        #expect(short.outcomes.map(\.unit) == [.page(0), .box(page: 0, planIndex: 0), .page(1), .box(page: 1, planIndex: 0)])
+        #expect(short.outcomes.map(\.kind) == [.completed, .completed, .fault(.wrongSubject), .fault(.wrongSubject)], "\(short.outcomes)")
         let none = BoxCheckInput(fill: .black, chosenDPI: 300, pages: [], pageImageDigests: [PageImageFixtures.sha256(jpeg)])
         let outside = try ExactFillCheck.run(fileData: file, source: source, input: none)
         #expect(outside.outcomes.map(\.kind) == [.fault(.wrongSubject)], "\(outside.outcomes)")

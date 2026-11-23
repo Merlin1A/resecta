@@ -56,6 +56,10 @@ public enum PipelineError: Sendable, LocalizedError {
         // Pre-flight reject before CGContextDrawPDFPage, which is a
         // synchronous C call with no cancellation points.
         case pageTooLarge(pageIndex: Int)
+        // The page's own two sides, read from its page data, are not the
+        // sides the run's record holds (or the record made no plan for it):
+        // refused before the page is rendered.
+        case pageSidesNotAsRecorded(pageIndex: Int)
         case reconstructionFailed
     }
 
@@ -101,6 +105,7 @@ public enum PipelineError: Sendable, LocalizedError {
             case .fillVerificationFailed(let p): "Redaction fill verification failed for page \(p + 1). The page may not be fully redacted."
             case .renderTimeout(let p): "Page \(p + 1) could not be rendered within the time limit."
             case .pageTooLarge(let p): "Page \(p + 1) has dimensions that exceed the safe rendering limit."
+            case .pageSidesNotAsRecorded(let p): "Page \(p + 1)'s size could not be confirmed against the run's record. The page was not redacted."
             case .reconstructionFailed: "The redacted document could not be assembled."
             }
         case .verificationError: "Verification could not be completed."
