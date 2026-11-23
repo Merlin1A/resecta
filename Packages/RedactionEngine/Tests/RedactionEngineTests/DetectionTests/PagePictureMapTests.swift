@@ -273,7 +273,9 @@ struct PagePictureMapTests {
             let cellDictionary = try #require(CGPDFStreamGetDictionary(cellStream!))
             try #require(CGPDFDictionaryGetDictionary(cellDictionary, "Resources", &cellResources) && cellResources != nil)
             let seen = PictureWalk.FormsSeen()
-            _ = PictureWalk.reachesImage(cellResources!, depth: 0, seen: seen)
+            let content = CGPDFContentStreamCreateWithPage(cgPage)
+            defer { CGPDFContentStreamRelease(content) }
+            _ = PictureWalk.reachesPicture(cellResources!, content: content, depth: 0, seen: seen)
             return (try #require(map), took, seen.looked)
         }
         let (plain, plainTook, plainLooked) = try pattern(last: "0 0 1 1 re f", names: "", objects: [])
@@ -351,6 +353,20 @@ struct PagePictureMapTests {
             withExtendedLifetime(document) {}
         }
         #expect(Map.entryLimit == 65_536)
+    }
+
+    @Test("A picture held deeper in a pattern leaves the painting not followed, and the page's patterns hold it")
+    func nestedPatternPictures() throws {
+        typealias C = PageImageCensusPiecesTests
+        for nested in C.Nested.allCases {
+            for picture in [true, false] {
+                let (document, page, cgPage) = try #require(S.pdfPage(C.letterWithNestedPattern(nested, picture: picture)))
+                defer { withExtendedLifetime(document) {} }
+                let map = Map.read(cgPage, cropBox: page.bounds(for: .cropBox))
+                #expect(map.followed == !picture, "\(nested), picture \(picture): followed")
+                #expect(PictureWalk.patternsHoldPicture(cgPage) == picture, "\(nested), picture \(picture): held")
+            }
+        }
     }
 
     @Test("Forms that draw each other many times are read for invisible text in bounded time, and answer true")

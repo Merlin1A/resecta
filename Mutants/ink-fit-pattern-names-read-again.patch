@@ -7,12 +7,12 @@ Apply in a scratch worktree with `git apply`; discard after.
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift
-@@ -378,7 +378,7 @@
-             seen.entries += 1
-             guard seen.entries <= PagePictureMap.entryLimit else { tooMany = true; return false }
-             var stream: CGPDFStreamRef?
--            if CGPDFObjectGetValue(value, .stream, &stream), let stream, known.insert(stream).inserted { streams.append(stream) }
-+            if CGPDFObjectGetValue(value, .stream, &stream), let stream { streams.append(stream) }
-             return true
-         }, nil)
-         guard !tooMany else { return true }
+@@ -427,7 +427,7 @@
+     /// cannot be followed.
+     static func patternCanBeFollowed(_ stream: CGPDFStreamRef, content: CGPDFContentStreamRef, depth: Int = 0,
+                                      seen: FormsSeen) -> Bool {
+-        guard seen.patterns.insert(stream).inserted else { return true }
++        seen.patterns.insert(stream)
+         seen.patternsRead += 1
+         guard depth < PageImageCensus.maxFormDepth, seen.patternsRead <= PagePictureMap.formLimit,
+               let dictionary = CGPDFStreamGetDictionary(stream) else { return false }

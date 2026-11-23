@@ -16,7 +16,8 @@ import CoreGraphics
 /// A scan stored as many small pictures (strips or tiles, image objects or
 /// inline images) passes none of those tests: each picture is below both
 /// floors, and its text layer is not thin. When they all say no, a page that
-/// draws a picture, or shows invisible text, still carries image content when
+/// draws a picture, shows invisible text, or holds a picture inside a tiling
+/// pattern (in its own resources or a form's), still carries image content when
 /// its pictures, as painted, cover four fifths of the crop box, or when its
 /// painting cannot be followed (`PagePictureMap`, the line the ink fit's gate
 /// reads). Where pictures are painted is read only then. The answer is kept
@@ -50,8 +51,10 @@ enum PageImageCensus {
     /// The census rule for one page. A page with no visible area carries
     /// nothing. The largest image object's size and the text layer's density
     /// decide first; where pictures are painted is read only when both say no
-    /// and the page reaches an image object, draws an inline image, or shows
-    /// invisible text (a scan's print can sit inside a pattern under that text).
+    /// and the page reaches an image object, draws an inline image, shows
+    /// invisible text, or holds a picture inside a tiling pattern: a scan's
+    /// print can sit inside a pattern under invisible or visible text, and the
+    /// fit's gate reads the same map for it.
     static func readCarriesImageContent(_ page: PDFPage) -> Bool {
         let crop = page.bounds(for: .cropBox)
         guard crop.width > 0, crop.height > 0, let cgPage = page.pageRef else { return false }
@@ -59,7 +62,8 @@ enum PageImageCensus {
             if pixels >= imagePixelFloor || imageShare(pixelArea: pixels, cropBox: crop) >= imageShareFloor { return true }
             let meaningful = (page.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines).count
             if textDensity(meaningfulCount: meaningful, cropBox: crop) < densityFloor { return true }
-        } else if !PageContentFacts.drawsInlineImage(cgPage) && !DocumentSearcher.showsInvisibleText(cgPage) {
+        } else if !PageContentFacts.drawsInlineImage(cgPage) && !DocumentSearcher.showsInvisibleText(cgPage)
+                    && !PictureWalk.patternsHoldPicture(cgPage) {
             return false
         }
         let map = PagePictureMap.cached(page, cgPage: cgPage)

@@ -255,4 +255,19 @@ struct PageContentFactsTests {
             #expect((reader.calls > 0) == reads, "picture \(picture): the source read \(reader.calls) times")
         }
     }
+
+    @Test("a picture held deeper in a pattern is read: a box drawn by hand flattens the page")
+    func pictureInNestedPatternIsRead() throws {
+        for nested in PageImageCensusPiecesTests.Nested.allCases {
+            for picture in [true, false] {
+                let data = PageImageCensusPiecesTests.letterWithNestedPattern(nested, picture: picture)
+                let document = try #require(PDFDocument(data: data))
+                let f = try Self.facts(document)
+                #expect(f.reachesImage == picture, "\(nested), picture \(picture): \(f)")
+                #expect(f.isPlain == !picture, "\(nested), picture \(picture): \(f)")
+                #expect(PageContentFacts.keepsTextLayer(regions: [Self.region()], facts: { f }) == !picture,
+                        "\(nested), picture \(picture): a hand box")
+            }
+        }
+    }
 }
