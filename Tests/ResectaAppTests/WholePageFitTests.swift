@@ -141,8 +141,11 @@ struct WholePageFitTests {
     @Test("The whole-page predicate: each edge within the slack of the unit square, and no further")
     func wholePagePredicate() {
         let e = RedactionState.shareSlack
+        // Inside the slack by half of it: an edge set at the slack itself lands a
+        // rounding step past it once 1 is added (1 + 1e-12 - 1 = 1.00009e-12).
+        let h = e / 2
         #expect(RedactionState.isWholePage(CGRect(x: 0, y: 0, width: 1, height: 1)))
-        #expect(RedactionState.isWholePage(CGRect(x: e, y: -e, width: 1, height: 1 + e)))
+        #expect(RedactionState.isWholePage(CGRect(x: h, y: -h, width: 1, height: 1 + h)))
         #expect(RedactionState.isWholePage(CGRect(x: 9.5e-17, y: 0, width: 1 - 9.5e-17, height: 1)))
         #expect(!RedactionState.isWholePage(CGRect(x: 9.6e-5, y: -1.3e-4, width: 1, height: 1)))
         #expect(!RedactionState.isWholePage(CGRect(x: 0, y: 0, width: 1, height: 1 - 3 * e)))
