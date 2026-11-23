@@ -122,8 +122,9 @@ struct AddressSpatialAssembler: Sendable {
 
         // Lines group and join on the text layer's own geometry
         // (`textLayerRect`, set when a line was fitted to its ink), never on
-        // the painted box: a fit or a drift envelope must not move the join.
-        func place(_ line: OCREngine.TextLine) -> CGRect { line.textLayerRect ?? line.normalizedRect }
+        // the painted box: a fit, a drift envelope or a growth to the line's
+        // own glyphs must not move the join.
+        func place(_ line: OCREngine.TextLine) -> CGRect { line.textLayerRect ?? line.ungrownRect ?? line.normalizedRect }
         // Sort by y descending (Vision coords: y=1 top, y=0 bottom).
         let sorted = lines.enumerated().sorted {
             place($0.element).minY > place($1.element).minY
@@ -211,8 +212,8 @@ struct AddressSpatialAssembler: Sendable {
                 baseConfidence = max(0.30, baseConfidence - 0.20)
             }
             let textLayerUnionRect = participants.contains { $0.textLayerRect != nil }
-                ? participants.dropFirst().reduce(participants[0].textLayerRect ?? participants[0].normalizedRect) {
-                    $0.union($1.textLayerRect ?? $1.normalizedRect)
+                ? participants.dropFirst().reduce(place(participants[0])) {
+                    $0.union(place($1))
                 }
                 : nil
             results.append(Assembled(

@@ -42,12 +42,13 @@ extension DocumentSearcher {
                 // the assembler (word enumeration → per-word selection bounds
                 // → y-bucketed lines, displayed-space normalized) —
                 // so Search and the detection path see identical line
-                // geometry for the same page.
+                // geometry for the same page; each line grown to its own
+                // drawn glyphs (`addressLines(on:)`).
                 var spatialRectByText: [String: TextLayerBox] = [:]
                 if categories.contains(.address),
-                   let embedded = EmbeddedTextSource.make(from: page, fitLines: true) {
+                   let lines = addressLines(on: page) {
                     let assembly = assembledAddressMatches(
-                        lines: embedded.lines, haystack: pageText as NSString)
+                        lines: lines, haystack: pageText as NSString)
                     rawMatches.append(contentsOf: assembly.matches)
                     spatialRectByText = assembly.spatialRectByText
                 }
