@@ -42,11 +42,15 @@ struct AccountOfWhatWasRead: Sendable, Equatable {
         static let unopenable = Facts(rawValue: 1 << 10)
         /// A pattern ran out of time on this page.
         static let patternTimedOut = Facts(rawValue: 1 << 11)
+        /// The page's text is searched where its painting cannot be followed:
+        /// not known to be another app's text.
+        static let paintingNotFollowed = Facts(rawValue: 1 << 12)
 
-        /// The twelve facts, in the order above.
+        /// The thirteen facts, in the order above.
         static let all: [Facts] = [
             .ownText, .anotherAppsLayer, .recognised, .emptyReadWithInk, .emptyReadBlank, .picturesRequired,
             .smallPictures, .recognitionOff, .recognitionFailed, .tooLarge, .unopenable, .patternTimedOut,
+            .paintingNotFollowed,
         ]
 
         /// Any one of these on a page with its own text leaves it partly read.
@@ -60,6 +64,7 @@ struct AccountOfWhatWasRead: Sendable, Equatable {
             case .textLayer:
                 facts.insert(.ownText)
                 if coverage.throughAnotherAppsLayer { facts.insert(.anotherAppsLayer) }
+                if coverage.paintingNotFollowed { facts.insert(.paintingNotFollowed) }
                 switch coverage.pictures {
                 case .required: facts.insert(.picturesRequired)
                 case .belowFloors: facts.insert(.smallPictures)
@@ -126,6 +131,7 @@ struct AccountOfWhatWasRead: Sendable, Equatable {
         case recognitionFoundNoText
         case partlyRead(Set<Reason>)
         case readThroughAnotherAppsText
+        case readWherePaintingIsNotFollowed
         case readFromOwnText
         case readByRecognition
         case readBlank
@@ -138,7 +144,7 @@ struct AccountOfWhatWasRead: Sendable, Equatable {
         /// Read, partly read, or not read: a worse kind is a larger value.
         var kind: Kind {
             switch self {
-            case .readThroughAnotherAppsText, .readFromOwnText, .readByRecognition, .readBlank: .read
+            case .readThroughAnotherAppsText, .readWherePaintingIsNotFollowed, .readFromOwnText, .readByRecognition, .readBlank: .read
             case .partlyRead: .partlyRead
             default: .notRead
             }
@@ -166,6 +172,7 @@ struct AccountOfWhatWasRead: Sendable, Equatable {
         let reasons = partReasons(of: facts, position: position)
         if !reasons.isEmpty { return .partlyRead(reasons) }                   // 10
         if ownText {
+            if facts.contains(.paintingNotFollowed) { return .readWherePaintingIsNotFollowed }
             return facts.contains(.anotherAppsLayer) ? .readThroughAnotherAppsText : .readFromOwnText // 11, 12
         }
         return facts.contains(.recognised) ? .readByRecognition : .readBlank // 13, 14

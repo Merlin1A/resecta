@@ -1,0 +1,19 @@
+Property: A page that reaches no image object and draws no inline image, but shows invisible text, is read for where its pictures are painted: a scan's print can sit inside a pattern.
+Area: Search, the census of image content
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'PageImageCensusPiecesTests'
+Must go red: RedactionEngineTests/PageImageCensusPiecesTests notFollowed (A page whose painting cannot be followed carries image content)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageImageCensus.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageImageCensus.swift
+index 629c6a6d..bccec0ba 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageImageCensus.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageImageCensus.swift
+@@ -59,7 +59,7 @@ enum PageImageCensus {
+             if pixels >= imagePixelFloor || imageShare(pixelArea: pixels, cropBox: crop) >= imageShareFloor { return true }
+             let meaningful = (page.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines).count
+             if textDensity(meaningfulCount: meaningful, cropBox: crop) < densityFloor { return true }
+-        } else if !PageContentFacts.drawsInlineImage(cgPage) && !DocumentSearcher.showsInvisibleText(cgPage) {
++        } else if !PageContentFacts.drawsInlineImage(cgPage) {
+             return false
+         }
+         let map = PagePictureMap.cached(page, cgPage: cgPage)

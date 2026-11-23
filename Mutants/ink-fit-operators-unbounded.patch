@@ -1,0 +1,21 @@
+Property: More than 1,000,000 operators read on one page, over its content and every form it draws, and its painting is not followed.
+Area: ink fit (Search), which pages are fitted
+Test command: cd Packages/RedactionEngine && swift test --filter 'InkFitPiecewiseScanTests|PagePictureMapTests'
+Must go red: RedactionEngineTests/PagePictureMapTests operatorsAreBounded (More operators than the limit on one page and the painting is not followed)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift
+@@ -257,11 +257,6 @@
+     static func walk(_ info: UnsafeMutableRawPointer?, _ scanner: CGPDFScannerRef) -> PictureWalk? {
+         guard let w = info.map({ Unmanaged<PictureWalk>.fromOpaque($0).takeUnretainedValue() }) else { return nil }
+         w.operations += 1
+-        guard w.operations <= PagePictureMap.operationLimit else {
+-            w.followed = false
+-            CGPDFScannerStop(scanner)
+-            return nil
+-        }
+         return w
+     }
+ 

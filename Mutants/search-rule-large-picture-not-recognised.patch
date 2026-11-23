@@ -1,18 +1,18 @@
 Property: A typed page is also read by text recognition when its largest picture reaches the pixel or share floor.
 Area: Search, the rules a search follows
-Test command: cd Packages/RedactionEngine && DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --no-parallel --filter '^RedactionEngineTests\.(HybridPageRouteTests|PageImageCensusTests)/'
-Must go red: RedactionEngineTests/PageImageCensusTests carriesImageContent; RedactionEngineTests/HybridPageRouteTests vendorLayerOverScanFindsTheBody
+Test command: cd Packages/RedactionEngine && DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --no-parallel --filter '^RedactionEngineTests\.PageImageCensusTests/'
+Must go red: RedactionEngineTests/PageImageCensusTests carriesImageContent
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageImageCensus.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageImageCensus.swift
-index cfcb14b..4d110b0 100644
+index 629c6a6d..45978e82 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageImageCensus.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageImageCensus.swift
-@@ -35,7 +35,6 @@ enum PageImageCensus {
+@@ -56,7 +56,6 @@ enum PageImageCensus {
          let crop = page.bounds(for: .cropBox)
-         guard crop.width > 0, crop.height > 0 else { return false }
-         guard let cgPage = page.pageRef, let pixels = largestImagePixelArea(of: cgPage) else { return false }
--        if pixels >= imagePixelFloor || imageShare(pixelArea: pixels, cropBox: crop) >= imageShareFloor { return true }
-         let meaningful = (page.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines).count
-         return textDensity(meaningfulCount: meaningful, cropBox: crop) < densityFloor
-     }
+         guard crop.width > 0, crop.height > 0, let cgPage = page.pageRef else { return false }
+         if let pixels = largestImagePixelArea(of: cgPage) {
+-            if pixels >= imagePixelFloor || imageShare(pixelArea: pixels, cropBox: crop) >= imageShareFloor { return true }
+             let meaningful = (page.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines).count
+             if textDensity(meaningfulCount: meaningful, cropBox: crop) < densityFloor { return true }
+         } else if !PageContentFacts.drawsInlineImage(cgPage) && !DocumentSearcher.showsInvisibleText(cgPage) {

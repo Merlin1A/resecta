@@ -1,0 +1,18 @@
+Property: More than 1,024 forms drawn on one page and its painting is not followed, so forms that draw each other many times are walked a bounded number of times.
+Area: ink fit (Search), which pages are fitted
+Test command: cd Packages/RedactionEngine && swift test --filter 'InkFitPiecewiseScanTests|PagePictureMapTests'
+Must go red: RedactionEngineTests/PagePictureMapTests formsDrawnManyTimes (Forms that draw each other many times are walked in bounded time, and not followed); RedactionEngineTests/InkFitPiecewiseScanTests unfollowedTypedPageIsFitted (A typed page that draws a picture and whose painting cannot be followed is fitted): 1,093 forms drawn
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift
+index 4faafb81..64dbcedf 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift
+@@ -296,7 +296,6 @@ final class PictureWalk {
+                   scanner: CGPDFScannerRef) {
+         guard depth < PageImageCensus.maxFormDepth, !drawing.contains(stream) else { followed = false; return }
+         formsDrawn += 1
+-        guard formsDrawn <= PagePictureMap.formLimit else { followed = false; CGPDFScannerStop(scanner); return }
+         drawing.insert(stream)
+         defer { drawing.remove(stream) }
+         var matrix = CGAffineTransform.identity

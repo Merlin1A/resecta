@@ -29,7 +29,8 @@ public struct PageContentFacts: Equatable, Sendable {
         reachesImage: true, drawsInlineImage: true, showsInvisibleText: true, usesType3Font: true)
 
     /// The four facts for one page, read from its content and resources (own,
-    /// inherited and through form objects).
+    /// inherited and through form objects). An image reached includes one
+    /// inside a tiling pattern, or a pattern that cannot be read.
     public static func read(_ page: CGPDFPage?) -> PageContentFacts {
         guard let page, let dictionary = page.dictionary else { return .unread }
         let resources: CGPDFDictionaryRef?
@@ -40,11 +41,27 @@ public struct PageContentFacts: Equatable, Sendable {
         }
         var walk = ContentWalk()
         walk.visit(contents: dictionary, resources: resources, depth: 0)
+        // A picture inside a tiling pattern is not an image the census sees.
         return PageContentFacts(
-            reachesImage: PageImageCensus.largestImagePixelArea(of: page) != nil,
+            reachesImage: PageImageCensus.largestImagePixelArea(of: page) != nil || PictureWalk.patternsHoldPicture(page),
             drawsInlineImage: walk.inlineImage,
             showsInvisibleText: DocumentSearcher.showsInvisibleText(page),
             usesType3Font: walk.type3Font)
+    }
+
+    /// Whether a page draws an inline image, in its content or in a form
+    /// object its resources reach; a page that cannot be read does.
+    static func drawsInlineImage(_ page: CGPDFPage) -> Bool {
+        guard let dictionary = page.dictionary else { return true }
+        let resources: CGPDFDictionaryRef?
+        switch TextLayerExtractor.inheritedResources(of: dictionary) {
+        case .found(let found): resources = found
+        case .none: resources = nil
+        case .unreadable: return true
+        }
+        var walk = ContentWalk()
+        walk.visit(contents: dictionary, resources: resources, depth: 0)
+        return walk.inlineImage
     }
 
     /// Whether a Searchable page keeps its text layer under these regions.

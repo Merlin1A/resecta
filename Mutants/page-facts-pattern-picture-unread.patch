@@ -1,0 +1,19 @@
+Property: A page whose picture sits inside a tiling pattern reaches an image, so it is never plain.
+Area: page content facts (Searchable export, hidden-word check)
+Test command: cd Packages/RedactionEngine && swift test --filter 'PageContentFactsTests'
+Must go red: RedactionEngineTests/PageContentFactsTests pictureInPatternIsRead (a picture in a tiling pattern is read: a box drawn by hand flattens the page); RedactionEngineTests/PageContentFactsTests pictureInPatternIsChecked (a picture in a tiling pattern is read: the hidden-word check reads the source page)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageContentFacts.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageContentFacts.swift
+index ad72e1ee..38efae3c 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageContentFacts.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageContentFacts.swift
+@@ -43,7 +43,7 @@ public struct PageContentFacts: Equatable, Sendable {
+         walk.visit(contents: dictionary, resources: resources, depth: 0)
+         // A picture inside a tiling pattern is not an image the census sees.
+         return PageContentFacts(
+-            reachesImage: PageImageCensus.largestImagePixelArea(of: page) != nil || PictureWalk.patternsHoldPicture(page),
++            reachesImage: PageImageCensus.largestImagePixelArea(of: page) != nil,
+             drawsInlineImage: walk.inlineImage,
+             showsInvisibleText: DocumentSearcher.showsInvisibleText(page),
+             usesType3Font: walk.type3Font)
