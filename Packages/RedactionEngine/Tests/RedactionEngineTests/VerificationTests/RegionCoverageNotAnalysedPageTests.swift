@@ -8,6 +8,8 @@ import PDFKit
 // is neither read by its text layer nor by OCR, and the searcher says so only
 // through its not-analysed signal. The check counts such a page under a box
 // as unread (a Needs review naming the page), never as a page with no match.
+// A text page carrying a picture the image census counts says the same when
+// recognition is off: its layer is read, its picture by nothing.
 
 @Suite("Search Re-check coverage: a page read by nothing", .tags(.search))
 struct RegionCoverageNotAnalysedPageTests {
@@ -59,5 +61,26 @@ struct RegionCoverageNotAnalysedPageTests {
             requests: [TestFixtures.textRequest("SEED", options: off, pages: [0, 1])],
             regions: [0: [Self.box()], 1: [Self.box()]])
         #expect(both.unreadPages == [1], "got \(both)")
+    }
+
+    @Test("Recognition off: a text page with a counted picture, under a box over its text-layer match, is unread")
+    func textPageWithACountedPictureRecognitionOff() async throws {
+        let stamped = try #require(PDFDocument(data: TestFixtures.stampedScanPDF()))
+        let page = try #require(stamped.page(at: 0))
+        try #require(TextLayerDetector.detectTextLayer(page) == .rich)
+        try #require(PageImageCensus.carriesImageContent(page))
+        let off = SearchOptions(includeOCR: false)
+        let stream = DocumentSearcher().search(SendablePDFDocument(stamped), mode: .text("EXHIBIT", options: off), progress: { _, _ in })
+        var matches: [SearchResult] = []
+        for await result in stream { matches.append(result) }
+        let match = try #require(matches.first, "the stamp is in the text layer")
+        let box = RedactionRegion(
+            id: UUID(), normalizedRect: match.normalizedRect.insetBy(dx: -0.01, dy: -0.01), source: .searchMatch(term: "EXHIBIT"))
+        let outcome = try await RegionCoverage.check(
+            source: SendablePDFDocument(stamped),
+            requests: [TestFixtures.textRequest("EXHIBIT", options: off)],
+            regions: [0: [box]])
+        #expect(outcome.unreadPages == [0], "the layer is read but the picture by nothing: unread; got \(outcome)")
+        #expect(outcome.shortfalls.isEmpty, "the box covers the text-layer match; got \(outcome)")
     }
 }
