@@ -82,13 +82,42 @@ enum PageDrawingReader {
     // MARK: The file
 
     /// One revision, and a catalog and page tree of the writer's keys alone.
+    /// Nothing but line ends follows the file's last %%EOF, and the trailer
+    /// before it names no earlier one, however its names are spelled.
     static func fileReason(_ data: Data, _ document: CGPDFDocument) -> Reason? {
-        let startxref = Data("startxref".utf8), trailer = Data("trailer".utf8)
-        guard count(of: startxref, in: data) == 1, let t = data.range(of: trailer, options: .backwards) else { return .fileRevised }
-        let tail = data[t.upperBound...]
+        let startxref = Data("startxref".utf8), trailer = Data("trailer".utf8), end = Data("%%EOF".utf8)
+        guard count(of: startxref, in: data) == 1, let e = data.range(of: end, options: .backwards) else { return .fileRevised }
+        guard data[e.upperBound...].allSatisfy({ $0 == 10 || $0 == 13 }) else { return .fileRevised }
+        guard let t = data.range(of: trailer, options: .backwards, in: data.startIndex..<e.lowerBound) else { return .fileRevised }
+        let tail = nameEscapesRead(data[t.upperBound..<e.lowerBound])
         if tail.range(of: Data("/Prev".utf8)) != nil || tail.range(of: Data("/XRefStm".utf8)) != nil { return .fileRevised }
         guard let catalog = document.catalog, keys(catalog).isSubset(of: catalogKeys) else { return .documentKeyNotListed }
         return nil
+    }
+
+    /// The bytes with each #xx escape read as the byte it stands for, so a
+    /// name spelled with escapes (/Pr#65v) is matched as the name it is.
+    static func nameEscapesRead(_ data: Data) -> Data {
+        let b = [UInt8](data)
+        func hex(_ c: UInt8) -> UInt8? {
+            switch c {
+            case 48...57: return c - 48
+            case 65...70: return c - 55
+            case 97...102: return c - 87
+            default: return nil
+            }
+        }
+        var out: [UInt8] = []
+        out.reserveCapacity(b.count)
+        var i = 0
+        while i < b.count {
+            if b[i] == 35, i + 2 < b.count, let high = hex(b[i + 1]), let low = hex(b[i + 2]) {
+                out.append(high << 4 | low); i += 3
+            } else {
+                out.append(b[i]); i += 1
+            }
+        }
+        return Data(out)
     }
 
     static func count(of needle: Data, in data: Data) -> Int {
@@ -254,9 +283,9 @@ enum PageDrawingReader {
     }
 
     /// The operator words of a content stream, in order, by the syntax's
-    /// rules for strings, names, numbers and delimiters; nil when a string,
-    /// a hex string or a comment runs past the end. Reading stops after an
-    /// inline picture's ID, whose data follows.
+    /// rules for strings, names, numbers and delimiters; nil when a string
+    /// or a hex string runs past the end. A comment ends at a line end or at
+    /// the end. Reading stops after an inline picture's ID, whose data follows.
     static func operatorWords(_ data: Data) -> [String]? {
         let b = [UInt8](data)
         let white: Set<UInt8> = [0, 9, 10, 12, 13, 32]
@@ -343,6 +372,7 @@ enum PageDrawingReader {
 
     static func scan(_ page: CGPDFPage) -> Result<[(name: String, ctm: Matrix)], PageImageRefusal> {
         guard let table = CGPDFOperatorTableCreate() else { return .failure(refused(.drawingNotRead)) }
+        defer { CGPDFOperatorTableRelease(table) }
         for op in everyOperator where !operators.contains(op) {
             CGPDFOperatorTableSetCallback(table, op) { s, info in
                 Unmanaged<Scan>.fromOpaque(info!).takeUnretainedValue().refuse(.operatorNotListed, s)
@@ -384,6 +414,8 @@ enum PageDrawingReader {
         let content = CGPDFContentStreamCreateWithPage(page)
         let scanner = CGPDFScannerCreate(content, table, Unmanaged.passUnretained(state).toOpaque())
         let finished = CGPDFScannerScan(scanner)
+        CGPDFScannerRelease(scanner)
+        CGPDFContentStreamRelease(content)
         if let refusal = state.refusal { return .failure(refused(refusal)) }
         guard finished else { return .failure(refused(.drawingNotRead)) }
         return .success(state.draws)

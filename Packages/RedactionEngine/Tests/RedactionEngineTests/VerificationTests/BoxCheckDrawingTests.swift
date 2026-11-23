@@ -122,6 +122,8 @@ struct BoxCheckDrawingTests {
         Case(number: 65, name: "16 bits a component", expected: .pictureColourNotListed) { $0.bitsPerComponent = 16 },
         Case(number: 66, name: "a four-component profile over device RGB", expected: .pictureColourNotListed) {
             $0.profileKeys = "/N 4 /Alternate /DeviceRGB" },
+        Case(number: 67, name: "a three-component profile over device grey", expected: .pictureColourNotListed) {
+            $0.profileKeys = "/N 3 /Alternate /DeviceGray" },
         // The page and the tree above it.
         Case(number: 70, name: "an annotation", expected: .pageKeyNotListed) { $0.page = "/Annots [<< /Type /Annot /Subtype /Square /Rect [0 0 10 10] >>]" },
         Case(number: 71, name: "a transparency group", expected: .pageKeyNotListed) { $0.page = "/Group << /S /Transparency >>" },
@@ -143,6 +145,9 @@ struct BoxCheckDrawingTests {
         Case(number: 85, name: "a second revision appended", expected: .fileRevised) {
             $0.appended = "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\nxref\n0 1\n0000000000 65535 f \ntrailer\n<< /Size 7 /Root 1 0 R /Prev 9 >>\nstartxref\n0\n%%EOF\n" },
         Case(number: 86, name: "a trailer that names an earlier one", expected: .fileRevised) { $0.trailer = "/Prev 9" },
+        Case(number: 87, name: "a trailer that names an earlier one with an escape", expected: .fileRevised) { $0.trailer = "/Pr#65v 9" },
+        Case(number: 88, name: "a trailer that names a cross-reference stream", expected: .fileRevised) { $0.trailer = "/XRefStm 9" },
+        Case(number: 89, name: "an object after the end of the file", expected: .fileRevised) { $0.appended = "9 0 obj\n<< >>\nendobj\n" },
         // The picture's segments.
         Case(number: 90, name: "a comment segment", expected: .unlistedSegment,
              change: picture { D.withSegment($0, marker: 0xFE, body: Array("note".utf8)) }),
@@ -162,10 +167,10 @@ struct BoxCheckDrawingTests {
         Case(number: 97, name: "a Q with nothing saved", expected: .drawingNotRead) { $0.content = "Q " + content },
     ]
 
-    @Test("The table holds 77 cases, eight of them admitted")
+    @Test("The table holds 81 cases, eight of them admitted")
     func tableLength() {
-        #expect(Self.cases.count == 77)
-        #expect(Set(Self.cases.map(\.number)).count == 77)
+        #expect(Self.cases.count == 81)
+        #expect(Set(Self.cases.map(\.number)).count == 81)
         #expect(Self.cases.filter { $0.expected == nil }.count == 8)
     }
 
