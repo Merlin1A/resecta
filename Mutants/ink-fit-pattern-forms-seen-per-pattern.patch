@@ -7,12 +7,12 @@ Apply in a scratch worktree with `git apply`; discard after.
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift
-@@ -394,7 +394,7 @@
-         guard let dictionary = CGPDFStreamGetDictionary(stream) else { return false }
+@@ -433,7 +433,7 @@
+               let dictionary = CGPDFStreamGetDictionary(stream) else { return false }
          var resources: CGPDFDictionaryRef?
          _ = CGPDFDictionaryGetDictionary(dictionary, "Resources", &resources)
--        if let resources, reachesImage(resources, depth: 0, seen: seen) { return false }
-+        if let resources, reachesImage(resources, depth: 0, seen: FormsSeen()) { return false }
+-        if let resources, reachesPicture(resources, content: content, depth: depth, seen: seen) { return false }
++        if let resources, reachesPicture(resources, content: content, depth: depth, seen: FormsSeen()) { return false }
          let inner = CGPDFContentStreamCreateWithStream(stream, resources ?? dictionary, content)
          defer { CGPDFContentStreamRelease(inner) }
          return drawsInlineImage(inner) == false

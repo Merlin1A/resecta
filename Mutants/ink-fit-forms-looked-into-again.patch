@@ -5,15 +5,14 @@ Must go red: RedactionEngineTests/PagePictureMapTests patternFormsLookedIntoOnce
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift
-index 4faafb81..4515e836 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift
-@@ -389,7 +389,7 @@ final class PictureWalk {
-             switch String(cString: subtype) {
-             case "Image": found.value = true; return false
+@@ -470,7 +470,7 @@
+             switch subtype(of: stream) {
+             case "Image": return true
              case "Form":
--                guard found.seen.forms.insert(stream).inserted else { return true }
-+                found.seen.forms.insert(stream)
-                 found.seen.looked += 1
-                 guard found.seen.looked <= PagePictureMap.formLimit else { found.value = true; return false }
+-                guard seen.forms.insert(stream).inserted else { continue }
++                seen.forms.insert(stream)
+                 seen.looked += 1
+                 guard seen.looked <= PagePictureMap.formLimit, let dictionary = CGPDFStreamGetDictionary(stream) else { return true }
                  var inner: CGPDFDictionaryRef?

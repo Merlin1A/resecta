@@ -174,8 +174,10 @@ struct RegionCoverage: Sendable {
         /// 0-based, sorted, deduplicated: a page with boxes (within the
         /// request's `appliedPages` when it names any) that the searcher
         /// reported it could not read — a render over the OCR pixel caps,
-        /// OCR that did not run, a page it could not open, a pattern that
-        /// ran out of time on it, or a pattern the safety gate refused.
+        /// OCR that did not run, a scanned page left unread with OCR off, a
+        /// text page whose counted picture is left unread with OCR off, a
+        /// page it could not open, a pattern that ran out of time on it, or
+        /// a pattern the safety gate refused.
         let unreadPages: [Int]
         /// How many re-run matches on pages with boxes were compared.
         let comparedMatches: Int
@@ -188,23 +190,27 @@ struct RegionCoverage: Sendable {
     /// searcher could not read is reported in `unreadPages`, never passed
     /// by silence: the searcher's own coverage and timeout sinks say which
     /// pages it read and why it could not read one, and a re-run that
-    /// reached the searcher's result cap leaves the page it stopped on and
-    /// every later page unread. A cancellation throws:
-    /// a re-run cut short is never an outcome.
+    /// reached the searcher's result cap leaves the page before the one it
+    /// stopped on, that page and every later page unread. A cancellation
+    /// throws: a re-run cut short is never an outcome.
     static func check(
         source: SendablePDFDocument,
         requests: [SearchRecheckRequest],
         regions: [Int: [RedactionRegion]]
     ) async throws -> Outcome {
         var unread = Set<Int>()
-        // The pages' text-layer status as the import and the search read
-        // it, so a scanned or header-only page is re-run through OCR the
-        // way the search that placed its boxes ran, not through its sparse
-        // text layer.
+        // The pages' text-layer status as the search read it, so a page is
+        // re-run the way the search that placed its boxes ran: a scanned or
+        // header-only page through OCR, not through its sparse text layer,
+        // and a page whose text layer the search cannot read (garbled, or
+        // with no geometry: `unreadableForSearch`) as `.sparse` too, as the
+        // search routes it, not through the layer that holds none of its
+        // words.
         var status: [Int: TextLayerStatus] = [:]
         for index in 0..<source.document.pageCount {
             if let page = source.document.page(at: index) {
-                status[index] = TextLayerDetector.detectTextLayer(page)
+                let detected = TextLayerDetector.detectTextLayer(page)
+                status[index] = detected == .rich && TextLayerDetector.unreadableForSearch(page) ? .sparse : detected
             }
         }
         let searcher = DocumentSearcher(textLayerStatusByPage: status)
@@ -228,6 +234,12 @@ struct RegionCoverage: Sendable {
             // own sink. Installed fresh per request so nothing crosses over.
             let reads = PageReadLog()
             await searcher.setPageCoverageSink { coverage in reads.record(coverage) }
+            // A scanned page (`.sparse`/`.none`) re-run with OCR off is read
+            // by nothing and reports only through this sink: unread. So does
+            // a text page carrying a picture the image census counts: its
+            // text layer is read, but the picture, which may hold words the
+            // layer does not, is read by nothing (`hybridOCRLeg`).
+            await searcher.setScannedRegionNotAnalyzedSink { page in reads.notAnalysed(page) }
             await searcher.setRegexTimeoutSink { page in reads.timedOut(page) }
             await searcher.setUserTermsTimeoutSink { page, _ in reads.timedOut(page) }
             await searcher.setRegexRejectionSink { _ in reads.refused() }
@@ -263,16 +275,20 @@ struct RegionCoverage: Sendable {
             }
             pieces.append(contentsOf: strays.filter { $0.match.occurrence.map(comparedOccurrences.contains) ?? false })
             await searcher.setPageCoverageSink(nil)
+            await searcher.setScannedRegionNotAnalyzedSink(nil)
             await searcher.setRegexTimeoutSink(nil)
             await searcher.setUserTermsTimeoutSink(nil)
             await searcher.setRegexRejectionSink(nil)
             unread.formUnion(reads.unreadPages(among: candidates))
             // A re-run that reached the cap stopped part-way: the page it
             // stopped on and every page after it were not read whole, and a
-            // page never reached reports nothing to the sinks. The searcher
-            // walks pages in order, so the pages before were read.
+            // page never reached reports nothing to the sinks. The page
+            // before is not read whole either: a phrase that runs from it
+            // into the page the re-run stopped on is listed after that page's
+            // own matches, so its piece there is never yielded. The searcher
+            // walks pages in order, so the pages before those were read.
             if yielded.count >= DocumentSearcher.maxResults {
-                unread.formUnion(candidates.filter { $0 >= lastPage })
+                unread.formUnion(candidates.filter { $0 >= lastPage - 1 })
             }
         }
         let occurrences = occurrenceShortfalls(pieces: pieces, regions: regions)
@@ -306,6 +322,10 @@ struct RegionCoverage: Sendable {
         }
 
         func timedOut(_ page: Int) {
+            lock.lock(); unread.insert(page); lock.unlock()
+        }
+
+        func notAnalysed(_ page: Int) {
             lock.lock(); unread.insert(page); lock.unlock()
         }
 

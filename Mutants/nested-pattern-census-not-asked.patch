@@ -1,0 +1,19 @@
+Property: The census reads where pictures are painted on a page whose only picture is held in a tiling pattern, as the fit's gate does.
+Area: ink fit (Search) and the census, pictures held in patterns
+Test command: cd Packages/RedactionEngine && swift test --filter 'PageImageCensusPiecesTests|SearchPiecesReadTests'
+Must go red: RedactionEngineTests/PageImageCensusPiecesTests notFollowed; RedactionEngineTests/PageImageCensusPiecesTests nestedPatterns; RedactionEngineTests/PageImageCensusPiecesTests censusAgreesWithTheGate; RedactionEngineTests/SearchPiecesReadTests patternScanRead; RedactionEngineTests/SearchPiecesReadTests patternScanNotReadSignal
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageImageCensus.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageImageCensus.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageImageCensus.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageImageCensus.swift
+@@ -62,8 +62,7 @@
+             if pixels >= imagePixelFloor || imageShare(pixelArea: pixels, cropBox: crop) >= imageShareFloor { return true }
+             let meaningful = (page.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines).count
+             if textDensity(meaningfulCount: meaningful, cropBox: crop) < densityFloor { return true }
+-        } else if !PageContentFacts.drawsInlineImage(cgPage) && !DocumentSearcher.showsInvisibleText(cgPage)
+-                    && !PictureWalk.patternsHoldPicture(cgPage) {
++        } else if !PageContentFacts.drawsInlineImage(cgPage) && !DocumentSearcher.showsInvisibleText(cgPage) {
+             return false
+         }
+         let map = PagePictureMap.cached(page, cgPage: cgPage)

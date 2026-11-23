@@ -1,0 +1,19 @@
+Property: The coverage check counts its re-run's matches toward the searcher's cap as the searcher does, once however many lines a match runs over, so wrapped matches under the cap leave no page unread.
+Area: the coverage check's reading of a capped re-run
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter RegionCoverageCapAndCategoryTests
+Must go red: RedactionEngineTests/RegionCoverageCapAndCategoryTests capCountsMatchesNotRows
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/RegionCoverage.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/RegionCoverage.swift
+index bc451ff6..be56c8b7 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/RegionCoverage.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/RegionCoverage.swift
+@@ -242,7 +242,7 @@ struct RegionCoverage: Sendable {
+             var lastPage = 0
+             for await result in stream {
+                 try Task.checkCancellation()
+-                yielded.insert(DocumentSearcher.occurrenceKey(result))
++                yielded.insert(UUID())  // mutant: every row counts toward the cap
+                 lastPage = max(lastPage, result.pageIndex)
+                 // A match with no box has nothing to measure a box's cover
+                 // against; the Search Re-check counts it as remaining.

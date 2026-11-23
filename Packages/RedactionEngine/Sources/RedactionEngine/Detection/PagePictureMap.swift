@@ -357,9 +357,9 @@ final class PictureWalk {
         if !canFollow { followed = false }
     }
 
-    /// Whether the page's resources (own or inherited) hold a tiling pattern
-    /// that holds a picture or cannot be read: a picture the page may draw
-    /// that no image census sees.
+    /// Whether the page's resources (own or inherited), or the resources of
+    /// the forms they reach, hold a tiling pattern that holds a picture or
+    /// cannot be read: a picture the page may draw that no image census sees.
     static func patternsHoldPicture(_ page: CGPDFPage) -> Bool { patternsHoldPicture(page, seen: FormsSeen()) }
 
     /// `patternsHoldPicture` with the search's record given: each pattern
@@ -369,40 +369,84 @@ final class PictureWalk {
     static func patternsHoldPicture(_ page: CGPDFPage, seen: FormsSeen) -> Bool {
         guard let dictionary = page.dictionary,
               case .found(let resources) = TextLayerExtractor.inheritedResources(of: dictionary) else { return false }
-        var patterns: CGPDFDictionaryRef?
-        guard CGPDFDictionaryGetDictionary(resources, "Pattern", &patterns), let patterns else { return false }
+        let content = CGPDFContentStreamCreateWithPage(page)
+        defer { CGPDFContentStreamRelease(content) }
+        return patternsHoldPicture(in: resources, content: content, depth: 0, seen: seen)
+    }
+
+    /// Whether the patterns of one resource dictionary, or of the forms it
+    /// reaches to the depth, hold a picture; each form looked into once.
+    /// More forms than `formLimit`, more names than `entryLimit`, or forms
+    /// deeper than the depth, and a picture is taken to be held.
+    static func patternsHoldPicture(in resources: CGPDFDictionaryRef, content: CGPDFContentStreamRef,
+                                    depth: Int, seen: FormsSeen) -> Bool {
+        guard depth < PageImageCensus.maxFormDepth else { return true }
+        guard let patterns = streams(in: resources, "Pattern", seen: seen) else { return true }
+        if patterns.contains(where: { !patternCanBeFollowed($0, content: content, depth: depth, seen: seen) }) { return true }
+        guard let xobjects = streams(in: resources, "XObject", seen: seen) else { return true }
+        for form in xobjects where subtype(of: form) == "Form" && seen.formsForPatterns.insert(form).inserted {
+            seen.looked += 1
+            guard seen.looked <= PagePictureMap.formLimit, let dictionary = CGPDFStreamGetDictionary(form) else { return true }
+            var inner: CGPDFDictionaryRef?
+            if CGPDFDictionaryGetDictionary(dictionary, "Resources", &inner), let inner,
+               patternsHoldPicture(in: inner, content: content, depth: depth + 1, seen: seen) { return true }
+        }
+        return false
+    }
+
+    /// The streams one resource category names, a stream once for each name;
+    /// nil past `entryLimit` names looked at. Each form and pattern is looked
+    /// into once by the page's record (`FormsSeen`), however many names it has.
+    static func streams(in resources: CGPDFDictionaryRef, _ category: String, seen: FormsSeen) -> [CGPDFStreamRef]? {
+        var dictionary: CGPDFDictionaryRef?
+        guard CGPDFDictionaryGetDictionary(resources, category, &dictionary), let dictionary else { return [] }
         var streams: [CGPDFStreamRef] = []
-        var known: Set<CGPDFStreamRef> = []
         var tooMany = false
-        CGPDFDictionaryApplyBlock(patterns, { _, value, _ in
+        CGPDFDictionaryApplyBlock(dictionary, { _, value, _ in
             seen.entries += 1
             guard seen.entries <= PagePictureMap.entryLimit else { tooMany = true; return false }
             var stream: CGPDFStreamRef?
-            if CGPDFObjectGetValue(value, .stream, &stream), let stream, known.insert(stream).inserted { streams.append(stream) }
+            if CGPDFObjectGetValue(value, .stream, &stream), let stream { streams.append(stream) }
             return true
         }, nil)
-        guard !tooMany else { return true }
-        let content = CGPDFContentStreamCreateWithPage(page)
-        defer { CGPDFContentStreamRelease(content) }
-        return streams.contains { !patternCanBeFollowed($0, content: content, seen: seen) }
+        return tooMany ? nil : streams
+    }
+
+    /// A stream's `/Subtype`, or nil.
+    static func subtype(of stream: CGPDFStreamRef) -> String? {
+        var name: UnsafePointer<CChar>?
+        guard let dictionary = CGPDFStreamGetDictionary(stream),
+              CGPDFDictionaryGetName(dictionary, "Subtype", &name), let name else { return nil }
+        return String(cString: name)
     }
 
     /// Whether a tiling pattern holds no picture and can be read, its forms
-    /// looked into under the page's one record.
-    static func patternCanBeFollowed(_ stream: CGPDFStreamRef, content: CGPDFContentStreamRef, seen: FormsSeen) -> Bool {
+    /// and the patterns its cell uses looked into under the page's one
+    /// record. A pattern already looked into answers by its first reading;
+    /// one nested deeper than the depth, or past `formLimit` patterns read,
+    /// cannot be followed.
+    static func patternCanBeFollowed(_ stream: CGPDFStreamRef, content: CGPDFContentStreamRef, depth: Int = 0,
+                                     seen: FormsSeen) -> Bool {
+        guard seen.patterns.insert(stream).inserted else { return true }
         seen.patternsRead += 1
-        guard let dictionary = CGPDFStreamGetDictionary(stream) else { return false }
+        guard depth < PageImageCensus.maxFormDepth, seen.patternsRead <= PagePictureMap.formLimit,
+              let dictionary = CGPDFStreamGetDictionary(stream) else { return false }
         var resources: CGPDFDictionaryRef?
         _ = CGPDFDictionaryGetDictionary(dictionary, "Resources", &resources)
-        if let resources, reachesImage(resources, depth: 0, seen: seen) { return false }
+        if let resources, reachesPicture(resources, content: content, depth: depth, seen: seen) { return false }
         let inner = CGPDFContentStreamCreateWithStream(stream, resources ?? dictionary, content)
         defer { CGPDFContentStreamRelease(inner) }
         return drawsInlineImage(inner) == false
     }
 
-    /// The forms one page's search for an image has looked into.
+    /// The forms and patterns one page's search for a picture has looked into.
     final class FormsSeen {
         var forms: Set<CGPDFStreamRef> = []
+        /// The forms looked into for patterns alone, apart from `forms`: a
+        /// form looked into there is still looked into for an image.
+        var formsForPatterns: Set<CGPDFStreamRef> = []
+        /// The pattern streams looked into.
+        var patterns: Set<CGPDFStreamRef> = []
         /// How many forms were looked into.
         var looked = 0
         /// How many names were looked at, against `PagePictureMap.entryLimit`.
@@ -411,40 +455,35 @@ final class PictureWalk {
         var patternsRead = 0
     }
 
-    /// Whether resources reach an image object, through forms to the depth,
-    /// each form looked into once; more forms than `formLimit`, more names
-    /// than `entryLimit`, or forms deeper than the depth, are taken to reach one.
-    static func reachesImage(_ resources: CGPDFDictionaryRef, depth: Int, seen: FormsSeen) -> Bool {
+    /// Whether resources reach a picture: an image object, a form that draws
+    /// an inline image, or a tiling pattern that holds a picture or cannot be
+    /// read, through forms and patterns to the depth, each looked into once.
+    /// More forms than `formLimit`, more names than `entryLimit`, or forms
+    /// deeper than the depth, are taken to reach one.
+    static func reachesPicture(_ resources: CGPDFDictionaryRef, content: CGPDFContentStreamRef, depth: Int,
+                               seen: FormsSeen) -> Bool {
         guard depth < PageImageCensus.maxFormDepth else { return true }
-        var xobjects: CGPDFDictionaryRef?
-        guard CGPDFDictionaryGetDictionary(resources, "XObject", &xobjects), let xobjects else { return false }
-        final class Found { var value = false; var depth = 0; var seen: FormsSeen; init(_ seen: FormsSeen) { self.seen = seen } }
-        let found = Found(seen)
-        found.depth = depth
-        CGPDFDictionaryApplyBlock(xobjects, { _, object, info in
-            guard let info else { return false }
-            let found = Unmanaged<Found>.fromOpaque(info).takeUnretainedValue()
-            found.seen.entries += 1
-            guard found.seen.entries <= PagePictureMap.entryLimit else { found.value = true; return false }
-            var stream: CGPDFStreamRef?
-            guard CGPDFObjectGetValue(object, .stream, &stream), let stream,
-                  let dictionary = CGPDFStreamGetDictionary(stream) else { return true }
-            var subtype: UnsafePointer<CChar>?
-            guard CGPDFDictionaryGetName(dictionary, "Subtype", &subtype), let subtype else { return true }
-            switch String(cString: subtype) {
-            case "Image": found.value = true; return false
+        guard let patterns = streams(in: resources, "Pattern", seen: seen) else { return true }
+        if patterns.contains(where: { !patternCanBeFollowed($0, content: content, depth: depth + 1, seen: seen) }) { return true }
+        guard let xobjects = streams(in: resources, "XObject", seen: seen) else { return true }
+        for stream in xobjects {
+            switch subtype(of: stream) {
+            case "Image": return true
             case "Form":
-                guard found.seen.forms.insert(stream).inserted else { return true }
-                found.seen.looked += 1
-                guard found.seen.looked <= PagePictureMap.formLimit else { found.value = true; return false }
+                guard seen.forms.insert(stream).inserted else { continue }
+                seen.looked += 1
+                guard seen.looked <= PagePictureMap.formLimit, let dictionary = CGPDFStreamGetDictionary(stream) else { return true }
                 var inner: CGPDFDictionaryRef?
-                if CGPDFDictionaryGetDictionary(dictionary, "Resources", &inner), let inner,
-                   PictureWalk.reachesImage(inner, depth: found.depth + 1, seen: found.seen) { found.value = true; return false }
-                return true
-            default: return true
+                _ = CGPDFDictionaryGetDictionary(dictionary, "Resources", &inner)
+                let drawn = CGPDFContentStreamCreateWithStream(stream, inner ?? dictionary, content)
+                let inline = drawsInlineImage(drawn)
+                CGPDFContentStreamRelease(drawn)
+                if inline != false { return true }
+                if let inner, reachesPicture(inner, content: content, depth: depth + 1, seen: seen) { return true }
+            default: continue
             }
-        }, Unmanaged.passUnretained(found).toOpaque())
-        return found.value
+        }
+        return false
     }
 
     /// Whether a content stream draws an inline image; nil when it cannot be read.
