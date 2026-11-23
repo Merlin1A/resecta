@@ -188,9 +188,9 @@ struct RegionCoverage: Sendable {
     /// searcher could not read is reported in `unreadPages`, never passed
     /// by silence: the searcher's own coverage and timeout sinks say which
     /// pages it read and why it could not read one, and a re-run that
-    /// reached the searcher's result cap leaves the page it stopped on and
-    /// every later page unread. A cancellation throws:
-    /// a re-run cut short is never an outcome.
+    /// reached the searcher's result cap leaves the page before the one it
+    /// stopped on, that page and every later page unread. A cancellation
+    /// throws: a re-run cut short is never an outcome.
     static func check(
         source: SendablePDFDocument,
         requests: [SearchRecheckRequest],
