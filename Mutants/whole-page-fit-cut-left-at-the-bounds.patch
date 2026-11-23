@@ -1,7 +1,7 @@
 Property: Every gesture cuts or holds a box in the page as PDFKit places it on the canvas, the rectangle the maps divide by, not the canvas's rounded bounds.
 Area: the canvas: draw, resize, move and group move on a page of fractional size
-Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/WholePageFitTests
-Must go red: ResectaAppTests/WholePageFitTests doorsStoreOnThePage; ResectaAppTests/WholePageFitTests wholePageMarkKeptAfterADrag
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/WholePageFitTests -only-testing:ResectaAppTests/PageEdgeCoverTests
+Must go red: ResectaAppTests/WholePageFitTests doorsStoreOnThePage; ResectaAppTests/WholePageFitTests wholePageMarkKeptAfterADrag; ResectaAppTests/PageEdgeCoverTests pushedBoxCoversTheEdge [7]
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Move.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Move.swift
