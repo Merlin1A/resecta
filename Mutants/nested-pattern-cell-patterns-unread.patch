@@ -1,7 +1,7 @@
 Property: A pattern cell's own patterns are read for a picture.
 Area: ink fit (Search) and the census, pictures held in patterns
-Test command: cd Packages/RedactionEngine && swift test --filter 'PageImageCensusPiecesTests|PagePictureMapTests'
-Must go red: RedactionEngineTests/PageImageCensusPiecesTests nestedPatterns; RedactionEngineTests/PagePictureMapTests nestedPatternPictures
+Test command: cd Packages/RedactionEngine && swift test --filter 'PageImageCensusPiecesTests|PagePictureMapTests|PageContentFactsTests'
+Must go red: RedactionEngineTests/PageImageCensusPiecesTests nestedPatterns; RedactionEngineTests/PagePictureMapTests nestedPatternPictures; RedactionEngineTests/PageContentFactsTests pictureInNestedPatternIsRead
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift
