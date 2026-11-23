@@ -5,16 +5,17 @@ Must go red: RedactionEngineTests/BoxCheckRuleTests recordPagesTheFileLacks
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
-index 0b46e217..9f8c2f9d 100644
+index 950ac094..321b1c07 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
-@@ -175,10 +175,6 @@ enum ExactFillCheck {
-             let page = index < input.pages.count ? input.pages[index] : nil
-             pages.append(judge(page: page, picture: outcome, fill: input.fill, chosenDPI: input.chosenDPI))
+@@ -194,11 +194,6 @@ enum ExactFillCheck {
+             judged.outsidePlan = page?.outsidePlan ?? []
+             pages.append(judged)
          }
 -        for page in input.pages.dropFirst(pages.count) {
 -            pages.append(BoxCheckPage(picture: .fault(.wrongSubject), quality: nil, belowChosen: false, noColour: false,
--                                      boxes: page.boxes.map { _ in .couldNotFinish(.wrongSubject, nil) }))
+-                                      boxes: page.boxes.map { _ in .couldNotFinish(.wrongSubject, nil) },
+-                                      outsidePlan: page.outsidePlan))
 -        }
          return .pages(pages)
      }

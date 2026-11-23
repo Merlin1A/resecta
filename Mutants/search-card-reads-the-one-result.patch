@@ -1,0 +1,20 @@
+Property: The card's applied and disabled states both read the current match, never the walk's one result.
+Area: the small Search card's Apply
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/CompactApplyWrappedMatchTests
+Must go red: ResectaAppTests/CompactApplyWrappedMatchTests "The card reads the match, not the one result, for both its applied and disabled states"
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/Search/SearchAndRedactSheet+CompactApply.swift b/Sources/ResectaApp/Views/Search/SearchAndRedactSheet+CompactApply.swift
+index b46eb6a5..66d5b8e6 100644
+--- a/Sources/ResectaApp/Views/Search/SearchAndRedactSheet+CompactApply.swift
++++ b/Sources/ResectaApp/Views/Search/SearchAndRedactSheet+CompactApply.swift
+@@ -140,7 +140,8 @@ extension SearchAndRedactSheet {
+     /// with a box applied or dedup-covered, the header Apply's graying
+     /// predicate folded over the match's lines.
+     private var applyCurrentResultApplied: Bool {
+-        searchState.currentMatchAppliedOrCovered
++        guard let current = searchState.currentResult else { return false }
++        return searchState.isAppliedOrCovered(current.id)
+     }
+ 
+     /// Live only with a current match on board that the apply path

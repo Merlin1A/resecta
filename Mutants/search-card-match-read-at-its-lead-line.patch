@@ -1,0 +1,21 @@
+Property: A match is applied only when every line of it with a box is applied or covered; a wrapped match whose first line an earlier box covers is not.
+Area: the small Search card's Apply
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/CompactApplyWrappedMatchTests
+Must go red: ResectaAppTests/CompactApplyWrappedMatchTests "With the first line covered and the second not, the current match is not applied"
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/SearchState+Results.swift b/Sources/ResectaApp/State/SearchState+Results.swift
+index 29a2143e..07190a2f 100644
+--- a/Sources/ResectaApp/State/SearchState+Results.swift
++++ b/Sources/ResectaApp/State/SearchState+Results.swift
+@@ -214,9 +214,7 @@ extension SearchState {
+     /// only when both are, so a first line covered by an earlier box does
+     /// not read the second as done. A result with no box reads as itself.
+     func isMatchAppliedOrCovered(_ id: UUID) -> Bool {
+-        let boxed = pieces(of: id).filter(\.hasBox)
+-        guard !boxed.isEmpty else { return isAppliedOrCovered(id) }
+-        return boxed.allSatisfy { isAppliedOrCovered($0.id) }
++        return isAppliedOrCovered(id)
+     }
+ 
+     /// `isMatchAppliedOrCovered` for the walk's current match; false

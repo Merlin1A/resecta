@@ -13,12 +13,12 @@ struct PagePixels: Sendable, Equatable {
     let height: Int
     /// The pixels the page's content spans on each side: S·d / 4608.
     let content: CGSize
-    /// The raster the plan's boxes are projected on. Nil on the region path:
-    /// a page with no record, or one whose record disagrees with the page.
+    /// The raster the plan's boxes are projected on. Nil on the region path
+    /// (a page with no record) and for a page whose record disagrees.
     let plan: PixelPlan.Raster?
     /// The page has a record, but its sides are not the page's own (or the
-    /// record made no plan): the page takes the region path and every region
-    /// on it is recorded as painted outside the plan.
+    /// record made no plan): the pre-flight refuses the page by name
+    /// (`pageSidesNotAsRecorded`) before it is rendered.
     let recordDisagrees: Bool
 }
 
@@ -183,8 +183,8 @@ extension PageRasterizer {
     /// A region with no box (the plan's admission and the run's disagreeing),
     /// or held only by a box that does not project, is never left unpainted:
     /// it is filled as the region path fills it and returned in
-    /// `outsidePlan`, which the record carries to the position check as
-    /// "could not be checked".
+    /// `outsidePlan`, which the record carries to the box check
+    /// (`ExactFillCheck`), where each is its own unit it cannot judge.
     func paintPlan(context ctx: CGContext, page: PDFPageData, raster: PixelPlan.Raster,
                    content: CGSize) throws -> PlanPaint {
         let bitmap = CGRect(x: 0, y: 0, width: ctx.width, height: ctx.height)

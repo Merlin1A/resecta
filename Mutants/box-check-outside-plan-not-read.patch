@@ -1,0 +1,19 @@
+Property: The box check lists each region the record says was painted outside the plan as its own unit it cannot judge.
+Area: box check (Verification)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/BoxCheckOutsidePlanTests (or on the host: cd Packages/RedactionEngine && swift test --no-parallel --filter BoxCheckOutsidePlanTests)
+Must go red: RedactionEngineTests/BoxCheckOutsidePlanTests "Each region painted outside the plan is its own unit the check cannot judge, in drawn order"
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
+index 950ac094..42d2a670 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
+@@ -44,7 +44,7 @@ extension BoxCheckInput {
+             let drawn = page.regions.map(\.id).filter { named.contains($0) }
+             let rest = named.subtracting(drawn).sorted { $0.uuidString < $1.uuidString }
+             pages.append(Page(widthSixtyFourths: plan.widthSixtyFourths, heightSixtyFourths: plan.heightSixtyFourths,
+-                              boxes: plan.boxes, reported: reported, outsidePlan: drawn + rest))
++                              boxes: plan.boxes, reported: reported))
+         }
+         var digests: [Data] = []
+         while let d = record.produced.pageImageDigests[digests.count] { digests.append(d) }

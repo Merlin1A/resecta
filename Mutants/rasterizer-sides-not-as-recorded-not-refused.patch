@@ -1,0 +1,20 @@
+Property: A page whose sides are not the sides its record holds is refused by name before it is rendered.
+Area: pre-flight (Pipeline)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/PageSidesNotAsRecordedTests (or on the host: cd Packages/RedactionEngine && swift test --no-parallel --filter PageSidesNotAsRecordedTests)
+Must go red: RedactionEngineTests/PageSidesNotAsRecordedTests "The page is refused by name before it is rendered"
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift
+index c7cc9019..50cf7969 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer.swift
+@@ -272,9 +272,6 @@ public final class PageRasterizer: @unchecked Sendable {
+         // A page whose record's sides are not its own (both read at run
+         // entry, the record first): refused by name, before it is rendered
+         // or painted.
+-        guard !pixels.recordDisagrees else {
+-            throw PipelineError.redactionError(.pageSidesNotAsRecorded(pageIndex: page.pageIndex))
+-        }
+         return Raster(effectiveSize: effectiveSize, dpi: dpi, pixels: pixels)
+     }
+ 
