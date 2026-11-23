@@ -22,9 +22,11 @@ extension RedactionOverlayView {
         // Draw committed regions
         for region in regions {
             let viewRect = pdfNormalizedToOverlay(region.normalizedRect)
-            // Perf: Skip regions entirely outside the dirty rect.
-            // 20pt expansion accounts for resize handles, badges, and shadow.
-            guard viewRect.insetBy(dx: -20, dy: -20).intersects(rect) else { continue }
+            // Perf: Skip regions entirely outside the dirty rect. The margin
+            // covers the badge, the shadow and a handle stepped clear of a
+            // thin box (16 on-screen points reach it), whichever is larger.
+            let margin = max(20, 16 * fingerScale)
+            guard viewRect.insetBy(dx: -margin, dy: -margin).intersects(rect) else { continue }
             let isSelected = selectedIDs.contains(region.id)
             let color = region.displayColor(isSelected: isSelected)
             let isBeingMoved = isSelected && isDraggingExistingRegion
@@ -85,9 +87,16 @@ extension RedactionOverlayView {
                 drawDimensionLabel(ctx: ctx, rect: drawRect)
             }
 
-            // Resize handles for selected region (suppressed during move)
-            if isSelected && !isBeingMoved && resizeHandlesActive {
-                drawResizeHandles(ctx: ctx, rect: drawRect)
+            // A selected box shows handles when it is the one selection and
+            // Add to Selection is off, and corner dots otherwise. A box being
+            // moved shows neither.
+            if isSelected && !isBeingMoved {
+                if Self.showsHandles(isSelected: isSelected, selectionCount: selectedIDs.count,
+                                     handlesActive: resizeHandlesActive) {
+                    drawResizeHandles(ctx: ctx, rect: viewRect)
+                } else {
+                    drawSelectionDots(ctx: ctx, rect: viewRect)
+                }
             }
         }
     }
@@ -184,46 +193,70 @@ extension RedactionOverlayView {
         }
     }
 
+    /// The resize handles at `handleCentres`: a white disc with a page-teal
+    /// ring over a faint shadow disc. The disc and its shadow grow in with
+    /// `handleScale`; the ring keeps its width.
     private func drawResizeHandles(ctx: CGContext, rect: CGRect) {
-        // Scale handles by animated handleScale (0 = hidden, 1 = full size)
         guard handleScale > 0.001 else { return }
-
-        let handleRadius: CGFloat = 5.0 * handleScale * fingerScale
-        // Mid-gray outer ring scales together with the handle so
-        // it animates in/out alongside the white-fill / blue-stroke disc.
-        let outerStroke = Self.handleRingWidth(handleScale: handleScale, fingerScale: fingerScale)
-        let points = [
-            CGPoint(x: rect.minX, y: rect.minY), CGPoint(x: rect.maxX, y: rect.minY),
-            CGPoint(x: rect.minX, y: rect.maxY), CGPoint(x: rect.maxX, y: rect.maxY),
-            CGPoint(x: rect.midX, y: rect.minY), CGPoint(x: rect.midX, y: rect.maxY),
-            CGPoint(x: rect.minX, y: rect.midY), CGPoint(x: rect.maxX, y: rect.midY),
-        ]
-
+        let style = ResectaTokens.Canvas.handle
+        let radius = style.radius * handleScale * fingerScale
+        let shadowRadius = (style.radius + ResectaTokens.Canvas.handleShadowGrowth) * handleScale * fingerScale
+        let drop = ResectaTokens.Canvas.handleShadowDrop * handleScale * fingerScale
         ctx.setLineDash(phase: 0, lengths: [])
-
-        for p in points {
-            // Mid-gray outer ring drawn under the handle. Pads
-            // the handle radius by `outerStroke` on each side so the visible
-            // band of grey sits outside the handle's blue border, giving the
-            // handle a visible perimeter against white page margins.
-            let outerRadius = handleRadius + outerStroke
-            let outerRect = CGRect(
-                x: p.x - outerRadius, y: p.y - outerRadius,
-                width: outerRadius * 2, height: outerRadius * 2
-            )
-            ctx.setFillColor(UIColor.systemGray2.cgColor)
-            ctx.fillEllipse(in: outerRect)
-
-            let handleRect = CGRect(
-                x: p.x - handleRadius, y: p.y - handleRadius,
-                width: handleRadius * 2, height: handleRadius * 2
-            )
-            ctx.setFillColor(UIColor.white.cgColor)
-            ctx.setStrokeColor(UIColor.systemBlue.cgColor)
-            ctx.setLineWidth(1.5 * fingerScale)
-            ctx.fillEllipse(in: handleRect)
-            ctx.strokeEllipse(in: handleRect)
+        for (_, p) in Self.handleCentres(for: rect, fingerScale: fingerScale) {
+            ctx.setFillColor(ResectaTokens.Canvas.handleShadow.uiColor.cgColor)
+            ctx.fillEllipse(in: Self.disc(at: CGPoint(x: p.x, y: p.y + drop), radius: shadowRadius))
+            let disc = Self.disc(at: p, radius: radius)
+            ctx.setFillColor(style.fill.uiColor.cgColor)
+            ctx.fillEllipse(in: disc)
+            ctx.setStrokeColor(style.ring.uiColor.cgColor)
+            ctx.setLineWidth(style.ringWidth * fingerScale)
+            ctx.strokeEllipse(in: disc)
         }
+    }
+
+    /// The four corner dots of a selected box that shows no handles.
+    private func drawSelectionDots(ctx: CGContext, rect: CGRect) {
+        let style = ResectaTokens.Canvas.selectionDot
+        let radius = style.radius * fingerScale
+        ctx.setLineDash(phase: 0, lengths: [])
+        for p in Self.selectionDotCentres(for: rect, fingerScale: fingerScale) {
+            let dot = Self.disc(at: p, radius: radius)
+            ctx.setFillColor(style.fill.uiColor.cgColor)
+            ctx.fillEllipse(in: dot)
+            ctx.setStrokeColor(style.ring.uiColor.cgColor)
+            ctx.setLineWidth(style.ringWidth * fingerScale)
+            ctx.strokeEllipse(in: dot)
+        }
+    }
+
+    /// The square that holds a disc of `radius` centred on `centre`.
+    static func disc(at centre: CGPoint, radius: CGFloat) -> CGRect {
+        CGRect(x: centre.x - radius, y: centre.y - radius, width: radius * 2, height: radius * 2)
+    }
+
+    /// Whether a selected box draws handles: it is the one selected box and
+    /// Add to Selection is off. Any other selected box draws corner dots.
+    static func showsHandles(isSelected: Bool, selectionCount: Int, handlesActive: Bool) -> Bool {
+        isSelected && selectionCount == 1 && handlesActive
+    }
+
+    /// The corner dots' centres, in overlay points: the four corners, each
+    /// stepped outward on an axis shorter on screen than
+    /// `Canvas.dotsStepOutBelow` by half the shortfall, at most
+    /// `Canvas.dotLargestStep`.
+    static func selectionDotCentres(for rect: CGRect, fingerScale: CGFloat = 1) -> [CGPoint] {
+        typealias C = ResectaTokens.Canvas
+        func step(_ length: CGFloat) -> CGFloat {
+            let onScreen = length / fingerScale
+            guard onScreen < C.dotsStepOutBelow else { return 0 }
+            return min(C.dotLargestStep, (C.dotsStepOutBelow - onScreen) / 2) * fingerScale
+        }
+        let dx = step(rect.width), dy = step(rect.height)
+        return [
+            CGPoint(x: rect.minX - dx, y: rect.minY - dy), CGPoint(x: rect.maxX + dx, y: rect.minY - dy),
+            CGPoint(x: rect.minX - dx, y: rect.maxY + dy), CGPoint(x: rect.maxX + dx, y: rect.maxY + dy),
+        ]
     }
 
     // MARK: - Region Badge
@@ -362,11 +395,6 @@ extension RedactionOverlayView {
     /// A region's outline: 2.5 on-screen points selected, 2 otherwise.
     static func regionStrokeWidth(isSelected: Bool, fingerScale: CGFloat) -> CGFloat {
         (isSelected ? 2.5 : 2.0) * fingerScale
-    }
-
-    /// The grey ring around a resize handle, grown in with `handleScale`.
-    static func handleRingWidth(handleScale: CGFloat, fingerScale: CGFloat) -> CGFloat {
-        selectionHandleOuterStrokeWidth * handleScale * fingerScale
     }
 
     static func dimensionLabelFont(fingerScale: CGFloat) -> UIFont {

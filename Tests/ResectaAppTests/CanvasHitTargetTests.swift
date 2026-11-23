@@ -174,4 +174,18 @@ struct CanvasHitTargetTests {
         #expect(resolve(CGPoint(x: 305, y: 405), [(sel, selRect), (other, otherRect)], selected: (sel, selRect)) == .region(other))
         #expect(resolve(CGPoint(x: 200, y: 350), [(sel, selRect), (other, otherRect)], selected: (sel, selRect)) == .region(sel), "the selected box's own body is the body")
     }
+
+    @Test("A side under 60 on-screen points has no edge handle, read through the overlay at fit")
+    func shortSideHasNoEdgeHandleAtFit() {
+        // 80 page points tall at 0.64 is 51 on screen: its left and right
+        // sides have no middle handle. The 200-point top and bottom (128 on
+        // screen) keep theirs.
+        let rect = CGRect(x: 100, y: 300, width: 200, height: 80)
+        let box = Self.region(rect)
+        let m = mounted([box], selectedIDs: [box.id])
+        #expect(m.overlay.hitTestResizeHandle(at: CGPoint(x: rect.minX, y: rect.midY)) != .leftCenter)
+        #expect(m.overlay.hitTestResizeHandle(at: CGPoint(x: rect.maxX, y: rect.midY)) != .rightCenter)
+        #expect(m.overlay.hitTestResizeHandle(at: CGPoint(x: rect.midX, y: rect.minY)) == .topCenter)
+        withExtendedLifetime(m) {}
+    }
 }

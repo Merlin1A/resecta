@@ -6,7 +6,6 @@ import UIKit
 // helpers are unit-testable without a UIView host.
 //
 //   `badgeOuterStrokeWidth`     (badge perimeter contrast)
-//   `selectionHandleOuterStrokeWidth` (handle ring against light bg)
 //
 //   `DimensionLabelPosition` + `dimensionLabelPosition(…)`
 //           (above-vs-below placement for small/tall regions; suppress
@@ -26,15 +25,6 @@ extension RedactionOverlayView {
     /// `UIColor.separator` colour at the call site; 0.5pt is sub-pixel
     /// on 2× / 3× retina — just enough for an edge.
     static let badgeOuterStrokeWidth: CGFloat = 0.5
-
-    // MARK: - Selection-handle outer ring
-
-    /// 1pt mid-gray outer stroke around each resize handle so the
-    /// white-fill / blue-stroke handles stay visible against light
-    /// backgrounds (e.g. white page margins). Drawn as a slightly
-    /// enlarged disc beneath the handle, so the visible ring scales
-    /// with `handleScale` alongside the handle itself.
-    static let selectionHandleOuterStrokeWidth: CGFloat = 1.0
 
     // MARK: - Dimension label placement
 

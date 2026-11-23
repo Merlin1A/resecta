@@ -138,6 +138,84 @@ nonisolated final class CanvasGeometryUITests: XCTestCase {
         sleep(2)
         XCTAssertFalse(try probe().isBackground(above), "dismissed: still zoomed")
     }
+
+    // MARK: - Handles and corner dots
+
+    /// A box 120 x 12 on screen, selected: four corner handles stepped 5
+    /// points clear of it and a handle at the middle of the top and the
+    /// bottom; none at the middle of the 12-point sides. A handle is a white
+    /// disc with a teal ring of radius 4.5.
+    func testASelectedThinBoxShowsHandlesClearOfIt() throws {
+        launchMultipage()
+        let page = try fitPage()
+        let drawn = CGRect(x: page.minX + page.width * 0.2, y: page.minY + page.height * 0.42, width: 120, height: 12)
+        drawBoxes([drawn])
+        tap(CGPoint(x: page.midX, y: page.minY + page.height * 0.8))
+        sleep(1)
+        let search = drawn.insetBy(dx: -20, dy: -20)
+        let line = try XCTUnwrap(try probe().tintBounds(.red, in: search), "the box at rest")
+        let box = line.insetBy(dx: 1, dy: 1)  // the 2-point line is centred on the box's edge
+        tap(CGPoint(x: box.midX, y: box.midY))
+        sleep(1)
+        let shot = try probe()
+        let out: CGFloat = (22 - box.height) / 2
+        let handles = [CGPoint(x: box.minX, y: box.minY - out), CGPoint(x: box.maxX, y: box.minY - out),
+                       CGPoint(x: box.minX, y: box.maxY + out), CGPoint(x: box.maxX, y: box.maxY + out),
+                       CGPoint(x: box.midX, y: box.minY - out), CGPoint(x: box.midX, y: box.maxY + out)]
+        for c in handles {
+            let (r, g, b) = shot.rgb(c.x, c.y)
+            XCTAssertTrue(r >= 235 && g >= 235 && b >= 235, "a white handle disc at \(c) (box \(box)): \((r, g, b))")
+            XCTAssertEqual(Self.ring(around: c).filter { Self.isTeal(shot, $0) }.count, 4, "a teal ring round the handle at \(c)")
+        }
+        for c in [CGPoint(x: box.minX, y: box.midY), CGPoint(x: box.maxX, y: box.midY)] {
+            XCTAssertEqual(Self.ring(around: c).filter { Self.isTeal(shot, $0) }.count, 0, "no handle at the short side's middle \(c)")
+        }
+    }
+
+    /// Two boxes selected with Add to Selection on show no handles: each
+    /// carries a teal dot at every corner, read 1.5 points diagonally outside
+    /// the corner, where at rest there is no teal.
+    func testASelectionWithoutHandlesCarriesCornerDots() throws {
+        launchMultipage()
+        let page = try fitPage()
+        let boxA = CGRect(x: page.minX + page.width * 0.12, y: page.minY + page.height * 0.42, width: page.width * 0.3, height: 30)
+        let boxB = CGRect(x: page.minX + page.width * 0.58, y: boxA.minY, width: page.width * 0.3, height: 30)
+        drawBoxes([boxA, boxB])
+        tap(CGPoint(x: page.midX, y: page.minY + page.height * 0.8))
+        sleep(1)
+        let rest = try probe()
+        let boxes = try [boxA, boxB].map { drawn in
+            try XCTUnwrap(rest.tintBounds(.red, in: drawn.insetBy(dx: -20, dy: -20)), "box at rest near \(drawn)").insetBy(dx: 1, dy: 1)
+        }
+        // Half a point past each corner of the box as measured at rest: the
+        // dot is centred on the corner with teal to about 2.35 points, so the
+        // grid stays on its teal when the measured edge is a pixel off. At
+        // 1.5 points the grid reached the dot's white ring. Neither the red
+        // nor the blue selected border reads as teal.
+        func outside(_ box: CGRect) -> [CGPoint] {
+            [CGPoint(x: box.minX - 0.5, y: box.minY - 0.5), CGPoint(x: box.maxX + 0.5, y: box.minY - 0.5),
+             CGPoint(x: box.minX - 0.5, y: box.maxY + 0.5), CGPoint(x: box.maxX + 0.5, y: box.maxY + 0.5)]
+        }
+        for box in boxes {
+            for p in outside(box) {
+                XCTAssertEqual(Self.grid(around: p).filter { Self.isTeal(rest, $0) }.count, 0, "no teal at \(p) at rest")
+            }
+        }
+        setAddToSelection(on: true)
+        for box in boxes { tap(CGPoint(x: box.midX, y: box.midY)); usleep(600_000) }
+        sleep(1)
+        let selected = try probe()
+        for box in boxes {
+            for p in outside(box) {
+                XCTAssertGreaterThanOrEqual(Self.grid(around: p).filter { Self.isTeal(selected, $0) }.count, 5, "a teal dot at \(p)")
+            }
+            for c in [CGPoint(x: box.minX, y: box.minY), CGPoint(x: box.maxX, y: box.maxY)] {
+                let (r, g, b) = selected.rgb(c.x, c.y)
+                XCTAssertFalse(r >= 235 && g >= 235 && b >= 235, "no white handle disc at the corner \(c)")
+            }
+        }
+        XCTAssertEqual(deleteRow(), "Delete 2 Regions", "both boxes are selected")
+    }
 }
 
 // MARK: - Helpers
@@ -170,6 +248,23 @@ private extension CanvasGeometryUITests {
     }
 
     nonisolated var window: XCUIElement { app.windows.firstMatch }
+
+    /// Four points at radius 4.5 (a handle's ring) round `c`.
+    nonisolated static func ring(around c: CGPoint) -> [CGPoint] {
+        [CGPoint(x: c.x, y: c.y - 4.5), CGPoint(x: c.x, y: c.y + 4.5), CGPoint(x: c.x - 4.5, y: c.y), CGPoint(x: c.x + 4.5, y: c.y)]
+    }
+
+    /// Nine points a third of a point apart round `p`, so a read one pixel
+    /// off still lands.
+    nonisolated static func grid(around p: CGPoint) -> [CGPoint] {
+        [-1, 0, 1].flatMap { dy in [-1, 0, 1].map { dx in CGPoint(x: p.x + CGFloat(dx) / 3, y: p.y + CGFloat(dy) / 3) } }
+    }
+
+    nonisolated static func isTeal(_ probe: CanvasPixelProbe, _ p: CGPoint) -> Bool {
+        let (r, g, b) = probe.rgb(p.x, p.y)
+        return CanvasPixelProbe.Tint.teal.matches(r, g, b)
+    }
+
 
     nonisolated func probe() throws -> CanvasPixelProbe {
         try XCTUnwrap(CanvasPixelProbe(XCUIScreen.main.screenshot(), windowSize: window.frame.size))
