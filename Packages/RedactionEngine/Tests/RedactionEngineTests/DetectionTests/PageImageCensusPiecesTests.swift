@@ -72,6 +72,55 @@ struct PageImageCensusPiecesTests {
                                   objects: [S.image(S.shade(width: 120, height: 60)), tile, pattern])])
     }
 
+    /// Where a typed letter's one picture is held deeper in a pattern than
+    /// the page's own pattern cell.
+    enum Nested: CaseIterable {
+        /// The fill's cell draws a form whose content holds an inline image.
+        case inlineImageInACellsForm
+        /// The fill's cell fills with a second pattern that holds a picture.
+        case patternInACell
+        /// A form the page draws fills with a pattern its own resources hold.
+        case patternInAForm
+    }
+
+    static func cellPattern(resources: String, cell: String) -> S.Object {
+        S.Object(dictionary: "/Type /Pattern /PatternType 1 /PaintType 1 /TilingType 1 /BBox [0 0 200 100] /XStep 200 /YStep 100 /Resources << \(resources) >>",
+                 stream: Data(cell.utf8))
+    }
+
+    static let patternFill = "q /Pattern cs /T1 scn 300 720 200 50 re f Q "
+
+    /// A typed letter whose fill is set to a pattern that holds its one
+    /// picture as `nested` says; with `picture` false, the same shape with no
+    /// picture at its end.
+    static func letterWithNestedPattern(_ nested: Nested, picture: Bool = true) -> Data {
+        let tile = S.image(S.shade(width: 200, height: 100))
+        let text = S.typedText + visibleFiller
+        let holding = picture ? cellPattern(resources: "/XObject << /Im @0@ >>", cell: "q 200 0 0 100 0 0 cm /Im Do Q")
+            : cellPattern(resources: "", cell: "0 0 200 100 re f")
+        switch nested {
+        case .inlineImageInACellsForm:
+            let drawn = picture ? S.draw(S.shade(width: 60, height: 30), dpi: 300, .inlineStrips(rows: 30)).ops : "0 0 200 100 re f"
+            let pattern = cellPattern(resources: "/XObject << /Fm @1@ >>", cell: "/Fm Do")
+            return S.document([S.Page(patternFill + text, resources: "/Pattern << /T1 @2@ >>",
+                                      objects: [tile, S.form(drawn, resources: ""), pattern])])
+        case .patternInACell:
+            let outer = cellPattern(resources: "/Pattern << /P2 @1@ >>", cell: "/Pattern cs /P2 scn 0 0 200 100 re f")
+            return S.document([S.Page(patternFill + text, resources: "/Pattern << /T1 @2@ >>", objects: [tile, holding, outer])])
+        case .patternInAForm:
+            let form = S.form(patternFill, resources: "/Pattern << /T1 @1@ >>")
+            return S.document([S.Page("/Fm Do " + text, resources: "/XObject << /Fm @2@ >>", objects: [tile, holding, form])])
+        }
+    }
+
+    /// A typed letter whose resources hold a pattern with a picture that its
+    /// content never paints.
+    static func letterWithUnusedPattern() -> Data {
+        let tile = S.image(S.shade(width: 200, height: 100))
+        let pattern = cellPattern(resources: "/XObject << /Im @0@ >>", cell: "q 200 0 0 100 0 0 cm /Im Do Q")
+        return S.document([S.Page(S.typedText + visibleFiller, resources: "/Pattern << /T1 @1@ >>", objects: [tile, pattern])])
+    }
+
     static func carries(_ data: Data) throws -> Bool {
         let (_, page, _) = try #require(S.pdfPage(data))
         return PageImageCensus.carriesImageContent(page)
@@ -110,7 +159,6 @@ struct PageImageCensusPiecesTests {
             Row(name: "C11 a letter with a letterhead logo", data: TestFixtures.letterWithImagePDF(width: 600, height: 300), carries: false),
             Row(name: "C13 pictures over four fifths less one row of points", data: Self.coverPage(height: 639), carries: false),
             Row(name: "C16 a short page that draws one small inline logo", data: Self.shortPageWithInlineLogo(), carries: false),
-            Row(name: "C18 a typed letter whose only picture is inside a pattern", data: Self.letterWithPatternFill(logo: false), carries: false),
         ])
     }
 
@@ -119,8 +167,29 @@ struct PageImageCensusPiecesTests {
         try Self.check([
             Row(name: "C14 tiles of 40 px, more pictures than the map follows", data: Self.fullScan(.tiles(40)), carries: true),
             Row(name: "C17 a letter with a logo and a fill set to a pattern that holds a picture", data: Self.letterWithPatternFill(logo: true), carries: true),
+            Row(name: "C18 a typed letter whose only picture is inside a pattern it fills with", data: Self.letterWithPatternFill(logo: false), carries: true),
             Row(name: "C19 a scan printed inside a pattern, under invisible text", data: InkFitPiecewiseScanTests.patternScan(), carries: true),
         ])
+    }
+
+    @Test("A picture held deeper in a pattern, and painted, carries image content; one never painted does not")
+    func nestedPatterns() throws {
+        try Self.check(Nested.allCases.map { Row(name: "C20 \($0), painted", data: Self.letterWithNestedPattern($0), carries: true) }
+            + Nested.allCases.map { Row(name: "C21 \($0), no picture at its end", data: Self.letterWithNestedPattern($0, picture: false), carries: false) }
+            + [Row(name: "C22 a letter whose pattern holds a picture it never paints", data: Self.letterWithUnusedPattern(), carries: false)])
+    }
+
+    @Test("The census and the fit's gate agree on pictures held in patterns")
+    func censusAgreesWithTheGate() throws {
+        let pages: [(String, Data)] = [("C17", Self.letterWithPatternFill(logo: true)), ("C18", Self.letterWithPatternFill(logo: false)),
+                                       ("C22", Self.letterWithUnusedPattern())]
+            + Nested.allCases.flatMap { [("C20 \($0)", Self.letterWithNestedPattern($0)), ("C21 \($0)", Self.letterWithNestedPattern($0, picture: false))] }
+        #expect(pages.count == 9)
+        for (name, data) in pages {
+            let (document, page, cgPage) = try #require(S.pdfPage(data))
+            defer { withExtendedLifetime(document) {} }
+            #expect(PageImageCensus.carriesImageContent(page) == DocumentSearcher.carriesHiddenTextOverImage(page, cgPage: cgPage), "\(name)")
+        }
     }
 
     // MARK: - Read only when needed, and kept

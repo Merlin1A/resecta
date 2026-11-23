@@ -4,7 +4,8 @@ import PDFKit
 @testable import RedactionEngine
 
 // Search, Scan and the not-read signal on a scan stored as many small
-// pictures under a full text layer: the picture is read on the second leg.
+// pictures under a full text layer, and on a scan painted from a tiling
+// pattern over visible text: the picture is read on the second leg.
 // Recognition is seeded through `_testSeedOCRLines`, so no Vision read runs.
 //
 // Privacy rule (audit-lint M-1): locate/read/report vocabulary.
@@ -28,6 +29,18 @@ struct SearchPiecesReadTests {
         let d = S.draw(S.print(dpi: 300, shift: 0), dpi: 300, .strips(rows: 96))
         let layer = S.text(mode: 3).replacingOccurrences(of: S.word, with: layerWord) + S.fillerLayer
         return S.document([S.Page(d.ops + layer, resources: "/XObject << \(d.names)>>", objects: d.objects)])
+    }
+
+    /// A typed page whose visible text reads `layerWord` where the print shows
+    /// the builder's word, under a scan painted over it as the fill of a
+    /// tiling pattern: no image object, inline image or invisible text.
+    static func patternScanOverVisibleText(layerWord: String) -> Data {
+        let print = S.image(S.print(dpi: 300, shift: 0))
+        let pattern = S.Object(dictionary: "/Type /Pattern /PatternType 1 /PaintType 1 /TilingType 1 /BBox [0 0 612 792] /XStep 612 /YStep 792 /Resources << /XObject << /Im @0@ >> >>",
+                               stream: Data("q 612 0 0 792 0 0 cm /Im Do Q".utf8))
+        let layer = (S.typedText + PageImageCensusPiecesTests.visibleFiller).replacingOccurrences(of: S.word, with: layerWord)
+        return S.document([S.Page(layer + "q /Pattern cs /T1 scn 0 0 612 792 re f Q",
+                                  resources: "/Pattern << /T1 @1@ >>", objects: [print, pattern])])
     }
 
     static func line(_ text: String, _ rect: CGRect) -> OCREngine.TextLine {
@@ -61,6 +74,23 @@ struct SearchPiecesReadTests {
     @Test("With OCR pages left out, the page is reported as not read")
     func notReadSignal() async throws {
         let (results, signals) = try await Self.run(Self.stripScan(layerWord: "QUENTLN"),
+                                                    .text(S.word, options: SearchOptions(includeOCR: false)))
+        #expect(results.isEmpty)
+        #expect(signals == [0])
+    }
+
+    @Test("A scan painted from a tiling pattern over visible text is read with OCR pages included")
+    func patternScanRead() async throws {
+        let (results, _) = try await Self.run(Self.patternScanOverVisibleText(layerWord: "QUENTLN"),
+                                              .text(S.word, options: SearchOptions(includeOCR: true)),
+                                              seed: [Self.line("Account holder MARISOL \(S.word)", Self.printedLine)])
+        #expect(results.count == 1)
+        if case .ocr = results.first?.source {} else { Issue.record("read from the picture: \(String(describing: results.first?.source))") }
+    }
+
+    @Test("A scan painted from a tiling pattern over visible text, with OCR pages left out, is reported as not read")
+    func patternScanNotReadSignal() async throws {
+        let (results, signals) = try await Self.run(Self.patternScanOverVisibleText(layerWord: "QUENTLN"),
                                                     .text(S.word, options: SearchOptions(includeOCR: false)))
         #expect(results.isEmpty)
         #expect(signals == [0])
