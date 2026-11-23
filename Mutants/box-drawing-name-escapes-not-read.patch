@@ -1,0 +1,19 @@
+Property: A trailer's names are matched with their #xx escapes read.
+Area: the box check's own reading of what each page draws
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/BoxCheckDrawingTests (or on the host: cd Packages/RedactionEngine && swift test --filter BoxCheckDrawingTests)
+Must go red: RedactionEngineTests/BoxCheckDrawingTests eachCase [D87: a trailer that names an earlier one with an escape]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+index 1debada2..ed15ffed 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+@@ -89,7 +89,7 @@ enum PageDrawingReader {
+         guard count(of: startxref, in: data) == 1, let e = data.range(of: end, options: .backwards) else { return .fileRevised }
+         guard data[e.upperBound...].allSatisfy({ $0 == 10 || $0 == 13 }) else { return .fileRevised }
+         guard let t = data.range(of: trailer, options: .backwards, in: data.startIndex..<e.lowerBound) else { return .fileRevised }
+-        let tail = nameEscapesRead(data[t.upperBound..<e.lowerBound])
++        let tail = data[t.upperBound..<e.lowerBound]
+         if tail.range(of: Data("/Prev".utf8)) != nil || tail.range(of: Data("/XRefStm".utf8)) != nil { return .fileRevised }
+         guard let catalog = document.catalog, keys(catalog).isSubset(of: catalogKeys) else { return .documentKeyNotListed }
+         return nil
