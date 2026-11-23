@@ -96,7 +96,7 @@ public struct RunRecord: Equatable, Sendable {
                 }
                 plan = PaintPlan.make(
                     regions: planRegions, words: PageWords(words: []), text: "",
-                    facts: PageTextFacts(showsInvisibleText: false, carriesPageScaleImage: false),
+                    facts: .noPageRead,
                     widthSixtyFourths: width, heightSixtyFourths: height,
                     policy: .release, source: choice.source, switchOn: choice.switchOn).plan
             }
