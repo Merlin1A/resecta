@@ -1,7 +1,8 @@
 import Foundation
 import PDFKit
 
-// Moved whole from DocumentSearcher.swift; no line inside a moved body changes.
+// Moved from DocumentSearcher.swift (cd4d1afc); the address placing and
+// boxing have changed since (each copy placed and boxed by its own lines).
 
 extension DocumentSearcher {
 
@@ -82,15 +83,45 @@ extension DocumentSearcher {
     }
 
     /// The next box kept at a surviving address match's place, taken so
-    /// that two copies at one place each get their own; nil where no box is
-    /// kept there.
+    /// that two copies at one place each get their own. A survivor the
+    /// overlap step widened (`resolveOverlaps`, `withRange`: the text kept,
+    /// the range grown to its group's span) is no longer at its own place
+    /// but still contains it, so where no box is kept at its exact range it
+    /// takes every box kept for its text at a place inside that range, never
+    /// a sentinel's, united. Nil where none is kept.
     nonisolated static func takeBox(for match: PIIDetector.PIIMatch,
                                     from boxes: inout [AddressPlace: [TextLayerBox]]) -> TextLayerBox? {
         let key = AddressPlace(text: match.text, range: match.range)
-        guard var kept = boxes[key], !kept.isEmpty else { return nil }
-        let box = kept.removeFirst()
-        boxes[key] = kept
-        return box
+        if var kept = boxes[key], !kept.isEmpty {
+            let box = kept.removeFirst()
+            boxes[key] = kept
+            return box
+        }
+        let start = match.range.location, end = NSMaxRange(match.range)
+        let inside = boxes.keys
+            .filter { $0.text == match.text && $0.length > 0 && $0.location >= start && $0.location + $0.length <= end }
+            .sorted { $0.location < $1.location }
+        var taken: [TextLayerBox] = []
+        for place in inside {
+            taken += boxes[place] ?? []
+            boxes[place] = []
+        }
+        return united(taken)
+    }
+
+    /// The boxes as one: the paint, the hidden glyphs' boxes (where any
+    /// has one) and the identities (where any has one) each united, degraded
+    /// when any is. Nil for none.
+    nonisolated static func united(_ boxes: [TextLayerBox]) -> TextLayerBox? {
+        guard let first = boxes.first else { return nil }
+        guard boxes.count > 1 else { return first }
+        let strips = boxes.compactMap(\.textLayerRect)
+        return TextLayerBox(
+            rect: boxes.dropFirst().reduce(first.rect) { $0.union($1.rect) },
+            textLayerRect: strips.first.map { strips.dropFirst().reduce($0) { $0.union($1) } },
+            degraded: boxes.contains(where: \.degraded),
+            identity: boxes.contains { $0.identity != nil }
+                ? boxes.dropFirst().reduce(first.mergeIdentity) { $0.union($1.mergeIdentity) } : nil)
     }
 
     /// The text layer's lines for the address assembly

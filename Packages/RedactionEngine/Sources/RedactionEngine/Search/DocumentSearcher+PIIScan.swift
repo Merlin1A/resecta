@@ -1,7 +1,8 @@
 import Foundation
 import PDFKit
 
-// Moved whole from DocumentSearcher.swift; no line inside a moved body changes.
+// Moved from DocumentSearcher.swift (cd4d1afc); both legs now take each
+// address copy's box by its place (`takeBox`), not by its text alone.
 
 extension DocumentSearcher {
 
