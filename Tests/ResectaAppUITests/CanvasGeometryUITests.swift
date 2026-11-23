@@ -187,9 +187,14 @@ nonisolated final class CanvasGeometryUITests: XCTestCase {
         let boxes = try [boxA, boxB].map { drawn in
             try XCTUnwrap(rest.tintBounds(.red, in: drawn.insetBy(dx: -20, dy: -20)), "box at rest near \(drawn)").insetBy(dx: 1, dy: 1)
         }
+        // Half a point past each corner of the box as measured at rest: the
+        // dot is centred on the corner with teal to about 2.35 points, so the
+        // grid stays on its teal when the measured edge is a pixel off. At
+        // 1.5 points the grid reached the dot's white ring. Neither the red
+        // nor the blue selected border reads as teal.
         func outside(_ box: CGRect) -> [CGPoint] {
-            [CGPoint(x: box.minX - 1.5, y: box.minY - 1.5), CGPoint(x: box.maxX + 1.5, y: box.minY - 1.5),
-             CGPoint(x: box.minX - 1.5, y: box.maxY + 1.5), CGPoint(x: box.maxX + 1.5, y: box.maxY + 1.5)]
+            [CGPoint(x: box.minX - 0.5, y: box.minY - 0.5), CGPoint(x: box.maxX + 0.5, y: box.minY - 0.5),
+             CGPoint(x: box.minX - 0.5, y: box.maxY + 0.5), CGPoint(x: box.maxX + 0.5, y: box.maxY + 0.5)]
         }
         for box in boxes {
             for p in outside(box) {
