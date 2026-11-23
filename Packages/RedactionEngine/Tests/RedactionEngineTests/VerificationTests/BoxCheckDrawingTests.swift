@@ -148,6 +148,8 @@ struct BoxCheckDrawingTests {
         Case(number: 87, name: "a trailer that names an earlier one with an escape", expected: .fileRevised) { $0.trailer = "/Pr#65v 9" },
         Case(number: 88, name: "a trailer that names a cross-reference stream", expected: .fileRevised) { $0.trailer = "/XRefStm 9" },
         Case(number: 89, name: "an object after the end of the file", expected: .fileRevised) { $0.appended = "9 0 obj\n<< >>\nendobj\n" },
+        Case(number: 98, name: "a second trailer word after the name of an earlier one", expected: .fileRevised) {
+            $0.trailer = "/Prev 9 /Note (trailer)" },
         // The picture's segments.
         Case(number: 90, name: "a comment segment", expected: .unlistedSegment,
              change: picture { D.withSegment($0, marker: 0xFE, body: Array("note".utf8)) }),
@@ -167,10 +169,10 @@ struct BoxCheckDrawingTests {
         Case(number: 97, name: "a Q with nothing saved", expected: .drawingNotRead) { $0.content = "Q " + content },
     ]
 
-    @Test("The table holds 81 cases, eight of them admitted")
+    @Test("The table holds 82 cases, eight of them admitted")
     func tableLength() {
-        #expect(Self.cases.count == 81)
-        #expect(Set(Self.cases.map(\.number)).count == 81)
+        #expect(Self.cases.count == 82)
+        #expect(Set(Self.cases.map(\.number)).count == 82)
         #expect(Self.cases.filter { $0.expected == nil }.count == 8)
     }
 

@@ -82,11 +82,12 @@ enum PageDrawingReader {
     // MARK: The file
 
     /// One revision, and a catalog and page tree of the writer's keys alone.
-    /// Nothing but line ends follows the file's last %%EOF, and the trailer
-    /// before it names no earlier one, however its names are spelled.
+    /// The file holds one startxref and one trailer, nothing but line ends
+    /// follows its last %%EOF, and the trailer names no earlier one, however
+    /// its names are spelled.
     static func fileReason(_ data: Data, _ document: CGPDFDocument) -> Reason? {
         let startxref = Data("startxref".utf8), trailer = Data("trailer".utf8), end = Data("%%EOF".utf8)
-        guard count(of: startxref, in: data) == 1, let e = data.range(of: end, options: .backwards) else { return .fileRevised }
+        guard count(of: startxref, in: data) == 1, count(of: trailer, in: data) == 1, let e = data.range(of: end, options: .backwards) else { return .fileRevised }
         guard data[e.upperBound...].allSatisfy({ $0 == 10 || $0 == 13 }) else { return .fileRevised }
         guard let t = data.range(of: trailer, options: .backwards, in: data.startIndex..<e.lowerBound) else { return .fileRevised }
         let tail = nameEscapesRead(data[t.upperBound..<e.lowerBound])
