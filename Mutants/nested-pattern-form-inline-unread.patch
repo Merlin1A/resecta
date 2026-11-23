@@ -1,0 +1,18 @@
+Property: A form a pattern cell reaches is read for an inline image.
+Area: ink fit (Search) and the census, pictures held in patterns
+Test command: cd Packages/RedactionEngine && swift test --filter 'PageImageCensusPiecesTests|PagePictureMapTests'
+Must go red: RedactionEngineTests/PageImageCensusPiecesTests nestedPatterns; RedactionEngineTests/PageImageCensusPiecesTests censusAgreesWithTheGate; RedactionEngineTests/PagePictureMapTests nestedPatternPictures
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift
+@@ -478,7 +478,7 @@
+                 let drawn = CGPDFContentStreamCreateWithStream(stream, inner ?? dictionary, content)
+                 let inline = drawsInlineImage(drawn)
+                 CGPDFContentStreamRelease(drawn)
+-                if inline != false { return true }
++                _ = inline
+                 if let inner, reachesPicture(inner, content: content, depth: depth + 1, seen: seen) { return true }
+             default: continue
+             }
