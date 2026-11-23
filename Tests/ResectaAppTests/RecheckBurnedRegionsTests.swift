@@ -112,16 +112,17 @@ struct RecheckBurnedRegionsTests {
     }
 
     /// The reproduction. The run hands the checks the clamped box, the
-    /// name's box with its ink strips and nothing for the box under the
-    /// floor; the re-check is handed the same.
+    /// name's box (whole: a Secure run makes no ink plan, so no strips) and
+    /// nothing for the box under the floor; the re-check is handed the same.
     func sameRegionsOnRunAndRecheck() async throws {
         let o = try await Self.runThenRecheck()
         let context = ("run: \(Self.describe(o.onRun))\nre-check: \(Self.describe(o.onRecheck))\n"
             + "run rows: \(Self.statuses(o.runReport))\nre-check rows: \(Self.statuses(o.recheckReport))")
         let runPage = try #require(o.onRun[0], "\(context)")
-        // The run's own form, so the comparison below tests all three ways.
-        #expect(runPage.first { $0.id == o.regionIDs.inked }?.inkStripRects.isEmpty == false,
-                "the run strips the name's hidden copy by its ink\n\(context)")
+        // The run's own form. A Secure run makes no ink plan, so the
+        // comparison below tests the clamp and the size floor.
+        #expect(runPage.first { $0.id == o.regionIDs.inked }?.inkStripRects.isEmpty == true,
+                "the run burns the name's box whole, with no ink strips\n\(context)")
         #expect(runPage.first { $0.id == o.regionIDs.pastTheEdge }?.normalizedRect.maxX == 1,
                 "the run clamps the box past the edge\n\(context)")
         #expect(!runPage.contains { $0.id == o.regionIDs.underTheFloor },

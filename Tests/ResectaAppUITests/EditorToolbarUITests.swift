@@ -91,10 +91,10 @@ nonisolated final class EditorToolbarUITests: XCTestCase {
         XCTAssertFalse(app.buttons["Searchable Redaction"].exists, "The … menu still offers Searchable Redaction.")
         attachScreenshot(named: "overflow-no-switch-mode")
         settings.tap()
-        let heading = app.navigationBars["Settings"]
-        XCTAssertTrue(heading.waitForExistence(timeout: 10), "Settings did not open.")
-        let secureLine = app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH %@", "Produces image-only output")).firstMatch
-        XCTAssertTrue(secureLine.waitForExistence(timeout: 5), "Settings no longer says what every export is.")
+        let secureLine = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Produces image-only output")).firstMatch
+        XCTAssertTrue(secureLine.waitForExistence(timeout: 10),
+                      "Settings did not open, or no longer says what every export is.")
         XCTAssertFalse(app.descendants(matching: .any)["Default Mode"].exists, "Settings still has the mode picker.")
         XCTAssertFalse(app.descendants(matching: .any)["Searchable Redaction"].exists, "Settings still offers Searchable Redaction.")
         attachScreenshot(named: "settings-no-mode-picker")
