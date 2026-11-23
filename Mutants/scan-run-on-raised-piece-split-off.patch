@@ -1,0 +1,19 @@
+Property: A word's line pieces stand for it only where no two overlap in height. Planted: a piece raised on one drawn line (a superscript ordinal) is split off as a line of its own.
+Area: Search, Scan's address lines (EmbeddedTextSource)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'ScanRunOnAddressTests'
+Must go red: RedactionEngineTests/ScanRunOnAddressTests piecesOverlappingInHeightAreRefused
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/EmbeddedTextSource.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/EmbeddedTextSource.swift
+index 3e4988a8..19197991 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/EmbeddedTextSource.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/EmbeddedTextSource.swift
+@@ -109,7 +109,7 @@ public struct EmbeddedTextSource: Sendable {
+         let ranges = pieces.map(\.range).sorted { $0.location < $1.location }
+         guard ranges.reduce(0, { $0 + $1.length }) == word.length,
+               zip(ranges, ranges.dropFirst()).allSatisfy({ NSMaxRange($0) <= $1.location }) else { return false }
+-        for (i, one) in pieces.enumerated() {
++        for (i, one) in pieces.enumerated() where false {
+             for other in pieces[(i + 1)...] where one.bounds.minY < other.bounds.maxY && other.bounds.minY < one.bounds.maxY {
+                 return false
+             }
