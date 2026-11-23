@@ -110,12 +110,11 @@ struct ResizeHandleHitTestTests {
         // min(width,height) = 10 -> 10/2 = 5 -> max(22,5) = 22 -> min(46,22) = 22 (half-width 11).
         // Unaffected by the 44->46 target bump — 22 wins either way.
         let rect = CGRect(x: 0, y: 0, width: 10, height: 10)
-        // A point at the exact center of the tiny region is still
-        // within 11pt (half-width) of every one of the 8 handles —
-        // it must resolve to the NEAREST, not merely "some" handle.
-        // bottomRight sits exactly at (10, 10); nearest to (5,5)
-        // among the four corners is a four-way tie by symmetry, so
-        // probe an off-center point where nearest-wins is unambiguous.
+        // A side of 10 is short of 60, so the region has only its four
+        // corner handles, and both axes are short of 22, so each corner
+        // steps 6 out: bottomRight sits at (16, 16), its 22pt box spans
+        // 5…27. A point just inside the region's own corner is in that box
+        // and in no other corner's, and past the body's reach.
         #expect(
             RedactionOverlayView.resolveResizeHandle(
                 at: CGPoint(x: 9, y: 9), regionRect: rect
@@ -127,23 +126,24 @@ struct ResizeHandleHitTestTests {
 
     @Test("Overlapping boxes on a thin region resolve to the NEAREST center, not array order")
     func tieBreakIsNearestCenterNotArrayOrder() {
-        // 100×20 region: min(w,h)/2 = 10 -> clamp floors at 22
-        // (half-width 11). topLeft(0,0) and leftCenter(0,10) both
-        // claim (0,7): |7-0|=7<=11 for topLeft, |7-10|=3<=11 for
-        // leftCenter. `.topLeft` is declared FIRST in the resolver's
-        // handles array, so a first-match policy (the pre-fix
-        // behavior class) would return `.topLeft` here; nearest-center
-        // must return `.leftCenter` (distance 3 < distance 7).
-        let rect = CGRect(x: 0, y: 0, width: 100, height: 20)
-        #expect(
-            RedactionOverlayView.resolveResizeHandle(
-                at: CGPoint(x: 0, y: 7), regionRect: rect
-            ) == .leftCenter
-        )
-        // Symmetric check on the opposite side: closer to topLeft than to leftCenter.
+        // 120×5 region: min(w,h)/2 = 2.5 -> clamp floors at 22
+        // (half-width 11). Its height is short of 22, so its corners
+        // step min(6.5, 8.5) = 6.5 out: topLeft at (0,-6.5), bottomLeft
+        // at (0,11.5), 18 apart, so their boxes overlap from y 0.5 to
+        // 4.5. Both claim (0,3): 9.5 from topLeft, 8.5 from bottomLeft.
+        // `.topLeft` is declared FIRST in the resolver's handles array,
+        // so a first-match policy (the pre-fix behavior class) would
+        // return `.topLeft` here; nearest-center must return `.bottomLeft`.
+        let rect = CGRect(x: 0, y: 0, width: 120, height: 5)
         #expect(
             RedactionOverlayView.resolveResizeHandle(
                 at: CGPoint(x: 0, y: 3), regionRect: rect
+            ) == .bottomLeft
+        )
+        // Symmetric check: closer to topLeft (8.5) than to bottomLeft (9.5).
+        #expect(
+            RedactionOverlayView.resolveResizeHandle(
+                at: CGPoint(x: 0, y: 2), regionRect: rect
             ) == .topLeft
         )
     }

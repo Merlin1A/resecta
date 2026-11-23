@@ -84,20 +84,18 @@ struct CanvasPolishBundleTests {
         overlayPoints * viewScale
     }
 
-    @Test("The size label, the outline and the handle ring keep one on-screen size at 0.64 and 2.0")
+    @Test("The size label and the outline keep one on-screen size at 0.64 and 2.0")
     func onScreenSizesHoldAcrossZoom() {
         let label = "120 \u{00D7} 24" as NSString
-        func sizes(_ viewScale: CGFloat) -> (pill: CGFloat, ring: CGFloat, stroke: CGFloat) {
+        func sizes(_ viewScale: CGFloat) -> (pill: CGFloat, stroke: CGFloat) {
             let fingerScale = 1 / viewScale
             return (
                 Self.onScreen(RedactionOverlayView.dimensionLabelPillSize(for: label, fingerScale: fingerScale).height, viewScale: viewScale),
-                Self.onScreen(RedactionOverlayView.handleRingWidth(handleScale: 1, fingerScale: fingerScale), viewScale: viewScale),
                 Self.onScreen(RedactionOverlayView.regionStrokeWidth(isSelected: true, fingerScale: fingerScale), viewScale: viewScale)
             )
         }
         let fit = sizes(0.64), zoomed = sizes(2.0)
         #expect(abs(fit.pill - zoomed.pill) < 0.5, "the label's pill: \(fit.pill) at fit, \(zoomed.pill) at 2x")
-        #expect(abs(fit.ring - zoomed.ring) < 0.01)
         #expect(abs(fit.stroke - 2.5) < 0.01 && abs(zoomed.stroke - 2.5) < 0.01)
     }
 

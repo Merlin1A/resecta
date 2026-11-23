@@ -263,6 +263,58 @@ enum ResectaTokens {
         static let guideColor: UIColor = .systemOrange
     }
 
+    // MARK: - Canvas
+
+    /// The marks drawn on the page: the resize handles and the corner dots.
+    /// Sizes are on-screen points, multiplied by the overlay's finger scale
+    /// before drawing. The colours are fixed, the same in light and dark
+    /// appearance, because the page under them does not change with it.
+    // nonisolated: pure values, read by host tests from any isolation.
+    nonisolated enum Canvas {
+        /// A colour as its components, 0 to 1.
+        nonisolated struct Tone: Equatable, Sendable {
+            let red: CGFloat, green: CGFloat, blue: CGFloat, alpha: CGFloat
+            var uiColor: UIColor { UIColor(red: red, green: green, blue: blue, alpha: alpha) }
+        }
+
+        /// A disc with a ring: `radius` to the ring's centre line.
+        nonisolated struct Disc: Equatable, Sendable {
+            let radius: CGFloat
+            let fill: Tone
+            let ring: Tone
+            let ringWidth: CGFloat
+        }
+
+        /// Page teal, #0B646F, the light appearance's tint, in both
+        /// appearances. Every teal drawn on the page is this one.
+        static let pageTeal = Tone(red: 0x0B / 255, green: 0x64 / 255, blue: 0x6F / 255, alpha: 1)
+
+        /// A resize handle: a white disc with a page-teal ring.
+        static let handle = Disc(radius: 4.5, fill: Tone(red: 1, green: 1, blue: 1, alpha: 1),
+                                 ring: pageTeal, ringWidth: 1.75)
+        /// The faint disc under a handle: black at 12 %, its radius larger
+        /// than the handle's by `handleShadowGrowth`, lower by `handleShadowDrop`.
+        static let handleShadow = Tone(red: 0, green: 0, blue: 0, alpha: 0.12)
+        static let handleShadowGrowth: CGFloat = 1.2
+        static let handleShadowDrop: CGFloat = 0.6
+
+        /// A corner dot of a selection without handles: page teal, with a
+        /// white 90 % ring centred on its edge.
+        static let selectionDot = Disc(radius: 2.75, fill: pageTeal,
+                                       ring: Tone(red: 1, green: 1, blue: 1, alpha: 0.9), ringWidth: 0.8)
+
+        /// On an axis shorter than this, the handles at its ends step outward.
+        static let handlesStepOutBelow: CGFloat = 22
+        /// The most a handle steps outward.
+        static let handleLargestStep: CGFloat = 6.5
+        /// The shortest side that has a handle at its middle.
+        static let edgeHandleShortestSide: CGFloat = 60
+        /// On an axis shorter than this, the corner dots step outward.
+        static let dotsStepOutBelow: CGFloat = 12
+        /// The most a corner dot steps outward.
+        static let dotLargestStep: CGFloat = 4
+    }
+
     // MARK: - Touch Targets
 
     enum TouchTarget {

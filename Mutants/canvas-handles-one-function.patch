@@ -1,0 +1,25 @@
+Property: The touch test takes a selected box's handles from where the drawing puts them, from the one function for handle centres.
+Area: canvas overlay (handles)
+Test command: xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/CanvasInkLookTests -only-testing:ResectaAppTests/CanvasHitTargetTests
+Must go red: ResectaAppTests/CanvasInkLookTests hitTestReadsTheDrawnCentres (The hit test reads the drawing's handle centres); ResectaAppTests/CanvasHitTargetTests shortSideHasNoEdgeHandleAtFit (A side under 60 on-screen points has no edge handle, read through the overlay at fit)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Resize.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Resize.swift
+--- a/Sources/ResectaApp/Overlay/RedactionOverlayView+Resize.swift
++++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+Resize.swift
+@@ -239,8 +239,13 @@
+             }
+             return box
+         }
+-        let boxes: [(handle: ResizeHandle, box: CGRect)] = handleCentres(for: regionRect, fingerScale: fingerScale)
+-            .map { handle, center in (handle, handleBox(at: center)) }
++        let r = regionRect
++        let boxes: [(handle: ResizeHandle, box: CGRect)] = [
++            (.topLeft, CGPoint(x: r.minX, y: r.minY)), (.topRight, CGPoint(x: r.maxX, y: r.minY)),
++            (.bottomLeft, CGPoint(x: r.minX, y: r.maxY)), (.bottomRight, CGPoint(x: r.maxX, y: r.maxY)),
++            (.topCenter, CGPoint(x: r.midX, y: r.minY)), (.bottomCenter, CGPoint(x: r.midX, y: r.maxY)),
++            (.leftCenter, CGPoint(x: r.minX, y: r.midY)), (.rightCenter, CGPoint(x: r.maxX, y: r.midY)),
++        ].map { handle, center in (handle, handleBox(at: center)) }
+ 
+         // The body zone: past each side's handle-box reach, capped at a
+         // quarter of that side. Each reach is measured from a box at the
