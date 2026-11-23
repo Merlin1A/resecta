@@ -1,0 +1,18 @@
+Property: The part of a widened address's range outside the places its box was kept at is boxed as its own result, on both legs. Planted: no part is found, so the earlier line the address pattern started on gets no box.
+Area: Search, Scan's address boxing
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'ScanOverlapTailTests'
+Must go red: RedactionEngineTests/ScanOverlapTailTests widenedAddressTailIsBoxed; RedactionEngineTests/ScanOverlapTailTests widenedAddressTailIsBoxedOnThePictureLeg; RedactionEngineTests/ScanOverlapTailTests widenedAddressTailPaintedInTheExport; RedactionEngineTests/ScanOverlapTailTests tailsOutsideThePlaces
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift
+index 5f3e9389..8e8451aa 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift
+@@ -122,6 +122,7 @@ extension DocumentSearcher {
+     /// (`resolveOverlaps`: a loser's part outside the winner), which the
+     /// address's own box does not reach. Each is boxed by its own range.
+     nonisolated static func tails(of range: NSRange, outside places: [NSRange], in text: NSString) -> [NSRange] {
++        return []
+         var parts: [NSRange] = []
+         var from = range.location
+         for place in places.sorted(by: { $0.location < $1.location }) {

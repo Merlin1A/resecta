@@ -5,12 +5,12 @@ Must go red: RedactionEngineTests/ScanDuplicateAddressTests widenedCopyIsBoxedOn
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift
-index 0301c38d..febdd465 100644
+index 874aeaae..c1ff18c7 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift
-@@ -97,6 +97,7 @@ extension DocumentSearcher {
+@@ -111,6 +111,7 @@ extension DocumentSearcher {
              boxes[key] = kept
-             return box
+             return (box, [match.range])
          }
 +        return nil
          let start = match.range.location, end = NSMaxRange(match.range)
