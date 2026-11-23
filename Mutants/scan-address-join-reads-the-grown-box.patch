@@ -1,0 +1,18 @@
+Property: Address lines join on their boxes before the growth. Planted: the join reads the grown box.
+Area: Search, the match boxes from the page's own drawing
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'ContentGlyphScanTests|ContentGlyphExportTests|ContentGlyphBoxTests|ContentGlyphRouteTests'
+Must go red: RedactionEngineTests/ContentGlyphScanTests joinReadsTheUngrownBox
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/Address/AddressSpatialAssembler.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/Address/AddressSpatialAssembler.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/Address/AddressSpatialAssembler.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/Address/AddressSpatialAssembler.swift
+@@ -124,7 +124,7 @@
+         // (`textLayerRect`, set when a line was fitted to its ink), never on
+         // the painted box: a fit, a drift envelope or a growth to the line's
+         // own glyphs must not move the join.
+-        func place(_ line: OCREngine.TextLine) -> CGRect { line.textLayerRect ?? line.ungrownRect ?? line.normalizedRect }
++        func place(_ line: OCREngine.TextLine) -> CGRect { line.textLayerRect ?? line.normalizedRect }
+         // Sort by y descending (Vision coords: y=1 top, y=0 bottom).
+         let sorted = lines.enumerated().sorted {
+             place($0.element).minY > place($1.element).minY

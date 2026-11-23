@@ -1,0 +1,18 @@
+Property: A match boxed whole (a Scan match, the preview's box) grows to its own drawn glyphs. Planted: the whole box is not grown.
+Area: Search, the match boxes from the page's own drawing
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'ContentGlyphScanTests|ContentGlyphExportTests|ContentGlyphBoxTests|ContentGlyphRouteTests'
+Must go red: RedactionEngineTests/ContentGlyphScanTests boxedWholeGrows
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
+@@ -103,7 +103,7 @@
+         let own = Self.ownGlyphs(for: nsRange, page: page)
+         return normalizedRect(for: selection, page: page).map {
+             let fitted = Self.inkFittedRect($0, page: page, text: selection.string, range: nsRange, paintOnly: true)
+-            let rect = grown(fitted, line: selection.bounds(for: page), by: own, page: page)
++            let rect = fitted
+             return (rect, rect == fitted ? nil : fitted)
+         }
+     }

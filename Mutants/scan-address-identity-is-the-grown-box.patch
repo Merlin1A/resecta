@@ -1,0 +1,19 @@
+Property: A grown address line is told by its box before the growth. Planted: it is told by the grown box.
+Area: Search, the match boxes from the page's own drawing
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'ContentGlyphScanTests|ContentGlyphExportTests|ContentGlyphBoxTests|ContentGlyphRouteTests'
+Must go red: RedactionEngineTests/ContentGlyphScanTests assembledAddressGrows
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/OCREngine.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/OCREngine.swift
+index 26e5bf63..16e54456 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/OCREngine.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/OCREngine.swift
+@@ -43,7 +43,7 @@ public struct OCREngine: Sendable {
+         func grown(to rect: CGRect) -> TextLine {
+             TextLine(text: text, normalizedRect: rect, confidence: confidence,
+                      textLayerRect: textLayerRect, inkFitDegraded: inkFitDegraded,
+-                     identityRect: identityRect ?? normalizedRect,
++                     identityRect: identityRect,
+                      ungrownRect: normalizedRect, wordBoxes: wordBoxes)
+         }
+     }

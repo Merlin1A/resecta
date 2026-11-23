@@ -144,4 +144,32 @@ struct ContentGlyphExportTests {
             #expect(dark.isEmpty, "\(mode): ink x \(inkMin)-\(inkMax) pt, box \(box.minX)-\(box.maxX) pt: \(dark.count) ink pixels still dark")
         }
     }
+
+    @Test("A Scan address whose ZIP line PDFKit boxes short: none of its last digit's ink stays dark outside the paint, in Secure or in Searchable")
+    func scanAddressInkCovered() async throws {
+        let s = Self.dpi / 72
+        let data = ContentGlyphWalkTests.data(ContentGlyphScanTests.shortZip)
+        let source = try #require(PDFDocument(data: data))
+        let (assembled, _) = try ContentGlyphScanTests.addresses(await ContentGlyphScanTests.scan(source))
+        // The assembled address alone: the one boxed from its lines.
+        let regions = [0: [RedactionRegion(id: UUID(), normalizedRect: assembled.normalizedRect, source: .detectedPII(kind: .address))]]
+        let plant = "BT /F1 12 Tf 0 0 0 0 72 686 Tm (,) Tj ET"
+        let alone = try Self.render(ContentGlyphWalkTests.data("BT /F1 12 Tf 175.392 686 Td (4) Tj ET"))
+        let without = try Self.render(ContentGlyphWalkTests.data(
+            [ContentGlyphScanTests.street, "BT /F1 12 Tf 72 686 Td (Springfield, IL 6270) Tj ET", plant].joined(separator: "\n")))
+        let x0 = Int(150 * s), x1 = Int(200 * s), y0 = Int(681 * s), y1 = Int(697 * s)
+        var own: [(Int, Int)] = []
+        for y in y0..<y1 { for x in x0..<x1 where Self.gray(alone, x, y) < 128 && Self.gray(without, x, y) > 245 { own.append((x, y)) } }
+        try #require(own.count > 100, "the digit's own ink is read: \(own.count) px")
+        for mode in [PipelineMode.secureRasterization, .searchableRedaction] {
+            let url = try await TestPipeline.processAndExport(data, mode: mode, regions: regions, fillColor: .black, dpi: 150)
+            defer { try? FileManager.default.removeItem(at: url) }
+            let out = try Self.render(try Data(contentsOf: url))
+            // Paint: columns solid black over the ZIP line's band.
+            let r0 = Int(684.0 * s), r1 = Int(695.0 * s)
+            let paint = Set((x0..<x1).filter { x in (r0...r1).allSatisfy { Self.gray(out, x, $0) < 40 } })
+            let dark = own.filter { !paint.contains($0.0) && Self.gray(out, $0.0, $0.1) < 200 }
+            #expect(dark.isEmpty, "\(mode): \(dark.count) of the digit's own-ink pixels dark outside the paint, at x \(CGFloat(dark.map(\.0).min() ?? 0) / s)-\(CGFloat((dark.map(\.0).max() ?? 0) + 1) / s) pt")
+        }
+    }
 }
