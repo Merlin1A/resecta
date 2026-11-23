@@ -1,0 +1,18 @@
+Property: Patterns nested deeper than the limit are taken to hold a picture.
+Area: ink fit (Search) and the census, pictures held in patterns
+Test command: cd Packages/RedactionEngine && swift test --filter 'PagePictureMapTests'
+Must go red: RedactionEngineTests/PagePictureMapTests patternDepthIsBounded
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift
+@@ -429,7 +429,7 @@
+                                      seen: FormsSeen) -> Bool {
+         guard seen.patterns.insert(stream).inserted else { return true }
+         seen.patternsRead += 1
+-        guard depth < PageImageCensus.maxFormDepth, seen.patternsRead <= PagePictureMap.formLimit,
++        guard seen.patternsRead <= PagePictureMap.formLimit,
+               let dictionary = CGPDFStreamGetDictionary(stream) else { return false }
+         var resources: CGPDFDictionaryRef?
+         _ = CGPDFDictionaryGetDictionary(dictionary, "Resources", &resources)

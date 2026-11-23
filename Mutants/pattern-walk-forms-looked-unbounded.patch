@@ -1,0 +1,18 @@
+Property: More forms than the limit in a page's resources are taken to hold a picture.
+Area: ink fit (Search) and the census, pictures held in patterns
+Test command: cd Packages/RedactionEngine && swift test --filter 'PagePictureMapTests'
+Must go red: RedactionEngineTests/PagePictureMapTests resourceFormsAreBounded
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift
+@@ -386,7 +386,7 @@
+         guard let xobjects = streams(in: resources, "XObject", seen: seen) else { return true }
+         for form in xobjects where subtype(of: form) == "Form" && seen.formsForPatterns.insert(form).inserted {
+             seen.looked += 1
+-            guard seen.looked <= PagePictureMap.formLimit, let dictionary = CGPDFStreamGetDictionary(form) else { return true }
++            guard let dictionary = CGPDFStreamGetDictionary(form) else { return true }
+             var inner: CGPDFDictionaryRef?
+             if CGPDFDictionaryGetDictionary(dictionary, "Resources", &inner), let inner,
+                patternsHoldPicture(in: inner, content: content, depth: depth + 1, seen: seen) { return true }

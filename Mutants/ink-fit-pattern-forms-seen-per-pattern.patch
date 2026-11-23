@@ -15,4 +15,4 @@ diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePict
 +        if let resources, reachesPicture(resources, content: content, depth: depth, seen: FormsSeen()) { return false }
          let inner = CGPDFContentStreamCreateWithStream(stream, resources ?? dictionary, content)
          defer { CGPDFContentStreamRelease(inner) }
-         return drawsInlineImage(inner) == false
+         return cellDrawsOnlyWhatItNames(inner, resources: resources) == true

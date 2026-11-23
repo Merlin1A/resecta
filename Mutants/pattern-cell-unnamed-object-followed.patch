@@ -1,0 +1,19 @@
+Property: A pattern cell that draws an object its own resources do not name cannot be followed.
+Area: ink fit (Search) and the census, pictures held in patterns
+Test command: cd Packages/RedactionEngine && swift test --filter 'PagePictureMapTests|PageImageCensusPiecesTests'
+Must go red: RedactionEngineTests/PagePictureMapTests cellNamesWhatItDraws; RedactionEngineTests/PageImageCensusPiecesTests cellDrawingWhatItDoesNotName
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift
+@@ -463,8 +463,7 @@
+             var object: CGPDFObjectRef?
+             if CGPDFScannerPopName(scanner, &name), let name, let named = cell.named,
+                CGPDFDictionaryGetObject(named, name, &object) { return }
+-            cell.other = true
+-            CGPDFScannerStop(scanner)
++            _ = cell
+         }
+         let scanner = CGPDFScannerCreate(content, table, Unmanaged.passUnretained(cell).toOpaque())
+         defer { CGPDFScannerRelease(scanner) }
