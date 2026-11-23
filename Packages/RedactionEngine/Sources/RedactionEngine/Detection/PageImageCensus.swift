@@ -13,6 +13,15 @@ import CoreGraphics
 /// carries nothing to recognise beyond its text layer, however short. Search
 /// reads such a page on both legs; its text-layer status is unchanged.
 ///
+/// A scan stored as many small pictures (strips or tiles, image objects or
+/// inline images) passes none of those tests: each picture is below both
+/// floors, and its text layer is not thin. When they all say no, a page that
+/// draws a picture, or shows invisible text, still carries image content when
+/// its pictures, as painted, cover four fifths of the crop box, or when its
+/// painting cannot be followed (`PagePictureMap`, the line the ink fit's gate
+/// reads). Where pictures are painted is read only then. The answer is kept
+/// while the page lives.
+///
 /// The two floors were set from a census of the sample corpus (543 pages in
 /// 35 documents): no page with a text layer carries an image object at all,
 /// and the thinnest carries 1,004 characters (2,071 per 10⁶ pt²), five times
@@ -30,14 +39,31 @@ enum PageImageCensus {
     /// Bound on form objects nested inside one another.
     static let maxFormDepth = 8
 
-    /// The census rule for one page. A page with no visible area carries nothing.
+    /// The census rule for one page, read once and kept while the page lives.
     static func carriesImageContent(_ page: PDFPage) -> Bool {
+        if let known = PageImageCensusCache.shared.value(for: page) { return known }
+        let answer = readCarriesImageContent(page)
+        PageImageCensusCache.shared.set(answer, for: page)
+        return answer
+    }
+
+    /// The census rule for one page. A page with no visible area carries
+    /// nothing. The largest image object's size and the text layer's density
+    /// decide first; where pictures are painted is read only when both say no
+    /// and the page reaches an image object, draws an inline image, or shows
+    /// invisible text (a scan's print can sit inside a pattern under that text).
+    static func readCarriesImageContent(_ page: PDFPage) -> Bool {
         let crop = page.bounds(for: .cropBox)
-        guard crop.width > 0, crop.height > 0 else { return false }
-        guard let cgPage = page.pageRef, let pixels = largestImagePixelArea(of: cgPage) else { return false }
-        if pixels >= imagePixelFloor || imageShare(pixelArea: pixels, cropBox: crop) >= imageShareFloor { return true }
-        let meaningful = (page.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines).count
-        return textDensity(meaningfulCount: meaningful, cropBox: crop) < densityFloor
+        guard crop.width > 0, crop.height > 0, let cgPage = page.pageRef else { return false }
+        if let pixels = largestImagePixelArea(of: cgPage) {
+            if pixels >= imagePixelFloor || imageShare(pixelArea: pixels, cropBox: crop) >= imageShareFloor { return true }
+            let meaningful = (page.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines).count
+            if textDensity(meaningfulCount: meaningful, cropBox: crop) < densityFloor { return true }
+        } else if !PageContentFacts.drawsInlineImage(cgPage) && !DocumentSearcher.showsInvisibleText(cgPage) {
+            return false
+        }
+        let map = PagePictureMap.cached(page, cgPage: cgPage)
+        return !map.followed || map.coversThePage
     }
 
     static func textDensity(meaningfulCount: Int, cropBox: CGRect) -> Double {
@@ -97,5 +123,23 @@ enum PageImageCensus {
             if let area, area > (largest ?? 0) { largest = area }
         }
         return largest
+    }
+}
+
+/// Each page's census answer, held no longer than the page: Search asks it
+/// once per term on every page.
+final class PageImageCensusCache: @unchecked Sendable {
+    static let shared = PageImageCensusCache()
+    private let lock = NSLock()
+    private let table = NSMapTable<PDFPage, NSNumber>.weakToStrongObjects()
+
+    func value(for page: PDFPage) -> Bool? {
+        lock.lock(); defer { lock.unlock() }
+        return table.object(forKey: page)?.boolValue
+    }
+
+    func set(_ value: Bool, for page: PDFPage) {
+        lock.lock(); defer { lock.unlock() }
+        table.setObject(NSNumber(value: value), forKey: page)
     }
 }

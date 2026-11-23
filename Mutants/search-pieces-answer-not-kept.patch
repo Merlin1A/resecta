@@ -1,0 +1,18 @@
+Property: The census answer is kept per page while the page lives, and the kept answer is the one returned.
+Area: Search, the census of image content
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'PageImageCensusPiecesTests'
+Must go red: RedactionEngineTests/PageImageCensusPiecesTests keptAnswer (The census returns the answer it keeps for the page)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageImageCensus.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageImageCensus.swift
+index 629c6a6d..aabfe36f 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageImageCensus.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageImageCensus.swift
+@@ -41,7 +41,6 @@ enum PageImageCensus {
+ 
+     /// The census rule for one page, read once and kept while the page lives.
+     static func carriesImageContent(_ page: PDFPage) -> Bool {
+-        if let known = PageImageCensusCache.shared.value(for: page) { return known }
+         let answer = readCarriesImageContent(page)
+         PageImageCensusCache.shared.set(answer, for: page)
+         return answer

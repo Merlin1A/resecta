@@ -1,0 +1,19 @@
+Property: A page whose painting cannot be followed carries image content: it may be a scan stored in pieces.
+Area: Search, the census of image content
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'PageImageCensusPiecesTests'
+Must go red: RedactionEngineTests/PageImageCensusPiecesTests notFollowed (A page whose painting cannot be followed carries image content)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageImageCensus.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageImageCensus.swift
+index 629c6a6d..26a64c6b 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageImageCensus.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageImageCensus.swift
+@@ -63,7 +63,7 @@ enum PageImageCensus {
+             return false
+         }
+         let map = PagePictureMap.cached(page, cgPage: cgPage)
+-        return !map.followed || map.coversThePage
++        return map.coversThePage
+     }
+ 
+     static func textDensity(meaningfulCount: Int, cropBox: CGRect) -> Double {
