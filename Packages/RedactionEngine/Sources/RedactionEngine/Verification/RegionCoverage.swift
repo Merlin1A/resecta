@@ -199,14 +199,18 @@ struct RegionCoverage: Sendable {
         regions: [Int: [RedactionRegion]]
     ) async throws -> Outcome {
         var unread = Set<Int>()
-        // The pages' text-layer status as the import and the search read
-        // it, so a scanned or header-only page is re-run through OCR the
-        // way the search that placed its boxes ran, not through its sparse
-        // text layer.
+        // The pages' text-layer status as the search read it, so a page is
+        // re-run the way the search that placed its boxes ran: a scanned or
+        // header-only page through OCR, not through its sparse text layer,
+        // and a page whose text layer the search cannot read (garbled, or
+        // with no geometry: `unreadableForSearch`) as `.sparse` too, as the
+        // search routes it, not through the layer that holds none of its
+        // words.
         var status: [Int: TextLayerStatus] = [:]
         for index in 0..<source.document.pageCount {
             if let page = source.document.page(at: index) {
-                status[index] = TextLayerDetector.detectTextLayer(page)
+                let detected = TextLayerDetector.detectTextLayer(page)
+                status[index] = detected == .rich && TextLayerDetector.unreadableForSearch(page) ? .sparse : detected
             }
         }
         let searcher = DocumentSearcher(textLayerStatusByPage: status)

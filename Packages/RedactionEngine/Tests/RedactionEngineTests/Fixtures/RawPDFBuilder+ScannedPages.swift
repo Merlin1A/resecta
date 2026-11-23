@@ -56,4 +56,43 @@ extension TestFixtures {
         defer { try? FileManager.default.removeItem(at: url) }
         return (try? Data(contentsOf: url)) ?? Data()
     }
+
+    /// A page whose text layer Search cannot read, with its word in ink
+    /// only: `garbled` drawn as real text at the top (a few letters
+    /// repeated, the signature of an unresolved encoding), and `word` drawn
+    /// as filled glyph outlines in 60-pt Helvetica from (70, 560): no text
+    /// and no picture. The import reads the page `.rich`; Search reads it by
+    /// OCR, as it reads a garbled layer; its text layer holds no `word`.
+    static func garbledLayerOutlinedWordPDF(
+        garbled: String = String(repeating: "ababa cbcbc ", count: 6), word: String = "SEED"
+    ) -> Data {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("garbled_\(UUID().uuidString).pdf")
+        var box = CGRect(x: 0, y: 0, width: 612, height: 792)
+        let ctx = CGContext(url as CFURL, mediaBox: &box, nil)!
+        ctx.beginPDFPage(nil)
+        ctx.setFillColor(red: 0, green: 0, blue: 0, alpha: 1)
+        ctx.textMatrix = .identity
+        let headerFont = CTFontCreateWithName("Helvetica" as CFString, 12, nil)
+        let headerLine = CTLineCreateWithAttributedString(NSAttributedString(
+            string: garbled, attributes: [kCTFontAttributeName as NSAttributedString.Key: headerFont]))
+        ctx.textPosition = CGPoint(x: 72, y: 740)
+        CTLineDraw(headerLine, ctx)
+        let wordFont = CTFontCreateWithName("Helvetica" as CFString, 60, nil)
+        let characters = Array(word.utf16)
+        var glyphs = [CGGlyph](repeating: 0, count: characters.count)
+        CTFontGetGlyphsForCharacters(wordFont, characters, &glyphs, characters.count)
+        var advances = [CGSize](repeating: .zero, count: glyphs.count)
+        CTFontGetAdvancesForGlyphs(wordFont, .horizontal, glyphs, &advances, glyphs.count)
+        var x: CGFloat = 70
+        for (glyph, advance) in zip(glyphs, advances) {
+            var at = CGAffineTransform(translationX: x, y: 560)
+            if let path = CTFontCreatePathForGlyph(wordFont, glyph, &at) { ctx.addPath(path) }
+            x += advance.width
+        }
+        ctx.fillPath()
+        ctx.endPDFPage()
+        ctx.closePDF()
+        defer { try? FileManager.default.removeItem(at: url) }
+        return (try? Data(contentsOf: url)) ?? Data()
+    }
 }
