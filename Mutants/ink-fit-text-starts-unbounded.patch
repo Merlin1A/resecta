@@ -1,0 +1,17 @@
+Property: More than 16,384 lines of visible text started on one page and its painting is not followed, so the starts the map keeps and their checks against the pictures stay bounded.
+Area: ink fit (Search), which pages are fitted
+Test command: cd Packages/RedactionEngine && swift test --filter 'InkFitPiecewiseScanTests|PagePictureMapTests'
+Must go red: RedactionEngineTests/PagePictureMapTests textStartsAreBounded (More lines of visible text than the limit and the painting is not followed)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift
+@@ -307,7 +307,6 @@
+         guard state.renderMode != 3, state.renderMode != 7 else { return }
+         let origin = CGPoint(x: lineMatrix.tx, y: lineMatrix.ty).applying(state.ctm)
+         guard origin.x.isFinite, origin.y.isFinite, abs(origin.x) < 0x1p40, abs(origin.y) < 0x1p40 else { return }
+-        guard starts.count < PagePictureMap.textStartLimit else { followed = false; CGPDFScannerStop(scanner); return }
+         order += 1
+         starts.append(.init(order: order, x: Int(origin.x.rounded(.down)), y: Int(origin.y.rounded(.down))))
+     }

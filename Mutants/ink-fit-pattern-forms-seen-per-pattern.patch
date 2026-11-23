@@ -1,0 +1,18 @@
+Property: A page's tiling patterns share one record of the forms their search for a picture has looked into, so forms reached from many patterns are looked into once over the page.
+Area: ink fit (Search), which pages are fitted
+Test command: cd Packages/RedactionEngine && swift test --filter 'InkFitPiecewiseScanTests|PagePictureMapTests'
+Must go red: RedactionEngineTests/PagePictureMapTests patternStreamsReadOnce (Each pattern stream is read once however many names it has, and the patterns share one record of forms)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PagePictureMap.swift
+@@ -394,7 +394,7 @@
+         guard let dictionary = CGPDFStreamGetDictionary(stream) else { return false }
+         var resources: CGPDFDictionaryRef?
+         _ = CGPDFDictionaryGetDictionary(dictionary, "Resources", &resources)
+-        if let resources, reachesImage(resources, depth: 0, seen: seen) { return false }
++        if let resources, reachesImage(resources, depth: 0, seen: FormsSeen()) { return false }
+         let inner = CGPDFContentStreamCreateWithStream(stream, resources ?? dictionary, content)
+         defer { CGPDFContentStreamRelease(inner) }
+         return drawsInlineImage(inner) == false

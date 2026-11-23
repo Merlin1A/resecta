@@ -28,6 +28,7 @@ struct AccountOfWhatWasReadTests {
         case c13 = "C-13 a page read by recognition is counted in the qualified no-match"
         case c14 = "C-14 another app's hidden text with recognition on is read through it, and qualified"
         case c14b = "C-14b another app's hidden text with recognition off is partly read"
+        case unfollowed = "A page whose painting cannot be followed is read with that reason, not as another app's text"
         case c15 = "C-15 an empty read on a blank picture is read, and the plain no-match stays allowed"
         case c16 = "C-16 adding a page not read or partly read never gives fewer warnings"
         case c17 = "C-17 a failure after a success leaves the page not read"
@@ -51,7 +52,7 @@ struct AccountOfWhatWasReadTests {
 
     @Test("The account's rows are all here")
     func rowCount() {
-        #expect(Row.allCases.count == 28)
+        #expect(Row.allCases.count == 29)
     }
 
     @Test("Account of what was read", arguments: Row.allCases)
@@ -70,6 +71,7 @@ struct AccountOfWhatWasReadTests {
         case .c14: c14()
         case .c14b: expectPage4(of: [.ownText, .anotherAppsLayer, .picturesRequired, .recognitionOff],
                                 is: .partlyRead([.picturesNotRead, .recognitionOff]), stopsRedact: true)
+        case .unfollowed: unfollowed()
         case .c15: c15()
         case .c16: c16()
         case .c17: c17(failureFirst: false)
@@ -183,6 +185,18 @@ struct AccountOfWhatWasReadTests {
         #expect(account.summary.everyPageRead)
     }
 
+    func unfollowed() {
+        var account = Account(pageCount: 10)
+        for page in 0..<10 where page != 3 { account.record(PageSearchCoverage(pageIndex: page, route: .textLayer)) }
+        account.record(PageSearchCoverage(pageIndex: 3, route: .textLayer, pictures: .required, paintingNotFollowed: true))
+        account.record(PageSearchCoverage(pageIndex: 3, route: .ocr))
+        #expect(account.facts[3] == [.ownText, .paintingNotFollowed, .picturesRequired, .recognised])
+        #expect(account.state(ofPage: 3) == .readWherePaintingIsNotFollowed)
+        #expect(account.summary.qualifiedPages.isEmpty, "not read by recognition, and not another app's text")
+        #expect(!account.summary.plainNoMatchAllowed)
+        #expect(account.summary.everyPageRead)
+    }
+
     func c15() {
         var account = Account(pageCount: 10)
         for page in 0..<10 where page != 3 { account.record(PageSearchCoverage(pageIndex: page, route: .textLayer)) }
@@ -221,7 +235,8 @@ struct AccountOfWhatWasReadTests {
 
     // MARK: - C-16: more unread never reads as less
 
-    static let readStates: [State] = [.readFromOwnText, .readBlank, .readByRecognition, .readThroughAnotherAppsText]
+    static let readStates: [State] = [.readFromOwnText, .readBlank, .readByRecognition, .readThroughAnotherAppsText,
+                                      .readWherePaintingIsNotFollowed]
     static let unreadStates: [State] = [
         .notReachedResultLimit, .notReachedStopped, .noReport, .couldNotBeOpened,
         .recognitionFailed, .tooLarge, .recognitionOff, .recognitionFoundNoText,
@@ -258,7 +273,7 @@ struct AccountOfWhatWasReadTests {
     }
 
     /// Documents of one to four pages, each page in any of the twenty states
-    /// (the four read states, the eight not read, and partly read for each
+    /// (the five read states, the eight not read, and partly read for each
     /// reason). The second account turns one read page of the first into any
     /// unread state; a larger addition is a chain of these, and "warns of
     /// everything the first did" carries along a chain.
@@ -284,7 +299,7 @@ struct AccountOfWhatWasReadTests {
                 }
             }
         }
-        #expect(pairs == 2_127_424)
+        #expect(pairs == 3_072_800)
         #expect(failures == 0)
     }
 
@@ -311,6 +326,7 @@ struct AccountOfWhatWasReadTests {
         let p = facts.contains(.picturesRequired), s = facts.contains(.smallPictures)
         let o = facts.contains(.recognitionOff), f = facts.contains(.recognitionFailed)
         let l = facts.contains(.tooLarge), u = facts.contains(.unopenable), x = facts.contains(.patternTimedOut)
+        let w = facts.contains(.paintingNotFollowed)
         let fail = f || l || o || n
         let endedHere = place == .onTheResultLimitPage || place == .onTheStopPage
         if facts.isEmpty, place == .afterTheResultLimit { return .notReachedResultLimit }
@@ -334,6 +350,7 @@ struct AccountOfWhatWasReadTests {
             if t, p, !r, !b { reasons.insert(.picturesNotRead) }
             return .partlyRead(reasons)
         }
+        if t, w { return .readWherePaintingIsNotFollowed }
         if t, a { return .readThroughAnotherAppsText }
         if t { return .readFromOwnText }
         if r { return .readByRecognition }
@@ -344,7 +361,7 @@ struct AccountOfWhatWasReadTests {
     func c25() {
         let worsening: [Facts] = [.unopenable, .recognitionFailed, .tooLarge, .recognitionOff, .emptyReadWithInk, .patternTimedOut]
         var inputs = 0, mismatches = 0, untotal = 0, better = 0
-        for raw in 0..<(UInt16(1) << 12) {
+        for raw in 0..<(UInt16(1) << 13) {
             let facts = Facts(rawValue: raw)
             for place in Account.Position.allCases {
                 inputs += 1
@@ -356,7 +373,7 @@ struct AccountOfWhatWasReadTests {
                 }
             }
         }
-        #expect(inputs == 20_480)
+        #expect(inputs == 40_960)
         #expect(untotal == 0)
         #expect(mismatches == 0)
         #expect(better == 0)

@@ -1,0 +1,18 @@
+Property: A picture inside a tiling pattern counts as a picture the page draws, though no image census sees it.
+Area: ink fit (Search), which pages are fitted
+Test command: cd Packages/RedactionEngine && swift test --filter 'InkFitPiecewiseScanTests|PagePictureMapTests'
+Must go red: RedactionEngineTests/InkFitPiecewiseScanTests unfollowedTypedPageIsFitted (A typed page that draws a picture and whose painting cannot be followed is fitted): a picture in a tiling pattern
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
+@@ -23,7 +23,7 @@
+         let reaches = !invisible && PageImageCensus.largestImagePixelArea(of: cgPage) != nil
+         let inline = !invisible && !reaches && PageContentFacts.drawsInlineImage(cgPage)
+         // A picture inside a tiling pattern is seen by neither fact above.
+-        let patterned = !invisible && !reaches && !inline && PictureWalk.patternsHoldPicture(cgPage)
++        let patterned = false
+         let answer: Bool
+         if needsPictureMap(showsInvisibleText: invisible, largestImageIsPageScale: pageScale,
+                            reachesImage: reaches || patterned, drawsInlineImage: inline) {
