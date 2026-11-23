@@ -402,4 +402,129 @@ struct PagePictureMapTests {
         #expect(Map.inward(CGRect(x: -1e30, y: 0, width: 2e30, height: 100)) == Self.r(-l, 0, l, 100), "rounded within the limit")
         #expect(Map.coordinateLimit == 0x1p28)
     }
+
+    // MARK: - A pattern cell names what it draws
+
+    /// A tiling pattern whose cell runs `cell`, with `/Resources` as given
+    /// (none when nil), a 10-point tile.
+    static func cellPattern(_ cell: String, resources: String?) -> S.Object {
+        S.Object(dictionary: "/Type /Pattern /PatternType 1 /PaintType 1 /TilingType 1 /BBox [0 0 10 10] /XStep 10 /YStep 10"
+                    + (resources.map { " /Resources << \($0) >>" } ?? ""),
+                 stream: Data(cell.utf8))
+    }
+
+    /// A page that names a small black image `/I0` and fills a square with a
+    /// pattern whose cell draws `/I0` by name.
+    static func pageDrawingI0ThroughACell(resources: String?, fill: String = "0 0 10 10", extra: [S.Object] = []) -> Data {
+        S.document([S.Page("/Pattern cs /P0 scn \(fill) re f", resources: "/XObject << /I0 @0@ >> /Pattern << /P0 @1@ >>",
+                           objects: [dot, cellPattern("q 10 0 0 10 0 0 cm /I0 Do Q", resources: resources)] + extra)])
+    }
+
+    @Test("A pattern cell that draws an object its own resources do not name cannot be followed")
+    func cellNamesWhatItDraws() throws {
+        let cases: [(String, Data, Bool)] = [
+            ("no /Resources", Self.pageDrawingI0ThroughACell(resources: nil), true),
+            ("empty /Resources", Self.pageDrawingI0ThroughACell(resources: ""), true),
+            ("/Resources naming a font only", Self.pageDrawingI0ThroughACell(resources: "/Font << >>"), true),
+            ("/Resources naming another object", Self.pageDrawingI0ThroughACell(resources: "/XObject << /F0 @2@ >>",
+                                                                                extra: [S.form("0 0 1 1 re f", resources: "")]), true),
+            ("no /Resources, paths only", S.document([S.Page("/Pattern cs /P0 scn 0 0 10 10 re f", resources: "/XObject << /I0 @0@ >> /Pattern << /P0 @1@ >>",
+                                                             objects: [Self.dot, Self.cellPattern("0 0 5 5 re f", resources: nil)])]), false),
+            ("a form its own /Resources name, paths only", S.document([S.Page("/Pattern cs /P0 scn 0 0 10 10 re f", resources: "/Pattern << /P0 @1@ >>",
+                                                             objects: [S.form("0 0 1 1 re f", resources: ""), Self.cellPattern("/F Do", resources: "/XObject << /F @0@ >>")])]), false),
+        ]
+        for (name, data, held) in cases {
+            let (document, page, cgPage) = try #require(S.pdfPage(data))
+            defer { withExtendedLifetime(document) {} }
+            #expect(PictureWalk.patternsHoldPicture(cgPage) == held, "\(name): held")
+            #expect(Map.read(cgPage, cropBox: page.bounds(for: .cropBox)).followed == !held, "\(name): followed")
+        }
+    }
+
+    /// The darkest of 25 points over a page whose whole media box is filled
+    /// with the pattern, drawn by Core Graphics on white.
+    static func darkestDrawn(_ data: Data) throws -> UInt8 {
+        let (document, _, cgPage) = try #require(S.pdfPage(data))
+        defer { withExtendedLifetime(document) {} }
+        let box = cgPage.getBoxRect(.mediaBox)
+        let side = 100
+        let context = try #require(CGContext(data: nil, width: side, height: side, bitsPerComponent: 8, bytesPerRow: side,
+                                             space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue))
+        context.setFillColor(gray: 1, alpha: 1)
+        context.fill(CGRect(x: 0, y: 0, width: side, height: side))
+        context.scaleBy(x: CGFloat(side) / box.width, y: CGFloat(side) / box.height)
+        context.drawPDFPage(cgPage)
+        let pixels = try #require(context.data).assumingMemoryBound(to: UInt8.self)
+        var darkest: UInt8 = 255
+        for y in stride(from: 10, to: side, by: 20) { for x in stride(from: 10, to: side, by: 20) { darkest = min(darkest, pixels[y * side + x]) } }
+        return darkest
+    }
+
+    /// The platform fact the rule above was weighed against: Core Graphics
+    /// draws nothing for a cell's `Do` that its own resources do not name,
+    /// though the page names it. The rule does not rest on it (another reader
+    /// may draw it), but a change here is worth knowing.
+    @Test("Core Graphics draws a cell's object only when the cell's own resources name it")
+    func coreGraphicsDrawsOnlyNamedCellObjects() throws {
+        let fill = "0 0 612 792"
+        #expect(try Self.darkestDrawn(Self.pageDrawingI0ThroughACell(resources: "/XObject << /I0 @0@ >>", fill: fill)) < 128, "named: drawn")
+        for resources in [nil, "", "/Font << >>"] as [String?] {
+            #expect(try Self.darkestDrawn(Self.pageDrawingI0ThroughACell(resources: resources, fill: fill)) > 128, "\(resources ?? "none"): not drawn")
+        }
+    }
+
+    // MARK: - The walk's limits
+
+    @Test("Forms nested deeper than the limit in a page's resources are taken to hold a picture")
+    func resourceFormDepthIsBounded() throws {
+        for (count, held) in [(PageImageCensus.maxFormDepth - 1, false), (PageImageCensus.maxFormDepth, true)] {
+            // Form k names form k + 1 in its resources; none is drawn, none holds a pattern.
+            let objects = (0..<count).map { k in S.form("0 0 1 1 re f", resources: k + 1 < count ? "/XObject << /F @\(k + 1)@ >>" : "") }
+            let data = S.document([S.Page("0 0 1 1 re f", resources: "/XObject << /F @0@ >>", objects: objects)])
+            let (document, _, cgPage) = try #require(S.pdfPage(data))
+            defer { withExtendedLifetime(document) {} }
+            #expect(PictureWalk.patternsHoldPicture(cgPage) == held, "\(count) forms deep")
+        }
+        #expect(PageImageCensus.maxFormDepth == 8)
+    }
+
+    @Test("More forms than the limit in a page's resources are taken to hold a picture")
+    func resourceFormsAreBounded() throws {
+        for (count, held) in [(Map.formLimit, false), (Map.formLimit + 1, true)] {
+            let objects = (0..<count).map { _ in S.form("0 0 1 1 re f", resources: "") }
+            let names = (0..<count).map { "/F\($0) @\($0)@" }.joined(separator: " ")
+            let data = S.document([S.Page("0 0 1 1 re f", resources: "/XObject << \(names) >>", objects: objects)])
+            let (document, _, cgPage) = try #require(S.pdfPage(data))
+            defer { withExtendedLifetime(document) {} }
+            #expect(PictureWalk.patternsHoldPicture(cgPage) == held, "\(count) forms")
+        }
+        #expect(Map.formLimit == 1_024)
+    }
+
+    @Test("More pattern streams read than the limit are taken to hold a picture")
+    func patternsReadAreBounded() throws {
+        for (count, held) in [(Map.formLimit, false), (Map.formLimit + 1, true)] {
+            let objects = (0..<count).map { _ in Self.cellPattern("0 0 5 5 re f", resources: "") }
+            let names = (0..<count).map { "/P\($0) @\($0)@" }.joined(separator: " ")
+            let data = S.document([S.Page("0 0 1 1 re f", resources: "/Pattern << \(names) >>", objects: objects)])
+            let (document, _, cgPage) = try #require(S.pdfPage(data))
+            defer { withExtendedLifetime(document) {} }
+            #expect(PictureWalk.patternsHoldPicture(cgPage) == held, "\(count) patterns")
+        }
+    }
+
+    @Test("Patterns nested deeper than the limit are taken to hold a picture")
+    func patternDepthIsBounded() throws {
+        for (count, held) in [(PageImageCensus.maxFormDepth, false), (PageImageCensus.maxFormDepth + 1, true)] {
+            // Pattern k fills with pattern k + 1; the last has no resources and paints a path.
+            let objects = (0..<count).map { k in
+                k + 1 < count ? Self.cellPattern("/Pattern cs /Q scn 0 0 10 10 re f", resources: "/Pattern << /Q @\(k + 1)@ >>")
+                    : Self.cellPattern("0 0 5 5 re f", resources: nil)
+            }
+            let data = S.document([S.Page("0 0 1 1 re f", resources: "/Pattern << /P0 @0@ >>", objects: objects)])
+            let (document, _, cgPage) = try #require(S.pdfPage(data))
+            defer { withExtendedLifetime(document) {} }
+            #expect(PictureWalk.patternsHoldPicture(cgPage) == held, "\(count) patterns deep")
+        }
+    }
 }

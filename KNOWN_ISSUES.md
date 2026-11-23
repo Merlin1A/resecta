@@ -400,6 +400,17 @@ When the same address appears twice on one page, Scan can place a box on the fir
 
 ---
 
+### KI-50: On a Typed Page Resecta Finds It Cannot Read, the Search Re-check Can Miss a Box That Covers Its Match Only in Part (Low) <!-- LegalPhrases:safe -->
+**Affects:** Resecta 1.3.0 and 1.3.1, the Search Re-check after an export, on a typed page that Resecta finds it cannot read and that has no picture Search also reads (KI-40 gives the rule), when the search ran with Include OCR Pages on. <!-- LegalPhrases:safe -->
+
+Search reads such a page with text recognition, as it reads a scan, and places its boxes from that reading. After export, the Search Re-check runs each applied search again on the original pages and checks that the boxes cover the whole of each match. On such a page it reads the stored text instead. Where that text does not hold the word, or gives it no place on the page, the check finds no match there, counts the page as read, and does not report a box that covers its match only in part, as it does on other pages. The box itself is exported as placed; only the check is silent. On a page that also has such a picture, the check reads the page with text recognition as well and can report such a box. <!-- LegalPhrases:safe -->
+
+**Workaround:** Before you tap Redact, check that each box covers the whole of the word you searched for; where one stops short, drag its handle out over the rest of the word, or draw a box over it with Rectangle.
+
+**Fix:** 1.4.0 re-checks such a page the way Search read it: with text recognition, or, when Include OCR Pages is off, by saying that it could not read the page.
+
+---
+
 ## Fixed
 
 ### KI-8: Duplicate Regions from Multiple Scan Runs (Low) — FIXED (entry moved 2026-10-01)
