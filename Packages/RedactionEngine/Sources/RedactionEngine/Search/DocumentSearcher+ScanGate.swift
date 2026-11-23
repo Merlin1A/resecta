@@ -82,8 +82,11 @@ extension DocumentSearcher {
         return NSRange(location: end, length: 0)
     }
 
-    /// The next box kept at a surviving address match's place, taken so
-    /// that two copies at one place each get their own. A survivor the
+    /// The boxes kept at a surviving address match's place. At a real place
+    /// every box kept there is taken, united: copies placed at one
+    /// occurrence (`place`: each meets its box) have one survivor, which
+    /// stands for them all. At the stand-in past the text's end the next
+    /// box is taken, so that copies placed there each get their own. A survivor the
     /// overlap step widened (`resolveOverlaps`, `withRange`: the text kept,
     /// the range grown to its group's span) is no longer at its own place
     /// but still contains it, so where no box is kept at its exact range it
@@ -93,6 +96,10 @@ extension DocumentSearcher {
                                     from boxes: inout [AddressPlace: [TextLayerBox]]) -> TextLayerBox? {
         let key = AddressPlace(text: match.text, range: match.range)
         if var kept = boxes[key], !kept.isEmpty {
+            if key.length > 0 {
+                boxes[key] = []
+                return united(kept)
+            }
             let box = kept.removeFirst()
             boxes[key] = kept
             return box
