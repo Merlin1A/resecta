@@ -1,0 +1,19 @@
+Property: A capped re-run leaves the page it stopped on unread, whatever it compared there.
+Area: the coverage check's reading of a capped re-run
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter RegionCoverageCapAndCategoryTests
+Must go red: RedactionEngineTests/RegionCoverageCapAndCategoryTests cappedReRunLeavesItsStopPageUnread; RedactionEngineTests/RegionCoverageCapAndCategoryTests cappedReRunLeavesThePageBeforeUnread
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/RegionCoverage.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/RegionCoverage.swift
+index bc451ff6..0b6db17d 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/RegionCoverage.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/RegionCoverage.swift
+@@ -275,7 +275,7 @@ struct RegionCoverage: Sendable {
+             // own matches, so its piece there is never yielded. The searcher
+             // walks pages in order, so the pages before those were read.
+             if yielded.count >= DocumentSearcher.maxResults {
+-                unread.formUnion(candidates.filter { $0 >= lastPage - 1 })
++                unread.formUnion(candidates.filter { $0 > lastPage /* mutant: the stop page and the page before count as read */ })
+             }
+         }
+         let occurrences = occurrenceShortfalls(pieces: pieces, regions: regions)

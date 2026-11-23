@@ -188,9 +188,9 @@ struct RegionCoverage: Sendable {
     /// searcher could not read is reported in `unreadPages`, never passed
     /// by silence: the searcher's own coverage and timeout sinks say which
     /// pages it read and why it could not read one, and a re-run that
-    /// reached the searcher's result cap leaves the page it stopped on and
-    /// every later page unread. A cancellation throws:
-    /// a re-run cut short is never an outcome.
+    /// reached the searcher's result cap leaves the page before the one it
+    /// stopped on, that page and every later page unread. A cancellation
+    /// throws: a re-run cut short is never an outcome.
     static func check(
         source: SendablePDFDocument,
         requests: [SearchRecheckRequest],
@@ -269,10 +269,13 @@ struct RegionCoverage: Sendable {
             unread.formUnion(reads.unreadPages(among: candidates))
             // A re-run that reached the cap stopped part-way: the page it
             // stopped on and every page after it were not read whole, and a
-            // page never reached reports nothing to the sinks. The searcher
-            // walks pages in order, so the pages before were read.
+            // page never reached reports nothing to the sinks. The page
+            // before is not read whole either: a phrase that runs from it
+            // into the page the re-run stopped on is listed after that page's
+            // own matches, so its piece there is never yielded. The searcher
+            // walks pages in order, so the pages before those were read.
             if yielded.count >= DocumentSearcher.maxResults {
-                unread.formUnion(candidates.filter { $0 >= lastPage })
+                unread.formUnion(candidates.filter { $0 >= lastPage - 1 })
             }
         }
         let occurrences = occurrenceShortfalls(pieces: pieces, regions: regions)
