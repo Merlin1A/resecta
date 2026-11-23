@@ -5,11 +5,11 @@ Must go red: RedactionEngineTests/BoxCheckDrawingTests eachCase [D87: a trailer 
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
-index 1debada2..ed15ffed 100644
+index 70c2ca23..8c2522ef 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
-@@ -89,7 +89,7 @@ enum PageDrawingReader {
-         guard count(of: startxref, in: data) == 1, let e = data.range(of: end, options: .backwards) else { return .fileRevised }
+@@ -90,7 +90,7 @@ enum PageDrawingReader {
+         guard count(of: startxref, in: data) == 1, count(of: trailer, in: data) == 1, let e = data.range(of: end, options: .backwards) else { return .fileRevised }
          guard data[e.upperBound...].allSatisfy({ $0 == 10 || $0 == 13 }) else { return .fileRevised }
          guard let t = data.range(of: trailer, options: .backwards, in: data.startIndex..<e.lowerBound) else { return .fileRevised }
 -        let tail = nameEscapesRead(data[t.upperBound..<e.lowerBound])
