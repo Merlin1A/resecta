@@ -25,7 +25,10 @@ enum PageDrawingFixtures {
 
     static let letter = CGSize(width: 612, height: 792), a4 = CGSize(width: 595.28, height: 841.89)
     static let wide = CGSize(width: 792, height: 612)
-    static let typed = ["Jane Roe, 12 Main Street", "Account 4417 1234 5678 9113", "Phone 555 0100"]
+    /// The last line is kept, below the box, and holds the words the file check counts, so an
+    /// export that carries them in its text is shown to be admitted.
+    static let typed = ["Jane Roe, 12 Main Street", "Account 4417 1234 5678 9113", "Phone 555 0100",
+                        "Read the trailer, startxref and %%EOF"]
     /// Lines the hidden text layer writes, refuses or splits by face.
     static let mixed = ["office affine fine flow", "東京都 新宿区 テスト 한국어", "Zoë Ångström naïve café", "call me 😀 ✅ ☎︎", "עברית العربية"]
 
