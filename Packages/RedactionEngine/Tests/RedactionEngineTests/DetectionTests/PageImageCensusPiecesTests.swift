@@ -121,6 +121,19 @@ struct PageImageCensusPiecesTests {
         return S.document([S.Page(S.typedText + visibleFiller, resources: "/Pattern << /T1 @1@ >>", objects: [tile, pattern])])
     }
 
+    /// A typed letter that names a small logo (an image object) and fills a
+    /// box with a pattern whose cell has no /Resources: with `drawn`, the
+    /// cell draws the logo by the page's name for it; else it paints a path
+    /// and the logo is never painted.
+    static func letterWithCellDrawingTheLogo(drawn: Bool) -> Data {
+        let logo = S.image(S.shade(width: 120, height: 60))
+        let cell = drawn ? "q 200 0 0 100 0 0 cm /Lg Do Q" : "0 0 200 100 re f"
+        let pattern = S.Object(dictionary: "/Type /Pattern /PatternType 1 /PaintType 1 /TilingType 1 /BBox [0 0 200 100] /XStep 200 /YStep 100",
+                               stream: Data(cell.utf8))
+        return S.document([S.Page(patternFill + S.typedText + visibleFiller, resources: "/XObject << /Lg @0@ >> /Pattern << /T1 @1@ >>",
+                                  objects: [logo, pattern])])
+    }
+
     /// A page with no picture that shows the builder's lines in an invisible
     /// mode and starts more lines of visible text than the map follows.
     static func invisibleTextPastTheStartLimit() -> Data {
@@ -187,12 +200,19 @@ struct PageImageCensusPiecesTests {
             + [Row(name: "C22 a letter whose pattern holds a picture it never paints", data: Self.letterWithUnusedPattern(), carries: false)])
     }
 
+    @Test("A letter whose logo is drawn only by a pattern cell that does not name it carries image content")
+    func cellDrawingWhatItDoesNotName() throws {
+        try Self.check([Row(name: "C24 a cell with no resources draws the page's logo by name", data: Self.letterWithCellDrawingTheLogo(drawn: true), carries: true),
+                        Row(name: "C25 the same letter whose cell paints a path", data: Self.letterWithCellDrawingTheLogo(drawn: false), carries: false)])
+    }
+
     @Test("The census and the fit's gate agree on pictures held in patterns")
     func censusAgreesWithTheGate() throws {
         let pages: [(String, Data)] = [("C17", Self.letterWithPatternFill(logo: true)), ("C18", Self.letterWithPatternFill(logo: false)),
-                                       ("C22", Self.letterWithUnusedPattern())]
+                                       ("C22", Self.letterWithUnusedPattern()), ("C24", Self.letterWithCellDrawingTheLogo(drawn: true)),
+                                       ("C25", Self.letterWithCellDrawingTheLogo(drawn: false))]
             + Nested.allCases.flatMap { [("C20 \($0)", Self.letterWithNestedPattern($0)), ("C21 \($0)", Self.letterWithNestedPattern($0, picture: false))] }
-        #expect(pages.count == 9)
+        #expect(pages.count == 11)
         for (name, data) in pages {
             let (document, page, cgPage) = try #require(S.pdfPage(data))
             defer { withExtendedLifetime(document) {} }

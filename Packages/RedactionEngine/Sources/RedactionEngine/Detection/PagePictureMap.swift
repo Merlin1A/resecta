@@ -436,7 +436,40 @@ final class PictureWalk {
         if let resources, reachesPicture(resources, content: content, depth: depth, seen: seen) { return false }
         let inner = CGPDFContentStreamCreateWithStream(stream, resources ?? dictionary, content)
         defer { CGPDFContentStreamRelease(inner) }
-        return drawsInlineImage(inner) == false
+        return cellDrawsOnlyWhatItNames(inner, resources: resources) == true
+    }
+
+    /// Whether a pattern cell draws no inline image and draws by `Do` only
+    /// objects its own /Resources /XObject names; nil when it cannot be read.
+    /// Core Graphics draws nothing for a `Do` the cell's own resources do not
+    /// name (macOS 27.2), but a reader that looks the name up in the
+    /// enclosing resources would draw it, so such a cell cannot be followed.
+    static func cellDrawsOnlyWhatItNames(_ content: CGPDFContentStreamRef, resources: CGPDFDictionaryRef?) -> Bool? {
+        final class Cell { var named: CGPDFDictionaryRef?; var other = false }
+        let cell = Cell()
+        var named: CGPDFDictionaryRef?
+        if let resources, CGPDFDictionaryGetDictionary(resources, "XObject", &named) { cell.named = named }
+        guard let table = CGPDFOperatorTableCreate() else { return nil }
+        defer { CGPDFOperatorTableRelease(table) }
+        CGPDFOperatorTableSetCallback(table, "EI") { scanner, info in
+            guard let info else { return }
+            Unmanaged<Cell>.fromOpaque(info).takeUnretainedValue().other = true
+            CGPDFScannerStop(scanner)
+        }
+        CGPDFOperatorTableSetCallback(table, "Do") { scanner, info in
+            guard let info else { return }
+            let cell = Unmanaged<Cell>.fromOpaque(info).takeUnretainedValue()
+            var name: UnsafePointer<CChar>?
+            var object: CGPDFObjectRef?
+            if CGPDFScannerPopName(scanner, &name), let name, let named = cell.named,
+               CGPDFDictionaryGetObject(named, name, &object) { return }
+            cell.other = true
+            CGPDFScannerStop(scanner)
+        }
+        let scanner = CGPDFScannerCreate(content, table, Unmanaged.passUnretained(cell).toOpaque())
+        defer { CGPDFScannerRelease(scanner) }
+        let read = CGPDFScannerScan(scanner)
+        return cell.other ? false : (read ? true : nil)
     }
 
     /// The forms and patterns one page's search for a picture has looked into.
