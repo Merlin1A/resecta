@@ -122,7 +122,9 @@ struct CanvasPageFrameTests {
         coordinator.publishPageFrames()
         let frames = state.canvasPageFrames, count = coordinator.pageFramePublishCount
         #expect(state.canvasPageIndices == [0])
-        view.go(to: try #require(view.document?.page(at: 1)))
+        // The editor's page change (PDFDocumentView.updateUIView): iOS 27's
+        // bare go(to:) refits a zoomed-in page, so the zoom would not hold.
+        view.goKeepingZoom(to: try #require(view.document?.page(at: 1)))
         view.layoutIfNeeded()
         await settle(until: { state.canvasPageIndices == [1] })
         #expect(state.canvasPageFrames == frames, "precondition: the zoomed page fills the canvas, so its rectangle is the same")
