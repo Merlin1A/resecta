@@ -15,7 +15,7 @@ import PDFKit
 // within `shareSlack`, since the store map need not carry a full side
 // through exactly when the page's corner is not the canvas's.
 // The pages are BoxPlaceCheckTests' own: 5 is A4 at 0°, 6 A4 at 90°,
-// 7 the 401.123 x 577.777 crop at 270°.
+// 7 the 401.123 x 577.777 crop at 270°, 9 the same crop at 180°.
 
 /// A touch at a point in the overlay's own points.
 private final class CanvasTouch: UITouch {
@@ -32,7 +32,7 @@ private final class CanvasTouch: UITouch {
 @MainActor
 struct WholePageFitTests {
 
-    nonisolated static let pages = [5, 6, 7]
+    nonisolated static let pages = [5, 6, 7, 9]
     typealias Canvas = BoxPlaceCheckTests.Canvas
 
     /// A finger from `start` to `end`, in the overlay's points, in four steps.
@@ -76,25 +76,24 @@ struct WholePageFitTests {
         let far = c.overlay.pdfNormalizedToOverlay(try #require(c.state.regions[pageIndex]?.last?.normalizedRect))
         #expect(abs(far.maxX - p.maxX) < 1e-9 && abs(far.maxY - p.maxY) < 1e-9,
                 "the band reached the page's far corner on the canvas: \(far) in \(p)")
-        Self.gesture(c, from: mid, to: CGPoint(x: p.minX - 60, y: p.minY - 60))
+        // The second band starts an eighth of the page short of the middle,
+        // so its far corner, where its handle is touched below, does not sit
+        // on the first box's edge.
+        Self.gesture(c, from: CGPoint(x: p.midX - p.width / 8, y: p.midY - p.height / 8),
+                     to: CGPoint(x: p.minX - 60, y: p.minY - 60))
         Self.onThePage(c, "a draw past the near corner")
         c.overlay.isDrawingMode = false
         let ids = try #require(c.state.regions[pageIndex]?.map(\.id))
         try #require(ids.count == 2, "both draws stored a box")
-        // A move, held at the far edges, then at the near ones.
         func centre(_ id: UUID) throws -> CGPoint {
             let r = try #require(c.state.regions[pageIndex]?.first { $0.id == id }?.normalizedRect)
             let shown = c.overlay.pdfNormalizedToOverlay(r)
             return CGPoint(x: shown.midX, y: shown.midY)
         }
-        Self.select(c, [ids[0]])
-        var at = try centre(ids[0])
-        Self.gesture(c, from: at, to: CGPoint(x: at.x + 2000, y: at.y + 2000))
-        Self.onThePage(c, "a move past the far edges")
-        at = try centre(ids[0])
-        Self.gesture(c, from: at, to: CGPoint(x: at.x - 2000, y: at.y - 2000))
-        Self.onThePage(c, "a move past the near edges")
-        // A resize by its bottom-right handle, past the far edges.
+        // A resize of the second box by its bottom-right handle, past the far
+        // edges, before any move: its far corner then lies inside no other
+        // box (a selected box's handle gives way to a box that holds the
+        // touch).
         Self.select(c, [ids[1]])
         let box = c.overlay.pdfNormalizedToOverlay(
             try #require(c.state.regions[pageIndex]?.first { $0.id == ids[1] }?.normalizedRect))
@@ -102,6 +101,16 @@ struct WholePageFitTests {
         try #require(c.overlay.hitTestResizeHandle(at: corner) != nil, "the touch lands on a handle")
         Self.gesture(c, from: corner, to: CGPoint(x: corner.x + 2000, y: corner.y + 2000))
         Self.onThePage(c, "a resize past the far edges")
+        // A move of the first box, held at the far edges, then at the near
+        // ones. Its centre lies in the resized box too, and a touch goes to
+        // the smaller box: the first.
+        Self.select(c, [ids[0]])
+        var at = try centre(ids[0])
+        Self.gesture(c, from: at, to: CGPoint(x: at.x + 2000, y: at.y + 2000))
+        Self.onThePage(c, "a move past the far edges")
+        at = try centre(ids[0])
+        Self.gesture(c, from: at, to: CGPoint(x: at.x - 2000, y: at.y - 2000))
+        Self.onThePage(c, "a move past the near edges")
         // A group move, past the far edges, then the near ones.
         Self.select(c, Set(ids))
         at = try centre(ids[0])
@@ -152,6 +161,30 @@ struct WholePageFitTests {
         #expect(!RedactionState.isWholePage(CGRect(x: 0, y: 0, width: 0.5, height: 1)))
     }
 
+    /// The exact comparisons with the unit square in `text`, comment lines
+    /// skipped and spaces dropped: `==` or `!=` on either side of the unit
+    /// square however it is spelt (CGRect or `.init`, x/y/width/height or
+    /// origin and size, whole or decimal), and a side compared exactly with 1.
+    static func exactUnitSquareComparisons(_ text: String) -> [String] {
+        let code = text.split(separator: "\n", omittingEmptySubsequences: false)
+            .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+            .joined(separator: "\n")
+            .replacingOccurrences(of: " ", with: "")
+        let zero = "0(\\.0+)?", one = "1(\\.0+)?"
+        let square = "(CGRect|\\.init)\\((x:\(zero),y:\(zero),width:\(one),height:\(one)"
+            + "|origin:(\\.zero|CGPoint\\(x:\(zero),y:\(zero)\\)),size:CGSize\\(width:\(one),height:\(one)\\))\\)"
+        let patterns = [
+            "(==|!=)\(square)", "\(square)(==|!=)",
+            "\\.(width|height|size)(==|!=)(\(one)|CGSize\\(width:\(one),height:\(one)\\))(?![0-9.])",
+            "(?<![0-9.])\(one)(==|!=)[A-Za-z_][A-Za-z0-9_.]*\\.(width|height)\\b",
+        ]
+        return patterns.flatMap { pattern -> [String] in
+            guard let re = try? NSRegularExpression(pattern: pattern) else { return ["bad pattern \(pattern)"] }
+            return re.matches(in: code, range: NSRange(code.startIndex..., in: code))
+                .compactMap { Range($0.range, in: code).map { String(code[$0]) } }
+        }
+    }
+
     @Test("No exact comparison with the unit square is left in the app's sources")
     func noExactUnitSquareComparison() throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
@@ -161,8 +194,31 @@ struct WholePageFitTests {
         try #require(files.count > 100, "the app's sources were read (\(files.count) files)")
         for file in files {
             let text = try String(contentsOf: file, encoding: .utf8)
-            #expect(!text.contains("== CGRect(x: 0, y: 0, width: 1, height: 1)"),
-                    "\(file.lastPathComponent) compares a share with the unit square exactly")
+            let found = Self.exactUnitSquareComparisons(text)
+            #expect(found.isEmpty, "\(file.lastPathComponent) compares a share with the unit square exactly: \(found)")
         }
+    }
+
+    @Test("The source pin reads each spelling of an exact unit-square comparison, and leaves the literal that makes the mark")
+    func sourcePinFindsEachSpelling() {
+        let caught = [
+            "r == CGRect(x: 0, y: 0, width: 1, height: 1)",
+            "CGRect(x: 0, y: 0, width: 1, height: 1) == r",
+            "r != .init(x: 0, y: 0, width: 1, height: 1)",
+            "r == CGRect(x: 0.0, y: 0.0, width: 1.0, height: 1.0)",
+            "r == CGRect(origin: .zero, size: CGSize(width: 1, height: 1))",
+            "r.size == CGSize(width: 1, height: 1)",
+            "if r.width == 1 && r.height == 1 {",
+            "1 == region.normalizedRect.width",
+        ]
+        for line in caught { #expect(!Self.exactUnitSquareComparisons(line).isEmpty, "\(line)") }
+        let left = [
+            "let mark = CGRect(x: 0, y: 0, width: 1, height: 1)",
+            "// r == CGRect(x: 0, y: 0, width: 1, height: 1)",
+            "if r.width == 12 {",
+            "if r.width == 1.5 {",
+            "RedactionState.isWholePage(r)",
+        ]
+        for line in left { #expect(Self.exactUnitSquareComparisons(line).isEmpty, "\(line)") }
     }
 }

@@ -51,6 +51,7 @@ struct BoxPlaceCheckTests {
         PageCase(media: a4, rotation: 90, crop: nil),
         PageCase(media: letter, rotation: 270, crop: CGRect(x: 12.345, y: 67.891, width: 401.123, height: 577.777)),
         PageCase(media: CGRect(x: 0, y: 0, width: 5000, height: 3000), rotation: 0, crop: nil),
+        PageCase(media: letter, rotation: 180, crop: CGRect(x: 12.345, y: 67.891, width: 401.123, height: 577.777)),
     ]
 
     static func document() throws -> PDFDocument {

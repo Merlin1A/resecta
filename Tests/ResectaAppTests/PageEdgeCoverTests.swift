@@ -12,13 +12,14 @@ import PDFKit
 // short of the page's edge by the rounding, and the strip between is never
 // covered. The gestures hold a box at the page's own rectangle on the
 // canvas (`pageRectOnCanvas`) instead. The pages are BoxPlaceCheckTests'
-// own: 5 is A4 at 0°, 6 A4 at 90°, 7 the 401.123 x 577.777 crop at 270°.
+// own: 5 is A4 at 0°, 6 A4 at 90°, 7 the 401.123 x 577.777 crop at 270°,
+// 9 the same crop at 180°.
 
 @Suite("A box pushed past a page edge covers that edge")
 @MainActor
 struct PageEdgeCoverTests {
 
-    nonisolated static let pages = [5, 6, 7]
+    nonisolated static let pages = [5, 6, 7, 9]
     typealias Canvas = BoxPlaceCheckTests.Canvas
     /// How near, in the canvas's points, a pushed side must come to the page's edge.
     static let reach: CGFloat = 1e-6
@@ -111,6 +112,26 @@ struct PageEdgeCoverTests {
             box = try Self.shown(c, id)
             Self.push(c, at: CGPoint(x: box.midX, y: box.midY), by: 2000, 2000)
             Self.reaches(c, try Self.shown(c, id), far: true, "a move past the far corner")
+        }
+        // A group of two boxes side by side, moved past the near corner,
+        // then past the far one: the group's union reaches each edge.
+        try Self.onFreshCanvas(pageIndex) { c, p in
+            let dx = p.width / 16, dy = p.height / 16
+            BoxPlaceCheckTests.drag(c, from: Self.onWindow(c, CGPoint(x: p.midX - 3 * dx, y: p.midY - dy)),
+                                    to: Self.onWindow(c, CGPoint(x: p.midX - dx, y: p.midY + dy)))
+            BoxPlaceCheckTests.drag(c, from: Self.onWindow(c, CGPoint(x: p.midX + dx, y: p.midY - dy)),
+                                    to: Self.onWindow(c, CGPoint(x: p.midX + 3 * dx, y: p.midY + dy)))
+            c.overlay.isDrawingMode = false
+            let ids = try #require(c.state.regions[pageIndex]?.map(\.id))
+            try #require(ids.count == 2, "both draws stored a box")
+            for far in [false, true] {
+                WholePageFitTests.select(c, Set(ids))
+                let first = try Self.shown(c, ids[0]), at = CGPoint(x: first.midX, y: first.midY)
+                let push: CGFloat = far ? 2000 : -2000
+                WholePageFitTests.gesture(c, from: at, to: CGPoint(x: at.x + push, y: at.y + push))
+                let union = try Self.shown(c, ids[0]).union(try Self.shown(c, ids[1]))
+                Self.reaches(c, union, far: far, far ? "a group move past the far corner" : "a group move past the near corner")
+            }
         }
         // A resize of a middle box by its far handle, then by its near one.
         try Self.onFreshCanvas(pageIndex) { c, p in
