@@ -225,8 +225,8 @@ extension PageRasterizer {
         // takes the ink check in place of growth. A box the check cannot
         // judge (no inputs, or `indeterminate`) is painted as at "as placed",
         // growth and all: the check only ever adds paint. A judged box keeps
-        // its regions' own fills too, so no box paints less than the region
-        // path did.
+        // its "as placed" paint too, its regions' own fills and growth
+        // included, so no box paints less than it would at "as placed".
         var rects: [(box: Int, rect: CGRect)] = []
         var painted = Set<UUID>()
         var verdicts: [Int: InkCheck.Verdict] = [:]
@@ -239,6 +239,19 @@ extension PageRasterizer {
                 guard let region = regionsByID[id] else { continue }
                 let filled = normalizedToFillPixels(region.normalizedRect, content: content).intersection(bitmap)
                 if !filled.isEmpty { rect = rect.union(filled) }
+            }
+            return rect
+        }
+        // A box's paint at "as placed": its projection, its regions' own
+        // fills, and its growth over the ink that crosses its edge.
+        func asPlacedRect(_ box: PaintedBox, grows: Bool) throws -> CGRect? {
+            guard let projection = PixelPlan.project(
+                inner: box.inner, paint: box.paint,
+                limitAbove: box.limitAbove, limitBelow: box.limitBelow, raster: raster) else { return nil }
+            var rect = withRegionFills(projection.painted.bitmapRect, of: box)
+            if grows,
+               let grown = try inkGrowthRect(context: ctx, fillRect: projection.marginEdge.bitmapRect) {
+                rect = rect.union(grown)
             }
             return rect
         }
@@ -262,7 +275,9 @@ extension PageRasterizer {
                                limitBelow: checked.limitBelow, raster: raster) {
                             verdicts[index] = verdict
                             if checked.inkEnlargedCovered || checked.inkEnlargedToCap { widened.insert(index) }
-                            rects.append((index, withRegionFills(projection.painted.bitmapRect, of: box)))
+                            var rect = withRegionFills(projection.painted.bitmapRect, of: box)
+                            if let floor = try asPlacedRect(box, grows: grows) { rect = rect.union(floor) }
+                            rects.append((index, rect))
                             painted.formUnion(box.regionIDs)
                             continue
                         }
@@ -271,16 +286,8 @@ extension PageRasterizer {
                 // Not judged: painted as at "as placed", below.
                 verdicts[index] = .indeterminate
             }
-            guard let projection = PixelPlan.project(
-                inner: box.inner, paint: box.paint,
-                limitAbove: box.limitAbove, limitBelow: box.limitBelow, raster: raster) else { continue }
-            var rect = projection.painted.bitmapRect
-            rect = withRegionFills(rect, of: box)
+            guard let rect = try asPlacedRect(box, grows: grows) else { continue }
             painted.formUnion(box.regionIDs)
-            if grows,
-               let grown = try inkGrowthRect(context: ctx, fillRect: projection.marginEdge.bitmapRect) {
-                rect = rect.union(grown)
-            }
             rects.append((index, rect))
         }
         let strays = page.regions.filter { !painted.contains($0.id) }

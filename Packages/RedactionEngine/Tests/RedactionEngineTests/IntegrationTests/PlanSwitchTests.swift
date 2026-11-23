@@ -27,7 +27,8 @@ struct PlanSwitchTests {
                        CGRect(x: 100, y: 40, width: 10, height: 8),
                        CGRect(x: 130, y: 40, width: 20, height: 8)]
     /// Each box's rectangle in points, and its regions' rectangles.
-    static let boxes: [(rect: CGRect, regions: [CGRect], search: Bool)] = [
+    typealias Box = (rect: CGRect, regions: [CGRect], search: Bool)
+    static let boxes: [Box] = [
         (CGRect(x: 36, y: 38, width: 22, height: 12), [CGRect(x: 36, y: 38, width: 22, height: 12)], true),
         (CGRect(x: 96, y: 38, width: 18, height: 12), [CGRect(x: 96, y: 38, width: 18, height: 12)], true),
         (CGRect(x: 126, y: 38, width: 28, height: 12),
@@ -35,7 +36,7 @@ struct PlanSwitchTests {
         (CGRect(x: 160, y: 38, width: 40, height: 12), [CGRect(x: 160, y: 38, width: 40, height: 12)], false),
     ]
 
-    static func pdf() -> Data {
+    static func pdf(bars: [CGRect] = bars) -> Data {
         let stream = "BT /F1 12 Tf 10 100 Td (Ordinary twelve point line) Tj ET 0 g "
             + bars.map { "\($0.minX) \($0.minY) \($0.width) \($0.height) re f" }.joined(separator: " ")
         let objects = [
@@ -94,8 +95,9 @@ struct PlanSwitchTests {
     /// Each Search box is marked checkable, as the plan marks one placed from
     /// typed text, except those in `uncheckable` (as for a box placed from
     /// the page's picture).
-    static func run(source: PlanSource, inputsFor: Set<Int>, uncheckable: Set<Int> = []) async throws -> Run {
-        let doc = try #require(PDFDocument(data: pdf()))
+    static func run(source: PlanSource, inputsFor: Set<Int>, uncheckable: Set<Int> = [],
+                    bars: [CGRect] = bars, boxes: [Box] = boxes) async throws -> Run {
+        let doc = try #require(PDFDocument(data: pdf(bars: bars)))
         defer { withExtendedLifetime(doc) {} }
         let page = try #require(doc.page(at: 0))
         var regions: [RedactionRegion] = []
@@ -229,5 +231,58 @@ struct PlanSwitchTests {
         for i in 0...3 { #expect(try handed.reported(i) == bare.reported(i), "box \(i)") }
         #expect(handed.result.fallbackReason == nil)
         #expect((handed.result.pageOutput.textLayerEntries?.count ?? 0) > 0)
+    }
+
+    // MARK: - A judged box never paints less than as placed
+
+    /// Letters 6 pt wide with 1 pt between them, from `x0` to `x1` on rows
+    /// 40-48 pt, each tied to the next by a 1 pt bridge at its top and its
+    /// bottom by turns: one piece of ink that no straight run follows far.
+    static func letters(_ x0: CGFloat, _ x1: CGFloat) -> [CGRect] {
+        var out: [CGRect] = [], x = x0, i = 0
+        while x < x1 {
+            let right = min(x + 6, x1)
+            out.append(CGRect(x: x, y: 40, width: right - x, height: 8))
+            if right + 1 < x1 { out.append(CGRect(x: right, y: i % 2 == 0 ? 47 : 40, width: 1, height: 1)) }
+            x = right + 1
+            i += 1
+        }
+        return out
+    }
+
+    /// One Search box at 36-58 pt across a 12 pt line, whose ink to the right
+    /// sets what the check reads. At 300 dpi the box is painted to pixel
+    /// 248, the 8 px block line that encloses 58 pt; its margin's edge, where
+    /// growth starts, is pixel 243. A bar inside the box; a bar to 60.2 pt,
+    /// 3 px past the paint (inside the 1 pt allowance, 4.17 px);
+    /// a bar 12 pt past; letters 62 pt past (past the 24 pt cap); a bar that
+    /// only starts at the box's right edge (under 1 % of the box is ink).
+    /// Growth at "as placed" follows the ink that crosses the edge up to 3 pt
+    /// out, so on the residual and the absent page the judged rectangle
+    /// alone would paint less.
+    static let judgedPages: [(verdict: InkCheck.Verdict, ink: [CGRect])] = [
+        (.clear, [CGRect(x: 40, y: 40, width: 14, height: 8)]),
+        (.residual, [CGRect(x: 40, y: 40, width: 20.2, height: 8)]),
+        (.escaped, [CGRect(x: 40, y: 40, width: 30, height: 8)]),
+        (.pastCap, letters(40, 120)),
+        (.absent, [CGRect(x: 57.9, y: 40, width: 30, height: 8)]),
+    ]
+
+    @Test("A judged box paints at least its \"as placed\" paint, growth included, for each verdict",
+          arguments: judgedPages.map(\.verdict))
+    func judgedBoxKeepsTheAsPlacedPaint(verdict: InkCheck.Verdict) async throws {
+        let ink = try #require(Self.judgedPages.first { $0.verdict == verdict }).ink
+        let box: Box = (CGRect(x: 36, y: 38, width: 22, height: 12), [CGRect(x: 36, y: 38, width: 22, height: 12)], true)
+        let judged = try await Self.run(source: .switchPolicy, inputsFor: [0], bars: ink, boxes: [box])
+        let placed = try await Self.run(source: .asPlaced, inputsFor: [], bars: ink, boxes: [box])
+        #expect(judged.result.inkVerdicts[0] == verdict)
+        let j = try judged.reported(0), a = try placed.reported(0)
+        #expect(j.minX <= a.minX && j.minY <= a.minY && j.maxX >= a.maxX && j.maxY >= a.maxY,
+                "judged \(j) does not hold as placed \(a)")
+        // The pixels the page as placed fills are filled on the judged page too.
+        #expect(judged.bitmap.misses(a, level: 0) == 0)
+        if verdict == .residual || verdict == .absent {
+            #expect(a != (try placed.projection(0)), "growth reaches past the box on this page")
+        }
     }
 }
