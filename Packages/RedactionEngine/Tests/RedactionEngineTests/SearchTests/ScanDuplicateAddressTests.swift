@@ -26,6 +26,29 @@ struct ScanDuplicateAddressTests {
         ContentGlyphScanTests.points(hit.normalizedRect).intersects(copy)
     }
 
+    /// Whether the hit's box holds both lines of the copy whose street line
+    /// sits at `top` - 9: a point inside each line, not only some overlap.
+    static func coversBothLines(_ hit: SearchResult, top: CGFloat) -> Bool {
+        let box = ContentGlyphScanTests.points(hit.normalizedRect)
+        return box.contains(CGPoint(x: 100, y: top - 5)) && box.contains(CGPoint(x: 100, y: top - 19))
+    }
+
+    /// The same one-line address twice, at y 700 and 500. With `above`, a
+    /// street line at x 300, y 520 (not aligned with the copy, so not joined
+    /// to it) starts the address pattern's match on the line above the
+    /// lower copy, and the overlap step widens the lower copy over it.
+    /// Written without commas: the text leg's lines drop them, and only an
+    /// address whose text is in the page's text word for word gets a place
+    /// there (with commas it goes to the sentinel and meets no other match).
+    static let oneLine = "1234 Main Street Springfield IL 62704"
+    static func oneLinePage(above: Bool) throws -> PDFDocument {
+        var lines = [line(72, 700, oneLine)]
+        if above { lines.append(line(300, 520, "55 Oak Avenue")) }
+        lines.append(line(72, 500, oneLine))
+        return try ContentGlyphWalkTests.document(lines.joined(separator: "\n"))
+    }
+    static func oneLineAt(_ baseline: CGFloat) -> CGRect { CGRect(x: 90, y: baseline + 2, width: 40, height: 4) }
+
     @Test("Two copies drawn in order: each assembled address is boxed on its own copy")
     func stackedCopiesEachOnTheirOwnLines() async throws {
         let hits = await ContentGlyphScanTests.scan(try Self.page(cityFirst: false))
@@ -35,6 +58,8 @@ struct ScanDuplicateAddressTests {
                 "one on the upper copy: \(assembled.map { ContentGlyphScanTests.points($0.normalizedRect) })")
         #expect(assembled.filter { Self.covers($0, Self.copy(top: 509)) }.count == 1,
                 "one on the lower copy: \(assembled.map { ContentGlyphScanTests.points($0.normalizedRect) })")
+        #expect(assembled.contains { Self.coversBothLines($0, top: 709) } && assembled.contains { Self.coversBothLines($0, top: 509) },
+                "each copy's box holds both its lines: \(assembled.map { ContentGlyphScanTests.points($0.normalizedRect) })")
     }
 
     @Test("On the picture leg too, two copies drawn in order: each assembled address is boxed on its own copy")
@@ -49,6 +74,30 @@ struct ScanDuplicateAddressTests {
                 "each assembled address sits on one copy: \(at)")
         #expect(assembled.contains { Self.covers($0, upper) }, "the upper copy has its own: \(at)")
         #expect(assembled.contains { Self.covers($0, lower) }, "the lower copy has its own: \(at)")
+        #expect(assembled.contains { Self.coversBothLines($0, top: 709) } && assembled.contains { Self.coversBothLines($0, top: 509) },
+                "each copy's box holds both its lines: \(at)")
+    }
+
+    @Test("On the picture leg, a one-line address twice is placed at each copy's own line: one result each")
+    func oneLineCopiesPlacedOnThePictureLeg() async throws {
+        let doc = try Self.oneLinePage(above: false)
+        let page = try #require(doc.page(at: 0))
+        let hits = await DocumentSearcher()._testScanPagePIIViaOCR(page: SendablePDFPage(page), pageIndex: 0, categories: [.address])
+        let at = hits.map { "\($0.matchedText.debugDescription) \(ContentGlyphScanTests.points($0.normalizedRect))" }
+        // Placed at its own line, each copy meets the pattern's match there
+        // and the two are one result; placed at the sentinel, each would
+        // stand beside the pattern's match as a second result.
+        #expect(hits.filter { Self.covers($0, Self.oneLineAt(700)) }.count == 1, "one result on the upper copy: \(at)")
+        #expect(hits.filter { Self.covers($0, Self.oneLineAt(500)) }.count == 1, "one result on the lower copy: \(at)")
+    }
+
+    @Test("A copy the overlap step widens over the line above is still boxed on its own line")
+    func widenedCopyIsBoxedOnItsOwnLine() async throws {
+        let hits = await ContentGlyphScanTests.scan(try Self.oneLinePage(above: true))
+        let at = hits.map { "\($0.matchedText.debugDescription) \(ContentGlyphScanTests.points($0.normalizedRect))" }
+        #expect(hits.contains { Self.covers($0, Self.oneLineAt(700)) }, "the upper copy is boxed: \(at)")
+        #expect(hits.contains { $0.matchedText == Self.oneLine && Self.covers($0, Self.oneLineAt(500)) },
+                "the lower copy's own result is boxed on the lower copy: \(at)")
     }
 
     @Test("Two copies drawn ZIP line first: the lower copy's ZIP line has a box of its own")
@@ -86,5 +135,30 @@ struct ScanDuplicateAddressTests {
         #expect(DocumentSearcher.takeBox(for: match, from: &boxes)?.rect == upper.rect)
         #expect(DocumentSearcher.takeBox(for: match, from: &boxes)?.rect == lower.rect)
         #expect(DocumentSearcher.takeBox(for: match, from: &boxes) == nil, "two boxes, two takes")
+    }
+
+    @Test("A survivor widened over two copies' places takes both their boxes, and no stand-in's")
+    func widenedSurvivorTakesEveryBoxInside() {
+        let text = "1 Main St, IL 62704"
+        let upper = DocumentSearcher.TextLayerBox(rect: CGRect(x: 0.1, y: 0.8, width: 0.2, height: 0.02), textLayerRect: nil)
+        let lower = DocumentSearcher.TextLayerBox(rect: CGRect(x: 0.1, y: 0.7, width: 0.2, height: 0.02), textLayerRect: nil)
+        let standIn = DocumentSearcher.TextLayerBox(rect: CGRect(x: 0.6, y: 0.1, width: 0.2, height: 0.02), textLayerRect: nil)
+        let other = DocumentSearcher.TextLayerBox(rect: CGRect(x: 0.6, y: 0.5, width: 0.2, height: 0.02), textLayerRect: nil)
+        var boxes: [DocumentSearcher.AddressPlace: [DocumentSearcher.TextLayerBox]] = [
+            DocumentSearcher.AddressPlace(text: text, range: NSRange(location: 20, length: 19)): [upper],
+            DocumentSearcher.AddressPlace(text: text, range: NSRange(location: 40, length: 19)): [lower],
+            DocumentSearcher.AddressPlace(text: text, range: NSRange(location: 200, length: 0)): [standIn],
+            DocumentSearcher.AddressPlace(text: "9 Elm St, IL 62704", range: NSRange(location: 45, length: 5)): [other],
+        ]
+        // The overlap step's survivor: the same text, its range widened from
+        // its own place over both copies' places.
+        let widened = PIIDetector.PIIMatch(text: text, range: NSRange(location: 5, length: 54), kind: .address, confidence: 0.8)
+        let box = DocumentSearcher.takeBox(for: widened, from: &boxes)
+        #expect(box?.rect == upper.rect.union(lower.rect), "both copies' boxes, united: \(String(describing: box?.rect))")
+        #expect(DocumentSearcher.takeBox(for: widened, from: &boxes) == nil, "each box is taken once")
+        let atStandIn = PIIDetector.PIIMatch(text: text, range: NSRange(location: 200, length: 0), kind: .address, confidence: 0.8)
+        #expect(DocumentSearcher.takeBox(for: atStandIn, from: &boxes)?.rect == standIn.rect, "the stand-in's box is left to its own match")
+        let elsewhere = PIIDetector.PIIMatch(text: "9 Elm St, IL 62704", range: NSRange(location: 45, length: 5), kind: .address, confidence: 0.8)
+        #expect(DocumentSearcher.takeBox(for: elsewhere, from: &boxes)?.rect == other.rect, "another text's box is left to it")
     }
 }
