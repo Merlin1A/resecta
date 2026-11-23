@@ -5,10 +5,10 @@ Must go red: RedactionEngineTests/RegionCoverageUnreadableLayerTests shortBoxIsA
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/RegionCoverage.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/RegionCoverage.swift
-index f5ce05ab..682b859b 100644
+index 5ed3ff17..6e008b82 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/RegionCoverage.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/RegionCoverage.swift
-@@ -196,7 +196,7 @@ struct RegionCoverage: Sendable {
+@@ -210,7 +210,7 @@ struct RegionCoverage: Sendable {
          for index in 0..<source.document.pageCount {
              if let page = source.document.page(at: index) {
                  let detected = TextLayerDetector.detectTextLayer(page)
