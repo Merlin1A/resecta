@@ -728,4 +728,8 @@ with its reason and the mutant that is caught in its place.
 | `redact-stop-pattern-named-by-kind.patch` | A pattern is its own unit, named by its pattern; only a Scan is named by its kind alone. | ResectaAppTests/RedactStopUnitTests kindAndText |
 | `redact-stop-answers-outlive-the-document.patch` | Answers at the stop last while the document is open and are cleared when it closes or another opens. | ResectaAppTests/RedactStopRefusalTests answersLastWhileOpen |
 | `redact-stop-answers-more-than-shown.patch` | Redact Anyway answers the pages the sheet named and no other. | ResectaAppTests/RedactStopRefusalTests answersWhatWasShown |
+| `redact-stop-returned-under-the-hold.patch` | Under the hold, the stop is never returned: a page not read refuses nothing until the sheet is drawn. | ResectaAppTests/RedactStopRefusalTests heldRefusesNothing |
+| `redact-stop-digit-separators-cover-backwards.patch` | With digit separators ignored, a unit covers the same unit that keeps them, never the other way. | ResectaAppTests/RedactStopUnitTests digitsAndQuotesDirection |
+| `redact-stop-quotes-cover-backwards.patch` | With quotes and dashes matched alike, a unit covers the same unit that keeps them apart, never the other way. | ResectaAppTests/RedactStopUnitTests digitsAndQuotesDirection |
+| `search-replaced-run-not-reported.patch` | A run replaced after an Apply tells the document it was replaced, so its boxes keep it counted at the stop. | ResectaAppTests/SearchRunLogTests replacedRunIsReported |
 | `run-log-named-in-a-log-line.patch` | No log line names the run log, the answered set or their types. | ResectaAppTests/RunLogStaysInMemoryTests noLogLineNamesThem() |

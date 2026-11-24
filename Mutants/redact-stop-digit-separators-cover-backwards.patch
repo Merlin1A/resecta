@@ -1,0 +1,19 @@
+Property: With digit separators ignored, a unit covers the same unit that keeps them, never the other way.
+Area: the stop at Redact
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/RedactStopUnitTests
+Must go red: ResectaAppTests/RedactStopUnitTests digitsAndQuotesDirection
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/RedactStopUnit.swift b/Sources/ResectaApp/State/RedactStopUnit.swift
+index 3ccf0be6..975f248c 100644
+--- a/Sources/ResectaApp/State/RedactStopUnit.swift
++++ b/Sources/ResectaApp/State/RedactStopUnit.swift
+@@ -53,7 +53,7 @@ struct RedactStopUnit: Hashable, Sendable {
+             && (!caseSensitive || other.caseSensitive)
+             && (!wholeWord || other.wholeWord)
+             && (accents || !other.accents)
+-            && (digitSeparators || !other.digitSeparators)
++            && (!digitSeparators || other.digitSeparators)
+             && (quotesAndDashes || !other.quotesAndDashes)
+     }
+ }
