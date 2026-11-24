@@ -5,7 +5,7 @@ import Testing
 
 // The pages the stop at Redact names, from the document's closed runs and
 // the answered set. Pages are
-// zero-based here; the paper's page numbers are one-based.
+// zero-based here; the names of the cases count pages from one.
 
 @Suite("Redact stop: the pages it names")
 struct RedactStopTests {

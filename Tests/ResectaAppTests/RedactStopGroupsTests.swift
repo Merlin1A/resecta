@@ -3,8 +3,8 @@ import Testing
 @testable import RedactionEngine
 @testable import ResectaApp
 
-// The stop's groups, their names and its button. Pages are zero-based; the
-// paper's pages 3, 5 and 9 are 2, 4 and 8 here.
+// The stop's groups, their names and its button. Pages are zero-based:
+// the pages a person sees as 3, 5 and 9 are 2, 4 and 8 here.
 
 @Suite("Redact stop: groups, names and Search These Pages")
 struct RedactStopGroupsTests {
