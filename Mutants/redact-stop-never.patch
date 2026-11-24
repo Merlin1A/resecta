@@ -5,14 +5,14 @@ Must go red: ResectaAppTests/RedactStopTests blankScannedPage; ResectaAppTests/R
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/State/RedactStop.swift b/Sources/ResectaApp/State/RedactStop.swift
-index ff1685b1..f1fe42b7 100644
+index 0bbec379..72603136 100644
 --- a/Sources/ResectaApp/State/RedactStop.swift
 +++ b/Sources/ResectaApp/State/RedactStop.swift
 @@ -67,6 +67,6 @@ enum RedactStop {
  
-     /// True when the stop opens at the Redact tap.
-     static func opens(runs: [Run], answered: Set<Page>) -> Bool {
--        !pagesToName(runs: runs, answered: answered).isEmpty
-+        false
+     /// Every page the stop names, by page and reason, across its units.
+     static func namedPages(runs: [Run], answered: Set<Page>) -> Set<Page> {
+-        pagesToName(runs: runs, answered: answered).values.reduce(into: Set<Page>()) { $0.formUnion($1) }
++        []
      }
  }
