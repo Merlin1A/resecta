@@ -181,6 +181,9 @@ nonisolated struct LockedImportHold: Sendable, Identifiable, Equatable {
     let returnPhase: DocumentState.ReturnPhase
     var attempts: Int = 0
     var lastOutcome: Outcome = .awaiting
+    /// Files dropped together with this one; the dropped-files note is set
+    /// from it once the document opens with its password.
+    var droppedCount = 1
 
     init(bytes: Data, declaredType: String?, door: ImportDoor, returnPhase: DocumentState.ReturnPhase) {
         self.bytes = bytes

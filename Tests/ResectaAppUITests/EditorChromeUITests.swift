@@ -514,4 +514,52 @@ nonisolated final class EditorChromeUITests: XCTestCase {
         }
         return nil
     }
+
+    // MARK: - The image note in the band
+
+    /// The image note stays in the editor's band until the person closes
+    /// it: not by time, not by a Search opened and closed over it. Closed,
+    /// it does not come back for that document.
+    func testImageImportNote_staysInTheEditorUntilClosed() {
+        app.launchArguments = ["--uitesting", "--loadTestImage"]
+        app.launch()
+        XCTAssertTrue(element("drawTool").waitForExistence(timeout: 60), "The editor never loaded.")
+        let note = element("imagePagesNote")
+        XCTAssertTrue(note.waitForExistence(timeout: 10), "The image note did not arrive in the band.")
+        let words = note.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Image pages are read")).firstMatch
+        XCTAssertTrue(words.exists, "The band's note does not read \"Image pages are read…\".")
+        let mark = element("noticeFoldedMark")
+
+        // Past a toast's longest stay, the note is still there.
+        sleep(12)
+        XCTAssertTrue(note.exists || mark.exists, "The image note left by time.")
+
+        // A Search opened and closed over it leaves it in place.
+        let search = element("searchRedact")
+        XCTAssertTrue(search.waitForExistence(timeout: 10), "Search is missing.")
+        search.tap()
+        let dismiss = element("searchDismissButton")
+        XCTAssertTrue(dismiss.waitForExistence(timeout: 10), "Search never opened.")
+        dismiss.tap()
+        XCTAssertTrue(dismiss.waitForNonExistence(timeout: 10), "Search did not close.")
+        if !note.waitForExistence(timeout: 5), mark.exists {
+            mark.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        }
+        XCTAssertTrue(note.waitForExistence(timeout: 5), "The image note did not stay through a Search.")
+        attachScreenshot(named: "image-note-open")
+
+        // Closed with a tap 20 above the close's glyph: gone, and Search again
+        // does not bring it back.
+        let close = app.buttons["noticeClose"].firstMatch
+        XCTAssertTrue(close.exists, "The image note has no close.")
+        close.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).withOffset(CGVector(dx: 0, dy: -20)).tap()
+        XCTAssertTrue(note.waitForNonExistence(timeout: 5), "A tap 20 above the close's glyph did not close the note.")
+        search.tap()
+        XCTAssertTrue(dismiss.waitForExistence(timeout: 10), "Search never opened again.")
+        dismiss.tap()
+        XCTAssertTrue(dismiss.waitForNonExistence(timeout: 10), "Search did not close again.")
+        XCTAssertFalse(note.waitForExistence(timeout: 3), "The closed image note came back.")
+        XCTAssertFalse(mark.exists, "The closed image note came back folded.")
+    }
 }

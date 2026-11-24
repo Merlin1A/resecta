@@ -46,15 +46,17 @@ struct PhotoImportPostureTests {
         #expect(mounts == ["PhotoImportPicker.swift"], "\(mounts)")
     }
 
-    @Test("The notice fires for an image import and not for a PDF")
+    @Test("The image note applies to an image import and not to a PDF")
     func noticeOncePerImageImport() {
         var facts = ImportFacts.Summary()
-        #expect(RedactWorkspaceView.imageSourceToast(facts: facts) == nil)
+        #expect(RedactWorkspaceView.imageSourceNote(facts: facts) == nil)
         facts.origin = .images(count: 3)
-        let message = RedactWorkspaceView.imageSourceToast(facts: facts)
-        #expect(message == "Image pages are read with on-device text recognition. Barcodes and QR codes are not read.")
+        let note = RedactWorkspaceView.imageSourceNote(facts: facts)
+        #expect(note == .imagePagesNote)
+        #expect(note.map { MessageCatalog.row(for: $0).text }
+                == "Image pages are read with on-device text recognition. Barcodes and QR codes are not read.")
         facts.origin = .pdf
-        #expect(RedactWorkspaceView.imageSourceToast(facts: facts) == nil)
+        #expect(RedactWorkspaceView.imageSourceNote(facts: facts) == nil)
     }
 
     @Test("The launch hook names the bundled synthetic image")

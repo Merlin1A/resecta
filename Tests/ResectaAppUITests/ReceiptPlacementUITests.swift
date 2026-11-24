@@ -243,9 +243,11 @@ nonisolated final class ReceiptPlacementUITests: XCTestCase {
         app.launch()
         let field = app.textFields["Search text"]
         XCTAssertTrue(field.waitForExistence(timeout: 30), "Search never opened.")
+        // The image note is drawn in the editor's band, not queued as a
+        // message, so it holds back no warning; with Search at its large
+        // height the band is hidden.
         let imageNote = labelled("Image pages are read")
-        _ = imageNote.waitForExistence(timeout: 10)
-        XCTAssertTrue(imageNote.waitForNonExistence(timeout: 30), "The image import's message never cleared.")
+        XCTAssertFalse(imageNote.exists && imageNote.isHittable, "The image note shows over Search at its large height.")
         let options = app.buttons["Options"].firstMatch
         XCTAssertTrue(options.waitForExistence(timeout: 10), "Search's options are missing.")
         options.tap()

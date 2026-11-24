@@ -325,17 +325,17 @@ enum MessageCatalog {
         case .imagePagesNote:
             return MessageRow(
                 text: RedactWorkspaceView.imageSourceMessage,
-                todaySeverity: .info, kind: .notice, tone: .caution,
-                phases: [.editing], mustBeSeen: true, coalescesRepeats: true, showsInRemainingLayer: true)
+                todaySeverity: nil, kind: .notice, tone: .caution,
+                phases: [.editing], mustBeSeen: true, coalescesRepeats: true, showsInRemainingLayer: false)
         case .encryptedSource(let hadRestrictions):
             return MessageRow(
                 text: RedactWorkspaceView.encryptedSourceMessage(hadRestrictions: hadRestrictions),
-                todaySeverity: .warning, kind: .notice, tone: .caution,
-                phases: [.editing], mustBeSeen: true, coalescesRepeats: true, showsInRemainingLayer: true)
+                todaySeverity: nil, kind: .notice, tone: .caution,
+                phases: [.editing], mustBeSeen: true, coalescesRepeats: true, showsInRemainingLayer: false)
         case .droppedFilesFirstOpened(let count):
             return MessageRow(
                 text: ImportService.dropOpenedFirstMessage(droppedCount: count),
-                todaySeverity: .info, kind: .notice, tone: .caution,
+                todaySeverity: nil, kind: .notice, tone: .caution,
                 phases: [.editing], mustBeSeen: true)
         case .unsupportedFormatDropped:
             // A receipt longer than a receipt's 75 characters: it answers

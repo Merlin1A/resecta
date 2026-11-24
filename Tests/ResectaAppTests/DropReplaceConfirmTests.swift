@@ -137,4 +137,53 @@ struct DropReplaceConfirmTests {
         #expect(workspace.documentState.pageCount == 3)
         #expect((workspace.redactionState.regions[0] ?? []).isEmpty)
     }
+
+    // MARK: - The dropped-files note
+
+    /// One page, encrypted with a user and an owner password.
+    private static func lockedPDF() -> Data {
+        let data = NSMutableData()
+        var box = CGRect(x: 0, y: 0, width: 612, height: 792)
+        let aux: [CFString: Any] = [kCGPDFContextUserPassword: "user", kCGPDFContextOwnerPassword: "owner"]
+        let ctx = CGContext(consumer: CGDataConsumer(data: data as CFMutableData)!,
+                            mediaBox: &box, aux as CFDictionary)!
+        ctx.beginPDFPage(nil)
+        ctx.fill(CGRect(x: 72, y: 72, width: 100, height: 20))
+        ctx.endPDFPage()
+        ctx.closePDF()
+        return data as Data
+    }
+
+    @Test("A drop of several files raises its note after the new document arrives, and only then")
+    func droppedFilesNoteOnArrival() async throws {
+        let pdf = try #require(makeMultiPagePDFDocument(pages: 3).dataRepresentation())
+
+        // Three files dropped: the first opens, and the note holds the count.
+        let three = Self.makeWorkspace("dropped-three")
+        await RedactWorkspaceView.importDrop(DroppedDocument(payload: .bytes(pdf)), droppedCount: 3, workspace: three)
+        #expect(three.documentState.pageCount == 3)
+        #expect(three.documentState.droppedFilesNoteCount == 3)
+
+        // One file: no note.
+        let one = Self.makeWorkspace("dropped-one")
+        await RedactWorkspaceView.importDrop(DroppedDocument(payload: .bytes(pdf)), droppedCount: 1, workspace: one)
+        #expect(one.documentState.pageCount == 3)
+        #expect(one.documentState.droppedFilesNoteCount == nil)
+
+        // Bytes that are not a document, over an open document holding a
+        // note of 2: nothing arrived, so the open document's note stands.
+        let open = Self.editingWorkspace("dropped-refused")
+        open.documentState.droppedFilesNoteCount = 2
+        await RedactWorkspaceView.importDrop(DroppedDocument(payload: .bytes(Data("not a document".utf8))),
+                                             droppedCount: 3, workspace: open)
+        #expect(open.documentState.droppedFilesNoteCount == 2)
+
+        // A locked document: no note yet; the hold carries the count to the
+        // password's arrival.
+        let locked = Self.makeWorkspace("dropped-locked")
+        await RedactWorkspaceView.importDrop(DroppedDocument(payload: .bytes(Self.lockedPDF())),
+                                             droppedCount: 3, workspace: locked)
+        #expect(locked.documentState.droppedFilesNoteCount == nil)
+        #expect(locked.lockedImport?.droppedCount == 3)
+    }
 }

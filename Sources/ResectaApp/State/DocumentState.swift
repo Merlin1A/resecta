@@ -346,9 +346,8 @@ class DocumentState {
     /// annotation findings. Zero for image imports.
     var sourceFilledFormFieldCount: Int = 0
 
-    /// True once the user dismisses the import annotation notice for
-    /// the current document. Reset to false on every import.
-    var annotationNoticeDismissed: Bool = false
+    /// The band's notes about this document, closed or not (`LoadNotes`).
+    var loadNotes = LoadNotes()
 
     /// Pipeline mode used for the most recent redaction run.
     var lastUsedPipelineMode: PipelineMode?
@@ -644,7 +643,7 @@ class DocumentState {
         searchUnreadablePages = []
         sourceAnnotationFindings = []
         sourceFilledFormFieldCount = 0
-        annotationNoticeDismissed = false
+        loadNotes = LoadNotes()
         currentPageIndex = 0
         canvasPageFramesWanted = false  // and the page frames with it
         lastUsedPipelineMode = nil

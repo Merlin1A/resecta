@@ -2,14 +2,17 @@ import SwiftUI
 import RedactionEngine
 
 // The editor's band under the toolbar. It shows at most one notice: the
-// first that holds, in a fixed order of six places (`TopBannerSlot`). A
+// first that holds, in a fixed order of seven places (`TopBannerSlot`). A
 // notice that is not shown waits its turn; hiding the band, or showing
 // another notice in front, ends nothing (each notice ends only when it is
-// dismissed or its condition ends). Three places have a notice today: the
+// dismissed or its condition ends). Six places have a notice today: the
 // paused notice (a run left unfinished when the app went to the
-// background), the import annotation notice and the fit notice (the page in
-// view holds a box drawn wider than its word); the other three are kept in
-// order for the notices that fill them later.
+// background), the dropped-files note (only the first of several dropped
+// files was opened), the import annotation notice, the note on a
+// password-protected source, the fit notice (the page in view holds a box
+// drawn wider than its word) and the image note (how image pages are read).
+// The redraw line's place is kept for the notice that fills it later. What
+// was not opened outranks what was found in what was opened.
 //
 // The band floats 8 points under the toolbar's foot and never moves or
 // resizes the page. A notice that meets a visible page folds to its mark
@@ -22,6 +25,8 @@ enum TopBannerSlot: Hashable, CaseIterable {
     // Declared in the band's order: the first that holds is shown.
     case redrawn
     case paused
+    /// Only the first of several dropped files was opened.
+    case droppedFiles
     case importAnnotations
     case sourceProtection
     case fit
@@ -55,7 +60,32 @@ enum TopBannerSlot: Hashable, CaseIterable {
             present.insert(.importAnnotations)
         }
         if widenedOnPage { present.insert(.fit) }
+        present.formUnion(documentNotes(
+            phase: .editing, facts: documentState.sourceFacts,
+            imagePagesNoteDismissed: documentState.imagePagesNoteDismissed,
+            sourceProtectionNoteDismissed: documentState.sourceProtectionNoteDismissed,
+            droppedFilesNoteCount: documentState.droppedFilesNoteCount))
         return present
+    }
+
+    /// The notes about the loaded document, while editing: the image note
+    /// for a document made from images, the source note for an encrypted
+    /// PDF, each until closed; the dropped-files note while its count is
+    /// set. None ends by time.
+    static func documentNotes(
+        phase: DocumentState.PhaseKind, facts: ImportFacts.Summary,
+        imagePagesNoteDismissed: Bool, sourceProtectionNoteDismissed: Bool, droppedFilesNoteCount: Int?
+    ) -> Set<TopBannerSlot> {
+        guard phase == .editing else { return [] }
+        var notes: Set<TopBannerSlot> = []
+        if droppedFilesNoteCount != nil { notes.insert(.droppedFiles) }
+        if RedactWorkspaceView.encryptedSourceNote(facts: facts) != nil, !sourceProtectionNoteDismissed {
+            notes.insert(.sourceProtection)
+        }
+        if RedactWorkspaceView.imageSourceNote(facts: facts) != nil, !imagePagesNoteDismissed {
+            notes.insert(.imagePages)
+        }
+        return notes
     }
 
     /// The editor's read: the occupant of what holds while editing, and
@@ -172,9 +202,14 @@ extension DocumentEditorView {
             return annotationNoticeContent
         case .fit:
             return fitNoticeContent
-        case .redrawn, .sourceProtection, .imagePages:
-            // The redraw line, the password-protected source notes and the
-            // image-pages note: their packages fill these.
+        case .droppedFiles:
+            return droppedFilesNoteContent
+        case .sourceProtection:
+            return sourceProtectionNoteContent
+        case .imagePages:
+            return imagePagesNoteContent
+        case .redrawn:
+            // The redraw line: its package fills this.
             return nil
         }
     }
@@ -189,8 +224,50 @@ extension DocumentEditorView {
             annotationNoticeBanner
         case .fit:
             fitNoticeBanner
-        case .redrawn, .sourceProtection, .imagePages:
+        case .droppedFiles:
+            documentNoteBanner(droppedFilesNoteContent) { documentState.droppedFilesNoteCount = nil }
+        case .sourceProtection:
+            documentNoteBanner(sourceProtectionNoteContent) { documentState.sourceProtectionNoteDismissed = true }
+        case .imagePages:
+            documentNoteBanner(imagePagesNoteContent) { documentState.imagePagesNoteDismissed = true }
+        case .redrawn:
             EmptyView()
+        }
+    }
+
+    // MARK: - The notes about the loaded document
+
+    /// The dropped-files note, with the count of files dropped together.
+    var droppedFilesNoteContent: NoticeContent? {
+        documentState.droppedFilesNoteCount.map {
+            NoticeContent(id: .droppedFilesFirstOpened(count: $0), closes: true, identifier: "droppedFilesNote")
+        }
+    }
+
+    /// The source note: the restrictions sentence or the plain one.
+    var sourceProtectionNoteContent: NoticeContent? {
+        RedactWorkspaceView.encryptedSourceNote(facts: documentState.sourceFacts).map {
+            NoticeContent(id: $0, closes: true, identifier: "sourceProtectionNote")
+        }
+    }
+
+    /// The image note: how a document made from images is read.
+    var imagePagesNoteContent: NoticeContent? {
+        RedactWorkspaceView.imageSourceNote(facts: documentState.sourceFacts).map {
+            NoticeContent(id: $0, closes: true, identifier: "imagePagesNote")
+        }
+    }
+
+    /// A note about the loaded document: no action; its close writes its
+    /// own state, through the Reduce Motion resolver.
+    @ViewBuilder
+    private func documentNoteBanner(_ content: NoticeContent?, close: @escaping () -> Void) -> some View {
+        if let content {
+            NoticeView(content: content, onClose: {
+                withAnimation(ResectaTokens.Anim.resolved(ResectaTokens.Anim.overlayDismiss, reduceMotion: reduceMotion)) {
+                    close()
+                }
+            }, placement: .band)
         }
     }
 

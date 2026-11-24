@@ -35,13 +35,13 @@ struct MessageCatalogTests {
             severity: .info, kind: .notice, tone: .note, phases: [.editing], mustBeSeen: false,
             coalescesRepeats: true, showsInRemainingLayer: true),
         .imagePagesNote: Frozen(
-            severity: .info, kind: .notice, tone: .caution, phases: [.editing], mustBeSeen: true,
-            coalescesRepeats: true, showsInRemainingLayer: true),
+            severity: nil, kind: .notice, tone: .caution, phases: [.editing], mustBeSeen: true,
+            coalescesRepeats: true, showsInRemainingLayer: false),
         .encryptedSource: Frozen(
-            severity: .warning, kind: .notice, tone: .caution, phases: [.editing], mustBeSeen: true,
-            coalescesRepeats: true, showsInRemainingLayer: true),
+            severity: nil, kind: .notice, tone: .caution, phases: [.editing], mustBeSeen: true,
+            coalescesRepeats: true, showsInRemainingLayer: false),
         .droppedFilesFirstOpened: Frozen(
-            severity: .info, kind: .notice, tone: .caution, phases: [.editing], mustBeSeen: true,
+            severity: nil, kind: .notice, tone: .caution, phases: [.editing], mustBeSeen: true,
             coalescesRepeats: false, showsInRemainingLayer: false),
         .unsupportedFormatDropped: Frozen(
             severity: .warning, kind: .receipt, tone: .caution, phases: everyPhase, mustBeSeen: false,
@@ -260,10 +260,10 @@ struct MessageCatalogTests {
             #expect(row.showsInRemainingLayer == want.showsInRemainingLayer, "\(id)")
         }
         let rows = MessageID.Name.allCases.map { MessageCatalog.row(for: .example(named: $0)) }
-        #expect(rows.filter { $0.todaySeverity == .info }.count == 12)
-        #expect(rows.filter { $0.todaySeverity == .warning }.count == 14)
+        #expect(rows.filter { $0.todaySeverity == .info }.count == 10)
+        #expect(rows.filter { $0.todaySeverity == .warning }.count == 13)
         #expect(rows.filter { $0.todaySeverity == .success }.count == 3)
-        #expect(rows.filter { $0.todaySeverity == nil }.count == 5)
+        #expect(rows.filter { $0.todaySeverity == nil }.count == 8)
         #expect(rows.filter { $0.kind == .receipt }.count == 21)
         #expect(rows.filter { $0.kind == .notice }.count == 13)
         #expect(rows.filter { $0.tone == .caution }.count == 24)
@@ -271,7 +271,7 @@ struct MessageCatalogTests {
         #expect(rows.filter { $0.tone == .note }.count == 4)
         #expect(rows.filter { $0.tone == .stop }.count == 2)
         #expect(rows.filter(\.mustBeSeen).count == 22)
-        #expect(rows.filter(\.showsInRemainingLayer).count == 5)
+        #expect(rows.filter(\.showsInRemainingLayer).count == 3)
     }
 
     @Test("Every row is either one message while it is up or a new event each time, and the split is 24 and 10")
@@ -472,7 +472,8 @@ struct MessageCatalogTests {
         #expect(files.count > 100, "the source tree was not found")
         let drawnInPlace = MessageID.Name.allCases
             .filter { MessageCatalog.row(for: .example(named: $0)).todaySeverity == nil }
-        #expect(Set(drawnInPlace) == [.pausedRun, .importAnnotations, .fitNotice, .fitNoticeShort, .runInProgressSettings])
+        #expect(Set(drawnInPlace) == [.imagePagesNote, .encryptedSource, .droppedFilesFirstOpened,
+                                      .pausedRun, .importAnnotations, .fitNotice, .fitNoticeShort, .runInProgressSettings])
         var posts: [String] = []
         for file in files {
             let text = try String(contentsOf: sources.appendingPathComponent(file), encoding: .utf8)

@@ -5,14 +5,16 @@ Must go red: ResectaAppTests/TopBannerSlotTests occupantForEverySet; ResectaAppT
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Views/DocumentEditorView+TopBanner.swift b/Sources/ResectaApp/Views/DocumentEditorView+TopBanner.swift
-index 488a5c57..a6a03498 100644
+index cf011776..2c91640e 100644
 --- a/Sources/ResectaApp/Views/DocumentEditorView+TopBanner.swift
 +++ b/Sources/ResectaApp/Views/DocumentEditorView+TopBanner.swift
-@@ -13,8 +13,8 @@ import RedactionEngine
+@@ -24,10 +24,10 @@ import RedactionEngine
  enum TopBannerSlot: Hashable, CaseIterable {
      // Declared in the band's order: the first that holds is shown.
      case redrawn
 -    case paused
+     /// Only the first of several dropped files was opened.
+     case droppedFiles
      case importAnnotations
 +    case paused
      case sourceProtection

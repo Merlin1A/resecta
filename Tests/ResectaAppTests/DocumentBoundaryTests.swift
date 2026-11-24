@@ -73,6 +73,18 @@ struct DocumentBoundaryTests {
         #expect(coord.documentState.documentOverride == nil)
     }
 
+    @Test("Start Over resets the closed load notes and the dropped-files note")
+    func startOverResetsTheLoadNotes() {
+        let coord = makeLoadedCoordinator()
+        coord.documentState.annotationNoticeDismissed = true
+        coord.documentState.imagePagesNoteDismissed = true
+        coord.documentState.sourceProtectionNoteDismissed = true
+        coord.documentState.droppedFilesNoteCount = 3
+        coord.documentState.resetForStartOver(redactionState: coord.redactionState, coordinator: coord)
+        #expect(coord.documentState.loadNotes == LoadNotes())
+        #expect(coord.documentState.droppedFilesNoteCount == nil)
+    }
+
     @Test("A drop on the results or error screen is refused with a notice")
     func dropOnResultsOrErrorIsRefusedWithANotice() {
         // The notice names the screen's own way back (its button's title).
