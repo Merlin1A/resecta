@@ -725,3 +725,7 @@ with its reason and the mutant that is caught in its place.
 | `default-band-switch-compared-with-the-line-margin.patch` | With the switch on, widened compares with the switch-off paint, the default band where it is taken. | RedactionCoreTests/PaintPlanDefaultBandTests aloneOnLineAlreadyAsWideAgainstTheDefault |
 | `default-band-taken-on-a-page-that-draws-lines.patch` | A page that paints a path or a shading takes no default band. | RedactionCoreTests/PaintPlanDefaultBandTests pageDrawsLines |
 | `default-band-takes-the-own-run.patch` | The default band excuses no word as the box's own run, so a label beside the value is never painted over. | RedactionCoreTests/PaintPlanDefaultBandTests labelBlockLabelNotTaken |
+| `page-read-words-dropped.patch` | The record's page hands its plan the read's words, text and facts. | RedactionEngineTests/RunRecordPageReadTests noReadOnlyBesideNoWords |
+| `page-read-print-answer-not-read.patch` | A page's read takes the page's own answer to whether its print is a picture. | RedactionEngineTests/RunRecordPageReadTests pictureRead; RedactionEngineTests/InkFitPiecewiseScanTests pageFactsTakeThePrintAnswer |
+| `page-reads-kept-across-documents.patch` | Another document empties the open document's page reads. | ResectaAppTests/DocumentPageReadsTests newDocumentEmptiesTheReads |
+| `page-read-handed-from-page-zero.patch` | The run's record hands each page the read held for that page. | ResectaAppTests/DocumentPageReadsTests runHandsEachPageItsRead |
