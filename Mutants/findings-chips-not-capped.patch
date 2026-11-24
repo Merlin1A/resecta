@@ -1,0 +1,19 @@
+Property: A closed row shows at most five page chips, or four and "+n more". Here every page gets a chip when closed.
+Area: findings on the results screen
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/FindingRowTests
+Must go red: ResectaAppTests/FindingRowTests pagesAreCapped
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/FindingRow.swift b/Sources/ResectaApp/Views/FindingRow.swift
+index de7cfd24..61b74537 100644
+--- a/Sources/ResectaApp/Views/FindingRow.swift
++++ b/Sources/ResectaApp/Views/FindingRow.swift
+@@ -150,7 +150,7 @@ enum FindingRowModel {
+     /// The pages the closed row shows as chips (at most five, else four and
+     /// "+n more"); the opened row shows every page.
+     static func chipPages(_ problem: VerificationProblem, isOpen: Bool) -> [Int] {
+-        isOpen ? problem.pages : LayerResultRow.collapsedChipPages(problem.pages)
++        problem.pages
+     }
+ 
+     static func moreChipsText(_ problem: VerificationProblem, isOpen: Bool) -> String? {

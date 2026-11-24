@@ -1,0 +1,22 @@
+Property: Each check has one place: a check behind a Findings row is in no by-check group. Here a by-check group of the failed checks is drawn as well as the findings, so a failed check is shown twice.
+Area: findings on the results screen
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/FindingRowTests
+Must go red: ResectaAppTests/FindingRowTests everyCheckHasOnePlace
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationDetailsSection.swift b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
+index c986ff72..9e956c4c 100644
+--- a/Sources/ResectaApp/Views/VerificationDetailsSection.swift
++++ b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
+@@ -116,7 +116,10 @@ struct VerificationDetailsSection: View {
+     /// Findings row or needs none, and is in the list of checks.
+     static func groups(_ partition: VerificationLayerPartition) -> [(header: String?, indices: [Int])] {
+         let warnings = plainWarnings(partition)
+-        return warnings.isEmpty ? [] : [(nil, warnings)]
++        let failed = partition.outcomes.indices.filter { partition.outcomes[$0] == .failed }
++        let byCheck: [(header: String?, indices: [Int])] = failed.isEmpty ? [] : [(header: "Failed", indices: failed)]
++        let plain: [(header: String?, indices: [Int])] = warnings.isEmpty ? [] : [(header: nil, indices: warnings)]
++        return plain + byCheck
+     }
+ 
+     /// The checks whose outcome is a plain warning: not a problem, so in no

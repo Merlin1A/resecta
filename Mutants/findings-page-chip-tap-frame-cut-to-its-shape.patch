@@ -1,0 +1,18 @@
+Property: A page chip answers a tap anywhere in its 44-pt touch target, not only on its drawn shape. Here the chip's tappable frame is cut back to its drawn shape.
+Area: findings on the results screen
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppUITests/FindingRowUITests
+Must go red: ResectaAppUITests/FindingRowUITests testFirstRowOpensAndItsChipOpensThePreview
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/PageChip.swift b/Sources/ResectaApp/Views/PageChip.swift
+index 176e1b22..0d930c39 100644
+--- a/Sources/ResectaApp/Views/PageChip.swift
++++ b/Sources/ResectaApp/Views/PageChip.swift
+@@ -20,7 +20,6 @@ struct PageChip: View {
+                 .background(Color(.tertiarySystemFill), in: Capsule())
+                 // The 46-pt hit frame reaches past the drawn capsule
+                 // without taking layout space: the meta line stays tight.
+-                .frame(minHeight: ResectaTokens.TouchTarget.minimum)
+                 .contentShape(Rectangle())
+                 .padding(.vertical, -(ResectaTokens.TouchTarget.minimum - ResectaTokens.Results.chipHeight) / 2)
+         }
