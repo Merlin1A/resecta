@@ -10,7 +10,7 @@ extension DocumentEditorView {
     /// The sheets and dialogs over the editor, each from its own source.
     var firstDocumentHintCovers: FirstDocumentHintRules.Covers {
         FirstDocumentHintRules.Covers(
-            editorSheet: sheetSlotIsPresenting,
+            editorSheet: Self.sheetSlotIsPresenting(redactionState),
             settings: showSettings,
             password: passwordSheetUp,
             dropReplace: dropDialogUp,
