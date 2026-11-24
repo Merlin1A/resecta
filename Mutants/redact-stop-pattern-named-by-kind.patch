@@ -5,7 +5,7 @@ Must go red: ResectaAppTests/RedactStopUnitTests kindAndText
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/State/RedactStopUnit.swift b/Sources/ResectaApp/State/RedactStopUnit.swift
-index 3ccf0be6..6dfc1f11 100644
+index 212f434a..1cfafc26 100644
 --- a/Sources/ResectaApp/State/RedactStopUnit.swift
 +++ b/Sources/ResectaApp/State/RedactStopUnit.swift
 @@ -27,7 +27,7 @@ struct RedactStopUnit: Hashable, Sendable {
@@ -16,4 +16,4 @@ index 3ccf0be6..6dfc1f11 100644
 +        self.text = kind == .text ? text : ""
          caseSensitive = options.caseSensitive
          wholeWord = options.wholeWord
-         accents = options.foldDiacritics
+         // Accents and digit separators change nothing a pattern matches, so

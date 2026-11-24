@@ -5,15 +5,15 @@ Must go red: ResectaAppTests/RedactStopGroupsTests textAndPattern; ResectaAppTes
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/State/RedactStop+Groups.swift b/Sources/ResectaApp/State/RedactStop+Groups.swift
-index a25e81b6..56b48d5c 100644
+index e198fe9c..6d8cd32e 100644
 --- a/Sources/ResectaApp/State/RedactStop+Groups.swift
 +++ b/Sources/ResectaApp/State/RedactStop+Groups.swift
-@@ -36,7 +36,7 @@ extension RedactStop {
+@@ -65,7 +65,7 @@ extension RedactStop {
              var pagesBySet: [Set<RedactStopUnit>: [Int]] = [:]
              for (page, units) in unitsByPage { pagesBySet[units, default: []].append(page) }
              let made = pagesBySet.map { units, pages in
--                Group(reason: reason, units: units == all ? nil : units, pages: pages.sorted())
-+                Group(reason: reason, units: nil, pages: pages.sorted())
+-                Group(reason: reason, units: units == all ? nil : units, pages: pages.sorted(),
++                Group(reason: reason, units: nil, pages: pages.sorted(),
+                       notReachedEnding: reason == .line(.notReached) ? notReachedEnding(of: units, runs: runs) : nil)
              }
              groups += made.sorted { a, b in
-                 if (a.units == nil) != (b.units == nil) { return a.units == nil }
