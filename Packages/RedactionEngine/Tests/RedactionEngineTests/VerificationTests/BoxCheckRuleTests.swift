@@ -95,6 +95,26 @@ struct BoxCheckRuleTests {
         #expect(BoxCheckTests.isIssue(o), "\(o)")
     }
 
+    @Test("A block's level past the 8-bit range: far darker than black is black, far lighter than white is white, never the other fill")
+    func levelsPastTheEightBitRange() {
+        // A baseline picture's DC values differ by at most 2,047 from block to block, so a block's
+        // DC value times its step can lie far outside the 8-bit range; the decoder clamps it to
+        // 0 or 255. The fill tests are one-sided and must hold at every such value.
+        let step = 255, far = Int32(2047 * step)
+        for v: Int32 in [-1021, -1024, -1025, -8 * 2047, -far] {
+            #expect(ExactFillCheck.isExactFill(CodedBlock(dcTimesStep: v, flat: true), .black), "\(v)")
+            #expect(!ExactFillCheck.isExactFill(CodedBlock(dcTimesStep: v, flat: true), .white), "\(v)")
+        }
+        for v: Int32 in [1013, 1016, 1017, 8 * 2047, far] {
+            #expect(ExactFillCheck.isExactFill(CodedBlock(dcTimesStep: v, flat: true), .white), "\(v)")
+            #expect(!ExactFillCheck.isExactFill(CodedBlock(dcTimesStep: v, flat: true), .black), "\(v)")
+        }
+        for v: Int32 in [-far, -4, 4, far] {
+            #expect(!ExactFillCheck.isNeutral(CodedBlock(dcTimesStep: v, flat: true)), "\(v)")
+        }
+        #expect(!ExactFillCheck.isExactFill(CodedBlock(dcTimesStep: -far, flat: false), .black))
+    }
+
     @Test("The seven outcome rows as data, against the names the verdict reads")
     func outcomeRows() {
         let rows: [(BoxOutcome, OutcomeKind, RowClass)] = [

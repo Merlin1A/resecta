@@ -7,11 +7,9 @@ import Testing
 // Here they are given the same boxes, pages and qualities, and must agree on
 // every pixel line, and on the size of every page's picture. Neither copy calls
 // the other and no constant is shared: the expected numbers below are the
-// rule's, written out. This shows the check agrees with the projection. It does
-// not show the painter's pixels are the projection's: at this head the fills are
-// painted by applyRedactionFills, which does not read it, and InkCheck is the
-// projection's one caller. The pixel step's second half makes the fills paint
-// through the projection; the test is run again there.
+// rule's, written out. The test shows the check agrees with the projection.
+// That the painted pixels are the projection's holds only where the fills are
+// painted through it (PixelPlan.project), and is shown there, not here.
 
 @Suite("The painting code and the box check's copy paint every box alike")
 struct PixelPaintDifferentialTests {

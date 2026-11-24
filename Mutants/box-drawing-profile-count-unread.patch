@@ -1,0 +1,19 @@
+Property: The picture's profile is the writer's: three components, read from its count.
+Area: the box check's own reading of what each page draws
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/BoxCheckDrawingTests (or on the host: cd Packages/RedactionEngine && swift test --filter BoxCheckDrawingTests)
+Must go red: RedactionEngineTests/BoxCheckDrawingTests eachCase [D66: a four-component profile over device RGB]
+The alternate guard above it still refuses D62 (a one-component profile over device grey).
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+@@ -158,7 +158,7 @@ enum PageDrawingReader {
+               keys(icc).isSubset(of: profileKeys), name(icc, "Alternate") == "DeviceRGB"
+         else { return .failure(refused(.pictureColourNotListed)) }
+         var n: CGPDFInteger = 0
+-        guard CGPDFDictionaryGetInteger(icc, "N", &n), n == 3 else { return .failure(refused(.pictureColourNotListed)) }
++        guard CGPDFDictionaryGetInteger(icc, "N", &n) else { return .failure(refused(.pictureColourNotListed)) }
+         guard CGPDFDictionaryGetInteger(pd, "Width", &w), CGPDFDictionaryGetInteger(pd, "Height", &h) else {
+             return .failure(refused(.pictureSizeDiffers))
+         }

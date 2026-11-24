@@ -1,0 +1,18 @@
+Property: No node above the page holds a key the page would inherit.
+Area: the box check's own reading of what each page draws
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/BoxCheckDrawingTests (or on the host: cd Packages/RedactionEngine && swift test --filter BoxCheckDrawingTests)
+Must go red: RedactionEngineTests/BoxCheckDrawingTests eachCase [D78: a turn the page inherits from its tree]; RedactionEngineTests/BoxCheckDrawingTests eachCase [D79: a crop box the page inherits from its tree]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+index 1038a83b..383452c0 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+@@ -107,7 +107,6 @@ enum PageDrawingReader {
+         while let parent = dictionary(node, "Parent") {
+             depth += 1
+             guard depth <= 64 else { return .failure(refused(.drawingNotRead)) }
+-            guard keys(parent).isSubset(of: pageTreeKeys) else { return .failure(refused(.pageKeyNotListed)) }
+             node = parent
+         }
+         guard let resources = dictionary(dict, "Resources") else { return .failure(refused(.resourceNotListed)) }

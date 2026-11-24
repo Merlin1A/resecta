@@ -1,0 +1,19 @@
+Property: An Exif segment that names a second directory, where its thumbnail lives, is refused.
+Area: the box check's own reading of what each page draws
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/BoxCheckDrawingTests (or on the host: cd Packages/RedactionEngine && swift test --filter BoxCheckDrawingTests)
+Must go red: RedactionEngineTests/BoxCheckDrawingTests eachCase [D92: an Exif segment that names a second directory, where a thumbnail lives]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+index 1038a83b..040db1e2 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+@@ -221,7 +221,7 @@ enum PageDrawingReader {
+             return lo | hi << 16
+         }
+         guard let first = u32(4), let entries = u16(first), let next = u32(first + 2 + 12 * entries) else { return false }
+-        return next == 0
++        return next >= 0
+     }
+ 
+     // MARK: The content

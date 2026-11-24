@@ -1,0 +1,19 @@
+Property: Text is shown only in the mode that neither fills, strokes nor clips.
+Area: the box check's own reading of what each page draws
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/BoxCheckDrawingTests (or on the host: cd Packages/RedactionEngine && swift test --filter BoxCheckDrawingTests)
+Must go red: RedactionEngineTests/BoxCheckDrawingTests eachCase [D20: text shown filled, mode 0]; RedactionEngineTests/BoxCheckDrawingTests eachCase [D21: text shown before any mode is set]; RedactionEngineTests/BoxCheckDrawingTests eachCase [D22: text as a clip, mode 7, then the picture]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+index 1038a83b..f678667b 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+@@ -372,7 +372,7 @@ enum PageDrawingReader {
+         }
+         CGPDFOperatorTableSetCallback(table, "Tj") { s, info in
+             let scan = Unmanaged<Scan>.fromOpaque(info!).takeUnretainedValue()
+-            if scan.mode != PageDrawingReader.invisibleText { scan.refuse(.textNotInvisible, s) }
++            _ = scan
+         }
+         CGPDFOperatorTableSetCallback(table, "Do") { s, info in
+             let scan = Unmanaged<Scan>.fromOpaque(info!).takeUnretainedValue()

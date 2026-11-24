@@ -1,0 +1,19 @@
+Property: The picture holds the writer's keys alone: no mask, decode array or decode parameters.
+Area: the box check's own reading of what each page draws
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/BoxCheckDrawingTests (or on the host: cd Packages/RedactionEngine && swift test --filter BoxCheckDrawingTests)
+Must go red: RedactionEngineTests/BoxCheckDrawingTests eachCase [D50: a soft mask on the picture]; RedactionEngineTests/BoxCheckDrawingTests eachCase [D51: a mask on the picture]; RedactionEngineTests/BoxCheckDrawingTests eachCase [D52: a decode array that inverts it]; RedactionEngineTests/BoxCheckDrawingTests eachCase [D53: decode parameters that turn off its colour transform]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+index 1038a83b..1fac561a 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+@@ -27,7 +27,7 @@ enum PageDrawingReader {
+     static let pageKeys: Set<String> = ["Type", "Parent", "Resources", "Contents", "MediaBox"]
+     static let resourceKeys: Set<String> = ["ProcSet", "XObject", "Font"]
+     static let pictureKeys: Set<String> = ["Type", "Subtype", "Width", "Height", "BitsPerComponent", "ColorSpace",
+-                                           "Filter", "Interpolate", "Length"]
++                                           "Filter", "Interpolate", "Length", "SMask", "Mask", "Decode", "DecodeParms"]
+     static let profileKeys: Set<String> = ["N", "Alternate", "Filter", "Length"]
+     static let fontKeys: Set<String> = ["Type", "Subtype", "BaseFont", "FirstChar", "LastChar", "Widths",
+                                         "FontDescriptor", "Encoding", "ToUnicode"]

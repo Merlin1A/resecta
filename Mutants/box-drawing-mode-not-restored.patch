@@ -1,0 +1,19 @@
+Property: A Q restores the text mode its q saved.
+Area: the box check's own reading of what each page draws
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/BoxCheckDrawingTests (or on the host: cd Packages/RedactionEngine && swift test --filter BoxCheckDrawingTests)
+Must go red: RedactionEngineTests/BoxCheckDrawingTests eachCase [D3: the text mode a q saved, restored by its Q]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+index 1038a83b..9ccde9f0 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+@@ -355,7 +355,7 @@ enum PageDrawingReader {
+         CGPDFOperatorTableSetCallback(table, "Q") { s, info in
+             let scan = Unmanaged<Scan>.fromOpaque(info!).takeUnretainedValue()
+             guard let top = scan.saved.popLast() else { scan.refuse(.drawingNotRead, s); return }
+-            (scan.ctm, scan.mode) = top
++            scan.ctm = top.0
+         }
+         CGPDFOperatorTableSetCallback(table, "cm") { s, info in
+             let scan = Unmanaged<Scan>.fromOpaque(info!).takeUnretainedValue()

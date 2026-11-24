@@ -1,0 +1,18 @@
+Property: A box with no area is never off its page: it maps to no pixel.
+Area: the box check
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/BoxCheckTests (or on the host: cd Packages/RedactionEngine && swift test --filter BoxCheckTests)
+Must go red: RedactionEngineTests/BoxCheckTests each [36: boxes with no area on the page's edges, and one turned inside out across one: none off its page]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
+index be216273..8d9ec11a 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
+@@ -232,7 +232,6 @@ enum ExactFillCheck {
+         let inner = box.inner
+         // A box with no area paints nothing; it is answered before the off-page
+         // test, so it never reads as off its page.
+-        guard PixelPaintRule.hasArea(inner) else { return .inconclusive(mapsToNoPixel, nil) }
+         if inner.maxX <= 0 || inner.minX >= sw || inner.maxY <= 0 || inner.minY >= sh { return .offPage }
+         let w = walk.width, h = walk.height
+         guard let unit = PixelPaintRule.unit(inner: inner, dpi: dpi, width: w, height: h) else {

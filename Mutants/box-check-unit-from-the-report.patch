@@ -5,11 +5,11 @@ Must go red: RedactionEngineTests/BoxCheckTests each [17: a report smaller than 
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
-index 9c70a425..83afc332 100644
+index be216273..58f6d45b 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
-@@ -219,9 +219,10 @@ enum ExactFillCheck {
-         let inner = box.inner
+@@ -235,9 +235,10 @@ enum ExactFillCheck {
+         guard PixelPaintRule.hasArea(inner) else { return .inconclusive(mapsToNoPixel, nil) }
          if inner.maxX <= 0 || inner.minX >= sw || inner.maxY <= 0 || inner.minY >= sh { return .offPage }
          let w = walk.width, h = walk.height
 -        guard let unit = PixelPaintRule.unit(inner: inner, dpi: dpi, width: w, height: h) else {
