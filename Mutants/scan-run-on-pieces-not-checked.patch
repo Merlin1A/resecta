@@ -1,0 +1,19 @@
+Property: A word's line pieces are taken only where they stand for it as drawn lines. Planted: every word's line pieces are taken unchecked.
+Area: Search, Scan's address lines (EmbeddedTextSource)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'ScanRunOnAddressTests'
+Must go red: RedactionEngineTests/ScanRunOnAddressTests piecesAtOneHeightKeepTheWordWhole
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/EmbeddedTextSource.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/EmbeddedTextSource.swift
+index f84013b2..e1b2ff29 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/EmbeddedTextSource.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/EmbeddedTextSource.swift
+@@ -98,7 +98,7 @@ public struct EmbeddedTextSource: Sendable {
+                   box.width > 0, box.height > 0 else { return [(word, bounds)] }
+             pieces.append((range, box))
+         }
+-        return piecesAccepted(pieces, word: word) ? pieces : [(word, bounds)]
++        return pieces
+     }
+ 
+     /// Whether a word's line pieces stand for it as drawn lines: together

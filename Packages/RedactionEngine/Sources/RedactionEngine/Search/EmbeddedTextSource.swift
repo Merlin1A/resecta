@@ -44,7 +44,8 @@ public struct EmbeddedTextSource: Sendable {
         self.coverage = coverage
     }
 
-    /// One line's words in the page's text, and their boxes' union in page space.
+    /// One line's words (or a run-on word's piece on this line, `linePieces`)
+    /// by their ranges in the page's text, and their boxes' union in page space.
     struct LineSpan: Sendable {
         let ranges: [NSRange]
         let pageRect: CGRect
@@ -102,20 +103,33 @@ public struct EmbeddedTextSource: Sendable {
 
     /// Whether a word's line pieces stand for it as drawn lines: together
     /// they hold every character of the word, each once (so no character
-    /// drops out of every line), and no two of them overlap in height (so a
-    /// piece raised or lowered on one drawn line, a superscript ordinal
-    /// "5th" or a digit set by a text rise, stays in its word).
+    /// drops out of every line), and no two of them are one line's: two
+    /// pieces are one line's where they overlap in height by more than half
+    /// the shorter one, or their middles are within the line bucketing's
+    /// tolerance (`lineTolerance`) of each other. So a piece raised or
+    /// lowered on one drawn line, a superscript ordinal "5th" or a digit set
+    /// by a text rise, stays in its word, while two lines set solid or
+    /// tighter (12 pt type on 11 pt lines, whose boxes overlap by a point)
+    /// keep their pieces apart.
     static func piecesAccepted(_ pieces: [(range: NSRange, bounds: CGRect)], word: NSRange) -> Bool {
         let ranges = pieces.map(\.range).sorted { $0.location < $1.location }
         guard ranges.reduce(0, { $0 + $1.length }) == word.length,
               zip(ranges, ranges.dropFirst()).allSatisfy({ NSMaxRange($0) <= $1.location }) else { return false }
         for (i, one) in pieces.enumerated() {
-            for other in pieces[(i + 1)...] where one.bounds.minY < other.bounds.maxY && other.bounds.minY < one.bounds.maxY {
-                return false
+            for other in pieces[(i + 1)...] {
+                let overlap = min(one.bounds.maxY, other.bounds.maxY) - max(one.bounds.minY, other.bounds.minY)
+                let shorter = min(one.bounds.height, other.bounds.height)
+                if overlap > shorter * 0.5 || abs(one.bounds.midY - other.bounds.midY) <= lineTolerance(shorter) {
+                    return false
+                }
             }
         }
         return true
     }
+
+    /// How far apart two boxes' middles can be and still be one line's,
+    /// for a box `height` tall: half its height, and at least 2 pt.
+    static func lineTolerance(_ height: CGFloat) -> CGFloat { max(height * 0.5, 2.0) }
 
     /// Variant that takes a pre-computed cropBox (avoids redundant PDFKit
     /// trips in callers that already have it).
@@ -185,7 +199,7 @@ public struct EmbeddedTextSource: Sendable {
             for piece in Self.linePieces(of: sel, word: safeRange, bounds: bounds, page: page) {
                 let yMid = piece.bounds.midY
                 let pieceText = nsText.substring(with: piece.range)
-                let lineTolerance = max(piece.bounds.height * 0.5, 2.0)
+                let lineTolerance = Self.lineTolerance(piece.bounds.height)
                 if let idx = lineBuckets.firstIndex(where: {
                     abs($0.yMid - yMid) <= lineTolerance
                 }) {
