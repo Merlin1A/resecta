@@ -342,9 +342,9 @@ A PDF page can carry a word drawn at zero size: the word is part of the page's t
 ---
 
 ### KI-44: On Text Drawn Back Over Itself, a Box Can Miss the First Letter of a Word (Low)
-**Fixed in 1.4.0 on pages whose drawing Resecta can follow letter by letter:** Search and Scan now take the box out to the word's first letter where the page draws it. Still affected: a page that draws any of its text in a font other than a simple Type 1 or TrueType font (a composite font, as many East Asian documents use, or a font drawn by its own procedures); a page whose text the system's PDF reader gives in another order than the page draws it; and a page built in one of a few rarer ways Resecta does not follow.
-
 **Affects:** Search and Scan (typed pages where text is drawn back over text printed before it, as some form fillers and overprinted documents do)
+
+**Fixed in 1.4.0 on pages whose drawing Resecta can follow letter by letter:** Search and Scan now take the box out to the word's first letter where the page draws it. Still affected: a page that draws any of its text in a font other than a simple Type 1 or TrueType font (a composite font, as many East Asian documents use, or a font drawn by its own procedures); a page whose text the system's PDF reader gives in another order than the page draws it; and a page built in one of a few rarer ways Resecta does not follow.
 
 A PDF can move its drawing position back over text it has already printed, so that a word is printed partly over the one before it. When Search or Scan matches a word drawn this way, the box is placed where PDFKit, the system's PDF reader, reports the word, which can start after the word's first letter. When you apply it, that letter stays printed in the export, with either export mode. The rest of the word is covered. The checks after export do not report the letter as readable. Ordinary letter spacing does not cause this.
 
