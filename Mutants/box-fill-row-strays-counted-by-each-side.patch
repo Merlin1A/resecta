@@ -1,0 +1,19 @@
+Property: A region painted outside the plan that both the row's containment test and the producer name is one box that could not be checked, not two.
+Area: the Box Fill row
+Test command: cd Packages/RedactionEngine && swift test --skip-build --no-parallel --filter BoxFillRowTests (after swift build --build-tests)
+Must go red: RedactionEngineTests/BoxFillRowTests paintedOutsideThePlan, producerAloneNamesIt
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/BoxFillRow.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/BoxFillRow.swift
+index c5573e77..ba1ccd12 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/BoxFillRow.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/BoxFillRow.swift
+@@ -60,7 +60,7 @@ enum BoxFillRow {
+             // containment test leaves it out, or when the producer reports it
+             // painted outside the plan (the report carries each as its own
+             // unit); a region either names is counted once.
+-            let strays = Set(page.regions.filter { !isCovered($0, on: page) }.map(\.id)).union(picture.outsidePlan)
++            let strays = page.regions.filter { !isCovered($0, on: page) }.map(\.id) + picture.outsidePlan
+             notChecked.append(contentsOf: repeatElement(index, count: strays.count))
+         }
+         var conditions: [UnverifiedCondition] = []

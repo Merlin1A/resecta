@@ -5,10 +5,10 @@ Must go red: RedactionEngineTests/BoxFillRowTests each [a box on page 4 not judg
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/BoxFillRow.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/BoxFillRow.swift
-index 35889a69..cfb189fe 100644
+index c5573e77..58d7f376 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/BoxFillRow.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/BoxFillRow.swift
-@@ -43,7 +43,7 @@ enum BoxFillRow {
+@@ -53,7 +53,7 @@ enum BoxFillRow {
                  switch outcome {
                  case .completed?, .offPage?: break
                  case .issue?: found.append(index)
@@ -16,4 +16,4 @@ index 35889a69..cfb189fe 100644
 +                case .inconclusive?, .couldNotFinish?, nil: break
                  }
              }
-             for region in page.regions where !isCovered(region, on: page) {
+             // A region is a unit the check cannot judge when the row's own
