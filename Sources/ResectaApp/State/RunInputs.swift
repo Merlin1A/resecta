@@ -23,6 +23,7 @@ enum RunInputs {
         pageCount: Int,
         geometry: [Int: PageGeometry],
         regions: [Int: [RedactionRegion]],
+        reads: [Int: RunRecord.PageRead],
         settings snapshot: PipelineCoordinator.RunSettings
     ) -> RunRecord.Confirmed {
         RunRecord.Confirmed(
@@ -35,7 +36,7 @@ enum RunInputs {
                 guard let sides = geometry[page] else { return RunRecord.Page(pageIndex: page, regions: drawn) }
                 return RunRecord.Page(pageIndex: page, regions: drawn,
                                       cropBox: sides.cropBox.size, rotation: sides.rotation,
-                                      switchOn: snapshot.boxesAcrossColumn)
+                                      switchOn: snapshot.boxesAcrossColumn, read: reads[page])
             })
     }
 

@@ -41,7 +41,7 @@ struct RunRecordBoxesCaptureTests {
         let snapshot = settings()
         let record = RunInputs.confirmedRecord(
             pageCount: doc.pageCount, geometry: RunInputs.pageGeometry(of: doc),
-            regions: regions, settings: snapshot)
+            regions: regions, reads: [:], settings: snapshot)
         let pages = RunInputs.pageData(
             document: doc, regions: regions, textLayerStatus: [0: .rich, 1: .rich, 2: .rich],
             sourceHasHiddenOCG: false, settings: snapshot, effectiveMode: .secureRasterization, record: record)

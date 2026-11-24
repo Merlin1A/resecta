@@ -132,7 +132,33 @@ class DocumentState {
     @ObservationIgnored var keepAwake = RunKeepAwake()
 
     var sourceDocument: PDFDocument? {
-        didSet { if oldValue !== sourceDocument { sourceDocumentToken = UUID() } }
+        didSet {
+            if oldValue !== sourceDocument {
+                sourceDocumentToken = UUID()
+                pageReads = [:]
+            }
+        }
+    }
+    /// Each page's read of the open document, by page index: its words, text
+    /// and facts, read once per document and handed to every plan made for
+    /// the page. Emptied when another document opens.
+    private(set) var pageReads: [Int: RunRecord.PageRead] = [:]
+
+    /// Reads the listed pages this document does not hold a read for yet,
+    /// from a private copy (no view draws it), and keeps them. A read that
+    /// returns after another document has opened is dropped.
+    func fillPageReads(for pages: Set<Int>) async {
+        guard let document = sourceDocument else { return }
+        let missing = pages.filter { pageReads[$0] == nil }.sorted()
+        guard !missing.isEmpty else { return }
+        let token = sourceDocumentToken
+        let source = SendablePDFDocument(document)
+        guard let copy = await Task.detached(priority: .userInitiated, operation: { [holder = documentPassword] in
+            SearchCopy.make(of: source, unlockingWith: holder)
+        }).value else { return }
+        let reads = await RunRecord.PageRead.reads(of: copy, pages: missing, hasHiddenOCG: sourceHasHiddenOCG)
+        guard token == sourceDocumentToken else { return }
+        pageReads.merge(reads) { kept, _ in kept }
     }
     /// A fresh token for every document that enters `sourceDocument`: the
     /// identity a parked search session is matched against on restore. A
