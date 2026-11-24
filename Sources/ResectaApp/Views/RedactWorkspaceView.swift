@@ -199,6 +199,11 @@ struct RedactWorkspaceView: View {
         guard dropNeedsConfirm(documentState: documentState, redactionState: redactionState) else {
             return .importNow
         }
+        // The stop at Redact is refused under today's sentence until its own has a row.
+        if DocumentEditorView.sheetSlotShowsStop(
+            stopAwaitsAnswer: DocumentEditorView.stopAwaitsAnswer(documentState), phaseKind: documentState.phaseKind) {
+            return .refuse(dropOverSheetRefusal)
+        }
         return DocumentEditorView.sheetSlotIsPresenting(redactionState)
             ? .refuse(dropOverSheetRefusal)
             : .confirmReplace

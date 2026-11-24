@@ -65,6 +65,21 @@ struct BeforeYouRedactSheetTests {
         #expect(shown.first?.0 == .editing && shown.first?.1 == true)
     }
 
+    @Test("The editor counts the stop as presenting, and its Cancel leaves no case awaiting")
+    func stopCountsAsPresenting() {
+        let coordinator = makeLoadedCoordinator()
+        let documentState = coordinator.documentState
+        let redactionState = coordinator.redactionState
+        #expect(!DocumentEditorView.editorSlotIsPresenting(documentState: documentState, redactionState: redactionState))
+        documentState.redactRefusalAwaitingAnswer = .pagesNotRead([RedactStop.Page(page: 0, reason: .line(.recognitionOff))])
+        #expect(DocumentEditorView.editorSlotIsPresenting(documentState: documentState, redactionState: redactionState))
+        DocumentEditorView.applyStopAnswer(.cancel, documentState: documentState, redactionState: redactionState,
+                                           coordinator: coordinator, documentOverride: nil)
+        #expect(documentState.redactRefusalAwaitingAnswer == nil)
+        #expect(redactionState.redactStopAnswered.isEmpty)
+        #expect(!DocumentEditorView.editorSlotIsPresenting(documentState: documentState, redactionState: redactionState))
+    }
+
     @Test("The stop's height follows its content, and it opens at full height at the accessibility sizes")
     func height() {
         #expect(Sheet.stopSheetDetent(contentHeight: 420, availableHeight: 800, isAccessibilitySize: false) == .height(420))
