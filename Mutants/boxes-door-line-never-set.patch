@@ -1,0 +1,18 @@
+Property: The door line is the boxes line whenever the run burned a box.
+Area: the results screen's boxes line
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/FactRowTests
+Must go red: ResectaAppTests/FactRowTests doorLineIsTheBoxesLine
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/ResultsRunLines.swift b/Sources/ResectaApp/Views/ResultsRunLines.swift
+--- a/Sources/ResectaApp/Views/ResultsRunLines.swift
++++ b/Sources/ResectaApp/Views/ResultsRunLines.swift
+@@ -39,7 +39,7 @@ extension VerificationResultsView.RunFactsStrip {
+     /// The run line that opens What Boxes Can Show: the boxes line, when it
+     /// shows.
+     static func doorLine(for facts: VerificationResultsView.RunFacts) -> String? {
+-        facts.burnedBoxes > 0 ? boxesLine(count: facts.burnedBoxes) : nil
++        nil
+     }
+ 
+     /// The spoken hint on the link row that opens the page.

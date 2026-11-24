@@ -1,0 +1,18 @@
+Property: The boxes line's link row opens the page.
+Area: the results screen's boxes line
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppUITests/SeededStatesUITests
+Must go red: ResectaAppUITests/SeededStatesUITests testBoxesLineOpensWhatBoxesCanShow
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationResultsView.swift b/Sources/ResectaApp/Views/VerificationResultsView.swift
+--- a/Sources/ResectaApp/Views/VerificationResultsView.swift
++++ b/Sources/ResectaApp/Views/VerificationResultsView.swift
+@@ -104,7 +104,7 @@ struct VerificationResultsView: View {
+                             onReviewInScan: {
+                                 Self.reviewInScan(documentState: documentState, redactionState: redactionState)
+                             },
+-                            onOpenDoor: { _ in presentedPage = .whatBoxesCanShow })
++                            onOpenDoor: { _ in })
+                         footerBlock
+                         trustStrip
+                             .padding(.top, ResectaTokens.Spacing.xl)

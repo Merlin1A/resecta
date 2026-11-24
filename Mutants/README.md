@@ -1009,3 +1009,11 @@ with its reason and the mutant that is caught in its place.
 | `overlay-top-canvas-not-marked-with-the-overlay.patch` | Every redraw of the overlay marks the top canvas too. | ResectaAppTests/OverlayTopCanvasTests setNeedsDisplayReachesTheCanvas; ResectaAppTests/OverlayTopCanvasTests setNeedsDisplayInARectReachesTheCanvas; ResectaAppTests/OverlayTopCanvasTests settingChangeReachesTheCanvas |
 | `overlay-search-pass-left-in-the-overlay.patch` | The overlay's own draw(_:) draws only the committed boxes; the Search layer is drawn by the top canvas above them. | ResectaAppTests/OverlayTopCanvasTests drawBodiesNameTheirPasses |
 | `overlay-rejected-band-below-the-top-canvas.patch` | A rejected rubber band, while shown, is above the top canvas. | ResectaAppTests/OverlayTopCanvasTests rejectedBandIsAboveTheCanvas |
+| `boxes-page-switch-paragraph-drifts.patch` | The page's section on the switch reads as the Settings footer does, sentence for sentence. | ResectaAppTests/WhatBoxesCanShowPageTests switchParagraph |
+| `boxes-page-marker-drawn.patch` | The lint marker on the page's one marked line is never drawn. | ResectaAppTests/WhatBoxesCanShowPageTests markerNeverDrawn |
+| `boxes-page-read-from-the-root.patch` | The bundled page is compared with the file in Resources, where it is kept. | ResectaAppTests/LegalDocumentBundleTests bundledCopyMatchesRepoRoot |
+| `boxes-line-without-its-door.patch` | The boxes line opens to its link row to What Boxes Can Show. | ResectaAppTests/FactRowTests boxesLineOpensThePage |
+| `boxes-door-without-its-hint.patch` | The link row to What Boxes Can Show carries its spoken hint. | ResectaAppTests/FactRowTests boxesLineOpensThePage |
+| `boxes-door-line-never-set.patch` | The door line is the boxes line whenever the run burned a box. | ResectaAppTests/FactRowTests doorLineIsTheBoxesLine |
+| `boxes-page-settings-row-opens-nothing.patch` | The Settings row What Boxes Can Show opens the page. | ResectaAppUITests/SettingsInAppPagesUITests testWhatBoxesCanShowOpensFromRedactionBoxes |
+| `boxes-page-results-door-opens-nothing.patch` | The boxes line's link row opens the page. | ResectaAppUITests/SeededStatesUITests testBoxesLineOpensWhatBoxesCanShow |

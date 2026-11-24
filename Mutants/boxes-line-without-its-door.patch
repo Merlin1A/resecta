@@ -1,0 +1,18 @@
+Property: The boxes line opens to its link row to What Boxes Can Show.
+Area: the results screen's boxes line
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/FactRowTests
+Must go red: ResectaAppTests/FactRowTests boxesLineOpensThePage
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationDetailsSection.swift b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
+--- a/Sources/ResectaApp/Views/VerificationDetailsSection.swift
++++ b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
+@@ -270,7 +270,7 @@ struct VerificationDetailsSection: View {
+     /// `runFactsStrip` identifier.
+     static func runLineFacts(_ lines: [String], doorLine: String? = nil) -> [ResultsFact] {
+         lines.enumerated().map { position, line in
+-            let isDoor = line == doorLine
++            let isDoor = false
+             return ResultsFact(
+                 id: position == 0 ? "runFactsStrip" : "runFactsLine_\(position)", shown: line,
+                 door: isDoor ? LegalDocument.whatBoxesCanShow.title : nil,
