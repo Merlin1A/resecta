@@ -170,6 +170,32 @@ struct SearchAccountLifecycleTests {
         #expect(account?.pages(for: .noReport) == [5, 6, 8, 9])
     }
 
+    @Test("After a Stop, a late report counts only at or before the stop page: page 6 is read, page 8 stays not reached")
+    func lateReportsAfterStop() async {
+        let store = Store()
+        let (search, run) = Self.running(store)
+        await search.cancelSearch()
+        search.recordCoverage(PageSearchCoverage(pageIndex: 5, route: .textLayer), run: run)
+        search.recordCoverage(PageSearchCoverage(pageIndex: 7, route: .textLayer), run: run)
+        let account = Self.only(store)
+        #expect(account?.ending == .stopped(page: 5))
+        #expect(account?.stopPage == nil)
+        #expect(account?.pages(for: .notReached) == [6, 7, 8, 9])
+    }
+
+    @Test("At the result limit, a late report counts only at or before the stop page: page 6 is read, page 8 stays not reached")
+    func lateReportsAtLimit() {
+        let store = Store()
+        let (search, run) = Self.running(store)
+        search.markCapReached()
+        search.recordCoverage(PageSearchCoverage(pageIndex: 5, route: .textLayer), run: run)
+        search.recordCoverage(PageSearchCoverage(pageIndex: 7, route: .textLayer), run: run)
+        let account = Self.only(store)
+        #expect(account?.ending == .stoppedAtResultLimit(page: 5))
+        #expect(account?.stopPage == nil)
+        #expect(account?.pages(for: .notReached) == [6, 7, 8, 9])
+    }
+
     @Test("A pattern the engine refuses at the start: no result is cleared, so the run's tail closes it completed with no page read")
     func refusedPattern() {
         let store = Store()
