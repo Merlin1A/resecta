@@ -235,4 +235,28 @@ struct OverlayDrawnPlanTests {
             .appendingPathComponent("Sources/ResectaApp/Views/PDFDocumentView.swift"), encoding: .utf8)
         #expect(source.contains("coordinator.qualityCap = pipelineCoordinator.dpiCap"))
     }
+
+    @Test("Source pin: the editor's view hands the coordinator the settings, when it makes it and on each update")
+    func theViewHandsOnTheSettings() throws {
+        let source = try String(contentsOf: URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/ResectaApp/Views/PDFDocumentView.swift"), encoding: .utf8)
+        // Without the settings the coordinator keeps no plan (noteDrawn).
+        #expect(source.components(separatedBy: "coordinator.settingsState = settingsState").count - 1 == 2)
+    }
+
+    @Test("A new document, or clearing all, drops the plans kept for the last one")
+    func aNewDocumentDropsTheKeptPlans() {
+        let region = RedactionRegion(id: UUID(), normalizedRect: CGRect(x: 0.1, y: 0.2, width: 0.3, height: 0.04),
+                                     source: .manual)
+        let plan = DrawnPlan(pageIndex: 0, regions: [region], cropBox: CGSize(width: 612, height: 792), rotation: 0,
+                             switchOn: false, exportDPI: 300, fillColor: .black)
+        let state = RedactionState()
+        state.drawnPlans[0] = plan
+        state.clearForNewDocument()
+        #expect(state.drawnPlans.isEmpty)
+        state.drawnPlans[0] = plan
+        state.clearAll()
+        #expect(state.drawnPlans.isEmpty)
+    }
 }

@@ -407,6 +407,9 @@ class RedactionState {
         regionMetadata = [:]
         appliedMatchAudit = [:] // holds matched text: never crosses documents
         fitNoticeClosedPages = []
+        // The kept plans describe the prior document's pages. Page versions
+        // keep counting, so no later plan reads as made at an earlier one.
+        drawnPlans = [:]
     }
 
     /// Clear pre-redaction text extraction buffer on success path.
