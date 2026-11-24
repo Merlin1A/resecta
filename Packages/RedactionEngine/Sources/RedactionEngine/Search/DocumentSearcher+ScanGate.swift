@@ -94,15 +94,22 @@ extension DocumentSearcher {
     /// a sentinel's, united. Nil where none is kept.
     nonisolated static func takeBox(for match: PIIDetector.PIIMatch,
                                     from boxes: inout [AddressPlace: [TextLayerBox]]) -> TextLayerBox? {
+        takePlaced(for: match, from: &boxes)?.box
+    }
+
+    /// `takeBox`, with the places the box was kept at: the match's own
+    /// range, or the places inside the range the overlap step widened it to.
+    nonisolated static func takePlaced(for match: PIIDetector.PIIMatch,
+                                       from boxes: inout [AddressPlace: [TextLayerBox]]) -> (box: TextLayerBox, places: [NSRange])? {
         let key = AddressPlace(text: match.text, range: match.range)
         if var kept = boxes[key], !kept.isEmpty {
             if key.length > 0 {
                 boxes[key] = []
-                return united(kept)
+                return united(kept).map { ($0, [match.range]) }
             }
             let box = kept.removeFirst()
             boxes[key] = kept
-            return box
+            return (box, [match.range])
         }
         let start = match.range.location, end = NSMaxRange(match.range)
         let inside = boxes.keys
@@ -113,7 +120,29 @@ extension DocumentSearcher {
             taken += boxes[place] ?? []
             boxes[place] = []
         }
-        return united(taken)
+        return united(taken).map { ($0, inside.map { NSRange(location: $0.location, length: $0.length) }) }
+    }
+
+    /// The parts of a survivor's range outside the places its box was kept
+    /// at, each trimmed of white space and left out when nothing else is in
+    /// it: the text the overlap step widened the survivor over
+    /// (`resolveOverlaps`: a loser's part outside the winner), which the
+    /// address's own box does not reach. Each is boxed by its own range.
+    nonisolated static func tails(of range: NSRange, outside places: [NSRange], in text: NSString) -> [NSRange] {
+        var parts: [NSRange] = []
+        var from = range.location
+        for place in places.sorted(by: { $0.location < $1.location }) {
+            if place.location > from { parts.append(NSRange(location: from, length: place.location - from)) }
+            from = max(from, NSMaxRange(place))
+        }
+        if NSMaxRange(range) > from { parts.append(NSRange(location: from, length: NSMaxRange(range) - from)) }
+        let kept = CharacterSet.whitespacesAndNewlines.union(.punctuationCharacters).inverted
+        return parts.compactMap { part in
+            let first = text.rangeOfCharacter(from: kept, options: [], range: part)
+            let last = text.rangeOfCharacter(from: kept, options: .backwards, range: part)
+            guard first.location != NSNotFound, last.location != NSNotFound else { return nil }
+            return NSRange(location: first.location, length: NSMaxRange(last) - first.location)
+        }
     }
 
     /// The boxes as one: the paint, the hidden glyphs' boxes (where any

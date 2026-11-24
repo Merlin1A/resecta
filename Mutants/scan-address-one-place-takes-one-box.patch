@@ -5,17 +5,17 @@ Must go red: RedactionEngineTests/ScanDuplicateAddressTests copiesAtOneRealPlace
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift
-index 68054b49..01d7eb07 100644
+index 874aeaae..8b2ae8bf 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift
-@@ -96,10 +96,6 @@ extension DocumentSearcher {
-                                     from boxes: inout [AddressPlace: [TextLayerBox]]) -> TextLayerBox? {
+@@ -103,10 +103,6 @@ extension DocumentSearcher {
+                                        from boxes: inout [AddressPlace: [TextLayerBox]]) -> (box: TextLayerBox, places: [NSRange])? {
          let key = AddressPlace(text: match.text, range: match.range)
          if var kept = boxes[key], !kept.isEmpty {
 -            if key.length > 0 {
 -                boxes[key] = []
--                return united(kept)
+-                return united(kept).map { ($0, [match.range]) }
 -            }
              let box = kept.removeFirst()
              boxes[key] = kept
-             return box
+             return (box, [match.range])
