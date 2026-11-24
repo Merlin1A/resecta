@@ -195,6 +195,15 @@ enum PageDrawingFixtures {
         return jpeg
     }
 
+    /// The writer's Exif body, naming `width` and `height` as the picture's sides.
+    static func writersExif(width: Int = 96, height: Int = 96) -> [UInt8] {
+        var b = PageDrawingReader.writersExif
+        for (range, value) in [(PageDrawingReader.exifWidth, width), (PageDrawingReader.exifHeight, height)] {
+            for (k, at) in range.enumerated() { b[at] = UInt8((value >> (8 * (3 - k))) & 0xFF) }
+        }
+        return b
+    }
+
     /// An Exif body (big-endian) whose first directory holds one entry and names a second at `next`.
     static func exif(next: UInt32) -> [UInt8] {
         let n = next.bigEndian
