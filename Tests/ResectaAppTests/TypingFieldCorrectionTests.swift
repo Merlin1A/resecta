@@ -12,7 +12,7 @@ import Foundation
 struct TypingFieldCorrectionTests {
 
     /// Each field, as (its file under Sources/ResectaApp/Views, its line).
-    static let fields: [(String, String)] = [
+    nonisolated static let fields: [(String, String)] = [
         ("Search/SearchAndRedactSheet+SearchBar.swift", #"TextField("Add term…", text: $searchState.queryText)"#),
         ("Search/SearchAndRedactSheet+SearchBar.swift", #"TextField("Search text…", text: $searchState.queryText)"#),
         ("CustomTermsView.swift", #"TextField(placeholder, text: $pattern)"#),
