@@ -5,14 +5,15 @@ Must go red: RedactionEngineTests/InvisibleTextPageTests reading [a hidden layer
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
+index a6bcf5d6..da022acc 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
-@@ -65,7 +65,7 @@
+@@ -173,7 +173,7 @@ extension DocumentSearcher {
          let show: CGPDFOperatorCallback = { scanner, info in
              guard let info else { return }
              let state = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
--            if state.mode == 3 || state.mode == 7 { state.found = true; CGPDFScannerStop(scanner) }
-+            if state.mode == 3 { state.found = true; CGPDFScannerStop(scanner) }
+-            if [state.mode, state.quartzMode].contains(where: { $0 == 3 || $0 == 7 }) {
++            if [state.mode, state.quartzMode].contains(where: { $0 == 3 }) {
+                 state.found = true; CGPDFScannerStop(scanner)
+             }
          }
-         for op in ["Tj", "TJ", "'", "\""] { CGPDFOperatorTableSetCallback(table, op, show) }
-         CGPDFOperatorTableSetCallback(table, "Do") { scanner, info in

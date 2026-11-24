@@ -6,22 +6,22 @@ Note: the form's exit also removes nothing when the form has left fewer saved st
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
-index 82920236..277b56e0 100644
+index a6bcf5d6..c9ce44f0 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
-@@ -68,7 +68,7 @@ extension DocumentSearcher {
+@@ -166,7 +166,7 @@ extension DocumentSearcher {
          CGPDFOperatorTableSetCallback(table, "Q") { _, info in
              guard let info else { return }
              let state = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
--            if state.saved.count > state.floor, let mode = state.saved.popLast() { state.mode = mode }
-+            if let mode = state.saved.popLast() { state.mode = mode }
+-            if state.saved.count > state.floor, let modes = state.saved.popLast() {
++            if let modes = state.saved.popLast() {
+                 state.mode = modes.mode; state.quartzMode = modes.quartzMode
+             }
          }
-         let show: CGPDFOperatorCallback = { scanner, info in
-             guard let info else { return }
-@@ -100,7 +100,7 @@ extension DocumentSearcher {
+@@ -205,7 +205,7 @@ extension DocumentSearcher {
              if !CGPDFScannerScan(innerScanner) && !state.found && !state.unreadable { state.unreadable = true }
              state.depth -= 1
-             state.mode = mode
+             state.mode = mode; state.quartzMode = quartzMode
 -            state.saved.removeLast(state.saved.count - savedCount)
 +            state.saved.removeLast(max(0, state.saved.count - savedCount))
              state.floor = floor

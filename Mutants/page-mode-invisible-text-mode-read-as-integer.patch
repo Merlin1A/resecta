@@ -5,19 +5,15 @@ Must go red: RedactionEngineTests/InvisibleTextPageTests reading [one invisible 
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
-index 82920236..6b4efdd9 100644
+index a6bcf5d6..c59ded9c 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
-@@ -56,9 +56,9 @@ extension DocumentSearcher {
-         CGPDFOperatorTableSetCallback(table, "Tr") { scanner, info in
-             guard let info else { return }
-             let state = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
--            var value: CGPDFReal = 0
--            guard CGPDFScannerPopNumber(scanner, &value) else { state.unreadable = true; CGPDFScannerStop(scanner); return }
--            state.mode = value
-+            var value: CGPDFInteger = 0
-+            guard CGPDFScannerPopInteger(scanner, &value) else { return }
-+            state.mode = CGPDFReal(value)
-         }
-         CGPDFOperatorTableSetCallback(table, "q") { _, info in
-             guard let info else { return }
+@@ -153,7 +153,7 @@ extension DocumentSearcher {
+             case .integer where CGPDFObjectGetValue(operand, .integer, &integer):
+                 state.mode = CGPDFReal(integer); state.quartzMode = CGPDFReal(integer)
+             case .real where CGPDFObjectGetValue(operand, .real, &real):
+-                state.mode = real
++                break
+             default:
+                 state.unreadable = true; CGPDFScannerStop(scanner)
+             }

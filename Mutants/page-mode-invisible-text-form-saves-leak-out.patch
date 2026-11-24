@@ -5,13 +5,13 @@ Must go red: RedactionEngineTests/InvisibleTextPageTests reading [a form that sa
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
-index 82920236..67a46bf4 100644
+index a6bcf5d6..a06a1b75 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
-@@ -100,7 +100,6 @@ extension DocumentSearcher {
+@@ -205,7 +205,6 @@ extension DocumentSearcher {
              if !CGPDFScannerScan(innerScanner) && !state.found && !state.unreadable { state.unreadable = true }
              state.depth -= 1
-             state.mode = mode
+             state.mode = mode; state.quartzMode = quartzMode
 -            state.saved.removeLast(state.saved.count - savedCount)
              state.floor = floor
              CGPDFScannerRelease(innerScanner)
