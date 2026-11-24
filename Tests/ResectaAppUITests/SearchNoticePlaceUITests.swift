@@ -52,11 +52,33 @@ nonisolated final class SearchNoticePlaceUITests: XCTestCase {
 
     private static let tooLarge7 = "Page 7 was too large to scan for text \u{2014} image content there was not searched."
 
+    /// Whether a run is going: its progress line shows.
+    private var isSearching: Bool {
+        app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Scanning page'")).firstMatch.exists
+    }
+
+    /// A condition read from the elements, checked every tenth of a second.
+    /// (A predicate on a frame's parts never matches: an element's frame is
+    /// not read by key path.)
+    private func waitUntil(timeout: TimeInterval, _ condition: () -> Bool) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while !condition() {
+            if Date() > deadline { return false }
+            usleep(100_000)
+        }
+        return true
+    }
+
     /// Some simulators never bring the software keyboard on screen; there
-    /// the keyboard tests skip and say why (a skip is not a pass).
-    private func requireKeyboard() throws {
+    /// the keyboard tests skip and say why (a skip is not a pass). The
+    /// sheet's field can hold focus from launch, where a tap brings no
+    /// keyboard; one typed letter brings it, and starts a new run.
+    private func requireKeyboard(typingInto field: XCUIElement) throws {
         let keyboard = app.keyboards.firstMatch
-        _ = keyboard.waitForExistence(timeout: 8)
+        if !keyboard.waitForExistence(timeout: 4) {
+            field.typeText("s")
+            _ = keyboard.waitForExistence(timeout: 8)
+        }
         let onScreen = keyboard.exists && keyboard.frame.minY < app.windows.firstMatch.frame.maxY - 100
         #if targetEnvironment(simulator)
         try XCTSkipUnless(onScreen, "No software keyboard on this simulator, so the notice cannot be judged with the keyboard up.")
@@ -115,14 +137,14 @@ nonisolated final class SearchNoticePlaceUITests: XCTestCase {
         let restHeight = notice.frame.height
         let field = app.textFields["Search text"]
         field.tap()
-        try requireKeyboard()
+        try requireKeyboard(typingInto: field)
+        XCTAssertTrue(notice.waitForExistence(timeout: 30))
+        XCTAssertTrue(waitUntil(timeout: 30) { !self.isSearching }, "The run did not end.")
         XCTAssertLessThanOrEqual(notice.frame.height, restHeight - 20, "With the keyboard up the notice takes one line.")
         XCTAssertEqual(notice.elementType, .button, "A cut notice opens the details.")
         attachScreenshot(named: "notice-limit-keyboard")
         app.keyboards.buttons["Return"].firstMatch.tap()
-        let back = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "frame.size.height >= %f", restHeight - 1), object: notice)
-        XCTAssertEqual(XCTWaiter().wait(for: [back], timeout: 10), .completed, "The notice is whole again.")
+        XCTAssertTrue(waitUntil(timeout: 10) { notice.frame.height >= restHeight - 1 }, "The notice is whole again.")
     }
 
     func testNothingFound_theNoticeStaysAboveTheEmptyState() {
@@ -138,9 +160,16 @@ nonisolated final class SearchNoticePlaceUITests: XCTestCase {
         launch(["--searchDetent=large", "--uitestNoticeSeed=tooLarge:6"])
         let notice = element("ocrSkipBanner")
         XCTAssertTrue(notice.waitForExistence(timeout: 30))
-        let top = notice.frame.minY
+        // The keyboard first, where the simulator shows one, and the run its
+        // letter starts brought to its end: then the place is read, and a
+        // second letter's run must leave it where it is.
         let field = app.textFields["Search text"]
         field.tap()
+        field.typeText("s")
+        _ = app.keyboards.firstMatch.waitForExistence(timeout: 5)
+        XCTAssertTrue(waitUntil(timeout: 30) { !self.isSearching }, "The first run did not end.")
+        sleep(1)
+        let top = notice.frame.minY
         field.typeText("s")
         for _ in 0..<40 {
             XCTAssertTrue(notice.exists, "The notice left while the new search ran.")
@@ -207,9 +236,8 @@ nonisolated final class SearchNoticePlaceUITests: XCTestCase {
         // The drag the detent tests make: from the half-height grabber to the top.
         window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.50))
             .press(forDuration: 0.1, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.03)))
-        let raised = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "frame.origin.y < %f", window.frame.height * 0.2), object: dismiss)
-        XCTAssertEqual(XCTWaiter().wait(for: [raised], timeout: 10), .completed, "One swipe did not raise the sheet.")
+        let raisedLine = window.frame.height * 0.2
+        XCTAssertTrue(waitUntil(timeout: 10) { dismiss.frame.minY < raisedLine }, "One swipe did not raise the sheet.")
     }
 
     func testTyping_withANotice_keepsTheFieldFocused() throws {
@@ -217,7 +245,7 @@ nonisolated final class SearchNoticePlaceUITests: XCTestCase {
         XCTAssertTrue(element("ocrSkipBanner").waitForExistence(timeout: 30))
         let field = app.textFields["Search text"]
         field.tap()
-        try requireKeyboard()
+        try requireKeyboard(typingInto: field)
         field.typeText("ss")
         sleep(2)
         XCTAssertTrue((field.value(forKey: "hasKeyboardFocus") as? Bool) ?? false, "The field lost focus.")
