@@ -42,6 +42,12 @@ package enum PaintRule: String, Hashable, Sendable, Codable, CaseIterable {
     /// line's own height; `paint` is the band plus the same margin, held at
     /// the limit lines.
     case band
+    /// The default band: the band without the box's own run, every
+    /// unselected word of the line a stop, taken only where the band is
+    /// clear of the page's other words and drawn objects; else the line
+    /// margin. `paint` is the default band plus the same margin, held at the
+    /// limit lines.
+    case defaultBand
 }
 
 /// What a row records about the switch.
@@ -340,7 +346,7 @@ extension GeometryPolicy {
         row(.drawnByHand, .direction, on: false, .asDrawn, .notAsked),
         row(.drawnByHand, .direction, on: true, .asDrawn, .couldNotWiden(reason: .byHand)),
         // Placed from the text and still anchored: the line decides.
-        row(.placedFromTextAnchored, .column, on: false, .lineMargin, .notAsked),
+        row(.placedFromTextAnchored, .column, on: false, .defaultBand, .notAsked),
         row(.placedFromTextAnchored, .column, on: true, .band, .byPaint),
         row(.placedFromTextAnchored, .noColumn, on: false, .lineMargin, .notAsked),
         row(.placedFromTextAnchored, .noColumn, on: true, .lineMargin, .couldNotWiden(reason: .noColumn)),
