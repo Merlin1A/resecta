@@ -308,6 +308,8 @@ On a page that is a picture, such as a photo, a screenshot or a scan without its
 ### KI-40: On a Scan Stored as Many Small Pictures, Search Does Not Read the Picture (Medium)
 **Affects:** Search (scanned pages that carry their own text)
 
+**Fixed in 1.4.0 for most such pages:** Search now also reads a page's images for text when its pictures together cover at least four fifths of the page, however many pieces they are stored in. A scanned page whose pictures cover less than four fifths of the page can still be affected.
+
 On a page with a text layer, Search also reads the page's images for text when one image holds at least 250,000 pixels, or at least half as many pixels as the page itself has at 100 dpi, or when the page's text layer is very short for its size. Some scanners store a page's picture as many narrow strips, each smaller than that, so on such a page Search reads the page's own text and does not read the picture, with or without Include OCR Pages. A word that is printed on the page but missing from that text, or spelled differently in it, is not found, and nothing in the app says the picture was not read. No box is placed on it, so it stays readable in the export. When you have applied at least one result of the same search, the check after export reads every page of the redacted copy for that term and can report it. A search that found nothing is not run again after export, so a word Search did not match anywhere in the document is not reported, and every check can pass.
 
 **Workaround:** On a scanned document, look over each page for the words you searched for, check each such page in the preview before sharing, and draw a box over anything Search missed.
@@ -343,6 +345,8 @@ A PDF page can carry a word drawn at zero size: the word is part of the page's t
 
 ### KI-44: On Text Drawn Back Over Itself, a Box Can Miss the First Letter of a Word (Low)
 **Affects:** Search and Scan (typed pages where text is drawn back over text printed before it, as some form fillers and overprinted documents do)
+
+**Fixed in 1.4.0 on pages whose drawing Resecta can follow letter by letter:** Search and Scan now take the box out to the word's first letter where the page draws it. Still affected: a page that draws any of its text in a font other than a simple Type 1 or TrueType font (a composite font, as many East Asian documents use, or a font drawn by its own procedures); a page whose text the system's PDF reader gives in another order than the page draws it; and a page built in one of a few rarer ways Resecta does not follow.
 
 A PDF can move its drawing position back over text it has already printed, so that a word is printed partly over the one before it. When Search or Scan matches a word drawn this way, the box is placed where PDFKit, the system's PDF reader, reports the word, which can start after the word's first letter. When you apply it, that letter stays printed in the export, with either export mode. The rest of the word is covered. The checks after export do not report the letter as readable. Ordinary letter spacing does not cause this.
 
