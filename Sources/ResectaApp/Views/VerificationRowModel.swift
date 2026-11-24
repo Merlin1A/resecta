@@ -257,7 +257,7 @@ nonisolated struct VerificationRowModel: Equatable {
                 ? "Checks Rasterized pages for a text layer."
                 : "Measures characters against regions."
         case .characterCount:       "Compares character counts with the record."
-        case .fontVerification:     "Checks fonts: Courier, Courier New, Menlo."
+        case .fontVerification:     "Checks fonts against Courier and Menlo."
         case .characterLineage:     "Compares kept characters with the record."
         case .operatorReExtraction: "Searches text commands for your terms."
         case .hiddenWordInk:
@@ -288,7 +288,7 @@ nonisolated struct VerificationRowModel: Equatable {
         case .characterCount:
             "Each page's count must match the one recorded at redaction, or be at most 2 over. Spaces are not counted."
         case .fontVerification:
-            "Fonts on Searchable pages must be Courier, Courier New, or Menlo, all fixed-width. Any other font fails."
+            "Fonts on Searchable pages must be Courier or Menlo, both fixed-width. Any other font fails."
         case .characterLineage:
             "Each page's kept characters must match the fingerprint recorded at redaction. Zero-width marks are not seen."
         case .operatorReExtraction:

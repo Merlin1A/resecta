@@ -338,7 +338,7 @@ struct VerificationRowModelTests {
         .metadataCheck: "Checks metadata for leftover fields.",
         .spatialVerification: "Measures characters against regions.",
         .characterCount: "Compares character counts with the record.",
-        .fontVerification: "Checks fonts: Courier, Courier New, Menlo.",
+        .fontVerification: "Checks fonts against Courier and Menlo.",
         .characterLineage: "Compares kept characters with the record.",
         .operatorReExtraction: "Searches text commands for your terms.",
         .hiddenWordInk: "Looks for hidden copies of boxed words.",
@@ -370,7 +370,7 @@ struct VerificationRowModelTests {
         #expect(VerificationRowModel.rule(for: .boxFill)
                 == "Image blocks each box touches must be exactly the fill in brightness. Margin edges are not confirmed.")
         #expect(VerificationRowModel.rule(for: .fontVerification)
-                == "Fonts on Searchable pages must be Courier, Courier New, or Menlo, all fixed-width. Any other font fails.")
+                == "Fonts on Searchable pages must be Courier or Menlo, both fixed-width. Any other font fails.")
         #expect(VerificationRowModel.rule(for: Self.layer(.fail("x"), identity: nil))
                 == "Compares the PDF's page count with the original's. The other checks run only when they match.")
     }
