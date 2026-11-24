@@ -221,7 +221,7 @@ struct SavedSearchListSheet: View {
                 presenting: deleteTarget
             ) { search in
                 Button("Delete", role: .destructive) {
-                    if savedSearchStore.remove(id: search.id) != .saved { Self.reportNotSaved() }
+                    if savedSearchStore.remove(id: search.id) != .saved { Self.reportNotSaved(toastManager) }
                     deleteTarget = nil
                 }
                 Button("Cancel", role: .cancel) { deleteTarget = nil }
@@ -240,7 +240,7 @@ struct SavedSearchListSheet: View {
                 titleVisibility: .visible
             ) {
                 Button("Delete All", role: .destructive) {
-                    if savedSearchStore.clearAll(interface: activeInterface) != .saved { Self.reportNotSaved() }
+                    if savedSearchStore.clearAll(interface: activeInterface) != .saved { Self.reportNotSaved(toastManager) }
                 }
                 .accessibilityIdentifier("savedSearchClearAllConfirm")
                 Button("Cancel", role: .cancel) { }
@@ -293,10 +293,10 @@ struct SavedSearchListSheet: View {
     }
 
     /// A delete this list did not store: the row stays. The list has no line
-    /// to show it on, so the buzz plays and VoiceOver reads the line.
-    static func reportNotSaved() {
+    /// to show it on, so the buzz plays and the message queue speaks the line.
+    static func reportNotSaved(_ messages: ToastQueueManager) {
         UINotificationFeedbackGenerator().notificationOccurred(.error)
-        AccessibilityNotification.Announcement(ListChange.notSavedMessage).post()
+        messages.announce(ListChange.notSavedMessage)
     }
 
     /// Whether a prompt that has closed is shown again: when a refusal left

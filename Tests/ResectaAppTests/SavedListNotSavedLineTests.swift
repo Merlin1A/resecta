@@ -63,7 +63,8 @@ struct SavedListNotSavedLineTests {
                 .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
                 .appendingPathComponent("Sources/ResectaApp/Views/Search/SavedSearchListSheet.swift"),
             encoding: .utf8)
-        #expect(source.contains("AccessibilityNotification.Announcement(ListChange.notSavedMessage).post()"))
-        #expect(source.components(separatedBy: "!= .saved { Self.reportNotSaved() }").count - 1 == 2)
+        #expect(source.contains("messages.announce(ListChange.notSavedMessage)"))
+        #expect(!source.contains("AccessibilityNotification.Announcement("))
+        #expect(source.components(separatedBy: "!= .saved { Self.reportNotSaved(toastManager) }").count - 1 == 2)
     }
 }
