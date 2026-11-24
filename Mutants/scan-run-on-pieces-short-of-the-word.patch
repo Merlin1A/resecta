@@ -1,0 +1,20 @@
+Property: A word's line pieces stand for it only where together they hold each of its characters once. Planted: pieces that leave a character out, or hold one twice, are taken.
+Area: Search, Scan's address lines (EmbeddedTextSource)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'ScanRunOnAddressTests'
+Must go red: RedactionEngineTests/ScanRunOnAddressTests piecesShortOfTheWordAreRefused
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/EmbeddedTextSource.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/EmbeddedTextSource.swift
+index 3e4988a8..3fd52989 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/EmbeddedTextSource.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/EmbeddedTextSource.swift
+@@ -107,8 +107,7 @@ public struct EmbeddedTextSource: Sendable {
+     /// "5th" or a digit set by a text rise, stays in its word).
+     static func piecesAccepted(_ pieces: [(range: NSRange, bounds: CGRect)], word: NSRange) -> Bool {
+         let ranges = pieces.map(\.range).sorted { $0.location < $1.location }
+-        guard ranges.reduce(0, { $0 + $1.length }) == word.length,
+-              zip(ranges, ranges.dropFirst()).allSatisfy({ NSMaxRange($0) <= $1.location }) else { return false }
++        guard !ranges.isEmpty else { return false }
+         for (i, one) in pieces.enumerated() {
+             for other in pieces[(i + 1)...] where one.bounds.minY < other.bounds.maxY && other.bounds.minY < one.bounds.maxY {
+                 return false
