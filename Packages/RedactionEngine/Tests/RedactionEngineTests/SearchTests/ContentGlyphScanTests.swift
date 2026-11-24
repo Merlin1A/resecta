@@ -99,6 +99,67 @@ struct ContentGlyphScanTests {
         #expect(address?.identityUnionRect == streetBox.union(zipBox), "told by the union before the growth")
     }
 
+    /// Each line `addressLines` gives holds its own drawn glyphs: the box of
+    /// each glyph of its text (cut to the line's height, as the growth is
+    /// sideways), within the growth's slack.
+    static func linesHoldTheirGlyphs(_ page: PDFPage, _ lines: [OCREngine.TextLine],
+                                     sourceLocation: SourceLocation = #_sourceLocation) throws {
+        let searcher = DocumentSearcher()
+        let text = try #require(page.string) as NSString
+        let tolerance = DocumentSearcher.growthSlack / 792
+        for word in ["Street", "62704"] {
+            let range = text.range(of: word)
+            let line = try #require(lines.first { $0.text.contains(word) }, "a line holds \(word): \(lines.map(\.text))",
+                                    sourceLocation: sourceLocation)
+            let glyphs = try #require(DocumentSearcher.ownGlyphs(for: range, page: page), "the page is mapped",
+                                      sourceLocation: sourceLocation)
+            #expect(glyphs.count == word.count, "\(word)'s glyphs: \(glyphs.count)", sourceLocation: sourceLocation)
+            for glyph in glyphs {
+                let box = try #require(searcher.normalizedRect(forPageRect: glyph.box, page: page), sourceLocation: sourceLocation)
+                let held = line.normalizedRect.insetBy(dx: -tolerance, dy: -tolerance)
+                // The growth runs along the line, so the glyph is held along it; across it, the two overlap.
+                #expect(held.intersects(box) && (held.minX <= box.minX && held.maxX >= box.maxX
+                                                 || held.minY <= box.minY && held.maxY >= box.maxY),
+                        "the \(word) line \(Self.points(line.normalizedRect)) leaves out a glyph at \(Self.points(box))",
+                        sourceLocation: sourceLocation)
+            }
+        }
+    }
+
+    @Test("On a page with a hidden layer over a page image, the address lines are the padded line boxes, each holds its own glyphs, and none is grown")
+    func addressLinesOverAnImage() throws {
+        let doc = try Self.overImage(Self.shortZip)
+        let page = try #require(doc.page(at: 0))
+        let padded = try #require(EmbeddedTextSource.make(from: page, fitLines: true)).lines
+        let pdfKit = try #require(EmbeddedTextSource.make(from: page, fitLines: false)).lines
+        let lines = try #require(DocumentSearcher().addressLines(on: page))
+        try Self.linesHoldTheirGlyphs(page, lines)
+        // Over a page image the line boxes are padded, so the ZIP line already holds the 4 PDFKit's box ends short of.
+        let zipPDFKit = try #require(pdfKit.first { $0.text.contains("62704") })
+        #expect(Self.points(zipPDFKit.normalizedRect).maxX < 176, "precondition: PDFKit's own box ends short of the 4")
+        #expect(lines.map(\.normalizedRect) == padded.map(\.normalizedRect), "the padded boxes, unchanged")
+        #expect(lines.allSatisfy { $0.ungrownRect == nil }, "no line grown")
+        let zip = try #require(lines.first { $0.text.contains("62704") })
+        #expect(Self.points(zip.normalizedRect).maxX >= Self.zipEnd, "the ZIP line ends at \(Self.points(zip.normalizedRect).maxX)")
+    }
+
+    @Test("On a page turned by /Rotate, every address line holds its own glyphs, and the ZIP line holds its last digit", arguments: [90, 180, 270])
+    func addressLinesOnATurnedPage(_ rotate: Int) throws {
+        let content = Self.shortZip
+        let data = buildRawPDF(objects: [
+            PDFObject(id: 1, content: "<< /Type /Catalog /Pages 2 0 R >>"),
+            PDFObject(id: 2, content: "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+            PDFObject(id: 3, content: "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Rotate \(rotate) /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>"),
+            PDFObject(id: 4, content: "<< /Length \(content.utf8.count) >>\nstream\n\(content)\nendstream"),
+            PDFObject(id: 5, content: ContentGlyphWalkTests.helvetica),
+        ], rootId: 1)
+        let doc = try #require(PDFDocument(data: data))
+        let page = try #require(doc.page(at: 0))
+        try #require(page.rotation == rotate, "the page is turned: \(page.rotation)")
+        let lines = try #require(DocumentSearcher().addressLines(on: page))
+        try Self.linesHoldTheirGlyphs(page, lines)
+    }
+
     // MARK: - A hidden layer over a page image, on a page that also draws text
 
     /// A white page-scale image (850 × 1100 one-bit pixels, the image share
