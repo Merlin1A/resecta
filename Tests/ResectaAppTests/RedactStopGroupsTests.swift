@@ -43,7 +43,7 @@ struct RedactStopGroupsTests {
         #expect(rerun.kind == .multiTerm(["Delia", "Rourke"]))
         #expect(rerun.options.includeOCR && !rerun.options.multiTermConjunction)
         // With its matches applied, the next tap runs.
-        #expect(!RedactStop.opens(runs: runs + [(rerun, Self.read)], answered: []))
+        #expect(!RedactStop.stops(runs: runs + [(rerun, Self.read)], answered: []))
     }
 
     @Test("A Text search and a Pattern: the button re-runs the Text search; the next showing names the pattern by its text, and the button re-runs it")

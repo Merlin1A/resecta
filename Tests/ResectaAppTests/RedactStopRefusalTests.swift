@@ -40,7 +40,7 @@ struct RedactStopRefusalTests {
         let coordinator = makeLoadedCoordinator()
         let state = Self.stateWithOneRun(coordinator.redactionState)
         state.regions[0] = [RedactionRegion(id: UUID(), normalizedRect: CGRect(x: 0.1, y: 0.2, width: 0.3, height: 0.4), source: .manual)]
-        #expect(RedactStop.opens(runs: state.closedSearchRuns, answered: state.redactStopAnswered))
+        #expect(RedactStop.stops(runs: state.closedSearchRuns, answered: state.redactStopAnswered))
         #expect(coordinator.documentState.redactRefusal(with: state) == nil)
     }
 
@@ -88,10 +88,10 @@ struct RedactStopRefusalTests {
         account.recordRecognitionOff(page: 2)
         account.end(.completed)
         state.recordSearchAccount(account, token: token)
-        #expect(RedactStop.opens(runs: state.closedSearchRuns, answered: state.redactStopAnswered))
+        #expect(RedactStop.stops(runs: state.closedSearchRuns, answered: state.redactStopAnswered))
         state.answerRedactStop(RedactStop.namedPages(runs: state.closedSearchRuns, answered: state.redactStopAnswered))
         #expect(state.redactStopAnswered == [RedactStop.Page(page: 2, reason: .line(.recognitionOff))])
-        #expect(!RedactStop.opens(runs: state.closedSearchRuns, answered: state.redactStopAnswered))
+        #expect(!RedactStop.stops(runs: state.closedSearchRuns, answered: state.redactStopAnswered))
     }
 
     @Test("Redact Anyway answers the pages the sheet named, and not a page that became unread after it was shown")
@@ -119,7 +119,7 @@ struct RedactStopRefusalTests {
         for close in [{ (state: RedactionState) in state.clearAll() }, { (state: RedactionState) in state.clearForNewDocument() }] {
             let state = Self.stateWithOneRun()
             state.answerRedactStop(Self.somePages)
-            #expect(!RedactStop.opens(runs: state.closedSearchRuns, answered: state.redactStopAnswered))
+            #expect(!RedactStop.stops(runs: state.closedSearchRuns, answered: state.redactStopAnswered))
             #expect(state.redactStopAnswered == Self.somePages)
             close(state)
             #expect(state.redactStopAnswered.isEmpty)
