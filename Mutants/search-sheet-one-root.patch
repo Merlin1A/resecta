@@ -5,7 +5,7 @@ Must go red: ResectaAppUITests/SearchTypingFocusUITests testTypingFirstResults_f
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Views/Search/SearchResultsSection.swift b/Sources/ResectaApp/Views/Search/SearchResultsSection.swift
-index 15f5b35b..055752b4 100644
+index b856cc61..b47aa225 100644
 --- a/Sources/ResectaApp/Views/Search/SearchResultsSection.swift
 +++ b/Sources/ResectaApp/Views/Search/SearchResultsSection.swift
 @@ -85,6 +85,13 @@ struct SearchResultsSection: View {
@@ -29,5 +29,5 @@ index 15f5b35b..055752b4 100644
 +            }
 +        }
              .background { keyboardShortcutButtons }
-             // Measured outside the section's own inset, so the place's
-             // height never feeds its own limit.
+             // The list's room: the section's own size, which already
+             // leaves out the sheet's fixed top and the footer or the
