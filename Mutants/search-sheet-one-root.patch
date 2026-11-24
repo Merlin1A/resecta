@@ -5,10 +5,10 @@ Must go red: ResectaAppUITests/SearchTypingFocusUITests testTypingFirstResults_f
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Views/Search/SearchResultsSection.swift b/Sources/ResectaApp/Views/Search/SearchResultsSection.swift
-index 586ac352..6cdb4613 100644
+index 15f5b35b..055752b4 100644
 --- a/Sources/ResectaApp/Views/Search/SearchResultsSection.swift
 +++ b/Sources/ResectaApp/Views/Search/SearchResultsSection.swift
-@@ -75,6 +75,13 @@ struct SearchResultsSection: View {
+@@ -85,6 +85,13 @@ struct SearchResultsSection: View {
          // found nothing) re-hosts that inset, the field leaves its
          // window for an instant, loses first responder, and the
          // keyboard closes under the user's fingers.
@@ -22,12 +22,12 @@ index 586ac352..6cdb4613 100644
          resultsList
              .overlay {
                  if searchState.searchModeType == .piiScan
-@@ -96,6 +103,8 @@ struct SearchResultsSection: View {
+@@ -106,6 +113,8 @@ struct SearchResultsSection: View {
              .safeAreaInset(edge: .top, spacing: 0) {
                  sectionTopChrome
              }
 +            }
 +        }
              .background { keyboardShortcutButtons }
-     }
- 
+             // Measured outside the section's own inset, so the place's
+             // height never feeds its own limit.
