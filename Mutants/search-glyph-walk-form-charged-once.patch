@@ -1,0 +1,21 @@
+Property: A form drawn again is charged again: its size is read once, but every drawing counts toward the limit.
+Area: Search, the match boxes from the page's own drawing
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter ContentGlyphWalkLimitTests
+Must go red: RedactionEngineTests/ContentGlyphWalkLimitTests formBytesChargedPerDrawing; RedactionEngineTests/ContentGlyphWalkLimitTests redrawnBareNumbersRefused
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphWalk.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphWalk.swift
+index c0bc5b61..16cbd63d 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphWalk.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphWalk.swift
+@@ -293,8 +293,8 @@ enum ContentGlyphWalk {
+     private static func charge(_ stream: CGPDFStreamRef, _ s: State) -> Bool {
+         let key = unsafeBitCast(stream, to: Int.self)
+         let size: Int
+-        if let known = s.formSizes[key] {
+-            size = known
++        if s.formSizes[key] != nil {
++            return true
+         } else {
+             var format = CGPDFDataFormat.raw
+             guard let data = CGPDFStreamCopyData(stream, &format) else { return false }
