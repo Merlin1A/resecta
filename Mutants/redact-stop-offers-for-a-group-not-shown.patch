@@ -5,11 +5,11 @@ Must go red: ResectaAppTests/BeforeYouRedactSheetTests offersOnlyForAShownGroup
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Views/BeforeYouRedactSheet.swift b/Sources/ResectaApp/Views/BeforeYouRedactSheet.swift
-index b97d044a..927b10d6 100644
+index ee77fb72..012bc8cf 100644
 --- a/Sources/ResectaApp/Views/BeforeYouRedactSheet.swift
 +++ b/Sources/ResectaApp/Views/BeforeYouRedactSheet.swift
-@@ -257,7 +257,7 @@ extension BeforeYouRedactSheet {
-                 nameLine: units == nil ? nil : words.nameLine(names, withOptions),
+@@ -260,7 +260,7 @@ extension BeforeYouRedactSheet {
+                 nameLine: units == nil ? nil : words.nameLine(names, withOptions, RedactStop.units(of: runs)),
                  rows: groups.map { NotSearchedListContent.Row(sentence: words.row($0, names), pages: $0.pages) })
          }
 -        let reRun = shown.lazy.compactMap { RedactStop.reRun(for: $0, runs: runs) }.first
