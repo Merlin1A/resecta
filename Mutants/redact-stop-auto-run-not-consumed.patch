@@ -1,0 +1,18 @@
+Property: The one-shot runs once as the sheet appears.
+Area: the stop at Redact
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BeforeYouRedactSheetTests
+Must go red: ResectaAppTests/BeforeYouRedactSheetTests autoRunFiresOnce
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/SearchState+ScanEntry.swift b/Sources/ResectaApp/State/SearchState+ScanEntry.swift
+index 2163ed47..2a7a081a 100644
+--- a/Sources/ResectaApp/State/SearchState+ScanEntry.swift
++++ b/Sources/ResectaApp/State/SearchState+ScanEntry.swift
+@@ -43,7 +43,6 @@ extension SearchState {
+     /// a run was armed and the mode it was armed for is the mode in hand.
+     func consumeAutoRun() -> Bool {
+         guard let armed = pendingAutoRun else { return false }
+-        pendingAutoRun = nil
+         return searchModeType == armed
+     }
+ }

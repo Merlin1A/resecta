@@ -780,6 +780,10 @@ with its reason and the mutant that is caught in its place.
 | `redact-stop-pattern-holds-accents.patch` | A pattern's unit holds neither Accents nor digit separators. | ResectaAppTests/RedactStopGroupsTests patternIgnoresAccentsAndDigits |
 | `redact-stop-names-out-of-run-order.patch` | A group names its searches in the order they were first run. | ResectaAppTests/RedactStopGroupsTests namesInRunOrder |
 | `redact-stop-not-reached-cause-when-mixed.patch` | Not reached names how its runs ended only when every one ended that way. | ResectaAppTests/RedactStopGroupsTests notReachedEnding |
+| `redact-stop-rerun-session-drops-recognition.patch` | Search These Pages's session takes the re-run's options, recognition on and any term. | ResectaAppTests/BeforeYouRedactSheetTests reRunSessionByKind |
+| `redact-stop-auto-run-not-consumed.patch` | The one-shot runs once as the sheet appears. | ResectaAppTests/BeforeYouRedactSheetTests autoRunFiresOnce |
+| `redact-stop-search-drops-users-session.patch` | Search These Pages keeps the user's own session the stop parked; only a run drops it. | ResectaAppTests/BeforeYouRedactSheetTests searchThesePagesKeepsTheUsersSession |
+| `redact-stop-session-back-under-the-rerun.patch` | The session the stop parked comes back only when no Search holds the slot. | ResectaAppTests/BeforeYouRedactSheetTests searchThesePagesKeepsTheUsersSession |
 | `search-run-replaced-report-commented-out.patch` | The run's replaced-run report is installed in code, not only quoted in a comment. | ResectaAppTests/SearchRunLogTests runInstallsTheReplacedReport |
 | `run-log-named-in-a-log-line.patch` | No log line names the run log, the answered set or their types. | ResectaAppTests/RunLogStaysInMemoryTests noLogLineNamesThem() |
 | `preview-kept-plan-ignores-the-cap.patch` | A drawn page's plan is kept at the run's quality, under the run's cap. | ResectaAppTests/OverlayDrawnPlanTests keptPlanReadsTheCap |

@@ -1,0 +1,19 @@
+Property: Search These Pages keeps the user's own session the stop parked; only a run drops it.
+Area: the stop at Redact
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BeforeYouRedactSheetTests
+Must go red: ResectaAppTests/BeforeYouRedactSheetTests searchThesePagesKeepsTheUsersSession
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/DocumentEditorView+BeforeRedact.swift b/Sources/ResectaApp/Views/DocumentEditorView+BeforeRedact.swift
+index a86a4ffd..bcf7c187 100644
+--- a/Sources/ResectaApp/Views/DocumentEditorView+BeforeRedact.swift
++++ b/Sources/ResectaApp/Views/DocumentEditorView+BeforeRedact.swift
+@@ -49,7 +49,7 @@ extension DocumentEditorView {
+     /// and any results not yet applied, and it comes back once the re-run's
+     /// session is down.
+     static func stopAnswerDropsParkedSearch(_ answer: BeforeYouRedactAnswer) -> Bool {
+-        BeforeYouRedactSheet.effects(of: answer).entersRun
++        BeforeYouRedactSheet.effects(of: answer).entersRun || BeforeYouRedactSheet.effects(of: answer).opensSearch
+     }
+ 
+     /// The session the stop parked comes back when the slot is free: no
