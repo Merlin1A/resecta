@@ -170,7 +170,7 @@ struct SearchAccountLifecycleTests {
         #expect(account?.pages(for: .noReport) == [5, 6, 8, 9])
     }
 
-    @Test("After a Stop, a late report counts only at or before the stop page: page 6 is read, page 8 stays not reached")
+    @Test("After a Stop, a late report counts only at or before the stop page: page 6 is searched in part, page 8 stays not reached")
     func lateReportsAfterStop() async {
         let store = Store()
         let (search, run) = Self.running(store)
@@ -179,11 +179,12 @@ struct SearchAccountLifecycleTests {
         search.recordCoverage(PageSearchCoverage(pageIndex: 7, route: .textLayer), run: run)
         let account = Self.only(store)
         #expect(account?.ending == .stopped(page: 5))
-        #expect(account?.stopPage == nil)
+        #expect(account?.stopPage == 5)
+        #expect(account?.account.state(ofPage: 5) == .partlyRead([.runEndedOnThisPage]))
         #expect(account?.pages(for: .notReached) == [6, 7, 8, 9])
     }
 
-    @Test("At the result limit, a late report counts only at or before the stop page: page 6 is read, page 8 stays not reached")
+    @Test("At the result limit, a late report counts only at or before the stop page: page 6 is searched in part, page 8 stays not reached")
     func lateReportsAtLimit() {
         let store = Store()
         let (search, run) = Self.running(store)
@@ -192,7 +193,8 @@ struct SearchAccountLifecycleTests {
         search.recordCoverage(PageSearchCoverage(pageIndex: 7, route: .textLayer), run: run)
         let account = Self.only(store)
         #expect(account?.ending == .stoppedAtResultLimit(page: 5))
-        #expect(account?.stopPage == nil)
+        #expect(account?.stopPage == 5)
+        #expect(account?.account.state(ofPage: 5) == .partlyRead([.runEndedOnThisPage]))
         #expect(account?.pages(for: .notReached) == [6, 7, 8, 9])
     }
 
