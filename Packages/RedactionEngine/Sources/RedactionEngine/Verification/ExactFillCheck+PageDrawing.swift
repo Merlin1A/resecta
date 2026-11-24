@@ -99,16 +99,33 @@ enum PageDrawingReader {
     /// One revision, and a catalog and page tree of the writer's keys alone.
     /// The file holds one startxref and one trailer, nothing but line ends
     /// follows its last %%EOF, and the trailer names no earlier one, however
-    /// its names are spelled.
+    /// its names are spelled. startxref names a table: the bytes there begin
+    /// "xref" and a line end, as in every export the writer was measured to
+    /// write, and the trailer comes before startxref.
     static func fileReason(_ data: Data, _ document: CGPDFDocument) -> Reason? {
         let startxref = Data("startxref".utf8), trailer = Data("trailer".utf8), end = Data("%%EOF".utf8)
         guard count(of: startxref, in: data) == 1, count(of: trailer, in: data) == 1, let e = data.range(of: end, options: .backwards) else { return .fileRevised }
         guard data[e.upperBound...].allSatisfy({ $0 == 10 || $0 == 13 }) else { return .fileRevised }
         guard let t = data.range(of: trailer, options: .backwards, in: data.startIndex..<e.lowerBound) else { return .fileRevised }
+        guard let s = data.range(of: startxref), tableOffset(data, after: s) != nil, t.upperBound <= s.lowerBound else {
+            return .fileRevised
+        }
         let tail = nameEscapesRead(data[t.upperBound..<e.lowerBound])
         if tail.range(of: Data("/Prev".utf8)) != nil || tail.range(of: Data("/XRefStm".utf8)) != nil { return .fileRevised }
         guard let catalog = document.catalog, keys(catalog).isSubset(of: catalogKeys) else { return .documentKeyNotListed }
         return nil
+    }
+
+    /// Where the table startxref names begins, when the bytes there are "xref"
+    /// and a line end: the offset written after the keyword, digits alone.
+    static func tableOffset(_ data: Data, after keyword: Range<Data.Index>) -> Data.Index? {
+        var i = keyword.upperBound, value = 0, digits = 0
+        while i < data.endIndex, data[i] == 10 || data[i] == 13 || data[i] == 32 { i += 1 }
+        while i < data.endIndex, (48...57).contains(data[i]), digits < 12 { value = value * 10 + Int(data[i] - 48); digits += 1; i += 1 }
+        guard digits > 0, value <= data.count - 5 else { return nil }
+        let x = data.startIndex + value
+        guard data[x..<(x + 4)].elementsEqual("xref".utf8), data[x + 4] == 10 || data[x + 4] == 13 else { return nil }
+        return x
     }
 
     /// The bytes with each #xx escape read as the byte it stands for, so a

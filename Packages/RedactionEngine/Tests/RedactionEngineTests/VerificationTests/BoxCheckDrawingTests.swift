@@ -150,6 +150,10 @@ struct BoxCheckDrawingTests {
         Case(number: 89, name: "an object after the end of the file", expected: .fileRevised) { $0.appended = "9 0 obj\n<< >>\nendobj\n" },
         Case(number: 98, name: "a second trailer word after the name of an earlier one", expected: .fileRevised) {
             $0.trailer = "/Prev 9 /Note (trailer)" },
+        Case(number: 104, name: "startxref names a cross-reference stream that names an earlier one, the one trailer word left in the file",
+             expected: .fileRevised) {
+            $0.more = ["<< /Type /XRef /Size 8 /W [1 2 1] /Prev 9 /Length 0 >>\nstream\n\nendstream"]; $0.startxrefObject = 7 },
+        Case(number: 105, name: "startxref names a byte past the start of the table", expected: .fileRevised) { $0.startxrefShift = 1 },
         // The picture's segments.
         Case(number: 90, name: "a comment segment", expected: .unlistedSegment,
              change: picture { D.withSegment($0, marker: 0xFE, body: Array("note".utf8)) }),
@@ -181,10 +185,10 @@ struct BoxCheckDrawingTests {
         Case(number: 97, name: "a Q with nothing saved", expected: .drawingNotRead) { $0.content = "Q " + content },
     ]
 
-    @Test("The table holds 87 cases, eight of them admitted")
+    @Test("The table holds 89 cases, eight of them admitted")
     func tableLength() {
-        #expect(Self.cases.count == 87)
-        #expect(Set(Self.cases.map(\.number)).count == 87)
+        #expect(Self.cases.count == 89)
+        #expect(Set(Self.cases.map(\.number)).count == 89)
         #expect(Self.cases.filter { $0.expected == nil }.count == 8)
     }
 

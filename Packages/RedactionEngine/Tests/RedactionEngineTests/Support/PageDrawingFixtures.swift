@@ -132,6 +132,10 @@ enum PageDrawingFixtures {
         var more: [String] = []
         var appended = ""
         var trailer = ""
+        /// startxref names this object (1-based) instead of the table, when set.
+        var startxrefObject: Int?
+        /// startxref names the table's offset plus this.
+        var startxrefShift = 0
 
         func file() -> Data {
             var objects: [Data] = []
@@ -156,7 +160,8 @@ enum PageDrawingFixtures {
             let xref = out.count
             out += text("xref\n0 \(objects.count + 1)\n0000000000 65535 f \n")
             for o in offsets { out += text(String(format: "%010d 00000 n \n", o)) }
-            out += text("trailer\n<< /Size \(objects.count + 1) /Root 1 0 R \(trailer) >>\nstartxref\n\(xref)\n%%EOF\n")
+            let named = startxrefObject.map { offsets[$0 - 1] } ?? xref + startxrefShift
+            out += text("trailer\n<< /Size \(objects.count + 1) /Root 1 0 R \(trailer) >>\nstartxref\n\(named)\n%%EOF\n")
             return out + text(appended)
         }
     }
