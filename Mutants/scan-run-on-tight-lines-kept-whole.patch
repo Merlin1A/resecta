@@ -1,0 +1,19 @@
+Property: Two lines set tighter than solid, whose boxes overlap by a point, keep a run-on word's pieces apart. Planted: any overlap in height keeps the word whole.
+Area: Search, Scan's address lines (EmbeddedTextSource)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'ScanRunOnAddressTests'
+Must go red: RedactionEngineTests/ScanRunOnAddressTests piecesOfTightLinesAreAccepted; RedactionEngineTests/ScanRunOnAddressTests tightLinesRunOnIsSplit
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/EmbeddedTextSource.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/EmbeddedTextSource.swift
+index f84013b2..daa71dfc 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/EmbeddedTextSource.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/EmbeddedTextSource.swift
+@@ -119,7 +119,7 @@ public struct EmbeddedTextSource: Sendable {
+             for other in pieces[(i + 1)...] {
+                 let overlap = min(one.bounds.maxY, other.bounds.maxY) - max(one.bounds.minY, other.bounds.minY)
+                 let shorter = min(one.bounds.height, other.bounds.height)
+-                if overlap > shorter * 0.5 || abs(one.bounds.midY - other.bounds.midY) <= lineTolerance(shorter) {
++                if overlap > 0 || abs(one.bounds.midY - other.bounds.midY) <= lineTolerance(shorter) {
+                     return false
+                 }
+             }
