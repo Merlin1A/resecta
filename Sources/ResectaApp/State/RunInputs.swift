@@ -15,8 +15,10 @@ enum RunInputs {
     /// still be in the record.
     ///
     /// `geometry` holds each page's crop box and rotation, read from the
-    /// document at run entry; a page with it gets its plan of boxes as
-    /// placed, made once here. A page without it has no plan.
+    /// document at run entry; a page with it gets its plan of boxes, made
+    /// once here under the run's plan source. A page without it has no plan.
+    /// No user switch exists yet, so the switch is passed off; under "as
+    /// placed" the plan does not read it.
     static func confirmedRecord(
         pageCount: Int,
         geometry: [Int: PageGeometry],
@@ -32,7 +34,7 @@ enum RunInputs {
                 }
                 guard let sides = geometry[page] else { return RunRecord.Page(pageIndex: page, regions: drawn) }
                 return RunRecord.Page(pageIndex: page, regions: drawn,
-                                      cropBox: sides.cropBox.size, rotation: sides.rotation)
+                                      cropBox: sides.cropBox.size, rotation: sides.rotation, switchOn: false)
             })
     }
 

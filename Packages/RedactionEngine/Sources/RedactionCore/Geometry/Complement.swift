@@ -20,6 +20,12 @@ package struct PageTextFacts: Hashable, Sendable {
         self.showsInvisibleText = showsInvisibleText
         self.carriesPageScaleImage = carriesPageScaleImage
     }
+
+    /// The facts of a plan made with no page's words: nothing of a page was
+    /// read, and a plan with no words reads no line, so neither fact is used.
+    /// A plan made from a page's words takes its facts from that page, the
+    /// print-is-a-picture answer included.
+    package static let noPageRead = PageTextFacts(showsInvisibleText: false, carriesPageScaleImage: false)
 }
 
 /// One letter as the complement reads it.

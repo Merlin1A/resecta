@@ -5,15 +5,15 @@ Must go red: RedactionEngineTests/PlanPaintTests coversTheRegionPath [pastLeft];
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
-index 06cd4910..95d26a6d 100644
+index d54a3332..3219a315 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
-@@ -207,7 +207,7 @@ extension PageRasterizer {
+@@ -238,7 +238,7 @@ extension PageRasterizer {
              for id in box.regionIDs {
                  guard let region = regionsByID[id] else { continue }
                  let filled = normalizedToFillPixels(region.normalizedRect, content: content).intersection(bitmap)
 -                if !filled.isEmpty { rect = rect.union(filled) }
 +                _ = filled
              }
-             painted.formUnion(box.regionIDs)
-             if box.regionIDs.contains(where: { growsOnInk[$0] == true }),
+             return rect
+         }

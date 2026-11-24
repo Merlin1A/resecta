@@ -1,0 +1,18 @@
+Property: The text layer's one drop clears every field the writer reads, the laid-out hidden lines too.
+Area: the producer, a widened Searchable page
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter PlanSwitchTests
+Must go red: RedactionEngineTests/PlanSwitchTests switchPaintsThePlan
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+TextLayerState.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+TextLayerState.swift
+index 1f27009b..9a930e13 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+TextLayerState.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+TextLayerState.swift
+@@ -25,7 +25,6 @@ extension PageRasterizer {
+             removalRects = []
+             digest = nil
+             runsLeftOut = 0
+-            hiddenTextLines = nil
+             fallbackReason = reason
+         }
+     }

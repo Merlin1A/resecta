@@ -254,7 +254,9 @@ private struct Maker {
                  treatment: SwitchTreatment, band: Bool, asDrawn: Bool) -> Made {
             Made(box: PaintedBox(regionIDs: ids, inner: inner, paint: paint, tight: tight, limitAbove: above,
                                  limitBelow: below, exposure: rule.exposure, treatment: treatment, bandMade: band,
-                                 inkEnlargedCovered: false, inkEnlargedToCap: false, asDrawn: asDrawn),
+                                 inkEnlargedCovered: false, inkEnlargedToCap: false, asDrawn: asDrawn,
+                                 inkCheckable: anchored && !asDrawn
+                                     && (lineReading == .column || lineReading == .noColumn)),
                  regions: group)
         }
         let outcome: SwitchTreatment = switch rule.outcome {

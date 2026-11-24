@@ -64,6 +64,9 @@ public struct RasterizeResult: Sendable {
     /// own, never left out, and recorded so verification reads the page as
     /// not checked.
     package var regionsPaintedOutsideThePlan: Set<UUID> = []
+    /// The ink check's verdict for each box it was asked about, by the box's
+    /// place in the plan. Empty at "as placed", where the check never runs.
+    package var inkVerdicts: [Int: InkCheck.Verdict] = [:]
 
     public init(pageOutput: PageOutput, filterDigest: PageFilterDigest?,
                 fallbackReason: TextLayerDetector.FallbackReason? = nil) {

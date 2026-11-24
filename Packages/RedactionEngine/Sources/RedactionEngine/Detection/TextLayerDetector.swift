@@ -122,6 +122,13 @@ public enum TextLayerDetector {
         /// three faces. Recorded by the text path, never by the pre-flight
         /// trigger check.
         case noWritableText
+        /// A box on the page was made larger by the ink check (it reached
+        /// ink of its own text past the box's edge, or was widened to the
+        /// check's limit), so the page's text-layer copies may sit outside
+        /// the box as placed. Recorded by the rasterizer where the check
+        /// runs, only under the plan switch's policy; never by the
+        /// pre-flight trigger check.
+        case inkEscapesBox
     }
 
     // MARK: - Private Helpers
