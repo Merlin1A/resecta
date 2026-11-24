@@ -33,6 +33,80 @@ nonisolated final class DrawToolStateUITests: XCTestCase {
         XCTAssertTrue(toggle(tool, until: false), "off again: label '\(tool.label)', value '\(tool.value as? String ?? "")'")
     }
 
+    // MARK: - The tool's look on and off
+
+    /// The six items of the bar whose frames turning the tool on must not
+    /// move, by name.
+    private func barFrames() -> [(String, CGRect)] {
+        let items: [(String, XCUIElement)] = [
+            ("drawTool", app.buttons["drawTool"]), ("Scan", app.buttons["Scan"]), ("Search", app.buttons["Search"]),
+            ("undoButton", app.buttons["undoButton"]), ("redactButton", app.buttons["redactButton"]),
+            ("overflow", app.editorOverflowButton),
+        ]
+        return items.map { name, element in
+            XCTAssertTrue(element.waitForExistence(timeout: 5), "\(name) is not on the bar")
+            return (name, element.frame)
+        }
+    }
+
+    private static func describe(_ frames: [(String, CGRect)]) -> String {
+        frames.map { name, f in
+            String(format: "%@ %.2f,%.2f,%.2fx%.2f", name, f.minX, f.minY, f.width, f.height)
+        }.joined(separator: "; ")
+    }
+
+    /// The points of `frame`, one a point, read from a fresh screenshot:
+    /// how many match the brand teal, and how many are white.
+    private func tealAndWhitePoints(in frame: CGRect) -> (teal: Int, white: Int, total: Int) {
+        let shot = XCUIScreen.main.screenshot()
+        guard let probe = CanvasPixelProbe(shot, windowSize: shot.image.size) else {
+            XCTFail("the screenshot could not be read"); return (0, 0, 0)
+        }
+        var teal = 0, white = 0, total = 0
+        for y in stride(from: frame.minY + 0.5, to: frame.maxY, by: 1) {
+            for x in stride(from: frame.minX + 0.5, to: frame.maxX, by: 1) {
+                let (r, g, b) = probe.rgb(x, y)
+                total += 1
+                if CanvasPixelProbe.Tint.teal.matches(r, g, b) { teal += 1 }
+                if r >= 235 && g >= 235 && b >= 235 { white += 1 }
+            }
+        }
+        return (teal, white, total)
+    }
+
+    func testTheRectangleTool_onIsAFilledPill_andNothingMoves() {
+        let tool = app.buttons["drawTool"]
+        XCTAssertTrue(reads(tool, on: false), "the tool must start off")
+        let off = barFrames()
+        XCTAssertTrue(toggle(tool, until: true), "the tool did not turn on")
+        sleep(1)
+        let on = barFrames()
+        let record = XCTAttachment(string: "off: \(Self.describe(off))\non: \(Self.describe(on))")
+        record.name = "toolbar-frames"
+        record.lifetime = .keepAlways
+        add(record)
+        print("TOOLBAR-FRAMES off: \(Self.describe(off)) | on: \(Self.describe(on))")
+        // Nothing moves: each item's frame on is its frame off, to half a point.
+        for ((name, before), (_, after)) in zip(off, on) {
+            let moved = max(abs(before.minX - after.minX), abs(before.minY - after.minY),
+                            abs(before.maxX - after.maxX), abs(before.maxY - after.maxY))
+            XCTAssertLessThanOrEqual(moved, 0.5, "\(name) moved \(moved) pt when the tool turned on: \(before) off, \(after) on")
+        }
+        // On: a filled teal pill over most of the item, the glyph white on it.
+        attachScreenshot(named: "rectangle-tool-on")
+        let frame = on[0].1
+        let lit = tealAndWhitePoints(in: frame)
+        XCTAssertGreaterThanOrEqual(Double(lit.teal), 0.6 * Double(lit.total),
+                                    "on: \(lit.teal) of \(lit.total) points in the tool's frame are brand teal")
+        XCTAssertGreaterThanOrEqual(lit.white, 12, "on: \(lit.white) white points in the tool's frame (the glyph)")
+        // Off again: no teal in the frame, as shipped.
+        XCTAssertTrue(toggle(tool, until: false), "the tool did not turn off")
+        sleep(1)
+        attachScreenshot(named: "rectangle-tool-off")
+        let plain = tealAndWhitePoints(in: frame)
+        XCTAssertEqual(plain.teal, 0, "off: \(plain.teal) points in the tool's frame are still brand teal")
+    }
+
     // MARK: - The drawing caption in the bottom slot
 
     private func element(_ identifier: String) -> XCUIElement {
