@@ -7,12 +7,12 @@ Apply in a scratch worktree with `git apply`; discard after.
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
-@@ -80,7 +80,7 @@
+@@ -169,7 +169,7 @@
                    let dictionary = CGPDFStreamGetDictionary(stream) else { return }
              var subtype: UnsafePointer<CChar>?
              guard CGPDFDictionaryGetName(dictionary, "Subtype", &subtype), let subtype,
 -                  String(cString: subtype) == "Form" else { return }
 +                  String(cString: subtype) == "Form " else { return }
-             guard state.depth < 8, let table = state.table else { state.unreadable = true; CGPDFScannerStop(scanner); return }
-             var resources: CGPDFDictionaryRef?
-             _ = CGPDFDictionaryGetDictionary(dictionary, "Resources", &resources)
+             state.drawn += 1
+             guard state.depth < 8, state.drawn <= PagePictureMap.formLimit, let table = state.table else {
+                 state.unreadable = true; CGPDFScannerStop(scanner); return
