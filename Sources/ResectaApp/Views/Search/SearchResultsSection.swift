@@ -107,11 +107,14 @@ struct SearchResultsSection: View {
                 sectionTopChrome
             }
             .background { keyboardShortcutButtons }
-            // Measured outside the section's own inset, so the place's
-            // height never feeds its own limit.
+            // The list's room: the section's own size, which already
+            // leaves out the sheet's fixed top and the footer or the
+            // keyboard (a geometry proxy's size is inside its safe area;
+            // taking the insets off again counted them twice). Measured
+            // outside the section's own inset, so the place's height
+            // never feeds its own limit.
             .onGeometryChange(for: CGSize.self) { proxy in
-                CGSize(width: proxy.size.width,
-                       height: proxy.size.height - proxy.safeAreaInsets.top - proxy.safeAreaInsets.bottom)
+                proxy.size
             } action: { size in
                 noticeWidth = size.width
                 noticeRoom = size.height
