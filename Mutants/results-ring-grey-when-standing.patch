@@ -1,0 +1,19 @@
+Property: A standing result's ring keeps its verdict's tone; only one that no longer stands is grey. Planted: the ring is grey always.
+Area: the results masthead, a result that no longer stands
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationMastheadTests -only-testing:ResectaAppTests/VerificationResultsActionsTests
+Must go red: ResectaAppTests/VerificationResultsActionsTests ringWhenTheResultDoesNotStand; ResectaAppTests/VerificationResultsActionsTests ringContent
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationMasthead.swift b/Sources/ResectaApp/Views/VerificationMasthead.swift
+index e5d024c..4e47f64 100644
+--- a/Sources/ResectaApp/Views/VerificationMasthead.swift
++++ b/Sources/ResectaApp/Views/VerificationMasthead.swift
+@@ -318,7 +318,7 @@ struct VerificationMasthead: View {
+         let tone: CountRing.Tone
+         switch report.overallStatus {
+         case .skipped: return .skipped
+-        case _ where !stands: tone = .noLongerStands
++        case _ where !stands || true: tone = .noLongerStands
+         case .pass, .info, .notApplicable: tone = .pass
+         case .warn: tone = .warn
+         case .attention: tone = .attention
