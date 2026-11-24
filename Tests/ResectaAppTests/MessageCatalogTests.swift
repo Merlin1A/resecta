@@ -126,12 +126,18 @@ struct MessageCatalogTests {
         .importAnnotations: Frozen(
             severity: nil, kind: .notice, tone: .caution, phases: [.editing], mustBeSeen: true,
             coalescesRepeats: true, showsInRemainingLayer: false),
+        .fitNotice: Frozen(
+            severity: nil, kind: .notice, tone: .caution, phases: [.editing], mustBeSeen: true,
+            coalescesRepeats: true, showsInRemainingLayer: false),
+        .fitNoticeShort: Frozen(
+            severity: nil, kind: .notice, tone: .caution, phases: [.editing], mustBeSeen: true,
+            coalescesRepeats: true, showsInRemainingLayer: false),
         .runInProgressSettings: Frozen(
             severity: nil, kind: .notice, tone: .note, phases: [.detecting, .redacting, .verifying], mustBeSeen: false,
             coalescesRepeats: true, showsInRemainingLayer: false),
     ]
 
-    /// The 32 names, in the table's order: what `--showToast=<name>` takes
+    /// The 34 names, in the table's order: what `--showToast=<name>` takes
     /// (the hook's post of a notice drawn in its place stops a debug build).
     nonisolated static let messageNames: [String] = [
         "textLayerDetected", "imagePagesNote", "encryptedSource", "droppedFilesFirstOpened",
@@ -141,7 +147,8 @@ struct MessageCatalogTests {
         "selectionLimit", "nearbyMatch", "marked", "searchClosedCleared", "searchRerunCleared",
         "modeSwitchCleared", "modeSwitchClearedAllApplied", "recallCleared", "searchResultsTruncated",
         "savedRegexSaved", "detectionDegraded", "customTermTimeout", "scannedRegionsNotAnalyzed",
-        "searchPreparationFailed", "pausedRun", "importAnnotations", "runInProgressSettings",
+        "searchPreparationFailed", "pausedRun", "importAnnotations", "fitNotice", "fitNoticeShort",
+        "runInProgressSettings",
     ]
 
     /// The shipped sentence for a message: the constant or builder beside
@@ -215,6 +222,10 @@ struct MessageCatalogTests {
             return ImportAnnotationNoticeBanner.noticeMessage(
                 annotationCount: annotationCount, filledFormFieldCount: filledFormFieldCount,
                 carriesFormDataOrAttachments: carries)
+        case .fitNotice:
+            return "Some boxes here are larger than their words. Keep them that size."
+        case .fitNoticeShort:
+            return "Larger boxes: keep their size"
         case .runInProgressSettings:
             return SettingsView.runInProgressTitle
         }
@@ -222,9 +233,9 @@ struct MessageCatalogTests {
 
     // MARK: - The table
 
-    @Test("Every message has an example, and there are 32")
+    @Test("Every message has an example, and there are 34")
     func everyMessageHasAnExample() {
-        #expect(MessageID.Name.allCases.count == 32)
+        #expect(MessageID.Name.allCases.count == 34)
         #expect(Set(MessageID.examples.map(\.name)) == Set(MessageID.Name.allCases))
         for name in MessageID.Name.allCases {
             #expect(MessageID.example(named: name).name == name)
@@ -233,7 +244,7 @@ struct MessageCatalogTests {
 
     @Test("Each row has the kind, tone, today's severity, phases and must-be-seen of the frozen table")
     func rowsMatchTheFrozenTable() {
-        #expect(Self.frozen.count == 32)
+        #expect(Self.frozen.count == 34)
         for id in MessageID.examples {
             guard let want = Self.frozen[id.name] else {
                 Issue.record("\(id.name) is not in the frozen table")
@@ -252,23 +263,23 @@ struct MessageCatalogTests {
         #expect(rows.filter { $0.todaySeverity == .info }.count == 12)
         #expect(rows.filter { $0.todaySeverity == .warning }.count == 14)
         #expect(rows.filter { $0.todaySeverity == .success }.count == 3)
-        #expect(rows.filter { $0.todaySeverity == nil }.count == 3)
+        #expect(rows.filter { $0.todaySeverity == nil }.count == 5)
         #expect(rows.filter { $0.kind == .receipt }.count == 21)
-        #expect(rows.filter { $0.kind == .notice }.count == 11)
-        #expect(rows.filter { $0.tone == .caution }.count == 22)
+        #expect(rows.filter { $0.kind == .notice }.count == 13)
+        #expect(rows.filter { $0.tone == .caution }.count == 24)
         #expect(rows.filter { $0.tone == .done }.count == 4)
         #expect(rows.filter { $0.tone == .note }.count == 4)
         #expect(rows.filter { $0.tone == .stop }.count == 2)
-        #expect(rows.filter(\.mustBeSeen).count == 20)
+        #expect(rows.filter(\.mustBeSeen).count == 22)
         #expect(rows.filter(\.showsInRemainingLayer).count == 5)
     }
 
-    @Test("Every row is either one message while it is up or a new event each time, and the split is 22 and 10")
+    @Test("Every row is either one message while it is up or a new event each time, and the split is 24 and 10")
     func everyRowCoalescesOrNot() {
         let rows = MessageID.Name.allCases.map { (name: $0, row: MessageCatalog.row(for: .example(named: $0))) }
         let oneWhileUp = Set(rows.filter { $0.row.coalescesRepeats }.map { $0.name })
         let newEachTime = Set(rows.filter { !$0.row.coalescesRepeats }.map { $0.name })
-        #expect(oneWhileUp.count == 22)
+        #expect(oneWhileUp.count == 24)
         #expect(newEachTime.count == 10)
         // Each post of these reports one thing the person did or lost.
         #expect(newEachTime == [
@@ -461,7 +472,7 @@ struct MessageCatalogTests {
         #expect(files.count > 100, "the source tree was not found")
         let drawnInPlace = MessageID.Name.allCases
             .filter { MessageCatalog.row(for: .example(named: $0)).todaySeverity == nil }
-        #expect(Set(drawnInPlace) == [.pausedRun, .importAnnotations, .runInProgressSettings])
+        #expect(Set(drawnInPlace) == [.pausedRun, .importAnnotations, .fitNotice, .fitNoticeShort, .runInProgressSettings])
         var posts: [String] = []
         for file in files {
             let text = try String(contentsOf: sources.appendingPathComponent(file), encoding: .utf8)
@@ -488,9 +499,9 @@ struct MessageCatalogTests {
         #expect(MessageID.example(named: parsed).name == parsed)
     }
 
-    @Test("The hook takes the table's 32 names")
+    @Test("The hook takes the table's 34 names")
     func hookTakesEveryName() {
-        #expect(Self.messageNames.count == 32)
+        #expect(Self.messageNames.count == 34)
         #expect(Set(Self.messageNames) == Set(MessageID.Name.allCases.map(\.rawValue)))
     }
 }

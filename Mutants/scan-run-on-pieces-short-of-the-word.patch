@@ -5,16 +5,16 @@ Must go red: RedactionEngineTests/ScanRunOnAddressTests piecesShortOfTheWordAreR
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/EmbeddedTextSource.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/EmbeddedTextSource.swift
-index 3e4988a8..3fd52989 100644
+index f84013b2..30ea0ae1 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/EmbeddedTextSource.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/EmbeddedTextSource.swift
-@@ -107,8 +107,7 @@ public struct EmbeddedTextSource: Sendable {
-     /// "5th" or a digit set by a text rise, stays in its word).
+@@ -113,8 +113,7 @@ public struct EmbeddedTextSource: Sendable {
+     /// keep their pieces apart.
      static func piecesAccepted(_ pieces: [(range: NSRange, bounds: CGRect)], word: NSRange) -> Bool {
          let ranges = pieces.map(\.range).sorted { $0.location < $1.location }
 -        guard ranges.reduce(0, { $0 + $1.length }) == word.length,
 -              zip(ranges, ranges.dropFirst()).allSatisfy({ NSMaxRange($0) <= $1.location }) else { return false }
 +        guard !ranges.isEmpty else { return false }
          for (i, one) in pieces.enumerated() {
-             for other in pieces[(i + 1)...] where one.bounds.minY < other.bounds.maxY && other.bounds.minY < one.bounds.maxY {
-                 return false
+             for other in pieces[(i + 1)...] {
+                 let overlap = min(one.bounds.maxY, other.bounds.maxY) - max(one.bounds.minY, other.bounds.minY)

@@ -1,0 +1,19 @@
+Property: The fit notice holds only on a page that holds a box drawn wider than its word, and not once the person closed it there.
+Area: editor (the band's fit notice)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/TopBannerSlotTests -only-testing:ResectaAppUITests/WidenedBoxNoticeUITests/testBannerCaptionAndAfterApply
+Must go red: ResectaAppTests/TopBannerSlotTests fitNoticeOnItsPageUntilClosed; ResectaAppUITests/WidenedBoxNoticeUITests testBannerCaptionAndAfterApply
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/RedactionState+WidenedBoxes.swift b/Sources/ResectaApp/State/RedactionState+WidenedBoxes.swift
+index c672174e..f6b6f789 100644
+--- a/Sources/ResectaApp/State/RedactionState+WidenedBoxes.swift
++++ b/Sources/ResectaApp/State/RedactionState+WidenedBoxes.swift
+@@ -59,7 +59,7 @@ extension RedactionState {
+     /// Whether the fit notice holds for `page`: the page holds a widened box
+     /// and the person has not closed the notice for it.
+     func fitNoticeHolds(on page: Int) -> Bool {
+-        pageHoldsWidenedBox(page) && !fitNoticeClosedPages.contains(page)
++        !widenedRegionPages.union(activeSearch?.widenedBoxPages ?? []).subtracting(fitNoticeClosedPages).isEmpty
+     }
+ 
+     /// Closes the fit notice on every page holding a widened box now. A page

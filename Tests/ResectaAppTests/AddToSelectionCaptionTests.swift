@@ -40,7 +40,7 @@ struct AddToSelectionCaptionTests {
                                  phaseKind: DocumentState.PhaseKind) -> BottomSlotOccupant? {
         DocumentEditorView.bottomSlotOccupant(
             phaseKind: phaseKind, messageShowing: false, selectionNewerThanMessage: false, firstTimeLineDue: false,
-            selectedCount: 0, addToSelection: addToSelection, activeTool: activeTool, widenedOnPage: false)
+            selectedCount: 0, addToSelection: addToSelection, activeTool: activeTool)
     }
 
     @Test("One capsule at a time: the drawing caption for the tool, the Add to Selection capsule for the mode, only while editing")

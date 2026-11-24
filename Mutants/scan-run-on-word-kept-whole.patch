@@ -1,11 +1,11 @@
 Property: A word the page text runs on over two drawn lines gives each line its own piece. Planted: the word is kept whole, one box as tall as both lines.
 Area: Search, Scan's address assembly (the text layer's lines)
 Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'ScanRunOnAddressTests'
-Must go red: RedactionEngineTests/ScanRunOnAddressTests runOnWordSplitByLine; RedactionEngineTests/ScanRunOnAddressTests secondCopysStreetLineIsCovered
+Must go red: RedactionEngineTests/ScanRunOnAddressTests runOnWordSplitByLine; RedactionEngineTests/ScanRunOnAddressTests secondCopysStreetLineIsCovered; RedactionEngineTests/ScanRunOnAddressTests tightLinesRunOnIsSplit
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/EmbeddedTextSource.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/EmbeddedTextSource.swift
-index dcd577f8..a1fdd175 100644
+index f84013b2..84839695 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/EmbeddedTextSource.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/EmbeddedTextSource.swift
 @@ -87,7 +87,7 @@ public struct EmbeddedTextSource: Sendable {

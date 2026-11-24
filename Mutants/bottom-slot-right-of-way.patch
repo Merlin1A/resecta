@@ -5,16 +5,17 @@ Must go red: ResectaAppTests/BottomSlotTests oneOccupant (selection with drawing
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Views/DocumentEditorView+Caption.swift b/Sources/ResectaApp/Views/DocumentEditorView+Caption.swift
-index a1026ce7..71f79067 100644
+index 86e296e0..64179f95 100644
 --- a/Sources/ResectaApp/Views/DocumentEditorView+Caption.swift
 +++ b/Sources/ResectaApp/Views/DocumentEditorView+Caption.swift
-@@ -110,8 +110,8 @@ extension DocumentEditorView {
+@@ -94,8 +94,8 @@ extension DocumentEditorView {
              return .message
          }
          if firstTimeLineDue { return .firstTimeLine }
 -        if let selection { return selection }
-         if drawingModeCaptionShouldShow(activeTool: activeTool, phaseKind: phaseKind) { return .drawingCaption }
-+        if let selection { return selection }
-         return widenedOnPage ? .widenedBoxes : nil
+-        return drawingModeCaptionShouldShow(activeTool: activeTool, phaseKind: phaseKind) ? .drawingCaption : nil
++        if drawingModeCaptionShouldShow(activeTool: activeTool, phaseKind: phaseKind) { return .drawingCaption }
++        return selection
      }
  
+     // MARK: - The slot's measures

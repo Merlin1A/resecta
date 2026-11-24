@@ -2,6 +2,7 @@ import Testing
 import Foundation
 import SwiftUI
 @testable import ResectaApp
+import RedactionEngine
 
 // The editor's band under the toolbar: six places in a fixed order, the
 // first that holds shown, the rest waiting. The order has one home
@@ -89,6 +90,52 @@ struct TopBannerSlotTests {
         plain.wasPausedByBackground = true
         #expect(TopBannerSlot.winner(documentState: plain, widenedOnPage: true) == .paused, "O-5 then with the pause")
         #expect(TopBannerSlot.holding(documentState: plain, widenedOnPage: true) == [.paused, .fit])
+    }
+
+    /// A search session whose results on `widened` pages are drawn widened,
+    /// and on `clean` pages are not.
+    private static func session(widened: [Int], clean: [Int] = []) -> SearchState {
+        let search = SearchState()
+        search.results = (widened.map { ($0, true) } + clean.map { ($0, false) }).map { page, flag in
+            SearchResult(
+                pageIndex: page, normalizedRect: CGRect(x: 0.1, y: 0.2, width: 0.3, height: 0.03),
+                matchedText: "Hartwell", contextSnippet: "...", source: .textLayer, term: "Hartwell",
+                isSelected: true, inkFitDegraded: flag)
+        }
+        return search
+    }
+
+    @Test("The editor's read puts the fit notice in the band only on a page holding a widened box, until it is closed")
+    func fitNoticeOnItsPageUntilClosed() {
+        let plain = DocumentState()
+        plain.phase = .editing
+        let state = RedactionState()
+        // Pages 1 and 4 (0-based 0 and 3) widened, page 2 clean.
+        state.activeSearch = Self.session(widened: [0, 3], clean: [1])
+        func band(on page: Int) -> TopBannerSlot? {
+            TopBannerSlot.winner(documentState: plain, widenedOnPage: state.fitNoticeHolds(on: page))
+        }
+        #expect(band(on: 0) == .fit, "F1 the widened page")
+        #expect(band(on: 1) == nil, "F6 a clean page")
+        #expect(band(on: 3) == .fit, "the other widened page")
+
+        state.closeFitNotice()
+        #expect(band(on: 0) == nil, "F7 closed on the page in view")
+        #expect(band(on: 3) == nil, "F7 and on every page widened when it was closed")
+        #expect(band(on: 1) == nil)
+
+        // Page 6 (0-based 5) widened for the first time.
+        state.activeSearch?.results += Self.session(widened: [5]).results
+        #expect(band(on: 5) == .fit, "F7b a page widened after the close shows it")
+        #expect(band(on: 0) == nil && band(on: 3) == nil, "F7b the closed pages stay closed")
+
+        state.clearForNewDocument()
+        #expect(state.fitNoticeClosedPages.isEmpty, "F7c another document: nothing is closed")
+        state.activeSearch = Self.session(widened: [0])
+        #expect(band(on: 0) == .fit, "F7c its widened page shows it")
+
+        plain.phase = .verified(report: .skipped)
+        #expect(band(on: 0) == nil, "F10 a phase other than editing: nothing")
     }
 
     @Test("The editor's read: a dismissed annotation notice and a phase other than editing leave the slot empty")

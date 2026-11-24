@@ -43,6 +43,9 @@ enum MessageID: Equatable {
     // Notices drawn in their place, never posted through the queue.
     case pausedRun
     case importAnnotations(annotationCount: Int, filledFormFieldCount: Int, carriesFormDataOrAttachments: Bool)
+    /// The fit notice, and its shorter words at the accessibility sizes.
+    case fitNotice
+    case fitNoticeShort
     case runInProgressSettings
 
     /// The cases without their values: the names `--showToast=<name>` takes
@@ -79,6 +82,8 @@ enum MessageID: Equatable {
         case searchPreparationFailed
         case pausedRun
         case importAnnotations
+        case fitNotice
+        case fitNoticeShort
         case runInProgressSettings
     }
 
@@ -115,6 +120,8 @@ enum MessageID: Equatable {
         case .searchPreparationFailed: .searchPreparationFailed
         case .pausedRun: .pausedRun
         case .importAnnotations: .importAnnotations
+        case .fitNotice: .fitNotice
+        case .fitNoticeShort: .fitNoticeShort
         case .runInProgressSettings: .runInProgressSettings
         }
     }
@@ -156,6 +163,8 @@ enum MessageID: Equatable {
         case .pausedRun: .pausedRun
         case .importAnnotations:
             .importAnnotations(annotationCount: 1, filledFormFieldCount: 0, carriesFormDataOrAttachments: false)
+        case .fitNotice: .fitNotice
+        case .fitNoticeShort: .fitNoticeShort
         case .runInProgressSettings: .runInProgressSettings
         }
     }
@@ -217,6 +226,8 @@ enum MessageID: Equatable {
             .searchPreparationFailed,
             .pausedRun,
             .importAnnotations(annotationCount: 1, filledFormFieldCount: 0, carriesFormDataOrAttachments: false),
+            .fitNotice,
+            .fitNoticeShort,
             .runInProgressSettings,
         ]
         let waysBack: [FailedStateView.PrimaryAction] = [
@@ -465,7 +476,7 @@ enum MessageCatalog {
                 text: "Could not prepare the document for search. Try again.",
                 todaySeverity: .warning, kind: .receipt, tone: .stop,
                 phases: [.editing], mustBeSeen: true, coalescesRepeats: true)
-        // The three below are drawn in their place (the editor's band and
+        // The five below are drawn in their place (the editor's band and
         // Settings' form) while their condition holds, and never posted.
         case .pausedRun:
             return MessageRow(
@@ -478,6 +489,16 @@ enum MessageCatalog {
                 text: ImportAnnotationNoticeBanner.noticeMessage(
                     annotationCount: annotationCount, filledFormFieldCount: filledFormFieldCount,
                     carriesFormDataOrAttachments: carries),
+                todaySeverity: nil, kind: .notice, tone: .caution,
+                phases: [.editing], mustBeSeen: true, coalescesRepeats: true)
+        case .fitNotice:
+            return MessageRow(
+                text: DocumentEditorView.fitNoticeText,
+                todaySeverity: nil, kind: .notice, tone: .caution,
+                phases: [.editing], mustBeSeen: true, coalescesRepeats: true)
+        case .fitNoticeShort:
+            return MessageRow(
+                text: DocumentEditorView.fitNoticeShortText,
                 todaySeverity: nil, kind: .notice, tone: .caution,
                 phases: [.editing], mustBeSeen: true, coalescesRepeats: true)
         case .runInProgressSettings:

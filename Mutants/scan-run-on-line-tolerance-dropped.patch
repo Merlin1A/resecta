@@ -1,0 +1,19 @@
+Property: Pieces whose middles are within the line bucketing's tolerance are one line's. Planted: only an overlap of more than half the shorter piece makes them one line's.
+Area: Search, Scan's address lines (EmbeddedTextSource)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'ScanRunOnAddressTests'
+Must go red: RedactionEngineTests/ScanRunOnAddressTests piecesWithinTheLineToleranceAreRefused
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/EmbeddedTextSource.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/EmbeddedTextSource.swift
+index f84013b2..b8d0f60b 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/EmbeddedTextSource.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/EmbeddedTextSource.swift
+@@ -119,7 +119,7 @@ public struct EmbeddedTextSource: Sendable {
+             for other in pieces[(i + 1)...] {
+                 let overlap = min(one.bounds.maxY, other.bounds.maxY) - max(one.bounds.minY, other.bounds.minY)
+                 let shorter = min(one.bounds.height, other.bounds.height)
+-                if overlap > shorter * 0.5 || abs(one.bounds.midY - other.bounds.midY) <= lineTolerance(shorter) {
++                if overlap > shorter * 0.5 {
+                     return false
+                 }
+             }
