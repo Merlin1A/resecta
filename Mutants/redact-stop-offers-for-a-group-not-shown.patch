@@ -1,0 +1,19 @@
+Property: Search These Pages is offered only for a group the stop shows.
+Area: the stop at Redact
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BeforeYouRedactSheetTests
+Must go red: ResectaAppTests/BeforeYouRedactSheetTests offersOnlyForAShownGroup
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/BeforeYouRedactSheet.swift b/Sources/ResectaApp/Views/BeforeYouRedactSheet.swift
+index b97d044a..927b10d6 100644
+--- a/Sources/ResectaApp/Views/BeforeYouRedactSheet.swift
++++ b/Sources/ResectaApp/Views/BeforeYouRedactSheet.swift
+@@ -257,7 +257,7 @@ extension BeforeYouRedactSheet {
+                 nameLine: units == nil ? nil : words.nameLine(names, withOptions),
+                 rows: groups.map { NotSearchedListContent.Row(sentence: words.row($0, names), pages: $0.pages) })
+         }
+-        let reRun = shown.lazy.compactMap { RedactStop.reRun(for: $0, runs: runs) }.first
++        let reRun = RedactStop.groups(runs: runs, answered: answered).lazy.compactMap { RedactStop.reRun(for: $0, runs: runs) }.first
+         return BeforeYouRedactStop(content: NotSearchedListContent(sections: sections, smallPicturesLine: nil), reRun: reRun)
+     }
+ }
