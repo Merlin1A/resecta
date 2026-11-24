@@ -308,6 +308,8 @@ On a page that is a picture, such as a photo, a screenshot or a scan without its
 ### KI-40: On a Scan Stored as Many Small Pictures, Search Does Not Read the Picture (Medium)
 **Affects:** Search (scanned pages that carry their own text)
 
+**Fixed in 1.4.0 for most such pages:** Search now also reads a page's images for text when its pictures together cover at least four fifths of the page, however many pieces they are stored in. A scanned page whose pictures cover less than four fifths of the page can still be affected.
+
 On a page with a text layer, Search also reads the page's images for text when one image holds at least 250,000 pixels, or at least half as many pixels as the page itself has at 100 dpi, or when the page's text layer is very short for its size. Some scanners store a page's picture as many narrow strips, each smaller than that, so on such a page Search reads the page's own text and does not read the picture, with or without Include OCR Pages. A word that is printed on the page but missing from that text, or spelled differently in it, is not found, and nothing in the app says the picture was not read. No box is placed on it, so it stays readable in the export. When you have applied at least one result of the same search, the check after export reads every page of the redacted copy for that term and can report it. A search that found nothing is not run again after export, so a word Search did not match anywhere in the document is not reported, and every check can pass.
 
 **Workaround:** On a scanned document, look over each page for the words you searched for, check each such page in the preview before sharing, and draw a box over anything Search missed.
