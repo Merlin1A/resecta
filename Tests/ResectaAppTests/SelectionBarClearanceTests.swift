@@ -183,7 +183,7 @@ struct SelectionBarPlaceHostedTests {
         let heard: Heard
     }
 
-    private func document(_ size: CGSize) -> PDFDocument {
+    private func document(_ size: CGSize, rotation: Int = 0) -> PDFDocument {
         let renderer = UIGraphicsPDFRenderer(bounds: CGRect(origin: .zero, size: size))
         let data = renderer.pdfData { ctx in
             for _ in 0..<2 {
@@ -192,16 +192,18 @@ struct SelectionBarPlaceHostedTests {
                 ctx.fill(CGRect(x: 36, y: 36, width: 100, height: 12))
             }
         }
-        return PDFDocument(data: data)!
+        let document = PDFDocument(data: data)!
+        for index in 0..<document.pageCount { document.page(at: index)?.rotation = rotation }
+        return document
     }
 
     private func rig(_ size: CGSize, canvas: CGSize = Self.defaultCanvas, bar: CGRect = Self.defaultBar,
-                     region normalized: CGRect, zoom: CGFloat = 1) -> Rig {
+                     region normalized: CGRect, zoom: CGFloat = 1, rotation: Int = 0) -> Rig {
         let window = UIWindow(frame: CGRect(origin: .zero, size: canvas))
         let view = FitFlooredPDFView(frame: window.bounds)
         view.autoScales = true
         view.displayMode = .singlePage
-        view.document = document(size)
+        view.document = document(size, rotation: rotation)
         window.addSubview(view)
         window.isHidden = false
         view.layoutIfNeeded()
@@ -280,6 +282,43 @@ struct SelectionBarPlaceHostedTests {
         try await decide(r)
         #expect(r.heard.places == [true])
         #expect(r.view.scaleFactor == scale)
+    }
+
+    @Test("On a page shown turned a half, a box at the shown foot takes the bar to the top; one at the shown top does not")
+    func turnedHalf() async throws {
+        // Regions are kept in the shown frame: on a page turned 180° the
+        // shown foot is the stored top.
+        let foot = rig(Self.legal, region: CGRect(x: 0.3, y: 0.025, width: 0.3, height: 0.03), rotation: 180)
+        try await decide(foot)
+        #expect(foot.heard.places == [true])
+        let top = rig(Self.legal, region: CGRect(x: 0.3, y: 0.945, width: 0.3, height: 0.03), rotation: 180)
+        try await decide(top)
+        #expect(top.heard.places == [false])
+    }
+
+    @Test("On a page shown turned a quarter either way, a box at the shown foot takes the bar to the top")
+    func turnedQuarter() async throws {
+        // A landscape page turned a quarter is shown as a Legal page upright.
+        let stored = CGSize(width: Self.legal.height, height: Self.legal.width)
+        var ran = 0
+        for rotation in [90, 270] {
+            let r = rig(stored, region: CGRect(x: 0.3, y: 0.025, width: 0.3, height: 0.03), rotation: rotation)
+            let shown = try pageFrame(r)
+            #expect(shown.height > shown.width, "\(rotation): \(shown)")
+            try await decide(r)
+            #expect(r.heard.places == [true], "\(rotation)")
+            ran += 1
+        }
+        #expect(ran == 2)
+    }
+
+    @Test("A bar taken down before the place is handed out hears nothing")
+    func barGoneBeforeTheTurn() async throws {
+        let r = rig(Self.legal, region: CGRect(x: 0.3, y: 0.025, width: 0.3, height: 0.03))
+        r.coordinator.keepSelectionClearOfBar(in: r.view, framedThisPass: false)
+        r.coordinator.selectionBarFrame = nil
+        try await Task.sleep(nanoseconds: 100_000_000)
+        #expect(r.heard.places.isEmpty)
     }
 
     @Test("A whole page selected meets both places: the bar stays at the bottom")
