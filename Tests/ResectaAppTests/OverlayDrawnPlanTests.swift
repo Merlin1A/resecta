@@ -4,10 +4,10 @@ import UIKit
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// G-06a in the app: drawing a page's regions keeps the plan the page is drawn
+// In the app: drawing a page's regions keeps the plan the page is drawn
 // from, made by the one maker the run's entry uses, from the same regions and
 // the source document's crop box and rotation, with the settings it was drawn
-// under. What the overlay paints is unchanged (its look is U-B14's).
+// under. What the overlay paints is unchanged.
 
 @MainActor
 @Suite("The overlay keeps the plan a page is drawn from")

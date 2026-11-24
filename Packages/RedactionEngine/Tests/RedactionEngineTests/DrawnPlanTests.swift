@@ -3,7 +3,7 @@ import Foundation
 import Testing
 @testable import RedactionEngine
 
-// The plan the editor draws a page from, and keeps (G-06a): made by the one
+// The plan the editor draws a page from, and keeps: made by the one
 // maker the run's entry uses, with the page's sides S read through the one
 // function, so the two make the same plan from the same inputs; kept with the
 // switch, the quality and the fill it was drawn under. Under "as placed" each

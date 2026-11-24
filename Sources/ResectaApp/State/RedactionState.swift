@@ -16,9 +16,8 @@ class RedactionState {
     var regionVersion: Int = 0
 
     /// The plan each page was last drawn from, with the switch, the quality
-    /// and the fill it was drawn under (G-06a): the run's start compares it
-    /// with the plan it makes (H-04b). Written while the editor draws, so
-    /// nothing observes it.
+    /// and the fill it was drawn under, kept so a run can be compared with
+    /// it. Written while the editor draws, so nothing observes it.
     @ObservationIgnored var drawnPlans: [Int: DrawnPlan] = [:]
 
     /// Multi-region selection set. Single selection is the common case.

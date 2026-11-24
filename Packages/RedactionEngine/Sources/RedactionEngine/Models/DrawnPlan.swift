@@ -4,8 +4,8 @@ import Foundation
 /// A page as the editor last drew it: the plan made from its regions by the
 /// one maker the run's entry uses (`RunRecord.Page.makePlan`), so with the
 /// same two sides S, and the switch, the quality and the fill colour it was
-/// drawn under. The run's start compares it with the plan it makes (H-04b):
-/// a plan or a setting that differs is a plan the user was not shown.
+/// drawn under. It is kept so a run can be compared with it: a plan or a
+/// setting that differs is a plan the user was not shown.
 ///
 /// The editor keeps one for each page it has drawn since that page's last
 /// change. Under "as placed" each box is one admitted region as placed.

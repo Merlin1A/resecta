@@ -458,7 +458,7 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
 
     // MARK: - The plan a page is drawn from
 
-    /// Keep the plan `pageIndex` is drawn from (G-06a): made by the one maker
+    /// Keep the plan `pageIndex` is drawn from: made by the one maker
     /// the run's entry uses (`DrawnPlan`, `RunRecord.Page.makePlan`), from the
     /// regions the overlay draws and the source document's crop box and
     /// rotation, which the run's entry reads too, with the settings now. No

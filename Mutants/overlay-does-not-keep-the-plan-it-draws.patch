@@ -10,7 +10,7 @@ diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift b/Source
 @@ -20,7 +20,6 @@
      /// resize handles — the first segment of `draw(_:)`.
      func drawCommittedRegions(ctx: CGContext, in rect: CGRect) {
-         // The plan this page is drawn from is kept with its settings (G-06a).
+         // The plan this page is drawn from is kept with its settings.
 -        coordinator?.noteDrawn(pageIndex: pageIndex, regions: regions)
          // Draw committed regions
          for region in regions {
