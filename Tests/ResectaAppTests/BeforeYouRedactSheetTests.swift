@@ -328,4 +328,64 @@ struct BeforeYouRedactSheetTests {
         #expect(!text.contains("@Environment(ScreenCaptureMonitor.self)"))
         #expect(!text.contains("onDisappear"))
     }
+
+    /// A row's reason as a short key, for the table below.
+    static func key(_ reason: RedactStop.Reason) -> String {
+        switch reason {
+        case .searchedInPart: return "part"
+        case .line(.notReached): return "notReached"
+        case .line(.recognitionOff): return "off"
+        case .line(.tooLarge): return "large"
+        case .line: return "other"
+        }
+    }
+    static let keyWords = BeforeYouRedactWords(
+        nameLine: { names, _, _ in
+            let line = names.map(\.text).joined(separator: ", ")
+            return NotSearchedListContent.NameLine(shown: line, spoken: line)
+        },
+        row: { group, _ in key(group.reason) })
+
+    /// One expected section: its name line (nil for none) and its rows' keys and pages.
+    typealias Expected = (name: String?, rows: [(String, [Int])])
+
+    // The cases are rebuilt from the state part's own suites (RedactStopTests,
+    // RedactStopGroupsTests).
+    @Test("The stop's list is the grouping function's output, in order, once each")
+    func listIsTheGrouping() {
+        let scanQuery = AppliedSearchQuery(kind: .piiScan(categories: []), options: SearchOptions())
+        let onlyFive = G.account((0..<10).map { $0 == 4 ? [] : [.ownText] }, off: [4])
+        let onlyThree = G.account((0..<10).map { $0 == 2 ? [] : [.ownText] }, off: [2])
+        let stopped = G.account((0..<10).map { $0 > 4 ? [] : [.ownText] }, .stopped(page: 4))
+        let largeAndOff = G.account([[.ownText], [.tooLarge], [], [.ownText]], off: [2])
+        let table: [(String, [RedactStop.Run], Set<RedactStop.Page>, [Expected])] = [
+            ("one text, recognition off", [(G.text("Delia"), G.unread)], [],
+             [(nil, [("off", [2, 4, 8])])]),
+            ("two texts unread alike", [(G.text("Delia"), G.unread), (G.text("Rourke"), G.unread)], [],
+             [(nil, [("off", [2, 4, 8])])]),
+            ("one text on more pages than another", [(G.text("Delia"), G.unread), (G.text("Rourke"), onlyFive)], [],
+             [(nil, [("off", [4])]), ("Delia", [("off", [2, 8])])]),
+            ("a run stopped on page 5", [(G.text("Delia"), stopped)], [],
+             [(nil, [("part", [4]), ("notReached", [5, 6, 7, 8, 9])])]),
+            ("a page answered", [(G.text("Delia"), G.unread)], [RedactStop.Page(page: 2, reason: .line(.recognitionOff))],
+             [(nil, [("off", [4, 8])])]),
+            ("two reasons, in the Search sheet's order", [(G.text("Delia"), largeAndOff)], [],
+             [(nil, [("large", [1]), ("off", [2])])]),
+            ("a pattern and a text", [(G.text("Delia"), G.unread), (AppliedSearchQuery(kind: .regex("[0-9]{3}"), options: SearchOptions()), onlyThree)], [],
+             [(nil, [("off", [2])]), ("Delia", [("off", [4, 8])])]),
+            ("a Scan and a text unread alike", [(G.text("Delia"), G.unread), (scanQuery, G.unread)], [],
+             [(nil, [("off", [2, 4, 8])])]),
+            ("two of three texts unread", [(G.text("Delia"), G.unread), (G.text("Rourke"), G.unread), (G.text("Moss"), G.read)], [],
+             [("Delia, Rourke", [("off", [2, 4, 8])])]),
+        ]
+        #expect(table.count == 9)
+        for (name, runs, answered, expected) in table {
+            let casePages = RedactStop.namedPages(runs: runs, answered: answered)
+            let stop = Sheet.stop(casePages: casePages, runs: runs, answered: answered, words: Self.keyWords)
+            #expect(stop.content.sections.map { $0.nameLine?.shown } == expected.map(\.name), "\(name)")
+            #expect(stop.content.sections.map { $0.rows.map(\.sentence) } == expected.map { $0.rows.map(\.0) }, "\(name)")
+            #expect(stop.content.sections.map { $0.rows.map(\.pages) } == expected.map { $0.rows.map(\.1) }, "\(name)")
+            #expect(stop.content.sections.allSatisfy { $0.nameLine.map { $0.shown == $0.spoken } ?? true }, "\(name)")
+        }
+    }
 }
