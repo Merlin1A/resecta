@@ -6,7 +6,8 @@ import RedactionEngine
 // where the word can be (`SearchResult.inkFitDegraded`). Shrinking one back
 // to the word can leave part of it readable, so the results sheet names the
 // pages holding one (`SearchWidenedBoxBanner`) and the page in view says so
-// in the bottom capsule, before the apply and after it. An applied box keeps
+// in the editor's band (the fit notice), before the apply and after it, until
+// the person closes it. An applied box keeps
 // the flag on its audit snapshot (`MatchAuditSnapshot.inkFitDegraded`),
 // which rides undo and redo with its region; a deleted region drops out with
 // the region, a moved or resized one keeps it.
@@ -53,5 +54,17 @@ extension RedactionState {
     /// or a result of the open search session.
     func pageHoldsWidenedBox(_ page: Int) -> Bool {
         widenedRegionPages.contains(page) || (activeSearch?.widenedBoxPages.contains(page) ?? false)
+    }
+
+    /// Whether the fit notice holds for `page`: the page holds a widened box
+    /// and the person has not closed the notice for it.
+    func fitNoticeHolds(on page: Int) -> Bool {
+        pageHoldsWidenedBox(page) && !fitNoticeClosedPages.contains(page)
+    }
+
+    /// Closes the fit notice on every page holding a widened box now. A page
+    /// that gains its first widened box later shows it again.
+    func closeFitNotice() {
+        fitNoticeClosedPages.formUnion(widenedRegionPages.union(activeSearch?.widenedBoxPages ?? []))
     }
 }
