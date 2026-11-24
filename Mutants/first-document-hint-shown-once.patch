@@ -1,0 +1,19 @@
+Property: Once the line has left, it never shows again on this install.
+Area: the first-time line in the editor
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/FirstDocumentHintTests -only-testing:ResectaAppUITests/FirstDocumentHintUITests
+Must go red: ResectaAppTests/FirstDocumentHintTests onceLeftNeverAgain; ResectaAppUITests/FirstDocumentHintUITests testFirstDocument_lineShowsOnceAndLeavesAtTheFirstToolbarTap
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/FirstDocumentHintStore.swift b/Sources/ResectaApp/State/FirstDocumentHintStore.swift
+index c1e6afe6..efcb20dc 100644
+--- a/Sources/ResectaApp/State/FirstDocumentHintStore.swift
++++ b/Sources/ResectaApp/State/FirstDocumentHintStore.swift
+@@ -23,7 +23,7 @@ nonisolated struct FirstDocumentHintStore {
+     }
+ 
+     func markDone() {
+-        defaults.set(true, forKey: Self.doneKey)
++        _ = defaults
+     }
+ 
+     /// Only the test launch clears it (`--firstDocumentHintFresh`).

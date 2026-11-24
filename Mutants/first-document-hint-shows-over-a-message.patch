@@ -1,0 +1,19 @@
+Property: While a message is at the slot the line waits; it shows when the message leaves.
+Area: the first-time line in the editor
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/FirstDocumentHintTests
+Must go red: ResectaAppTests/FirstDocumentHintTests showsOnlyWhenDue; ResectaAppTests/FirstDocumentHintTests waitsBehindAMessage
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/FirstDocumentHintStore.swift b/Sources/ResectaApp/State/FirstDocumentHintStore.swift
+index c1e6afe6..6ed30092 100644
+--- a/Sources/ResectaApp/State/FirstDocumentHintStore.swift
++++ b/Sources/ResectaApp/State/FirstDocumentHintStore.swift
+@@ -83,7 +83,7 @@ enum FirstDocumentHintRules {
+     /// While it is due it shows, unless a message holds the slot; then it
+     /// waits for the message to leave.
+     static func shows(due: Bool, messageAtSlot: Bool) -> Bool {
+-        due && !messageAtSlot
++        due
+     }
+ 
+     /// With VoiceOver running a touch is exploring, not acting: only the
