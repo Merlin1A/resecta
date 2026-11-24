@@ -1,0 +1,20 @@
+Property: Search's ink-fit content key never inflates an image: an image under any filter but a JPEG's alone is keyed by its dictionary, so the key of a page whose image inflates to 512 MiB or 2 GiB is taken under 100 MB.
+Area: ink fit (Search), the content key
+Test command: cd Packages/RedactionEngine && DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --no-parallel --filter InkTokenKeyInflateTests (on the host: the two bound cases run their step in a child process; the planted run inflates about 4 GB there)
+Must go red: RedactionEngineTests/InkTokenKeyInflateTests "The key of a page whose image inflates to 512 MiB is taken under 100 MB"; RedactionEngineTests/InkTokenKeyInflateTests "The key of a page whose image inflates to 2 GiB is taken under 100 MB"; RedactionEngineTests/InkTokenKeyInflateTests "Two Flate pages alike but for the image's stored /Length get different keys, and pages alike in every fact the same key"
+Planted: every image's stream is copied again, whatever its filter.
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/InkFitCaches.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/InkFitCaches.swift
+index 53b1cc0a..a5536db8 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/InkFitCaches.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/InkFitCaches.swift
+@@ -189,7 +189,7 @@ final class InkTokenCache: @unchecked Sendable {
+             return true
+         }, Unmanaged.passUnretained(best).toOpaque())
+         guard let stream = best.stream, let image = best.image else { return Data() }
+-        guard SystemPageImageSource.isJPEGAlone(image) else { return imageFacts(image) }
++        _ = image // mutant: every image is copied, whatever its filter
+         var format = CGPDFDataFormat.raw
+         return (CGPDFStreamCopyData(stream, &format) as Data?) ?? Data()
+     }
