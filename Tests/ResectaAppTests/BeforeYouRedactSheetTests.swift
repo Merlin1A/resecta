@@ -1,7 +1,7 @@
 import Testing
 import Foundation
 import SwiftUI
-import RedactionEngine
+@testable import RedactionEngine
 @testable import ResectaApp
 
 // The stop at Redact's sheet: its choices, what each answer does, when the
@@ -199,7 +199,7 @@ struct BeforeYouRedactSheetTests {
         let both = G.account([[.ownText], [.tooLarge], []], off: [2])
         let onlyLarge = Sheet.stop(casePages: [.init(page: 1, reason: .line(.tooLarge))], runs: [(G.text("Delia"), both)],
                                    answered: [], words: Self.words)
-        #expect(onlyLarge.content.sections.flatMap(\.rows).map(\.pages) == [[1]])
+        #expect(onlyLarge.content.sections.flatMap { $0.rows }.map { $0.pages } == [[1]])
         #expect(onlyLarge.reRun == nil)
     }
 
