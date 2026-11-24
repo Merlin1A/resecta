@@ -109,7 +109,7 @@ public actor DocumentSearcher {
     // never became a Search candidate on either leg. The assembler is a
     // Sendable value whose gazetteer load is cached statically
     // (`AddressSpatialAssembler.sharedAddressComponents`), so per-searcher
-    // construction is cheap. See `assembledAddressMatches(lines:haystack:)`.
+    // construction is cheap. See `assembledAddressMatches(lines:haystack:boxOf:)`.
     let addressAssembler = AddressSpatialAssembler()
 
     // Optional preset-threshold vector applied to PII matches before

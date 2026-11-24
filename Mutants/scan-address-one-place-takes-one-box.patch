@@ -1,0 +1,21 @@
+Property: Copies placed at one real place of their text are covered by its one survivor, every box kept there taken, united. Planted: the survivor takes the first box kept there, one per take, and the other copy is left without a box.
+Area: Search, Scan's address assembly
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'ScanDuplicateAddressTests'
+Must go red: RedactionEngineTests/ScanDuplicateAddressTests copiesAtOneRealPlaceAreTakenTogether
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift
+index 68054b49..01d7eb07 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift
+@@ -96,10 +96,6 @@ extension DocumentSearcher {
+                                     from boxes: inout [AddressPlace: [TextLayerBox]]) -> TextLayerBox? {
+         let key = AddressPlace(text: match.text, range: match.range)
+         if var kept = boxes[key], !kept.isEmpty {
+-            if key.length > 0 {
+-                boxes[key] = []
+-                return united(kept)
+-            }
+             let box = kept.removeFirst()
+             boxes[key] = kept
+             return box
