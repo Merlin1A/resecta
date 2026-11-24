@@ -1,0 +1,18 @@
+Property: Each copy of a repeated address keeps its own box, kept by its place. Planted: every copy takes the first copy's box, kept by text alone.
+Area: Search, Scan's address assembly
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'ScanDuplicateAddressTests'
+Must go red: RedactionEngineTests/ScanDuplicateAddressTests stackedCopiesEachOnTheirOwnLines; RedactionEngineTests/ScanDuplicateAddressTests stackedCopiesOnThePictureLeg; RedactionEngineTests/ScanDuplicateAddressTests copiesAtOnePlaceTakeOneBoxEach
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift
+index 874aeaae..23dbbd66 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+ScanGate.swift
+@@ -101,6 +101,7 @@ extension DocumentSearcher {
+     /// range, or the places inside the range the overlap step widened it to.
+     nonisolated static func takePlaced(for match: PIIDetector.PIIMatch,
+                                        from boxes: inout [AddressPlace: [TextLayerBox]]) -> (box: TextLayerBox, places: [NSRange])? {
++        return nil
+         let key = AddressPlace(text: match.text, range: match.range)
+         if var kept = boxes[key], !kept.isEmpty {
+             if key.length > 0 {

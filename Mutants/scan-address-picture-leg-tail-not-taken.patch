@@ -1,0 +1,19 @@
+Property: On the picture leg, a widened address's part outside its own line is boxed as its own result. Planted: the leg takes the address's whole range as its place, so the earlier line gets no box there.
+Area: Search, Scan's address boxing
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'ScanOverlapTailTests'
+Must go red: RedactionEngineTests/ScanOverlapTailTests widenedAddressTailIsBoxedOnThePictureLeg
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift
+index b4e29fe4..4ae60c87 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift
+@@ -399,7 +399,7 @@ extension DocumentSearcher {
+         ) -> (rect: CGRect, window: ContextWindow, ocrConfidence: Float)? {
+             tails = []
+             let taken = match.kind == .address ? Self.takePlaced(for: match, from: &boxesByPlace) : nil
+-            if let taken { tails = Self.tails(of: match.range, outside: taken.places, in: concatenated as NSString) }
++            if taken != nil { tails = Self.tails(of: match.range, outside: [match.range], in: concatenated as NSString) }
+             guard let spatialRect =
+                 (match.kind == .address
+                     ? (taken?.box ?? spatialRectByText[match.text])?.rect : nil) else {

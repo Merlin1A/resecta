@@ -22,8 +22,9 @@ public struct EmbeddedTextSource: Sendable {
     public let wordBounds: [WordBound]
     /// Per-line records used by `AddressSpatialAssembler`.
     public let lines: [OCREngine.TextLine]
-    /// Index-aligned with `lines`: each line's words by their ranges in the
-    /// page's text, and the union of their boxes in the page's absolute,
+    /// Index-aligned with `lines`: each line's words (or, for a word run on
+    /// over two drawn lines, its piece on this line; `linePieces`) by their
+    /// ranges in the page's text, and the union of their boxes in the page's absolute,
     /// unrotated space (what a line's glyphs are cut to when its box grows to
     /// them, `DocumentSearcher.addressLines(on:)`).
     var lineSpans: [LineSpan] = []
@@ -75,6 +76,45 @@ public struct EmbeddedTextSource: Sendable {
     public static func make(from page: PDFPage, fitLines: Bool = false) -> EmbeddedTextSource? {
         let cropBox = page.bounds(for: .cropBox)
         return make(from: page, cropBox: cropBox, fitLines: fitLines)
+    }
+
+    /// A word's pieces on the lines it is drawn on: the word whole where it
+    /// is drawn on one line, where a line's piece cannot be read inside the
+    /// word, or where the pieces are not two drawn lines' (`piecesAccepted`);
+    /// otherwise one piece for each line, with its own range and box.
+    static func linePieces(
+        of selection: PDFSelection, word: NSRange, bounds: CGRect, page: PDFPage
+    ) -> [(range: NSRange, bounds: CGRect)] {
+        let byLine = selection.selectionsByLine()
+        guard byLine.count > 1 else { return [(word, bounds)] }
+        var pieces: [(range: NSRange, bounds: CGRect)] = []
+        for line in byLine {
+            guard line.numberOfTextRanges(on: page) == 1 else { return [(word, bounds)] }
+            let range = line.range(at: 0, on: page)
+            let box = line.bounds(for: page)
+            guard range.location != NSNotFound, range.length > 0,
+                  NSIntersectionRange(range, word) == range,
+                  box.width > 0, box.height > 0 else { return [(word, bounds)] }
+            pieces.append((range, box))
+        }
+        return piecesAccepted(pieces, word: word) ? pieces : [(word, bounds)]
+    }
+
+    /// Whether a word's line pieces stand for it as drawn lines: together
+    /// they hold every character of the word, each once (so no character
+    /// drops out of every line), and no two of them overlap in height (so a
+    /// piece raised or lowered on one drawn line, a superscript ordinal
+    /// "5th" or a digit set by a text rise, stays in its word).
+    static func piecesAccepted(_ pieces: [(range: NSRange, bounds: CGRect)], word: NSRange) -> Bool {
+        let ranges = pieces.map(\.range).sorted { $0.location < $1.location }
+        guard ranges.reduce(0, { $0 + $1.length }) == word.length,
+              zip(ranges, ranges.dropFirst()).allSatisfy({ NSMaxRange($0) <= $1.location }) else { return false }
+        for (i, one) in pieces.enumerated() {
+            for other in pieces[(i + 1)...] where one.bounds.minY < other.bounds.maxY && other.bounds.minY < one.bounds.maxY {
+                return false
+            }
+        }
+        return true
     }
 
     /// Variant that takes a pre-computed cropBox (avoids redundant PDFKit
@@ -137,23 +177,31 @@ public struct EmbeddedTextSource: Sendable {
                 range: safeRange, normalizedRect: normalized
             ))
 
-            let yMid = bounds.midY
-            let wordText = nsText.substring(with: safeRange)
-            let lineTolerance = max(bounds.height * 0.5, 2.0)
-            if let idx = lineBuckets.firstIndex(where: {
-                abs($0.yMid - yMid) <= lineTolerance
-            }) {
-                lineBuckets[idx].words.append((bounds, wordText, safeRange))
-            } else {
-                lineBuckets.append((yMid, [(bounds, wordText, safeRange)]))
+            // A word PDFKit runs on from one drawn line into the next
+            // ("StreetSpringfield", where no break was drawn between them)
+            // is one selection over both lines: each line takes its own
+            // piece of it, so neither line loses its word to a box as tall
+            // as the two.
+            for piece in Self.linePieces(of: sel, word: safeRange, bounds: bounds, page: page) {
+                let yMid = piece.bounds.midY
+                let pieceText = nsText.substring(with: piece.range)
+                let lineTolerance = max(piece.bounds.height * 0.5, 2.0)
+                if let idx = lineBuckets.firstIndex(where: {
+                    abs($0.yMid - yMid) <= lineTolerance
+                }) {
+                    lineBuckets[idx].words.append((piece.bounds, pieceText, piece.range))
+                } else {
+                    lineBuckets.append((yMid, [(piece.bounds, pieceText, piece.range)]))
+                }
             }
         }
 
         let coverage = Double(areaSum / pageArea)
 
         // Build OCREngine.TextLine entries from line buckets. Each line is
-        // the union of its words' rects (in normalized coords) plus the
-        // concatenated text. Used by AddressSpatialAssembler.
+        // the union of its words' rects, or of a run-on word's piece on this
+        // line (`linePieces`), in normalized coords, plus the concatenated
+        // text. Used by AddressSpatialAssembler.
         let sortedBuckets = lineBuckets
             .sorted { $0.yMid > $1.yMid }  // top-to-bottom in PDF (bottom-left origin)
         let lines: [OCREngine.TextLine] = sortedBuckets

@@ -1,7 +1,9 @@
 import Foundation
 import PDFKit
 
-// Moved whole from DocumentSearcher.swift; no line inside a moved body changes.
+// Moved from DocumentSearcher.swift (cd4d1afc); both legs now take each
+// address copy's box by its place (`takePlaced`), not by its text alone, and
+// box the part of a widened address its own box does not reach (`tails`).
 
 extension DocumentSearcher {
 
@@ -45,12 +47,15 @@ extension DocumentSearcher {
                 // geometry for the same page; each line grown to its own
                 // drawn glyphs (`addressLines(on:)`).
                 var spatialRectByText: [String: TextLayerBox] = [:]
+                var boxesByPlace: [AddressPlace: [TextLayerBox]] = [:]
                 if categories.contains(.address),
                    let lines = addressLines(on: page) {
                     let assembly = assembledAddressMatches(
-                        lines: lines, haystack: pageText as NSString)
+                        lines: lines, haystack: pageText as NSString,
+                        boxOf: { [self] in textLayerBox(for: $0, page: page)?.rect })
                     rawMatches.append(contentsOf: assembly.matches)
                     spatialRectByText = assembly.spatialRectByText
+                    boxesByPlace = assembly.boxesByPlace
                 }
                 // Cross-category overlap resolution before the threshold filter.
                 let resolution = DetectionOrchestrator.resolveOverlaps(rawMatches)
@@ -76,9 +81,14 @@ extension DocumentSearcher {
                     // selection exists) or the located anchor text (whose
                     // selection would cover only part of the block). Every
                     // other match keeps PDFKit selection geometry unchanged.
+                    // A survivor the overlap step widened past its own
+                    // place also boxes the rest of its range (`tails`).
                     let found: TextLayerBox?
-                    if let spatialBox =
-                        (match.kind == .address ? spatialRectByText[match.text] : nil) {
+                    var tails: [NSRange] = []
+                    if match.kind == .address, let taken = Self.takePlaced(for: match, from: &boxesByPlace) {
+                        found = taken.box
+                        tails = Self.tails(of: match.range, outside: taken.places, in: pageText as NSString)
+                    } else if let spatialBox = match.kind == .address ? spatialRectByText[match.text] : nil {
                         found = spatialBox
                     } else {
                         found = textLayerBox(for: match.range, page: page)
@@ -117,6 +127,38 @@ extension DocumentSearcher {
                         matchRangeInSnippet: window.matchRange, textLayerRect: box.textLayerRect, inkFitDegraded: box.degraded
                     ).identified(by: box.identity))
                     totalYielded += 1
+
+                    for tail in tails {
+                        if Task.isCancelled || totalYielded >= Self.maxResults { break }
+                        let tailText = (pageText as NSString).substring(with: tail)
+                        if userTermsIndex?.underlyingMatcher.shouldSuppress(tailText) != nil { continue }
+                        let tailWindow = contextSnippet(text: pageText, matchNSRange: tail)
+                        guard let box = textLayerBox(for: tail, page: page) else {
+                            continuation.yield(.unboxed(
+                                pageIndex: pageIndex, matchedText: tailText,
+                                contextSnippet: tailWindow.snippet, source: .textLayer,
+                                term: match.category?.rawValue ?? "PII",
+                                piiCategory: match.category, piiConfidence: match.confidence,
+                                rationale: match.rationale, matchRangeInSnippet: tailWindow.matchRange,
+                                liesOffVisiblePage: liesOffVisiblePage(tail, page: page)))
+                            totalYielded += 1
+                            continue
+                        }
+                        pageRects.append(box.mergeIdentity)
+                        continuation.yield(SearchResult(
+                            pageIndex: pageIndex,
+                            normalizedRect: box.rect,
+                            matchedText: tailText,
+                            contextSnippet: tailWindow.snippet,
+                            source: .textLayer,
+                            term: match.category?.rawValue ?? "PII",
+                            piiCategory: match.category,
+                            piiConfidence: match.confidence,
+                            rationale: match.rationale,
+                            matchRangeInSnippet: tailWindow.matchRange, textLayerRect: box.textLayerRect, inkFitDegraded: box.degraded
+                        ).identified(by: box.identity))
+                        totalYielded += 1
+                    }
                 }
 
                 // Always-flag synthetic hits. Emitted after detector
@@ -292,6 +334,7 @@ extension DocumentSearcher {
         // the normalized concatenation so a located
         // range stays consistent with `lineOffsets`.
         var spatialRectByText: [String: TextLayerBox] = [:]
+        var boxesByPlace: [AddressPlace: [TextLayerBox]] = [:]
         if categories.contains(.address) {
             let assemblerLines = lineOffsets.map { entry in
                 OCREngine.TextLine(
@@ -300,10 +343,13 @@ extension DocumentSearcher {
                     confidence: entry.confidence
                 )
             }
+            let boxLines = Self.boxLookupLines(lineOffsets)
             let assembly = assembledAddressMatches(
-                lines: assemblerLines, haystack: concatenated as NSString)
+                lines: assemblerLines, haystack: concatenated as NSString,
+                boxOf: { [self] in ocrUnionRect(forUTF16Range: $0, lineOffsets: boxLines, page: page)?.rect })
             rawMatches.append(contentsOf: assembly.matches)
             spatialRectByText = assembly.spatialRectByText
+            boxesByPlace = assembly.boxesByPlace
         }
         // The overlap resolver runs on the OCR path too. Resolver is a
         // pure static function on DetectionOrchestrator.
@@ -345,11 +391,18 @@ extension DocumentSearcher {
         // lines), the snippet is the assembled text and the confidence is the
         // minimum over the lines the union rect covers. Non-address matches
         // flow through `mapToOCR` unchanged.
+        // The parts of the current match's range its own box does not reach
+        // (`tails`), set by `resolvedMapping`.
+        var tails: [NSRange] = []
         func resolvedMapping(
             for match: PIIDetector.PIIMatch
         ) -> (rect: CGRect, window: ContextWindow, ocrConfidence: Float)? {
+            tails = []
+            let taken = match.kind == .address ? Self.takePlaced(for: match, from: &boxesByPlace) : nil
+            if let taken { tails = Self.tails(of: match.range, outside: taken.places, in: concatenated as NSString) }
             guard let spatialRect =
-                (match.kind == .address ? spatialRectByText[match.text]?.rect : nil) else {
+                (match.kind == .address
+                    ? (taken?.box ?? spatialRectByText[match.text])?.rect : nil) else {
                 return mapToOCR(match.range)
             }
             if let mapped = mapToOCR(match.range) {
@@ -404,6 +457,33 @@ extension DocumentSearcher {
                 rationale: rationale,
                 matchRangeInSnippet: mapped.window.matchRange
             ))
+
+            for tail in tails {
+                let tailText = (concatenated as NSString).substring(with: tail)
+                if userTermsIndex?.underlyingMatcher.shouldSuppress(tailText) != nil { continue }
+                guard let tailMapped = mapToOCR(tail) else {
+                    let window = contextSnippet(text: concatenated, matchNSRange: tail)
+                    results.append(.unboxed(
+                        pageIndex: pageIndex, matchedText: tailText,
+                        contextSnippet: window.snippet, source: .ocr(confidence: 1.0),
+                        term: match.category?.rawValue ?? "PII",
+                        piiCategory: match.category, piiConfidence: match.confidence,
+                        rationale: match.rationale, matchRangeInSnippet: window.matchRange))
+                    continue
+                }
+                results.append(SearchResult(
+                    pageIndex: pageIndex,
+                    normalizedRect: tailMapped.rect,
+                    matchedText: tailText,
+                    contextSnippet: tailMapped.window.snippet,
+                    source: .ocr(confidence: tailMapped.ocrConfidence),
+                    term: match.category?.rawValue ?? "PII",
+                    piiCategory: match.category,
+                    piiConfidence: match.confidence,
+                    rationale: match.rationale?.appending(.ocrConfidence(value: Double(tailMapped.ocrConfidence))),
+                    matchRangeInSnippet: tailMapped.window.matchRange
+                ))
+            }
         }
 
         // Always-flag synthetic OCR hits. Matched against the

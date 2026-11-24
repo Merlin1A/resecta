@@ -103,7 +103,7 @@ struct HybridDedupTests {
     /// The text-layer results made from a fitted box, by file: each carries
     /// the box's identity (`identified(by:)`).
     static let identifiedResults = ["DocumentSearcher+TextMatches.swift": 1, "DocumentSearcher+TextModes.swift": 1,
-                                    "DocumentSearcher+PIIScan.swift": 2, "DocumentSearcher+PageSeam.swift": 1]
+                                    "DocumentSearcher+PIIScan.swift": 3, "DocumentSearcher+PageSeam.swift": 1]
 
     /// Each call that starts with `head` in `text`, to its matching closing parenthesis.
     static func calls(of head: String, in text: String) -> [String] {

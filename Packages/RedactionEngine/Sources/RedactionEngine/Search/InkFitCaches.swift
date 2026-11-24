@@ -136,8 +136,8 @@ final class InkTokenCache: @unchecked Sendable {
     private var order: [Int] = []
 
     /// The page's content key: the document session, the page's index in its
-    /// document, its text, the bytes of its largest image, its displayed box
-    /// and rotation. Read once per page object. The session and the index
+    /// document, its text, what tells its largest image apart
+    /// (`largestImageKey`), its displayed box and rotation. Read once per page object. The session and the index
     /// keep one page's read from standing in for another page's, in this
     /// document or a later one, when the two share a text and a box and no
     /// direct image tells them apart (a scan whose picture sits inside a form
@@ -149,7 +149,7 @@ final class InkTokenCache: @unchecked Sendable {
         hasher.combine(InkFitSession.shared.salt)
         hasher.combine(page.document?.index(for: page) ?? -1)
         hasher.combine(page.string ?? "")
-        hasher.combine(largestImageBytes(cgPage))
+        hasher.combine(largestImageKey(cgPage))
         hasher.combine(visual.width)
         hasher.combine(visual.height)
         hasher.combine(page.rotation)
@@ -158,14 +158,19 @@ final class InkTokenCache: @unchecked Sendable {
         return key
     }
 
-    /// The stored bytes of the page's largest direct image (as stored: a JPEG
-    /// stays compressed), or empty.
-    static func largestImageBytes(_ cgPage: CGPDFPage) -> Data {
+    /// What tells the page's largest direct image (by declared Width x
+    /// Height) apart, read without undoing any filter, or empty when the page
+    /// has none. A JPEG alone (`SystemPageImageSource.isJPEGAlone`) gives its
+    /// stored bytes: copying them undoes nothing. Any other image gives its
+    /// dictionary's facts and is never copied: copying undoes the filter
+    /// first, and a Flate stream can inflate a thousand times over before
+    /// anything could refuse it.
+    static func largestImageKey(_ cgPage: CGPDFPage) -> Data {
         guard let dictionary = cgPage.dictionary,
               case .found(let resources) = TextLayerExtractor.inheritedResources(of: dictionary) else { return Data() }
         var xobjects: CGPDFDictionaryRef?
         guard CGPDFDictionaryGetDictionary(resources, "XObject", &xobjects), let xobjects else { return Data() }
-        final class Best { var area = 0; var data = Data() }
+        final class Best { var area = 0; var stream: CGPDFStreamRef?; var image: CGPDFDictionaryRef? }
         let best = Best()
         CGPDFDictionaryApplyBlock(xobjects, { _, value, info in
             guard let info else { return true }
@@ -179,12 +184,39 @@ final class InkTokenCache: @unchecked Sendable {
             else { return true }
             let best = Unmanaged<Best>.fromOpaque(info).takeUnretainedValue()
             if Int(width) * Int(height) > best.area {
-                var format = CGPDFDataFormat.raw
-                if let data = CGPDFStreamCopyData(stream, &format) as Data? { best.area = Int(width) * Int(height); best.data = data }
+                best.area = Int(width) * Int(height); best.stream = stream; best.image = dictionary
             }
             return true
         }, Unmanaged.passUnretained(best).toOpaque())
-        return best.data
+        guard let stream = best.stream, let image = best.image else { return Data() }
+        guard SystemPageImageSource.isJPEGAlone(image) else { return imageFacts(image) }
+        var format = CGPDFDataFormat.raw
+        return (CGPDFStreamCopyData(stream, &format) as Data?) ?? Data()
+    }
+
+    /// An image's dictionary facts, as text: its filter names in order, its
+    /// stored /Length, Width, Height and BitsPerComponent, and its colour
+    /// space when that is a name.
+    static func imageFacts(_ image: CGPDFDictionaryRef) -> Data {
+        var facts = "image dictionary"
+        var name: UnsafePointer<CChar>?
+        var filters: CGPDFArrayRef?
+        if CGPDFDictionaryGetName(image, "Filter", &name), let name {
+            facts += " Filter=" + String(cString: name)
+        } else if CGPDFDictionaryGetArray(image, "Filter", &filters), let filters {
+            for index in 0..<CGPDFArrayGetCount(filters) {
+                var item: UnsafePointer<CChar>?
+                let named = CGPDFArrayGetName(filters, index, &item)
+                facts += " Filter=" + (named ? item.map { String(cString: $0) } ?? "?" : "?")
+            }
+        }
+        for key in ["Length", "Width", "Height", "BitsPerComponent"] {
+            var number: CGPDFInteger = 0
+            facts += " \(key)=" + (CGPDFDictionaryGetInteger(image, key, &number) ? String(number) : "none")
+        }
+        var space: UnsafePointer<CChar>?
+        if CGPDFDictionaryGetName(image, "ColorSpace", &space), let space { facts += " ColorSpace=" + String(cString: space) }
+        return Data(facts.utf8)
     }
 
     func value(for key: Int) -> [DocumentSearcher.InkToken]? {
