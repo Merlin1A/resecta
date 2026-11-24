@@ -18,8 +18,7 @@ struct RedactStopRefusalTests {
 
     /// A state with one closed Text run over 3 pages: pages 0 and 1 read
     /// from their own text, page 2 with recognition off.
-    static func stateWithOneRun() -> RedactionState {
-        let state = RedactionState()
+    static func stateWithOneRun(_ state: RedactionState = RedactionState()) -> RedactionState {
         let token = UUID()
         state.recordSearchRunOpened(token: token, query: AppliedSearchQuery(kind: .text("Delia"), options: SearchOptions()))
         var account = SearchAccount(pageCount: 3)
@@ -34,6 +33,15 @@ struct RedactStopRefusalTests {
     @Test("The stop is not returned on this branch: the sheet that shows it is not drawn yet")
     func heldUntilTheSheetIsDrawn() {
         #expect(DocumentState.pagesNotReadReturned == false)
+    }
+
+    @Test("Under the hold, a box and a page not read refuse nothing: the tap runs as today")
+    func heldRefusesNothing() {
+        let coordinator = makeLoadedCoordinator()
+        let state = Self.stateWithOneRun(coordinator.redactionState)
+        state.regions[0] = [RedactionRegion(id: UUID(), normalizedRect: CGRect(x: 0.1, y: 0.2, width: 0.3, height: 0.4), source: .manual)]
+        #expect(RedactStop.opens(runs: state.closedSearchRuns, answered: state.redactStopAnswered))
+        #expect(coordinator.documentState.redactRefusal(with: state) == nil)
     }
 
     @Test("K7-T: selected matches waiting or not, against the pages to name: the stop only when pages are unanswered, never ahead of the selections")

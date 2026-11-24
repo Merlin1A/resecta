@@ -24,6 +24,25 @@ struct SearchRunLogTests {
         #expect(logged == [AppliedSearchQuery(kind: .text("Delia"), options: search.options)])
     }
 
+    @Test("A run replaced after an Apply tells the document it was replaced; one replaced unapplied, or completed, does not")
+    func replacedRunIsReported() throws {
+        var replaced: [UUID] = []
+        let store = SearchAccountLifecycleTests.Store()
+        let (applied, _) = SearchAccountLifecycleTests.running(store)
+        applied.accountReplacedSink = { replaced.append($0) }
+        let token = try #require(applied.appliedSearchRecord()?.accountToken)
+        applied.closeAccount(.replaced)
+        #expect(replaced == [token])
+        let (unapplied, _) = SearchAccountLifecycleTests.running(store)
+        unapplied.accountReplacedSink = { replaced.append($0) }
+        unapplied.closeAccount(.replaced)
+        let (completed, run) = SearchAccountLifecycleTests.running(store)
+        completed.accountReplacedSink = { replaced.append($0) }
+        _ = completed.appliedSearchRecord()
+        completed.closeAccount(.completed, run: run)
+        #expect(replaced == [token])
+    }
+
     @Test("Closed runs come oldest first with their queries; a replaced run is left out")
     func closedRunsInOrder() {
         let state = RedactionState()

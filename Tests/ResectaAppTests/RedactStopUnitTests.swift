@@ -49,6 +49,18 @@ struct RedactStopUnitTests {
         #expect(!on.covers(off))
     }
 
+    @Test("Digit separators and quotes and dashes: the option on covers it off, never the other way")
+    func digitsAndQuotesDirection() {
+        let digitsOn = RedactStopUnit(kind: .text, text: "1000", options: SearchOptions(stripDigitSeparators: true))
+        let digitsOff = RedactStopUnit(kind: .text, text: "1000", options: SearchOptions(stripDigitSeparators: false))
+        #expect(digitsOn.covers(digitsOff))
+        #expect(!digitsOff.covers(digitsOn))
+        let quotesOn = RedactStopUnit(kind: .text, text: "O'Neil", options: SearchOptions(normalizeSmartPunctuation: true))
+        let quotesOff = RedactStopUnit(kind: .text, text: "O'Neil", options: SearchOptions(normalizeSmartPunctuation: false))
+        #expect(quotesOn.covers(quotesOff))
+        #expect(!quotesOff.covers(quotesOn))
+    }
+
     @Test("K7-29 at the unit: case-sensitive with Accents on, and ignoring case with Accents off: neither covers the other")
     func neitherCovers() {
         let one = RedactStopUnit(kind: .text, text: "Hartwell", options: SearchOptions(caseSensitive: true, foldDiacritics: true))
