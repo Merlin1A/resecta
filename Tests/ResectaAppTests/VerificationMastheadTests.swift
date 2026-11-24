@@ -207,13 +207,32 @@ struct VerificationMastheadTests {
         #expect(rows == 20 * 4)
     }
 
+    @Test("A result that no longer stands is titled Out of Date on every verdict; a standing one keeps its title")
+    func titleWhenTheResultDoesNotStand() {
+        #expect(Fixtures.all.count == 18)
+        var rows = 0
+        for (name, report) in Fixtures.all.sorted(by: { $0.key < $1.key }) {
+            let standing = Results.mastheadTitle(report: report)
+            #expect(standing != "Out of Date", "\(name): a standing result keeps its verdict's title")
+            for state in Self.states {
+                let shown = Results.mastheadTitle(report: report, outputExists: state.outputExists, isStale: state.isStale)
+                #expect(shown == (Self.stands(state) ? standing : "Out of Date"), "\(name), \(state.name): \(shown)")
+                rows += 1
+            }
+            // The end of a run is announced with the verdict's title: at that
+            // moment the result stands.
+            #expect(Results.completionAnnouncement(report: report).hasPrefix("Verification complete. \(standing)."), "\(name)")
+        }
+        #expect(rows == 18 * 4)
+    }
+
     @Test("The spoken label of a result that no longer stands: the title and the counts, then that sentence, and no review term")
     func spokenLabelWhenTheResultDoesNotStand() {
         let missing = Results.outputMissingSentence
         #expect(Results.mastheadAccessibilityLabel(report: Fixtures.secureFail, isStale: true)
-                == "Checks Failed. 6 of 7 checks passed. 1\u{00A0}failed. \(missing)")
+                == "Out of Date. 6 of 7 checks passed. 1\u{00A0}failed. \(missing)")
         #expect(Results.mastheadAccessibilityLabel(report: Fixtures.secureSkippedOff, outputExists: false, mode: .secure)
-                == "Checks Not Run. \(missing)")
+                == "Out of Date. \(missing)")
         let attention = Fixtures.searchableAttentionFull
         let terms = Results.reviewTermTexts(report: attention)
         #expect(!terms.isEmpty)
@@ -222,7 +241,7 @@ struct VerificationMastheadTests {
         for state in Self.states where !Self.stands(state) {
             let label = Results.mastheadAccessibilityLabel(
                 report: attention, outputExists: state.outputExists, isStale: state.isStale)
-            #expect(label.hasPrefix("\(Results.mastheadTitle(report: attention))."), "\(state.name): \(label)")
+            #expect(label.hasPrefix("Out of Date."), "\(state.name): \(label)")
             #expect(label.hasSuffix(missing), "\(state.name): \(label)")
             for term in terms {
                 #expect(!label.contains(term), "\(state.name): the label speaks \(term)")
