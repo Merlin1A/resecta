@@ -178,11 +178,9 @@ class RedactionState {
     /// Anyway records them, and they last while the document is open.
     var redactStopAnswered: Set<RedactStop.Page> = []
 
-    /// Redact Anyway: every page the stop names now is answered.
-    func answerRedactStop() {
-        for pages in RedactStop.pagesToName(runs: closedSearchRuns, answered: redactStopAnswered).values {
-            redactStopAnswered.formUnion(pages)
-        }
+    /// Redact Anyway: the pages the stop named are answered, and no other.
+    func answerRedactStop(_ pages: Set<RedactStop.Page>) {
+        redactStopAnswered.formUnion(pages)
     }
 
     /// The replaced runs whose accounts were kept, since an Apply took a

@@ -61,6 +61,8 @@ struct RedactStopUnitTests {
         let text = RedactStopUnit(kind: .text, text: "a+", options: SearchOptions())
         #expect(!text.covers(RedactStopUnit(kind: .pattern, text: "a+", options: SearchOptions())))
         #expect(!text.covers(RedactStopUnit(kind: .text, text: "b+", options: SearchOptions())))
+        let pattern = RedactStopUnit(kind: .pattern, text: "a+", options: SearchOptions())
+        #expect(!pattern.covers(RedactStopUnit(kind: .pattern, text: "b+", options: SearchOptions())))
     }
 
     @Test("Units of a search: one per text, one per term, the pattern, one Scan")

@@ -65,6 +65,11 @@ enum RedactStop {
         return named
     }
 
+    /// Every page the stop names, by page and reason, across its units.
+    static func namedPages(runs: [Run], answered: Set<Page>) -> Set<Page> {
+        pagesToName(runs: runs, answered: answered).values.reduce(into: Set<Page>()) { $0.formUnion($1) }
+    }
+
     /// True when the stop opens at the Redact tap.
     static func opens(runs: [Run], answered: Set<Page>) -> Bool {
         !pagesToName(runs: runs, answered: answered).isEmpty

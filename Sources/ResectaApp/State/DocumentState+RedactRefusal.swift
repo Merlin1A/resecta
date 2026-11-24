@@ -13,8 +13,10 @@ extension DocumentState {
         case noRegions        // no region survives the minimum-dimension filter
         case busy             // another phase, a run in flight, a pending review or a touch held on the canvas; no hint
         /// A search that counts left a page not read, and it is not yet
-        /// answered: the stop at Redact, a sheet that needs an answer.
-        case pagesNotRead
+        /// answered: the stop at Redact, a sheet that needs an answer. It
+        /// carries the pages it names, so Redact Anyway answers exactly the
+        /// pages the sheet showed.
+        case pagesNotRead(Set<RedactStop.Page>)
 
         /// How a refusal is shown: a notice that leaves, or a sheet that needs an answer.
         enum Presentation: Equatable {
@@ -22,7 +24,10 @@ extension DocumentState {
             case sheet
         }
 
-        var presentation: Presentation { self == .pagesNotRead ? .sheet : .notice }
+        var presentation: Presentation {
+            if case .pagesNotRead = self { return .sheet }
+            return .notice
+        }
 
         /// The hint the button speaks and the funnel shows.
         var hint: String {
@@ -43,12 +48,12 @@ extension DocumentState {
     /// regions, a run that cannot start, then the cases that need an answer,
     /// pages not read first.
     static func refusal(
-        unappliedSelections: Bool, hasRegions: Bool, canStart: Bool, pagesNotRead: Bool
+        unappliedSelections: Bool, hasRegions: Bool, canStart: Bool, pagesToName: Set<RedactStop.Page>
     ) -> RedactRefusal? {
         if unappliedSelections { return .selectedMatches }
         if !hasRegions { return .noRegions }
         if !canStart { return .busy }
-        if pagesNotRead { return .pagesNotRead }
+        if !pagesToName.isEmpty { return .pagesNotRead(pagesToName) }
         return nil
     }
 
@@ -69,7 +74,8 @@ extension DocumentState {
             unappliedSelections: Self.hasUnappliedSelections(redactionState),
             hasRegions: redactionState.hasEffectiveRegions,
             canStart: canStartPipeline && !redactionState.canvasHoldsATouch,
-            pagesNotRead: Self.pagesNotReadReturned
-                && RedactStop.opens(runs: redactionState.closedSearchRuns, answered: redactionState.redactStopAnswered))
+            pagesToName: Self.pagesNotReadReturned
+                ? RedactStop.namedPages(runs: redactionState.closedSearchRuns, answered: redactionState.redactStopAnswered)
+                : [])
     }
 }
