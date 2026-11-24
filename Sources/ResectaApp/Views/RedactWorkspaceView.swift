@@ -279,7 +279,9 @@ struct RedactWorkspaceView: View {
     @ViewBuilder
     private var detailContent: some View {
         DocumentEditorView(
-            showSettings: $showSettings
+            showSettings: $showSettings,
+            passwordSheetUp: workspace.lockedImport != nil,
+            dropDialogUp: heldDrop != nil
         )
     }
 

@@ -137,6 +137,17 @@ struct BottomSlotTests {
         #expect(!source.contains("pageHoldsWidenedBox"), "and does not read the widened pages")
     }
 
+    @Test("The editor passes the first-time line's own rule to the slot")
+    func editorPassesTheLine() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let source = try String(contentsOf: root.appendingPathComponent(
+            "Sources/ResectaApp/Views/DocumentEditorView+Caption.swift"), encoding: .utf8)
+        #expect(source.contains("firstTimeLineDue: firstDocumentHintShows,"))
+        #expect(!source.contains("firstTimeLineDue: false"))
+        #expect(Self.occupant([.firstTimeLine]) == .firstTimeLine)
+    }
+
     @Test("The slot's measures")
     func measures() {
         // The canvas already ends 8 pt above the page bar's glass (the bar's
