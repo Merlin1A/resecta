@@ -32,6 +32,7 @@ extension SearchAndRedactSheet {
                     // silently replace the typed term before it runs.
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
+                    .writingToolsBehavior(.disabled)
                     .focused($isSearchFieldFocused)
                     .onSubmit {
                         // Route every multi-term submission
@@ -78,6 +79,7 @@ extension SearchAndRedactSheet {
                     // autocorrect can silently rewrite the query.
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
+                    .writingToolsBehavior(.disabled)
                     .focused($isSearchFieldFocused)
                     .accessibilityLabel("Search text")
                     // Return runs the current query — the explicit-run
