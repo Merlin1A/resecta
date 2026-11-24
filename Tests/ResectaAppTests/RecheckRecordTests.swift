@@ -24,7 +24,7 @@ struct RecheckRecordTests {
         var received: [RunRecord?] = []
         coord.verificationRecordSeam = { received.append($0) }
 
-        coord.runFullPipeline(documentOverride: .searchableRedaction)
+        coord.runFullPipeline(documentOverride: nil)
         let run = try #require(coord.documentState.activePipelineTask, "the run started")
         await run.value
         guard case .verified = coord.documentState.phase else {

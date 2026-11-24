@@ -517,7 +517,7 @@ struct DocumentEditorView: View {
             searchSheetDetent: $searchSheetDetent,
             documentOverride: documentOverride, redactButtonDisabled: redactButtonDisabled,
             redactButtonHint: redactButtonHint, handleHomeTap: handleHomeTap,
-            homeButton: AnyView(homeButton), pipelineModePicker: AnyView(pipelineModePicker),
+            homeButton: AnyView(homeButton),
             openSettings: openSettings,
             resultsAppearedAt: resultsAppearedAt
         )

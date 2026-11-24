@@ -1,0 +1,51 @@
+Property: No control offers a mode: the editor's … menu has no Switch Mode row, and nothing in the app lists Searchable Redaction. Planted: a Switch Mode row that lists both modes is put back in the … menu.
+Area: editor "…" menu, Switch Mode
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/EditorToolbarLayoutTests -only-testing:ResectaAppTests/EffectivePipelineModeTests
+Must go red: ResectaAppTests/EditorToolbarLayoutTests "Default sizes: Undo, Redact and … in the bar; the … menu lists the selection actions, then Settings, then Home"; ResectaAppTests/EditorToolbarLayoutTests "The largest sizes: Redact folds into the … menu first; Undo stays in the bar"; ResectaAppTests/EffectivePipelineModeTests "No view offers a mode: no Switch Mode row, no mode picker, no Searchable label"
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/DocumentEditorToolbar.swift b/Sources/ResectaApp/Views/DocumentEditorToolbar.swift
+index 352fc6ae..0fde8b3d 100644
+--- a/Sources/ResectaApp/Views/DocumentEditorToolbar.swift
++++ b/Sources/ResectaApp/Views/DocumentEditorToolbar.swift
+@@ -283,6 +283,18 @@ struct DocumentEditorToolbar {
+         case .delete: deleteButton
+         case .markWholePage: markWholePageButton
+         case .redact: redactButton
++        case .switchMode:
++            Menu {
++                Picker("Redaction Mode", selection: Binding(
++                    get: { documentState.documentOverride ?? .secureRasterization },
++                    set: { documentState.documentOverride = $0 }
++                )) {
++                    Text("Secure Rasterization").tag(PipelineMode.secureRasterization)
++                    Text("Searchable Redaction").tag(PipelineMode.searchableRedaction)
++                }
++            } label: {
++                Label("Switch Mode", systemImage: "arrow.triangle.2.circlepath")
++            }
+         case .settings: settingsButton
+         case .home: homeButton
+         case .undo, .overflow: EmptyView()
+diff --git a/Sources/ResectaApp/Views/EditorToolbarLayout.swift b/Sources/ResectaApp/Views/EditorToolbarLayout.swift
+index ac375ce8..97e16554 100644
+--- a/Sources/ResectaApp/Views/EditorToolbarLayout.swift
++++ b/Sources/ResectaApp/Views/EditorToolbarLayout.swift
+@@ -18,7 +18,7 @@ struct EditorToolbarLayout: Equatable {
+     enum Control: Hashable {
+         case undo, redact, overflow
+         case selectRegions, addToSelection, delete, markWholePage
+-        case settings
++        case switchMode, settings
+         case home
+     }
+ 
+@@ -43,7 +43,7 @@ struct EditorToolbarLayout: Equatable {
+         trailing = redactFolds ? [.undo, .overflow] : [.undo, .redact, .overflow]
+         overflowSections = [
+             [.selectRegions, .addToSelection, .delete, .markWholePage],
+-            (redactFolds ? [.redact] : []) + [.settings],
++            (redactFolds ? [.redact] : []) + [.switchMode, .settings],
+             [.home],
+         ]
+         undoMode = Self.undoMode(canUndo: canUndo, canRedo: canRedo)

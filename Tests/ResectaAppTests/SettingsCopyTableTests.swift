@@ -14,18 +14,15 @@ struct SettingsCopyTableTests {
         case set03
         case set03TwoKinds
         case set06
-        case set07
-        case set08
         case set10
         case set11
         case set12
-        case set13
         case fr08c
     }
 
-    @Test("Settings shows twelve lines of record")
+    @Test("Settings shows nine lines of record")
     func lineCount() {
-        #expect(Line.allCases.count == 12)
+        #expect(Line.allCases.count == 9)
     }
 
     private static func shown(_ line: Line) -> String {
@@ -35,12 +32,9 @@ struct SettingsCopyTableTests {
         case .set03: RedactionBoxesCopy.footer()
         case .set03TwoKinds: RedactionBoxesCopy.footer(measured: [.leftAlignedParagraph, .justifiedParagraph])
         case .set06: SettingsView.secureModeDescription
-        case .set07: SettingsView.searchableModeDescription
-        case .set08: SettingsView.defaultModeAccessibilityHint
         case .set10: SettingsView.runInProgressTitle
         case .set11: SettingsView.runInProgressBody
         case .set12: SettingsView.paranoidModeFooter
-        case .set13: SettingsView.paranoidForcesSecureLine
         case .fr08c: RedactionBoxesCopy.switchHint
         }
     }
@@ -51,13 +45,10 @@ struct SettingsCopyTableTests {
         case .set02: "Cover Other Words"
         case .set03: "A box removes the text under it, but its width can still show how long that text was. That can be enough to tell which name or month it was, or how many digits an amount has.\n\nWhere it can, Cover Other Words runs a box across every line it touches, out to where the lines above and below reach, and stops short of words that belong to another column, cell, or field. It can cover the other words there too, and that is its cost. It leaves a box as it is over a scan or a picture, on a page with text with no ink of its own, or on a page that is half or more a picture. It also leaves a box as it is over print that does not run upright and left to right, where there is too little unselected text above and below it to show its column, and where you drew, moved, or resized the box by hand. A widened box can still show about how long its text was: in a paragraph, by where the lines break, and more closely each time the same text appears."
         case .set03TwoKinds: "A box removes the text under it, but its width can still show how long that text was. That can be enough to tell which name or month it was, or how many digits an amount has.\n\nWhere it can, Cover Other Words runs a box across every line it touches, out to where the lines above and below reach, and stops short of words that belong to another column, cell, or field. It can cover the other words there too, and that is its cost. It leaves a box as it is over a scan or a picture, on a page with text with no ink of its own, or on a page that is half or more a picture. It also leaves a box as it is over print that does not run upright and left to right, where there is too little unselected text above and below it to show its column, and where you drew, moved, or resized the box by hand. In Resecta's test, Cover Other Words reduced what the page shows about how long the text was on lines of a left-aligned paragraph and lines of a justified paragraph. A widened box can still show about how long its text was: in a paragraph, by where the lines break, and more closely each time the same text appears."
-        case .set06: "Produces image-only output with all text removed, so the PDF has no text to search or copy. The simplest approach — recommended when redaction confidence is the top priority. A court or regulator that requires searchable PDFs may refuse an image-only PDF."
-        case .set07: "Keeps a searchable copy of the text you did not box, for documents that have a text layer. Words next to a box can be left out. So is text with characters its fonts cannot draw, and the results say where. A page whose text is invisible or shows no ink is exported as a picture. Text under a picture, bar, or cover that was already in the page can still enter the searchable copy. Text that a file stores as different words from those it prints can still enter the searchable copy."
-        case .set08: "Choose how redacted output is produced. Secure Rasterization produces image-only output, with no text to search or copy. Searchable Redaction keeps a searchable copy of the text you did not box, less some words. A page whose text is invisible or shows no ink is exported as a picture. Text under a picture, bar, or cover already in the page, or stored as different words from those the page prints, can still enter the searchable copy."
+        case .set06: "Produces image-only output with all text removed, so the PDF has no text to search or copy. A court or regulator that requires searchable PDFs may refuse an image-only PDF."
         case .set10: "Redaction in progress"
         case .set11: "A redaction is running. Changes apply to the next one."
-        case .set12: "Paranoid Mode forces Secure Rasterization and always runs the checks."
-        case .set13: "The redaction mode is forced to Secure Rasterization."
+        case .set12: "Paranoid Mode always runs the checks."
         case .fr08c: "Where it can, runs boxes out along their lines, stopping short of words in another column, cell, or field. Can cover the other words there."
         }
     }

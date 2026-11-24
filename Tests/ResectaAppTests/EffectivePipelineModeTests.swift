@@ -3,64 +3,75 @@ import Foundation
 @testable import ResectaApp
 import RedactionEngine
 
-// Paranoid Mode forces Secure Rasterization: the run, the verify-only
-// re-run and the editor's Switch Mode read one rule, so Switch Mode never
-// offers a mode the run would not use, and it says why it is unavailable
-// with the Settings sentence.
+// Secure Rasterization is the only mode. The run and the verify-only re-run
+// read one rule, `PipelineMode.effective`, and it gives Secure Rasterization
+// for every input: Paranoid Mode on or off, any document override, and any
+// setting, including a stored Searchable setting, which is left as stored.
+// A launch argument reaches the app as the same defaults key, so the
+// stored-setting and run cases cover it; it is not set here, because the
+// argument domain is the whole test process's. The screen test launches the
+// app with it. No control offers a mode: the … menu has no Switch Mode row
+// and Settings no picker.
 
-@Suite("Effective pipeline mode")
+@Suite("Effective pipeline mode", .serialized)
+@MainActor
 struct EffectivePipelineModeTests {
 
-    @Test("Paranoid Mode forces Secure Rasterization over any override or setting")
-    func paranoidForcesSecure() {
-        for override in [nil, PipelineMode.secureRasterization, .searchableRedaction] {
-            for setting in PipelineMode.allCases {
-                #expect(PipelineMode.effective(paranoid: true, override: override, setting: setting)
-                        == .secureRasterization)
-            }
+    @Test("Every input gives Secure Rasterization",
+          arguments: [true, false], [nil, PipelineMode.secureRasterization, .searchableRedaction])
+    func everyInputGivesSecure(paranoid: Bool, override: PipelineMode?) {
+        for setting in PipelineMode.allCases {
+            #expect(PipelineMode.effective(paranoid: paranoid, override: override, setting: setting)
+                    == .secureRasterization, "setting \(setting)")
         }
     }
 
-    @Test("Without Paranoid Mode the document's override wins, else the setting")
-    func overrideThenSetting() {
-        #expect(PipelineMode.effective(paranoid: false, override: .searchableRedaction, setting: .secureRasterization)
-                == .searchableRedaction)
-        #expect(PipelineMode.effective(paranoid: false, override: nil, setting: .searchableRedaction)
-                == .searchableRedaction)
+    @Test("A stored Searchable setting is left as stored and read as Secure Rasterization")
+    func storedSearchableReadsAsSecure() throws {
+        let suiteName = "effective-mode-stored-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set("searchableRedaction", forKey: "pipelineMode.v2")
+        let settings = SettingsState(defaults: defaults)
+        #expect(settings.pipelineMode == .searchableRedaction, "the stored value is read back, not migrated")
+        #expect(defaults.string(forKey: "pipelineMode.v2") == "searchableRedaction", "the stored value is left")
+        #expect(PipelineMode.effective(paranoid: settings.paranoidMode, override: nil, setting: settings.pipelineMode)
+                == .secureRasterization)
     }
 
-    @MainActor
-    @Test("Switch Mode is unavailable under Paranoid Mode and says why with the Settings sentence")
-    func switchModeUnderParanoid() {
-        #expect(SettingsView.paranoidForcesSecureLine == "The redaction mode is forced to Secure Rasterization.")
-        #expect(!DocumentEditorView.switchModeAvailable(phaseKind: .editing, paranoid: true))
-        #expect(DocumentEditorView.switchModeAvailable(phaseKind: .editing, paranoid: false))
-        #expect(!DocumentEditorView.switchModeAvailable(phaseKind: .verified, paranoid: false))
-        #expect(DocumentEditorView.switchModeHint(paranoid: true) == SettingsView.paranoidForcesSecureLine)
-        #expect(DocumentEditorView.switchModeHint(paranoid: false) == "")
+    @Test("A run asked for Searchable, over a stored Searchable setting, writes its text page in Secure Rasterization",
+          .timeLimit(.minutes(3)))
+    func runAskedForSearchableIsSecure() async throws {
+        let coord = try InkStripRunEntryTests.coordinator()
+        coord.settingsState.paranoidMode = false
+        coord.settingsState.pipelineMode = .searchableRedaction
+        let region = InkStripRunEntryTests.hand(
+            InkStripRunEntryTests.inkRect(line: 5, phrase: "Marisol", through: "Vance-Oduya"))
+        coord.redactionState.addRegion(region, page: 0, undoManager: nil)
+        coord.runFullPipeline(documentOverride: .searchableRedaction)
+        let run = try #require(coord.documentState.activePipelineTask, "the run started")
+        await run.value
+        guard case .verified(let report) = coord.documentState.phase else {
+            Issue.record("the run did not end verified: \(coord.documentState.phaseKind)")
+            return
+        }
+        #expect(coord.documentState.lastUsedPipelineMode == .secureRasterization)
+        #expect(report.perPageModes == [.secureRasterization], "the page's text layer is not kept")
     }
 
-    @Test("On iOS 27 the Switch Mode list draws each mode's name with no hyphenation, so a name breaks only at its space")
-    func modeNamesHaveNoHyphenationOnIOS27() throws {
+    @Test("No view offers a mode: no Switch Mode row, no mode picker, no Searchable label")
+    func noViewOffersAMode() throws {
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-        let source = try String(contentsOf: root.appendingPathComponent(
-            "Sources/ResectaApp/Views/DocumentEditorView+ModeOverride.swift"), encoding: .utf8)
-        let function = try #require(source.range(of: "static func modeName(_ words: String) -> Text {")?.lowerBound)
-        let body = source[function...].prefix(400)
-        #expect(body.contains("if #available(iOS 27, *) {"))
-        #expect(body.contains("name.languageIdentifier = \"zxx\""))
-        #expect(body.contains("return Text(words)"), "earlier systems draw the plain name")
-        #expect(source.contains("Label { Self.modeName(\"Secure Rasterization\") }"))
-        #expect(source.contains("Label { Self.modeName(\"Searchable Redaction\") }"))
-        #expect(source.contains("Label { Text(\"Switch Mode\") }"))
-        // The trial's launch argument never reaches the app's sources.
-        let sources = root.appendingPathComponent("Sources/ResectaApp")
-        let files = try #require(FileManager.default.enumerator(at: sources, includingPropertiesForKeys: nil))
+        let views = root.appendingPathComponent("Sources/ResectaApp")
+        let files = try #require(FileManager.default.enumerator(at: views, includingPropertiesForKeys: nil))
         var read = 0
         for case let file as URL in files where file.pathExtension == "swift" {
             let text = try String(contentsOf: file, encoding: .utf8)
-            #expect(!text.contains("modeMenuVariant"), "\(file.lastPathComponent)")
+            #expect(!text.contains("\"Switch Mode\""), "\(file.lastPathComponent)")
+            #expect(!text.contains("\"Searchable Redaction\""), "\(file.lastPathComponent)")
+            #expect(!text.contains("\"Default Mode\""), "\(file.lastPathComponent)")
+            #expect(!text.contains(".tag(PipelineMode.searchableRedaction)"), "\(file.lastPathComponent)")
             read += 1
         }
         #expect(read > 100, "the app's sources were read")

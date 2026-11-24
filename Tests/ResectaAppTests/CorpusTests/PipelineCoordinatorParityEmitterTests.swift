@@ -421,6 +421,12 @@ struct PipelineCoordinatorParityEmitterTests {
                 continue
             }
             if let only, !only.contains(cell.doc_id) { continue }
+            guard cell.mode != PipelineMode.searchableRedaction.rawValue else {
+                // The app's run is Secure Rasterization for every input, so a
+                // Searchable cell has no app run to compare with the mirror.
+                cellsSkipped[cellName] = "Searchable Redaction is not offered"
+                continue
+            }
             let data: Data
             if let cached = docCache[cell.doc_id] {
                 data = cached
