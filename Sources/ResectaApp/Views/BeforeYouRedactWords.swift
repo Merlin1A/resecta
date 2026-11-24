@@ -80,7 +80,7 @@ enum StopWords {
         let searches = names.contains { $0.kind != .scan }
         let oneBased = group.pages.map { $0 + 1 }
         // The strings table's page rule: a run of three or more as "3–9".
-        let pageList = list(VerificationDetailsSection.pageRanges(group.pages.sorted()))
+        let pageList = list(VerificationResultsView.pageRanges(group.pages.sorted()))
         let one = oneBased.count == 1
         switch group.reason {
         case .searchedInPart:
