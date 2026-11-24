@@ -89,6 +89,16 @@ struct MatchCharactersTests {
         #expect(found.map(\.pageCharacters) == [expected])
     }
 
+    @Test("The part of a widened address its own box does not reach keeps its own characters")
+    func scanTailCarriesItsCharacters() async throws {
+        let document = try ScanOverlapTailTests.page()
+        let page = try #require(document.page(at: 0))
+        let hits = await ContentGlyphScanTests.scan(document)
+        let tail = try #require(hits.first { $0.matchedText == ScanOverlapTailTests.street },
+                                "the earlier line boxed on its own: \(ScanOverlapTailTests.show(hits))")
+        #expect(tail.pageCharacters == (try Self.range(of: ScanOverlapTailTests.street, in: page)))
+    }
+
     @Test("The run's maker selects a match's characters for a region still anchored to its text")
     func anchoredRegionSelectsItsCharacters() async throws {
         let document = try Self.document(Self.paragraph)

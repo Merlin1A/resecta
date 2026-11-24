@@ -156,7 +156,7 @@ extension DocumentSearcher {
                             piiConfidence: match.confidence,
                             rationale: match.rationale,
                             matchRangeInSnippet: tailWindow.matchRange, textLayerRect: box.textLayerRect, inkFitDegraded: box.degraded
-                        ).identified(by: box.identity))
+                        ).identified(by: box.identity).carrying(box.characters))
                         totalYielded += 1
                     }
                 }
