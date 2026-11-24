@@ -57,6 +57,9 @@ struct InvisibleTextPageTests {
         Case(name: "one invisible word whose mode is written as the real number 3.0",
              make: { TestFixtures.typedPageWithOneInvisibleWordPDF(operand: "3.0") },
              reading: .shows, mode: .secureRasterization, reason: .invisibleText),
+        Case(name: "mode 3, then the real number 0.0, which Quartz drops: the line after it is in mode 3",
+             make: { TestFixtures.lineAfterPDF(prefix: "3 Tr 0.0 Tr") },
+             reading: .shows, mode: .secureRasterization, reason: .invisibleText),
         Case(name: "a mode given as a name, not a number: content that could not be read",
              make: { TestFixtures.modeNotANumberPDF() },
              reading: .unreadable, mode: .secureRasterization, reason: .extractionFailed),
@@ -74,10 +77,10 @@ struct InvisibleTextPageTests {
              reading: .shows, mode: .secureRasterization, reason: .invisibleText),
     ]
 
-    @Test("The cases are sixteen, fourteen of them picture pages")
+    @Test("The cases are seventeen, fifteen of them picture pages")
     func caseCount() {
-        #expect(Self.cases.count == 16)
-        #expect(Self.cases.filter { $0.mode == .secureRasterization }.count == 14)
+        #expect(Self.cases.count == 17)
+        #expect(Self.cases.filter { $0.mode == .secureRasterization }.count == 15)
     }
 
     struct Drawn: Sendable, CustomTestStringConvertible {
@@ -92,12 +95,16 @@ struct InvisibleTextPageTests {
     /// exception. Quartz drops a mode written as a real number and draws the
     /// words in the mode before it, while the reading takes 3.0 as 3 and makes
     /// the page a picture. A picture page holds no text, so nothing hidden
-    /// survives in a viewer that takes 3.0 as invisible.
+    /// survives in a viewer that takes 3.0 as invisible. The reading also
+    /// keeps the mode as Quartz draws it, so a real number after mode 3 still
+    /// reads as mode 3, where Quartz leaves the words without ink.
     static let drawn: [Drawn] = [
         Drawn(name: "a word in mode 3", make: { TestFixtures.typedPageWithOneInvisibleWordPDF(operand: "3") }, inks: false),
         Drawn(name: "a word in mode 3.0: Quartz drops a real-number mode and draws it",
               make: { TestFixtures.typedPageWithOneInvisibleWordPDF(operand: "3.0") }, inks: true),
         Drawn(name: "control: a word in mode 0.0", make: { TestFixtures.typedPageWithOneInvisibleWordPDF(operand: "0.0") }, inks: true),
+        Drawn(name: "mode 3, then the real number 0.0: Quartz drops the real and draws in mode 3",
+              make: { TestFixtures.lineAfterPDF(prefix: "3 Tr 0.0 Tr") }, inks: false),
         Drawn(name: "a form that saves and never restores, inside a save the page restores to mode 3",
               make: { TestFixtures.lineAfterPDF(prefix: "3 Tr q 0 Tr /Fx1 Do Q", form: "q") }, inks: false),
         Drawn(name: "a form that restores a state it never saved, drawn in mode 3",

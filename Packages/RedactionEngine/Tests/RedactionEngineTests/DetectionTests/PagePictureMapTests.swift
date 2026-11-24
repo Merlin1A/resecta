@@ -379,6 +379,8 @@ struct PagePictureMapTests {
             let (document, _, cgPage) = try #require(S.pdfPage(data))
             let start = clock.now
             #expect(DocumentSearcher.showsInvisibleText(cgPage) == answer, "\(times) draws at each level")
+            #expect(DocumentSearcher.invisibleTextReading(cgPage) == (answer ? .unreadable : .showsNone),
+                    "\(times) draws at each level: past the limit reads unreadable")
             #expect(clock.now - start < .seconds(10), "took \(clock.now - start)")
             withExtendedLifetime(document) {}
         }

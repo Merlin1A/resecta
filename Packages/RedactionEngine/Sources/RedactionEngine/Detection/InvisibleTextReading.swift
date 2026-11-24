@@ -10,8 +10,9 @@ enum InvisibleTextReading: Sendable, Equatable {
     /// The whole content was read, and none does.
     case showsNone
     /// Some of the content could not be read: a content stream the scanner
-    /// cannot read, a form chain past the depth limit, or the page's
-    /// dictionary or resources.
+    /// cannot read, a `Tr` whose operand is not a number, a form chain past
+    /// the depth limit, more than `PagePictureMap.formLimit` forms drawn, or
+    /// the page's dictionary or resources.
     case unreadable
 
     /// The reading for one page: its dictionary and inherited resources
