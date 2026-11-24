@@ -5,12 +5,12 @@ Must go red: RedactionEngineTests/PlanPaintTests neighbourLetterDoesNotGrowTheBo
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
-index f49660db..668e7ee7 100644
+index e64b2356..6866b4e2 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
-@@ -250,7 +250,7 @@ extension PageRasterizer {
-                 limitAbove: box.limitAbove, limitBelow: box.limitBelow, raster: raster) else { return nil }
-             var rect = withRegionFills(projection.painted.bitmapRect, of: box)
+@@ -280,7 +280,7 @@ extension PageRasterizer {
+                 box: box, regions: regionsByID, raster: raster, content: content) else { return nil }
+             var rect = fill.bitmapRect
              if grows,
 -               let grown = try inkGrowthRect(context: ctx, fillRect: projection.marginEdge.bitmapRect) {
 +               let grown = try inkGrowthRect(context: ctx, fillRect: projection.painted.bitmapRect) {

@@ -7,12 +7,12 @@ Apply in a scratch worktree with `git apply`; discard after.
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift
-@@ -52,7 +52,7 @@
+@@ -139,7 +139,7 @@ public struct DrawnPlan: Equatable, Sendable {
          self.pageIndex = pageIndex
          self.switchOn = switchOn
          self.exportDPI = exportDPI
 -        self.fillColor = fillColor
 +        self.fillColor = .black
          self.plan = plan
+         self.filledPixels = filledPixels
          guard let plan else { boxes = []; return }
-         let w = Double(plan.widthSixtyFourths), h = Double(plan.heightSixtyFourths)
