@@ -5,15 +5,15 @@ Must go red: RedactionEngineTests/RunRecordPageReadTests noReadOnlyBesideNoWords
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
-index d24971ed..7d72e26f 100644
+index 201ef8fb..14544cf7 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
-@@ -118,7 +118,7 @@ public struct RunRecord: Equatable, Sendable {
-                 }
-                 if let read {
-                     plan = PaintPlan.make(
--                        regions: planRegions, words: read.words, text: read.text, facts: read.facts,
-+                        regions: planRegions, words: PageWords(words: []), text: read.text, facts: read.facts,
-                         widthSixtyFourths: width, heightSixtyFourths: height,
-                         policy: .release, source: choice.source, switchOn: choice.switchOn).plan
-                 } else {
+@@ -129,7 +129,7 @@ public struct RunRecord: Equatable, Sendable {
+             let planRegions = RunRecord.planRegions(admitted, text: read?.text ?? "")
+             if let read {
+                 return PaintPlan.make(
+-                    regions: planRegions, words: read.words, text: read.text, facts: read.facts,
++                    regions: planRegions, words: PageWords(words: []), text: read.text, facts: read.facts,
+                     widthSixtyFourths: width, heightSixtyFourths: height,
+                     policy: .release, source: choice.source, switchOn: choice.switchOn).plan
+             }
