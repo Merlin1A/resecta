@@ -1,4 +1,5 @@
 import Foundation
+import RedactionEngine
 
 // One home for opening Scan: the session the editor's Scan button and the
 // results screen's Review in Scan both present.
