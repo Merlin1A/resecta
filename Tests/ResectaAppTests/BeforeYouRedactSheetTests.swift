@@ -268,4 +268,64 @@ struct BeforeYouRedactSheetTests {
         #expect(row(.searchedInPart, [delia, scan]) == "Page 4 was searched and scanned in part.")
         #expect(row(.line(.recognitionOff), [delia]) == nil)
     }
+
+    /// A source file of the app, its comment lines left out.
+    static func source(_ path: String) throws -> String {
+        let file = URL(fileURLWithPath: "\(#filePath)")
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent(path)
+        return try String(contentsOf: file, encoding: .utf8)
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+            .joined(separator: "\n")
+    }
+
+    /// The offset of `needle` in `text` at or after `from`, or nil.
+    static func offset(of needle: String, in text: String, from: String.Index? = nil) -> String.Index? {
+        text.range(of: needle, range: (from ?? text.startIndex)..<text.endIndex)?.lowerBound
+    }
+
+    @Test("The stop takes the slot ahead of Search and the canvas rationale")
+    func stopTakesTheSlotFirst() throws {
+        let text = try Self.source("Sources/ResectaApp/Views/DocumentEditorView.swift")
+        let get = try #require(Self.offset(of: "get: {", in: text))
+        let stop = try #require(Self.offset(of: "if sheetSlotShowsStop, redactionState.activeSearch == nil { return .beforeRedact }", in: text, from: get))
+        let search = try #require(Self.offset(of: "if let searchState = redactionState.activeSearch", in: text, from: get))
+        #expect(stop < search)
+        let set = try #require(Self.offset(of: "set: { newValue in", in: text))
+        let swipe = try #require(Self.offset(of: "answerStop(.swipedDown)", in: text, from: set))
+        let session = try #require(Self.offset(of: "if let session = redactionState.activeSearch", in: text, from: set))
+        #expect(swipe < session)
+        let dismiss = try #require(text.range(of: "onDismiss: {\n"))
+        let next = text[dismiss.upperBound...].drop { $0 == " " }
+        #expect(next.hasPrefix("handOffAfterStop()"))
+    }
+
+    @Test("Cancel and Go to page leave the answered set as it was; Go to page shows the page")
+    func cancelAndGoToPageRecordNothing() {
+        let coordinator = makeLoadedCoordinator()
+        let documentState = coordinator.documentState
+        let redactionState = coordinator.redactionState
+        let page = RedactStop.Page(page: 0, reason: .line(.recognitionOff))
+        documentState.redactRefusalAwaitingAnswer = .pagesNotRead([page])
+        DocumentEditorView.applyStopAnswer(.goToPage(2), documentState: documentState, redactionState: redactionState,
+                                           coordinator: coordinator, documentOverride: nil)
+        #expect(documentState.redactRefusalAwaitingAnswer == nil)
+        #expect(redactionState.redactStopAnswered.isEmpty)
+        #expect(documentState.currentPageIndex == 2)
+        documentState.redactRefusalAwaitingAnswer = .pagesNotRead([page])
+        DocumentEditorView.applyStopAnswer(.swipedDown, documentState: documentState, redactionState: redactionState,
+                                           coordinator: coordinator, documentOverride: nil)
+        #expect(documentState.redactRefusalAwaitingAnswer == nil)
+        #expect(redactionState.redactStopAnswered.isEmpty)
+    }
+
+    @Test("The stop sheet carries the capture cover, takes the monitor as a value, and changes nothing when it leaves the screen")
+    func carriesTheCaptureCover() throws {
+        let text = try Self.source("Sources/ResectaApp/Views/BeforeYouRedactSheet.swift")
+        #expect(text.components(separatedBy: ".shieldedSheetContent(monitor:").count - 1 == 1)
+        #expect(text.components(separatedBy: "let captureMonitor: ScreenCaptureMonitor").count - 1 == 1)
+        #expect(!text.contains("@Environment(ScreenCaptureMonitor.self)"))
+        #expect(!text.contains("onDisappear"))
+    }
 }
