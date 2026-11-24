@@ -319,7 +319,9 @@ struct SearchNoticePlaceTests {
         #expect(view.contains("NoticeSurface("))
         #expect(view.contains("NoticeView.Metrics"))
         #expect(view.contains("ResectaTokens.Ink.quietPill"))
-        for raw in ["SemanticColor.warnText", ".orange", "Color("] { #expect(!view.contains(raw), "\(raw)") }
+        for raw in ["SemanticColor.warnText", ".orange"] { #expect(!view.contains(raw), "\(raw)") }
+        // A colour built in place, not a token's name that ends in "Color(".
+        #expect(view.range(of: #"(?<![A-Za-z.])Color\("#, options: .regularExpression) == nil)
     }
 
     @Test("The place stands above the list in every state")

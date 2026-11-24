@@ -36,6 +36,20 @@ nonisolated final class SearchNoticePlaceUITests: XCTestCase {
         app.launch()
     }
 
+    /// Raise a parked sheet until its Dismiss can be tapped, as the editor
+    /// chrome tests do.
+    private func raiseSheetToDismiss() -> XCUIElement? {
+        let window = app.windows.firstMatch
+        let dismiss = app.buttons["searchDismissButton"].firstMatch
+        for _ in 0..<3 {
+            let start = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95))
+            let end = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45))
+            start.press(forDuration: 0.1, thenDragTo: end)
+            if dismiss.waitForExistence(timeout: 3), dismiss.isHittable { return dismiss }
+        }
+        return nil
+    }
+
     private static let tooLarge7 = "Page 7 was too large to scan for text \u{2014} image content there was not searched."
 
     /// Some simulators never bring the software keyboard on screen; there
@@ -56,6 +70,7 @@ nonisolated final class SearchNoticePlaceUITests: XCTestCase {
         let notice = element("ocrSkipBanner")
         XCTAssertTrue(notice.waitForExistence(timeout: 30), "The notice never came up.")
         XCTAssertEqual(notice.label, Self.tooLarge7)
+        XCTAssertNotEqual(notice.elementType, .button, "Alone and within its room, the notice has no control.")
         let firstRow = app.cells.firstMatch
         XCTAssertTrue(firstRow.waitForExistence(timeout: 10))
         XCTAssertLessThan(notice.frame.minY, firstRow.frame.minY, "The notice stands above the results.")
@@ -81,6 +96,11 @@ nonisolated final class SearchNoticePlaceUITests: XCTestCase {
         app.buttons["Go to page 7"].firstMatch.tap()
         XCTAssertTrue(details.waitForNonExistence(timeout: 10), "The chip did not close the details.")
         XCTAssertTrue(element("compactFloatStrip").waitForExistence(timeout: 10), "The chip did not park the sheet.")
+        // The page bar steps aside while the sheet is parked; it comes back,
+        // on the page shown, once the sheet is dismissed.
+        let dismiss = raiseSheetToDismiss()
+        XCTAssertNotNil(dismiss, "The sheet's Dismiss never appeared after the raise.")
+        dismiss?.tap()
         let onPage7 = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "label BEGINSWITH 'Page 7 of'"), object: element("pageNavCounter"))
         XCTAssertEqual(XCTWaiter().wait(for: [onPage7], timeout: 10), .completed, "Page 7 is not the page shown.")
@@ -160,7 +180,10 @@ nonisolated final class SearchNoticePlaceUITests: XCTestCase {
         let plain = app.staticTexts["Search"].firstMatch
         XCTAssertTrue(plain.waitForExistence(timeout: 30))
         XCTAssertFalse(element("parkedStripNoticeMark").exists)
-        XCTAssertEqual(plain.frame.minX, withMark.minX, accuracy: 1, "The mark moved the title.")
+        // The mark is an overlay before the title, and the title's element
+        // reports a frame that takes the overlay in; where the words stand
+        // is read from the edge the mark is not on.
+        XCTAssertEqual(plain.frame.maxX, withMark.maxX, accuracy: 1, "The mark moved the title.")
         XCTAssertEqual(plain.frame.minY, withMark.minY, accuracy: 1, "The mark moved the title.")
     }
 
@@ -173,16 +196,19 @@ nonisolated final class SearchNoticePlaceUITests: XCTestCase {
     }
 
     func testWithANotice_oneSwipeStillScrollsAndResizes() {
-        launch(["--searchDetent=medium", "--uitestNoticeSeed=tooLarge:6"])
+        // A search that lists nothing: results arriving at half height raise
+        // the sheet by themselves, which would leave the drag nothing to do.
+        launch(["--searchDetent=medium", "--uitestNoticeSeed=tooLarge:6"], query: "Zqx")
         XCTAssertTrue(element("ocrSkipBanner").waitForExistence(timeout: 30))
         let window = app.windows.firstMatch
         let dismiss = app.buttons["searchDismissButton"]
         XCTAssertTrue(dismiss.waitForExistence(timeout: 10))
-        let before = dismiss.frame.minY
-        window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.85))
-            .press(forDuration: 0.05, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25)))
+        XCTAssertGreaterThan(dismiss.frame.minY, window.frame.height * 0.3, "The sheet did not start at half height.")
+        // The drag the detent tests make: from the half-height grabber to the top.
+        window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.50))
+            .press(forDuration: 0.1, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.03)))
         let raised = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "frame.origin.y < %f", before - 100), object: dismiss)
+            predicate: NSPredicate(format: "frame.origin.y < %f", window.frame.height * 0.2), object: dismiss)
         XCTAssertEqual(XCTWaiter().wait(for: [raised], timeout: 10), .completed, "One swipe did not raise the sheet.")
     }
 

@@ -72,7 +72,7 @@ struct SearchSheetTextTierTests {
     @Test("No system grey on text in the Search sheet's files")
     func noSystemGreyOnText() throws {
         #expect(Self.files.count == 18)
-        #expect(Self.allowList.reduce(0) { $0 + $1.count } == 12)
+        #expect(Self.allowList.reduce(0) { $0 + $1.count } == 9)
         var found: [String: Int] = [:]
         for file in Self.files {
             let text = try Self.source(file)
