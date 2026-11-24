@@ -6,8 +6,9 @@ import Testing
 
 // The Box Fill row: the box check's report and the run's record, read as
 // today's row. The table holds the mapping's seven cells; the cases after it
-// hold the containment test, the sentences' forms, a box the report leaves
-// out, and one export through the engine.
+// hold the containment test, the regions painted outside the plan, the
+// sentences' forms, a box the report leaves out, and one export through the
+// engine.
 
 @Suite("The box check's result reads as the Box Fill row")
 struct BoxFillRowTests {
@@ -30,8 +31,10 @@ struct BoxFillRowTests {
         return RunRecord.Page(pageIndex: index, regions: regions, plan: plan)
     }
 
-    static func record(_ pages: [RunRecord.Page]) -> RunRecord {
-        RunRecord(confirmed: .init(fillColor: .black, exportDPI: 300, pages: pages), produced: .init())
+    static func record(_ pages: [RunRecord.Page], paintedOutsideThePlan: [Int: Set<UUID>] = [:]) -> RunRecord {
+        var produced = RunRecord.Produced()
+        produced.regionsPaintedOutsideThePlan = paintedOutsideThePlan
+        return RunRecord(confirmed: .init(fillColor: .black, exportDPI: 300, pages: pages), produced: produced)
     }
 
     static let done = BoxOutcome.completed(BoxCounts(), .none)
@@ -154,6 +157,35 @@ struct BoxFillRowTests {
         let reading = BoxFillRow.reading(report: .pages([Self.read([Self.done, Self.done])]), record: Self.record([page]))
         #expect(reading == .row(CheckRow(status: .warn("2 boxes on page 1 could not be checked."), pages: [0], couldNotVerify: true), nil))
         if case .row(let row, _) = reading { #expect(Self.sentence(row.status) == "2 boxes on page 1 could not be checked.") }
+    }
+
+    @Test("A region painted outside the plan, named by the row's containment test and by the producer alike, could not be checked, and is counted once")
+    func paintedOutsideThePlan() throws {
+        let named = Self.share(0.1, 0.1, 0.3, 0.2)
+        let stray = Self.share(0.6, 0.6, 0.8, 0.7)
+        let boxes = try #require(Self.page(0, [named]).plan?.boxes)
+        let page = Self.page(0, [named, stray], boxes: boxes)
+        let record = Self.record([page], paintedOutsideThePlan: [0: [stray.id]])
+        // The two sets agree: the containment test leaves out the one region the producer names.
+        #expect(Set(page.regions.filter { !BoxFillRow.isCovered($0, on: page) }.map(\.id)) == [stray.id])
+        let input = try #require(BoxCheckInput(record: record))
+        #expect(input.pages[0].outsidePlan == [stray.id])
+        var picture = Self.read([Self.done])
+        picture.outsidePlan = input.pages[0].outsidePlan
+        let reading = BoxFillRow.reading(report: .pages([picture]), record: record)
+        #expect(reading == .row(CheckRow(status: .warn("A box on page 1 could not be checked."), pages: [0], couldNotVerify: true), nil))
+    }
+
+    @Test("A region the producer reports painted outside the plan could not be checked, even where a box of the plan names and holds it")
+    func producerAloneNamesIt() throws {
+        let named = Self.share(0.1, 0.1, 0.3, 0.2)
+        let page = Self.page(0, [named])
+        let record = Self.record([page], paintedOutsideThePlan: [0: [named.id]])
+        #expect(BoxFillRow.isCovered(named, on: page))
+        var picture = Self.read([Self.done])
+        picture.outsidePlan = try #require(BoxCheckInput(record: record)).pages[0].outsidePlan
+        let reading = BoxFillRow.reading(report: .pages([picture]), record: record)
+        #expect(reading == .row(CheckRow(status: .warn("A box on page 1 could not be checked."), pages: [0], couldNotVerify: true), nil))
     }
 
     @Test("Wholly off its page is the region as drawn sharing no area with the page; one past the left edge by a hair is on it")

@@ -10,7 +10,9 @@ import Foundation
 /// own pages, beside an issue or alone; a run with no record reads Skipped.
 /// The boxes are taken from the record, not from the check's report, so a
 /// box the report leaves out is a box that could not be checked, never a
-/// box that passed. The check returns every refusal as a value, so nothing
+/// box that passed. A region painted outside the plan reads as a box that
+/// could not be checked, whether the row's containment test or the
+/// producer's own account names it. The check returns every refusal as a value, so nothing
 /// here can read as a failed check.
 enum BoxFillRow {
     /// The line under an issue: the check is new.
@@ -54,9 +56,12 @@ enum BoxFillRow {
                 case .inconclusive?, .couldNotFinish?, nil: notChecked.append(index)
                 }
             }
-            for region in page.regions where !isCovered(region, on: page) {
-                notChecked.append(index)
-            }
+            // A region is a unit the check cannot judge when the row's own
+            // containment test leaves it out, or when the producer reports it
+            // painted outside the plan (the report carries each as its own
+            // unit); a region either names is counted once.
+            let strays = Set(page.regions.filter { !isCovered($0, on: page) }.map(\.id)).union(picture.outsidePlan)
+            notChecked.append(contentsOf: repeatElement(index, count: strays.count))
         }
         var conditions: [UnverifiedCondition] = []
         if !unreadPages.isEmpty {
