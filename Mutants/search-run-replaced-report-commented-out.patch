@@ -1,0 +1,23 @@
+Property: The run's replaced-run report is installed in code, not only quoted in a comment.
+Area: the stop at Redact
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/SearchRunLogTests
+Must go red: ResectaAppTests/SearchRunLogTests runInstallsTheReplacedReport
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/SearchRun.swift b/Sources/ResectaApp/State/SearchRun.swift
+index b73d6f91..a901bc15 100644
+--- a/Sources/ResectaApp/State/SearchRun.swift
++++ b/Sources/ResectaApp/State/SearchRun.swift
+@@ -218,9 +218,9 @@ import RedactionEngine
+         let mode = buildSearchMode()
+         searchState.lastRunShape = searchState.currentRunShape  // read in the same stretch as the query above
+         searchState.totalPages = liveDoc.pageCount
+-        searchState.accountReplacedSink = { [weak redactionState] token in
+-            redactionState?.recordSearchRunReplaced(token: token)
+-        }
++//        searchState.accountReplacedSink = { [weak redactionState] token in
++//            redactionState?.recordSearchRunReplaced(token: token)
++//        }
+         searchState.accountOpenedSink = { [weak redactionState] token, query in
+             redactionState?.recordSearchRunOpened(token: token, query: query)
+         }

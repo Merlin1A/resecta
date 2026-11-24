@@ -733,4 +733,10 @@ with its reason and the mutant that is caught in its place.
 | `redact-stop-quotes-cover-backwards.patch` | With quotes and dashes matched alike, a unit covers the same unit that keeps them apart, never the other way. | ResectaAppTests/RedactStopUnitTests digitsAndQuotesDirection |
 | `search-replaced-run-not-reported.patch` | A run replaced after an Apply tells the document it was replaced, so its boxes keep it counted at the stop. | ResectaAppTests/SearchRunLogTests replacedRunIsReported |
 | `search-run-replaced-report-not-installed.patch` | The run gives the document its replaced-run report, so a replaced run's boxes keep it counted at the stop. | ResectaAppTests/SearchRunLogTests runInstallsTheReplacedReport |
+| `redact-stop-options-named-by-text-only.patch` | A typed text and a pattern with the same characters are two names; neither one's options are named for the other. | ResectaAppTests/RedactStopGroupsTests optionsNamedOnlyWhenApart |
+| `redact-stop-options-named-when-together.patch` | Options are named only for a text whose units stand in different groups. | ResectaAppTests/RedactStopGroupsTests optionsNamedOnlyWhenApart |
+| `redact-stop-pattern-holds-accents.patch` | A pattern's unit holds neither Accents nor digit separators. | ResectaAppTests/RedactStopGroupsTests patternIgnoresAccentsAndDigits |
+| `redact-stop-names-out-of-run-order.patch` | A group names its searches in the order they were first run. | ResectaAppTests/RedactStopGroupsTests namesInRunOrder |
+| `redact-stop-not-reached-cause-when-mixed.patch` | Not reached names how its runs ended only when every one ended that way. | ResectaAppTests/RedactStopGroupsTests notReachedEnding |
+| `search-run-replaced-report-commented-out.patch` | The run's replaced-run report is installed in code, not only quoted in a comment. | ResectaAppTests/SearchRunLogTests runInstallsTheReplacedReport |
 | `run-log-named-in-a-log-line.patch` | No log line names the run log, the answered set or their types. | ResectaAppTests/RunLogStaysInMemoryTests noLogLineNamesThem() |
