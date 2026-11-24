@@ -34,7 +34,7 @@ struct RedactStopGroupsTests {
         RedactStopUnit(kind: kind, text: text, options: options)
     }
 
-    @Test("K7-20: two Text searches with default options, recognition off on pages 3, 5 and 9: one group, no name; the button runs one terms search holding both, recognition on")
+    @Test("Two Text searches with default options, recognition off on pages 3, 5 and 9: one group, no name; the button runs one terms search holding both, recognition on")
     func k720() throws {
         let runs: [RedactStop.Run] = [(Self.text("Delia"), Self.unread), (Self.text("Rourke"), Self.unread)]
         let groups = RedactStop.groups(runs: runs, answered: [])
@@ -46,7 +46,7 @@ struct RedactStopGroupsTests {
         #expect(!RedactStop.opens(runs: runs + [(rerun, Self.read)], answered: []))
     }
 
-    @Test("K7-21 and K7-22: a Text search and a Pattern: the button re-runs the Text search; the next showing names the pattern by its text, and the button re-runs it")
+    @Test("A Text search and a Pattern: the button re-runs the Text search; the next showing names the pattern by its text, and the button re-runs it")
     func k721() throws {
         let pattern = AppliedSearchQuery(kind: .regex("[0-9]{3}-[0-9]{4}"), options: SearchOptions())
         let runs: [RedactStop.Run] = [(Self.text("Delia"), Self.unread), (pattern, Self.unread)]
@@ -60,7 +60,7 @@ struct RedactStopGroupsTests {
         #expect(RedactStop.reRun(for: second[0], runs: after)?.kind == .regex("[0-9]{3}-[0-9]{4}"))
     }
 
-    @Test("K7-23: two Text searches, one case-sensitive: the button re-runs one; the second showing names the one left")
+    @Test("Two Text searches, one case-sensitive: the button re-runs one; the second showing names the one left")
     func k723() throws {
         let strict = SearchOptions(caseSensitive: true)
         let runs: [RedactStop.Run] = [(Self.text("Delia"), Self.unread), (Self.text("Rourke", strict), Self.unread)]
@@ -71,7 +71,7 @@ struct RedactStopGroupsTests {
         #expect(second.map(\.units) == [[Self.unit(.text, "Rourke", strict)]])
     }
 
-    @Test("K7-24: one text unread on pages 3, 5 and 9, another on page 5 only: page 5 with no name; pages 3 and 9 naming the first")
+    @Test("One text unread on pages 3, 5 and 9, another on page 5 only: page 5 with no name; pages 3 and 9 naming the first")
     func k724() {
         let onlyFive = Self.account((0..<10).map { $0 == 4 ? [] : [.ownText] }, off: [4])
         let runs: [RedactStop.Run] = [(Self.text("Delia"), Self.unread), (Self.text("Rourke"), onlyFive)]
@@ -81,7 +81,7 @@ struct RedactStopGroupsTests {
         ])
     }
 
-    @Test("K7-25 and K7-34: a name is returned whole; a pattern that reached the limit names its group by its text, the other two patterns unnamed")
+    @Test("A name is returned whole; a pattern that reached the limit names its group by its text, the other two patterns unnamed")
     func namesWhole() {
         let long = String(repeating: "[A-Z]", count: 12)
         #expect(long.count == 60)
@@ -96,7 +96,7 @@ struct RedactStopGroupsTests {
         #expect(groups.allSatisfy { RedactStop.reRun(for: $0, runs: runs) == nil }, "no button at the limit")
     }
 
-    @Test("K7-27 and K7-35: the shared re-run reaches the limit on page 5: page 5 in part, the scanned pages after it not reached as a list, no button")
+    @Test("The shared re-run reaches the limit on page 5: page 5 in part, the scanned pages after it not reached as a list, no button")
     func k727() {
         let pages = 12, scanned: Set<Int> = [2, 4, 8, 11]
         let first = Self.account((0..<pages).map { scanned.contains($0) ? [] : [.ownText] }, off: scanned)
@@ -110,7 +110,7 @@ struct RedactStopGroupsTests {
         #expect(groups.allSatisfy { RedactStop.reRun(for: $0, runs: runs) == nil })
     }
 
-    @Test("K7-28: the same text with Whole Word off and on: one group, no name; the button re-runs the Whole Word off unit")
+    @Test("The same text with Whole Word off and on: one group, no name; the button re-runs the Whole Word off unit")
     func k728() throws {
         let loose = SearchOptions(wholeWord: false), strict = SearchOptions(wholeWord: true)
         let runs: [RedactStop.Run] = [(Self.text("Hartwell", strict), Self.unread), (Self.text("Hartwell", loose), Self.unread)]
@@ -120,7 +120,7 @@ struct RedactStopGroupsTests {
         #expect(rerun.kind == .text("Hartwell") && rerun.options.wholeWord == false)
     }
 
-    @Test("K7-29: the same text where neither covers the other: the button re-runs one; the next showing names the text with the options that differ")
+    @Test("The same text where neither covers the other: the button re-runs one; the next showing names the text with the options that differ")
     func k729() throws {
         let one = SearchOptions(caseSensitive: true, foldDiacritics: true)
         let two = SearchOptions(caseSensitive: false, foldDiacritics: false)
@@ -136,7 +136,7 @@ struct RedactStopGroupsTests {
         #expect(RedactStop.textsNamedWithOptions(second).isEmpty)
     }
 
-    @Test("K7-32: the user's all-terms option on: the button's run is any term, and the user's setting is left as it was")
+    @Test("The user's all-terms option on: the button's run is any term, and the user's setting is left as it was")
     func k732() throws {
         let allTerms = SearchOptions(multiTermConjunction: true)
         let runs: [RedactStop.Run] = [(Self.text("Delia", allTerms), Self.unread), (Self.text("Rourke", allTerms), Self.unread)]

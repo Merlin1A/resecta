@@ -44,7 +44,7 @@ struct RedactStopRefusalTests {
         #expect(coordinator.documentState.redactRefusal(with: state) == nil)
     }
 
-    @Test("K7-T: selected matches waiting or not, against the pages to name: the stop only when pages are unanswered, never ahead of the selections")
+    @Test("Selected matches waiting or not, against the pages to name: the stop only when pages are unanswered, never ahead of the selections")
     func table() {
         // The pages to name: none; small pictures only; some, not answered;
         // some, all answered; some answered and one new. Only the third and
@@ -63,7 +63,7 @@ struct RedactStopRefusalTests {
         #expect(rows == 10)
     }
 
-    @Test("K7-19: no regions, and a page not read: the notice, and no sheet; a run that cannot start comes first too")
+    @Test("No regions, and a page not read: the notice, and no sheet; a run that cannot start comes first too")
     func noRegionsWins() {
         #expect(DocumentState.refusal(unappliedSelections: false, hasRegions: false, canStart: true, pagesToName: Self.somePages) == .noRegions)
         #expect(DocumentState.refusal(unappliedSelections: false, hasRegions: true, canStart: false, pagesToName: Self.somePages) == .busy)

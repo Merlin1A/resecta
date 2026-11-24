@@ -4,7 +4,7 @@ import Testing
 import RedactionEngine
 
 // The units the stop at Redact keeps accounts for, and when one covers
-// another (K7-30, K7-31 at the unit).
+// another.
 
 @Suite("Redact stop: units and covering")
 struct RedactStopUnitTests {
@@ -21,7 +21,7 @@ struct RedactStopUnitTests {
         }
     }
 
-    @Test("K7-30: covering over every pair of the 32 settings: from a setting to itself, never both ways between two, through a third; Include OCR Pages and all-terms change nothing")
+    @Test("Covering over every pair of the 32 settings: from a setting to itself, never both ways between two, through a third; Include OCR Pages and all-terms change nothing")
     func coveringIsAnOrder() {
         let all = Self.settings()
         let units = all.map { $0.map { RedactStopUnit(kind: .text, text: "Hartwell", options: $0) } }
@@ -41,7 +41,7 @@ struct RedactStopUnitTests {
         #expect(broken.isEmpty, "\(broken.prefix(5))")
     }
 
-    @Test("K7-28 and K7-31 at the unit: Whole Word off covers Whole Word on, never the other way")
+    @Test("At the unit: Whole Word off covers Whole Word on, never the other way")
     func looserCoversStricter() {
         let off = RedactStopUnit(kind: .text, text: "Hartwell", options: SearchOptions(wholeWord: false))
         let on = RedactStopUnit(kind: .text, text: "Hartwell", options: SearchOptions(wholeWord: true))
@@ -61,7 +61,7 @@ struct RedactStopUnitTests {
         #expect(!quotesOff.covers(quotesOn))
     }
 
-    @Test("K7-29 at the unit: case-sensitive with Accents on, and ignoring case with Accents off: neither covers the other")
+    @Test("At the unit: case-sensitive with Accents on, and ignoring case with Accents off: neither covers the other")
     func neitherCovers() {
         let one = RedactStopUnit(kind: .text, text: "Hartwell", options: SearchOptions(caseSensitive: true, foldDiacritics: true))
         let two = RedactStopUnit(kind: .text, text: "Hartwell", options: SearchOptions(caseSensitive: false, foldDiacritics: false))
