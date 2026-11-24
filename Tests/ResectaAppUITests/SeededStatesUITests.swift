@@ -74,6 +74,25 @@ nonisolated final class SeededStatesUITests: XCTestCase {
         XCTAssertEqual(line.label, "19 boxes can still show how long their text is.")
     }
 
+    func testBoxesLineOpensWhatBoxesCanShow() {
+        launchResults(["--seedBurnedBoxes=19"])
+        let line = app.buttons["19 boxes can still show how long their text is."]
+        XCTAssertTrue(line.waitForExistence(timeout: 10), "The boxes line is not a row that opens.")
+        var swipes = 0
+        while !line.isHittable && swipes < 6 {
+            app.swipeUp()
+            swipes += 1
+        }
+        line.tap()
+        let door = app.buttons["What Boxes Can Show"]
+        XCTAssertTrue(door.waitForExistence(timeout: 5), "The boxes line opened to no link row.")
+        door.tap()
+        XCTAssertTrue(element("legalDocumentView").waitForExistence(timeout: 10), "The link row opened nothing.")
+        XCTAssertTrue(app.navigationBars["What Boxes Can Show"].exists, "The page is not titled What Boxes Can Show.")
+        app.buttons["legalDocumentDone"].tap()
+        XCTAssertTrue(line.waitForExistence(timeout: 10), "Done did not return to the results.")
+    }
+
     func testOutputSizeShowsWithTheOutput() {
         launchResults(["--seedOutput", "--seedOutputBytes=38200000"])
         let line = text(beginningWith: "This PDF is ")

@@ -9,15 +9,22 @@ import SwiftUI
 // for post-acceptance browsing; this surface must work offline at first
 // launch). Bundled copies are byte-pinned to the repo-root EULA.md /
 // PRIVACY.md by LegalDocumentBundleTests, so the text shown here is the text
-// published at resecta.app.
+// published at resecta.app. What Boxes Can Show is the one page that is not a
+// legal document: in-app words bundled from Resources/, opened from Settings
+// and from the results screen's boxes line.
 
-/// The two bundled legal documents the first-launch gate can present.
+/// The bundled pages shown read-only: the legal documents the first-launch
+/// gate can present, and What Boxes Can Show.
 enum LegalDocument: String, Identifiable, CaseIterable {
     case eula = "EULA"
     case privacyPolicy = "PRIVACY"
     /// The repo-root NOTICE: the third-party data and typeface attributions
     /// the product ships (Apache License 2.0, section 4(d)).
     case acknowledgements = "NOTICE"
+    /// What a box can still show, what Cover Other Words does, what stays in
+    /// the document, what Checks Passed means, AI tools, and what Search does
+    /// not look for. Opened from Settings and from the results screen.
+    case whatBoxesCanShow = "WhatBoxesCanShow"
 
     var id: String { rawValue }
 
@@ -31,9 +38,16 @@ enum LegalDocument: String, Identifiable, CaseIterable {
         self == .acknowledgements ? nil : "md"
     }
 
-    /// The repo-root file name (`EULA.md`, `PRIVACY.md`, `NOTICE`).
+    /// The file name (`EULA.md`, `PRIVACY.md`, `NOTICE`,
+    /// `WhatBoxesCanShow.md`).
     var fileName: String {
         fileExtension.map { "\(resourceName).\($0)" } ?? resourceName
+    }
+
+    /// Where the file sits in the repository: the root for the three legal
+    /// files, the app's Resources folder for What Boxes Can Show.
+    var sourcePath: String {
+        self == .whatBoxesCanShow ? "Resources/\(fileName)" : fileName
     }
 
     /// Navigation title — shares the gate link-label string so the sheet the
@@ -43,13 +57,18 @@ enum LegalDocument: String, Identifiable, CaseIterable {
         case .eula: "eula_view_eula"
         case .privacyPolicy: "eula_view_privacy"
         case .acknowledgements: "eula_view_acknowledgements"
+        case .whatBoxesCanShow: "boxes_page_title"
         }
     }
+
+    /// The page's name: its navigation title, and the label of every row
+    /// that opens it.
+    var title: String { String(localized: titleKey, table: "Legal") }
 }
 
 /// Minimal read-only Markdown presenter for the bundled legal documents.
 ///
-/// Deliberately NOT a general document viewer: it renders the two known,
+/// Deliberately NOT a general document viewer: it renders the known,
 /// guard-pinned files verbatim — headings and paragraphs — with no links, no
 /// selection actions, and no state side effects. Inline emphasis goes through
 /// `AttributedString(markdown:)` with `.inlineOnlyPreservingWhitespace`, which
@@ -71,7 +90,7 @@ struct LegalDocumentView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(ResectaTokens.Spacing.md)
             }
-            .navigationTitle(String(localized: document.titleKey, table: "Legal"))
+            .navigationTitle(document.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -88,7 +107,7 @@ struct LegalDocumentView: View {
     // MARK: - Content
 
     /// One paragraph-level unit of the document.
-    private enum Block {
+    nonisolated enum Block: Equatable {
         case heading(level: Int, text: String)
         case paragraph(String)
     }
@@ -106,7 +125,13 @@ struct LegalDocumentView: View {
             return [.paragraph(String(
                 localized: "legal_doc_unavailable", table: "Legal"))]
         }
-        return contents
+        return Self.blocks(in: contents)
+    }
+
+    /// The text split into blank-line-separated blocks, `#`-prefixed blocks
+    /// read as headings.
+    nonisolated static func blocks(in contents: String) -> [Block] {
+        contents
             .components(separatedBy: "\n\n")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }

@@ -80,6 +80,12 @@ targets:
       # shown in-app as Acknowledgements; byte-compared like the two above.
       - path: NOTICE
         buildPhase: resources
+      # What Boxes Can Show: in-app words, not a published document, so the
+      # page sits in Resources/ rather than at the root. Shown by
+      # LegalDocumentView from Settings and from the results screen;
+      # byte-compared like the three above.
+      - path: Resources/WhatBoxesCanShow.md
+        buildPhase: resources
       # DEBUG-only: committed synthetic UI-test document fixtures, bundled
       # via `sources:` because the target's `resources:` block silently
       # fails to enumerate. Loaded by the `--loadTestDocument` /
