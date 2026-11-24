@@ -33,7 +33,7 @@ struct FirstDocumentHintTests {
 
     // MARK: - when it shows
 
-    struct ShowCase: Sendable, CustomTestStringConvertible {
+    struct ShowCase {
         let done: Bool
         let phase: DocumentState.PhaseKind
         let covered: Bool
@@ -55,11 +55,13 @@ struct FirstDocumentHintTests {
         ShowCase(done: false, phase: .empty, covered: false, message: false, shows: false),
     ]
 
-    @Test("The line shows on a first document while editing, with no sheet and no message", arguments: showCases)
-    func showsOnlyWhenDue(_ row: ShowCase) {
-        let covers = Rules.Covers(editorSheet: row.covered)
-        let due = Rules.isDue(done: row.done, phaseKind: row.phase, covers: covers)
-        #expect(Rules.shows(due: due, messageAtSlot: row.message) == row.shows)
+    @Test("The line shows on a first document while editing, with no sheet and no message")
+    func showsOnlyWhenDue() {
+        for row in Self.showCases {
+            let covers = Rules.Covers(editorSheet: row.covered)
+            let due = Rules.isDue(done: row.done, phaseKind: row.phase, covers: covers)
+            #expect(Rules.shows(due: due, messageAtSlot: row.message) == row.shows, "\(row.testDescription)")
+        }
     }
 
     @Test("Every row of the showing table is counted")
@@ -114,10 +116,12 @@ struct FirstDocumentHintTests {
         .empty, .importing, .detecting, .redacting, .verifying, .verified, .exporting, .failed,
     ]
 
-    @Test("Never during a run, nor in any phase but editing", arguments: otherPhases)
-    func neverOutsideEditing(_ phase: DocumentState.PhaseKind) {
-        #expect(!Self.isEditing(phase))
-        #expect(!Rules.isDue(done: false, phaseKind: phase, covers: .init()))
+    @Test("Never during a run, nor in any phase but editing")
+    func neverOutsideEditing() {
+        for phase in Self.otherPhases {
+            #expect(!Self.isEditing(phase), "\(phase)")
+            #expect(!Rules.isDue(done: false, phaseKind: phase, covers: .init()), "\(phase)")
+        }
     }
 
     @Test("Every phase but editing is listed")
@@ -159,12 +163,11 @@ struct FirstDocumentHintTests {
         return snapshot
     }
 
-    struct ActionCase: @unchecked Sendable, CustomTestStringConvertible {
+    struct ActionCase {
         let name: String
         let old: Rules.Snapshot
         let new: Rules.Snapshot
         let action: Rules.Action?
-        var testDescription: String { name }
     }
 
     static let actionCases: [ActionCase] = [
@@ -193,9 +196,11 @@ struct FirstDocumentHintTests {
                    new: changed({ $0.editing = false; $0.page = 3 }), action: nil),
     ]
 
-    @Test("The state changes that count as the first action, only while editing", arguments: actionCases)
-    func stateChangesThatCount(_ row: ActionCase) {
-        #expect(Rules.action(from: row.old, to: row.new) == row.action)
+    @Test("The state changes that count as the first action, only while editing")
+    func stateChangesThatCount() {
+        for row in Self.actionCases {
+            #expect(Rules.action(from: row.old, to: row.new) == row.action, "\(row.name)")
+        }
     }
 
     @Test("Every state change of the editor is in the action table")
