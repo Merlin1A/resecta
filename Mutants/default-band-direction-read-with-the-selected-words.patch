@@ -1,0 +1,18 @@
+Property: With the switch off the direction is read from unselected words alone, so the covered word's script does not change the paint.
+Area: the plan's default band (PaintPlan.make, switch off)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter PaintPlanDefaultBandTests
+Must go red: RedactionCoreTests/PaintPlanDefaultBandTests coveredScriptDoesNotTurnThePaint; RedactionCoreTests/PaintPlanDefaultBandTests loneValueScriptNotRead
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+@@ -179,7 +179,7 @@ private struct Maker {
+     func reading(of selected: Set<Int>) -> BoxReading? {
+         guard !selected.isEmpty else { return nil }
+         return Complement.reading(of: selected, on: complement, words: words, text: text, facts: pageFacts,
+-                                  constants: policy.provisional, directionFromUnselected: !switchOn)
++                                  constants: policy.provisional, directionFromUnselected: false)
+     }
+ 
+     /// Whether a region's selected extents are read from a layout: placed from
