@@ -42,4 +42,29 @@ struct WalkCoverageSinkTests {
         #expect(own.all.allSatisfy { $0.route == .textLayer })
         #expect(later.all.isEmpty, "\(later.all)")
     }
+
+    @Test("On pages read by recognition, a sink set while the walk is under way gets none of its reports")
+    func laterSinkGetsNothingOnRecognisedPages() async throws {
+        let document = try #require(PDFDocument(data: TestFixtures.imageOnlyPDF()))
+        let first = try #require(document.page(at: 0))
+        let copy = try #require(first.copy() as? PDFPage)
+        document.insert(copy, at: 1)
+        let searcher = DocumentSearcher()
+        let line = OCREngine.TextLine(text: "statement", normalizedRect: CGRect(x: 0.1, y: 0.1, width: 0.6, height: 0.04),
+                                      confidence: 0.9)
+        await searcher._testSeedOCRLines([line], forPageIndex: 0)
+        await searcher._testSeedOCRLines([line], forPageIndex: 1)
+        let own = PageCoverageReportTests.Reports()
+        let later = PageCoverageReportTests.Reports()
+        await searcher.setPageCoverageSink { [searcher] coverage in
+            own.record(coverage)
+            if coverage.pageIndex == 0 {
+                searcher.assumeIsolated { $0.pageCoverageSink = { later.record($0) } }
+            }
+        }
+        for await _ in searcher.search(SendablePDFDocument(document), mode: .text("statement", options: SearchOptions(includeOCR: true)),
+                                       progress: { _, _ in }) {}
+        #expect(Set(own.all.filter { $0.route == .ocr }.map(\.pageIndex)) == [0, 1], "\(own.all)")
+        #expect(later.all.isEmpty, "\(later.all)")
+    }
 }
