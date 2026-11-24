@@ -732,4 +732,5 @@ with its reason and the mutant that is caught in its place.
 | `redact-stop-digit-separators-cover-backwards.patch` | With digit separators ignored, a unit covers the same unit that keeps them, never the other way. | ResectaAppTests/RedactStopUnitTests digitsAndQuotesDirection |
 | `redact-stop-quotes-cover-backwards.patch` | With quotes and dashes matched alike, a unit covers the same unit that keeps them apart, never the other way. | ResectaAppTests/RedactStopUnitTests digitsAndQuotesDirection |
 | `search-replaced-run-not-reported.patch` | A run replaced after an Apply tells the document it was replaced, so its boxes keep it counted at the stop. | ResectaAppTests/SearchRunLogTests replacedRunIsReported |
+| `search-run-replaced-report-not-installed.patch` | The run gives the document its replaced-run report, so a replaced run's boxes keep it counted at the stop. | ResectaAppTests/SearchRunLogTests runInstallsTheReplacedReport |
 | `run-log-named-in-a-log-line.patch` | No log line names the run log, the answered set or their types. | ResectaAppTests/RunLogStaysInMemoryTests noLogLineNamesThem() |
