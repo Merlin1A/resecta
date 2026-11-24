@@ -76,10 +76,10 @@ class SettingsState {
     }
 
     /// Opt-in paranoid-mode toggle.
-    /// Off by default. When on, the app applies two behavior overrides
-    /// (numbered #1/#2 at their call sites): pipeline mode is forced to
-    /// `.secureRasterization`; `autoVerify` is forced to `true` (UI toggle
-    /// disabled while paranoid is on). Mechanism-description language: the
+    /// Off by default. When on, `autoVerify` is forced to `true` (UI toggle
+    /// disabled while paranoid is on). The pipeline mode is
+    /// `.secureRasterization` with Paranoid Mode on or off
+    /// (`PipelineMode.effective`). Mechanism-description language: the
     /// bundle is designed to reduce the surface area of optional side
     /// channels; behavior is best-effort.
     var paranoidMode: Bool = false {

@@ -21,18 +21,6 @@ struct AccessibilityLabelTests {
 
     // MARK: - Settings picker hints
 
-    @Test("Default Mode picker hint describes both pipeline modes")
-    func testSettingsDefaultModeHint() {
-        // The descriptive mode rows below the picker are
-        // invisible to VoiceOver, so the hint carries the trade-off.
-        // Mechanism-description language — no outcome
-        // promise.
-        #expect(
-            SettingsView.defaultModeAccessibilityHint
-            == "Choose how redacted output is produced. Secure Rasterization produces image-only output, with no text to search or copy. Searchable Redaction keeps a searchable copy of the text you did not box, less some words. A page whose text is invisible or shows no ink is exported as a picture. Text under a picture, bar, or cover already in the page, or stored as different words from those the page prints, can still enter the searchable copy."
-        )
-    }
-
     @Test("Fill Color picker hint describes what the color controls")
     func testSettingsFillColorHint() {
         // The leading color swatch is .accessibilityHidden,
@@ -44,15 +32,12 @@ struct AccessibilityLabelTests {
         )
     }
 
-    @Test("Settings picker hints — both Default Mode and Fill Color pinned")
+    @Test("Settings picker hint — Fill Color pinned")
     func testSettingsPickerHints() {
-        // Group test that re-asserts both picker hints in one place so
-        // a future regression in either picker hint surfaces here even
-        // if the individual tests are skipped.
-        #expect(!SettingsView.defaultModeAccessibilityHint.isEmpty)
+        // Re-asserts the picker hint so a regression surfaces here even
+        // if the individual test is skipped. Settings has no mode picker:
+        // Secure Rasterization is the only mode.
         #expect(!SettingsView.fillColorAccessibilityHint.isEmpty)
-        #expect(SettingsView.defaultModeAccessibilityHint.contains("Secure Rasterization"))
-        #expect(SettingsView.defaultModeAccessibilityHint.contains("Searchable Redaction"))
         #expect(SettingsView.fillColorAccessibilityHint.contains("redacted regions"))
     }
 

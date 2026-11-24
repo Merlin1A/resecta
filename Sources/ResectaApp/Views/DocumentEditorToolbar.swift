@@ -29,7 +29,6 @@ struct DocumentEditorToolbar {
     let redactButtonHint: String
     let handleHomeTap: () -> Void
     let homeButton: AnyView
-    let pipelineModePicker: AnyView
     /// Settings, parking the search sheet first when it is up.
     let openSettings: () -> Void
     /// When the results last replaced the running checks (nil otherwise).
@@ -195,7 +194,6 @@ struct DocumentEditorToolbar {
                 selectionMenu
                 selectMoreToggle
                 deleteButton
-                pipelineModePicker
             }
 
             redactButton
@@ -264,8 +262,8 @@ struct DocumentEditorToolbar {
     }
 
     /// The iPhone … menu — same neutral-group rule — in the layout's
-    /// sections: the selection actions, then Switch Mode and Settings (and
-    /// Redact first there at the largest sizes), then Home.
+    /// sections: the selection actions, then Settings (and Redact first
+    /// there at the largest sizes), then Home.
     func secondaryActionToolbarItems(layout: EditorToolbarLayout) -> some View {
         Group {
             ForEach(Array(layout.overflowSections.enumerated()), id: \.offset) { _, section in
@@ -285,7 +283,6 @@ struct DocumentEditorToolbar {
         case .delete: deleteButton
         case .markWholePage: markWholePageButton
         case .redact: redactButton
-        case .switchMode: pipelineModePicker
         case .settings: settingsButton
         case .home: homeButton
         case .undo, .overflow: EmptyView()

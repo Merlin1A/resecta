@@ -2,7 +2,7 @@ Property: A word that could lie under a box but cannot be placed makes the page 
 Area: hidden-word check (Verification)
 Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/HiddenWordInkPredicateCases
 Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/HiddenWordInkRunCases
-Must go red: RedactionEngineTests/HiddenWordInkPredicateCases V8; RedactionEngineTests/HiddenWordInkPredicateCases V9; RedactionEngineTests/HiddenWordInkPredicateCases V18; RedactionEngineTests/HiddenWordInkPredicateCases V18b; RedactionEngineTests/HiddenWordInkPredicateCases V5b; ResectaAppTests/HiddenWordInkRunCases V15
+Must go red: RedactionEngineTests/HiddenWordInkPredicateCases V8; RedactionEngineTests/HiddenWordInkPredicateCases V9; RedactionEngineTests/HiddenWordInkPredicateCases V18; RedactionEngineTests/HiddenWordInkPredicateCases V18b; RedactionEngineTests/HiddenWordInkPredicateCases V5b; ResectaAppTests/HiddenWordInkRunCases V15 (pair)
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkCheck.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/HiddenWordInkCheck.swift

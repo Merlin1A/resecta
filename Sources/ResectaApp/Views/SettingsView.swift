@@ -9,14 +9,12 @@ struct SettingsView: View {
     // VoiceOver hint strings are exposed as `static`
     // constants so the contract can be pinned by unit tests without
     // rendering the form.
-    static let defaultModeAccessibilityHint = "Choose how redacted output is produced. Secure Rasterization produces image-only output, with no text to search or copy. Searchable Redaction keeps a searchable copy of the text you did not box, less some words. A page whose text is invisible or shows no ink is exported as a picture. Text under a picture, bar, or cover already in the page, or stored as different words from those the page prints, can still enter the searchable copy."
-    /// The line under the mode picker for each mode.
-    static let secureModeDescription = "Produces image-only output with all text removed, so the PDF has no text to search or copy. The simplest approach — recommended when redaction confidence is the top priority. A court or regulator that requires searchable PDFs may refuse an image-only PDF."
-    static let searchableModeDescription = "Keeps a searchable copy of the text you did not box, for documents that have a text layer. Words next to a box can be left out. So is text with characters its fonts cannot draw, and the results say where. A page whose text is invisible or shows no ink is exported as a picture. Text under a picture, bar, or cover that was already in the page can still enter the searchable copy. Text that a file stores as different words from those it prints can still enter the searchable copy."
+    /// What every export is: the line under the Processing header.
+    static let secureModeDescription = "Produces image-only output with all text removed, so the PDF has no text to search or copy. A court or regulator that requires searchable PDFs may refuse an image-only PDF."
     /// The banner shown while a run is in progress: its title and body.
     static let runInProgressTitle = "Redaction in progress"
     static let runInProgressBody = "A redaction is running. Changes apply to the next one."
-    static let paranoidModeFooter = "Paranoid Mode forces Secure Rasterization and always runs the checks."
+    static let paranoidModeFooter = "Paranoid Mode always runs the checks."
     static let fillColorAccessibilityHint = "Color used to fill redacted regions in the output."
     static let verifyToggleDefaultHint = "When enabled, the app runs verification checks before you can export"
     static let verifyToggleParanoidLockedHint = "Locked on because Paranoid Mode is enabled."
@@ -25,9 +23,6 @@ struct SettingsView: View {
     /// mechanism description and the paranoid-locked variant. Exposed
     /// as `static` so the conditional can be unit-tested without
     /// rendering the toggle.
-    /// What Paranoid Mode does to the pipeline mode — the Settings bullet
-    /// and the editor's Switch Mode hint read this one sentence.
-    static let paranoidForcesSecureLine = "The redaction mode is forced to Secure Rasterization."
 
     static func verifyToggleHint(paranoidMode: Bool) -> String {
         paranoidMode ? verifyToggleParanoidLockedHint : verifyToggleDefaultHint
@@ -151,8 +146,8 @@ struct SettingsView: View {
 
     /// Non-blocking banner shown while the pipeline is `.detecting`,
     /// `.redacting`, or `.verifying`. The pipeline-affecting
-    /// controls below (`pipelineMode`, `autoVerify`,
-    /// `paranoidMode`, plus `fillColor` / `exportDPI`) remain functional;
+    /// controls below (`autoVerify`, `paranoidMode`, plus
+    /// `fillColor` / `exportDPI`) remain functional;
     /// the banner describes the mechanism (the settings snapshot
     /// captured at run entry) without promising an outcome.
     /// Mechanism-description language only.
@@ -177,40 +172,14 @@ struct SettingsView: View {
 
     private var processingSection: some View {
         Section {
-            // Description text rows hide separators for visual clarity
-            // Picker with descriptions per mode
-            Picker(selection: Binding(
-                get: { settingsState.pipelineMode },
-                set: { settingsState.pipelineMode = $0 }
-            )) {
-                Text("Secure Rasterization").tag(PipelineMode.secureRasterization)
-                Text("Searchable Redaction").tag(PipelineMode.searchableRedaction)
-            } label: {
-                Text("Default Mode")
-            }
-            // VoiceOver users miss the descriptive
-            // mode rows below the picker. Mirror the mechanism-description
-            // copy as a hint so the trade-off is audible.
-            .accessibilityHint(Self.defaultModeAccessibilityHint)
-
-            // Description for current selection
-            switch settingsState.pipelineMode {
-            case .secureRasterization:
-                Text(Self.secureModeDescription)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .listRowSeparator(.hidden)
-            case .searchableRedaction:
-                Text(Self.searchableModeDescription)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .listRowSeparator(.hidden)
-            }
+            // Secure Rasterization is the only mode, so there is no picker:
+            // the section says what every export is. The stored setting is
+            // left as stored and read as Secure (`PipelineMode.effective`).
+            Text(Self.secureModeDescription)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
         } header: {
             Label("Processing", systemImage: "cpu")
-        } footer: {
-            // Footer note
-            Text("Both modes use the same pixel-destruction process for redacted regions.")
         }
     }
 
@@ -390,9 +359,8 @@ struct SettingsView: View {
 
     /// Paranoid-mode toggle. Off by default. Copy uses
     /// mechanism-description language only: each item
-    /// describes what the app does, not an outcome promise. The two
-    /// listed behaviors land as a bundle — there are no per-behavior
-    /// sub-toggles by locked design.
+    /// describes what the app does, not an outcome promise. The listed
+    /// behavior has no sub-toggle by locked design.
     ///
     /// The never-shipped
     /// report-copy behavior was removed from the paranoid copy — that mechanism
@@ -409,21 +377,17 @@ struct SettingsView: View {
             )) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Paranoid Mode")
-                    Text("When on, the app forces secure-rasterization mode and runs verification automatically.")
+                    Text("When on, the app runs verification automatically.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
             }
-            .accessibilityHint("When enabled, the app applies two behavior overrides described below")
 
-            // Explicit list of the two enforced behaviors. Phrased in
+            // Explicit list of the enforced behavior. Phrased in
             // mechanism-description language. Each row hides its
             // separator for visual continuity with the toggle row.
             VStack(alignment: .leading, spacing: 4) {
                 Text("While on:")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                Text("\u{2022} \(Self.paranoidForcesSecureLine)")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                 Text("\u{2022} Verification runs before every export; the toggle above is disabled.")

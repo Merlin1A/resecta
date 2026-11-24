@@ -719,10 +719,13 @@ final class PipelineCoordinator: @unchecked Sendable {
 }
 
 extension PipelineMode {
-    /// The mode a run uses: Secure Rasterization whenever Paranoid Mode is
-    /// on, else the document's override, else the setting. The run, the
-    /// verify-only re-run and the editor's Switch Mode read this one rule.
+    /// The mode a run uses: Secure Rasterization, for every input. Searchable
+    /// Redaction is not offered, so neither Paranoid Mode, a document's
+    /// override, the stored setting (`pipelineMode.v2`, left as stored) nor a
+    /// launch argument that writes that setting can reach it. The run and
+    /// the verify-only re-run read this one rule. The Searchable code stays
+    /// in place, unreachable from the app.
     static func effective(paranoid: Bool, override: PipelineMode?, setting: PipelineMode) -> PipelineMode {
-        paranoid ? .secureRasterization : (override ?? setting)
+        .secureRasterization
     }
 }
