@@ -787,6 +787,7 @@ with its reason and the mutant that is caught in its place.
 | `redact-stop-shows-pages-not-in-its-case.patch` | The stop shows only the pages and reasons its case carries. | ResectaAppTests/BeforeYouRedactSheetTests showsOnlyTheCasesPages; ResectaAppTests/BeforeYouRedactSheetTests offersOnlyForAShownGroup |
 | `redact-stop-named-section-first.patch` | The stop's section with no name comes first. | ResectaAppTests/BeforeYouRedactSheetTests sectionsBySearches |
 | `redact-stop-offers-for-a-group-not-shown.patch` | Search These Pages is offered only for a group the stop shows. | ResectaAppTests/BeforeYouRedactSheetTests offersOnlyForAShownGroup |
+| `stop-sheet-swipe-is-cancel.patch` | The stop swiped down is its Cancel, never Redact Anyway. | ResectaAppTests/BeforeYouRedactSheetTests answers |
 | `search-run-replaced-report-commented-out.patch` | The run's replaced-run report is installed in code, not only quoted in a comment. | ResectaAppTests/SearchRunLogTests runInstallsTheReplacedReport |
 | `run-log-named-in-a-log-line.patch` | No log line names the run log, the answered set or their types. | ResectaAppTests/RunLogStaysInMemoryTests noLogLineNamesThem() |
 | `preview-kept-plan-ignores-the-cap.patch` | A drawn page's plan is kept at the run's quality, under the run's cap. | ResectaAppTests/OverlayDrawnPlanTests keptPlanReadsTheCap |
