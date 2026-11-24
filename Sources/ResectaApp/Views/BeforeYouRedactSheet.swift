@@ -219,8 +219,10 @@ private struct StopContentHeightKey: PreferenceKey {
 /// Search sheet's line sentences and the stop's own name line.
 struct BeforeYouRedactWords {
     /// The name line for a section's searches, in the order they were first
-    /// run; `withOptions` holds the texts whose names also say their options.
-    let nameLine: (_ names: [RedactStopUnit], _ withOptions: Set<RedactStop.NamedText>) -> NotSearchedListContent.NameLine
+    /// run; `withOptions` holds the texts whose names also say their options,
+    /// and `allUnits` every unit the runs hold, to tell which options differ.
+    let nameLine: (_ names: [RedactStopUnit], _ withOptions: Set<RedactStop.NamedText>,
+                   _ allUnits: [RedactStopUnit]) -> NotSearchedListContent.NameLine
     /// The sentence of one row: a reason, its pages and how its runs ended.
     let row: (_ group: RedactStop.Group, _ names: [RedactStopUnit]) -> String
 }
@@ -255,7 +257,7 @@ extension BeforeYouRedactSheet {
             let groups = shown.filter { $0.units == units }
             let names = RedactStop.names(of: groups[0], runs: runs)
             return NotSearchedListContent.Section(
-                nameLine: units == nil ? nil : words.nameLine(names, withOptions),
+                nameLine: units == nil ? nil : words.nameLine(names, withOptions, RedactStop.units(of: runs)),
                 rows: groups.map { NotSearchedListContent.Row(sentence: words.row($0, names), pages: $0.pages) })
         }
         let reRun = shown.lazy.compactMap { RedactStop.reRun(for: $0, runs: runs) }.first

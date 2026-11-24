@@ -154,7 +154,7 @@ struct BeforeYouRedactSheetTests {
 
     /// Hand words: the name line lists the texts; a row names its reason and pages.
     static let words = BeforeYouRedactWords(
-        nameLine: { names, withOptions in
+        nameLine: { names, withOptions, _ in
             let line = names.map { withOptions.contains(RedactStop.NamedText(kind: $0.kind, text: $0.text)) ? "\($0.text)*" : $0.text }
                 .joined(separator: ", ")
             return NotSearchedListContent.NameLine(shown: line, spoken: line)
@@ -212,5 +212,60 @@ struct BeforeYouRedactSheetTests {
         let after = Sheet.stop(casePages: casePages, runs: runs + [(reRun, G.read)], answered: [], words: Self.words)
         #expect(after.content.sections.isEmpty)
         #expect(after.reRun == nil)
+    }
+
+    @Test("The stop's name line in each of its forms")
+    func nameLines() {
+        let delia = G.unit(.text, "Delia"), rourke = G.unit(.text, "Rourke"), moss = G.unit(.text, "Moss")
+        let pattern = G.unit(.pattern, "[0-9]{3}"), scan = G.unit(.scan, "")
+        let table: [([RedactStopUnit], String)] = [
+            ([delia], "For your search for \u{201C}Delia\u{201D}:"),
+            ([delia, rourke], "For your searches for \u{201C}Delia\u{201D} and \u{201C}Rourke\u{201D}:"),
+            ([delia, rourke, moss], "For your searches for \u{201C}Delia\u{201D}, \u{201C}Rourke\u{201D}, and \u{201C}Moss\u{201D}:"),
+            ([pattern], "For your pattern search \u{201C}[0-9]{3}\u{201D}:"),
+            ([scan], "For your Scan:"),
+            ([delia, scan], "For your search for \u{201C}Delia\u{201D} and for your Scan:"),
+            ([delia, pattern, scan], "For your search for \u{201C}Delia\u{201D}, for your pattern search \u{201C}[0-9]{3}\u{201D}, and for your Scan:"),
+        ]
+        #expect(table.count == 7)
+        for (names, line) in table {
+            #expect(StopWords.nameLine(names, withOptions: [], allUnits: names) == line)
+        }
+        let strict = G.unit(.text, "Hartwell", SearchOptions(caseSensitive: true)), loose = G.unit(.text, "Hartwell")
+        #expect(StopWords.nameLine([strict], withOptions: [RedactStop.NamedText(kind: .text, text: "Hartwell")],
+                                   allUnits: [strict, loose])
+                == "For your search for \u{201C}Hartwell\u{201D} with Case-sensitive on:")
+    }
+
+    @Test("Not reached names the cause only when every search ended that way; a mixed group is searched and scanned")
+    func notReachedRows() {
+        let delia = G.unit(.text, "Delia"), scan = G.unit(.scan, "")
+        func row(_ pages: [Int], _ ending: RedactStop.NotReachedEnding?, _ names: [RedactStopUnit]) -> String? {
+            StopWords.row(RedactStop.Group(reason: .line(.notReached), units: Set(names), pages: pages, notReachedEnding: ending), names: names)
+        }
+        #expect(row([5], .stopped, [delia]) == "Page 6 was not searched, because the search stopped before it reached it.")
+        #expect(row([5, 6, 7], .stopped, [delia]) == "Pages 6\u{2013}8 were not searched, because the search stopped before it reached them.")
+        #expect(row([5], .atResultLimit, [delia])
+                == "Page 6 was not searched, because the search reached its limit of 1,000 results before it reached it.")
+        #expect(row([5, 7], .differs, [delia]) == "Pages 6 and 8 were not searched, because the search ended before it reached them.")
+        #expect(row([5], .stopped, [scan]) == "Page 6 was not scanned, because the Scan stopped before it reached it.")
+        #expect(row([5], .stopped, [delia, scan])
+                == "Page 6 was not searched and scanned, because the search and the Scan stopped before they reached it.")
+        #expect(row([1, 3, 4, 5, 6, 11], .stopped, [delia])
+                == "Pages 2, 4\u{2013}7, and 12 were not searched, because the search stopped before it reached them.")
+        #expect(row([5, 6], .atResultLimit, [delia, scan])
+                == "Pages 6 and 7 were not searched and scanned, because the search and the Scan reached their limit of 1,000 results before they reached them.")
+    }
+
+    @Test("Searched in part in its three forms; the other reasons take the Search sheet's lines")
+    func searchedInPartRows() {
+        let delia = G.unit(.text, "Delia"), scan = G.unit(.scan, "")
+        func row(_ reason: RedactStop.Reason, _ names: [RedactStopUnit]) -> String? {
+            StopWords.row(RedactStop.Group(reason: reason, units: Set(names), pages: [3]), names: names)
+        }
+        #expect(row(.searchedInPart, [delia]) == "Page 4 was searched in part.")
+        #expect(row(.searchedInPart, [scan]) == "Page 4 was scanned in part.")
+        #expect(row(.searchedInPart, [delia, scan]) == "Page 4 was searched and scanned in part.")
+        #expect(row(.line(.recognitionOff), [delia]) == nil)
     }
 }
