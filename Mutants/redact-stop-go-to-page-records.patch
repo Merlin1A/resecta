@@ -1,0 +1,18 @@
+Property: Go to page answers nothing.
+Area: the stop at Redact
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BeforeYouRedactSheetTests
+Must go red: ResectaAppTests/BeforeYouRedactSheetTests cancelAndGoToPageRecordNothing
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/DocumentEditorView+BeforeRedact.swift b/Sources/ResectaApp/Views/DocumentEditorView+BeforeRedact.swift
+index a86a4ffd..91379f92 100644
+--- a/Sources/ResectaApp/Views/DocumentEditorView+BeforeRedact.swift
++++ b/Sources/ResectaApp/Views/DocumentEditorView+BeforeRedact.swift
+@@ -39,6 +39,7 @@ extension DocumentEditorView {
+         case .cancel, .swipedDown:
+             coordinator.cancelRefusalAwaitingAnswer()
+         case .goToPage(let page):
++            if case .pagesNotRead(let shown) = documentState.redactRefusalAwaitingAnswer { redactionState.redactStopAnswered.formUnion(shown) }
+             coordinator.cancelRefusalAwaitingAnswer()
+             PageNavigationBar.showPage(page, documentState: documentState, redactionState: redactionState)
+         }

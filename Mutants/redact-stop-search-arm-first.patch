@@ -1,0 +1,25 @@
+Property: The stop takes the slot ahead of Search.
+Area: the stop at Redact
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BeforeYouRedactSheetTests
+Must go red: ResectaAppTests/BeforeYouRedactSheetTests stopTakesTheSlotFirst
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/DocumentEditorView.swift b/Sources/ResectaApp/Views/DocumentEditorView.swift
+index fa195301..d35c5a75 100644
+--- a/Sources/ResectaApp/Views/DocumentEditorView.swift
++++ b/Sources/ResectaApp/Views/DocumentEditorView.swift
+@@ -301,12 +301,12 @@ struct DocumentEditorView: View {
+         // the session down at the Apply seam (`runFullPipeline`).
+         .sheet(item: Binding<ActiveSheet?>(
+             get: {
+-                // A session still up when the stop's case arrives is parked first, so its teardown never runs.
+-                if sheetSlotShowsStop, redactionState.activeSearch == nil { return .beforeRedact }
+                 if let searchState = redactionState.activeSearch,
+                    Self.sheetSlotMayPresentSearch(in: documentState.phaseKind) {
+                     return .search(searchState)
+                 }
++                // A session still up when the stop's case arrives is parked first, so its teardown never runs.
++                if sheetSlotShowsStop, redactionState.activeSearch == nil { return .beforeRedact }
+                 if let regionID = redactionState.pendingCanvasRationaleRequest {
+                     return .rationale(regionID)
+                 }

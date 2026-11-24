@@ -788,6 +788,16 @@ with its reason and the mutant that is caught in its place.
 | `redact-stop-named-section-first.patch` | The stop's section with no name comes first. | ResectaAppTests/BeforeYouRedactSheetTests sectionsBySearches |
 | `redact-stop-offers-for-a-group-not-shown.patch` | Search These Pages is offered only for a group the stop shows. | ResectaAppTests/BeforeYouRedactSheetTests offersOnlyForAShownGroup |
 | `stop-sheet-swipe-is-cancel.patch` | The stop swiped down is its Cancel, never Redact Anyway. | ResectaAppTests/BeforeYouRedactSheetTests answers |
+| `redact-stop-redact-anyway-teal.patch` | Exactly one capsule is teal, and it is never Redact Anyway. | ResectaAppTests/BeforeYouRedactSheetTests oneTealCapsule |
+| `redact-stop-search-arm-first.patch` | The stop takes the slot ahead of Search. | ResectaAppTests/BeforeYouRedactSheetTests stopTakesTheSlotFirst |
+| `redact-stop-go-to-page-records.patch` | Go to page answers nothing. | ResectaAppTests/BeforeYouRedactSheetTests cancelAndGoToPageRecordNothing |
+| `redact-stop-shows-in-every-phase.patch` | The slot shows the stop only while editing. | ResectaAppTests/BeforeYouRedactSheetTests onlyWhileEditing |
+| `redact-stop-not-presenting.patch` | The editor counts the stop as presenting. | ResectaAppTests/BeforeYouRedactSheetTests stopCountsAsPresenting |
+| `redact-stop-no-capture-cover.patch` | The stop sheet carries the capture cover. | ResectaAppTests/BeforeYouRedactSheetTests carriesTheCaptureCover |
+| `redact-stop-drop-door-asks.patch` | A drop over the stop at Redact is refused, not asked. | ResectaAppTests/DropReplaceConfirmTests stopUpRefuses |
+| `redact-stop-drop-names-dismiss.patch` | A drop refused over the stop names its Cancel. | ResectaAppTests/DropReplaceConfirmTests stopRefusalNamesCancel; ResectaAppTests/DropReplaceConfirmTests stopUpRefuses |
+| `redact-stop-words-cause-when-ended-apart.patch` | Not reached names no cause when its searches ended in different ways. | ResectaAppTests/BeforeYouRedactSheetTests notReachedRows |
+| `redact-stop-words-pages-as-a-list.patch` | The stop's pages follow the strings table's range rule. | ResectaAppTests/BeforeYouRedactSheetTests notReachedRows |
 | `search-run-replaced-report-commented-out.patch` | The run's replaced-run report is installed in code, not only quoted in a comment. | ResectaAppTests/SearchRunLogTests runInstallsTheReplacedReport |
 | `run-log-named-in-a-log-line.patch` | No log line names the run log, the answered set or their types. | ResectaAppTests/RunLogStaysInMemoryTests noLogLineNamesThem() |
 | `preview-kept-plan-ignores-the-cap.patch` | A drawn page's plan is kept at the run's quality, under the run's cap. | ResectaAppTests/OverlayDrawnPlanTests keptPlanReadsTheCap |
