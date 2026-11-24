@@ -1,0 +1,18 @@
+Property: The Exif segment names the picture's own sides, those of its frame header.
+Area: the box check's own reading of what each page draws
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/BoxCheckDrawingTests (or on the host: cd Packages/RedactionEngine && swift test --filter BoxCheckDrawingTests)
+Must go red: RedactionEngineTests/BoxCheckDrawingTests eachCase [D101: the writer's Exif segment naming sides other than the picture's]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+index 86dc26d9..213c405f 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+@@ -244,7 +244,6 @@ enum PageDrawingReader {
+             guard b[i] == 0xFF else { return .drawingNotRead }
+             let marker = b[i + 1]
+             if marker == 0xDA {
+-                if let e = exifSides, let f = frameSides, e != f { return .unlistedSegment }
+                 if exifSides != nil, frameSides == nil { return .unlistedSegment }
+                 return nil
+             }

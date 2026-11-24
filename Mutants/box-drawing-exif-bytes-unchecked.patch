@@ -1,0 +1,20 @@
+Property: The Exif segment is the writer's in every byte but the picture's sides.
+Area: the box check's own reading of what each page draws
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/BoxCheckDrawingTests (or on the host: cd Packages/RedactionEngine && swift test --filter BoxCheckDrawingTests)
+Must go red: RedactionEngineTests/BoxCheckDrawingTests eachCase [D102: the writer's Exif segment with one byte outside the sides changed]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+index 86dc26d9..376f6195 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+@@ -275,9 +275,6 @@ enum PageDrawingReader {
+     /// other byte.
+     static func writersExifSides(_ body: [UInt8]) -> (width: Int, height: Int)? {
+         guard body.count == writersExif.count else { return nil }
+-        for k in body.indices where !exifWidth.contains(k) && !exifHeight.contains(k) {
+-            guard body[k] == writersExif[k] else { return nil }
+-        }
+         func u32(_ r: Range<Int>) -> Int { r.reduce(0) { $0 << 8 | Int(body[$1]) } }
+         return (u32(exifWidth), u32(exifHeight))
+     }
