@@ -5,21 +5,23 @@ Must go red: RedactionCoreTests/PaintPlanBandTests bandHoldsTheRegion
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
-index d31c2a6d..1a4554df 100644
+index f7fe787b..920ab51f 100644
 --- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
-@@ -280,12 +280,12 @@ private struct Maker {
-                        treatment: outcome, band: false, asDrawn: false)
+@@ -316,14 +316,14 @@ private struct Maker {
+                        treatment: outcome, band: made.inner != tight, asDrawn: false, width: made.width)
          case .band:
              let rows = read?.rows ?? []
 -            let band = self.band(tight: tight, rows: rows)
 +            let band = self.band(tight: letters.first.map { first in letters.reduce(first) { $0.union($1) } } ?? tight, rows: rows)
-             let off = marginPaint(inner: tight, rows: rows)
+             // "Widened" compares with the paint the switch-off row gives:
+             // the default band where it is taken, else the line margin.
+             let off = defaultPaint(tight: tight, rows: rows, regions: regions.map(\.rect), letters: letters)
              // The one place a band is made: it must hold every covered region
              // and every selected letter, or the box falls back.
              let holds = regions.allSatisfy { band.contains($0.rect) } && letters.allSatisfy { band.contains($0) }
 -            guard holds else {
 +            guard holds || true else {
                  if regions.allSatisfy({ tight.contains($0.rect) }) && letters.allSatisfy({ tight.contains($0) }) {
-                     return box(inner: tight, paint: off.paint, tight: tight, above: off.above, below: off.below,
-                                treatment: .fellBack, band: false, asDrawn: false)
+                     let margin = marginPaint(inner: tight, rows: rows)
+                     return box(inner: tight, paint: margin.paint, tight: tight, above: margin.above, below: margin.below,

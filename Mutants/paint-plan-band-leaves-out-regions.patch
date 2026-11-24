@@ -2,18 +2,16 @@ Property: A band is made from the tight rectangle, which holds every covered reg
 Area: the plan, the containment check
 Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/PaintPlanBandTests (or on the host: cd Packages/RedactionEngine && swift test --filter 'PaintPlanBandTests')
 Must go red: RedactionCoreTests/PaintPlanBandTests bandHoldsTheRegion
-Apply in a scratch worktree with `git apply`; discard after.
-
-diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
-index d31c2a6d..b4938fe0 100644
+Apply in a scratch worktree with `git apply`; discard after.diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+index f7fe787b..096229af 100644
 --- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
-@@ -280,7 +280,7 @@ private struct Maker {
-                        treatment: outcome, band: false, asDrawn: false)
+@@ -316,7 +316,7 @@ private struct Maker {
+                        treatment: outcome, band: made.inner != tight, asDrawn: false, width: made.width)
          case .band:
              let rows = read?.rows ?? []
 -            let band = self.band(tight: tight, rows: rows)
 +            let band = self.band(tight: letters.first.map { first in letters.reduce(first) { $0.union($1) } } ?? tight, rows: rows)
-             let off = marginPaint(inner: tight, rows: rows)
-             // The one place a band is made: it must hold every covered region
-             // and every selected letter, or the box falls back.
+             // "Widened" compares with the paint the switch-off row gives:
+             // the default band where it is taken, else the line margin.
+             let off = defaultPaint(tight: tight, rows: rows, regions: regions.map(\.rect), letters: letters)
