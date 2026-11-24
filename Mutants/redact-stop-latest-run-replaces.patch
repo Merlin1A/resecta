@@ -1,7 +1,7 @@
 Property: A unit's account at the stop joins every run that covers it, so a later run does not undo what an earlier one read.
 Area: the stop at Redact
 Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/RedactStopTests
-Must go red: ResectaAppTests/RedactStopTests k733k736
+Must go red: ResectaAppTests/RedactStopTests readThenStopped
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/State/RedactStop.swift b/Sources/ResectaApp/State/RedactStop.swift

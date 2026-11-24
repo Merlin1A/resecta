@@ -1,7 +1,7 @@
 Property: Search These Pages re-runs at once every typed text of the group that can share one run.
 Area: the stop at Redact
 Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/RedactStopGroupsTests
-Must go red: ResectaAppTests/RedactStopGroupsTests k720
+Must go red: ResectaAppTests/RedactStopGroupsTests oneGroupNoName
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/State/RedactStop+Groups.swift b/Sources/ResectaApp/State/RedactStop+Groups.swift

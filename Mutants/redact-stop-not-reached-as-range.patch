@@ -1,7 +1,7 @@
 Property: At the stop, not reached is the pages still not reached after the join, as a list; never every page after the latest stop.
 Area: the stop at Redact
 Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/RedactStopTests -only-testing:ResectaAppTests/RedactStopGroupsTests
-Must go red: ResectaAppTests/RedactStopTests k733k736; ResectaAppTests/RedactStopGroupsTests k727
+Must go red: ResectaAppTests/RedactStopTests readThenStopped; ResectaAppTests/RedactStopGroupsTests sharedRerunAtLimit
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/State/RedactStop.swift b/Sources/ResectaApp/State/RedactStop.swift

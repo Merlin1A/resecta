@@ -35,7 +35,7 @@ struct RedactStopGroupsTests {
     }
 
     @Test("Two Text searches with default options, recognition off on pages 3, 5 and 9: one group, no name; the button runs one terms search holding both, recognition on")
-    func k720() throws {
+    func oneGroupNoName() throws {
         let runs: [RedactStop.Run] = [(Self.text("Delia"), Self.unread), (Self.text("Rourke"), Self.unread)]
         let groups = RedactStop.groups(runs: runs, answered: [])
         #expect(groups == [RedactStop.Group(reason: .line(.recognitionOff), units: nil, pages: [2, 4, 8])])
@@ -47,7 +47,7 @@ struct RedactStopGroupsTests {
     }
 
     @Test("A Text search and a Pattern: the button re-runs the Text search; the next showing names the pattern by its text, and the button re-runs it")
-    func k721() throws {
+    func textAndPattern() throws {
         let pattern = AppliedSearchQuery(kind: .regex("[0-9]{3}-[0-9]{4}"), options: SearchOptions())
         let runs: [RedactStop.Run] = [(Self.text("Delia"), Self.unread), (pattern, Self.unread)]
         let first = RedactStop.groups(runs: runs, answered: [])
@@ -61,7 +61,7 @@ struct RedactStopGroupsTests {
     }
 
     @Test("Two Text searches, one case-sensitive: the button re-runs one; the second showing names the one left")
-    func k723() throws {
+    func caseSensitivePair() throws {
         let strict = SearchOptions(caseSensitive: true)
         let runs: [RedactStop.Run] = [(Self.text("Delia"), Self.unread), (Self.text("Rourke", strict), Self.unread)]
         let first = RedactStop.groups(runs: runs, answered: [])
@@ -72,7 +72,7 @@ struct RedactStopGroupsTests {
     }
 
     @Test("One text unread on pages 3, 5 and 9, another on page 5 only: page 5 with no name; pages 3 and 9 naming the first")
-    func k724() {
+    func groupsByText() {
         let onlyFive = Self.account((0..<10).map { $0 == 4 ? [] : [.ownText] }, off: [4])
         let runs: [RedactStop.Run] = [(Self.text("Delia"), Self.unread), (Self.text("Rourke"), onlyFive)]
         #expect(RedactStop.groups(runs: runs, answered: []) == [
@@ -97,7 +97,7 @@ struct RedactStopGroupsTests {
     }
 
     @Test("The shared re-run reaches the limit on page 5: page 5 in part, the scanned pages after it not reached as a list, no button")
-    func k727() {
+    func sharedRerunAtLimit() {
         let pages = 12, scanned: Set<Int> = [2, 4, 8, 11]
         let first = Self.account((0..<pages).map { scanned.contains($0) ? [] : [.ownText] }, off: scanned)
         let rerun = Self.account((0..<pages).map { $0 > 4 ? [] : scanned.contains($0) ? [.recognised] : [.ownText] },
@@ -111,7 +111,7 @@ struct RedactStopGroupsTests {
     }
 
     @Test("The same text with Whole Word off and on: one group, no name; the button re-runs the Whole Word off unit")
-    func k728() throws {
+    func wholeWordOffAndOn() throws {
         let loose = SearchOptions(wholeWord: false), strict = SearchOptions(wholeWord: true)
         let runs: [RedactStop.Run] = [(Self.text("Hartwell", strict), Self.unread), (Self.text("Hartwell", loose), Self.unread)]
         let groups = RedactStop.groups(runs: runs, answered: [])
@@ -121,7 +121,7 @@ struct RedactStopGroupsTests {
     }
 
     @Test("The same text where neither covers the other: the button re-runs one; the next showing names the text with the options that differ")
-    func k729() throws {
+    func neitherCoversRerunsOne() throws {
         let one = SearchOptions(caseSensitive: true, foldDiacritics: true)
         let two = SearchOptions(caseSensitive: false, foldDiacritics: false)
         let runs: [RedactStop.Run] = [(Self.text("Hartwell", one), Self.unread), (Self.text("Hartwell", two), Self.unread)]
@@ -137,7 +137,7 @@ struct RedactStopGroupsTests {
     }
 
     @Test("The user's all-terms option on: the button's run is any term, and the user's setting is left as it was")
-    func k732() throws {
+    func allTermsOption() throws {
         let allTerms = SearchOptions(multiTermConjunction: true)
         let runs: [RedactStop.Run] = [(Self.text("Delia", allTerms), Self.unread), (Self.text("Rourke", allTerms), Self.unread)]
         let groups = RedactStop.groups(runs: runs, answered: [])
