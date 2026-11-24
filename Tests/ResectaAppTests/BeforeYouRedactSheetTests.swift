@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 import SwiftUI
+import RedactionEngine
 @testable import ResectaApp
 
 // The stop at Redact's sheet: its choices, what each answer does, when the

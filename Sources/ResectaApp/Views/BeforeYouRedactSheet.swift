@@ -1,4 +1,5 @@
 import SwiftUI
+import RedactionEngine
 
 // The stop at Redact: one sheet, raised when pages a search did not read
 // are not yet answered for. It draws the list the state gives it and the
