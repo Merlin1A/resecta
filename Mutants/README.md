@@ -723,4 +723,9 @@ with its reason and the mutant that is caught in its place.
 | `redact-stop-button-latest-only.patch` | Search These Pages re-runs at once every typed text of the group that can share one run. | ResectaAppTests/RedactStopGroupsTests k720 |
 | `redact-stop-rerun-inherits-all-terms.patch` | The button's run lets any term match, whatever the user's all-terms setting. | ResectaAppTests/RedactStopGroupsTests k720; ResectaAppTests/RedactStopGroupsTests k732 |
 | `redact-stop-not-reached-as-range.patch` | At the stop, not reached is the pages still not reached after the join, as a list; never every page after the latest stop. | ResectaAppTests/RedactStopTests k733k736; ResectaAppTests/RedactStopGroupsTests k727 |
+| `redact-stop-applied-only.patch` | Every search run since the document opened counts at the stop, applied or not. | ResectaAppTests/SearchRunLogTests closedRunsInOrder; ResectaAppTests/RedactStopRefusalTests answering |
+| `redact-stop-latest-run-replaces.patch` | A unit's account at the stop joins every run that covers it, so a later run does not undo what an earlier one read. | ResectaAppTests/RedactStopTests k733k736 |
+| `redact-stop-pattern-named-by-kind.patch` | A pattern is its own unit, named by its pattern; only a Scan is named by its kind alone. | ResectaAppTests/RedactStopUnitTests kindAndText |
+| `redact-stop-answers-outlive-the-document.patch` | Answers at the stop last while the document is open and are cleared when it closes or another opens. | ResectaAppTests/RedactStopRefusalTests answersLastWhileOpen |
+| `redact-stop-answers-more-than-shown.patch` | Redact Anyway answers the pages the sheet named and no other. | ResectaAppTests/RedactStopRefusalTests answersWhatWasShown |
 | `run-log-named-in-a-log-line.patch` | No log line names the run log, the answered set or their types. | ResectaAppTests/RunLogStaysInMemoryTests noLogLineNamesThem() |

@@ -1,0 +1,19 @@
+Property: A unit's account at the stop joins every run that covers it, so a later run does not undo what an earlier one read.
+Area: the stop at Redact
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/RedactStopTests
+Must go red: ResectaAppTests/RedactStopTests k733k736
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/RedactStop.swift b/Sources/ResectaApp/State/RedactStop.swift
+index fc750ece..4b21b08e 100644
+--- a/Sources/ResectaApp/State/RedactStop.swift
++++ b/Sources/ResectaApp/State/RedactStop.swift
+@@ -40,7 +40,7 @@ enum RedactStop {
+             guard RedactStopUnit.units(of: run.query).contains(where: { $0.covers(unit) }) else { return nil }
+             return unit.kind == .scan ? run.account : run.account.forText(unit.text)
+         }
+-        return SearchAccount.joined(accounts)
++        return SearchAccount.joined(Array(accounts.suffix(1)))
+     }
+ 
+     /// The pages of one account that stop Redact, each with every reason it is named for.

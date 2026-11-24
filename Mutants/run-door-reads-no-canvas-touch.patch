@@ -5,14 +5,15 @@ Must go red: ResectaAppTests/RunDoorHeldTouchTests heldTouchRefusesTheRun
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/State/DocumentState+RedactRefusal.swift b/Sources/ResectaApp/State/DocumentState+RedactRefusal.swift
+index 6ec7bf61..14f173c8 100644
 --- a/Sources/ResectaApp/State/DocumentState+RedactRefusal.swift
 +++ b/Sources/ResectaApp/State/DocumentState+RedactRefusal.swift
-@@ -68,7 +68,7 @@ extension DocumentState {
+@@ -73,7 +73,7 @@ extension DocumentState {
          Self.refusal(
              unappliedSelections: Self.hasUnappliedSelections(redactionState),
              hasRegions: redactionState.hasEffectiveRegions,
 -            canStart: canStartPipeline && !redactionState.canvasHoldsATouch,
 +            canStart: canStartPipeline,
-             pagesNotRead: Self.pagesNotReadReturned
-                 && RedactStop.opens(runs: redactionState.closedSearchRuns, answered: redactionState.redactStopAnswered))
-     }
+             pagesToName: Self.pagesNotReadReturned
+                 ? RedactStop.namedPages(runs: redactionState.closedSearchRuns, answered: redactionState.redactStopAnswered)
+                 : [])
