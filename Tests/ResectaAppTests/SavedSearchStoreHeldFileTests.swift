@@ -202,4 +202,22 @@ struct SavedSearchStoreHeldFileTests {
         #expect(!source.contains("renameError != nil"), "a guard reads the error alone")
         #expect(source.components(separatedBy: "Self.promptReturnOwed(error: renameError, notSaved: renameNotSaved)").count - 1 == 3)
     }
+
+    // MARK: - A write that fails
+
+    @Test("Saved searches: a change whose write fails is not saved and leaves the list as the file has it",
+          arguments: Change.allCases)
+    func failedWrite(_ change: Change) throws {
+        let fileURL = Self.makeScratchFileURL()
+        let folder = fileURL.deletingLastPathComponent()
+        defer { UnreadableFile.unlockFolder(folder); Self.removeScratch(fileURL) }
+        let (stored, _) = try Self.seed(fileURL)
+        let store = SavedSearchStore(fileURL: fileURL, legacyDefaults: Self.makeSuite())
+        let before = store.savedSearches
+        try UnreadableFile.lockFolder(folder)
+
+        #expect(Self.apply(change, to: store, stored: stored) == .notSaved)
+        #expect(store.savedSearches == before)
+        #expect(SavedSearchStore(fileURL: fileURL, legacyDefaults: Self.makeSuite()).savedSearches == before)
+    }
 }

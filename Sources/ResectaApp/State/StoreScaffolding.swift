@@ -12,12 +12,17 @@ nonisolated enum ListChange: Equatable {
     case saved
     /// The change was not made, for this reason.
     case refused(ListRefusal)
-    /// The change was made in memory and its write did not report success.
-    /// No store returns it yet: no write reports its outcome.
+    /// The change passed its checks and its write failed, so it was not
+    /// made: the list is as its file holds it.
     case notSaved
     /// The list's file is there and could not be read, so the store takes
     /// no change until a read succeeds; nothing changed.
     case held
+}
+
+extension ListChange {
+    /// The line a prompt shows when its change was not stored.
+    static let notSavedMessage = "Could not save this change. Try again."
 }
 
 /// Why a change to a saved list was refused.
@@ -87,8 +92,8 @@ nonisolated struct FailableRow<Value: Decodable>: Decodable {
 
 extension FileJSONBlob {
     /// One-shot move of a pre-file `UserDefaults` envelope under `key` into
-    /// this protected file. The key is removed only after the file is
-    /// confirmed on disk, so a failed write retries next launch. Envelope
+    /// this protected file. The key is removed only when the write reports
+    /// that the file holds the list, so a failed write retries next launch. Envelope
     /// shape and schema version are unchanged on both sides; a later launch
     /// sees no key and does nothing.
     nonisolated func migrateLegacyDefaultsIfNeeded(from defaults: UserDefaults, key: String) {
@@ -102,8 +107,7 @@ extension FileJSONBlob {
             defaults: defaults,
             fallback: fallback
         )
-        save(legacy.load())
-        if FileManager.default.fileExists(atPath: fileURL.path) {
+        if save(legacy.load()) {
             defaults.removeObject(forKey: key)
         }
     }

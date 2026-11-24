@@ -476,4 +476,56 @@ struct StoreFileHardeningTests {
         }
         #expect(answer == expected)
     }
+
+    // MARK: - A write that fails
+
+    private static func applyFailing(_ change: TermsChange, to store: UserTermsStore) -> ListChange {
+        switch change {
+        case .addAlways: store.addAlwaysFlag(UserTerm(pattern: "new-term", isRegex: false))
+        case .addNever: store.addNeverFlag(UserTerm(pattern: "new-term", isRegex: false))
+        case .removeAlways: store.removeAlwaysFlag(at: IndexSet(integer: 0))
+        case .removeNever: store.removeNeverFlag(at: IndexSet(integer: 0))
+        case .clearAll: store.clearAllTerms()
+        }
+    }
+
+    private static func applyFailing(_ change: RegexChange, to store: SavedRegexStore) -> ListChange {
+        switch change {
+        case .add: store.add(label: "New", pattern: "[0-9]{6}")
+        case .delete: store.deleteUserSaved(at: IndexSet(integer: 0))
+        case .clearAll: store.clearAllUserSaved()
+        }
+    }
+
+    @Test("Custom terms: a change whose write fails is not saved and leaves the lists as the file has them",
+          arguments: TermsChange.allCases)
+    func termsFailedWrite(_ change: TermsChange) throws {
+        let fileURL = Self.makeScratchFileURL("user-terms.v1.json")
+        let folder = fileURL.deletingLastPathComponent()
+        defer { UnreadableFile.unlockFolder(folder); Self.removeScratch(fileURL) }
+        _ = try Self.seedTerms(fileURL)
+        let store = UserTermsStore(fileURL: fileURL, legacyDefaults: Self.makeSuite())
+        let before = store.blob
+        try UnreadableFile.lockFolder(folder)
+
+        #expect(Self.applyFailing(change, to: store) == .notSaved)
+        #expect(store.blob == before)
+        #expect(UserTermsStore(fileURL: fileURL, legacyDefaults: Self.makeSuite()).blob == before)
+    }
+
+    @Test("Saved patterns: a change whose write fails is not saved and leaves the list as the file has it",
+          arguments: RegexChange.allCases)
+    func regexesFailedWrite(_ change: RegexChange) throws {
+        let fileURL = Self.makeScratchFileURL("saved-regexes.v1.json")
+        let folder = fileURL.deletingLastPathComponent()
+        defer { UnreadableFile.unlockFolder(folder); Self.removeScratch(fileURL) }
+        _ = try Self.seedRegexes(fileURL)
+        let store = SavedRegexStore(fileURL: fileURL, legacyDefaults: Self.makeSuite())
+        let before = store.userSavedRegexes
+        try UnreadableFile.lockFolder(folder)
+
+        #expect(Self.applyFailing(change, to: store) == .notSaved)
+        #expect(store.userSavedRegexes == before)
+        #expect(SavedRegexStore(fileURL: fileURL, legacyDefaults: Self.makeSuite()).userSavedRegexes == before)
+    }
 }

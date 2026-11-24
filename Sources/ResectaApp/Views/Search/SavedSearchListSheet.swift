@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import RedactionEngine
 
 // Saved-searches recall UI. The store
@@ -143,6 +144,7 @@ struct SavedSearchListSheet: View {
                         // the binding.
                         if #available(iOS 27, *) { renameTarget = nil }
                     case .notSaved?, .held?:
+                        renameError = ListChange.notSavedMessage
                         renameNotSaved = true
                         renameRetryTarget = search
                         if #available(iOS 27, *) { renameTarget = nil }
@@ -189,6 +191,7 @@ struct SavedSearchListSheet: View {
                         // dismissal back through the binding.
                         if #available(iOS 27, *) { showSavePrompt = false }
                     case .notSaved, .held:
+                        savePromptError = ListChange.notSavedMessage
                         savePromptNotSaved = true
                         if #available(iOS 27, *) { showSavePrompt = false }
                     }
@@ -218,7 +221,7 @@ struct SavedSearchListSheet: View {
                 presenting: deleteTarget
             ) { search in
                 Button("Delete", role: .destructive) {
-                    savedSearchStore.remove(id: search.id)
+                    if savedSearchStore.remove(id: search.id) != .saved { Self.reportNotSaved(toastManager) }
                     deleteTarget = nil
                 }
                 Button("Cancel", role: .cancel) { deleteTarget = nil }
@@ -237,7 +240,7 @@ struct SavedSearchListSheet: View {
                 titleVisibility: .visible
             ) {
                 Button("Delete All", role: .destructive) {
-                    savedSearchStore.clearAll(interface: activeInterface)
+                    if savedSearchStore.clearAll(interface: activeInterface) != .saved { Self.reportNotSaved(toastManager) }
                 }
                 .accessibilityIdentifier("savedSearchClearAllConfirm")
                 Button("Cancel", role: .cancel) { }
@@ -287,6 +290,13 @@ struct SavedSearchListSheet: View {
         .messageHost(toastManager, place: .otherSheet)
         .shieldedSheetContent(monitor: captureMonitor)
         .presentationBackground(.regularMaterial)
+    }
+
+    /// A delete this list did not store: the row stays. The list has no line
+    /// to show it on, so the buzz plays and the message queue speaks the line.
+    static func reportNotSaved(_ messages: ToastQueueManager) {
+        UINotificationFeedbackGenerator().notificationOccurred(.error)
+        messages.announce(ListChange.notSavedMessage)
     }
 
     /// Whether a prompt that has closed is shown again: when a refusal left
