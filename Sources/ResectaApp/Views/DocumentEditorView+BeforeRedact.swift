@@ -33,7 +33,10 @@ extension DocumentEditorView {
         switch answer {
         case .redactAnyway:
             coordinator.answerPagesNotReadAndRun(documentOverride: documentOverride)
-        case .searchThesePages, .cancel, .swipedDown:
+        case .searchThesePages(let query):
+            coordinator.cancelRefusalAwaitingAnswer()
+            redactionState.activeSearch = SearchState.reRunSession(for: query)
+        case .cancel, .swipedDown:
             coordinator.cancelRefusalAwaitingAnswer()
         case .goToPage(let page):
             coordinator.cancelRefusalAwaitingAnswer()
@@ -41,11 +44,25 @@ extension DocumentEditorView {
         }
     }
 
-    /// The view half of an answer. A run or a new Search drops the session
-    /// parked for the stop; the other answers leave it for the hand-off.
+    /// Only a run drops the Search session parked for the stop. Search These
+    /// Pages keeps it: the session parked is the user's own, with its terms
+    /// and any results not yet applied, and it comes back once the re-run's
+    /// session is down.
+    static func stopAnswerDropsParkedSearch(_ answer: BeforeYouRedactAnswer) -> Bool {
+        BeforeYouRedactSheet.effects(of: answer).entersRun
+    }
+
+    /// The session the stop parked comes back when the slot is free: no
+    /// Search up (the re-run's session holds it until it closes), and neither
+    /// Home's dialog nor Settings waiting to take it.
+    static func handOffRestores(stopParkedSearch: Bool, searchUp: Bool,
+                                homeWaits: Bool, settingsWaits: Bool) -> Bool {
+        stopParkedSearch && !searchUp && !homeWaits && !settingsWaits
+    }
+
+    /// The view half of an answer; see `stopAnswerDropsParkedSearch`.
     func answerStop(_ answer: BeforeYouRedactAnswer) {
-        let effects = BeforeYouRedactSheet.effects(of: answer)
-        if effects.entersRun || effects.opensSearch, let parked = parkedEditorSearch, stopParkedSearch {
+        if Self.stopAnswerDropsParkedSearch(answer), let parked = parkedEditorSearch, stopParkedSearch {
             stopParkedSearch = false
             parkedEditorSearch = nil
             parked.parkedForHomeClose = false
@@ -63,10 +80,12 @@ extension DocumentEditorView {
         stopParkedSearch = true
     }
 
-    /// The stop went down without a run: the session it parked comes back,
-    /// unless Home's dialog or Settings is waiting to take the slot.
+    /// The stop went down without a run, or the re-run's session closed: the
+    /// session the stop parked comes back when `handOffRestores` says so.
     func handOffAfterStop() {
-        guard stopParkedSearch, !homeCloseAwaitsSheetDismissal, !settingsAwaitsSheetDismissal else { return }
+        guard Self.handOffRestores(stopParkedSearch: stopParkedSearch, searchUp: redactionState.activeSearch != nil,
+                                   homeWaits: homeCloseAwaitsSheetDismissal,
+                                   settingsWaits: settingsAwaitsSheetDismissal) else { return }
         stopParkedSearch = false
         restoreParkedSearchIfNeeded()
     }

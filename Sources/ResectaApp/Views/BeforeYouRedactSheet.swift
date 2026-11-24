@@ -7,7 +7,8 @@ import SwiftUI
 /// An answer to the stop at Redact.
 enum BeforeYouRedactAnswer: Equatable {
     case redactAnyway
-    case searchThesePages
+    /// The re-run of a group the sheet shows, as the state gave it.
+    case searchThesePages(AppliedSearchQuery)
     case cancel
     /// The sheet swiped down: the same as Cancel.
     case swipedDown
@@ -100,7 +101,8 @@ struct BeforeYouRedactSheet: View {
     // MARK: - The view
 
     let content: NotSearchedListContent
-    let offersSearchThesePages: Bool
+    /// The run Search These Pages starts; nil when the sheet offers none.
+    let reRun: AppliedSearchQuery?
     let captureMonitor: ScreenCaptureMonitor
     let onAnswer: (BeforeYouRedactAnswer) -> Void
 
@@ -126,7 +128,7 @@ struct BeforeYouRedactSheet: View {
                     NotSearchedList(content: content, showsHeader: true, goToPage: { onAnswer(.goToPage($0)) })
                         .padding(.top, 16)
                     VStack(spacing: 10) {
-                        ForEach(Self.choices(offersSearchThesePages: offersSearchThesePages), id: \.capsule) { choice in
+                        ForEach(Self.choices(offersSearchThesePages: reRun != nil), id: \.capsule) { choice in
                             capsuleButton(choice)
                         }
                     }
@@ -156,7 +158,7 @@ struct BeforeYouRedactSheet: View {
         switch choice.capsule {
         case .searchThesePages:
             capsule(Self.searchThesePagesTitle, style: choice.style, identifier: "beforeYouRedactSearchThesePages") {
-                onAnswer(.searchThesePages)
+                if let reRun { onAnswer(.searchThesePages(reRun)) }
             }
         case .redactAnyway:
             VStack(spacing: 0) {
