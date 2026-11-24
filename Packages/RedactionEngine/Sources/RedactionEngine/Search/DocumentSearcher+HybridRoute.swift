@@ -25,12 +25,12 @@ extension DocumentSearcher {
         reportsWhenOff: Bool = true, ocr: () async -> [SearchResult]
     ) async -> [SearchResult] {
         guard PageImageCensus.carriesImageContent(page) else {
-            if let sink = pageCoverageSink, let cgPage = page.pageRef, PageImageCensus.largestImagePixelArea(of: cgPage) != nil {
+            if let sink = Self.walkCoverageSink, let cgPage = page.pageRef, PageImageCensus.largestImagePixelArea(of: cgPage) != nil {
                 sink(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer, pictures: .belowFloors))
             }
             return []
         }
-        if let sink = pageCoverageSink {
+        if let sink = Self.walkCoverageSink {
             let reason = page.pageRef.flatMap { Self.fitReason(page, cgPage: $0) }
             sink(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer, pictures: .required,
                                     throughAnotherAppsLayer: reason == .anotherAppsText,

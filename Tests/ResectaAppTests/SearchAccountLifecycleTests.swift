@@ -198,6 +198,45 @@ struct SearchAccountLifecycleTests {
         #expect(account?.pages(for: .notReached) == [6, 7, 8, 9])
     }
 
+    /// Run one, replaced unapplied, then run two with its account open.
+    static func replacedByASecondRun(_ store: Store) -> (search: SearchState, old: Int, new: Int) {
+        let (search, old) = Self.running(store)
+        search.closeAccount(.replaced)
+        let new = search.beginRun()
+        search.beginAccount(run: new, pageCount: 10)
+        return (search, old, new)
+    }
+
+    @Test("A replaced run's late recognised report does not read the new run's pictures: page 3 stays pictures not read")
+    func oldRecognisedReportOnTheNewRun() throws {
+        let store = Store()
+        let (search, old, new) = Self.replacedByASecondRun(store)
+        for page in 0..<10 where page != 2 {
+            search.recordCoverage(PageSearchCoverage(pageIndex: page, route: .textLayer), run: new)
+        }
+        search.recordCoverage(PageSearchCoverage(pageIndex: 2, route: .textLayer, pictures: .required), run: new)
+        search.recordCoverage(PageSearchCoverage(pageIndex: 2, route: .ocr), run: old)
+        search.closeAccount(.completed, run: new)
+        let account = try #require(Self.only(store))
+        #expect(account.pages(for: .picturesNotRead(.notReported)) == [2])
+        #expect(account.pagesThatStopRedact == [2])
+    }
+
+    @Test("A replaced run's late report past the new run's stop does not read it: page 8 stays not reached")
+    func oldReportPastTheNewStop() async throws {
+        let store = Store()
+        let (search, old, new) = Self.replacedByASecondRun(store)
+        for page in 0..<4 {
+            search.recordCoverage(PageSearchCoverage(pageIndex: page, route: .textLayer), run: new)
+        }
+        search.currentSearchPage = 5
+        await search.cancelSearch()
+        search.recordCoverage(PageSearchCoverage(pageIndex: 7, route: .textLayer), run: old)
+        let account = try #require(Self.only(store))
+        #expect(account.ending == .stopped(page: 4))
+        #expect(account.pages(for: .notReached) == [5, 6, 7, 8, 9])
+    }
+
     @Test("A pattern the engine refuses at the start: no result is cleared, so the run's tail closes it completed with no page read")
     func refusedPattern() {
         let store = Store()

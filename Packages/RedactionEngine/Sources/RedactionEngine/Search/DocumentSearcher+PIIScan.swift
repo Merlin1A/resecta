@@ -29,14 +29,14 @@ extension DocumentSearcher {
             progress(pageIndex + 1, pageCount)
 
             guard let page = doc.page(at: pageIndex) else {
-                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .unopenable))
+                Self.walkCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .unopenable))
                 continue
             }
             let pageText = page.string ?? ""
 
             if !pageText.isEmpty && pageHasRichTextLayer(pageIndex) {
                 // Text-layer path: PIIDetector on the extracted text, then NSRange → bounding rect via PDFKit selection.
-                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer))
+                Self.walkCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer))
                 var rawMatches = await afterInkFitRead(page, await piiDetector.detect(in: pageText, categories: categories))
                 // Spatial address assembly on the text leg. The line
                 // records come from `EmbeddedTextSource.make` — the SAME
