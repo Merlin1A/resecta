@@ -1,0 +1,18 @@
+Property: The field where a search term is added has the keyboard's correction off, so the term searched is the term typed.
+Area: typing fields (Search)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/TypingFieldCorrectionTests
+Must go red: ResectaAppTests/TypingFieldCorrectionTests "A term, pattern or name field has autocorrection disabled"
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/Search/SearchAndRedactSheet+SearchBar.swift b/Sources/ResectaApp/Views/Search/SearchAndRedactSheet+SearchBar.swift
+index c122ed31..2e3a9aa8 100644
+--- a/Sources/ResectaApp/Views/Search/SearchAndRedactSheet+SearchBar.swift
++++ b/Sources/ResectaApp/Views/Search/SearchAndRedactSheet+SearchBar.swift
+@@ -31,7 +31,6 @@ extension SearchAndRedactSheet {
+                     // rewrite case-sensitive terms and autocorrect can
+                     // silently replace the typed term before it runs.
+                     .textInputAutocapitalization(.never)
+-                    .autocorrectionDisabled()
+                     .focused($isSearchFieldFocused)
+                     .onSubmit {
+                         // Route every multi-term submission

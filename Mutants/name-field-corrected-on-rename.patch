@@ -1,0 +1,18 @@
+Property: The field where a saved search is renamed has the keyboard's correction off, so the name saved is the name typed.
+Area: typing fields (Search)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/TypingFieldCorrectionTests
+Must go red: ResectaAppTests/TypingFieldCorrectionTests "A term, pattern or name field has autocorrection disabled"
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/Search/SavedSearchListSheet.swift b/Sources/ResectaApp/Views/Search/SavedSearchListSheet.swift
+index 4867ecfb..d4cb825f 100644
+--- a/Sources/ResectaApp/Views/Search/SavedSearchListSheet.swift
++++ b/Sources/ResectaApp/Views/Search/SavedSearchListSheet.swift
+@@ -126,7 +126,6 @@ struct SavedSearchListSheet: View {
+                 set: { if !$0 { renameTarget = nil } }
+             ), presenting: renameTarget) { search in
+                 TextField("Name", text: $renameText)
+-                    .autocorrectionDisabled(true)
+                 Button("Rename") {
+                     let trimmed = renameText.trimmingCharacters(in: .whitespaces)
+                     switch trimmed.isEmpty ? nil : savedSearchStore.rename(id: search.id, to: trimmed) {
