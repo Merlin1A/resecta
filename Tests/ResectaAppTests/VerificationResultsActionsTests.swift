@@ -270,6 +270,36 @@ struct VerificationResultsActionsTests {
         #expect(VerificationMasthead.ringContent(report: Self.report(.info("i"))) == .count(passed: 0, total: 0, tone: .pass))
     }
 
+    @Test("The ring of a result that no longer stands: the same count, its arc in the caption grey; a run whose checks did not run keeps its slot")
+    func ringWhenTheResultDoesNotStand() {
+        let states: [(name: String, outputExists: Bool, isStale: Bool)] = [
+            ("standing", true, false), ("boxes changed", true, true), ("PDF gone", false, false), ("both", false, true),
+        ]
+        #expect(Fixtures.all.count == 18)
+        var rows = 0
+        for (name, report) in Fixtures.all.sorted(by: { $0.key < $1.key }) {
+            let today = VerificationMasthead.ringContent(report: report)
+            for state in states {
+                let shown = VerificationMasthead.ringContent(
+                    report: report, outputExists: state.outputExists, isStale: state.isStale)
+                rows += 1
+                switch today {
+                case .skipped:
+                    #expect(shown == .skipped, "\(name), \(state.name)")
+                case let .count(passed, total, tone):
+                    #expect(tone != .noLongerStands, "\(name): a standing ring keeps its verdict's tone")
+                    let stands = state.outputExists && !state.isStale
+                    #expect(shown == (stands ? today : .count(passed: passed, total: total, tone: .noLongerStands)),
+                            "\(name), \(state.name)")
+                case .running:
+                    Issue.record("\(name): a report's ring is never the running one")
+                }
+            }
+        }
+        #expect(rows == 18 * 4)
+        #expect(CountRing.arcColor(.noLongerStands) == ResectaTokens.SemanticColor.supportText)
+    }
+
     @Test("The figure is 22 pt below ten checks and 20 pt from ten; the arc is P over T")
     func ringMetrics() {
         #expect(CountRing.figureSize(total: 7) == 22)
