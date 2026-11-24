@@ -26,9 +26,19 @@ import RedactionEngine
 ///   report's first `finished` rows finished and the next one running. A
 ///   count that leaves no row running stops the launch, naming the count
 ///   and the report's rows.
+/// - `--seedBurnedBoxes=<n>`: the run's inputs record `n` burned boxes on
+///   page 1.
+/// - `--seedOutputBytes=<n>`: the run's inputs record an output of `n`
+///   bytes; its line shows only beside `--seedOutput`.
+/// - `--seedSecurePages=<n>`: the run's inputs record `n` Secure
+///   Rasterization pages in place of the report's own.
+/// - `--seedUnread=<k>/<m>`: the run's inputs record pages 1 to `k` as named
+///   by the stop at Redact and pages 1 to `m` as small pictures only (each
+///   from 0, not both 0).
 ///
-/// Honest limits: hand boxes, form values, the left items and the applied
-/// search are put into state directly; they show how the screen reads
+/// Honest limits: hand boxes, form values, the left items, the applied
+/// search, the burned boxes, the output's size, the pages and the unread
+/// pages are put into state directly; they show how the screen reads
 /// those values, not that a real run produces them. The covered text and
 /// the changed boxes go through real steps: an annotation constructed here
 /// that the shipped derivation reads, and a box added by the state's own
@@ -46,6 +56,11 @@ nonisolated struct DebugSeedOptions: Equatable, Sendable {
         let total: Int
     }
 
+    struct Unread: Equatable {
+        let notInFull: Int
+        let smallPictures: Int
+    }
+
     var handBoxes: Int?
     var formValues: Int?
     var coveredText = false
@@ -53,6 +68,10 @@ nonisolated struct DebugSeedOptions: Equatable, Sendable {
     var appliedSearch: AppliedSearchKind?
     var boxesChanged = false
     var verifyingFinished: Int?
+    var burnedBoxes: Int?
+    var outputBytes: Int?
+    var securePages: Int?
+    var unread: Unread?
 
     /// The options in `arguments`. The first occurrence of each argument
     /// counts; a value that is not of its form seeds nothing.
@@ -71,6 +90,10 @@ nonisolated struct DebugSeedOptions: Equatable, Sendable {
         }
         options.boxesChanged = arguments.contains("--seedBoxesChanged")
         options.verifyingFinished = value(of: "--seedVerifying=", in: arguments).flatMap(nonNegative)
+        options.burnedBoxes = value(of: "--seedBurnedBoxes=", in: arguments).flatMap(positive)
+        options.outputBytes = value(of: "--seedOutputBytes=", in: arguments).flatMap(positive)
+        options.securePages = value(of: "--seedSecurePages=", in: arguments).flatMap(positive)
+        options.unread = value(of: "--seedUnread=", in: arguments).flatMap(unread)
         return options
     }
 
@@ -93,6 +116,13 @@ nonisolated struct DebugSeedOptions: Equatable, Sendable {
         guard parts.count == 2, let left = positive(String(parts[0])),
               let total = positive(String(parts[1])), left <= total else { return nil }
         return Left(left: left, total: total)
+    }
+
+    private static func unread(_ raw: String) -> Unread? {
+        let parts = raw.split(separator: "/", omittingEmptySubsequences: false)
+        guard parts.count == 2, let notInFull = nonNegative(String(parts[0])),
+              let smallPictures = nonNegative(String(parts[1])), notInFull + smallPictures > 0 else { return nil }
+        return Unread(notInFull: notInFull, smallPictures: smallPictures)
     }
 }
 
@@ -130,6 +160,34 @@ extension DebugSeedOptions {
                          matchedText: "item", contextSnippet: "item", source: .textLayer, term: "item")
         }
         return RedactionState.DeselectionSnapshot(items: items, totalCount: left.total)
+    }
+
+    /// The run's page modes: `securePages` Secure Rasterization pages, or the
+    /// report's own.
+    func pageModes(_ own: [PipelineMode]) -> [PipelineMode] {
+        securePages.map { Array(repeating: .secureRasterization, count: $0) } ?? own
+    }
+
+    /// The run's fallback reasons, beside `pageModes`: none on seeded pages.
+    func fallbackReasons(_ own: [TextLayerDetector.FallbackReason?]) -> [TextLayerDetector.FallbackReason?] {
+        securePages.map { Array(repeating: nil, count: $0) } ?? own
+    }
+
+    /// `inputs` with the seeded burned boxes, output size and unread pages.
+    func withRunLineFacts(_ inputs: RedactionState.LastRunInputs) -> RedactionState.LastRunInputs {
+        var inputs = inputs
+        if let burnedBoxes {
+            inputs.burnedRegions = [0: (0..<burnedBoxes).map { index in
+                RedactionRegion(id: UUID(), normalizedRect: CGRect(
+                    x: 0.1, y: 0.1 + 0.05 * Double(index % 10), width: 0.2, height: 0.03), source: .manual)
+            }]
+        }
+        if let outputBytes { inputs.outputBytes = Int64(outputBytes) }
+        if let unread {
+            inputs.pagesNotSearchedInFull = Set(0..<unread.notInFull)
+            inputs.smallPicturePages = Set(0..<unread.smallPictures)
+        }
+        return inputs
     }
 
     /// The box `--seedBoxesChanged` adds: a small hand-drawn box near the

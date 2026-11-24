@@ -49,6 +49,16 @@ struct DebugSeedOptionsTests {
              expected: options { $0.verifyingFinished = 0 }),
         Case(name: "verifying with two finished", arguments: [report, "--seedVerifying=2"],
              expected: options { $0.verifyingFinished = 2 }),
+        Case(name: "burned boxes", arguments: [report, "--seedBurnedBoxes=19"],
+             expected: options { $0.burnedBoxes = 19 }),
+        Case(name: "the output's size", arguments: [report, "--seedOutput", "--seedOutputBytes=38200000"],
+             expected: options { $0.outputBytes = 38_200_000 }),
+        Case(name: "Secure pages", arguments: [report, "--seedSecurePages=140"],
+             expected: options { $0.securePages = 140 }),
+        Case(name: "unread pages, both counts", arguments: [report, "--seedUnread=12/38"],
+             expected: options { $0.unread = .init(notInFull: 12, smallPictures: 38) }),
+        Case(name: "unread pages, small pictures only", arguments: [report, "--seedUnread=0/1"],
+             expected: options { $0.unread = .init(notInFull: 0, smallPictures: 1) }),
         Case(name: "all seven together",
              arguments: [report, "--seedOutput", "--seedHandBoxes=1", "--seedFormValues=4", "--seedCoveredText",
                          "--seedLeft=1/1", "--seedAppliedSearch=scan", "--seedBoxesChanged", "--seedVerifying=3"],
@@ -69,13 +79,20 @@ struct DebugSeedOptionsTests {
              expected: DebugSeedOptions()),
         Case(name: "verifying not a number", arguments: [report, "--seedVerifying=x"], expected: DebugSeedOptions()),
         Case(name: "verifying negative", arguments: [report, "--seedVerifying=-1"], expected: DebugSeedOptions()),
+        Case(name: "burned boxes zero", arguments: [report, "--seedBurnedBoxes=0"], expected: DebugSeedOptions()),
+        Case(name: "the output's size not a number", arguments: [report, "--seedOutputBytes=big"],
+             expected: DebugSeedOptions()),
+        Case(name: "Secure pages zero", arguments: [report, "--seedSecurePages=0"], expected: DebugSeedOptions()),
+        Case(name: "unread pages both zero", arguments: [report, "--seedUnread=0/0"], expected: DebugSeedOptions()),
+        Case(name: "unread pages without a second count", arguments: [report, "--seedUnread=3"],
+             expected: DebugSeedOptions()),
         Case(name: "a malformed seed leaves the others",
              arguments: [report, "--seedHandBoxes=x", "--seedFormValues=2", "--seedLeft=5", "--seedCoveredText"],
              expected: options { $0.formValues = 2; $0.coveredText = true }),
     ]
 
     @Test("The table's length is pinned")
-    func tableLength() { #expect(Self.cases.count == 25) }
+    func tableLength() { #expect(Self.cases.count == 35) }
 
     @Test("Each argument seeds its one option; a malformed value seeds nothing", arguments: cases)
     func parsesEachSeedAndIgnoresMalformedOnes(_ c: Case) {
@@ -106,12 +123,13 @@ struct DebugSeedOptionsTests {
 
     // MARK: - Debug builds only
 
-    /// The seeds' own names: the options type and its seven arguments.
+    /// The seeds' own names: the options type and its eleven arguments.
     /// (`--seedVerifiedReport` and `--seedOutput` are the hook's older
     /// arguments and are not pinned here.)
     nonisolated static let seedNames = [
         "DebugSeedOptions", "--seedHandBoxes", "--seedFormValues", "--seedCoveredText", "--seedLeft",
-        "--seedAppliedSearch", "--seedBoxesChanged", "--seedVerifying",
+        "--seedAppliedSearch", "--seedBoxesChanged", "--seedVerifying", "--seedBurnedBoxes", "--seedOutputBytes",
+        "--seedSecurePages", "--seedUnread",
     ]
 
     /// Every code line of the app's sources that names a seed lies inside

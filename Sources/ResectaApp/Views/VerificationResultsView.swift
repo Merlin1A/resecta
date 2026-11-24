@@ -40,14 +40,14 @@ struct VerificationResultsView: View {
     var onRunVerification: () -> Void
     /// Deselection facts captured at run entry
     /// (`RedactionState.LastRunInputs.deselection`), threaded in like
-    /// `previewAvailable` since this view does not inject RedactionState.
-    /// Nil (also the default, so fixture call sites stay source-compatible)
+    /// `previewAvailable`: a fact recorded with the output, never read live
+    /// from the RedactionState this view also holds. Nil (also the default, so fixture call sites stay source-compatible)
     /// or zero deselections renders no row.
     var deselectionSnapshot: RedactionState.DeselectionSnapshot? = nil
-    /// Pre-derived run facts for the run-facts strip.
-    /// This view injects no RedactionState (mirrors
-    /// `deselectionSnapshot`/`previewAvailable`); `DocumentEditorView`
-    /// builds this via the pure `RunFacts.derive(...)` static func.
+    /// Pre-derived run facts for the run-facts strip, recorded with the
+    /// output (mirrors `deselectionSnapshot`/`previewAvailable`), never read
+    /// live from RedactionState; `DocumentEditorView` builds this via the
+    /// pure `RunFacts.derive(...)` static func.
     /// Defaults to the empty/false value, so the strip renders nothing
     /// when unthreaded (keeps any future fixture call site
     /// source-compatible).
@@ -92,7 +92,7 @@ struct VerificationResultsView: View {
                         // inside the section directly after its Findings group.
                         let afterFindings = ResultsBlock.smallPrintFollowsFindings(
                             ResultsBlock.order(present: Self.blocksPresent(report: report, findings: findings,
-                                                                           smallPrint: Self.smallPrint),
+                                                                           smallPrint: smallPrint),
                                                checksPassed: Self.isChecksPassed(report)))
                         // Covered text and form values are Findings rows below;
                         // this section keeps what Share does not ask about.
@@ -100,7 +100,7 @@ struct VerificationResultsView: View {
                             findings: Self.findingsOutsideTheGroup(findings), pagesOnChips: previewAvailable,
                             onOpenPage: openPreview(at:))
                         if !afterFindings {
-                            ResultsScopeNote(report: report, sentences: Self.smallPrint)
+                            ResultsScopeNote(report: report, sentences: smallPrint)
                         }
                         VerificationDetailsSection(
                             report: report, deselectionSnapshot: deselectionSnapshot,
@@ -108,7 +108,7 @@ struct VerificationResultsView: View {
                             onOpenPage: openPreview(at:),
                             coveredPages: VerificationResultsActions.concealedPages(in: findings),
                             formValueCount: Self.formValueCount(in: findings),
-                            smallPrintAfterFindings: afterFindings ? Self.smallPrint : nil,
+                            smallPrintAfterFindings: afterFindings ? smallPrint : nil,
                             onReviewInScan: {
                                 Self.reviewInScan(documentState: documentState, redactionState: redactionState)
                             })
@@ -138,9 +138,11 @@ struct VerificationResultsView: View {
         // dialogs are also mounted on DocumentEditorView.
     }
 
-    /// The small print about what Checks Passed means: no sentences are
-    /// supplied yet, so it draws nothing.
-    static let smallPrint: [String] = []
+    /// The small print about what Checks Passed means, while this PDF is
+    /// on disk.
+    private var smallPrint: [String] {
+        ResultsScopeNote.checksPassedSentences(outputExists: outputExists)
+    }
 
     /// Whether the run is titled Checks Passed.
     static func isChecksPassed(_ report: VerificationReport) -> Bool {
@@ -233,12 +235,12 @@ struct VerificationResultsView: View {
 
     // MARK: - Run facts strip
     //
-    // 0-2 conditional lines stating what this run's detection did not
-    // cover, the first rows of the headerless run section, on every
-    // verdict — a routine PASS with nothing to state renders none. Every line
-    // is a pinned static builder so the rendered text is unit-testable
-    // without a SwiftUI host. Whether the detectors ran on the output is
-    // no longer stated here in prose: the verification ledger measures it.
+    // Conditional lines stating what this run did not cover and what its
+    // output is, the first rows of the headerless run section, on every
+    // verdict; each needs its own fact, so a run with nothing to state renders
+    // none. Every line is a pinned static builder so the rendered text is
+    // unit-testable without a SwiftUI host. Whether the detectors ran on the
+    // output is not stated here in prose: the verification ledger measures it.
 
     /// Pure facts input for the strip. `derive` is the single production
     /// source (called from `DocumentEditorView`); the plain-value
@@ -252,17 +254,33 @@ struct VerificationResultsView: View {
         var degradeFailures: [String]? = nil
         /// The run's mode, for the SKIPPED sentences.
         var runMode: RunMode = .searchableOrUnknown
+        /// The output's pages: one per page the run made.
+        var pageCount: Int = 0
+        /// The boxes the run burned, as burned (refused boxes are not among them).
+        var burnedBoxes: Int = 0
+        /// The output's size in bytes, read when the run finished.
+        var outputBytes: Int64? = nil
+        /// The pages the stop at Redact named, answered or not, at run entry.
+        var pagesNotSearchedInFull: Set<Int> = []
+        /// The pages whose only gap is small pictures, at run entry.
+        var smallPicturePages: Set<Int> = []
 
-        /// Pure derivation from the run's own retained inputs — the two
-        /// facts are read at run entry and recorded with the output, so
-        /// a later scan not followed by another Redact cannot move what
-        /// this strip says about the on-screen report.
+        /// Pure derivation from the run's own retained inputs — every fact
+        /// is read at run entry or when the run finished, and recorded with
+        /// the output, so a later scan, box or search not followed by another
+        /// Redact cannot move what this strip says about the on-screen report.
+        /// With no inputs every fact is off.
         static func derive(inputs: RedactionState.LastRunInputs?) -> RunFacts {
             RunFacts(
                 ocrSkippedPages: inputs?.ocrSkippedPages ?? [],
                 degradeFailures: inputs?.degradeFailures,
                 runMode: RunMode.of(perPageModes: inputs?.perPageModes ?? [],
-                                    fallbackReasons: inputs?.perPageFallbackReasons ?? [])
+                                    fallbackReasons: inputs?.perPageFallbackReasons ?? []),
+                pageCount: inputs?.perPageModes.count ?? 0,
+                burnedBoxes: inputs?.burnedRegions?.values.reduce(0) { $0 + $1.count } ?? 0,
+                outputBytes: inputs?.outputBytes,
+                pagesNotSearchedInFull: inputs?.pagesNotSearchedInFull ?? [],
+                smallPicturePages: inputs?.smallPicturePages ?? []
             )
         }
     }
@@ -286,9 +304,14 @@ struct VerificationResultsView: View {
             DetectionDegradeCopy.banner(failedGazetteers: failedGazetteers)
         }
 
-        /// Ordered lines for the given facts: the OCR-skip line, then
-        /// the degrade line.
-        static func lines(for facts: RunFacts) -> [String] {
+        /// Ordered lines for the given facts: the OCR-skip line, the degrade
+        /// line, the boxes, then the output's size and the long image-only
+        /// line while the output is on disk, then the lines about what was
+        /// not read before Redact (`unreadLines`), whose last reads the
+        /// report shown. With no report and no output only the run's own
+        /// facts speak.
+        static func lines(for facts: RunFacts, report: VerificationReport? = nil,
+                          outputExists: Bool = false) -> [String] {
             var result: [String] = []
             if !facts.ocrSkippedPages.isEmpty {
                 result.append(ocrSkipLine(pages: Array(facts.ocrSkippedPages)))
@@ -296,11 +319,22 @@ struct VerificationResultsView: View {
             if let degradeFailures = facts.degradeFailures {
                 result.append(degradeLine(failedGazetteers: degradeFailures))
             }
-            return result
+            if facts.burnedBoxes > 0 {
+                result.append(boxesLine(count: facts.burnedBoxes))
+            }
+            if outputExists, let bytes = facts.outputBytes {
+                result.append(sizeLine(bytes: bytes))
+            }
+            if outputExists, facts.runMode == .secure, facts.pageCount > longImageOnlyPageCount {
+                result.append(longImageOnlyLine(pages: facts.pageCount))
+            }
+            return result + unreadLines(for: facts, report: report)
         }
     }
 
-    private var runFactsLines: [String] { RunFactsStrip.lines(for: runFacts) }
+    private var runFactsLines: [String] {
+        RunFactsStrip.lines(for: runFacts, report: report, outputExists: outputExists)
+    }
 
     // MARK: - The actions' rules and words (the view is VerificationResultsActions)
 
@@ -464,8 +498,8 @@ struct VerificationResultsView: View {
 
     private var honestyDisclaimer: some View {
         // The disclaimer's copy is markCount-independent (its switch binds
-        // no value); this view does not inject RedactionState, so 0 stands
-        // in rather than threading a count the component never reads.
+        // no value), so 0 stands in rather than threading a count the
+        // component never reads.
         HonestyDisclaimer(profile: .redacted(markCount: 0), style: .sectionFooter)
             .accessibilityIdentifier("honestyDisclaimer")
     }
