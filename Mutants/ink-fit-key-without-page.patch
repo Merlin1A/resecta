@@ -15,5 +15,5 @@ index b217c3ba..77e28fb9 100644
 -        hasher.combine(page.document?.index(for: page) ?? -1)
 +        // mutant: page index term removed
          hasher.combine(page.string ?? "")
-         hasher.combine(largestImageBytes(cgPage))
+         hasher.combine(largestImageKey(cgPage))
          hasher.combine(visual.width)
