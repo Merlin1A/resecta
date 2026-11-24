@@ -59,6 +59,8 @@ struct TouchTargetFloorTests {
             "Sources/ResectaApp/Views/Search/SearchAndRedactSheet+CompactApply.swift",
             // The parked strip's row floor.
             "Sources/ResectaApp/Views/Search/SearchAndRedactSheet+CompactStrip.swift",
+            // The parked strip's notice mark.
+            "Sources/ResectaApp/Views/Search/SearchAndRedactSheet+Notices.swift",
             "Sources/ResectaApp/Views/Search/SearchSheetHeaderSection.swift",
             "Sources/ResectaApp/Views/Search/SearchFooterSection.swift",
             // The resize-handle hit test, carved out of the overlay hub.

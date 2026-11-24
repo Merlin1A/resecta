@@ -47,7 +47,6 @@ struct SearchSheetTextTierTests {
          "the menu chip's outline"),
         ("Views/Search/SearchToolbarSection.swift", ".foregroundStyle(.secondary)", 1, "the saved-pattern menu's glyph"),
         ("Views/Search/SearchResultsSection.swift", ".foregroundStyle(.secondary)", 1, "the live row's eye glyph"),
-        ("Views/Search/SearchResultsBanners.swift", ".foregroundStyle(.secondary)", 3, "the three banners' glyphs"),
         ("Views/Search/SearchSheetHeaderSection.swift", "? AnyShapeStyle(.tertiary)", 1, "Apply when it is disabled"),
         ("Views/Search/SearchAndRedactSheet+CompactApply.swift", ".foregroundStyle(.secondary)", 1,
          "Applied on the parked strip, a disabled control"),

@@ -220,7 +220,7 @@ final class SearchState: Identifiable {
     /// Page indices where a regex enumeration bailed on
     /// the per-page timeout. Populated by `DocumentSearcher`'s
     /// timeout sink via `SearchAndRedactSheet+Trigger.triggerSearch`.
-    /// Drives the banner rendered by `SearchResultsSection`.
+    /// Read by the notice place above the results (`noticeFacts`).
     /// Cleared in both `clear()` and `clearResults()`.
     /// Field is document-derived (page indices reveal document
     /// structure) and is on the forbidden-key list
@@ -244,9 +244,8 @@ final class SearchState: Identifiable {
     /// Page indices whose raster exceeded the OCR pixel caps, so
     /// OCR never ran on them during this scan. Populated by
     /// `DocumentSearcher`'s OCR-skip sink via
-    /// `SearchAndRedactSheet+Trigger.triggerSearch`. Drives the OCR-skip
-    /// banner rendered by `SearchResultsSection`, mirroring
-    /// `regexTimeoutPages`. Cleared in both `clear()` and
+    /// `SearchAndRedactSheet+Trigger.triggerSearch`. Read by the notice
+    /// place (`noticeFacts`), as `regexTimeoutPages` is. Cleared in both `clear()` and
     /// `clearResults()`. Field is document-derived (page indices reveal
     /// document structure) and is on the forbidden-key list for
     /// `SavedSearch` decoding.
@@ -350,10 +349,13 @@ final class SearchState: Identifiable {
     /// Pages the cap-cancelled scan never reached. Snapshotted in
     /// `appendResult` at the moment the cap fires (`totalPages` minus the
     /// engine's last-reported `currentSearchPage`; the current page itself
-    /// may be partially scanned and is not counted). Drives the remainder
-    /// sentence in `SearchFooterSection`'s cap banner so the cap stops
-    /// reading as full coverage. Reset wherever `resultsAtCap` resets.
+    /// may be partially scanned and is not counted). Read by the notice
+    /// place's result-limit line so the cap stops reading as full coverage. Reset wherever `resultsAtCap` resets.
     private(set) var capUnscannedPageCount: Int = 0
+    /// The page (1-based) the run was on when the cap fired; 0 before it.
+    private(set) var capStopPage: Int = 0
+    /// What the notice place remembers (`SearchNoticeState`).
+    var notices = SearchNoticeState()
 
     // @ObservationIgnored: the memo store is a memoization internal, not
     // view state. The getters WRITE it mid-body-evaluation; if the macro
@@ -560,6 +562,7 @@ final class SearchState: Identifiable {
         guard !resultsAtCap else { return }
         resultsAtCap = true
         capUnscannedPageCount = max(0, totalPages - currentSearchPage)
+        capStopPage = currentSearchPage
     }
 
     /// Clear results and increment version for overlay refresh. The
@@ -593,6 +596,8 @@ final class SearchState: Identifiable {
         regexTimeoutPages = []
         ocrSkippedPages = []
         capUnscannedPageCount = 0
+        capStopPage = 0
+        notices = SearchNoticeState()
         // Run-state discriminators reset with results: the next empty
         // state must read as "not run yet" until a run completes, and a
         // prior failed-start must not outlive the state it described.

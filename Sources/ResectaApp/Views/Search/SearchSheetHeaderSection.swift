@@ -130,8 +130,8 @@ extension SearchAndRedactSheet {
     /// the retired NavigationStack toolbar's exact contract, no
     /// overflow (saved-searches access stays in the content area: one
     /// `savedSearchesBookmark` per interface, both in the shared
-    /// search-bar row) — plus the unified gazetteer-degrade
-    /// disclosure. Opaque background: list rows scroll UNDER the
+    /// search-bar row); the degraded-detection notice stands in the
+    /// notice place above the results. Opaque background: list rows scroll UNDER the
     /// inset region.
     var sheetHeaderChrome: some View {
         VStack(spacing: 0) {
@@ -161,21 +161,6 @@ extension SearchAndRedactSheet {
                     applySelectedSearchResults()
                 }
             )
-
-            // Unified degrade rule: the gazetteer-degrade disclosure is unified
-            // across interfaces: Scan shows it whenever the session
-            // is degraded (its runs consult the detection corpus);
-            // Search shows it only when a scan-class capability
-            // degrades the current action — and no Search-side
-            // action in this tree uses one (literal matching plus
-            // OCR modality access only), so the Search side
-            // renders none. Predicate is static for testability.
-            if Self.degradeBannerShouldShow(
-                interface: searchState.searchModeType.interface,
-                degraded: redactionState.autoDetectionDegraded
-            ) {
-                degradedDetectionBanner
-            }
 
             // Orientation line — pages with
             // hits out of total pages, mounted only after a completed

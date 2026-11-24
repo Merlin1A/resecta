@@ -18,35 +18,6 @@ extension SearchAndRedactSheet {
         degraded && interface == .scan
     }
 
-    /// Persistent top banner while `redactionState.autoDetectionDegraded`
-    /// is true (one or more gazetteer / context-keywords resources failed
-    /// to load this session). The copy is a mechanism description —
-    /// describes what happened and what remains available, no outcome
-    /// promises. The copy pass reworded the inherited banner line: the
-    /// state is a degrade (runs proceed with the resources that
-    /// loaded), and the retired flow name is gone — the wording now
-    /// matches the toast that announces the same state.
-    @ViewBuilder
-    var degradedDetectionBanner: some View {
-        HStack(alignment: .top, spacing: ResectaTokens.Spacing.sm) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.orange)
-                .accessibilityHidden(true)
-            Text(DetectionDegradeCopy.banner(
-                failedGazetteers: redactionState.autoDetectionDegradeFailures))
-                .font(.subheadline)
-                .multilineTextAlignment(.leading)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, ResectaTokens.Spacing.md)
-        .padding(.vertical, ResectaTokens.Spacing.sm)
-        .background(ResectaTokens.SemanticColor.warningTint.opacity(0.12))
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("degradedDetectionBanner")
-        .accessibilityAddTraits(.isHeader)
-    }
-
     // `debounceSearch(query:)`, `triggerSearch()`, the two apply
     // handlers (toolbar + keyboard shortcut), `applyShortcutEnabled`,
     // and the saved-search recall live in
