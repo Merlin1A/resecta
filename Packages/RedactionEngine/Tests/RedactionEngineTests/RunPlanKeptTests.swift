@@ -23,7 +23,7 @@ struct RunPlanKeptTests {
         RunRecord.Page(pageIndex: index, regions: regions, cropBox: letter, rotation: 0, switchOn: switchOn)
     }
 
-    /// H-04c's boxes as placed for the same regions: the admitted ones, each
+    /// The as-placed plan's boxes for the same regions: the admitted ones, each
     /// its rectangle in sixty-fourths, on Letter's sides.
     static func asPlaced(_ regions: [RunRecord.DrawnRegion]) -> PaintPlan {
         PaintPlan.asPlaced(
@@ -52,7 +52,7 @@ struct RunPlanKeptTests {
 
     // MARK: - The kept plan
 
-    @Test("The kept plan's boxes are H-04c's boxes as placed, one per region, whatever its kind")
+    @Test("The kept plan's boxes are the as-placed plan's boxes, one per region, whatever its kind")
     func keptPlanIsAsPlaced() throws {
         let regions = Self.everyKind()
         let plan = try #require(Self.page(regions).plan)
