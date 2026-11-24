@@ -43,6 +43,20 @@ struct SearchRunLogTests {
         #expect(replaced == [token])
     }
 
+    @Test("The run gives the document its replaced-run report: a source pin, since no hosted test starts a run")
+    func runInstallsTheReplacedReport() throws {
+        let file = URL(fileURLWithPath: "\(#filePath)")
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/ResectaApp/State/SearchRun.swift")
+        let text = try String(contentsOf: file, encoding: .utf8)
+        let install = [
+            "        searchState.accountReplacedSink = { [weak redactionState] token in",
+            "            redactionState?.recordSearchRunReplaced(token: token)",
+            "        }",
+        ].joined(separator: "\n")
+        #expect(text.components(separatedBy: install).count == 2)
+    }
+
     @Test("Closed runs come oldest first with their queries; a replaced run is left out")
     func closedRunsInOrder() {
         let state = RedactionState()
