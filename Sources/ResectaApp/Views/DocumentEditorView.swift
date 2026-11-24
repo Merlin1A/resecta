@@ -89,6 +89,9 @@ struct DocumentEditorView: View {
     /// A search session parked for the close dialog, kept whole for Cancel
     /// (`restoreParkedSearchIfNeeded()`); Close drops it with the session.
     @State var parkedEditorSearch: SearchState?
+    /// The Search session in `parkedEditorSearch` was parked for the stop at
+    /// Redact, and comes back when the stop goes without a run.
+    @State var stopParkedSearch = false
 
     // Drives the bespoke share-risk confirm sheet shown when a
     // Share tap reaches handleExportTap while the report is FAIL/ATTENTION

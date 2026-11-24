@@ -1,0 +1,211 @@
+import SwiftUI
+
+// The stop at Redact: one sheet, raised when pages a search did not read
+// are not yet answered for. It draws the list the state gives it and the
+// choices; the state decides when it shows and what each answer does.
+
+/// An answer to the stop at Redact.
+enum BeforeYouRedactAnswer: Equatable {
+    case redactAnyway
+    case searchThesePages
+    case cancel
+    /// The sheet swiped down: the same as Cancel.
+    case swipedDown
+    /// A page chip: Cancel, then the page (0-based).
+    case goToPage(Int)
+}
+
+struct BeforeYouRedactSheet: View {
+
+    // MARK: - Words
+
+    static let title = "Before You Redact"
+    static let searchThesePagesTitle = "Search These Pages"
+    static let redactAnywayTitle = "Redact Anyway"
+    static let cancelTitle = "Cancel"
+    /// Drawn under Redact Anyway, and its spoken hint.
+    static let redactAnywayPromise =
+        "If you redact anyway, Resecta will not ask again about the same pages for the same reasons while this document is open."
+
+    // MARK: - The choices
+
+    enum Capsule: Equatable {
+        case searchThesePages, redactAnyway, cancel
+    }
+
+    enum CapsuleStyle: Equatable {
+        case tealSolid, outlined, plain
+    }
+
+    struct Choice: Equatable {
+        let capsule: Capsule
+        let style: CapsuleStyle
+    }
+
+    /// The choices in drawn order. Exactly one is solid teal, the safest way
+    /// forward, and it is never Redact Anyway: Search These Pages when the
+    /// state offers the re-run, else Cancel.
+    static func choices(offersSearchThesePages: Bool) -> [Choice] {
+        if offersSearchThesePages {
+            return [Choice(capsule: .searchThesePages, style: .tealSolid),
+                    Choice(capsule: .redactAnyway, style: .outlined),
+                    Choice(capsule: .cancel, style: .plain)]
+        }
+        return [Choice(capsule: .redactAnyway, style: .outlined),
+                Choice(capsule: .cancel, style: .tealSolid)]
+    }
+
+    // MARK: - What an answer does
+
+    struct Effects: Equatable {
+        /// The pages and reasons are recorded as answered.
+        let records: Bool
+        /// The stop's case no longer awaits an answer.
+        let clearsCase: Bool
+        /// The run funnel is entered again, after any record.
+        let entersRun: Bool
+        /// Search opens on the state's re-run, at medium.
+        let opensSearch: Bool
+        /// The page shown afterwards (0-based), if any.
+        let showsPage: Int?
+    }
+
+    /// Only Redact Anyway records an answer. A swipe down is Cancel; Go to
+    /// page is Cancel and then the page.
+    static func effects(of answer: BeforeYouRedactAnswer) -> Effects {
+        switch answer {
+        case .redactAnyway:
+            return Effects(records: true, clearsCase: true, entersRun: true, opensSearch: false, showsPage: nil)
+        case .searchThesePages:
+            return Effects(records: false, clearsCase: true, entersRun: false, opensSearch: true, showsPage: nil)
+        case .cancel, .swipedDown:
+            return Effects(records: false, clearsCase: true, entersRun: false, opensSearch: false, showsPage: nil)
+        case .goToPage(let page):
+            return Effects(records: false, clearsCase: true, entersRun: false, opensSearch: false, showsPage: page)
+        }
+    }
+
+    // MARK: - Height
+
+    /// The sheet takes its content's height up to the screen's; at the
+    /// accessibility text sizes, or when the content does not fit, it opens
+    /// at full height, and it scrolls.
+    static func stopSheetDetent(
+        contentHeight: CGFloat, availableHeight: CGFloat, isAccessibilitySize: Bool
+    ) -> PresentationDetent {
+        guard !isAccessibilitySize, contentHeight > 0, contentHeight <= availableHeight else { return .large }
+        return .height(contentHeight)
+    }
+
+    // MARK: - The view
+
+    let content: NotSearchedListContent
+    let offersSearchThesePages: Bool
+    let captureMonitor: ScreenCaptureMonitor
+    let onAnswer: (BeforeYouRedactAnswer) -> Void
+
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var contentHeight: CGFloat = 0
+    @AccessibilityFocusState private var titleFocused: Bool
+
+    var body: some View {
+        GeometryReader { screen in
+            ScrollView {
+                VStack(spacing: 0) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 24))
+                        .foregroundStyle(ResectaTokens.Ink.cautionMark)
+                        .frame(width: 30, height: 30)
+                        .accessibilityHidden(true)
+                    Text(Self.title)
+                        .font(.title2.bold())
+                        .multilineTextAlignment(.center)
+                        .padding(.top, 12)
+                        .accessibilityAddTraits(.isHeader)
+                        .accessibilityFocused($titleFocused)
+                    NotSearchedList(content: content, showsHeader: true, goToPage: { onAnswer(.goToPage($0)) })
+                        .padding(.top, 16)
+                    VStack(spacing: 10) {
+                        ForEach(Self.choices(offersSearchThesePages: offersSearchThesePages), id: \.capsule) { choice in
+                            capsuleButton(choice)
+                        }
+                    }
+                    .padding(.top, 22)
+                }
+                .padding(.top, 26)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 24)
+                .background(GeometryReader { measured in
+                    Color.clear.preference(key: StopContentHeightKey.self, value: measured.size.height)
+                })
+            }
+            .onPreferenceChange(StopContentHeightKey.self) { contentHeight = $0 }
+            .presentationDetents([Self.stopSheetDetent(
+                contentHeight: contentHeight, availableHeight: screen.size.height,
+                isAccessibilitySize: dynamicTypeSize.isAccessibilitySize)])
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("beforeYouRedactSheet")
+        .accessibilityAction(.escape) { onAnswer(.cancel) }
+        .onAppear { titleFocused = true }
+        .shieldedSheetContent(monitor: captureMonitor)
+    }
+
+    @ViewBuilder
+    private func capsuleButton(_ choice: Choice) -> some View {
+        switch choice.capsule {
+        case .searchThesePages:
+            capsule(Self.searchThesePagesTitle, style: choice.style, identifier: "beforeYouRedactSearchThesePages") {
+                onAnswer(.searchThesePages)
+            }
+        case .redactAnyway:
+            VStack(spacing: 0) {
+                capsule(Self.redactAnywayTitle, style: choice.style, identifier: "beforeYouRedactRedactAnyway") {
+                    onAnswer(.redactAnyway)
+                }
+                .accessibilityHint(Self.redactAnywayPromise)
+                Text(Self.redactAnywayPromise)
+                    .font(.caption)
+                    .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 10)
+                    .padding(.top, 7)
+                    .accessibilityHidden(true)
+            }
+        case .cancel:
+            capsule(Self.cancelTitle, style: choice.style, identifier: "beforeYouRedactCancel") {
+                onAnswer(.cancel)
+            }
+        }
+    }
+
+    private func capsule(
+        _ title: String, style: CapsuleStyle, identifier: String, action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.body.weight(.semibold))
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity, minHeight: 50)
+                .foregroundStyle(style == .tealSolid ? Color.white : Color.primary)
+                .background {
+                    switch style {
+                    case .tealSolid:
+                        RoundedRectangle(cornerRadius: 25).fill(ResectaTokens.BrandTeal.fill)
+                    case .outlined:
+                        RoundedRectangle(cornerRadius: 25).strokeBorder(Color.primary, lineWidth: 1.5)
+                    case .plain:
+                        RoundedRectangle(cornerRadius: 25).fill(Color(uiColor: .tertiarySystemFill))
+                    }
+                }
+                .contentShape(RoundedRectangle(cornerRadius: 25))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(identifier)
+    }
+}
+
+private struct StopContentHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
