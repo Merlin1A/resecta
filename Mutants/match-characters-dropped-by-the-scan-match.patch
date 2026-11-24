@@ -5,15 +5,15 @@ Must go red: RedactionEngineTests/MatchCharactersTests "A match Scan reads from 
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift
-index 621f4c5c..4dfa2e51 100644
+index fc2f0122..c52b6971 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift
-@@ -115,7 +115,7 @@ extension DocumentSearcher {
+@@ -125,7 +125,7 @@ extension DocumentSearcher {
                          piiConfidence: match.confidence,
                          rationale: match.rationale,
                          matchRangeInSnippet: window.matchRange, textLayerRect: box.textLayerRect, inkFitDegraded: box.degraded
 -                    ).identified(by: box.identity).carrying(box.characters))
 +                    ).identified(by: box.identity))
                      totalYielded += 1
-                 }
  
+                     for tail in tails {
