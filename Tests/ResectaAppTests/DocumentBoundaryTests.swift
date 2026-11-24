@@ -65,6 +65,39 @@ struct DocumentBoundaryTests {
         #expect(coord.documentState.phaseKind == .editing)
     }
 
+    @Test("A document's arrival is posted to VoiceOver once")
+    func arrivalIsSpokenOnce() throws {
+        let defaults = UserDefaults(suiteName: "DocumentBoundaryTests.arrival")!
+        defaults.removePersistentDomain(forName: "DocumentBoundaryTests.arrival")
+        let workspace = RedactWorkspace(
+            settingsState: SettingsState(defaults: defaults),
+            userTermsStore: UserTermsStore(
+                fileURL: FileManager.default.temporaryDirectory.appendingPathComponent("arrival-\(UUID().uuidString).json"),
+                legacyDefaults: defaults))
+        let toasts = ToastQueueManager()
+        var spoken: [String] = []
+        toasts.voiceOverRunning = { true }
+        toasts.postAnnouncement = { spoken.append($0) }
+        let first = makeMultiPagePDFDocument(pages: 2)
+        let second = makeMultiPagePDFDocument(pages: 3)
+
+        // A document arrives: said once.
+        RedactWorkspaceView.documentChanged(from: nil, to: first, workspace: workspace, toastManager: toasts)
+        #expect(spoken == ["Document opened."])
+        toasts.announcementDidFinish("Document opened.")
+
+        // A return to the editor keeps the document: nothing said.
+        RedactWorkspaceView.documentChanged(from: first, to: first, workspace: workspace, toastManager: toasts)
+        // Start Over clears it: nothing said.
+        RedactWorkspaceView.documentChanged(from: first, to: nil, workspace: workspace, toastManager: toasts)
+        #expect(spoken == ["Document opened."])
+
+        // The next document arrives: said once more.
+        RedactWorkspaceView.documentChanged(from: nil, to: second, workspace: workspace, toastManager: toasts)
+        #expect(spoken == ["Document opened.", "Document opened."])
+        #expect(RedactWorkspaceView.documentOpenedLine == "Document opened.")
+    }
+
     @Test("Start Over clears the mode override with the rest of the document")
     func startOverClearsTheModeOverride() {
         let coord = makeLoadedCoordinator()

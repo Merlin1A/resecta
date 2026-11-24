@@ -31,9 +31,6 @@ struct MessageCatalogTests {
     ]
 
     static let frozen: [MessageID.Name: Frozen] = [
-        .textLayerDetected: Frozen(
-            severity: .info, kind: .notice, tone: .note, phases: [.editing], mustBeSeen: false,
-            coalescesRepeats: true, showsInRemainingLayer: true),
         .imagePagesNote: Frozen(
             severity: nil, kind: .notice, tone: .caution, phases: [.editing], mustBeSeen: true,
             coalescesRepeats: true, showsInRemainingLayer: false),
@@ -137,10 +134,10 @@ struct MessageCatalogTests {
             coalescesRepeats: true, showsInRemainingLayer: false),
     ]
 
-    /// The 34 names, in the table's order: what `--showToast=<name>` takes
+    /// The 33 names, in the table's order: what `--showToast=<name>` takes
     /// (the hook's post of a notice drawn in its place stops a debug build).
     nonisolated static let messageNames: [String] = [
-        "textLayerDetected", "imagePagesNote", "encryptedSource", "droppedFilesFirstOpened",
+        "imagePagesNote", "encryptedSource", "droppedFilesFirstOpened",
         "unsupportedFormatDropped", "importBlockedDuringRun", "importBlockedOnThisScreen", "outputReclaimed",
         "shared", "shareSheetUnavailable", "applyOrClearSelectedMatchesBeforeRedact",
         "applyOrClearSelectedMatchesBeforeVerify", "drawOrApplyFirst", "boxTooSmall", "deletedBoxes",
@@ -156,8 +153,6 @@ struct MessageCatalogTests {
     /// moved into the table, a copy of it.
     static func shippedText(_ id: MessageID) -> String? {
         switch id {
-        case .textLayerDetected:
-            return "Text layer detected \u{2014} Scan and Search can match text in this document."
         case .imagePagesNote:
             return RedactWorkspaceView.imageSourceMessage
         case .encryptedSource(let hadRestrictions):
@@ -233,9 +228,9 @@ struct MessageCatalogTests {
 
     // MARK: - The table
 
-    @Test("Every message has an example, and there are 34")
+    @Test("Every message has an example, and there are 33")
     func everyMessageHasAnExample() {
-        #expect(MessageID.Name.allCases.count == 34)
+        #expect(MessageID.Name.allCases.count == 33)
         #expect(Set(MessageID.examples.map(\.name)) == Set(MessageID.Name.allCases))
         for name in MessageID.Name.allCases {
             #expect(MessageID.example(named: name).name == name)
@@ -244,7 +239,7 @@ struct MessageCatalogTests {
 
     @Test("Each row has the kind, tone, today's severity, phases and must-be-seen of the frozen table")
     func rowsMatchTheFrozenTable() {
-        #expect(Self.frozen.count == 34)
+        #expect(Self.frozen.count == 33)
         for id in MessageID.examples {
             guard let want = Self.frozen[id.name] else {
                 Issue.record("\(id.name) is not in the frozen table")
@@ -260,26 +255,26 @@ struct MessageCatalogTests {
             #expect(row.showsInRemainingLayer == want.showsInRemainingLayer, "\(id)")
         }
         let rows = MessageID.Name.allCases.map { MessageCatalog.row(for: .example(named: $0)) }
-        #expect(rows.filter { $0.todaySeverity == .info }.count == 10)
+        #expect(rows.filter { $0.todaySeverity == .info }.count == 9)
         #expect(rows.filter { $0.todaySeverity == .warning }.count == 13)
         #expect(rows.filter { $0.todaySeverity == .success }.count == 3)
         #expect(rows.filter { $0.todaySeverity == nil }.count == 8)
         #expect(rows.filter { $0.kind == .receipt }.count == 21)
-        #expect(rows.filter { $0.kind == .notice }.count == 13)
+        #expect(rows.filter { $0.kind == .notice }.count == 12)
         #expect(rows.filter { $0.tone == .caution }.count == 24)
         #expect(rows.filter { $0.tone == .done }.count == 4)
-        #expect(rows.filter { $0.tone == .note }.count == 4)
+        #expect(rows.filter { $0.tone == .note }.count == 3)
         #expect(rows.filter { $0.tone == .stop }.count == 2)
         #expect(rows.filter(\.mustBeSeen).count == 22)
-        #expect(rows.filter(\.showsInRemainingLayer).count == 3)
+        #expect(rows.filter(\.showsInRemainingLayer).count == 2)
     }
 
-    @Test("Every row is either one message while it is up or a new event each time, and the split is 24 and 10")
+    @Test("Every row is either one message while it is up or a new event each time, and the split is 23 and 10")
     func everyRowCoalescesOrNot() {
         let rows = MessageID.Name.allCases.map { (name: $0, row: MessageCatalog.row(for: .example(named: $0))) }
         let oneWhileUp = Set(rows.filter { $0.row.coalescesRepeats }.map { $0.name })
         let newEachTime = Set(rows.filter { !$0.row.coalescesRepeats }.map { $0.name })
-        #expect(oneWhileUp.count == 24)
+        #expect(oneWhileUp.count == 23)
         #expect(newEachTime.count == 10)
         // Each post of these reports one thing the person did or lost.
         #expect(newEachTime == [
@@ -488,6 +483,29 @@ struct MessageCatalogTests {
         #expect(posts.isEmpty, "a notice drawn in its place is posted: \(posts)")
     }
 
+    @Test("Retired messages appear nowhere in the app's source")
+    func retiredMessagesAreGone() throws {
+        let sources = URL(fileURLWithPath: "\(#filePath)")
+            .deletingLastPathComponent()   // Tests/ResectaAppTests
+            .deletingLastPathComponent()   // Tests
+            .deletingLastPathComponent()   // <repo root>
+            .appendingPathComponent("Sources/ResectaApp")
+        let files = try #require(FileManager.default.enumerator(atPath: sources.path))
+            .compactMap { $0 as? String }
+            .filter { $0.hasSuffix(".swift") }
+        #expect(files.count > 100, "the source tree was not found")
+        var found: [String] = []
+        for file in files {
+            let text = try String(contentsOf: sources.appendingPathComponent(file), encoding: .utf8)
+            for (index, line) in text.components(separatedBy: "\n").enumerated() {
+                let code = line.trimmingCharacters(in: .whitespaces)
+                if code.hasPrefix("//") { continue }
+                if code.contains("Text layer detected") { found.append("\(file):\(index + 1)") }
+            }
+        }
+        #expect(found.isEmpty, "a retired message is still in the source: \(found)")
+    }
+
     // MARK: - The DEBUG hook
 
     @Test("Each message name parses from --showToast=", arguments: MessageCatalogTests.messageNames)
@@ -500,9 +518,9 @@ struct MessageCatalogTests {
         #expect(MessageID.example(named: parsed).name == parsed)
     }
 
-    @Test("The hook takes the table's 34 names")
+    @Test("The hook takes the table's 33 names")
     func hookTakesEveryName() {
-        #expect(Self.messageNames.count == 34)
+        #expect(Self.messageNames.count == 33)
         #expect(Set(Self.messageNames) == Set(MessageID.Name.allCases.map(\.rawValue)))
     }
 }

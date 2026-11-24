@@ -49,16 +49,13 @@ struct RedactWorkspaceView: View {
 
     var body: some View {
         navigationContainer
-            // Fire the import-completion toasts when a new document is
-            // loaded, for EVERY import path. The Home -> redact load
-            // (openRedactWithDocument) runs its import in AppCoordinator AFTER
-            // this view mounts, so the in-view post-import calls never covered
-            // it — keying off the document swap covers all paths uniformly.
+            // A new document's arrival, for EVERY import path. The Home ->
+            // redact load (openRedactWithDocument) runs its import in
+            // AppCoordinator AFTER this view mounts, so the in-view
+            // post-import calls never covered it — keying off the document
+            // swap covers all paths uniformly.
             .onChange(of: workspace.documentState.sourceDocument) { oldDocument, newDocument in
-                if Self.isDocumentSwap(from: oldDocument, to: newDocument) {
-                    workspace.coordinator.documentDidChange()
-                    checkImportToasts()
-                }
+                Self.documentChanged(from: oldDocument, to: newDocument, workspace: workspace, toastManager: toastManager)
             }
             // Drag and drop. The dropped file is read inside its transfer
             // (size on disk first, then the bytes), so an oversized drop
@@ -290,7 +287,7 @@ struct RedactWorkspaceView: View {
         )
     }
 
-    // MARK: - Toast Helpers
+    // MARK: - A document's arrival and its notes
 
     /// A new document replaced the one shown, or arrived in an empty
     /// workspace. Its one writer is `ImportService.apply`, so this holds
@@ -307,11 +304,20 @@ struct RedactWorkspaceView: View {
         if count > 1 { documentState.droppedFilesNoteCount = count }
     }
 
-    /// The import-completion toast: the text-layer notice. (A source that
-    /// was encrypted and an image import have their notes in the editor's
-    /// band, `TopBannerSlot.documentNotes`.)
-    private func checkImportToasts() {
-        checkTextLayerToast()
+    /// What VoiceOver says when a document has arrived.
+    static let documentOpenedLine = "Document opened."
+
+    /// A document swap: the coordinator's per-document reset, then the
+    /// arrival said to VoiceOver once. A return to the editor keeps the
+    /// document and Start Over clears it; neither is a swap, so neither
+    /// says it. (A source that was encrypted, an image import and a drop of
+    /// several files have their notes in the editor's band,
+    /// `TopBannerSlot.documentNotes`.)
+    static func documentChanged(from oldDocument: PDFDocument?, to newDocument: PDFDocument?,
+                                workspace: RedactWorkspace, toastManager: ToastQueueManager) {
+        guard isDocumentSwap(from: oldDocument, to: newDocument) else { return }
+        workspace.coordinator.documentDidChange()
+        toastManager.announce(documentOpenedLine)
     }
 
     /// The note for an image import, never for a PDF: the pages are read by
@@ -325,14 +331,6 @@ struct RedactWorkspaceView: View {
     /// The image import's note, drawn by `imageSourceNote(facts:)`'s rule.
     static let imageSourceMessage =
         "Image pages are read with on-device text recognition. Barcodes and QR codes are not read."
-
-    /// Notify user when text layer detected after import.
-    private func checkTextLayerToast() {
-        if workspace.documentState.hasAnyTextLayer,
-           workspace.documentState.phaseKind == .editing {
-            toastManager.post(.textLayerDetected)
-        }
-    }
 
     /// The note for an encrypted source: the restrictions line when the
     /// owner withheld a permission, else the plain line; nil when the

@@ -37,13 +37,12 @@ nonisolated final class ReceiptPlacementUITests: XCTestCase {
         return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
     }
 
-    /// Launches the multipage document and waits for the import's own
-    /// message to clear, so the next message is the one under test.
+    /// Launches the multipage document. A document's arrival raises no
+    /// message, so the next message is the one under test.
     private func launchEditor(_ extra: [String] = []) {
         app.launchArguments = ["--uitesting", "--loadTestDocument", "--multipageDoc"] + extra
         app.launch()
         XCTAssertTrue(app.buttons["pageNavMarkWholePage"].waitForExistence(timeout: 30), "The page bar never appeared.")
-        XCTAssertTrue(labelled("Text layer detected").waitForNonExistence(timeout: 20), "The import message never cleared.")
     }
 
     /// Two boxes on page 1 (the whole page marked, one drawn), both
@@ -214,8 +213,7 @@ nonisolated final class ReceiptPlacementUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["pageNavMarkWholePage"].waitForExistence(timeout: 30), "The page bar never appeared.")
         XCTAssertGreaterThan(counter.frame.height, 40, "The largest text size did not take.")
-        // It may wait behind the import's own message: read the receipt while
-        // its words are the truncation's.
+        // Read the receipt while its words are the truncation's.
         let words = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Search results truncated")).firstMatch
         XCTAssertTrue(words.waitForExistence(timeout: 30), "The truncation message never showed.")
         let receipt = element("toastMessage")

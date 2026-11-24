@@ -105,15 +105,8 @@ nonisolated final class CanvasSelectionUITests: XCTestCase {
         XCTAssertTrue(app.buttons["drawTool"].waitForExistence(timeout: 30), "The editor never appeared.")
         XCTAssertTrue(counter.waitForExistence(timeout: 10))
         XCTAssertGreaterThan(counter.frame.height, 40, "The largest text size did not take.")
-        // At the largest sizes the import's "Text layer detected" message
-        // covers most of the page, its top too, and takes the drag: wait for
-        // it to arrive, then to go, and let the page settle before measuring
-        // the page and drawing (as the canvas geometry tests do).
-        let toast = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "label BEGINSWITH %@", "Text layer detected")).firstMatch
-        if toast.waitForExistence(timeout: 4) {
-            XCTAssertTrue(toast.waitForNonExistence(timeout: 20), "The import message never cleared off the page.")
-        }
+        // Let the page settle before measuring the page and drawing (as the
+        // canvas geometry tests do).
         sleep(1)
         let shot = try XCTUnwrap(CanvasPixelProbe(XCUIScreen.main.screenshot(), windowSize: window.frame.size))
         let page = try XCTUnwrap(shot.fitPage(), "the page at fit is measurable")

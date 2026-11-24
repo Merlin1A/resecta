@@ -76,38 +76,40 @@ nonisolated final class EditorChromeUITests: XCTestCase {
     /// return the whole-page control.
     private func launchWholePageControl(atTextSize textSize: String?) -> XCUIElement {
         // A size name the system ignores says nothing, so a sized launch is
-        // measured against the default size first: the load message must be
-        // taller. (The counter's own height cannot tell: its tappable height
-        // is floored to the touch target at every size.)
+        // measured against the default size first: a message raised by the
+        // launch hook must be taller. (The counter's own height cannot tell:
+        // its tappable height is floored to the touch target at every size.)
         var defaultHeight: CGFloat?
         if textSize != nil {
-            launchEditorForWholePage(textSize: nil)
+            launchEditorForWholePage(textSize: nil, withMessage: true)
             defaultHeight = loadMessageHeight()
             app.terminate()
         }
-        launchEditorForWholePage(textSize: textSize)
+        launchEditorForWholePage(textSize: textSize, withMessage: textSize != nil)
         let control = app.buttons["pageNavMarkWholePage"]
         XCTAssertTrue(control.waitForExistence(timeout: 30), "The page bar's whole-page control never appeared.")
         if let defaultHeight {
             let height = loadMessageHeight()
             XCTAssertGreaterThan(height, defaultHeight + 1,
-                                 "The text size did not take: the load message is \(height) pt tall, \(defaultHeight) pt at the default size.")
+                                 "The text size did not take: the message is \(height) pt tall, \(defaultHeight) pt at the default size.")
         }
         return control
     }
 
-    private func launchEditorForWholePage(textSize: String?) {
+    /// `withMessage` raises one message through the launch hook, as a
+    /// measure of the text size (a document's arrival raises none).
+    private func launchEditorForWholePage(textSize: String?, withMessage: Bool = false) {
         var arguments = ["--uitesting", "--loadTestDocument", "--multipageDoc"]
+        if withMessage { arguments.append("--showToast=selectionLimit") }
         if let textSize { arguments += ["-UIPreferredContentSizeCategoryName", textSize] }
         app.launchArguments = arguments
         app.launch()
     }
 
-    /// The load message's height once it has stopped sliding in.
+    /// The launch hook's message's height once it has stopped sliding in.
     private func loadMessageHeight() -> CGFloat {
-        let message = app.staticTexts
-            .matching(NSPredicate(format: "label BEGINSWITH 'Text layer detected'")).firstMatch
-        XCTAssertTrue(message.waitForExistence(timeout: 60), "The load message never appeared.")
+        let message = element("toastMessage")
+        XCTAssertTrue(message.waitForExistence(timeout: 60), "The launch hook's message never appeared.")
         var frame = message.frame
         let deadline = Date().addingTimeInterval(3)
         while Date() < deadline {
@@ -422,7 +424,7 @@ nonisolated final class EditorChromeUITests: XCTestCase {
         app.launch()
     }
 
-    /// The load message and the page bar, read once the message has stopped
+    /// A bottom message and the page bar, read once the message has stopped
     /// sliding in.
     private struct BottomReading {
         let message: CGRect
@@ -434,8 +436,9 @@ nonisolated final class EditorChromeUITests: XCTestCase {
     private func readBottom(_ name: String) -> BottomReading {
         let bar = element("pageNav")
         XCTAssertTrue(bar.waitForExistence(timeout: 60), "The page bar never appeared.")
+        raiseDeletedTwoRegions()
         let message = element("toastMessage")
-        XCTAssertTrue(message.waitForExistence(timeout: 10), "The load message never appeared.")
+        XCTAssertTrue(message.waitForExistence(timeout: 10), "The bottom message never appeared.")
         var frame = message.frame
         let deadline = Date().addingTimeInterval(3)
         while Date() < deadline {
@@ -451,6 +454,50 @@ nonisolated final class EditorChromeUITests: XCTestCase {
         add(reading)
         attachScreenshot(named: name)
         return read
+    }
+
+    /// Raises "Deleted 2 regions." with its Undo, as the shipped
+    /// `EditorToolbarUITests.testDeleteTwoRegions_noticeUndoRestoresThem`
+    /// does: page 1 marked whole, a second box drawn, both selected and
+    /// deleted. The message stays at least 8 s.
+    private func raiseDeletedTwoRegions() {
+        let counter = element("pageNavCounter")
+        let mark = app.buttons["pageNavMarkWholePage"]
+        XCTAssertTrue(mark.waitForExistence(timeout: 30), "The page bar's whole-page control never appeared.")
+        mark.tap()
+        XCTAssertTrue(waitForLabel(counter, containing: "1 region"), "Marking the page did not add a region.")
+        let draw = app.buttons["drawTool"].firstMatch
+        XCTAssertTrue(draw.waitForExistence(timeout: 10), "The Rectangle tool is missing.")
+        draw.tap()
+        let window = app.windows.firstMatch
+        window.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.40))
+            .press(forDuration: 0.1, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.6, dy: 0.45)))
+        draw.tap()
+        XCTAssertTrue(waitForLabel(counter, containing: "2 regions"), "The drawn box did not count.")
+        openOverflowAndTap("Select Regions")
+        let selectAll = app.buttons["Select All on Page"].firstMatch
+        XCTAssertTrue(selectAll.waitForExistence(timeout: 5), "Select All on Page is missing.")
+        selectAll.tap()
+        openOverflowAndTap("Delete 2 Regions")
+        XCTAssertTrue(waitForLabel(counter, containing: "0 regions"), "Both regions must go at once.")
+        let notice = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH 'Deleted 2 regions.'")).firstMatch
+        XCTAssertTrue(notice.waitForExistence(timeout: 5), "Deleting two did not show its message.")
+    }
+
+    private func waitForLabel(_ element: XCUIElement, containing text: String, timeout: TimeInterval = 8) -> Bool {
+        let predicate = NSPredicate(format: "label CONTAINS %@", text)
+        let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
+        return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
+    }
+
+    private func openOverflowAndTap(_ label: String) {
+        let overflow = app.editorOverflowButton
+        XCTAssertTrue(overflow.waitForExistence(timeout: 10), "The … menu button is missing.")
+        overflow.tap()
+        let row = app.buttons[label].firstMatch.exists ? app.buttons[label].firstMatch : app.switches[label].firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 5), "The … menu has no '\(label)' row.")
+        row.tap()
     }
 
     /// The same reading at the default text size, then at `textSize`. The
