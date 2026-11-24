@@ -1,0 +1,22 @@
+Property: The notice place above the Search results shows one notice by rank: pages not searched first, then degraded detection, then boxes drawn wider than their words.
+Area: the Search sheet's notice place
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/SearchNoticePlaceTests
+Must go red: ResectaAppTests/SearchNoticePlaceTests rank
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/Search/SearchNoticePlace.swift b/Sources/ResectaApp/Views/Search/SearchNoticePlace.swift
+index cc1972c2..25bd51a1 100644
+--- a/Sources/ResectaApp/Views/Search/SearchNoticePlace.swift
++++ b/Sources/ResectaApp/Views/Search/SearchNoticePlace.swift
+@@ -124,9 +124,9 @@ enum SearchNoticePlace {
+         run: [SearchNoticeLine], held: [SearchNoticeLine], isSearching: Bool, degraded: SearchNoticeLine?
+     ) -> [SearchNoticeLine] {
+         let runPart = isSearching ? held : run
+-        return runPart.filter { $0.kind == .notSearched }
++        return runPart.filter { $0.kind == .fit } /* planted: the fit line ranks above pages not searched */
++            + runPart.filter { $0.kind == .notSearched }
+             + (degraded.map { [$0] } ?? [])
+-            + runPart.filter { $0.kind == .fit }
+     }
+ 
+     enum Control: Equatable {
