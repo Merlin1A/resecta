@@ -8,8 +8,9 @@ import RedactionCore
 
 extension RedactionRegion {
     /// The region a Search or Scan result places. The one maker for the app's
-    /// placing sites and the verification corpus's runner, so every region
-    /// placed from a result carries both marks as the app sets them: placed
+    /// placing sites (the verification corpus's runner still makes its own
+    /// regions), so every region the app places from a result carries both
+    /// marks as the app sets them: placed
     /// from the page's own text, and anchored, exactly when the result was
     /// read from the text layer; a result read from the page's picture is
     /// neither.

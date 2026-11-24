@@ -45,7 +45,7 @@ extension PipelineError {
                 "Not Enough Memory"
             case .unsupportedPageGeometry:
                 "Unsupported Page Geometry"
-            // Provisional words (MX/WORDS-PROVISIONAL.tsv P-lane-s3-20261119-132413-1).
+            // Provisional words; not reachable in this release.
             case .boxCannotShowLength:
                 "Box Could Not Be Applied"
             case .bitmapCreationFailed:
@@ -137,8 +137,8 @@ extension PipelineError {
                 // process.
                 "Page \(p + 1) uses a page size, scale factor or rotation that is not processed. Pages must be between 10 and 5,000 points per side at the standard scale, rotated by a right angle. Export the page from another app at a standard size and rotation, then import it again."
             case .boxCannotShowLength(let p):
-                // Provisional words (MX/WORDS-PROVISIONAL.tsv P-lane-s3-20261119-132847-1):
-                // no retry advice, since a retry meets the same plan.
+                // Provisional words; not reachable in this release. No retry
+                // advice, since a retry meets the same plan.
                 "Page \(p + 1) has a box that cannot be applied as planned. The redaction did not start, and nothing was exported."
             case .bitmapCreationFailed(let p):
                 "An image buffer could not be created for page \(p + 1). Try reducing output quality in Settings."

@@ -1,4 +1,4 @@
-Property: The record keeps the plan the rasterizer paints: made under the one plan source, as placed, one box per admitted region as placed. Here the capture makes the record's plan under the switch's policy while the regions are painted as placed (PACKAGES-VARIANT L299).
+Property: The record keeps the plan the rasterizer paints: made under the one plan source, as placed, one box per admitted region as placed. Here the capture makes the record's plan under the switch's policy while the regions are painted as placed.
 Area: run record
 Test command: cd Packages/RedactionEngine && swift test --filter RunPlanKeptTests
 Must go red: RedactionEngineTests/RunPlanKeptTests keptPlanIsAsPlaced; RedactionEngineTests/RunPlanKeptTests switchIgnoredAsPlaced
