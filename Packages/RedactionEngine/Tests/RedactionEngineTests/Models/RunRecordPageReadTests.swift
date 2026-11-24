@@ -81,6 +81,28 @@ import Testing
         #expect(run == named)
     }
 
+    @Test("Through the record, a Search box that carries its match's characters, on a read page, is widened by the switch; with no read it could not be")
+    func switchWidensACarriedSelection() async throws {
+        let document = try MatchCharactersTests.document(MatchCharactersTests.paragraph)
+        let found = try await MatchCharactersTests.results(.text("Quentin Ashby", options: SearchOptions()), in: document)
+        let region = RunRecord.DrawnRegion(region: RedactionRegion(placing: try #require(found.first)))
+        #expect(region.kind == .placedFromTextAnchored && region.pageCharacters != nil)
+        // The page read from a document of its own, drawn the same way.
+        let other = SendablePDFDocument(try MatchCharactersTests.document(MatchCharactersTests.paragraph))
+        let read = try #require(await RunRecord.PageRead.reads(of: other, pages: [0], hasHiddenOCG: false)[0])
+        let side = CGSize(width: 612, height: 792)
+        func box(_ read: RunRecord.PageRead?) throws -> PaintedBox {
+            let page = RunRecord.Page(pageIndex: 0, regions: [region], cropBox: side, rotation: 0, switchOn: true,
+                                      read: read, source: .switchPolicy)
+            return try #require(page.plan?.boxes.first)
+        }
+        let widened = try box(read)
+        #expect(widened.treatment == .widened, "\(widened.treatment)")
+        #expect(widened.paint.width > widened.tight.width, "the paint reaches past the match's own letters")
+        let unread = try box(nil)
+        if case .couldNotWiden = unread.treatment {} else { Issue.record("no read: \(unread.treatment)") }
+    }
+
     /// The engine's sources, every Swift file.
     static func sources() throws -> [(name: String, text: String)] {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
