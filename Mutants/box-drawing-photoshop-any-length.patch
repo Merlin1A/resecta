@@ -1,0 +1,19 @@
+Property: A Photoshop segment is no longer than the writer's.
+Area: the box check's own reading of what each page draws
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/BoxCheckDrawingTests (or on the host: cd Packages/RedactionEngine && swift test --filter BoxCheckDrawingTests)
+Must go red: RedactionEngineTests/BoxCheckDrawingTests eachCase [D94: a Photoshop segment one byte longer than the writer's]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+index 1038a83b..8949a307 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+@@ -190,7 +190,7 @@ enum PageDrawingReader {
+             case 0xE1:
+                 guard exifHasNoSecondDirectory(body) else { return .unlistedSegment }
+             case 0xED:
+-                guard length <= photoshopSegmentLength, body.starts(with: Array("Photoshop 3.0\0".utf8)) else { return .unlistedSegment }
++                guard body.starts(with: Array("Photoshop 3.0\0".utf8)) else { return .unlistedSegment }
+             case 0xE2...0xEC, 0xEE, 0xEF, 0xFE:
+                 return .unlistedSegment
+             default:

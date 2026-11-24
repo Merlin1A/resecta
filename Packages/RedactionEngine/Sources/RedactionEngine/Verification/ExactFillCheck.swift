@@ -161,7 +161,7 @@ enum ExactFillCheck {
     static let edgeBlocksJudgedByTheirPartOnTheImage = true
 
     static let frameFitsNoQuality = CheckRule("the frame fits no quality of its page")
-    static let mapsToNoPixel = CheckRule("the box maps to no pixel and is not off its page")
+    static let mapsToNoPixel = CheckRule("the box has no area, or it maps to no pixel and is not off its page")
     static let reportDoesNotHoldThePaint = CheckRule("the reported rectangle does not contain the rule's paint")
     static let noReport = CheckRule("the record holds no reported rectangle for the box")
     static let tooManyBoxes = CheckRule("more boxes on the page than the check reads")
@@ -182,15 +182,19 @@ enum ExactFillCheck {
     static func isNeutral(_ b: CodedBlock) -> Bool { b.flat && abs(b.dcTimesStep) <= 3 }
 
     /// The check over a file: every page's picture read by the page-image
-    /// reader, then every box of that page judged. Every page of the record
-    /// has an answer: one the file does not have is not the file the record
-    /// names, and so is each of its boxes. Throws only cancellation.
+    /// reader and held against what the page draws, read by the check itself;
+    /// then every box of that page judged. Every page of the record has an
+    /// answer: one the file does not have is not the file the record names,
+    /// and so is each of its boxes. Throws only cancellation.
     static func run(fileData: Data, source: some PageImageSource, input: BoxCheckInput?) throws(CancellationError) -> BoxCheckReport {
         guard let input else { return .noRecord }
+        let drawings = try PageDrawingReader.read(fileData: fileData)
         var pages: [BoxCheckPage] = []
         try PageImageLocator.readEach(fileData: fileData, source: source, recordedHashes: input.pageImageDigests) { index, outcome in
             let page = index < input.pages.count ? input.pages[index] : nil
-            var judged = judge(page: page, picture: outcome, fill: input.fill, chosenDPI: input.chosenDPI)
+            let drawing = index < drawings.count ? drawings[index] : .failure(PageImageRefusal(reason: .drawingNotRead, offset: 0))
+            let admitted = PageDrawingReader.admit(outcome, drawing: drawing)
+            var judged = judge(page: page, picture: admitted, fill: input.fill, chosenDPI: input.chosenDPI)
             judged.outsidePlan = page?.outsidePlan ?? []
             pages.append(judged)
         }
@@ -246,6 +250,9 @@ enum ExactFillCheck {
     static func judge(box: PaintedBox, reported: RunRecord.PaintedPixels?, walk: PageImageWalk, dpi: Int,
                       widthSixtyFourths sw: Int, heightSixtyFourths sh: Int, fill: FillColor) -> BoxOutcome {
         let inner = box.inner
+        // A box with no area paints nothing; it is answered before the off-page
+        // test, so it never reads as off its page.
+        guard PixelPaintRule.hasArea(inner) else { return .inconclusive(mapsToNoPixel, nil) }
         if inner.maxX <= 0 || inner.minX >= sw || inner.maxY <= 0 || inner.minY >= sh { return .offPage }
         let w = walk.width, h = walk.height
         guard let unit = PixelPaintRule.unit(inner: inner, dpi: dpi, width: w, height: h) else {

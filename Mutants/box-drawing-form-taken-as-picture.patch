@@ -1,0 +1,18 @@
+Property: The one thing drawn is a picture, not a form.
+Area: the box check's own reading of what each page draws
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/BoxCheckDrawingTests (or on the host: cd Packages/RedactionEngine && swift test --filter BoxCheckDrawingTests)
+Must go red: RedactionEngineTests/BoxCheckDrawingTests eachCase [D48: a form drawn in place of the picture]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+index 1038a83b..c7fe3c6f 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+@@ -118,7 +118,6 @@ enum PageDrawingReader {
+         var stream: CGPDFStreamRef?
+         guard CGPDFDictionaryGetStream(pictures, name, &stream), let stream, let pd = CGPDFStreamGetDictionary(stream)
+         else { return .failure(refused(.resourceNotListed)) }
+-        guard self.name(pd, "Subtype") == "Image" else { return .failure(refused(.resourceNotListed)) }
+         let picture: (width: Int, height: Int, bytes: Data)
+         switch pictureFacts(pd, stream) {
+         case .failure(let reason): return .failure(reason)

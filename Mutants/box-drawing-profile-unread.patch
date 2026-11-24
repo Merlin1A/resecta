@@ -1,0 +1,20 @@
+Property: The picture's profile is the writer's: three components over device RGB, nothing more.
+Area: the box check's own reading of what each page draws
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/BoxCheckDrawingTests (or on the host: cd Packages/RedactionEngine && swift test --filter BoxCheckDrawingTests)
+Must go red: RedactionEngineTests/BoxCheckDrawingTests eachCase [D63: a profile with a range]; RedactionEngineTests/BoxCheckDrawingTests eachCase [D67: a three-component profile over device grey]
+The count guard below it still refuses D62 (a one-component profile), so D62 stays green here.
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+index 1038a83b..6b3dd407 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+@@ -155,7 +155,7 @@ enum PageDrawingReader {
+         guard CGPDFDictionaryGetArray(pd, "ColorSpace", &space), let space, CGPDFArrayGetCount(space) == 2,
+               CGPDFArrayGetName(space, 0, &family), let family, String(cString: family) == "ICCBased",
+               CGPDFArrayGetStream(space, 1, &profile), let profile, let icc = CGPDFStreamGetDictionary(profile),
+-              keys(icc).isSubset(of: profileKeys), name(icc, "Alternate") == "DeviceRGB"
++              !keys(icc).isEmpty
+         else { return .failure(refused(.pictureColourNotListed)) }
+         var n: CGPDFInteger = 0
+         guard CGPDFDictionaryGetInteger(icc, "N", &n), n == 3 else { return .failure(refused(.pictureColourNotListed)) }

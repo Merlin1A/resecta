@@ -104,7 +104,7 @@ struct DebugLaunchHookTests {
 
     nonisolated static let hookNames = [
         "--showToast", "--seedFailure", "--forceDetectionDegrade", "--uitestOCRSkipPage",
-        "--forceSnapshotOverlay", "--lockedDoc", "--annotatedFormDoc", "--turnedDoc",
+        "--forceSnapshotOverlay", "--lockedDoc", "--annotatedFormDoc", "--turnedDoc", "--annotatedDoc",
     ]
 
     @Test("Every read of one of these hook names in the app's sources sits inside #if DEBUG")

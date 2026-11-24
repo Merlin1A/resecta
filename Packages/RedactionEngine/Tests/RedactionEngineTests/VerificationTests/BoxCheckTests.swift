@@ -49,21 +49,30 @@ struct BoxCheckTests {
         Case(number: 33, name: "a report smaller with every block the fill; a report past the image; no report"),
         Case(number: 34, name: "a Letter record with a 2,550 by 3,300 frame, and with 3,301 rows"),
         Case(number: 35, name: "a Letter box in the top block row, its report read with rows from the bottom"),
+        Case(number: 36, name: "boxes with no area on the page's edges, and one turned inside out across one: none off its page"),
     ]
 
-    @Test("The table holds the check's 23 cases; with the page-image reader's 12 they make 35")
+    @Test("The table holds the check's 24 cases; with the page-image reader's 12 they make 36")
     func tableLength() {
-        #expect(Self.cases.count == 23)
-        #expect(Self.cases.count + PageImageReadTests.cases.count == 35)
-        #expect(Set(Self.cases.map(\.number)).count == 23)
+        #expect(Self.cases.count == 24)
+        #expect(Self.cases.count + PageImageReadTests.cases.count == 36)
+        #expect(Set(Self.cases.map(\.number)).count == 24)
     }
 
-    @Test("The check's planted failures are eleven, each a patch in the repository's Mutants folder")
+    @Test("The check's planted failures are fourteen, each a patch in the repository's Mutants folder")
     func plantedFailures() throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("../../../../../Mutants").standardized
         let names = try FileManager.default.contentsOfDirectory(atPath: root.path)
             .filter { $0.hasPrefix("box-check-") && $0.hasSuffix(".patch") }
-        #expect(names.count == 11, "\(names.sorted())")
+        #expect(names.count == 14, "\(names.sorted())")
+    }
+
+    @Test("The drawing reader's planted failures are twenty-seven, each a patch in the repository's Mutants folder")
+    func drawingPlantedFailures() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("../../../../../Mutants").standardized
+        let names = try FileManager.default.contentsOfDirectory(atPath: root.path)
+            .filter { $0.hasPrefix("box-drawing-") && $0.hasSuffix(".patch") }
+        #expect(names.count == 27, "\(names.sorted())")
     }
 
     // MARK: - helpers
@@ -266,6 +275,17 @@ struct BoxCheckTests {
             let three = F.judge(b, report: report2, on: w3, dpi: 300, sides: Self.letter)
             guard case .issue(_, let blocks) = three else { Issue.record("(iii) an issue expected: \(three)"); return }
             #expect(blocks == [BoxWrongBlock(component: 0, column: 60, row: 2)], "(iii) the grey block: \(blocks)")
+        case 36:
+            // Zero width on the left and right edges, zero height on the bottom and top, and a box
+            // whose right edge lies left of its left edge across the page's left edge. Each would
+            // read as off its page by its edges alone; none has an area, so none is passed.
+            let (walk, _) = F.walk(F.picture(width: 600, height: 600, marks: []))
+            let boxes = [F.r(0, 2000, 0, 3000), F.r(9216, 2000, 9216, 3000), F.r(2000, 0, 3000, 0),
+                         F.r(2000, 9216, 3000, 9216), F.r(64, 2000, -64, 3000)].map { F.box($0) }
+            for b in boxes {
+                #expect(F.judge(b, report: nil, on: walk, dpi: 300, sides: Self.square) == .inconclusive(ExactFillCheck.mapsToNoPixel, nil),
+                        "\(b.inner)")
+            }
         default:
             Issue.record("case \(c.number) has no body")
         }
