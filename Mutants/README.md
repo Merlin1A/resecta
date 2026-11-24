@@ -708,3 +708,5 @@ with its reason and the mutant that is caught in its place.
 | `kept-plan-always-from-the-stored-regions.patch` | A kept plan says whether it was drawn from the stored regions or a working copy. | ResectaAppTests/OverlayDrawnPlanTests keptPlanIsStamped |
 | `cap-change-re-keeps-a-plan-of-an-older-version.patch` | A cap change leaves a kept plan of an older version of its page as it was. | ResectaAppTests/OverlayDrawnPlanTests aCapChangeKeepsOnlyWhatWasDrawn |
 | `cap-change-re-keeps-only-the-pages-on-screen.patch` | A cap change keeps every current kept plan at the new quality, on screen or not. | ResectaAppTests/OverlayDrawnPlanTests aCapChangeRedrawsThePagesOnScreen |
+| `reset-keeps-the-drawn-plans.patch` | A new document, or clearing all, drops the plans kept for the last one. | ResectaAppTests/OverlayDrawnPlanTests aNewDocumentDropsTheKeptPlans |
+| `view-does-not-hand-the-settings.patch` | The editor's view hands the coordinator the settings when it makes it and on each update. | ResectaAppTests/OverlayDrawnPlanTests theViewHandsOnTheSettings |
