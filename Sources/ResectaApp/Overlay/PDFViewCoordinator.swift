@@ -593,7 +593,9 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
     }
 
     /// The selected boxes on the page in view, in the PDF view's points,
-    /// with the page's frame there.
+    /// with the page's frame there. A region is kept in the frame the page
+    /// is shown in, so it is turned back to the stored page first, as the
+    /// overlay draws it.
     func selectedBoxesInView(_ pdfView: PDFView) -> (boxes: [CGRect], page: CGRect)? {
         guard let state = redactionState, let document = pdfView.document else { return nil }
         let index = documentState?.currentPageIndex ?? 0
@@ -601,7 +603,8 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
         let pageBounds = page.bounds(for: pdfView.displayBox)
         let boxes = (state.regions[index] ?? [])
             .filter { state.selectedRegionIDs.contains($0.id) }
-            .map { pdfView.convert(normalizedToPDFPageCoordinates($0.normalizedRect, pageRect: pageBounds), from: page) }
+            .map { pdfView.convert(PDFDocumentView.pageRect(forShown: $0.normalizedRect, on: page, box: pdfView.displayBox),
+                                   from: page) }
         return (boxes, pdfView.convert(pageBounds, from: page))
     }
 
@@ -612,7 +615,12 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
         let atTop = SelectionBarClearance.barAtTop(
             selection: SelectionBarClearance.selectionRect(boxes: read.boxes, page: read.page),
             bottomBar: bar, canvas: pdfView.bounds)
-        Task { @MainActor [weak self] in self?.onSelectionBarPlace?(atTop) }
+        Task { @MainActor [weak self] in
+            // A bar taken down before this turn hears nothing: the next bar
+            // starts at the bottom and is measured there.
+            guard let self, self.selectionBarFrame != nil else { return }
+            self.onSelectionBarPlace?(atTop)
+        }
     }
 
     /// The one home for when one finger scrolls: while the Rectangle tool
