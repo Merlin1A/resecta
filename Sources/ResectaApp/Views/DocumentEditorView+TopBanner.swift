@@ -219,12 +219,12 @@ extension DocumentEditorView {
     /// The fit notice's words: the page in view holds a box drawn wider than
     /// its word, because the ink fit could not fit it
     /// (`RedactionState+WidenedBoxes`).
-    static let fitNoticeText = "Some boxes here are wider than their words. Keep them wide."
+    static let fitNoticeText = "Some boxes here are larger than their words. Keep them that size."
     /// The same at the accessibility sizes.
-    static let fitNoticeShortText = "Wide boxes: keep them wide"
+    static let fitNoticeShortText = "Larger boxes: keep their size"
     /// The fit notice as VoiceOver speaks it: the reason and the ask.
-    static let fitNoticeSpokenText = "Some boxes on this page were drawn wider than their words, because the "
-        + "text could not be fitted to the printed words. Keep them wide: shrinking one can leave part of a word readable."
+    static let fitNoticeSpokenText = "Some boxes on this page were drawn larger than their words, because the "
+        + "text could not be fitted to the printed words. Keep them that size: shrinking one can leave part of a word readable."
 
     /// Whether the fit notice holds: the page in view holds a widened box and
     /// the person has not closed the notice for it.

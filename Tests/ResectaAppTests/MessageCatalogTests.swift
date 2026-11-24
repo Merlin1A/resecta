@@ -223,9 +223,9 @@ struct MessageCatalogTests {
                 annotationCount: annotationCount, filledFormFieldCount: filledFormFieldCount,
                 carriesFormDataOrAttachments: carries)
         case .fitNotice:
-            return "Some boxes here are wider than their words. Keep them wide."
+            return "Some boxes here are larger than their words. Keep them that size."
         case .fitNoticeShort:
-            return "Wide boxes: keep them wide"
+            return "Larger boxes: keep their size"
         case .runInProgressSettings:
             return SettingsView.runInProgressTitle
         }

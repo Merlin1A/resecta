@@ -48,19 +48,19 @@ struct WidenedBoxNoticeTests {
     @Test("The sheet's banner names the pages, one-based, singular and plural")
     func bannerHeadline() {
         #expect(SearchResultsSection.widenedBoxBannerHeadline(pages: [2])
-                == "Some boxes on page 3 were drawn wider than their words, because the text could not be fitted to the printed words. Keep them wide: shrinking one can leave part of a word readable.")
+                == "Some boxes on page 3 were drawn larger than their words, because the text could not be fitted to the printed words. Keep them that size: shrinking one can leave part of a word readable.")
         #expect(SearchResultsSection.widenedBoxBannerHeadline(pages: [0, 4])
-                == "Some boxes on pages 1 and 5 were drawn wider than their words, because the text could not be fitted to the printed words. Keep them wide: shrinking one can leave part of a word readable.")
+                == "Some boxes on pages 1 and 5 were drawn larger than their words, because the text could not be fitted to the printed words. Keep them that size: shrinking one can leave part of a word readable.")
     }
 
     @Test("The fit notice's words, shorter at accessibility sizes, and its one spoken sentence")
     func captionWords() {
-        #expect(DocumentEditorView.fitNoticeText == "Some boxes here are wider than their words. Keep them wide.")
-        #expect(DocumentEditorView.fitNoticeShortText == "Wide boxes: keep them wide")
+        #expect(DocumentEditorView.fitNoticeText == "Some boxes here are larger than their words. Keep them that size.")
+        #expect(DocumentEditorView.fitNoticeShortText == "Larger boxes: keep their size")
         #expect(MessageCatalog.row(for: .fitNotice).text == DocumentEditorView.fitNoticeText)
         #expect(MessageCatalog.row(for: .fitNoticeShort).text == DocumentEditorView.fitNoticeShortText)
         #expect(DocumentEditorView.fitNoticeSpokenText
-                == "Some boxes on this page were drawn wider than their words, because the text could not be fitted to the printed words. Keep them wide: shrinking one can leave part of a word readable.")
+                == "Some boxes on this page were drawn larger than their words, because the text could not be fitted to the printed words. Keep them that size: shrinking one can leave part of a word readable.")
     }
 
     // MARK: - Before the apply

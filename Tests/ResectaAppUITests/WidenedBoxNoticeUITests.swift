@@ -109,7 +109,7 @@ nonisolated final class WidenedBoxNoticeUITests: XCTestCase {
         launch(widenPage: 0)
         let banner = element("widenedBoxBanner")
         XCTAssertTrue(banner.waitForExistence(timeout: 30), "The results sheet must name the page with widened boxes.")
-        XCTAssertTrue(banner.label.contains("page 1 were drawn wider"), "The banner reads \"\(banner.label)\".")
+        XCTAssertTrue(banner.label.contains("page 1 were drawn larger"), "The banner reads \"\(banner.label)\".")
         attachScreenshot(named: "widened-banner")
 
         app.buttons["resultNavNext"].tap()
