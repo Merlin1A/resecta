@@ -14,6 +14,35 @@ extension RedactStop {
         /// The units the group holds for; nil when it holds for every unit, and so carries no name.
         let units: Set<RedactStopUnit>?
         let pages: [Int]
+        /// For "not reached" only: how the runs of its units ended.
+        var notReachedEnding: NotReachedEnding? = nil
+    }
+
+    /// How the units of a "not reached" group ended. A line names the cause
+    /// only when every unit of the group ended the same way.
+    enum NotReachedEnding: Hashable, Sendable {
+        case stopped, atResultLimit
+        /// The units ended in different ways; the line names no cause.
+        case differs
+    }
+
+    /// The ending of a "not reached" group: each unit's own account's ending.
+    static func notReachedEnding(of units: Set<RedactStopUnit>, runs: [Run]) -> NotReachedEnding? {
+        var seen = Set<NotReachedEnding>()
+        for unit in units {
+            switch account(for: unit, in: runs)?.ending {
+            case .stopped: seen.insert(.stopped)
+            case .stoppedAtResultLimit: seen.insert(.atResultLimit)
+            case .completed, nil: continue
+            }
+        }
+        if seen.count > 1 { return .differs }
+        return seen.first
+    }
+
+    /// A group's units in the order their runs first held them, for its name line.
+    static func names(of group: Group, runs: [Run]) -> [RedactStopUnit] {
+        units(of: runs).filter { group.units?.contains($0) ?? true }
     }
 
     /// The reasons in the order the stop shows them: the Search sheet's
@@ -36,7 +65,8 @@ extension RedactStop {
             var pagesBySet: [Set<RedactStopUnit>: [Int]] = [:]
             for (page, units) in unitsByPage { pagesBySet[units, default: []].append(page) }
             let made = pagesBySet.map { units, pages in
-                Group(reason: reason, units: units == all ? nil : units, pages: pages.sorted())
+                Group(reason: reason, units: units == all ? nil : units, pages: pages.sorted(),
+                      notReachedEnding: reason == .line(.notReached) ? notReachedEnding(of: units, runs: runs) : nil)
             }
             groups += made.sorted { a, b in
                 if (a.units == nil) != (b.units == nil) { return a.units == nil }
@@ -46,12 +76,26 @@ extension RedactStop {
         return groups
     }
 
-    /// The texts named in more than one group by different units: their
-    /// names also say the options that differ.
-    static func textsNamedWithOptions(_ groups: [Group]) -> Set<String> {
-        var unitsByText: [String: Set<RedactStopUnit>] = [:]
-        for group in groups { for unit in group.units ?? [] { unitsByText[unit.text, default: []].insert(unit) } }
-        return Set(unitsByText.filter { $0.value.count > 1 }.keys)
+    /// A searched text by its kind: a typed text and a pattern with the same
+    /// characters are two names.
+    struct NamedText: Hashable, Sendable {
+        let kind: RedactStopUnit.Kind
+        let text: String
+    }
+
+    /// The texts whose names also say the options that differ: those with two
+    /// units that stand in different groups. Units of one text that are
+    /// always in the same groups need no options to tell them apart.
+    static func textsNamedWithOptions(_ groups: [Group]) -> Set<NamedText> {
+        var groupsByUnit: [RedactStopUnit: Set<Int>] = [:]
+        for (index, group) in groups.enumerated() {
+            for unit in group.units ?? [] { groupsByUnit[unit, default: []].insert(index) }
+        }
+        var placesByText: [NamedText: Set<Set<Int>>] = [:]
+        for (unit, places) in groupsByUnit {
+            placesByText[NamedText(kind: unit.kind, text: unit.text), default: []].insert(places)
+        }
+        return Set(placesByText.filter { $0.value.count > 1 }.keys)
     }
 
     /// The one run "Search These Pages" starts for a group, or nil when it

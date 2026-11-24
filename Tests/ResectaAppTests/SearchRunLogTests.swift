@@ -48,7 +48,11 @@ struct SearchRunLogTests {
         let file = URL(fileURLWithPath: "\(#filePath)")
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .appendingPathComponent("Sources/ResectaApp/State/SearchRun.swift")
+        // Comment lines are left out, so a comment quoting the install cannot stand in for it.
         let text = try String(contentsOf: file, encoding: .utf8)
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+            .joined(separator: "\n")
         let install = [
             "        searchState.accountReplacedSink = { [weak redactionState] token in",
             "            redactionState?.recordSearchRunReplaced(token: token)",

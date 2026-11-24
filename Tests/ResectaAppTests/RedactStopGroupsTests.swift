@@ -106,7 +106,8 @@ struct RedactStopGroupsTests {
         let runs: [RedactStop.Run] = [(Self.text("Delia"), first), (Self.text("Rourke"), first), (shared, rerun)]
         let groups = RedactStop.groups(runs: runs, answered: [])
         #expect(groups == [RedactStop.Group(reason: .searchedInPart, units: nil, pages: [4]),
-                           RedactStop.Group(reason: .line(.notReached), units: nil, pages: [8, 11])])
+                           RedactStop.Group(reason: .line(.notReached), units: nil, pages: [8, 11],
+                                            notReachedEnding: .atResultLimit)])
         #expect(groups.allSatisfy { RedactStop.reRun(for: $0, runs: runs) == nil })
     }
 
@@ -132,8 +133,51 @@ struct RedactStopGroupsTests {
         // Named once a different unit of the same text stands in another group.
         let split = [RedactStop.Group(reason: .line(.recognitionOff), units: [Self.unit(.text, "Hartwell", one)], pages: [2]),
                      RedactStop.Group(reason: .line(.tooLarge), units: [Self.unit(.text, "Hartwell", two)], pages: [4])]
-        #expect(RedactStop.textsNamedWithOptions(split) == ["Hartwell"])
+        #expect(RedactStop.textsNamedWithOptions(split) == [RedactStop.NamedText(kind: .text, text: "Hartwell")])
         #expect(RedactStop.textsNamedWithOptions(second).isEmpty)
+    }
+
+    @Test("Options are named only for a text whose units stand in different groups, and a pattern is its own text")
+    func optionsNamedOnlyWhenApart() {
+        let one = SearchOptions(caseSensitive: true, foldDiacritics: true)
+        let two = SearchOptions(caseSensitive: false, foldDiacritics: false)
+        let together = [RedactStop.Group(reason: .line(.recognitionOff),
+                                         units: [Self.unit(.text, "Hartwell", one), Self.unit(.text, "Hartwell", two)], pages: [2])]
+        #expect(RedactStop.textsNamedWithOptions(together).isEmpty)
+        let kinds = [RedactStop.Group(reason: .line(.recognitionOff), units: [Self.unit(.text, "a+")], pages: [2]),
+                     RedactStop.Group(reason: .line(.tooLarge), units: [Self.unit(.pattern, "a+")], pages: [4])]
+        #expect(RedactStop.textsNamedWithOptions(kinds).isEmpty)
+    }
+
+    @Test("A pattern's unit holds neither Accents nor digit separators, which change nothing it matches")
+    func patternIgnoresAccentsAndDigits() {
+        let plain = Self.unit(.pattern, "[0-9]{3}")
+        #expect(Self.unit(.pattern, "[0-9]{3}", SearchOptions(stripDigitSeparators: true, foldDiacritics: true)) == plain)
+        #expect(Self.unit(.text, "123", SearchOptions(stripDigitSeparators: true)) != Self.unit(.text, "123"))
+    }
+
+    @Test("A group names its searches in the order they were first run")
+    func namesInRunOrder() {
+        let runs: [RedactStop.Run] = [(Self.text("Rourke"), Self.unread), (Self.text("Delia"), Self.unread),
+                                      (Self.text("Moss"), Self.read)]
+        let group = RedactStop.Group(reason: .line(.recognitionOff),
+                                     units: [Self.unit(.text, "Delia"), Self.unit(.text, "Rourke")], pages: [2])
+        #expect(RedactStop.names(of: group, runs: runs) == [Self.unit(.text, "Rourke"), Self.unit(.text, "Delia")])
+    }
+
+    @Test("Not reached names the way its runs ended only when every one ended that way")
+    func notReachedEnding() {
+        let stopped = Self.account([[.ownText], [], []], .stopped(page: 0))
+        let atLimit = Self.account([[.ownText], [], []], .stoppedAtResultLimit(page: 0))
+        let delia = Self.unit(.text, "Delia"), rourke = Self.unit(.text, "Rourke")
+        let same: [RedactStop.Run] = [(Self.text("Delia"), stopped), (Self.text("Rourke"), stopped)]
+        #expect(RedactStop.notReachedEnding(of: [delia, rourke], runs: same) == .stopped)
+        let limits: [RedactStop.Run] = [(Self.text("Delia"), atLimit), (Self.text("Rourke"), atLimit)]
+        #expect(RedactStop.notReachedEnding(of: [delia, rourke], runs: limits) == .atResultLimit)
+        let mixed: [RedactStop.Run] = [(Self.text("Delia"), stopped), (Self.text("Rourke"), atLimit)]
+        #expect(RedactStop.notReachedEnding(of: [delia, rourke], runs: mixed) == .differs)
+        let groups = RedactStop.groups(runs: mixed, answered: [])
+        #expect(groups.first { $0.reason == .line(.notReached) }?.notReachedEnding == .differs)
     }
 
     @Test("The user's all-terms option on: the button's run is any term, and the user's setting is left as it was")

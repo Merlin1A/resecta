@@ -30,8 +30,10 @@ struct RedactStopUnit: Hashable, Sendable {
         self.text = kind == .scan ? "" : text
         caseSensitive = options.caseSensitive
         wholeWord = options.wholeWord
-        accents = options.foldDiacritics
-        digitSeparators = options.stripDigitSeparators
+        // Accents and digit separators change nothing a pattern matches, so
+        // a pattern's unit does not hold them.
+        accents = kind == .pattern ? false : options.foldDiacritics
+        digitSeparators = kind == .pattern ? false : options.stripDigitSeparators
         quotesAndDashes = options.normalizeSmartPunctuation
     }
 
