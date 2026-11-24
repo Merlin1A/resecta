@@ -5,10 +5,10 @@ import UIKit
 import RedactionEngine
 @testable import ResectaApp
 
-// The selection under Differentiate Without Color. A selected region is
-// blue and an unselected one red, green or orange; with the setting on,
-// colour alone does not tell them apart, so every member of a
-// multi-selection also carries a dashed outline 2 on-screen points wide
+// The selection under Differentiate Without Color. Every box's line is
+// page teal, at rest and selected; with the setting on, every selected box
+// that shows no handles (a multi-selection, or one box with Add to
+// Selection on) also carries a dashed outline 2 on-screen points wide
 // (a single selection shows its handles). Nothing changes with the
 // setting off. The overlay redraws when the setting changes.
 
@@ -16,7 +16,7 @@ import RedactionEngine
 @MainActor
 struct SelectedCueTests {
 
-    @Test("Every member of a multi-selection carries the dashed outline only while the setting is on")
+    @Test("Every selected box without handles carries the dashed outline only while the setting is on")
     func cueOnlyUnderTheSetting() {
         let fingerScale: CGFloat = 1 / 0.64
         #expect(RedactionOverlayView.selectionCue(isSelected: true, selectionCount: 3, differentiateWithoutColor: false, fingerScale: fingerScale) == nil)
@@ -26,6 +26,11 @@ struct SelectedCueTests {
         #expect(RedactionOverlayView.selectionCue(isSelected: false, selectionCount: 3, differentiateWithoutColor: true, fingerScale: fingerScale) == nil)
         #expect(RedactionOverlayView.selectionCue(isSelected: true, selectionCount: 1, differentiateWithoutColor: true, fingerScale: fingerScale) == nil,
                 "a single selection shows its handles")
+        #expect(RedactionOverlayView.selectionCue(isSelected: true, selectionCount: 1, differentiateWithoutColor: true,
+                                                  fingerScale: fingerScale, handlesActive: false) != nil,
+                "one box with Add to Selection on shows dots, not handles, so it carries the cue")
+        #expect(RedactionOverlayView.selectionCue(isSelected: true, selectionCount: 1, differentiateWithoutColor: false,
+                                                  fingerScale: fingerScale, handlesActive: false) == nil)
     }
 
     @Test("The outline is 2 on-screen points wide at the fit zoom and at 2x")

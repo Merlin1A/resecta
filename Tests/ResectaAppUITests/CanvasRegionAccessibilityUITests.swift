@@ -74,7 +74,7 @@ nonisolated final class CanvasRegionAccessibilityUITests: XCTestCase {
         XCTAssertTrue(box.waitForExistence(timeout: 10), "the box is in the accessibility tree")
 
         // The canvas is not dimmed while the sheet is parked.
-        let before = try XCTUnwrap(try settledDrawnBounds(), "the box's red line is on the parked canvas")
+        let before = try XCTUnwrap(try settledDrawnBounds(), "the box's teal line is on the parked canvas")
         attachScreenshot(named: "box-element-sheet-parked")
         assertOnTheBox(box.frame, before, "with the sheet parked")
 
@@ -85,7 +85,7 @@ nonisolated final class CanvasRegionAccessibilityUITests: XCTestCase {
         XCTAssertTrue(dismiss.waitForNonExistence(timeout: 10), "the Search sheet did not close")
         XCTAssertTrue(compactFloatStrip.waitForNonExistence(timeout: 10), "the parked strip is still up")
 
-        let after = try XCTUnwrap(try settledDrawnBounds(), "the box's red line settled once the sheet closed")
+        let after = try XCTUnwrap(try settledDrawnBounds(), "the box's teal line settled once the sheet closed")
         attachScreenshot(named: "box-element-sheet-closed")
         XCTAssertGreaterThan(
             abs(after.minY - before.minY), 20,
@@ -106,12 +106,12 @@ nonisolated final class CanvasRegionAccessibilityUITests: XCTestCase {
         drawBox(CGRect(x: page.midX - 70, y: 300, width: 140, height: 40))
         let box = regionElement
         XCTAssertTrue(box.waitForExistence(timeout: 10), "the box is in the accessibility tree")
-        let before = try XCTUnwrap(try settledDrawnBounds(), "the box's red line is on the fit page")
+        let before = try XCTUnwrap(try settledDrawnBounds(), "the box's teal line is on the fit page")
         attachScreenshot(named: "box-element-fit-page")
         assertOnTheBox(box.frame, before, "on the fit page")
 
         XCTAssertTrue(try pinchToZoom(above: page), "the pinch zoomed the page")
-        let after = try XCTUnwrap(try settledDrawnBounds(), "the box's red line settled after the pinch")
+        let after = try XCTUnwrap(try settledDrawnBounds(), "the box's teal line settled after the pinch")
         attachScreenshot(named: "box-element-after-pinch")
         XCTAssertGreaterThanOrEqual(
             after.width, before.width * 1.2,
@@ -122,8 +122,9 @@ nonisolated final class CanvasRegionAccessibilityUITests: XCTestCase {
             after.minX > screen.minX + 1 && after.maxX < screen.maxX - 1,
             "the zoomed box is whole on screen, so its drawn bounds are its own: \(after)"
         )
-        // The line is drawn with the page: 2 pt wide at fit, so 1 pt outside
-        // the box there, and zoom times that once the page is zoomed. The
+        // The line is drawn with the page: 1.4 pt wide at fit at rest, so
+        // 0.7 pt outside the box there, and zoom times that once the page is
+        // zoomed (the measures below were taken with the 2-pt line before). The
         // probe reads whole points, which adds up to 1 pt more. At fit this
         // is the 2 pt of the other reads. Measured on iOS 26.4.1 after a 2x
         // pinch: a zoom of about 1.78 (drawn width 142 pt, then 253 pt); read
@@ -194,17 +195,21 @@ private extension CanvasRegionAccessibilityUITests {
         XCTAssertTrue(waitForRegionCount(1), "the box drew")
     }
 
-    /// The bounds of the box's red line once two screenshots 0.3 s apart
+    /// The bounds of the box's teal line once two screenshots 0.3 s apart
     /// show it in the same place; nil if it never settles or is not found.
-    /// The line is 2 pt wide, so the drawn bounds are 1 pt outside the box.
+    /// The line at rest is 1.4 pt wide, so the drawn bounds are 0.7 pt
+    /// outside the box. The band starts below the navigation bar, whose
+    /// items are teal too.
     nonisolated func settledDrawnBounds(timeout: TimeInterval = 10) throws -> CGRect? {
         let size = window.frame.size
-        let band = CGRect(x: 0, y: 60, width: size.width, height: size.height * 0.75 - 60)
+        let bar = app.navigationBars.firstMatch
+        let top = max(60, bar.exists ? bar.frame.maxY + 2 : 0)
+        let band = CGRect(x: 0, y: top, width: size.width, height: size.height * 0.75 - top)
         let deadline = Date().addingTimeInterval(timeout)
-        var last = try probe().tintBounds(.red, in: band)
+        var last = try probe().tintBounds(.teal, in: band)
         while Date() < deadline {
             usleep(300_000)
-            let next = try probe().tintBounds(.red, in: band)
+            let next = try probe().tintBounds(.teal, in: band)
             if let a = last, let b = next,
                abs(a.minX - b.minX) < 0.5, abs(a.minY - b.minY) < 0.5,
                abs(a.width - b.width) < 0.5, abs(a.height - b.height) < 0.5 {
