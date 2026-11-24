@@ -4,16 +4,16 @@ import Foundation
 
 // The bottom slot above the page bar holds at most one occupant: the first
 // that asks, in the order message, first-time line, selection (Add to
-// Selection is its adding state), drawing caption, widened-box notice. A
-// selection made after the message takes the slot from it. Outside editing
-// nothing holds it.
+// Selection is its adding state), drawing caption. A selection made after
+// the message takes the slot from it. Outside editing nothing holds it. The
+// widened-box notice is not here: it is the band's fit notice.
 
 @Suite("Bottom slot")
 struct BottomSlotTests {
 
     /// One asker of the slot.
     nonisolated enum Asker: String, CaseIterable, Sendable {
-        case message, firstTimeLine, selection, addToSelection, drawingCaption, widenedBoxes
+        case message, firstTimeLine, selection, addToSelection, drawingCaption
     }
 
     /// A set of askers and the occupant they must give.
@@ -34,8 +34,7 @@ struct BottomSlotTests {
             firstTimeLineDue: askers.contains(.firstTimeLine),
             selectedCount: askers.contains(.selection) ? 2 : 0,
             addToSelection: askers.contains(.addToSelection),
-            activeTool: askers.contains(.drawingCaption) ? .rectangle : nil,
-            widenedOnPage: askers.contains(.widenedBoxes)
+            activeTool: askers.contains(.drawingCaption) ? .rectangle : nil
         )
     }
 
@@ -47,26 +46,19 @@ struct BottomSlotTests {
         Case(askers: [.selection], expected: .selection(adding: false)),
         Case(askers: [.addToSelection], expected: .selection(adding: true)),
         Case(askers: [.drawingCaption], expected: .drawingCaption),
-        Case(askers: [.widenedBoxes], expected: .widenedBoxes),
         // A message with anyone.
         Case(askers: [.message, .firstTimeLine], expected: .message),
         Case(askers: [.message, .selection], expected: .message),
         Case(askers: [.message, .addToSelection], expected: .message),
         Case(askers: [.message, .drawingCaption], expected: .message),
-        Case(askers: [.message, .widenedBoxes], expected: .message),
         // The first-time line with anyone after it.
         Case(askers: [.firstTimeLine, .selection], expected: .firstTimeLine),
         Case(askers: [.firstTimeLine, .addToSelection], expected: .firstTimeLine),
         Case(askers: [.firstTimeLine, .drawingCaption], expected: .firstTimeLine),
-        Case(askers: [.firstTimeLine, .widenedBoxes], expected: .firstTimeLine),
         // A selection: Add to Selection is one occupant in its adding state.
         Case(askers: [.selection, .addToSelection], expected: .selection(adding: true)),
         Case(askers: [.selection, .drawingCaption], expected: .selection(adding: false)),
-        Case(askers: [.selection, .widenedBoxes], expected: .selection(adding: false)),
         Case(askers: [.addToSelection, .drawingCaption], expected: .selection(adding: true)),
-        Case(askers: [.addToSelection, .widenedBoxes], expected: .selection(adding: true)),
-        // The drawing caption before the widened-box notice.
-        Case(askers: [.drawingCaption, .widenedBoxes], expected: .drawingCaption),
     ]
 
     @Test("One occupant: every pair of askers has one winner, in the slot's order", arguments: cases)
@@ -93,7 +85,6 @@ struct BottomSlotTests {
         // With no message, "newer" changes nothing.
         #expect(Self.occupant([.selection], selectionNewer: true) == .selection(adding: false))
         #expect(Self.occupant([.drawingCaption], selectionNewer: true) == .drawingCaption)
-        #expect(Self.occupant([.drawingCaption, .widenedBoxes], selectionNewer: true) == .drawingCaption)
         #expect(Self.occupant([], selectionNewer: true) == nil)
         // A newer selection does not pass the message when there is none.
         #expect(Self.occupant([.message, .drawingCaption], selectionNewer: true) == .message)
@@ -115,7 +106,7 @@ struct BottomSlotTests {
             DocumentEditorView.bottomSlotOccupant(
                 phaseKind: .editing, messageShowing: false, selectionNewerThanMessage: false,
                 firstTimeLineDue: false, selectedCount: count, addToSelection: adding,
-                activeTool: tool, widenedOnPage: false)
+                activeTool: tool)
         }
         #expect(plain(0) == nil)
         #expect(plain(1) == .selection(adding: false))
@@ -134,6 +125,16 @@ struct BottomSlotTests {
             "Sources/ResectaApp/Views/DocumentEditorView+Caption.swift"), encoding: .utf8)
         #expect(source.contains("selectedCount: redactionState.selectedRegionIDs.count,"))
         #expect(source.contains("case .selection(adding: false): SelectionBar(toolbar: editorToolbar)"))
+    }
+
+    @Test("The bottom slot holds no widened-box notice")
+    func noWidenedBoxNotice() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let source = try String(contentsOf: root.appendingPathComponent(
+            "Sources/ResectaApp/Views/DocumentEditorView+Caption.swift"), encoding: .utf8)
+        #expect(!source.contains("widenedBox"), "the slot's file names no widened box")
+        #expect(!source.contains("pageHoldsWidenedBox"), "and does not read the widened pages")
     }
 
     @Test("The slot's measures")

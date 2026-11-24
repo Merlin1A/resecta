@@ -7,7 +7,7 @@ import RedactionEngine
 // The widened-box notice: a Search box the ink fit could not fit to the
 // printed word is drawn larger (`SearchResult.inkFitDegraded`). The results
 // sheet names the pages holding one, and the page in view says so in the
-// bottom capsule, before the apply and after it. The notice is on a page iff
+// editor's band (the fit notice), before the apply and after it. The notice is on a page iff
 // a result or a live applied region there is widened; it rides undo and redo
 // with its region, stays when the region is resized, and goes when the
 // region is deleted.
@@ -48,18 +48,19 @@ struct WidenedBoxNoticeTests {
     @Test("The sheet's banner names the pages, one-based, singular and plural")
     func bannerHeadline() {
         #expect(SearchResultsSection.widenedBoxBannerHeadline(pages: [2])
-                == "Some boxes on page 3 were drawn wider than their words, because the text could not be fitted to the printed words. Keep them wide: shrinking one can leave part of a word readable.")
+                == "Some boxes on page 3 were drawn larger than their words, because the text could not be fitted to the printed words. Keep them that size: shrinking one can leave part of a word readable.")
         #expect(SearchResultsSection.widenedBoxBannerHeadline(pages: [0, 4])
-                == "Some boxes on pages 1 and 5 were drawn wider than their words, because the text could not be fitted to the printed words. Keep them wide: shrinking one can leave part of a word readable.")
+                == "Some boxes on pages 1 and 5 were drawn larger than their words, because the text could not be fitted to the printed words. Keep them that size: shrinking one can leave part of a word readable.")
     }
 
-    @Test("The page capsule's words, shorter at accessibility sizes, and its one spoken sentence")
+    @Test("The fit notice's words, shorter at accessibility sizes, and its one spoken sentence")
     func captionWords() {
-        #expect(DocumentEditorView.widenedBoxCaption(accessibilitySize: false)
-                == "Some boxes here are wider than their words. Keep them wide.")
-        #expect(DocumentEditorView.widenedBoxCaption(accessibilitySize: true) == "Wide boxes: keep them wide")
-        #expect(DocumentEditorView.widenedBoxAccessibilityLabel
-                == "Some boxes on this page were drawn wider than their words, because the text could not be fitted to the printed words. Keep them wide: shrinking one can leave part of a word readable.")
+        #expect(DocumentEditorView.fitNoticeText == "Some boxes here are larger than their words. Keep them that size.")
+        #expect(DocumentEditorView.fitNoticeShortText == "Larger boxes: keep their size")
+        #expect(MessageCatalog.row(for: .fitNotice).text == DocumentEditorView.fitNoticeText)
+        #expect(MessageCatalog.row(for: .fitNoticeShort).text == DocumentEditorView.fitNoticeShortText)
+        #expect(DocumentEditorView.fitNoticeSpokenText
+                == "Some boxes on this page were drawn larger than their words, because the text could not be fitted to the printed words. Keep them that size: shrinking one can leave part of a word readable.")
     }
 
     // MARK: - Before the apply
@@ -131,28 +132,5 @@ struct WidenedBoxNoticeTests {
         let region = state.acceptManualDrawNudge(Self.result(page: 2, y: 0.4, widened: true), undoManager: nil)
         #expect(region != nil)
         #expect(state.widenedRegionPages == [2])
-    }
-
-    // MARK: - The capsule host
-
-    private static func occupant(activeTool: DocumentEditorView.DrawingTool?, addToSelection: Bool, phaseKind: DocumentState.PhaseKind,
-                                 widenedOnPage: Bool) -> BottomSlotOccupant? {
-        DocumentEditorView.bottomSlotOccupant(
-            phaseKind: phaseKind, messageShowing: false, selectionNewerThanMessage: false, firstTimeLineDue: false,
-            selectedCount: 0, addToSelection: addToSelection, activeTool: activeTool, widenedOnPage: widenedOnPage)
-    }
-
-    @Test("The widened-box capsule shows while editing, after the drawing caption and Add to Selection")
-    func capsulePrecedence() {
-        #expect(Self.occupant(
-            activeTool: nil, addToSelection: false, phaseKind: .editing, widenedOnPage: true) == .widenedBoxes)
-        #expect(Self.occupant(
-            activeTool: .rectangle, addToSelection: false, phaseKind: .editing, widenedOnPage: true) == .drawingCaption)
-        #expect(Self.occupant(
-            activeTool: nil, addToSelection: true, phaseKind: .editing, widenedOnPage: true) == .selection(adding: true))
-        #expect(Self.occupant(
-            activeTool: nil, addToSelection: false, phaseKind: .verifying, widenedOnPage: true) == nil)
-        #expect(Self.occupant(
-            activeTool: nil, addToSelection: false, phaseKind: .editing, widenedOnPage: false) == nil)
     }
 }
