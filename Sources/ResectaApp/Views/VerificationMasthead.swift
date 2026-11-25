@@ -19,8 +19,13 @@ extension VerificationResultsView {
 
     /// The masthead title: the status-level title, except a WARN that holds
     /// a check that could not verify (a skipped one included), which reads
-    /// `Some Checks Incomplete`.
-    static func mastheadTitle(report: VerificationReport) -> String {
+    /// `Some Checks Incomplete`; on every verdict, a result that no longer
+    /// stands reads `Out of Date`. The verdict itself is unchanged
+    /// (`VerificationStatus.title`).
+    static func mastheadTitle(
+        report: VerificationReport, outputExists: Bool = true, isStale: Bool = false
+    ) -> String {
+        guard resultStands(outputExists: outputExists, isStale: isStale) else { return outOfDateTitle }
         if report.overallStatus.isWarn, partition(report).count(.couldNotVerify) > 0 {
             return "Some Checks Incomplete"
         }
@@ -34,7 +39,7 @@ extension VerificationResultsView {
         report: VerificationReport, outputExists: Bool = true, isStale: Bool = false,
         mode: RunMode = .searchableOrUnknown, findingCount: Int = 0
     ) -> String {
-        let title = mastheadTitle(report: report)
+        let title = mastheadTitle(report: report, outputExists: outputExists, isStale: isStale)
         let sentence = mastheadSubtitle(
             report: report, outputExists: outputExists, isStale: isStale, mode: mode,
             findingCount: findingCount) ?? ""
@@ -105,6 +110,9 @@ extension VerificationResultsView {
     /// sentence gives way to it, since each would invite a share the Share
     /// button cannot make.
     static let outputMissingSentence = "\(keepEditing), then run Redact again to share the PDF."
+
+    /// The title of a result that no longer stands, on every verdict.
+    static let outOfDateTitle = "Out of Date"
 
     /// Whether the result stands: the redacted PDF exists and the boxes have
     /// not changed since it was made, exactly when Share is enabled
@@ -285,7 +293,8 @@ struct VerificationMasthead: View {
         VStack(spacing: 0) {
             CountRing(content: VerificationMasthead.ringContent(
                 report: report, outputExists: outputExists, isStale: isStale))
-            BalancedText(string: VerificationResultsView.mastheadTitle(report: report), font: .title.bold())
+            BalancedText(string: VerificationResultsView.mastheadTitle(
+                report: report, outputExists: outputExists, isStale: isStale), font: .title.bold())
                 .foregroundStyle(.primary)
                 .padding(.top, ResectaTokens.Results.ringToTitle)
             if let sentence {
