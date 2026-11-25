@@ -120,6 +120,16 @@ struct ResectaApp: App {
                 defaults.removeObject(forKey: "autoVerify")
             }
         }
+        // The first-time line: a test launch sets its flag, so no suite meets
+        // the line, unless it asks for a fresh one or for the stored value.
+        if CommandLine.arguments.contains("--uitesting") {
+            let hint = FirstDocumentHintStore(defaults: defaults)
+            if CommandLine.arguments.contains("--firstDocumentHintFresh") {
+                hint.clear()
+            } else if !CommandLine.arguments.contains("--firstDocumentHintStored") {
+                hint.markDone()
+            }
+        }
         if CommandLine.arguments.contains("--searchSourceFilter=ocr"),
            let data = try? JSONEncoder().encode(SearchState.LastSearchFilterShape(
                sourceFilter: .ocrOnly, minimumOCRConfidence: 0, sortOrder: .discoveryOrder

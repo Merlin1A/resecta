@@ -1,0 +1,19 @@
+Property: The line is due only while the document is being edited.
+Area: the first-time line in the editor
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/FirstDocumentHintTests
+Must go red: ResectaAppTests/FirstDocumentHintTests neverOutsideEditing; ResectaAppTests/FirstDocumentHintTests showsOnlyWhenDue
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/FirstDocumentHintStore.swift b/Sources/ResectaApp/State/FirstDocumentHintStore.swift
+index c1e6afe6..4bbb816b 100644
+--- a/Sources/ResectaApp/State/FirstDocumentHintStore.swift
++++ b/Sources/ResectaApp/State/FirstDocumentHintStore.swift
+@@ -77,7 +77,7 @@ enum FirstDocumentHintRules {
+     /// Due while the flag is unset, the document is being edited and no
+     /// sheet or dialog is up.
+     static func isDue(done: Bool, phaseKind: DocumentState.PhaseKind, covers: Covers) -> Bool {
+-        !done && phaseKind == .editing && !covers.any
++        !done && !covers.any
+     }
+ 
+     /// While it is due it shows, unless a message holds the slot; then it
