@@ -283,10 +283,11 @@ final class SettingsStateTests {
         #expect(view.contains("get: { settingsState.boxesAcrossColumn }"))
         // The screen reads the settings state; the run takes the switch from
         // its snapshot of the settings state (the pipeline's snapshot, the
-        // plan made from it). Each reads the property, and only the settings
-        // state names the key.
+        // plan made from it), and the editor's kept plan from the settings
+        // state, as the run makes it. Each reads the property, and only the
+        // settings state names the key.
         #expect(Set(readers) == ["SettingsState.swift", "SettingsView.swift",
-                                 "PipelineCoordinator.swift", "RunInputs.swift"])
+                                 "PipelineCoordinator.swift", "RunInputs.swift", "PDFViewCoordinator.swift"])
         #expect(keyReaders == ["SettingsState.swift"])
     }
 }
