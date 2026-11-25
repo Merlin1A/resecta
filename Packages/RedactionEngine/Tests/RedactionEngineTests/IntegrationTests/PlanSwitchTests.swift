@@ -317,6 +317,11 @@ struct PlanSwitchTests {
         }
     }
 
+    @Test("A judged box keeps today's growth in its floor until the differential count passes")
+    func judgedBoxKeepsGrowthForNow() {
+        #expect(PageRasterizer.judgedBoxKeepsGrowth)
+    }
+
     // MARK: - The record carries the verdicts
 
     @Test("The record carries each judged box's verdict, and a box the check widened or whose ink ran past the cap is in its list",

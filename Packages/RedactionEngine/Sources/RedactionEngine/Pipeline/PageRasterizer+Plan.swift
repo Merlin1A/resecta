@@ -294,6 +294,13 @@ extension PageRasterizer {
 
     // MARK: - The plan path
 
+    /// Whether a box the ink check judges keeps today's growth in its floor.
+    /// It stays true until a differential count passes: for each word, the
+    /// ink pixels the check's paint leaves unfilled that growth fills, read
+    /// from a render of that word alone, at 150 and 300 dpi, must be zero.
+    /// Only then may a judged box drop growth.
+    static let judgedBoxKeepsGrowth = true
+
     /// The plan's boxes painted, with any region no box
     /// holds painted on its own as the region path paints it. In this
     /// order: every growth read on the rendered page before any fill, then
@@ -388,7 +395,7 @@ extension PageRasterizer {
                             var rect = withRegionFills(projection.painted.bitmapRect, of: box)
                             // Its floor: "as placed", with what was shown. A box that does not
                             // project as placed still holds what was shown for it.
-                            if let floor = try asPlacedRect(box, grows: grows) {
+                            if let floor = try asPlacedRect(box, grows: grows && Self.judgedBoxKeepsGrowth) {
                                 rect = rect.union(floor)
                             } else if let shown = Self.shownFill(box: box, regions: regionsByID, raster: raster,
                                                                  shownDPI: shownDPI) {
