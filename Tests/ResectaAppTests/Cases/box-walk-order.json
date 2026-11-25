@@ -1,0 +1,682 @@
+{
+  "rule": "box-walk-order",
+  "units": "each region's stored rectangle, top-left origin, in page points (any one unit per page gives the same order); created: the region's place in its page's stored array; indexes into the walk's order",
+  "cases": [
+    {
+      "id": "one-row-reads-left-to-right",
+      "inputs": {
+        "boxes": [
+          {
+            "id": "A",
+            "page": 1,
+            "rect": {
+              "x": 300,
+              "y": 100,
+              "w": 60,
+              "h": 12
+            },
+            "created": 65
+          },
+          {
+            "id": "B",
+            "page": 1,
+            "rect": {
+              "x": 50,
+              "y": 104,
+              "w": 60,
+              "h": 12
+            },
+            "created": 66
+          },
+          {
+            "id": "C",
+            "page": 1,
+            "rect": {
+              "x": 50,
+              "y": 130,
+              "w": 60,
+              "h": 12
+            },
+            "created": 67
+          }
+        ]
+      },
+      "expected": {
+        "order": [
+          "B",
+          "A",
+          "C"
+        ]
+      }
+    },
+    {
+      "id": "half-the-smaller-height-joins",
+      "inputs": {
+        "boxes": [
+          {
+            "id": "A",
+            "page": 1,
+            "rect": {
+              "x": 300,
+              "y": 100,
+              "w": 60,
+              "h": 20
+            },
+            "created": 65
+          },
+          {
+            "id": "B",
+            "page": 1,
+            "rect": {
+              "x": 50,
+              "y": 105.9,
+              "w": 60,
+              "h": 12
+            },
+            "created": 66
+          }
+        ]
+      },
+      "expected": {
+        "order": [
+          "B",
+          "A"
+        ]
+      }
+    },
+    {
+      "id": "half-the-smaller-height-splits",
+      "inputs": {
+        "boxes": [
+          {
+            "id": "A",
+            "page": 1,
+            "rect": {
+              "x": 300,
+              "y": 100,
+              "w": 60,
+              "h": 20
+            },
+            "created": 65
+          },
+          {
+            "id": "B",
+            "page": 1,
+            "rect": {
+              "x": 50,
+              "y": 106,
+              "w": 60,
+              "h": 12
+            },
+            "created": 66
+          }
+        ]
+      },
+      "expected": {
+        "order": [
+          "A",
+          "B"
+        ]
+      }
+    },
+    {
+      "id": "pages-first",
+      "inputs": {
+        "boxes": [
+          {
+            "id": "A",
+            "page": 2,
+            "rect": {
+              "x": 50,
+              "y": 10,
+              "w": 60,
+              "h": 12
+            },
+            "created": 65
+          },
+          {
+            "id": "B",
+            "page": 1,
+            "rect": {
+              "x": 50,
+              "y": 500,
+              "w": 60,
+              "h": 12
+            },
+            "created": 66
+          }
+        ]
+      },
+      "expected": {
+        "order": [
+          "B",
+          "A"
+        ]
+      }
+    },
+    {
+      "id": "ties-keep-creation-order",
+      "inputs": {
+        "boxes": [
+          {
+            "id": "A",
+            "page": 1,
+            "rect": {
+              "x": 50,
+              "y": 100,
+              "w": 60,
+              "h": 12
+            },
+            "created": 1
+          },
+          {
+            "id": "B",
+            "page": 1,
+            "rect": {
+              "x": 50,
+              "y": 100,
+              "w": 60,
+              "h": 12
+            },
+            "created": 0
+          }
+        ]
+      },
+      "expected": {
+        "order": [
+          "B",
+          "A"
+        ]
+      }
+    },
+    {
+      "id": "same-left-in-a-row-keeps-creation-order",
+      "inputs": {
+        "boxes": [
+          {
+            "id": "A",
+            "page": 1,
+            "rect": {
+              "x": 50,
+              "y": 100,
+              "w": 60,
+              "h": 12
+            },
+            "created": 1
+          },
+          {
+            "id": "B",
+            "page": 1,
+            "rect": {
+              "x": 50,
+              "y": 103,
+              "w": 60,
+              "h": 12
+            },
+            "created": 0
+          }
+        ]
+      },
+      "expected": {
+        "order": [
+          "B",
+          "A"
+        ]
+      }
+    },
+    {
+      "id": "top-tie-anchors-on-the-earlier",
+      "inputs": {
+        "boxes": [
+          {
+            "id": "B",
+            "page": 1,
+            "rect": {
+              "x": 300,
+              "y": 100,
+              "w": 60,
+              "h": 20
+            },
+            "created": 1
+          },
+          {
+            "id": "A",
+            "page": 1,
+            "rect": {
+              "x": 200,
+              "y": 100,
+              "w": 60,
+              "h": 10
+            },
+            "created": 0
+          },
+          {
+            "id": "C",
+            "page": 1,
+            "rect": {
+              "x": 10,
+              "y": 106,
+              "w": 60,
+              "h": 20
+            },
+            "created": 2
+          }
+        ]
+      },
+      "expected": {
+        "order": [
+          "A",
+          "B",
+          "C"
+        ]
+      }
+    },
+    {
+      "id": "rows-anchor-on-their-first-box",
+      "inputs": {
+        "boxes": [
+          {
+            "id": "A",
+            "page": 1,
+            "rect": {
+              "x": 300,
+              "y": 100,
+              "w": 60,
+              "h": 12
+            },
+            "created": 65
+          },
+          {
+            "id": "B",
+            "page": 1,
+            "rect": {
+              "x": 50,
+              "y": 105,
+              "w": 60,
+              "h": 12
+            },
+            "created": 66
+          },
+          {
+            "id": "C",
+            "page": 1,
+            "rect": {
+              "x": 10,
+              "y": 110,
+              "w": 60,
+              "h": 12
+            },
+            "created": 67
+          }
+        ]
+      },
+      "expected": {
+        "order": [
+          "B",
+          "A",
+          "C"
+        ]
+      }
+    },
+    {
+      "id": "the-mixed-seed-by-its-rectangles",
+      "inputs": {
+        "boxes": [
+          {
+            "id": "name",
+            "page": 1,
+            "rect": {
+              "x": 54.0,
+              "y": 131.828,
+              "w": 80.785,
+              "h": 12.705
+            },
+            "created": 0
+          },
+          {
+            "id": "street",
+            "page": 1,
+            "rect": {
+              "x": 54.0,
+              "y": 144.828,
+              "w": 103.821,
+              "h": 12.705
+            },
+            "created": 1
+          },
+          {
+            "id": "acct",
+            "page": 1,
+            "rect": {
+              "x": 510.924,
+              "y": 141.766,
+              "w": 55.076,
+              "h": 10.285
+            },
+            "created": 2
+          },
+          {
+            "id": "phone",
+            "page": 1,
+            "rect": {
+              "x": 498.894,
+              "y": 55.766,
+              "w": 77.106,
+              "h": 10.285
+            },
+            "created": 3
+          },
+          {
+            "id": "email",
+            "page": 1,
+            "rect": {
+              "x": 461.252,
+              "y": 193.766,
+              "w": 104.748,
+              "h": 10.285
+            },
+            "created": 4
+          },
+          {
+            "id": "card",
+            "page": 1,
+            "rect": {
+              "x": 543.97,
+              "y": 167.766,
+              "w": 22.03,
+              "h": 10.285
+            },
+            "created": 5
+          },
+          {
+            "id": "hand",
+            "page": 1,
+            "rect": {
+              "x": 197.5,
+              "y": 383.6,
+              "w": 69.8,
+              "h": 12.6
+            },
+            "created": 6
+          },
+          {
+            "id": "personal",
+            "page": 1,
+            "rect": {
+              "x": 489.67,
+              "y": 154.766,
+              "w": 35.527,
+              "h": 10.285
+            },
+            "created": 7
+          },
+          {
+            "id": "checking",
+            "page": 1,
+            "rect": {
+              "x": 527.48,
+              "y": 154.766,
+              "w": 38.52,
+              "h": 10.285
+            },
+            "created": 8
+          }
+        ]
+      },
+      "expected": {
+        "order": [
+          "phone",
+          "name",
+          "street",
+          "acct",
+          "personal",
+          "checking",
+          "card",
+          "email",
+          "hand"
+        ]
+      }
+    },
+    {
+      "id": "step-default-wraps-at-the-end",
+      "inputs": {
+        "step": {
+          "n": 3,
+          "index": 2,
+          "dir": 1,
+          "dead": []
+        }
+      },
+      "expected": {
+        "index": 0
+      }
+    },
+    {
+      "id": "step-default-wraps-back-at-the-start",
+      "inputs": {
+        "step": {
+          "n": 3,
+          "index": 0,
+          "dir": -1,
+          "dead": []
+        }
+      },
+      "expected": {
+        "index": 2
+      }
+    },
+    {
+      "id": "step-default-one-box-forward",
+      "inputs": {
+        "step": {
+          "n": 1,
+          "index": 0,
+          "dir": 1,
+          "dead": []
+        }
+      },
+      "expected": {
+        "index": 0
+      }
+    },
+    {
+      "id": "step-default-one-box-back",
+      "inputs": {
+        "step": {
+          "n": 1,
+          "index": 0,
+          "dir": -1,
+          "dead": []
+        }
+      },
+      "expected": {
+        "index": 0
+      }
+    },
+    {
+      "id": "step-default-one-left-of-three",
+      "inputs": {
+        "step": {
+          "n": 3,
+          "index": 1,
+          "dir": 1,
+          "dead": [
+            0,
+            2
+          ]
+        }
+      },
+      "expected": {
+        "index": 1
+      }
+    },
+    {
+      "id": "step-default-wrap-skips-a-deleted-first",
+      "inputs": {
+        "step": {
+          "n": 4,
+          "index": 3,
+          "dir": 1,
+          "dead": [
+            0
+          ]
+        }
+      },
+      "expected": {
+        "index": 1
+      }
+    },
+    {
+      "id": "step-stop-at-the-end",
+      "inputs": {
+        "step": {
+          "n": 3,
+          "index": 2,
+          "dir": 1,
+          "ends": "stop",
+          "dead": []
+        }
+      },
+      "expected": {
+        "index": 2
+      }
+    },
+    {
+      "id": "step-wrap-at-the-end",
+      "inputs": {
+        "step": {
+          "n": 3,
+          "index": 2,
+          "dir": 1,
+          "ends": "wrap",
+          "dead": []
+        }
+      },
+      "expected": {
+        "index": 0
+      }
+    },
+    {
+      "id": "step-back-stop-at-the-start",
+      "inputs": {
+        "step": {
+          "n": 3,
+          "index": 0,
+          "dir": -1,
+          "ends": "stop",
+          "dead": []
+        }
+      },
+      "expected": {
+        "index": 0
+      }
+    },
+    {
+      "id": "step-skips-a-deleted-box",
+      "inputs": {
+        "step": {
+          "n": 4,
+          "index": 0,
+          "dir": 1,
+          "ends": "stop",
+          "dead": [
+            1
+          ]
+        }
+      },
+      "expected": {
+        "index": 2
+      }
+    },
+    {
+      "id": "step-none-left",
+      "inputs": {
+        "step": {
+          "n": 2,
+          "index": 0,
+          "dir": 1,
+          "ends": "wrap",
+          "dead": [
+            0,
+            1
+          ]
+        }
+      },
+      "expected": {
+        "index": null
+      }
+    },
+    {
+      "id": "delete-moves-to-the-next",
+      "inputs": {
+        "afterDelete": {
+          "n": 4,
+          "index": 1,
+          "dead": [
+            1
+          ]
+        }
+      },
+      "expected": {
+        "index": 2
+      }
+    },
+    {
+      "id": "delete-at-the-end-wraps",
+      "inputs": {
+        "afterDelete": {
+          "n": 3,
+          "index": 2,
+          "dead": [
+            2
+          ]
+        }
+      },
+      "expected": {
+        "index": 0
+      }
+    },
+    {
+      "id": "step-empty-order",
+      "inputs": {
+        "step": {
+          "n": 0,
+          "index": 0,
+          "dir": 1,
+          "dead": []
+        }
+      },
+      "expected": {
+        "index": null
+      }
+    },
+    {
+      "id": "delete-empty-order",
+      "inputs": {
+        "afterDelete": {
+          "n": 0,
+          "index": 0,
+          "dead": []
+        }
+      },
+      "expected": {
+        "index": null
+      }
+    },
+    {
+      "id": "delete-the-last-one",
+      "inputs": {
+        "afterDelete": {
+          "n": 1,
+          "index": 0,
+          "dead": [
+            0
+          ]
+        }
+      },
+      "expected": {
+        "index": null
+      }
+    }
+  ]
+}
