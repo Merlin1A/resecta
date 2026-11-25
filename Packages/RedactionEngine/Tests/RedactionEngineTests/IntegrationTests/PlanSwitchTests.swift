@@ -316,4 +316,29 @@ struct PlanSwitchTests {
             #expect(alone == painted, "the grids nest: the join changes nothing")
         }
     }
+
+    // MARK: - The record carries the verdicts
+
+    @Test("The record carries each judged box's verdict, and a box the check widened or whose ink ran past the cap is in its list",
+          arguments: judgedPages.map(\.verdict))
+    func recordCarriesTheVerdicts(verdict: InkCheck.Verdict) async throws {
+        let ink = try #require(Self.judgedPages.first { $0.verdict == verdict }).ink
+        let box: Box = (CGRect(x: 36, y: 38, width: 22, height: 12), [CGRect(x: 36, y: 38, width: 22, height: 12)], true)
+        let judged = try await Self.run(source: .switchPolicy, inputsFor: [0], bars: ink, boxes: [box])
+        var produced = RunRecord.Produced()
+        produced.record(judged.result, pageIndex: 3)
+        let position = RunRecord.BoxPosition(pageIndex: 3, box: 0)
+        #expect(produced.inkVerdicts == [position: verdict])
+        #expect(produced.boxesWidenedForInk == (verdict == .escaped ? [position] : []))
+        #expect(produced.boxesWithInkPastTheCap == (verdict == .pastCap ? [position] : []))
+    }
+
+    @Test("At \"as placed\" the record carries no verdict and both lists are empty")
+    func recordCarriesNoVerdictAsPlaced() async throws {
+        let placed = try await Self.run(source: .asPlaced, inputsFor: [0, 1, 2])
+        var produced = RunRecord.Produced()
+        produced.record(placed.result, pageIndex: 0)
+        #expect(produced.inkVerdicts.isEmpty)
+        #expect(produced.boxesWidenedForInk.isEmpty && produced.boxesWithInkPastTheCap.isEmpty)
+    }
 }

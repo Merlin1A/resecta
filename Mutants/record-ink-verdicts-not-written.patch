@@ -1,0 +1,20 @@
+Property: The run's record carries the ink check's verdict for each box it ran on, and the lists of boxes widened for ink and with ink past the cap are read from it.
+Area: the run's record (RunRecord.Produced.record)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter PlanSwitchTests
+Must go red: RedactionEngineTests/PlanSwitchTests recordCarriesTheVerdicts
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
+index 68524ab1..3948e08d 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
+@@ -220,9 +220,6 @@ extension RunRecord.Produced {
+         for (box, pixels) in result.paintedBoxes {
+             paintedRectangles[RunRecord.BoxPosition(pageIndex: pageIndex, box: box)] = pixels
+         }
+-        for (box, verdict) in result.inkVerdicts {
+-            inkVerdicts[RunRecord.BoxPosition(pageIndex: pageIndex, box: box)] = verdict
+-        }
+         if !result.regionsPaintedOutsideThePlan.isEmpty {
+             regionsPaintedOutsideThePlan[pageIndex] = result.regionsPaintedOutsideThePlan
+         }

@@ -229,6 +229,9 @@ public struct RunRecord: Equatable, Sendable {
         /// holds, by page index: painted on their own, and read by the box
         /// check (`ExactFillCheck`), each as its own unit it cannot judge.
         package var regionsPaintedOutsideThePlan: [Int: Set<UUID>] = [:]
+        /// The ink check's verdict for each box it ran on, by box. A box the
+        /// check did not run on has none.
+        package var inkVerdicts: [BoxPosition: InkCheck.Verdict] = [:]
         /// Which way found the information dictionary for its rewrite; nil
         /// until the rewrite has run.
         package var infoDictionary: InfoDictionaryWay?
@@ -252,15 +255,33 @@ public struct RunRecord: Equatable, Sendable {
 
 extension RunRecord.Produced {
     /// Records what the rasterizer reports for one page: the rectangle it
-    /// painted for each box of the page's plan, and the regions it painted
-    /// outside the plan. The one writer of both fields.
+    /// painted for each box of the page's plan, the ink check's verdict for
+    /// each box it ran on, and the regions it painted outside the plan. The
+    /// one writer of the three fields.
     public mutating func record(_ result: RasterizeResult, pageIndex: Int) {
         for (box, pixels) in result.paintedBoxes {
             paintedRectangles[RunRecord.BoxPosition(pageIndex: pageIndex, box: box)] = pixels
         }
+        for (box, verdict) in result.inkVerdicts {
+            inkVerdicts[RunRecord.BoxPosition(pageIndex: pageIndex, box: box)] = verdict
+        }
         if !result.regionsPaintedOutsideThePlan.isEmpty {
             regionsPaintedOutsideThePlan[pageIndex] = result.regionsPaintedOutsideThePlan
         }
+    }
+
+    /// The boxes the ink check widened to cover ink that crossed their edge,
+    /// in page order then box order: read from `inkVerdicts`.
+    package var boxesWidenedForInk: [RunRecord.BoxPosition] { boxes(withInkVerdict: .escaped) }
+
+    /// The boxes whose ink ran past the check's cap, so ink of the boxed
+    /// text can still show beyond the box, in page order then box order:
+    /// read from `inkVerdicts`.
+    package var boxesWithInkPastTheCap: [RunRecord.BoxPosition] { boxes(withInkVerdict: .pastCap) }
+
+    private func boxes(withInkVerdict verdict: InkCheck.Verdict) -> [RunRecord.BoxPosition] {
+        inkVerdicts.filter { $0.value == verdict }.keys
+            .sorted { ($0.pageIndex, $0.box) < ($1.pageIndex, $1.box) }
     }
 
     /// Records what the writer reports for the file: the SHA-256 of each
