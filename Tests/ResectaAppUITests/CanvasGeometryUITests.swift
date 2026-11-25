@@ -209,9 +209,10 @@ nonisolated final class CanvasGeometryUITests: XCTestCase {
         sleep(1)
         let shot = try probe()
         let run = shot.thickness(of: .teal, across: along, vertical: true)
-        // Measured (J0968, simB): 4 teal pixels at rest and 6 selected; a
-        // 1.4- and a 2.4-point line lose their blended edge pixels. Half a
-        // pixel of slack keeps a whole-pixel 2.0 from failing on rounding.
+        // Measured on an iOS 26.4.1 simulator at 3x: 4 teal pixels at rest and
+        // 6 selected; a 1.4- and a 2.4-point line lose their blended edge
+        // pixels. Half a pixel of slack keeps a whole-pixel 2.0 from failing on
+        // rounding.
         XCTAssertGreaterThanOrEqual(run, 2.0 - shot.pixel / 2, "the selected line is heavier: \(run) points, at rest \(restRun)")
         XCTAssertGreaterThan(run, restRun + shot.pixel / 2, "the selected line is heavier than the resting one")
         XCTAssertGreaterThanOrEqual(shot.edgeCoverage(of: box, .teal), 0.8, "a teal line on the selected box's edge")
@@ -293,10 +294,11 @@ nonisolated final class CanvasGeometryUITests: XCTestCase {
         let rest = try probe()
         XCTAssertNotNil(rest.differenceBounds(from: before, in: dark), "the box drew")
         // The box's edge is the middle of its teal line, read pixel by pixel
-        // (the resting line is 1.4 points). Measured (J0967, simB): teal at
-        // 319.33-320.67 round an edge at 320.0, the keyline brightest at
-        // 321.0-321.33 and faded by 322.0, nearer the line than the model's
-        // middle at 321.5, since a 0.8-point line is drawn on whole pixels.
+        // (the resting line is 1.4 points). Measured on an iOS 26.4.1 simulator
+        // at 3x: teal at 319.33-320.67 round an edge at 320.0, the keyline
+        // brightest at 321.0-321.33 and faded by 322.0, nearer the line than
+        // the model's middle at 321.5, since a 0.8-point line is drawn on whole
+        // pixels.
         let box = try XCTUnwrap(rest.tintPixelBounds(.teal, in: dark), "the box's line").insetBy(dx: 0.7, dy: 0.7)
         func rims(_ shot: CanvasPixelProbe, lineWidth: CGFloat, _ state: String) {
             // The keyline lies between the line's outer edge and its own
@@ -335,8 +337,8 @@ private extension CanvasGeometryUITests {
     /// The "Amount" boxes on page 1 of the fixture: one per ledger row,
     /// "Amount" set at x 180–212.4 of the 612-point page on baselines
     /// 472 − 13·row (Scripts/generate_uitest_multipage.py). Rows are placed
-    /// from that geometry and read by the veil at each box's left strip,
-    /// clear of the search badge at its top right.
+    /// from that geometry and read by the teal line at each box's left
+    /// edge, clear of the search badge at its top right.
     nonisolated struct Stack {
         static let rowCount = 28
         let page: CGRect
@@ -344,9 +346,10 @@ private extension CanvasGeometryUITests {
         func centre(_ row: Int) -> CGPoint {
             CGPoint(x: page.minX + 196.2 * scale, y: page.minY + (792 - (472 - 13 * CGFloat(row) + 2.5)) * scale)
         }
-        /// The rows whose box shows `tint` on its left line. Measured
-        /// (J0967, simB): each box's left line is 4 pixels of page teal at
-        /// 180 page points, continuous down the row; inside it, the veil
+        /// The rows whose box shows `tint` on its left line, at the word's
+        /// left edge (x 180). Measured on an iOS 26.4.1 simulator at 3x:
+        /// each box's left line is 4 pixels of page teal there, continuous
+        /// down the row; inside it, the veil
         /// over the row's first glyph and the type badge leave no clear
         /// strip, so the line is read and not the veil.
         func rows(in probe: CanvasPixelProbe, tint: CanvasPixelProbe.Tint) -> [Int] {
