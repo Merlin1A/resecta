@@ -5,18 +5,18 @@ Must go red: RedactionEngineTests/SwitchThroughTheRecordTests searchAndScanBoxes
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
-index 4cca263d..03470301 100644
+index d08be39..9d709e2 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
-@@ -148,10 +148,7 @@ public struct RunRecord: Equatable, Sendable {
+@@ -153,10 +153,7 @@ public struct RunRecord: Equatable, Sendable {
                      widthSixtyFourths: width, heightSixtyFourths: height,
                      policy: .release, source: choice.source, switchOn: choice.switchOn)
-                 guard choice.source == .switchPolicy else { return (made.plan, [:]) }
+                 guard choice.source == .switchPolicy else { return (made.plan, [:], [:]) }
 -                let inputs = made.facts.inkLineHeights.mapValues {
 -                    InkCheckInputs(lineHeight: $0, others: made.facts.otherWords)
 -                }
--                return (made.plan, inputs)
-+                return (made.plan, [:])
+-                return (made.plan, inputs, made.facts.defaultFallbacks)
++                return (made.plan, [:], made.facts.defaultFallbacks)
              }
              return (PaintPlan.make(
                  regions: planRegions, words: PageWords(words: []), text: "",
