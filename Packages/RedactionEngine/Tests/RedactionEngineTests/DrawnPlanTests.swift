@@ -34,10 +34,11 @@ struct DrawnPlanTests {
          hand(CGRect(x: 0.50, y: 0.80, width: 0.0005, height: 0.02))]
     }
 
+    /// The page's kept plan under `source`, the run's own unless a case names another.
     static func drawn(_ regions: [RedactionRegion], cropBox: CGSize = letter, rotation: Int = 0, switchOn: Bool = false,
-                      dpi: Int = 300, fill: FillColor = .black) -> DrawnPlan {
+                      dpi: Int = 300, fill: FillColor = .black, source: PlanSource = RunRecord.planSource) -> DrawnPlan {
         DrawnPlan(pageIndex: 0, regions: regions, cropBox: cropBox, rotation: rotation,
-                  switchOn: switchOn, exportDPI: dpi, fillColor: fill)
+                  switchOn: switchOn, exportDPI: dpi, fillColor: fill, read: nil, source: source)
     }
 
     @Test("Under as placed, each box is one admitted region and the rectangle drawn is that region")
@@ -45,7 +46,7 @@ struct DrawnPlanTests {
         let regions = Self.regions()
         let admitted = regions.filter { RedactionRegion.isAdmitted(normalizedRect: $0.normalizedRect) }
         #expect(admitted.count == 3)
-        let page = Self.drawn(regions)
+        let page = Self.drawn(regions, source: .asPlaced)
         let plan = try #require(page.plan)
         #expect(page.boxes.count == 3)
         for (box, region) in zip(page.boxes, admitted) {
