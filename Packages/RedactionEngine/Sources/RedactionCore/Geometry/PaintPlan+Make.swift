@@ -479,19 +479,21 @@ private struct Maker {
         if let next { sides.end = Swift.min(sides.end, Swift.max(0, (next - inner.maxX) / 2)) }
         var paint = inner.outset(top: sides.top, bottom: sides.bottom, left: sides.start, right: sides.end)
 
+        // A neighbour above has its middle above inner's top, one below has
+        // its middle below inner's bottom: a line inside inner that carries
+        // none of the box's rows is no neighbour and limits neither margin.
         let own = Set(rows.compactMap(\.line))
-        let middle2 = inner.minY + inner.maxY
         var above: Int?
         var below: Int?
         let neighbours = complement.lines.indices.filter { !own.contains($0) && complement.lines[$0].box.overlapsAlongLine(paint) }
-        if let n = neighbours.filter({ complement.lines[$0].box.minY + complement.lines[$0].box.maxY > middle2 })
+        if let n = neighbours.filter({ complement.lines[$0].box.minY + complement.lines[$0].box.maxY > 2 * inner.maxY })
             .min(by: { complement.lines[$0].box.minY < complement.lines[$1].box.minY }) {
             let line = complement.lines[n]
             let limit = Swift.max(line.box.minY + policy.margin.entry(letterSize: Self.letterSize(line)), inner.maxY)
             above = limit
             paint.maxY = Swift.min(paint.maxY, limit)
         }
-        if let n = neighbours.filter({ complement.lines[$0].box.minY + complement.lines[$0].box.maxY < middle2 })
+        if let n = neighbours.filter({ complement.lines[$0].box.minY + complement.lines[$0].box.maxY < 2 * inner.minY })
             .max(by: { complement.lines[$0].box.maxY < complement.lines[$1].box.maxY }) {
             let line = complement.lines[n]
             let limit = Swift.min(line.box.maxY - policy.margin.entry(letterSize: Self.letterSize(line)), inner.minY)
