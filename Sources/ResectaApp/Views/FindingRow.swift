@@ -61,9 +61,9 @@ enum FindingRowModel {
     // MARK: - The closed row
 
     /// The mark's outcome: its symbol and colour are that outcome's shipped
-    /// ones. The form-values row keeps the mark the shipped row draws for it.
+    /// ones. The form-values row takes its problem's mark, the grey "i" of
+    /// possible items: the values were left out of the export, nothing leaked.
     static func markOutcome(_ problem: VerificationProblem) -> VerificationOutcome {
-        if problem.kind == .formValuesNotCarried { return .needsReview }
         switch problem.mark {
         case .failed: return .failed
         case .needsReview: return .needsReview

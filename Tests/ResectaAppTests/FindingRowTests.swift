@@ -125,13 +125,16 @@ struct FindingRowTests {
                 != Model.partOfBoxedText)
     }
 
-    @Test("Each kind's mark: its outcome's shipped symbol; the form-values row keeps the shipped needs-review mark")
+    @Test("Each kind's mark: its outcome's shipped symbol; the form-values row takes the grey i of possible items")
     func marksByKind() throws {
         let fragment = Self.report([Self.layer(.attention("a"), .ocrCheck, terms: ["x"], pages: [0], fragment: true)])
         let recheckFailed = Self.report([Self.layer(.fail("f"), .searchRecheck, pages: [0])])
         #expect(Model.markOutcome(try Self.only(fragment)) == .needsReview)
         #expect(Model.markOutcome(try Self.only(recheckFailed)) == .failed)
-        #expect(Model.markOutcome(try Self.only(Self.report([]), forms: 2)) == .needsReview)
+        let forms = try Self.only(Self.report([]), forms: 2)
+        #expect(forms.mark == .possibleItems)
+        #expect(Model.markOutcome(forms) == .note)
+        #expect(Model.markOutcome(forms).markSymbolName == "info.circle")
         #expect(Model.markOutcome(try Self.only(Self.report([]), covered: [0])) == .needsReview)
         #expect(Model.markOutcome(try Self.only(Self.report([Self.layer(.info("i"), .detectionSweep,
                                                                          lines: [Self.sweepLine], pages: [0])])))
