@@ -1,0 +1,18 @@
+Property: A region exactly held by another region of its box starts from its own rectangle (clause 2). Here clause 2 is removed.
+Area: the first edit's start (engine)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'FirstEditStartTests'
+Must go red: RedactionEngineTests/FirstEditStartTests tableCase
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/FirstEditStart.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/FirstEditStart.swift
+index 1bb9af39c..4778307a0 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/FirstEditStart.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/FirstEditStart.swift
+@@ -52,7 +52,6 @@ package enum FirstEditStartRule {
+     static func decide(own: PageRect64, paint: PageRect64, neighbours: [PageRect64], tight: PageRect64,
+                        neighbourTights: [PageRect64], oneLineBox: Bool) -> (rect: PageRect64, clause: Int) {
+         if neighbours.isEmpty { return (paint, 1) }
+-        if neighbours.contains(where: { $0.contains(own) && $0 != own }) { return (own, 2) }
+         if oneLineBox, neighbourTights.allSatisfy({ $0.minY == tight.minY && $0.maxY == tight.maxY }) {
+             var right = paint.maxX
+             for n in neighbours where n.maxX > own.maxX { right = Swift.min(right, Swift.max(own.maxX, n.minX)) }
