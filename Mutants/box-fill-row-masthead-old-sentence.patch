@@ -1,6 +1,6 @@
 Property: A needs-review row with no term to search for asks that it be read; it is never told to redact terms with text search.
 Area: the results masthead
-Test command: the app unit scheme on the lane simulator, -only-testing:ResectaAppTests/BoxFillShareTests
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BoxFillShareTests
 Must go red: ResectaAppTests/BoxFillShareTests issue, twoFindings
 Apply in a scratch worktree with `git apply`; discard after.
 

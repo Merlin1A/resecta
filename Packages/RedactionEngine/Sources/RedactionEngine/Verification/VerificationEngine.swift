@@ -11,8 +11,8 @@ import AppKit  // macOS tooling destination: thumbnail returns NSImage
 
 // Verification engine. Each check is a `VerificationLayer` case; the
 // per-mode order and count come from `layers(for:)` (Secure Rasterization
-// runs seven checks, Searchable Redaction thirteen; the two post-sequential
-// checks are last in both), never from an index table.
+// runs eight checks, Searchable Redaction fourteen; Box Fill is listed last
+// in both, after the two post-sequential checks), never from an index table.
 
 /// Stateless verification engine. Runs individual layers on output PDFs.
 public struct VerificationEngine: Sendable {
