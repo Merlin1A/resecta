@@ -150,6 +150,16 @@ struct BoxCheckDrawingTests {
         Case(number: 89, name: "an object after the end of the file", expected: .fileRevised) { $0.appended = "9 0 obj\n<< >>\nendobj\n" },
         Case(number: 98, name: "a second trailer word after the name of an earlier one", expected: .fileRevised) {
             $0.trailer = "/Prev 9 /Note (trailer)" },
+        Case(number: 104, name: "startxref names a cross-reference stream that names an earlier one, the one trailer word left in the file",
+             expected: .fileRevised) {
+            $0.more = ["<< /Type /XRef /Size 8 /W [1 2 1] /Prev 9 /Length 0 >>\nstream\n\nendstream"]; $0.startxrefObject = 7 },
+        Case(number: 105, name: "startxref names a byte past the start of the table", expected: .fileRevised) { $0.startxrefShift = 1 },
+        Case(number: 106, name: "startxref's number in thirteen digits: the table's offset zero-padded to twelve, then one digit more",
+             expected: .fileRevised) { $0.startxrefWidth = 12; $0.startxrefAfter = "7" },
+        Case(number: 107, name: "startxref's number followed by a byte that is not a line end", expected: .fileRevised) {
+            $0.startxrefAfter = " 5" },
+        Case(number: 108, name: "startxref names the xref inside its own keyword, after the trailer", expected: .fileRevised) {
+            $0.startxrefSelf = true },
         // The picture's segments.
         Case(number: 90, name: "a comment segment", expected: .unlistedSegment,
              change: picture { D.withSegment($0, marker: 0xFE, body: Array("note".utf8)) }),
@@ -157,8 +167,20 @@ struct BoxCheckDrawingTests {
              change: picture { D.withSegment($0, marker: 0xE2, body: Array("ICC_PROFILE\0\u{1}\u{1}".utf8)) }),
         Case(number: 92, name: "an Exif segment that names a second directory, where a thumbnail lives", expected: .unlistedSegment,
              change: picture { D.withSegment(D.withoutSegment($0, marker: 0xE1), marker: 0xE1, body: D.exif(next: 26)) }),
-        Case(number: 93, name: "an Exif segment with no second directory", expected: nil,
+        Case(number: 93, name: "an Exif segment with no second directory, holding an orientation the writer does not write",
+             expected: .unlistedSegment,
              change: picture { D.withSegment(D.withoutSegment($0, marker: 0xE1), marker: 0xE1, body: D.exif(next: 0)) }),
+        Case(number: 99, name: "the writer's Exif segment one byte longer", expected: .unlistedSegment,
+             change: picture { D.withSegment(D.withoutSegment($0, marker: 0xE1), marker: 0xE1, body: D.writersExif() + [0]) }),
+        Case(number: 100, name: "the writer's Exif segment naming the picture's own sides", expected: nil,
+             change: picture { D.withSegment(D.withoutSegment($0, marker: 0xE1), marker: 0xE1, body: D.writersExif()) }),
+        Case(number: 101, name: "the writer's Exif segment naming sides other than the picture's", expected: .unlistedSegment,
+             change: picture { D.withSegment(D.withoutSegment($0, marker: 0xE1), marker: 0xE1, body: D.writersExif(width: 97)) }),
+        Case(number: 102, name: "the writer's Exif segment with one byte outside the sides changed", expected: .unlistedSegment,
+             change: picture { var e = D.writersExif(); e[43] = 2; return D.withSegment(D.withoutSegment($0, marker: 0xE1), marker: 0xE1, body: e) }),
+        Case(number: 103, name: "the writer's Exif segment twice", expected: .unlistedSegment,
+             change: picture { D.withSegment(D.withSegment(D.withoutSegment($0, marker: 0xE1), marker: 0xE1, body: D.writersExif()),
+                                             marker: 0xE1, body: D.writersExif()) }),
         Case(number: 94, name: "a Photoshop segment one byte longer than the writer's", expected: .unlistedSegment,
              change: picture { D.withSegment(D.withoutSegment($0, marker: 0xED), marker: 0xED, body: D.segmentBody($0, marker: 0xED)! + [0]) }),
         Case(number: 95, name: "a JFIF extension segment, which can hold a thumbnail", expected: .unlistedSegment,
@@ -169,10 +191,10 @@ struct BoxCheckDrawingTests {
         Case(number: 97, name: "a Q with nothing saved", expected: .drawingNotRead) { $0.content = "Q " + content },
     ]
 
-    @Test("The table holds 82 cases, eight of them admitted")
+    @Test("The table holds 92 cases, eight of them admitted")
     func tableLength() {
-        #expect(Self.cases.count == 82)
-        #expect(Set(Self.cases.map(\.number)).count == 82)
+        #expect(Self.cases.count == 92)
+        #expect(Set(Self.cases.map(\.number)).count == 92)
         #expect(Self.cases.filter { $0.expected == nil }.count == 8)
     }
 

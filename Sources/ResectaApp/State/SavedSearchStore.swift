@@ -358,16 +358,18 @@ final class SavedSearchStore {
     func add(_ search: SavedSearch) -> ListChange {
         guard loadIfHeld() else { return .held }
         guard !savedSearches.contains(where: { $0.name == search.name }) else { return .refused(.duplicate) }
-        savedSearches.append(search)
-        persist()
+        let next = savedSearches + [search]
+        guard persist(next, unrecognizedRows) else { return .notSaved }
+        savedSearches = next
         return .saved
     }
 
     @discardableResult
     func remove(id: UUID) -> ListChange {
         guard loadIfHeld() else { return .held }
-        savedSearches.removeAll(where: { $0.id == id })
-        persist()
+        let next = savedSearches.filter { $0.id != id }
+        guard persist(next, unrecognizedRows) else { return .notSaved }
+        savedSearches = next
         return .saved
     }
 
@@ -383,11 +385,11 @@ final class SavedSearchStore {
     @discardableResult
     func clearAll(interface: SearchInterface) -> ListChange {
         guard loadIfHeld() else { return .held }
-        savedSearches.removeAll(where: { $0.mode.interface == interface })
-        if savedSearches.isEmpty {
-            unrecognizedRows = []
-        }
-        persist()
+        let next = savedSearches.filter { $0.mode.interface != interface }
+        let nextUnrecognized = next.isEmpty ? [] : unrecognizedRows
+        guard persist(next, nextUnrecognized) else { return .notSaved }
+        savedSearches = next
+        unrecognizedRows = nextUnrecognized
         return .saved
     }
 
@@ -404,7 +406,8 @@ final class SavedSearchStore {
         }
         guard let idx = savedSearches.firstIndex(where: { $0.id == id }) else { return .refused(.missing) }
         let existing = savedSearches[idx]
-        savedSearches[idx] = SavedSearch(
+        var next = savedSearches
+        next[idx] = SavedSearch(
             id: existing.id,
             name: newName,
             mode: existing.mode,
@@ -422,15 +425,18 @@ final class SavedSearchStore {
             includeOCR: existing.includeOCR,
             multiTermConjunction: existing.multiTermConjunction
         )
-        persist()
+        guard persist(next, unrecognizedRows) else { return .notSaved }
+        savedSearches = next
         return .saved
     }
 
-    private func persist() {
+    /// Write the next list to the file; true when the file holds it.
+    /// Changes no state.
+    private func persist(_ searches: [SavedSearch], _ unrecognized: [RetainedJSONValue]) -> Bool {
         blob.save(SavedSearchEnvelope(
             schemaVersion: Int(Self.schemaVersion),
-            savedSearches: savedSearches,
-            unrecognized: unrecognizedRows
+            savedSearches: searches,
+            unrecognized: unrecognized
         ))
     }
 }

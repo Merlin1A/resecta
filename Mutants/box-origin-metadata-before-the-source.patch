@@ -1,0 +1,16 @@
+Property: The source decides first: a drawn box reads as drawn whatever metadata sits beside it.
+Area: the editor, a box's origin
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild build-for-testing -scheme ResectaApp -destination id=<simulator>, then DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test-without-building -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BoxOriginTests
+Must go red: ResectaAppTests/BoxOriginTests sourceDecidesFirst()
+Apply in a scratch worktree with `git apply`; discard after.
+
+--- a/Sources/ResectaApp/State/BoxOrigin.swift
++++ b/Sources/ResectaApp/State/BoxOrigin.swift
+@@ -24,6 +24,7 @@
+     case face
+ 
+     static func of(_ region: RedactionRegion, metadata: RegionMetadata?) -> BoxOrigin {
++        if case .pii(let kind)? = metadata?.piiKind { return .scan(kind: kind) }
+         switch region.source {
+         case .manual:
+             return .drawn

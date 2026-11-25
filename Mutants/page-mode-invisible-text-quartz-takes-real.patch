@@ -1,0 +1,19 @@
+Property: The mode as Quartz draws it drops a real-number operand: after mode 3, `0.0 Tr` leaves the words in mode 3.
+Area: page mode (Detection)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/InvisibleTextPageTests (or on the host: cd Packages/RedactionEngine && swift test --no-parallel --filter InvisibleTextPageTests)
+Must go red: RedactionEngineTests/InvisibleTextPageTests reading [mode 3, then the real number 0.0, which Quartz drops: the line after it is in mode 3]; RedactionEngineTests/InvisibleTextPageTests exported [mode 3, then the real number 0.0, which Quartz drops: the line after it is in mode 3]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
+index a6bcf5d6..4f389f09 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
+@@ -153,7 +153,7 @@ extension DocumentSearcher {
+             case .integer where CGPDFObjectGetValue(operand, .integer, &integer):
+                 state.mode = CGPDFReal(integer); state.quartzMode = CGPDFReal(integer)
+             case .real where CGPDFObjectGetValue(operand, .real, &real):
+-                state.mode = real
++                state.mode = real; state.quartzMode = real
+             default:
+                 state.unreadable = true; CGPDFScannerStop(scanner)
+             }

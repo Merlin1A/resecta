@@ -178,8 +178,8 @@ extension SearchResultsSection {
     static func widenedBoxBannerHeadline(pages: [Int]) -> String {
         let oneBased = pages.map { $0 + 1 }
         let pageNoun = oneBased.count == 1 ? "page" : "pages"
-        return "Some boxes on \(pageNoun) \(formatPageList(oneBased)) were drawn wider than their words, because the "
-            + "text could not be fitted to the printed words. Keep them wide: shrinking one can leave part of a word readable."
+        return "Some boxes on \(pageNoun) \(formatPageList(oneBased)) were drawn larger than their words, because the "
+            + "text could not be fitted to the printed words. Keep them that size: shrinking one can leave part of a word readable."
     }
     /// English-list formatter for page numbers. "3" / "3 and 5"
     /// / "3, 5, and 7". Caller passes 1-based numbers.

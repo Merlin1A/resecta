@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import RedactionEngine
 
 // Saved-searches recall UI. The store
@@ -43,7 +44,8 @@ struct SavedSearchListSheet: View {
     @State private var savePromptError: String?
     @State private var renameError: String?
     /// A Save or a Rename the store did not take for a reason that is no
-    /// refusal: the prompt comes back with the typed name and no new words.
+    /// refusal: the prompt comes back with the typed name and the
+    /// not-saved line, `ListChange.notSavedMessage`.
     @State private var savePromptNotSaved = false
     @State private var renameNotSaved = false
     /// The entry whose rename collided, held across the
@@ -126,6 +128,8 @@ struct SavedSearchListSheet: View {
                 set: { if !$0 { renameTarget = nil } }
             ), presenting: renameTarget) { search in
                 TextField("Name", text: $renameText)
+                    .autocorrectionDisabled(true)
+                    .writingToolsBehavior(.disabled)
                 Button("Rename") {
                     let trimmed = renameText.trimmingCharacters(in: .whitespaces)
                     switch trimmed.isEmpty ? nil : savedSearchStore.rename(id: search.id, to: trimmed) {
@@ -143,6 +147,7 @@ struct SavedSearchListSheet: View {
                         // the binding.
                         if #available(iOS 27, *) { renameTarget = nil }
                     case .notSaved?, .held?:
+                        renameError = ListChange.notSavedMessage
                         renameNotSaved = true
                         renameRetryTarget = search
                         if #available(iOS 27, *) { renameTarget = nil }
@@ -167,6 +172,8 @@ struct SavedSearchListSheet: View {
             .holdsMessages(toastManager, while: showSavePrompt)
             .alert(Self.savePromptTitle(for: activeInterface), isPresented: $showSavePrompt) {
                 TextField("Name", text: $savePromptName)
+                    .autocorrectionDisabled(true)
+                    .writingToolsBehavior(.disabled)
                 Button("Save") {
                     let trimmed = savePromptName.trimmingCharacters(in: .whitespaces)
                     guard !trimmed.isEmpty else { return }
@@ -189,6 +196,7 @@ struct SavedSearchListSheet: View {
                         // dismissal back through the binding.
                         if #available(iOS 27, *) { showSavePrompt = false }
                     case .notSaved, .held:
+                        savePromptError = ListChange.notSavedMessage
                         savePromptNotSaved = true
                         if #available(iOS 27, *) { showSavePrompt = false }
                     }
@@ -218,7 +226,7 @@ struct SavedSearchListSheet: View {
                 presenting: deleteTarget
             ) { search in
                 Button("Delete", role: .destructive) {
-                    savedSearchStore.remove(id: search.id)
+                    if savedSearchStore.remove(id: search.id) != .saved { Self.reportNotSaved(toastManager) }
                     deleteTarget = nil
                 }
                 Button("Cancel", role: .cancel) { deleteTarget = nil }
@@ -237,7 +245,7 @@ struct SavedSearchListSheet: View {
                 titleVisibility: .visible
             ) {
                 Button("Delete All", role: .destructive) {
-                    savedSearchStore.clearAll(interface: activeInterface)
+                    if savedSearchStore.clearAll(interface: activeInterface) != .saved { Self.reportNotSaved(toastManager) }
                 }
                 .accessibilityIdentifier("savedSearchClearAllConfirm")
                 Button("Cancel", role: .cancel) { }
@@ -287,6 +295,13 @@ struct SavedSearchListSheet: View {
         .messageHost(toastManager, place: .otherSheet)
         .shieldedSheetContent(monitor: captureMonitor)
         .presentationBackground(.regularMaterial)
+    }
+
+    /// A delete this list did not store: the row stays. The list has no line
+    /// to show it on, so the buzz plays and the message queue speaks the line.
+    static func reportNotSaved(_ messages: ToastQueueManager) {
+        UINotificationFeedbackGenerator().notificationOccurred(.error)
+        messages.announce(ListChange.notSavedMessage)
     }
 
     /// Whether a prompt that has closed is shown again: when a refusal left

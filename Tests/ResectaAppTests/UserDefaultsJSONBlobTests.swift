@@ -89,4 +89,15 @@ struct UserDefaultsJSONBlobTests {
         let b = suite2.data(forKey: "k")
         #expect(a == b, "sortedKeys output must be byte-identical for equal payloads")
     }
+
+    @Test("A save returns false only for a value that cannot be encoded")
+    func saveAnswer() {
+        let defaults = makeSuite()
+        let blob = UserDefaultsJSONBlob<Payload>(
+            key: "answer", schemaVersion: 1, defaults: defaults, fallback: Payload(items: [:]))
+        #expect(blob.save(Payload(items: ["nan": .nan])) == false)
+        #expect(defaults.data(forKey: "answer") == nil)
+        #expect(blob.save(Payload(items: ["a": 1.0])))
+        #expect(blob.load() == Payload(items: ["a": 1.0]))
+    }
 }

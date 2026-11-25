@@ -185,8 +185,11 @@ enum HiddenWordInkFixtures {
     /// from the page's own text, on a page that is not plain, kept in
     /// Searchable. Each page's mode is the app's decision with the page's
     /// facts read as plain, so such a box does not send its page to a
-    /// picture; every other arm (the other mode, no rich text, a trigger) is
-    /// the app's. The pages are otherwise built as the corpus mirror builds
+    /// picture, and with the page read as showing no invisible text: the
+    /// app writes a page whose text is in an invisible render mode (these
+    /// pages' layers are) as a picture, so without it the check would have
+    /// no Searchable page to read. Every other arm (the other mode, no rich
+    /// text, a trigger) is the app's. The pages are otherwise built as the corpus mirror builds
     /// them (`VerificationCorpusRunnerTests.buildPages`). For tests of a
     /// verification check on such an export only.
     static func pagesKeepingUnanchoredBoxesSearchable(
@@ -205,7 +208,8 @@ enum HiddenWordInkFixtures {
             let pageRegions = regionsByPage[i] ?? []
             let (pageMode, fallbackReason) = PageModeDecision.decide(
                 effectiveMode: effectiveMode, textLayerStatus: textLayerStatus[i], page: page,
-                pageRegions: pageRegions, inkPlanCovers: false, readFacts: { _ in readAsPlain })
+                pageRegions: pageRegions, inkPlanCovers: false, readFacts: { _ in readAsPlain },
+                readInvisibleText: { _ in .showsNone })
             let hasText = pageMode == .searchableRedaction
                 ? (page.string?.isEmpty == false) : false
             return PDFPageData(

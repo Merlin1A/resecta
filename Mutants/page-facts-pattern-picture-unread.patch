@@ -8,12 +8,12 @@ diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageCont
 index ad72e1ee..38efae3c 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageContentFacts.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageContentFacts.swift
-@@ -43,7 +43,7 @@ public struct PageContentFacts: Equatable, Sendable {
+@@ -50,7 +50,7 @@ public struct PageContentFacts: Equatable, Sendable {
          walk.visit(contents: dictionary, resources: resources, depth: 0)
          // A picture inside a tiling pattern is not an image the census sees.
          return PageContentFacts(
 -            reachesImage: PageImageCensus.largestImagePixelArea(of: page) != nil || PictureWalk.patternsHoldPicture(page),
 +            reachesImage: PageImageCensus.largestImagePixelArea(of: page) != nil,
              drawsInlineImage: walk.inlineImage,
-             showsInvisibleText: DocumentSearcher.showsInvisibleText(page),
+             showsInvisibleText: known ?? DocumentSearcher.showsInvisibleText(page),
              usesType3Font: walk.type3Font)

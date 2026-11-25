@@ -21,11 +21,25 @@ struct ShownGlyph: Equatable, Sendable {
 /// place or text cannot be read exactly: a font other than a simple one, a
 /// code without an advance or text, a `gs` that sets the font, text shown
 /// outside `BT`, marked content carrying /ActualText, an unresolved resource,
-/// a form past the depth, or more than `operatorLimit` of the operators it
-/// reads (path, image and other operators it does not read are not counted).
+/// a form past the depth, more than `operatorLimit` operators of any kind
+/// (every operator is counted, those the walk does not read too, and a
+/// form's each time it is drawn), or more than `formBytesLimit` bytes of form
+/// content walked (each time a form is drawn its decoded content is charged
+/// again, so bare operands, which no operator counts, are bounded too). The
+/// page's own content is not charged: it is walked as PDFKit reads it for
+/// the page's text, once for each /Contents entry, so an array that names one
+/// stream many times is walked that many times, as PDFKit's own read is.
 enum ContentGlyphWalk {
-    static let operatorLimit = 200_000
+    static let operatorLimit = 2_000_000
+    static let formBytesLimit = 16 * 1024 * 1024
     static let formDepthLimit = 8
+
+    /// The operators of the PDF reference the walk does not read: each is
+    /// counted and nothing else.
+    static let countedOnly = ["b", "B", "b*", "B*", "BI", "BMC", "BX", "c", "CS", "cs", "d", "d0", "d1", "DP", "EI",
+                              "EMC", "EX", "f", "F", "f*", "G", "g", "h", "i", "ID", "j", "J", "K", "k", "l", "m", "M",
+                              "MP", "n", "re", "RG", "rg", "ri", "s", "S", "SC", "sc", "SCN", "scn", "sh", "v", "w",
+                              "W", "W*", "y"]
 
     struct GraphicsState {
         var ctm = CGAffineTransform.identity
@@ -48,6 +62,9 @@ enum ContentGlyphWalk {
         var glyphs: [ShownGlyph] = []
         var unknown = false
         var operators = 0
+        var formBytes = 0
+        /// Each form's decoded size, read once however often it is drawn.
+        var formSizes: [Int: Int] = [:]
         var depth = 0
         var fonts: [Int: ContentGlyphFont] = [:]
         var table: CGPDFOperatorTableRef?
@@ -117,6 +134,11 @@ enum ContentGlyphWalk {
     }
 
     private static func register(_ table: CGPDFOperatorTableRef) {
+        for name in countedOnly {
+            CGPDFOperatorTableSetCallback(table, name) { scanner, info in
+                _ = State.from(info)?.count(scanner)
+            }
+        }
         CGPDFOperatorTableSetCallback(table, "q") { scanner, info in
             guard let s = State.from(info), s.count(scanner) else { return }
             s.saved.append(s.g)
@@ -269,6 +291,22 @@ enum ContentGlyphWalk {
         s.g[keyPath: path] = CGFloat(value)
     }
 
+    /// Charges one drawing of a form its decoded size; false past `formBytesLimit`.
+    private static func charge(_ stream: CGPDFStreamRef, _ s: State) -> Bool {
+        let key = unsafeBitCast(stream, to: Int.self)
+        let size: Int
+        if let known = s.formSizes[key] {
+            size = known
+        } else {
+            var format = CGPDFDataFormat.raw
+            guard let data = CGPDFStreamCopyData(stream, &format) else { return false }
+            size = CFDataGetLength(data)
+            s.formSizes[key] = size
+        }
+        s.formBytes += size
+        return s.formBytes <= formBytesLimit
+    }
+
     /// `Do`: an image draws no glyph; a form is walked under its matrix with
     /// its own resources, the graphics state saved and restored around it.
     private static func drawObject(_ scanner: CGPDFScannerRef, _ s: State) {
@@ -284,6 +322,7 @@ enum ContentGlyphWalk {
         var resources: CGPDFDictionaryRef?
         guard s.depth < formDepthLimit, let table = s.table,
               CGPDFDictionaryGetDictionary(dictionary, "Resources", &resources), let resources else { s.fail(scanner); return }
+        guard charge(stream, s) else { s.fail(scanner); return }
         var matrix = CGAffineTransform.identity
         var array: CGPDFArrayRef?
         if CGPDFDictionaryGetArray(dictionary, "Matrix", &array), let array {

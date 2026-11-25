@@ -5,10 +5,11 @@ import RedactionEngine
 // first that holds, in a fixed order of six places (`TopBannerSlot`). A
 // notice that is not shown waits its turn; hiding the band, or showing
 // another notice in front, ends nothing (each notice ends only when it is
-// dismissed or its condition ends). Two places have a notice today, the
+// dismissed or its condition ends). Three places have a notice today: the
 // paused notice (a run left unfinished when the app went to the
-// background) and the import annotation notice; the other four are kept
-// in order for the notices that fill them later.
+// background), the import annotation notice and the fit notice (the page in
+// view holds a box drawn wider than its word); the other three are kept in
+// order for the notices that fill them later.
 //
 // The band floats 8 points under the toolbar's foot and never moves or
 // resizes the page. A notice that meets a visible page folds to its mark
@@ -127,14 +128,13 @@ extension DocumentEditorView {
         let shown = TopBannerSlot.bandIsShown(
             phase: documentState.phaseKind, slotPresents: editorSheetIsPresented,
             searchIsTheSheet: editorSlotPresentsSearch, searchDetent: searchSheetDetent)
-        // The fit notice's own change feeds `widenedOnPage`; nothing does yet.
-        return shown ? TopBannerSlot.winner(documentState: documentState, widenedOnPage: false) : nil
+        return shown ? TopBannerSlot.winner(documentState: documentState, widenedOnPage: fitNoticeHolds) : nil
     }
 
     /// The band: the shown notice, open or folded, or nothing.
     @ViewBuilder
     var topBannerSlot: some View {
-        let holding = TopBannerSlot.holding(documentState: documentState, widenedOnPage: false)
+        let holding = TopBannerSlot.holding(documentState: documentState, widenedOnPage: fitNoticeHolds)
         ZStack(alignment: .top) {
             if let slot = shownNotice, let content = noticeContent(for: slot) {
                 NoticeBand(
@@ -157,7 +157,8 @@ extension DocumentEditorView {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         // The canvas publishes its page frames only while the band has a
         // notice: an occupant, shown or hidden behind a sheet.
-        .onChange(of: TopBannerSlot.winner(documentState: documentState) != nil, initial: true) { _, wanted in
+        .onChange(of: TopBannerSlot.winner(documentState: documentState, widenedOnPage: fitNoticeHolds) != nil,
+                  initial: true) { _, wanted in
             documentState.canvasPageFramesWanted = wanted
         }
     }
@@ -169,9 +170,11 @@ extension DocumentEditorView {
             return pausedNoticeContent
         case .importAnnotations:
             return annotationNoticeContent
-        case .redrawn, .sourceProtection, .fit, .imagePages:
-            // The redraw line, the password-protected source notes, the fit
-            // notice and the image-pages note: their packages fill these.
+        case .fit:
+            return fitNoticeContent
+        case .redrawn, .sourceProtection, .imagePages:
+            // The redraw line, the password-protected source notes and the
+            // image-pages note: their packages fill these.
             return nil
         }
     }
@@ -184,7 +187,9 @@ extension DocumentEditorView {
             resumeBannerOverlay
         case .importAnnotations:
             annotationNoticeBanner
-        case .redrawn, .sourceProtection, .fit, .imagePages:
+        case .fit:
+            fitNoticeBanner
+        case .redrawn, .sourceProtection, .imagePages:
             EmptyView()
         }
     }
@@ -209,6 +214,40 @@ extension DocumentEditorView {
         }, placement: .band)
     }
 
+    // MARK: - The fit notice
+
+    /// The fit notice's words: the page in view holds a box drawn wider than
+    /// its word, because the ink fit could not fit it
+    /// (`RedactionState+WidenedBoxes`).
+    static let fitNoticeText = "Some boxes here are larger than their words. Keep them that size."
+    /// The same at the accessibility sizes.
+    static let fitNoticeShortText = "Larger boxes: keep their size"
+    /// The fit notice as VoiceOver speaks it: the reason and the ask.
+    static let fitNoticeSpokenText = "Some boxes on this page were drawn larger than their words, because the "
+        + "text could not be fitted to the printed words. Keep them that size: shrinking one can leave part of a word readable."
+
+    /// Whether the fit notice holds: the page in view holds a widened box and
+    /// the person has not closed the notice for it.
+    var fitNoticeHolds: Bool {
+        redactionState.fitNoticeHolds(on: documentState.currentPageIndex)
+    }
+
+    /// The fit notice, in its shorter words at the accessibility sizes.
+    var fitNoticeContent: NoticeContent {
+        NoticeContent(
+            id: dynamicTypeSize.isAccessibilitySize ? .fitNoticeShort : .fitNotice,
+            spokenText: Self.fitNoticeSpokenText, closes: true, identifier: "fitNotice")
+    }
+
+    /// Its close closes it on every page holding a widened box now.
+    private var fitNoticeBanner: some View {
+        NoticeView(content: fitNoticeContent, onClose: {
+            withAnimation(ResectaTokens.Anim.resolved(ResectaTokens.Anim.overlayDismiss, reduceMotion: reduceMotion)) {
+                redactionState.closeFitNotice()
+            }
+        }, placement: .band)
+    }
+
     // MARK: - Speech
 
     /// What the band's speech reads: the notice shown for speech (none
@@ -221,7 +260,7 @@ extension DocumentEditorView {
     var noticeSpeechInput: NoticeSpeechInput {
         NoticeSpeechInput(
             shown: TopBannerSlot.shownForSpeech(shownNotice, sceneIsActive: scenePhase == .active),
-            holding: TopBannerSlot.holding(documentState: documentState, widenedOnPage: false))
+            holding: TopBannerSlot.holding(documentState: documentState, widenedOnPage: fitNoticeHolds))
     }
 
     /// One step of the band's speech: speaks the shown notice when it is

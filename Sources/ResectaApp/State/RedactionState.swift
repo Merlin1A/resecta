@@ -254,6 +254,11 @@ class RedactionState {
     // Reset on clearAll() — never leaks across documents.
     var appliedMatchAudit: [UUID: MatchAuditSnapshot] = [:]
 
+    /// The pages the person closed the fit notice on: every page holding a
+    /// widened box when it was closed (`closeFitNotice()`). Never crosses
+    /// documents.
+    var fitNoticeClosedPages: Set<Int> = []
+
     /// Audit snapshots sorted by pageIndex then appliedAt for stable
     /// ordering in the exported CSV / JSON.
     var appliedMatchAuditSnapshots: [MatchAuditSnapshot] {
@@ -379,6 +384,7 @@ class RedactionState {
         regionPageIndex.removeAll()
         regionMetadata = [:]
         appliedMatchAudit = [:] // holds matched text: never crosses documents
+        fitNoticeClosedPages = []
     }
 
     /// Clear pre-redaction text extraction buffer on success path.

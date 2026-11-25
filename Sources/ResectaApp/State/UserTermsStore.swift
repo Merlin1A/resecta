@@ -101,8 +101,10 @@ final class UserTermsStore {
         guard Self.isValidUserTerm(term) else { return .refused(.invalid) }
         guard blob.alwaysFlag.count < Self.perListCap else { return .refused(.full) }
         guard !blob.alwaysFlag.contains(term) else { return .refused(.duplicate) }
-        blob.alwaysFlag.append(term)
-        persist()
+        var next = blob
+        next.alwaysFlag.append(term)
+        guard persist(next) else { return .notSaved }
+        blob = next
         return .saved
     }
 
@@ -112,24 +114,30 @@ final class UserTermsStore {
         guard Self.isValidUserTerm(term) else { return .refused(.invalid) }
         guard blob.neverFlag.count < Self.perListCap else { return .refused(.full) }
         guard !blob.neverFlag.contains(term) else { return .refused(.duplicate) }
-        blob.neverFlag.append(term)
-        persist()
+        var next = blob
+        next.neverFlag.append(term)
+        guard persist(next) else { return .notSaved }
+        blob = next
         return .saved
     }
 
     @discardableResult
     func removeAlwaysFlag(at indices: IndexSet) -> ListChange {
         guard loadIfHeld() else { return .held }
-        blob.alwaysFlag.remove(atOffsets: indices)
-        persist()
+        var next = blob
+        next.alwaysFlag.remove(atOffsets: indices)
+        guard persist(next) else { return .notSaved }
+        blob = next
         return .saved
     }
 
     @discardableResult
     func removeNeverFlag(at indices: IndexSet) -> ListChange {
         guard loadIfHeld() else { return .held }
-        blob.neverFlag.remove(atOffsets: indices)
-        persist()
+        var next = blob
+        next.neverFlag.remove(atOffsets: indices)
+        guard persist(next) else { return .notSaved }
+        blob = next
         return .saved
     }
 
@@ -140,8 +148,8 @@ final class UserTermsStore {
     @discardableResult
     func clearAllTerms() -> ListChange {
         guard loadIfHeld() else { return .held }
+        guard persist(.empty) else { return .notSaved }
         blob = .empty
-        persist()
         return .saved
     }
 
@@ -184,7 +192,8 @@ final class UserTermsStore {
         )
     }
 
-    private func persist() {
-        storage.save(blob)
+    /// Write `next` to the file; true when the file holds it. Changes no state.
+    private func persist(_ next: UserTermsBlob) -> Bool {
+        storage.save(next)
     }
 }

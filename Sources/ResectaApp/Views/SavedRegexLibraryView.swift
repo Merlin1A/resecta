@@ -46,7 +46,7 @@ struct SavedRegexLibraryView: View {
             titleVisibility: .visible
         ) {
             Button("Delete All", role: .destructive) {
-                savedRegexStore.clearAllUserSaved()
+                if savedRegexStore.clearAllUserSaved() != .saved { addError = ListChange.notSavedMessage }
             }
             .accessibilityIdentifier("savedRegexClearAllConfirm")
             Button("Cancel", role: .cancel) { }
@@ -113,7 +113,7 @@ struct SavedRegexLibraryView: View {
                     regexRow(regex)
                 }
                 .onDelete { offsets in
-                    savedRegexStore.deleteUserSaved(at: offsets)
+                    if savedRegexStore.deleteUserSaved(at: offsets) != .saved { addError = ListChange.notSavedMessage }
                 }
             }
         } header: {
@@ -128,12 +128,15 @@ struct SavedRegexLibraryView: View {
             VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xs) {
                 TextField("Label", text: $newLabel)
                     .textInputAutocapitalization(.words)
+                    .autocorrectionDisabled(true)
+                    .writingToolsBehavior(.disabled)
                     .disabled(addInFlight)
 
                 HStack {
                     TextField("Pattern", text: $newPattern)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled(true)
+                        .writingToolsBehavior(.disabled)
                         .font(.body.monospaced())
                         .disabled(addInFlight)
 
@@ -194,7 +197,7 @@ struct SavedRegexLibraryView: View {
             addError = message
             UINotificationFeedbackGenerator().notificationOccurred(.error)
         case .notSaved:
-            addError = nil
+            addError = ListChange.notSavedMessage
             UINotificationFeedbackGenerator().notificationOccurred(.error)
         }
     }

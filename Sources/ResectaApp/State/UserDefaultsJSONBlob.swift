@@ -2,8 +2,8 @@ import Foundation
 import OSLog
 
 // A reusable envelope for persisting structured Codable values in
-// UserDefaults with a schema-version byte. Shared by the user-terms
-// store, the per-category threshold overrides, and the saved-regex library.
+// UserDefaults with a schema-version byte. In the app its one use is reading
+// a saved list's old settings record for the one-time move into its file.
 //
 // Schema mismatches and decode errors fall through to the provided
 // fallback rather than corrupting state. No automatic migration is
@@ -51,19 +51,22 @@ nonisolated struct UserDefaultsJSONBlob<T: Codable & Sendable>: @unchecked Senda
         }
     }
 
-    /// Serialize and write with the current schema version. Silent on
-    /// failure (disk pressure / encoder bug) — UserDefaults itself does
+    /// Serialize and write with the current schema version. Returns false
+    /// only when the value cannot be encoded — UserDefaults itself does
     /// not throw.
-    func save(_ value: T) {
+    @discardableResult
+    func save(_ value: T) -> Bool {
         let envelope = Envelope(schemaVersion: schemaVersion, payload: value)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         do {
             let data = try encoder.encode(envelope)
             defaults.set(data, forKey: key)
+            return true
         } catch {
             logger.warning(
                 "UserDefaultsJSONBlob[\(self.key, privacy: .public)] encode failed: \(LogSafeError.publicSummary(error), privacy: .public); \(String(describing: error), privacy: .private)")
+            return false
         }
     }
 

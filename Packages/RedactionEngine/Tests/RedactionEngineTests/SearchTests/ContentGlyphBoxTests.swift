@@ -73,6 +73,37 @@ struct ContentGlyphBoxTests {
         #expect(box.minX <= 98.616 + DocumentSearcher.growthSlack, "the box starts at \(box.minX); the T starts at 98.616")
     }
 
+    /// The backward-TJ line, set upright or slanted by its text matrix (a
+    /// made-up italic: an upright font drawn with a slant, `1 0 0.2 1`).
+    static func drawnBack(slant: Bool) -> String {
+        "BT /F1 12 Tf \(slant ? "1 0 0.2 1 72 700 Tm" : "72 700 Td") [(Inv) -250 (oice) 1200 (Total) -500 (due)] TJ ET"
+    }
+
+    @Test("A first letter drawn slanted is not one the box grows to; the same letter drawn upright is")
+    func slantedFirstLetterIsLeftOut() async throws {
+        for slant in [false, true] {
+            let content = Self.drawnBack(slant: slant)
+            let doc = try ContentGlyphWalkTests.document(content)
+            let page = try #require(doc.page(at: 0))
+            let text = (try #require(page.string)) as NSString
+            let range = text.range(of: "Total")
+            #expect(range.location != NSNotFound, "\(text)")
+            // The page is followed either way: the walk maps it, and the
+            // match's letters are found in the map.
+            let own = try #require(DocumentSearcher.ownGlyphs(for: range, page: page), "slant \(slant): the page is mapped")
+            let today = try #require(try Self.pdfKitBoxes(content, "Total").first)
+            #expect(today.minX > 105, "precondition, slant \(slant): PDFKit's box starts at \(today.minX), past the T")
+            let box = try #require(try await Self.boxes(content, "Total").first)
+            if slant {
+                #expect(own.isEmpty, "a slanted letter is not taken: \(own)")
+                #expect(Self.close(box, today, 0.001), "slanted: the box is PDFKit's, \(box) against \(today)")
+            } else {
+                #expect(own.first?.unit == range.location, "the upright T is taken: \(own)")
+                #expect(box.minX <= 98.616 + DocumentSearcher.growthSlack, "upright: the box starts at \(box.minX); the T starts at 98.616")
+            }
+        }
+    }
+
     // MARK: - Unchanged
 
     @Test("Where PDFKit's boxes are right, no box changes: ordinary kerning, five lines, two columns, a ligature",

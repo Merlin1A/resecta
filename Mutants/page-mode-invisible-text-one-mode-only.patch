@@ -1,0 +1,19 @@
+Property: Both invisible render modes, 3 and 7, are read.
+Area: page mode (Detection)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/InvisibleTextPageTests (or on the host: cd Packages/RedactionEngine && swift test --no-parallel --filter InvisibleTextPageTests)
+Must go red: RedactionEngineTests/InvisibleTextPageTests reading [a hidden layer over a scan, mode 7]; RedactionEngineTests/InvisibleTextPageTests exported [a hidden layer over a scan, mode 7]; RedactionEngineTests/InvisibleTextPageTests reading [a line in mode 7 with a fill painted through its clip: the words show]; RedactionEngineTests/InvisibleTextPageTests exported [a line in mode 7 with a fill painted through its clip: the words show]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
+index a6bcf5d6..da022acc 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
+@@ -173,7 +173,7 @@ extension DocumentSearcher {
+         let show: CGPDFOperatorCallback = { scanner, info in
+             guard let info else { return }
+             let state = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
+-            if [state.mode, state.quartzMode].contains(where: { $0 == 3 || $0 == 7 }) {
++            if [state.mode, state.quartzMode].contains(where: { $0 == 3 }) {
+                 state.found = true; CGPDFScannerStop(scanner)
+             }
+         }
