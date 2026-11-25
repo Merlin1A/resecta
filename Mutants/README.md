@@ -356,6 +356,16 @@ with its reason and the mutant that is caught in its place.
 | `balanced-lines-split-no-break-space.patch` | A no-break space keeps its words in one run. | ResectaAppTests/BalancedLinesTests narrowestWidthTable |
 | `balanced-lines-title-bypasses-builder.patch` | Every balanced title and sentence is built by the one builder, with its measuring runs. | ResectaAppTests/BalancedLinesTests layoutIsBuiltInOnePlace |
 | `results-fold-no-headed-list.patch` | A run where every check passed draws no headed list of checks; its checks are inside the closed row. | ResectaAppTests/VerificationResultsActionsTests noHeadedListOfChecks; ResectaAppUITests/SearchRecheckUITests testSearchRecheck_appliedTextSearch_rowReadsCheckPassed |
+| `results-share-outline-red-in-the-teal-arm.patch` | Share's outline under the filled Keep Editing is the brand teal, never a red drawn from the teal arm. | ResectaAppTests/VerificationResultsActionsTests shareDrawsNoRed |
+| `results-share-swapped-stays-filled.patch` | Under the filled Keep Editing, Share is outlined, so one capsule is filled. | ResectaAppTests/VerificationResultsActionsTests shareCapsuleStyle |
+| `results-share-stroke-hard-coded-red.patch` | Share's outline takes its tint's colour, not a red set at the stroke. | ResectaAppTests/VerificationResultsActionsTests shareDrawsNoRed |
+| `results-share-attention-left-pink.patch` | On a needs-review result Share is outlined teal, not pink. | ResectaAppTests/VerificationResultsActionsTests shareCapsuleStyle; ResectaAppTests/VerificationResultsActionsTests shareDrawsNoRed |
+| `results-swap-not-on-attention.patch` | Keep Editing leads, and Share is demoted, on a needs-review result. | ResectaAppTests/VerificationResultsActionsTests swapRule; ResectaAppTests/SkippedShareGateTests frictionLadderHolds |
+| `results-swap-not-on-fail.patch` | Keep Editing leads, and Share is demoted, on a failed result. | ResectaAppTests/VerificationResultsActionsTests swapRule; ResectaAppTests/SkippedShareGateTests frictionLadderHolds |
+| `results-swap-off-once-overridden.patch` | A failed result keeps Share demoted after Share Anyway. | ResectaAppTests/SkippedShareGateTests frictionLadderHolds |
+| `results-passed-checks-gap-back-to-32.patch` | The passed checks' row sits one block gap below the block above. | ResectaAppTests/VerificationEvenRhythmTests blocksShareOneGap |
+| `results-keep-editing-second-line-footnote.patch` | Keep Editing's second line is subheadline, the size of every other row's. | ResectaAppTests/VerificationEvenRhythmTests actionRowSecondLine |
+| `results-trust-line-own-text.patch` | The results screen draws the shared trust line. | ResectaAppTests/VerificationEvenRhythmTests resultsTrustLine |
 | `results-fold-members-on-a-clean-run.patch` | On a run where every check passed, the row holds every check. | ResectaAppTests/VerificationResultsActionsTests listRowHoldsThePassedChecks |
 | `results-fold-clean-run-arrives-closed.patch` | The row arrives closed on a clean pass; it opens on arrival only for riding notes. | ResectaAppTests/VerificationResultsActionsTests listRowHoldsThePassedChecks |
 | `results-fold-riding-note-arrives-open.patch` | With a riding note and nothing above, the row arrives open. | ResectaAppTests/VerificationResultsActionsTests listRowHoldsThePassedChecks; ResectaAppTests/VerificationResultsActionsTests clusterRules |

@@ -1,0 +1,19 @@
+Property: Share's outline under the filled Keep Editing is the brand teal, never a red drawn from the teal arm.
+Area: results (Share's capsule)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationResultsActionsTests
+Must go red: ResectaAppTests/VerificationResultsActionsTests shareDrawsNoRed
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationResultsActions.swift b/Sources/ResectaApp/Views/VerificationResultsActions.swift
+index 2f9028a..be99197 100644
+--- a/Sources/ResectaApp/Views/VerificationResultsActions.swift
++++ b/Sources/ResectaApp/Views/VerificationResultsActions.swift
+@@ -316,7 +316,7 @@ struct ResultsCapsuleButtonStyle: ButtonStyle {
+ 
+         static func text(_ tint: Tint) -> Color {
+             switch tint {
+-            case .teal: ResectaTokens.BrandTeal.text
++            case .teal: ResectaTokens.SemanticColor.failText
+             }
+         }
+     }
