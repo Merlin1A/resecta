@@ -1,0 +1,19 @@
+Property: A new name is its strings row letter for letter.
+Area: the names of the checks
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationRowModelTests
+Must go red: ResectaAppTests/VerificationRowModelTests everyCheckHasItsPlainName
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationRowModel.swift b/Sources/ResectaApp/Views/VerificationRowModel.swift
+index a3b93bf7..1c96c283 100644
+--- a/Sources/ResectaApp/Views/VerificationRowModel.swift
++++ b/Sources/ResectaApp/Views/VerificationRowModel.swift
+@@ -230,7 +230,7 @@ nonisolated struct VerificationRowModel: Equatable {
+         case .binaryStringSearch:   return "Boxed Text in the File"
+         case .structureCheck:       return "Scripts & Attachments"
+         case .metadataCheck:        return "Author & File Details"
+-        case .spatialVerification:  return "Kept Text Clear of Boxes"
++        case .spatialVerification:  return "Kept Text Clear of Boxas"
+         case .characterCount:       return "Character Count"
+         case .fontVerification:     return "Fonts in the Searchable Copy"
+         case .characterLineage:     return "Kept Text Unchanged"

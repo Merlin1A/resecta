@@ -1,0 +1,19 @@
+Property: Every check named plainer carries its new name; none keeps the one it shipped with.
+Area: the names of the checks
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationRowModelTests
+Must go red: ResectaAppTests/VerificationRowModelTests everyCheckHasItsPlainName, noOldNameIsLeft
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationRowModel.swift b/Sources/ResectaApp/Views/VerificationRowModel.swift
+index a3b93bf7..433c074b 100644
+--- a/Sources/ResectaApp/Views/VerificationRowModel.swift
++++ b/Sources/ResectaApp/Views/VerificationRowModel.swift
+@@ -229,7 +229,7 @@ nonisolated struct VerificationRowModel: Equatable {
+         case .ocrCheck:             return "Text Recognition of Each Page"
+         case .binaryStringSearch:   return "Boxed Text in the File"
+         case .structureCheck:       return "Scripts & Attachments"
+-        case .metadataCheck:        return "Author & File Details"
++        case .metadataCheck:        return "Document Metadata"
+         case .spatialVerification:  return "Kept Text Clear of Boxes"
+         case .characterCount:       return "Character Count"
+         case .fontVerification:     return "Fonts in the Searchable Copy"
