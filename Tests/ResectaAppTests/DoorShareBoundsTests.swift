@@ -266,7 +266,9 @@ struct DoorShareBoundsTests {
                 for (dx, dy) in Self.toEachEdge {
                     let before = try #require(c.regions.first { $0.id == box.id }?.normalizedRect)
                     Self.select(c, ids)
-                    let at = padded ? try Self.centre(c, box.id) : CGPoint(x: p.minX + 8, y: p.minY + 8)
+                    // The mark is held a quarter in from its corner: clear of its
+                    // handles (a corner's handle would resize it) and of the drawn box.
+                    let at = padded ? try Self.centre(c, box.id) : CGPoint(x: p.minX + p.width / 4, y: p.minY + p.height / 4)
                     Self.gesture(c, from: at, to: CGPoint(x: at.x + dx, y: at.y + dy))
                     let after = try #require(c.regions.first { $0.id == box.id }?.normalizedRect)
                     let what = "\(padded ? "the padded box" : "the mark")\(withAnother ? " with another" : "") pushed (\(dx), \(dy))"
