@@ -5,7 +5,7 @@ Must go red: ResectaAppTests/RunDoorHeldTouchTests heldTouchRefusesTheRun; Resec
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
-index f6e294dd..08f6111f 100644
+index 75b9a8f4..c05d4897 100644
 --- a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
 +++ b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
 @@ -19,7 +19,6 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
@@ -15,4 +15,4 @@ index f6e294dd..08f6111f 100644
 -            redactionState?.canvas = self
          }
      }
-     /// Toast surface for the too-small-draw notice, the selection delete's
+     /// The settings a drawn page's plan is kept with (`noteDrawn`).

@@ -15,6 +15,11 @@ class RedactionState {
     /// Enables O(1) dirty checking in PDFViewCoordinator overlay refresh.
     var regionVersion: Int = 0
 
+    /// The plan each page was last drawn from, with the switch, the quality
+    /// and the fill it was drawn under, kept so a run can be compared with
+    /// it. Written while the editor draws, so nothing observes it.
+    @ObservationIgnored var drawnPlans: [Int: DrawnPlan] = [:]
+
     /// Multi-region selection set. Single selection is the common case.
     var selectedRegionIDs: Set<UUID> = []
 

@@ -9,6 +9,7 @@ import RedactionEngine
 struct PDFDocumentView: UIViewRepresentable {
     @Environment(DocumentState.self) private var documentState
     @Environment(RedactionState.self) private var redactionState
+    @Environment(SettingsState.self) private var settingsState
     @Environment(ToastQueueManager.self) private var toastManager
 
     /// Whether any drawing tool is active. Controls new-region creation.
@@ -30,6 +31,7 @@ struct PDFDocumentView: UIViewRepresentable {
         let coordinator = PDFViewCoordinator()
         coordinator.documentState = documentState
         coordinator.redactionState = redactionState
+        coordinator.settingsState = settingsState
         coordinator.toastManager = toastManager
         return coordinator
     }
@@ -146,6 +148,7 @@ struct PDFDocumentView: UIViewRepresentable {
 
         // Propagate state to coordinator
         coordinator.redactionState = redactionState
+        coordinator.settingsState = settingsState
         coordinator.toastManager = toastManager
         let isEditing = documentState.phaseKind == .editing
         coordinator.updateDrawingMode(isEditing, isDrawing: isEditing && isDrawingMode)

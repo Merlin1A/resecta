@@ -7,12 +7,12 @@ Apply in a scratch worktree with `git apply`; discard after.
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
-@@ -90,7 +90,7 @@
-         /// holds one box for each of them, as placed, and the switch is not
-         /// read. The plan is nil when a side cannot be read.
-         public init(pageIndex: Int, regions: [DrawnRegion], cropBox: CGSize, rotation: Int, switchOn: Bool) {
+@@ -100,7 +100,7 @@
+         /// S are read here, through `PixelPlan.sixtyFourths(ofSide:)`, in the
+         /// frame as the page is rasterised. Nil when a side cannot be read.
+         package static func makePlan(regions: [DrawnRegion], cropBox: CGSize, rotation: Int, switchOn: Bool) -> PaintPlan? {
 -            let turned = ((rotation % 360) + 360) % 180 != 0
 +            let turned = false && ((rotation % 360) + 360) % 180 != 0
-             var plan: PaintPlan?
-             if let width = PixelPlan.sixtyFourths(ofSide: Double(turned ? cropBox.height : cropBox.width)),
-                let height = PixelPlan.sixtyFourths(ofSide: Double(turned ? cropBox.width : cropBox.height)) {
+             guard let width = PixelPlan.sixtyFourths(ofSide: Double(turned ? cropBox.height : cropBox.width)),
+                   let height = PixelPlan.sixtyFourths(ofSide: Double(turned ? cropBox.width : cropBox.height))
+             else { return nil }

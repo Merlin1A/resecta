@@ -22,6 +22,8 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
             redactionState?.canvas = self
         }
     }
+    /// The settings a drawn page's plan is kept with (`noteDrawn`).
+    var settingsState: SettingsState?
     /// Toast surface for the too-small-draw notice, the selection delete's
     /// notice and the lasso's 500-region warning. Optional so the
     /// coordinator stays usable in tests that don't wire the toast manager.
@@ -452,6 +454,22 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
         let outcome = RegionDeleteRule.deleteSelection(
             redactionState: state, undoManager: pdfView?.window?.undoManager, toastManager: toastManager)
         for page in outcome.pages { refreshOverlay(for: page) }
+    }
+
+    // MARK: - The plan a page is drawn from
+
+    /// Keep the plan `pageIndex` is drawn from: made by the one maker
+    /// the run's entry uses (`DrawnPlan`, `RunRecord.Page.makePlan`), from the
+    /// regions the overlay draws and the source document's crop box and
+    /// rotation, which the run's entry reads too, with the settings now. No
+    /// user switch exists yet, so the switch is passed off, as at run entry.
+    func noteDrawn(pageIndex: Int, regions: [RedactionRegion]) {
+        guard let state = redactionState, let settings = settingsState,
+              let page = documentState?.sourceDocument?.page(at: pageIndex) else { return }
+        let drawn = DrawnPlan(pageIndex: pageIndex, regions: regions, cropBox: page.bounds(for: .cropBox).size,
+                              rotation: page.rotation, switchOn: false,
+                              exportDPI: settings.exportDPI, fillColor: settings.fillColor)
+        if state.drawnPlans[pageIndex] != drawn { state.drawnPlans[pageIndex] = drawn }
     }
 
     // MARK: - Overlay Refresh
