@@ -557,6 +557,75 @@ import RedactionCore
         #expect(box.limitAbove == nil && box.limitBelow == nil, "no neighbour above or below")
         #expect(box.paint.contains(box.inner))
     }
+
+    /// A hand box 1 pt around a set of letters.
+    static func handAround(_ page: Sheet, _ offsets: Set<Int>) -> PlanRegion {
+        let r = Self.rect(page, offsets)
+        return Self.drawn(PointRect(minX: r.minX - 1, minY: r.minY - 1, maxX: r.maxX + 1, maxY: r.maxY + 1))
+    }
+
+    /// A found word on a tight pitch (15.46 pt letters on 13.55 pt lines),
+    /// with or without a word on the line above, that word under a hand box
+    /// or not; and the whole top margin of the line.
+    static func tightPitchFound(wordAbove: Bool, handOverIt: Bool) -> (box: PaintedBox, top: Int) {
+        var page = Sheet()
+        var above: Set<Int> = []
+        if wordAbove { above = page.word("abcd", x: 72 + 28, y: 700, height: 15.46) }
+        let line = (0..<4).map { k in page.word("abcd", x: 72 + 28 * Double(k), y: 700 - 13.55, height: 15.46) }
+        let found = Self.matched(page, line[1])
+        var regions = [found]
+        if handOverIt { regions.append(Self.handAround(page, above)) }
+        let box = Self.plan(page, regions).box(found)
+        let h = Self.rect64(page, line.reduce(into: Set<Int>()) { $0.formUnion($1) }).height
+        return (box, Self.margins(h).top)
+    }
+
+    @Test("On a tight pitch an uncovered word above limits the top margin, and with no word above the margin is whole")
+    func tightPitchControls() {
+        let bare = Self.tightPitchFound(wordAbove: false, handOverIt: false)
+        #expect(bare.box.paint.maxY == bare.box.inner.maxY + bare.top)
+        let held = Self.tightPitchFound(wordAbove: true, handOverIt: false)
+        #expect(held.box.paint.maxY < held.box.inner.maxY + held.top)
+    }
+
+    @Test("A word above wholly under a hand box is no neighbour: the top margin is whole")
+    func wordUnderAHandBoxAboveIsNoNeighbour() {
+        let r = Self.tightPitchFound(wordAbove: true, handOverIt: true)
+        #expect(r.box.limitAbove == nil)
+        #expect(r.box.paint.maxY == r.box.inner.maxY + r.top)
+    }
+
+    @Test("A word after a found word, wholly under a hand box: the end side is held by the next uncovered word")
+    func wordUnderAHandBoxAfterIsNoStop() {
+        var page = Sheet()
+        let w = page.line(count: 4, y: 700)
+        let found = Self.matched(page, w[0])
+        let box = Self.plan(page, [found, Self.handAround(page, w[1])]).box(found)
+        #expect(box.paint.maxX - box.inner.maxX == min(Self.margins(Self.s(10)).end, Self.s(32) / 2))
+    }
+
+    @Test("Two found words with a word between them wholly under a hand box are one box; the hand box stays its own")
+    func foundWordsAcrossAHandCoveredWordJoin() {
+        var page = Sheet()
+        let w = page.line(count: 4, y: 700)
+        let a = Self.matched(page, w[0]), c = Self.matched(page, w[2])
+        let hand = Self.handAround(page, w[1])
+        let made = Self.plan(page, [a, c, hand])
+        #expect(made.box(a).regionIDs.contains(c.id))
+        #expect(made.box(hand).regionIDs == [hand.id])
+    }
+
+    @Test("A word whose letters are each only partly under a hand box stays a neighbour")
+    func wordPartlyUnderAHandBoxStays() {
+        var page = Sheet()
+        let w = page.line(count: 4, y: 700)
+        let found = Self.matched(page, w[0])
+        let r = Self.rect(page, w[1])
+        let half = Self.drawn(PointRect(minX: r.minX - 1, minY: r.minY - 1, maxX: r.maxX + 1, maxY: (r.minY + r.maxY) / 2))
+        let box = Self.plan(page, [found, half]).box(found)
+        let bare = Self.plan(page, [found]).box(found)
+        #expect(box.paint == bare.paint)
+    }
 }
 
 extension PageRect64 {
