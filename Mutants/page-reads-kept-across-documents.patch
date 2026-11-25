@@ -1,0 +1,18 @@
+Property: Another document empties the open document's page reads.
+Area: the open document's page reads (DocumentState)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/DocumentPageReadsTests
+Must go red: ResectaAppTests/DocumentPageReadsTests newDocumentEmptiesTheReads
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/DocumentState.swift b/Sources/ResectaApp/State/DocumentState.swift
+index b4029d30..69dcc5bd 100644
+--- a/Sources/ResectaApp/State/DocumentState.swift
++++ b/Sources/ResectaApp/State/DocumentState.swift
+@@ -135,7 +135,6 @@ class DocumentState {
+         didSet {
+             if oldValue !== sourceDocument {
+                 sourceDocumentToken = UUID()
+-                pageReads = [:]
+             }
+         }
+     }

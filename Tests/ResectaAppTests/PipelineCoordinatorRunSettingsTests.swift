@@ -46,6 +46,28 @@ struct PipelineCoordinatorRunSettingsTests {
         #expect(snapshot.exportDPI == 200)
     }
 
+    @Test("The snapshot reads the Cover Other Words switch, and a later toggle does not change it")
+    func snapshotReadsTheSwitch() {
+        let (defaults, suiteName) = makeScratchDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let settings = SettingsState(defaults: defaults)
+        #expect(PipelineCoordinator.RunSettings.snapshot(from: settings).boxesAcrossColumn == false)
+        settings.boxesAcrossColumn = true
+        let snapshot = PipelineCoordinator.RunSettings.snapshot(from: settings)
+        #expect(snapshot.boxesAcrossColumn == true)
+        settings.boxesAcrossColumn = false
+        #expect(snapshot.boxesAcrossColumn == true, "the run keeps the switch as it was at entry")
+    }
+
+    @Test("The run's record takes the switch from the run's snapshot, not a fixed value")
+    func recordTakesTheSwitchFromTheSnapshot() throws {
+        let file = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appendingPathComponent("Sources/ResectaApp/State/RunInputs.swift")
+        let source = try String(contentsOf: file, encoding: .utf8)
+        #expect(source.contains("switchOn: snapshot.boxesAcrossColumn"))
+        #expect(!source.contains("switchOn: false"))
+    }
+
     // MARK: - Independence from live SettingsState
 
     @Test("Mid-run SettingsState toggle of autoVerify does not affect a captured snapshot")

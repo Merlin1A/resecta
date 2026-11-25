@@ -101,7 +101,7 @@ import RedactionCore
                 #expect(paint == .placedPlusFixedMargin, "\(key)")
             case .placedFromTextAnchored:
                 switch key.reading {
-                case .column: #expect(paint == (key.switchOn ? .band : .lineMargin), "\(key)")
+                case .column: #expect(paint == (key.switchOn ? .band : .defaultBand), "\(key)")
                 case .noColumn: #expect(paint == .lineMargin, "\(key)")
                 case .scanOrPicture, .direction: #expect(paint == .placedPlusFixedMargin, "\(key)")
                 }

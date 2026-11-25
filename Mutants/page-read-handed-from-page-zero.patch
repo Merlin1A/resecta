@@ -1,0 +1,19 @@
+Property: The run's record hands each page the read held for that page.
+Area: the run's record (RunInputs.confirmedRecord)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/DocumentPageReadsTests
+Must go red: ResectaAppTests/DocumentPageReadsTests runHandsEachPageItsRead
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/RunInputs.swift b/Sources/ResectaApp/State/RunInputs.swift
+index c7db1b1c..8a356df4 100644
+--- a/Sources/ResectaApp/State/RunInputs.swift
++++ b/Sources/ResectaApp/State/RunInputs.swift
+@@ -36,7 +36,7 @@ enum RunInputs {
+                 guard let sides = geometry[page] else { return RunRecord.Page(pageIndex: page, regions: drawn) }
+                 return RunRecord.Page(pageIndex: page, regions: drawn,
+                                       cropBox: sides.cropBox.size, rotation: sides.rotation,
+-                                      switchOn: snapshot.boxesAcrossColumn, read: reads[page])
++                                      switchOn: snapshot.boxesAcrossColumn, read: reads[0])
+             })
+     }
+ 

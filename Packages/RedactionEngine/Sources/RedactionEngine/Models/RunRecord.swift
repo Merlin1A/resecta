@@ -88,10 +88,22 @@ public struct RunRecord: Equatable, Sendable {
         /// `RunRecord.planChoice(source: RunRecord.planSource, switchOn:)`
         /// over the regions admission lets through: under "as placed" it
         /// holds one box for each of them, as placed, and the switch is not
-        /// read. The plan is nil when a side cannot be read.
-        public init(pageIndex: Int, regions: [DrawnRegion], cropBox: CGSize, rotation: Int, switchOn: Bool) {
+        /// read. The plan is nil when a side cannot be read. The page's read,
+        /// when there is one, gives the plan the page's words, text and facts;
+        /// with none the plan is made with no words.
+        public init(pageIndex: Int, regions: [DrawnRegion], cropBox: CGSize, rotation: Int, switchOn: Bool,
+                    read: PageRead? = nil) {
+            self.init(pageIndex: pageIndex, regions: regions, cropBox: cropBox, rotation: rotation, switchOn: switchOn,
+                      read: read, source: RunRecord.planSource)
+        }
+
+        /// The same page under a plan source given here: the run passes its
+        /// own; a test can name the switch's policy before the run reads it.
+        package init(pageIndex: Int, regions: [DrawnRegion], cropBox: CGSize, rotation: Int, switchOn: Bool,
+                     read: PageRead?, source: PlanSource) {
             self.init(pageIndex: pageIndex, regions: regions,
-                      plan: Self.makePlan(regions: regions, cropBox: cropBox, rotation: rotation, switchOn: switchOn))
+                      plan: Self.makePlan(regions: regions, cropBox: cropBox, rotation: rotation, switchOn: switchOn,
+                                          read: read, source: source))
         }
 
         /// The one maker of a page's plan from its regions as drawn: the run's
@@ -99,17 +111,28 @@ public struct RunRecord: Equatable, Sendable {
         /// two make the same plan from the same inputs. The page's two sides
         /// S are read here, through `PixelPlan.sixtyFourths(ofSide:)`, in the
         /// frame as the page is rasterised. Nil when a side cannot be read.
-        package static func makePlan(regions: [DrawnRegion], cropBox: CGSize, rotation: Int, switchOn: Bool) -> PaintPlan? {
+        /// The page's read, when there is one, gives the plan the page's
+        /// words, text and facts, and a region still anchored to its text
+        /// selects its match's characters in that text; with none the plan
+        /// is made with no words and nothing is selected.
+        package static func makePlan(regions: [DrawnRegion], cropBox: CGSize, rotation: Int, switchOn: Bool,
+                                     read: PageRead? = nil,
+                                     source: PlanSource = RunRecord.planSource) -> PaintPlan? {
             let turned = ((rotation % 360) + 360) % 180 != 0
             guard let width = PixelPlan.sixtyFourths(ofSide: Double(turned ? cropBox.height : cropBox.width)),
                   let height = PixelPlan.sixtyFourths(ofSide: Double(turned ? cropBox.width : cropBox.height))
             else { return nil }
             let admitted = regions.filter { RedactionRegion.isAdmitted(normalizedRect: $0.normalizedRect) }
-            let choice = RunRecord.planChoice(source: RunRecord.planSource, switchOn: switchOn)
+            let choice = RunRecord.planChoice(source: source, switchOn: switchOn)
             // Each region goes with its kind; under "as placed" the plan
-            // reads none. Neither the run's capture nor the editor's drawing
-            // reads page text here, so no characters are selected.
-            let planRegions = RunRecord.planRegions(admitted, text: "")
+            // reads none.
+            let planRegions = RunRecord.planRegions(admitted, text: read?.text ?? "")
+            if let read {
+                return PaintPlan.make(
+                    regions: planRegions, words: read.words, text: read.text, facts: read.facts,
+                    widthSixtyFourths: width, heightSixtyFourths: height,
+                    policy: .release, source: choice.source, switchOn: choice.switchOn).plan
+            }
             return PaintPlan.make(
                 regions: planRegions, words: PageWords(words: []), text: "",
                 facts: .noPageRead,

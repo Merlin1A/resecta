@@ -1,0 +1,17 @@
+Property: A page that paints a path or a shading takes no default band.
+Area: the plan's default band (PaintPlan.make, switch off)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter PaintPlanDefaultBandTests
+Must go red: RedactionCoreTests/PaintPlanDefaultBandTests pageDrawsLines
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+@@ -402,7 +402,6 @@ private struct Maker {
+             (tight, margin.paint, margin.above, margin.below, width)
+         }
+         guard drawing.read else { return lineMargin(.notTaken(.drawingNotRead)) }
+-        guard !drawing.drawsLinesOrShading else { return lineMargin(.notTaken(.pageDrawsLinesOrShading)) }
+         let (band, start) = defaultBand(tight: tight, rows: rows)
+         guard regions.allSatisfy({ band.contains($0) }) && letters.allSatisfy({ band.contains($0) }) else {
+             return lineMargin(.fellBack)

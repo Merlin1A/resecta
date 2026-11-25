@@ -88,6 +88,34 @@ package enum SwitchTreatment: Hashable, Sendable {
     }
 }
 
+/// What the plan did with a box's default band: the paint a box placed from
+/// the page's typed text, still anchored, on a line whose column is read,
+/// takes with the switch off.
+package enum DefaultWidth: Hashable, Sendable {
+    /// The box's row has no default band.
+    case notAsked
+    /// The box is painted with its default band.
+    case taken
+    /// The default band was not taken, for this reason, and the box is
+    /// painted with its line margin.
+    case notTaken(DefaultHold)
+    /// The default band did not hold every covered region and selected
+    /// letter, so the box is painted with its line margin. A correct plan
+    /// never gives it.
+    case fellBack
+}
+
+/// Why a box's default band was not taken.
+package enum DefaultHold: Hashable, Sendable {
+    /// An unselected word's box or a drawn object's bounds lies in the band,
+    /// under the box's own letters included.
+    case wordOrDrawingInBand
+    /// The page paints a path or a shading, whose bounds the plan is not given.
+    case pageDrawsLinesOrShading
+    /// The page's painting was not followed to its end.
+    case drawingNotRead
+}
+
 /// The four kinds of region a plan tells apart, from how the region was
 /// placed and whether it has been edited since.
 package enum RegionKind: String, Hashable, Sendable, Codable, CaseIterable {
@@ -137,12 +165,14 @@ package struct PaintedBox: Hashable, Sendable {
     /// Never a box drawn by hand, edited since, or placed from the page's
     /// picture. The plan sets it; the producer reads it.
     package var inkCheckable: Bool
+    /// What the plan did with the box's default band.
+    package var defaultWidth: DefaultWidth
 
     package init(
         regionIDs: Set<UUID>, inner: PageRect64, paint: PageRect64, tight: PageRect64,
         limitAbove: Int?, limitBelow: Int?, exposure: Exposure, treatment: SwitchTreatment,
         bandMade: Bool, inkEnlargedCovered: Bool, inkEnlargedToCap: Bool, asDrawn: Bool,
-        inkCheckable: Bool = false
+        inkCheckable: Bool = false, defaultWidth: DefaultWidth = .notAsked
     ) {
         self.regionIDs = regionIDs
         self.inner = inner
@@ -157,6 +187,7 @@ package struct PaintedBox: Hashable, Sendable {
         self.inkEnlargedToCap = inkEnlargedToCap
         self.asDrawn = asDrawn
         self.inkCheckable = inkCheckable
+        self.defaultWidth = defaultWidth
     }
 
     /// A limit line above a box at `points`, in whole sixty-fourths rounded

@@ -148,6 +148,11 @@ final class PipelineCoordinator: @unchecked Sendable {
         let paranoidMode: Bool
         let fillColor: FillColor
         let exportDPI: Int
+        /// The Settings switch that widens boxes to their column ("Cover
+        /// Other Words"), read once at run entry with the rest. The run's
+        /// record hands it to the plan; under "as placed" the plan does not
+        /// read it.
+        var boxesAcrossColumn: Bool = false
 
         /// Capture the current pipeline-affecting settings as an
         /// immutable snapshot. Callers are expected to be on MainActor
@@ -164,7 +169,8 @@ final class PipelineCoordinator: @unchecked Sendable {
                 autoVerify: settingsState.autoVerify,
                 paranoidMode: settingsState.paranoidMode,
                 fillColor: settingsState.fillColor,
-                exportDPI: settingsState.exportDPI
+                exportDPI: settingsState.exportDPI,
+                boxesAcrossColumn: settingsState.boxesAcrossColumn
             )
         }
     }

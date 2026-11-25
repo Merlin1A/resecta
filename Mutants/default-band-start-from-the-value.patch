@@ -1,0 +1,18 @@
+Property: On a line the box ends, its start is the end of the word before it, so the start does not move with the value's first letter.
+Area: the plan's default band (PaintPlan.make, switch off)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter PaintPlanDefaultBandTests
+Must go red: RedactionCoreTests/PaintPlanDefaultBandTests oneStartForThreeSpacings; RedactionCoreTests/PaintPlanDefaultBandTests labelThenValueGrowsToTheColumn
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+@@ -446,7 +446,7 @@ private struct Maker {
+             let next = lineWords.filter { $0.box.minX >= row.tight.maxX }.map(\.box.minX).min()
+             if let next { hi = Swift.max(Swift.min(hi, next - stop), row.tight.maxX) }
+             if let prev = lineWords.filter({ $0.box.maxX <= row.tight.minX }).map(\.box.maxX).max() {
+-                lo = Swift.min(Swift.max(lo, next == nil ? prev : prev + stop), row.tight.minX)
++                lo = Swift.min(Swift.max(lo, prev + stop), row.tight.minX)
+                 if next == nil { start = Swift.max(start ?? prev, prev) }
+             }
+             left = Swift.max(left, lo)
