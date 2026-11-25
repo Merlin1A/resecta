@@ -209,7 +209,11 @@ nonisolated final class CanvasGeometryUITests: XCTestCase {
         sleep(1)
         let shot = try probe()
         let run = shot.thickness(of: .teal, across: along, vertical: true)
-        XCTAssertGreaterThanOrEqual(run, 2.0, "the selected line is heavier: \(run) points, at rest \(restRun)")
+        // Measured (J0968, simB): 4 teal pixels at rest and 6 selected; a
+        // 1.4- and a 2.4-point line lose their blended edge pixels. Half a
+        // pixel of slack keeps a whole-pixel 2.0 from failing on rounding.
+        XCTAssertGreaterThanOrEqual(run, 2.0 - shot.pixel / 2, "the selected line is heavier: \(run) points, at rest \(restRun)")
+        XCTAssertGreaterThan(run, restRun + shot.pixel / 2, "the selected line is heavier than the resting one")
         XCTAssertGreaterThanOrEqual(shot.edgeCoverage(of: box, .teal), 0.8, "a teal line on the selected box's edge")
         let out: CGFloat = (22 - box.height) / 2
         let handles = [CGPoint(x: box.minX, y: box.minY - out), CGPoint(x: box.maxX, y: box.minY - out),
@@ -220,8 +224,11 @@ nonisolated final class CanvasGeometryUITests: XCTestCase {
             XCTAssertTrue(r >= 235 && g >= 235 && b >= 235, "a white handle disc at \(c) (box \(box)): \((r, g, b))")
             XCTAssertEqual(Self.ring(around: c).filter { Self.isTeal(shot, $0) }.count, 4, "a teal ring round the handle at \(c)")
         }
+        // Across the side only: the ring's points above and below a side's
+        // middle lie on the box's own teal line.
         for c in [CGPoint(x: box.minX, y: box.midY), CGPoint(x: box.maxX, y: box.midY)] {
-            XCTAssertEqual(Self.ring(around: c).filter { Self.isTeal(shot, $0) }.count, 0, "no handle at the short side's middle \(c)")
+            let across = [CGPoint(x: c.x - 4.5, y: c.y), CGPoint(x: c.x + 4.5, y: c.y)]
+            XCTAssertEqual(across.filter { Self.isTeal(shot, $0) }.count, 0, "no handle at the short side's middle \(c)")
         }
     }
 
