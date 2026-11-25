@@ -103,6 +103,32 @@ import Testing
         if case .couldNotWiden = unread.treatment {} else { Issue.record("no read: \(unread.treatment)") }
     }
 
+    @Test("Through the record, with the selection carried, the page's words keep two Search boxes apart: a word between them stays two boxes; next to each other they join")
+    func wordsKeepTwoBoxesApart() async throws {
+        let document = try MatchCharactersTests.document(MatchCharactersTests.paragraph)
+        let other = SendablePDFDocument(try MatchCharactersTests.document(MatchCharactersTests.paragraph))
+        let read = try #require(await RunRecord.PageRead.reads(of: other, pages: [0], hasHiddenOCG: false)[0])
+        func region(_ term: String) async throws -> RunRecord.DrawnRegion {
+            let found = try await MatchCharactersTests.results(.text(term, options: SearchOptions()), in: document)
+            return RunRecord.DrawnRegion(region: RedactionRegion(placing: try #require(found.first)))
+        }
+        func plan(_ regions: [RunRecord.DrawnRegion]) throws -> PaintPlan {
+            try #require(RunRecord.Page(pageIndex: 0, regions: regions, cropBox: CGSize(width: 612, height: 792),
+                                        rotation: 0, switchOn: false, read: read, source: .switchPolicy).plan)
+        }
+        let quentin = try await region("Quentin"), ashby = try await region("Ashby"), opened = try await region("opened")
+        let joined = try plan([quentin, ashby])
+        #expect(joined.boxes.map(\.regionIDs) == [[quentin.id, ashby.id]], "next to each other: one box")
+        let apart = try plan([quentin, opened])
+        #expect(apart.boxes.count == 2, "a word between them: two boxes")
+        let at = try #require(read.text.range(of: "Ashby opened")).lowerBound
+        let offset = read.text.utf16.distance(from: read.text.utf16.startIndex, to: at)
+        let between = try #require(read.words.words.first { $0.letters.contains(offset) }?.box)
+        let word = PageRect64(minX: Int((between.minX * 64).rounded()), minY: Int((between.minY * 64).rounded()),
+                              maxX: Int((between.maxX * 64).rounded()), maxY: Int((between.maxY * 64).rounded()))
+        #expect(apart.boxes.allSatisfy { !$0.paint.sharesArea(with: word) }, "no paint over the word between")
+    }
+
     /// The engine's sources, every Swift file.
     static func sources() throws -> [(name: String, text: String)] {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
