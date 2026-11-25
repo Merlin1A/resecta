@@ -151,8 +151,17 @@ private struct Maker {
         self.switchOn = switchOn
         // Every anchored region's characters are selected when the page's
         // complement is made, so no box's own text is read as a neighbour.
-        let selected = placed.reduce(into: Set<Int>()) { set, p in
+        // A letter whose box lies wholly inside any placed region's
+        // rectangle, of any kind, is painted already and leaves the
+        // complement too; a letter only partly inside stays.
+        var selected = placed.reduce(into: Set<Int>()) { set, p in
             if p.region.kind == .placedFromTextAnchored { set.formUnion(p.region.selected) }
+        }
+        for word in words.words {
+            for letter in word.letterBoxes where !selected.contains(letter.offset) {
+                guard let box = PageRect64(outward: letter.rect) else { continue }
+                if placed.contains(where: { $0.rect.contains(box) }) { selected.insert(letter.offset) }
+            }
         }
         complement = Complement.page(words: words, text: text, selected: selected, constants: policy.provisional)
     }
