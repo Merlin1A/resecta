@@ -78,6 +78,9 @@ public struct PDFPageData: @unchecked Sendable {
     /// a test can set it. A box the check would read with nothing here is
     /// painted as placed, its ink growth as today, and recorded as not judged.
     package var inkCheckInputs: [Int: InkCheckInputs]
+    /// For each box painted with its default band, the same box with its
+    /// line margin (from the record's page); a test can set it.
+    package var defaultFallbacks: [Int: PaintedBox]
 
     public init(page: PDFPage, pageIndex: Int, regions: [RedactionRegion],
                 fillColor: FillColor, targetDPI: Int, pipelineMode: PipelineMode,
@@ -99,6 +102,7 @@ public struct PDFPageData: @unchecked Sendable {
         self.hasText = hasText
         self.fallbackReason = fallbackReason
         self.inkCheckInputs = confirmedPage?.inkCheckInputs ?? [:]
+        self.defaultFallbacks = confirmedPage?.defaultFallbacks ?? [:]
         self.confirmedPage = confirmedPage
     }
 }

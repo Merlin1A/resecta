@@ -333,6 +333,48 @@ private func floorDivision(_ a: Int, _ b: Int) -> Int {
 }
 
 /// ⌈a / b⌉ for a positive `b`, for any sign of `a`.
+extension InkCheck {
+    /// The default band's net: whether the page's picture, before any fill,
+    /// shows ink in the pixels of `band` that `lineMargin` does not hold, by
+    /// the check's own ink: more than `inkContrast` grey levels from paper,
+    /// paper the most common value on a ring from one pixel off `band` to
+    /// 1.5 pt out (at least three pixels). True too when under 60 % of the
+    /// ring is at that value, or the grid is not the raster's size: the net
+    /// can only withdraw a band, never grant one.
+    package static func inkInSlot(band: PixelPlan.PixelRect, lineMargin: PixelPlan.PixelRect,
+                                  grid: Grid, raster: PixelPlan.Raster) -> Bool {
+        guard grid.width == raster.pixelWidth, grid.height == raster.pixelHeight else { return true }
+        let width = grid.width, height = grid.height
+        func value(_ x: Int, _ y: Int) -> Int { Int(grid.values[y * width + x]) }
+        let ring = max(3, ceilDivision(96 * raster.dpi, PixelPlan.sixtyFourthsPerInch))
+        var histogram = [Int](repeating: 0, count: 256), count = 0
+        let rx0 = max(0, band.minX - ring), rx1 = min(width, band.maxX + ring)
+        let ry0 = max(0, band.minY - ring), ry1 = min(height, band.maxY + ring)
+        if rx0 < rx1 && ry0 < ry1 {
+            for y in ry0..<ry1 {
+                for x in rx0..<rx1
+                where !(x >= band.minX - 1 && x < band.maxX + 1 && y >= band.minY - 1 && y < band.maxY + 1) {
+                    histogram[value(x, y)] += 1
+                    count += 1
+                }
+            }
+        }
+        var paper = 0
+        for v in 1..<256 where histogram[v] > histogram[paper] { paper = v }
+        guard count > 0, histogram[paper] * 10 >= count * 6 else { return true }
+        let x0 = max(0, band.minX), x1 = min(width, band.maxX)
+        let y0 = max(0, band.minY), y1 = min(height, band.maxY)
+        guard x0 < x1 && y0 < y1 else { return false }
+        for y in y0..<y1 {
+            for x in x0..<x1
+            where !(x >= lineMargin.minX && x < lineMargin.maxX && y >= lineMargin.minY && y < lineMargin.maxY) {
+                if abs(value(x, y) - paper) > inkContrast { return true }
+            }
+        }
+        return false
+    }
+}
+
 private func ceilDivision(_ a: Int, _ b: Int) -> Int {
     let q = a / b
     return (a % b != 0 && a > 0) ? q + 1 : q

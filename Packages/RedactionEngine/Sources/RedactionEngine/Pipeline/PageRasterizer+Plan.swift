@@ -38,6 +38,9 @@ struct PlanPaint: Sendable, Equatable {
     /// Some box was made larger by the ink check.
     var inkWidened: Bool { !inkWidenedBoxes.isEmpty }
     var inkWidenedBoxes: Set<Int> = []
+    /// The boxes painted with their line margin in place of their default
+    /// band: the page's picture showed ink in the band's slot.
+    var defaultsWithdrawn: Set<Int> = []
 }
 
 /// The ink check's inputs for one box of a page's plan.
@@ -344,6 +347,28 @@ extension PageRasterizer {
         var widened: Set<Int> = []
         let atSwitch = page.planSource == .switchPolicy
         var grid: InkCheck.Grid?
+        // 4b'. The default band's net, before anything else reads a box: a box
+        // painted with its default band where the page's picture shows ink in
+        // the part of the band its line margin does not hold is painted with
+        // its line margin instead. The net only withdraws a band.
+        var boxes = page.boxes
+        var withdrawn: Set<Int> = []
+        for (index, fallback) in page.defaultFallbacks.sorted(by: { $0.key < $1.key })
+        where index < boxes.count && boxes[index].defaultWidth == .taken {
+            let box = boxes[index]
+            if let band = PixelPlan.project(inner: box.inner, paint: box.paint, limitAbove: box.limitAbove,
+                                            limitBelow: box.limitBelow, raster: raster)?.painted,
+               let margin = PixelPlan.project(inner: fallback.inner, paint: fallback.paint,
+                                              limitAbove: fallback.limitAbove, limitBelow: fallback.limitBelow,
+                                              raster: raster)?.painted {
+                if grid == nil { grid = Self.greyGrid(context: ctx) }
+                guard let grid, !InkCheck.inkInSlot(band: band, lineMargin: margin, grid: grid, raster: raster)
+                else { boxes[index] = fallback; withdrawn.insert(index); continue }
+            } else {
+                boxes[index] = fallback
+                withdrawn.insert(index)
+            }
+        }
         // What was shown for a box that does not project here: filled as one
         // more stray rectangle, and read back.
         var shownOutsidePlan: [CGRect] = []
@@ -372,7 +397,7 @@ extension PageRasterizer {
             }
             return rect
         }
-        for (index, box) in page.boxes.enumerated() {
+        for (index, box) in boxes.enumerated() {
             let grows = box.regionIDs.contains(where: { growsOnInk[$0] == true })
             // Only a box the plan marks checkable: placed from typed text,
             // still anchored, not painted as drawn. A box placed from the
@@ -454,6 +479,7 @@ extension PageRasterizer {
         result.outsidePlan = Set(strays.map(\.id))
         result.inkVerdicts = verdicts
         result.inkWidenedBoxes = widened
+        result.defaultsWithdrawn = withdrawn
         return result
     }
 

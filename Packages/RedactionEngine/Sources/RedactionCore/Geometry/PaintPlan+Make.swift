@@ -63,6 +63,10 @@ package struct PlanFacts: Hashable, Sendable {
     /// The boxes of the page's words that no box selects or covers, in
     /// whole sixty-fourths: the ink check's flood never enters them.
     package var otherWords: [PageRect64] = []
+    /// For each box painted with its default band, by its place in the plan:
+    /// the same box with its line margin, which the producer paints instead
+    /// when the page's picture shows ink in the band's slot.
+    package var defaultFallbacks: [Int: PaintedBox] = [:]
 
     package init() {}
 }
@@ -146,6 +150,9 @@ private struct Maker {
         var regions: [Int]
         /// The tallest line the box's rows lie on, when it has any.
         var lineHeight: Int? = nil
+        /// A box painted with its default band: the same box with its line
+        /// margin.
+        var fallback: PaintedBox? = nil
     }
 
     init(placed: [(region: PlanRegion, rect: PageRect64)], words: PageWords, text: String, pageFacts: PageTextFacts,
@@ -355,9 +362,17 @@ private struct Maker {
             return box(inner: tight, paint: margin.paint, tight: tight, above: margin.above, below: margin.below,
                        treatment: outcome, band: false, asDrawn: false)
         case .defaultBand:
-            let made = defaultPaint(tight: tight, rows: read?.rows ?? [], regions: regions.map(\.rect), letters: letters)
-            return box(inner: made.inner, paint: made.paint, tight: tight, above: made.above, below: made.below,
-                       treatment: outcome, band: made.inner != tight, asDrawn: false, width: made.width)
+            let rows = read?.rows ?? []
+            let made = defaultPaint(tight: tight, rows: rows, regions: regions.map(\.rect), letters: letters)
+            var result = box(inner: made.inner, paint: made.paint, tight: tight, above: made.above, below: made.below,
+                             treatment: outcome, band: made.inner != tight, asDrawn: false, width: made.width)
+            if made.width == .taken && made.inner != tight {
+                let margin = marginPaint(inner: tight, rows: rows)
+                result.fallback = box(inner: tight, paint: margin.paint, tight: tight, above: margin.above,
+                                      below: margin.below, treatment: outcome, band: false, asDrawn: false,
+                                      width: .notTaken(.inkInSlot)).box
+            }
+            return result
         case .band:
             let rows = read?.rows ?? []
             let band = self.band(tight: tight, rows: rows)
@@ -576,6 +591,9 @@ private struct Maker {
         }
         for (index, m) in made.enumerated() where m.box.inkCheckable {
             if let h = m.lineHeight { facts.inkLineHeights[index] = h }
+        }
+        for (index, m) in made.enumerated() {
+            if let fallback = m.fallback { facts.defaultFallbacks[index] = fallback }
         }
         facts.otherWords = complement.lines.flatMap { $0.words.map(\.box) }
         return facts
