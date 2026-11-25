@@ -174,6 +174,12 @@ struct ResectaApp: App {
         // foot (Scripts/generate_uitest_legal.py): a page taller than
         // Letter, whose foot the bottom controls cover at fit zoom.
         "--legalDoc": "uitest_legal",
+        // One unturned Letter page, and one page with an offset crop box shown
+        // turned a quarter, each with one word off the centre in a clear
+        // block (Scripts/generate_uitest_clear_page.py): where a result is
+        // framed on a turned page.
+        "--clearPageDoc": "uitest_clear_page",
+        "--clearPageTurnedDoc": "uitest_clear_page_turned",
     ]
 
     /// The `--loadTestDocument` fixture name for a launch-argument list.
