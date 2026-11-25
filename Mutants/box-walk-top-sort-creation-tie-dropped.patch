@@ -1,0 +1,17 @@
+Property: Down a page, boxes with the same top keep the order they entered the page's list, so the earlier one anchors the row whatever order they are handed in.
+Area: the editor, stepping through boxes
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild build-for-testing -scheme ResectaApp -destination id=<simulator>, then DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test-without-building -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BoxWalkTests
+Must go red: ResectaAppTests/BoxWalkTests tableCase(_:) [top-tie-anchors-on-the-earlier]; ResectaAppTests/BoxWalkTests theFivePropertiesOverSeededPages(); ResectaAppTests/BoxWalkTests theSeededPagesMatchTheReference()
+Apply in a scratch worktree with `git apply`; discard after.
+
+--- a/Sources/ResectaApp/State/BoxWalk.swift
++++ b/Sources/ResectaApp/State/BoxWalk.swift
+@@ -74,7 +74,7 @@
+         out.reserveCapacity(boxes.count)
+         for page in byPage.keys.sorted() {
+             let down = (byPage[page] ?? []).sorted { a, b in
+-                a.rect.minY != b.rect.minY ? a.rect.minY < b.rect.minY : a.created < b.created
++                a.rect.minY < b.rect.minY
+             }
+             var rows: [[Box]] = []
+             for box in down {

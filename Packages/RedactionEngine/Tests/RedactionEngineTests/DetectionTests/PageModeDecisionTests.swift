@@ -80,6 +80,34 @@ struct PageModeDecisionTests {
         }
     }
 
+    @Test("the arms in order: a trigger before the invisible-text reading, that reading before the box rule")
+    func triggerThenInvisibleTextThenBoxRule() throws {
+        let typed = try Self.typedPage()
+        let trigger = try Self.triggerPage()
+        let unanchored = [Self.region(anchored: false)]
+        var (textReads, factReads) = (0, 0)
+        func decide(_ page: PDFPage, _ reading: InvisibleTextReading) -> (PipelineMode, Reason?) {
+            let got = PageModeDecision.decide(
+                effectiveMode: .searchableRedaction, textLayerStatus: .rich, page: page,
+                pageRegions: unanchored, inkPlanCovers: false,
+                readFacts: { _ in factReads += 1; return Self.notPlain },
+                readInvisibleText: { _ in textReads += 1; return reading })
+            return (got.mode, got.fallbackReason)
+        }
+        let byTrigger = decide(trigger, .shows)
+        #expect(byTrigger == (.secureRasterization, .unresolvedEncoding), "a trigger wins over invisible text")
+        #expect((textReads, factReads) == (0, 0), "the trigger page is not read for invisible text or its facts")
+        let byText = decide(typed, .shows)
+        #expect(byText == (.secureRasterization, .invisibleText), "invisible text wins over an unanchored box")
+        #expect((textReads, factReads) == (1, 0), "the box rule's facts are not read on an invisible-text page")
+        let byFault = decide(typed, .unreadable)
+        #expect(byFault == (.secureRasterization, .extractionFailed), "unreadable content wins over an unanchored box")
+        #expect((textReads, factReads) == (2, 0), "nor on a page that could not be read")
+        let byBox = decide(typed, .showsNone)
+        #expect(byBox == (.secureRasterization, .unanchoredRegion), "with none shown, the box rule decides")
+        #expect((textReads, factReads) == (3, 1), "control: the box rule reads the facts once")
+    }
+
     @Test("the page's facts are not read when every box is anchored")
     func factsNotReadWhenAnchored() throws {
         let page = try Self.typedPage()

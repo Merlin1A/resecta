@@ -13,9 +13,14 @@ public enum PageModeDecision {
     /// was entered with; `textLayerStatus` is the import's status for the
     /// page; `pageRegions` are the page's regions after the size floor;
     /// `inkPlanCovers` says whether an ink plan covers every one of them.
-    /// The page's content facts are read (`PageContentFacts.read`) only when
-    /// some region was not placed from the page's own text and does not
-    /// cover the whole page.
+    /// Every Searchable page with rich text that no trigger takes is read
+    /// for text shown in an invisible render mode (`InvisibleTextReading`):
+    /// a page that shows some, or whose content could not be read, is
+    /// written as an image only. The page's other content facts are read
+    /// (`PageContentFacts.read`) only when some region was not placed from
+    /// the page's own text and does not cover the whole page; by then the
+    /// page is known to show no invisible text, so its content is not walked
+    /// for that again.
     public static func decide(
         effectiveMode: PipelineMode,
         textLayerStatus: TextLayerStatus?,
@@ -23,12 +28,16 @@ public enum PageModeDecision {
         pageRegions: [RedactionRegion],
         inkPlanCovers: Bool
     ) -> (mode: PipelineMode, fallbackReason: TextLayerDetector.FallbackReason?) {
+        // `showsInvisibleText: false` holds because the invisible-text arm
+        // runs before the box rule: a page the box rule reads shows none.
+        // PageModeDecisionTests pins that order.
         decide(effectiveMode: effectiveMode, textLayerStatus: textLayerStatus, page: page,
-               pageRegions: pageRegions, inkPlanCovers: inkPlanCovers, readFacts: PageContentFacts.read)
+               pageRegions: pageRegions, inkPlanCovers: inkPlanCovers,
+               readFacts: { PageContentFacts.read($0, showsInvisibleText: false) })
     }
 
-    /// The decision with the reader of the page's facts given, so a test can
-    /// count its reads. Internal: outside the package the facts are always
+    /// The decision with the readers of the page's facts given, so a test can
+    /// count their reads. Internal: outside the package the facts are always
     /// read from the page.
     static func decide(
         effectiveMode: PipelineMode,
@@ -36,7 +45,8 @@ public enum PageModeDecision {
         page: PDFPage,
         pageRegions: [RedactionRegion],
         inkPlanCovers: Bool,
-        readFacts: (CGPDFPage?) -> PageContentFacts
+        readFacts: (CGPDFPage?) -> PageContentFacts,
+        readInvisibleText: (CGPDFPage?) -> InvisibleTextReading = InvisibleTextReading.read
     ) -> (mode: PipelineMode, fallbackReason: TextLayerDetector.FallbackReason?) {
         let pageMode: PipelineMode
         var fallbackReason: TextLayerDetector.FallbackReason?
@@ -60,6 +70,13 @@ public enum PageModeDecision {
             if let trigger = TextLayerDetector.checkFallbackTriggers(page) {
                 pageMode = .secureRasterization
                 fallbackReason = trigger
+            } else if let reason = Self.invisibleTextReason(readInvisibleText(page.pageRef)) {
+                // The page shows text in an invisible render mode (a hidden
+                // layer over a picture of the page, or a word drawn without
+                // ink), or its content could not be read: it is written as
+                // an image only, with the reason.
+                pageMode = .secureRasterization
+                fallbackReason = reason
             } else if !inkPlanCovers, !PageContentFacts.keepsTextLayer(
                 regions: pageRegions, facts: { readFacts(page.pageRef) }
             ) {
@@ -85,5 +102,17 @@ public enum PageModeDecision {
             }
         }
         return (pageMode, fallbackReason)
+    }
+
+    /// The page's reason from its invisible-text reading: text shown in an
+    /// invisible mode is its own reason; content that could not be read is
+    /// a fault's (`extractionFailed`), never the invisible-text reason;
+    /// content that shows none gives no reason here.
+    static func invisibleTextReason(_ reading: InvisibleTextReading) -> TextLayerDetector.FallbackReason? {
+        switch reading {
+        case .shows: .invisibleText
+        case .unreadable: .extractionFailed
+        case .showsNone: nil
+        }
     }
 }

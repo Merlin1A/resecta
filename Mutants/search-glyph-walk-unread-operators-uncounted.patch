@@ -1,0 +1,22 @@
+Property: Every operator a page draws counts toward the walk's limit, those it does not read too.
+Area: Search, the match boxes from the page's own drawing
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter ContentGlyphWalkLimitTests
+Must go red: RedactionEngineTests/ContentGlyphWalkLimitTests everyOperatorCounts; RedactionEngineTests/ContentGlyphWalkLimitTests formOperatorsCountPerDrawing
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphWalk.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphWalk.swift
+index c0bc5b61..79462203 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphWalk.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphWalk.swift
+@@ -132,11 +132,6 @@ enum ContentGlyphWalk {
+     }
+ 
+     private static func register(_ table: CGPDFOperatorTableRef) {
+-        for name in countedOnly {
+-            CGPDFOperatorTableSetCallback(table, name) { scanner, info in
+-                _ = State.from(info)?.count(scanner)
+-            }
+-        }
+         CGPDFOperatorTableSetCallback(table, "q") { scanner, info in
+             guard let s = State.from(info), s.count(scanner) else { return }
+             s.saved.append(s.g)

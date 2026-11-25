@@ -1,0 +1,16 @@
+Property: After the box in view is deleted, the walk moves to the next box going forward, wrapping at the end, and never back to the one before.
+Area: the editor, stepping through boxes
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild build-for-testing -scheme ResectaApp -destination id=<simulator>, then DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test-without-building -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BoxWalkTests
+Must go red: ResectaAppTests/BoxWalkTests tableCase(_:) [delete-moves-to-the-next]; ResectaAppTests/BoxWalkTests tableCase(_:) [delete-at-the-end-wraps]
+Apply in a scratch worktree with `git apply`; discard after.
+
+--- a/Sources/ResectaApp/State/BoxWalk.swift
++++ b/Sources/ResectaApp/State/BoxWalk.swift
+@@ -126,6 +126,7 @@
+     static func afterDelete(_ order: [UUID], at index: Int, alive: (UUID) -> Bool) -> Int? {
+         let n = order.count
+         guard n > 0 else { return nil }
++        if index - 1 >= 0, index - 1 < n, alive(order[index - 1]) { return index - 1 }
+         for k in 1...n {
+             let j = ((index + k) % n + n) % n
+             if alive(order[j]) { return j }

@@ -11,6 +11,9 @@ import PDFKit
 // an invisible render mode and uses no Type 3 font. On any other page a box
 // can cover printed words whose hidden copies sit beside it, outside the box,
 // and the export would keep them; such a page is written as an image only.
+// A page that shows text in an invisible render mode (a scan made searchable)
+// is written as an image only before any box is read, with the
+// invisible-text reason, whatever its boxes.
 //
 // These run over `RunInputs.pageData`, the run's own page bridge
 // (`TestHelpers.productionRun` in the engine tests builds its pages without it).
@@ -138,6 +141,12 @@ struct ScannedPageBoxFloorTests {
         #expect(page.fallbackReason == .unanchoredRegion, "an image-only page states why: \(String(describing: page.fallbackReason))")
     }
 
+    /// Written as an image only for its invisible text, before any box is read.
+    static func expectInvisibleText(_ page: PDFPageData, _ comment: Comment) {
+        #expect(page.pipelineMode == .secureRasterization, comment)
+        #expect(page.fallbackReason == .invisibleText, "the page states why: \(String(describing: page.fallbackReason))")
+    }
+
     static func expectKept(_ page: PDFPageData, _ comment: Comment) {
         #expect(page.pipelineMode == .searchableRedaction, comment)
         #expect(page.fallbackReason == nil, comment)
@@ -150,9 +159,9 @@ struct ScannedPageBoxFloorTests {
         Self.expectImageOnly(Self.outcome(Self.imagePage(), [Self.hand()]), "image page, hand box")
     }
 
-    @Test("a hand-drawn box on a page with text in an invisible render mode writes the page as an image")
+    @Test("a hand-drawn box on a page with text in an invisible render mode writes the page as an image, for its invisible text")
     func handBoxOnInvisibleTextPage() {
-        Self.expectImageOnly(Self.outcome(Self.invisibleTextPage(), [Self.hand()]), "invisible text, hand box")
+        Self.expectInvisibleText(Self.outcome(Self.invisibleTextPage(), [Self.hand()]), "invisible text, hand box")
     }
 
     @Test("a hand-drawn box on a page with a Type 3 font writes the page as an image")
@@ -173,12 +182,12 @@ struct ScannedPageBoxFloorTests {
         Self.expectImageOnly(Self.outcome(Self.imagePage(), state.regions[0] ?? []), "image page, a Duplicate beside a match")
     }
 
-    @Test("a match resized by hand on a scanned page writes the page as an image")
+    @Test("a match resized by hand on a scanned page writes the page as an image, for its invisible text")
     func resizedMatchOnScanPage() throws {
         let state = Self.applied([Self.match(.textLayer, strip: Self.strip)])
         let region = try #require(state.regions[0]?.first)
         #expect(state.resizeRegion(region.id, page: 0, newRect: Self.ink.insetBy(dx: -0.05, dy: 0), undoManager: nil))
-        Self.expectImageOnly(Self.outcome(Self.scanPage(), state.regions[0] ?? []), "scan page, resized match")
+        Self.expectInvisibleText(Self.outcome(Self.scanPage(), state.regions[0] ?? []), "scan page, resized match")
     }
 
     @Test("a match moved by hand on a page with a picture writes the page as an image")
@@ -223,10 +232,10 @@ struct ScannedPageBoxFloorTests {
         Self.expectKept(Self.outcome(Self.imagePage(), state.regions[0] ?? []), "image page, placed match")
     }
 
-    @Test("a match with its hidden glyphs' box, left where it was placed, keeps the text layer on a scanned page")
+    @Test("a match with its hidden glyphs' box, left where it was placed, on a scanned page: the page is an image, for its invisible text")
     func placedStripMatchOnScanPage() {
         let state = Self.applied([Self.match(.textLayer, strip: Self.strip)])
-        Self.expectKept(Self.outcome(Self.scanPage(), state.regions[0] ?? []), "scan page, placed match with strip")
+        Self.expectInvisibleText(Self.outcome(Self.scanPage(), state.regions[0] ?? []), "scan page, placed match with strip")
     }
 
     @Test("a box over the whole page keeps the text layer: it removes every glyph")
@@ -240,7 +249,7 @@ struct ScannedPageBoxFloorTests {
         Self.expectKept(Self.outcome(Self.imagePage(), []), "image page, no box")
     }
 
-    @Test("a match resized and then put back by Undo keeps the text layer")
+    @Test("a match resized and then put back by Undo is placed from the text again; on a scanned page the page is an image, for its invisible text")
     func resizeUndoneOnScanPage() throws {
         let state = Self.applied([Self.match(.textLayer, strip: Self.strip)])
         let region = try #require(state.regions[0]?.first)
@@ -250,7 +259,8 @@ struct ScannedPageBoxFloorTests {
         }
         undo.undo()
         #expect(state.regions[0]?.first?.normalizedRect == Self.ink)
-        Self.expectKept(Self.outcome(Self.scanPage(), state.regions[0] ?? []), "scan page, resize undone")
+        #expect(state.regions[0]?.first?.textAnchored == true, "Undo puts the match back as placed from the page's text")
+        Self.expectInvisibleText(Self.outcome(Self.scanPage(), state.regions[0] ?? []), "scan page, resize undone")
     }
 
     // MARK: - Anchoring

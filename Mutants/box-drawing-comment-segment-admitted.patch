@@ -3,13 +3,12 @@ Area: the box check's own reading of what each page draws
 Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/BoxCheckDrawingTests (or on the host: cd Packages/RedactionEngine && swift test --filter BoxCheckDrawingTests)
 Must go red: RedactionEngineTests/BoxCheckDrawingTests eachCase [D90: a comment segment]
 Apply in a scratch worktree with `git apply`; discard after.
-
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
-index 1038a83b..4063eef3 100644
+index 86dc26d9..2d1d9ebd 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
-@@ -191,7 +191,7 @@ enum PageDrawingReader {
-                 guard exifHasNoSecondDirectory(body) else { return .unlistedSegment }
+@@ -261,7 +261,7 @@ enum PageDrawingReader {
+                 if body.count >= 5 { frameSides = (Int(body[3]) << 8 | Int(body[4]), Int(body[1]) << 8 | Int(body[2])) }
              case 0xED:
                  guard length <= photoshopSegmentLength, body.starts(with: Array("Photoshop 3.0\0".utf8)) else { return .unlistedSegment }
 -            case 0xE2...0xEC, 0xEE, 0xEF, 0xFE:

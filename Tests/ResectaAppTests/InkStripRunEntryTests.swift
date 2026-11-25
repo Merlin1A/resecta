@@ -6,17 +6,15 @@ import PDFKit
 @testable import ResectaApp
 @testable import RedactionEngine
 
-// On a scanned page whose text is an invisible layer drifted along the line
-// from its print, a box strips the hidden copies of the words whose printed
-// ink it covers, wherever they sit, and the page keeps its text layer: a box
-// drawn by hand over a name, and one on a first word narrower than the drift.
-// The hand-box capture names the boxed words, not the words whose hidden
-// copies drifted under the box. A box on a line where some word's print could
-// not be placed with confidence ("Signed by Lee on the date below." on this
-// page) sends the page to the image-only floor instead, with its reason and no
-// hidden text: a box on a short word, a Search box widened by hand, and a box
-// on the line's first word. Driven through the run's own entry
-// (`PipelineRunner.captureRunEntry`) and the rasterizer.
+// A scanned page whose text is an invisible layer drifted along the line from
+// its print is written as an image only in a Searchable run, with the
+// invisible-text reason and no hidden text, whatever box is on it: a box drawn
+// by hand over a name, one on a first word narrower than the drift, one on a
+// short word, a Search box widened by hand, and one on a line's first word.
+// The page's mode is decided before any box is read, so no box's strip of
+// hidden copies is reached. The hand-box capture still names the boxed words,
+// not the words whose hidden copies drifted under the box. Driven through the
+// run's own entry (`PipelineRunner.captureRunEntry`) and the rasterizer.
 
 @Suite("Strip by ink at run entry", .serialized, .tags(.coordination))
 @MainActor
@@ -165,42 +163,37 @@ struct InkStripRunEntryTests {
                 raster.pageOutput.textLayerEntries?.count ?? 0)
     }
 
-    static func expectKeptAndStripped(_ r: (page: PDFPageData, survivors: String, terms: [String], glyphs: Int),
-                                      _ comment: Comment) {
-        #expect(r.page.pipelineMode == .searchableRedaction, comment)
-        #expect(r.page.fallbackReason == nil, comment)
-        #expect(r.glyphs > 0, "\(comment): the page keeps its text layer")
-        #expect(r.survivors.isEmpty, "\(comment): the boxed word's hidden copy survived: \(r.survivors)")
-    }
-
-    static func expectFloor(_ r: (page: PDFPageData, survivors: String, terms: [String], glyphs: Int),
-                            _ comment: Comment) {
+    /// The page is written as an image only, for its invisible text, and
+    /// carries no hidden word.
+    static func expectPicture(_ r: (page: PDFPageData, survivors: String, terms: [String], glyphs: Int),
+                              _ comment: Comment) {
         #expect(r.page.pipelineMode == .secureRasterization, comment)
-        #expect(r.page.fallbackReason == .unanchoredRegion, "\(comment): \(String(describing: r.page.fallbackReason))")
+        #expect(r.page.fallbackReason == .invisibleText, "\(comment): \(String(describing: r.page.fallbackReason))")
         #expect(r.glyphs == 0, "\(comment): an image-only page carries no hidden text")
+        #expect(r.survivors.isEmpty, "\(comment): the boxed word's hidden copy survived: \(r.survivors)")
     }
 
     static func hand(_ rect: CGRect) -> RedactionRegion { RedactionRegion(id: UUID(), normalizedRect: rect, source: .manual) }
 
-    @Test("a hand-drawn box over a name keeps the page and strips the name's hidden copy beside it")
+    @Test("a hand-drawn box over a name: the page is an image only, and the capture names the boxed name")
     func handBoxOnName() async throws {
         let coord = try Self.coordinator()
         coord.redactionState.addRegion(Self.hand(Self.inkRect(line: 5, phrase: "Marisol", through: "Vance-Oduya")),
                                        page: 0, undoManager: nil)
         let r = try await Self.run(coord, covered: "Marisol Vance-Oduya")
-        Self.expectKeptAndStripped(r, "hand box on the name")
+        Self.expectPicture(r, "hand box on the name")
         #expect(r.terms.contains("Marisol") || r.terms.contains("Marisol Vance-Oduya"), "the capture names the boxed name: \(r.terms)")
         #expect(!r.terms.contains("Contact"), "the capture does not name the neighbour whose hidden copy drifted under the box: \(r.terms)")
     }
 
-    @Test("a hand-drawn box over a short word on a line with an uncertain word sends the page to the floor")
+    @Test("a hand-drawn box over a short word: the page is an image only")
     func handBoxOnShortWord() async throws {
         let coord = try Self.coordinator()
         coord.redactionState.addRegion(Self.hand(Self.inkRect(line: 11, phrase: "Lee")), page: 0, undoManager: nil)
-        Self.expectFloor(try await Self.run(coord, covered: "Lee"), "hand box on a short word")
+        Self.expectPicture(try await Self.run(coord, covered: "Lee"), "hand box on a short word")
     }
 
-    @Test("a Search box widened by hand on a line with an uncertain word sends the page to the floor")
+    @Test("a Search box widened by hand: the page is an image only")
     func widenedSearchBox() async throws {
         let coord = try Self.coordinator()
         let page = try #require(coord.documentState.sourceDocument?.page(at: 0))
@@ -216,20 +209,20 @@ struct InkStripRunEntryTests {
         let id = try #require(coord.redactionState.regions[0]?.first?.id)
         _ = coord.redactionState.resizeRegion(id, page: 0, newRect: Self.inkRect(line: 11, phrase: "Signed", through: "Lee"),
                                               undoManager: nil)
-        Self.expectFloor(try await Self.run(coord, covered: "Lee"), "widened Search box")
+        Self.expectPicture(try await Self.run(coord, covered: "Lee"), "widened Search box")
     }
 
-    @Test("a hand-drawn box on the first word of a line with an uncertain word sends the page to the floor")
+    @Test("a hand-drawn box on the first word of a line: the page is an image only")
     func handBoxOnFirstWord() async throws {
         let coord = try Self.coordinator()
         coord.redactionState.addRegion(Self.hand(Self.inkRect(line: 11, phrase: "Signed")), page: 0, undoManager: nil)
-        Self.expectFloor(try await Self.run(coord, covered: "Signed"), "hand box on the first word")
+        Self.expectPicture(try await Self.run(coord, covered: "Signed"), "hand box on the first word")
     }
 
-    @Test("a hand-drawn box on a first word narrower than the drift strips its hidden copy")
+    @Test("a hand-drawn box on a first word narrower than the drift: the page is an image only")
     func handBoxOnNarrowFirstWord() async throws {
         let coord = try Self.coordinator()
         coord.redactionState.addRegion(Self.hand(Self.inkRect(line: 0, phrase: "The")), page: 0, undoManager: nil)
-        Self.expectKeptAndStripped(try await Self.run(coord, covered: "The"), "hand box on a narrow first word")
+        Self.expectPicture(try await Self.run(coord, covered: "The"), "hand box on a narrow first word")
     }
 }

@@ -1,0 +1,17 @@
+Property: The row test is a share of the boxes' own heights, never a fixed distance, so the order does not depend on the page's size or unit.
+Area: the editor, stepping through boxes
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild build-for-testing -scheme ResectaApp -destination id=<simulator>, then DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test-without-building -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BoxWalkTests
+Must go red: ResectaAppTests/BoxWalkTests tableCase(_:) [one-row-reads-left-to-right]; ResectaAppTests/BoxWalkTests tableCase(_:) [half-the-smaller-height-joins]; ResectaAppTests/BoxWalkTests tableCase(_:) [rows-anchor-on-their-first-box]; ResectaAppTests/BoxWalkTests tableCase(_:) [same-left-in-a-row-keeps-creation-order]; ResectaAppTests/BoxWalkTests tableCase(_:) [the-mixed-seed-by-its-rectangles]; ResectaAppTests/BoxWalkTests theSeededPagesMatchTheReference()
+Apply in a scratch worktree with `git apply`; discard after.
+
+--- a/Sources/ResectaApp/State/BoxWalk.swift
++++ b/Sources/ResectaApp/State/BoxWalk.swift
+@@ -79,7 +79,7 @@
+             var rows: [[Box]] = []
+             for box in down {
+                 if let first = rows.last?.first,
+-                   box.rect.minY - first.rect.minY < rowShare * min(box.rect.height, first.rect.height) {
++                   box.rect.minY - first.rect.minY < 6.0 / 792.0 {
+                     rows[rows.count - 1].append(box)
+                 } else {
+                     rows.append([box])

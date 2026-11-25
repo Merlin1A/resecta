@@ -32,6 +32,13 @@ public struct PageContentFacts: Equatable, Sendable {
     /// inherited and through form objects). An image reached includes one
     /// inside a tiling pattern, or a pattern that cannot be read.
     public static func read(_ page: CGPDFPage?) -> PageContentFacts {
+        read(page, showsInvisibleText: nil)
+    }
+
+    /// The facts with the invisible-text fact given when it is already known
+    /// (`known`), so the page's content is not walked for it twice; nil
+    /// walks for it.
+    static func read(_ page: CGPDFPage?, showsInvisibleText known: Bool?) -> PageContentFacts {
         guard let page, let dictionary = page.dictionary else { return .unread }
         let resources: CGPDFDictionaryRef?
         switch TextLayerExtractor.inheritedResources(of: dictionary) {
@@ -45,7 +52,7 @@ public struct PageContentFacts: Equatable, Sendable {
         return PageContentFacts(
             reachesImage: PageImageCensus.largestImagePixelArea(of: page) != nil || PictureWalk.patternsHoldPicture(page),
             drawsInlineImage: walk.inlineImage,
-            showsInvisibleText: DocumentSearcher.showsInvisibleText(page),
+            showsInvisibleText: known ?? DocumentSearcher.showsInvisibleText(page),
             usesType3Font: walk.type3Font)
     }
 
