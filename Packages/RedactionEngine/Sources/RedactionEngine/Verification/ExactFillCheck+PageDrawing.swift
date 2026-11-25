@@ -44,6 +44,21 @@ enum PageDrawingReader {
     static let invisibleText = 3
     /// The longest Photoshop segment (APP13) the writer was measured to write, its length field.
     static let photoshopSegmentLength = 56
+    /// The writer's Exif segment (APP1) as measured on its exports, its body
+    /// (76 bytes with its length field): big-endian; the first directory holds
+    /// one entry, the place of the Exif directory, and names no second; that
+    /// directory holds the colour space and the picture's two pixel sides, and
+    /// names no next. Only the sides vary, at `exifWidth` and `exifHeight`, and
+    /// they must be the picture's own.
+    static let writersExif: [UInt8] = [
+        0x45, 0x78, 0x69, 0x66, 0x00, 0x00, 0x4D, 0x4D, 0x00, 0x2A, 0x00, 0x00, 0x00, 0x08,
+        0x00, 0x01, 0x87, 0x69, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x1A, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x03, 0xA0, 0x01, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00,
+        0xA0, 0x02, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00,
+        0xA0, 0x03, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00]
+    static let exifWidth = 54..<58
+    static let exifHeight = 66..<70
 
     /// Every page's drawing, or the reason the check will not judge it. A
     /// reason about the file as a whole is every page's reason.
@@ -84,16 +99,39 @@ enum PageDrawingReader {
     /// One revision, and a catalog and page tree of the writer's keys alone.
     /// The file holds one startxref and one trailer, nothing but line ends
     /// follows its last %%EOF, and the trailer names no earlier one, however
-    /// its names are spelled.
+    /// its names are spelled. startxref is followed by at most 12 digits and a
+    /// line end, and the offset they write names a table before the trailer:
+    /// the bytes there begin "xref" and a line end, as in every export the
+    /// writer was measured to write. The trailer comes before startxref.
     static func fileReason(_ data: Data, _ document: CGPDFDocument) -> Reason? {
         let startxref = Data("startxref".utf8), trailer = Data("trailer".utf8), end = Data("%%EOF".utf8)
         guard count(of: startxref, in: data) == 1, count(of: trailer, in: data) == 1, let e = data.range(of: end, options: .backwards) else { return .fileRevised }
         guard data[e.upperBound...].allSatisfy({ $0 == 10 || $0 == 13 }) else { return .fileRevised }
         guard let t = data.range(of: trailer, options: .backwards, in: data.startIndex..<e.lowerBound) else { return .fileRevised }
+        guard let s = data.range(of: startxref), let x = tableOffset(data, after: s), x < t.lowerBound, t.upperBound <= s.lowerBound else {
+            return .fileRevised
+        }
         let tail = nameEscapesRead(data[t.upperBound..<e.lowerBound])
         if tail.range(of: Data("/Prev".utf8)) != nil || tail.range(of: Data("/XRefStm".utf8)) != nil { return .fileRevised }
         guard let catalog = document.catalog, keys(catalog).isSubset(of: catalogKeys) else { return .documentKeyNotListed }
         return nil
+    }
+
+    /// Where the table startxref names begins, when the bytes there are "xref"
+    /// and a line end: the offset written after the keyword, every digit of
+    /// it, at most 12, and a line end right after the last.
+    static func tableOffset(_ data: Data, after keyword: Range<Data.Index>) -> Data.Index? {
+        var i = keyword.upperBound, value = 0, digits = 0
+        while i < data.endIndex, data[i] == 10 || data[i] == 13 || data[i] == 32 { i += 1 }
+        while i < data.endIndex, (48...57).contains(data[i]) {
+            digits += 1
+            guard digits <= 12 else { return nil }
+            value = value * 10 + Int(data[i] - 48); i += 1
+        }
+        guard digits > 0, i < data.endIndex, data[i] == 10 || data[i] == 13, value <= data.count - 5 else { return nil }
+        let x = data.startIndex + value
+        guard data[x..<(x + 4)].elementsEqual("xref".utf8), data[x + 4] == 10 || data[x + 4] == 13 else { return nil }
+        return x
     }
 
     /// The bytes with each #xx escape read as the byte it stands for, so a
@@ -200,17 +238,22 @@ enum PageDrawingReader {
     // MARK: The picture's segments
 
     /// The segments before the picture's scan: those a decoder reads, and of
-    /// those it does not, only a JFIF header, an Exif segment with no second
-    /// directory (the one that holds a thumbnail) and a Photoshop segment no
-    /// longer than the writer's. The reader judges the header's own segments.
+    /// those it does not, only a JFIF header, the writer's Exif segment naming
+    /// the picture's own sides, and a Photoshop segment no longer than the
+    /// writer's. The reader judges the header's own segments.
     static func segmentReason(_ data: Data) -> Reason? {
         let b = [UInt8](data)
         guard b.count >= 4, b[0] == 0xFF, b[1] == 0xD8 else { return .drawingNotRead }
         var i = 2
+        var exifSides: (width: Int, height: Int)?, frameSides: (width: Int, height: Int)?
         while i + 4 <= b.count {
             guard b[i] == 0xFF else { return .drawingNotRead }
             let marker = b[i + 1]
-            if marker == 0xDA { return nil }
+            if marker == 0xDA {
+                if let e = exifSides, let f = frameSides, e != f { return .unlistedSegment }
+                if exifSides != nil, frameSides == nil { return .unlistedSegment }
+                return nil
+            }
             let length = Int(b[i + 2]) << 8 | Int(b[i + 3])
             guard length >= 2, i + 2 + length <= b.count else { return .drawingNotRead }
             let body = Array(b[(i + 4)..<(i + 2 + length)])
@@ -218,7 +261,10 @@ enum PageDrawingReader {
             case 0xE0:
                 guard body.starts(with: Array("JFIF\0".utf8)) else { return .unlistedSegment }
             case 0xE1:
-                guard exifHasNoSecondDirectory(body) else { return .unlistedSegment }
+                guard exifSides == nil, let sides = writersExifSides(body) else { return .unlistedSegment }
+                exifSides = sides
+            case 0xC0...0xC3, 0xC5...0xC7, 0xC9...0xCB, 0xCD...0xCF:
+                if body.count >= 5 { frameSides = (Int(body[3]) << 8 | Int(body[4]), Int(body[1]) << 8 | Int(body[2])) }
             case 0xED:
                 guard length <= photoshopSegmentLength, body.starts(with: Array("Photoshop 3.0\0".utf8)) else { return .unlistedSegment }
             case 0xE2...0xEC, 0xEE, 0xEF, 0xFE:
@@ -231,27 +277,15 @@ enum PageDrawingReader {
         return .drawingNotRead
     }
 
-    /// An Exif segment whose first directory names no second one.
-    static func exifHasNoSecondDirectory(_ body: [UInt8]) -> Bool {
-        guard body.starts(with: [0x45, 0x78, 0x69, 0x66, 0, 0]) else { return false }
-        let t = Array(body.dropFirst(6))
-        guard t.count >= 8 else { return false }
-        let little: Bool
-        switch (t[0], t[1], t[2], t[3]) {
-        case (0x49, 0x49, 0x2A, 0x00): little = true
-        case (0x4D, 0x4D, 0x00, 0x2A): little = false
-        default: return false
+    /// The sides an Exif segment names, when it is the writer's in every
+    /// other byte.
+    static func writersExifSides(_ body: [UInt8]) -> (width: Int, height: Int)? {
+        guard body.count == writersExif.count else { return nil }
+        for k in body.indices where !exifWidth.contains(k) && !exifHeight.contains(k) {
+            guard body[k] == writersExif[k] else { return nil }
         }
-        func u16(_ o: Int) -> Int? {
-            guard o >= 0, o + 2 <= t.count else { return nil }
-            return little ? Int(t[o]) | Int(t[o + 1]) << 8 : Int(t[o]) << 8 | Int(t[o + 1])
-        }
-        func u32(_ o: Int) -> Int? {
-            guard let lo = u16(little ? o : o + 2), let hi = u16(little ? o + 2 : o) else { return nil }
-            return lo | hi << 16
-        }
-        guard let first = u32(4), let entries = u16(first), let next = u32(first + 2 + 12 * entries) else { return false }
-        return next == 0
+        func u32(_ r: Range<Int>) -> Int { r.reduce(0) { $0 << 8 | Int(body[$1]) } }
+        return (u32(exifWidth), u32(exifHeight))
     }
 
     // MARK: The content

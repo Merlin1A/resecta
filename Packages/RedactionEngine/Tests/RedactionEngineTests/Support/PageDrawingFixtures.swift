@@ -132,6 +132,16 @@ enum PageDrawingFixtures {
         var more: [String] = []
         var appended = ""
         var trailer = ""
+        /// startxref names this object (1-based) instead of the table, when set.
+        var startxrefObject: Int?
+        /// startxref names the table's offset plus this.
+        var startxrefShift = 0
+        /// startxref's number zero-padded to this many digits (0: as written).
+        var startxrefWidth = 0
+        /// Bytes written right after startxref's number, before its line end.
+        var startxrefAfter = ""
+        /// startxref names the "xref" inside its own keyword.
+        var startxrefSelf = false
 
         func file() -> Data {
             var objects: [Data] = []
@@ -156,7 +166,11 @@ enum PageDrawingFixtures {
             let xref = out.count
             out += text("xref\n0 \(objects.count + 1)\n0000000000 65535 f \n")
             for o in offsets { out += text(String(format: "%010d 00000 n \n", o)) }
-            out += text("trailer\n<< /Size \(objects.count + 1) /Root 1 0 R \(trailer) >>\nstartxref\n\(xref)\n%%EOF\n")
+            let trailerText = text("trailer\n<< /Size \(objects.count + 1) /Root 1 0 R \(trailer) >>\n")
+            var named = startxrefObject.map { offsets[$0 - 1] } ?? xref + startxrefShift
+            if startxrefSelf { named = out.count + trailerText.count + 5 }
+            let number = startxrefWidth > 0 ? String(format: "%0\(startxrefWidth)d", named) : "\(named)"
+            out += trailerText + text("startxref\n\(number)\(startxrefAfter)\n%%EOF\n")
             return out + text(appended)
         }
     }
@@ -193,6 +207,15 @@ enum PageDrawingFixtures {
             i += 2 + length
         }
         return jpeg
+    }
+
+    /// The writer's Exif body, naming `width` and `height` as the picture's sides.
+    static func writersExif(width: Int = 96, height: Int = 96) -> [UInt8] {
+        var b = PageDrawingReader.writersExif
+        for (range, value) in [(PageDrawingReader.exifWidth, width), (PageDrawingReader.exifHeight, height)] {
+            for (k, at) in range.enumerated() { b[at] = UInt8((value >> (8 * (3 - k))) & 0xFF) }
+        }
+        return b
     }
 
     /// An Exif body (big-endian) whose first directory holds one entry and names a second at `next`.
