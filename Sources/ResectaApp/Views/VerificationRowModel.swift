@@ -225,16 +225,16 @@ nonisolated struct VerificationRowModel: Equatable {
     /// before it has a result.
     static func title(for identity: VerificationLayer) -> String {
         switch identity {
-        case .textExtraction:       return "Text & Annotations in the Redacted PDF"
-        case .ocrCheck:             return "OCR of Page Images"
-        case .binaryStringSearch:   return "Terms in Text & Bytes"
-        case .structureCheck:       return "Active Content & Structure"
-        case .metadataCheck:        return "Document Metadata"
-        case .spatialVerification:  return "Character Positions"
+        case .textExtraction:       return "Leftover Text & Markup"
+        case .ocrCheck:             return "Text Recognition of Each Page"
+        case .binaryStringSearch:   return "Boxed Text in the File"
+        case .structureCheck:       return "Scripts & Attachments"
+        case .metadataCheck:        return "Author & File Details"
+        case .spatialVerification:  return "Kept Text Clear of Boxes"
         case .characterCount:       return "Character Count"
-        case .fontVerification:     return "Monospace Fonts"
-        case .characterLineage:     return "Character Sequence"
-        case .operatorReExtraction: return "Terms in Content Streams"
+        case .fontVerification:     return "Fonts in the Searchable Copy"
+        case .characterLineage:     return "Kept Text Unchanged"
+        case .operatorReExtraction: return "Boxed Text in Drawing Commands"
         case .hiddenWordInk:        return "Hidden Words Under Boxes"
         case .searchRecheck:        return "Search Re-check"
         case .detectionSweep:       return "Detection Sweep"
@@ -243,7 +243,7 @@ nonisolated struct VerificationRowModel: Equatable {
     }
 
     /// One line on what the check reads — a passing row's caption, and the
-    /// first line of every other row's expanded block. Character Positions
+    /// first line of every other row's expanded block. Kept Text Clear of Boxes
     /// reads differently when no page of the run kept a text layer.
     static func explainer(for identity: VerificationLayer, perPageModes: [PipelineMode] = []) -> String {
         switch identity {
@@ -435,9 +435,9 @@ nonisolated struct VerificationRowModel: Equatable {
 
     // MARK: - Needs review
 
-    /// The three checks whose needs review texts are document terms (OCR of
-    /// Page Images, Terms in Text & Bytes, Terms in Content Streams). The
-    /// Search Re-check's are query labels — a regex would quote its pattern.
+    /// The three checks whose needs review texts are document terms (Text
+    /// Recognition of Each Page, Boxed Text in the File, Boxed Text in Drawing
+    /// Commands). The Search Re-check's are query labels — a regex would quote its pattern.
     static func quotesReviewTerms(_ identity: VerificationLayer?) -> Bool {
         switch identity {
         case .ocrCheck, .binaryStringSearch, .operatorReExtraction: true

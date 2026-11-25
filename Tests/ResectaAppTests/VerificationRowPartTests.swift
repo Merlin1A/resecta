@@ -111,7 +111,7 @@ struct VerificationRowPartTests {
                                source: .manual)
     }
 
-    @Test("Character Positions' own row for a page that did not open beside an edge graze: the Share line names the unopened page and no other")
+    @Test("Kept Text Clear of Boxes' own row for a page that did not open beside an edge graze: the Share line names the unopened page and no other")
     func shareLineNamesTheUnopenedPage() async throws {
         let data = Self.rawPDF(["BT /F1 24 Tf 72 700 Td (SECRET CONTENT) Tj ET", ""])
         let doc = try Self.open(data, unopenable: [1]), whole = try Self.open(data)
@@ -125,10 +125,10 @@ struct VerificationRowPartTests {
         let layer = await Self.engineRow(.spatialVerification, doc, mode: .searchableRedaction, regions: [0: [region]])
         #expect(layer.status == .warn("") && layer.shortDescription == Self.unread2, "got \(layer.status)")
         #expect(DocumentEditorView.couldNotVerifyItemLines(report: Self.report([layer]))
-                == ["Character Positions: could not verify on\(Self.nbsp)page\(Self.nbsp)2"])
+                == ["Kept Text Clear of Boxes: could not verify on\(Self.nbsp)page\(Self.nbsp)2"])
     }
 
-    @Test("Terms in Text & Bytes' own joined row with no page list: the Share line reads could not verify, with no page")
+    @Test("Boxed Text in the File's own joined row with no page list: the Share line reads could not verify, with no page")
     func shareLineJoinedRowNoPage() async throws {
         let doc = try Self.open(Self.rawPDF([""], info: "/X (CLASSIFIEDZ)"))
         defer { Self.remove(doc) }
@@ -138,7 +138,7 @@ struct VerificationRowPartTests {
                 "got \(layer.status)")
         #expect(layer.pageReferences == nil)
         #expect(DocumentEditorView.couldNotVerifyItemLines(report: Self.report([layer]))
-                == ["Terms in Text & Bytes: could not verify"])
+                == ["Boxed Text in the File: could not verify"])
     }
 
     // MARK: - The caption
@@ -220,8 +220,8 @@ struct VerificationRowPartTests {
         let layer = Self.row(.fail("Annotations found on page 1"), .textExtraction, pages: [0],
                              part: Self.unread2, partPages: [1])
         #expect(DocumentEditorView.atRiskItemLines(report: Self.report([layer]))
-                == ["Text & Annotations in the Redacted PDF: failed on\(Self.nbsp)page\(Self.nbsp)1",
-                    "Text & Annotations in the Redacted PDF: could not verify on\(Self.nbsp)page\(Self.nbsp)2"])
+                == ["Leftover Text & Markup: failed on\(Self.nbsp)page\(Self.nbsp)1",
+                    "Leftover Text & Markup: could not verify on\(Self.nbsp)page\(Self.nbsp)2"])
     }
 
     @Test("the Share sheet for a needs-review row whose part names no page: could not verify, with no page")
@@ -229,8 +229,8 @@ struct VerificationRowPartTests {
         let layer = Self.row(.attention("Sensitive term found in decoded text on page 1"), .binaryStringSearch, pages: [0],
                              terms: ["Acme"], part: "1 term too short to check", partPages: [])
         #expect(DocumentEditorView.atRiskItemLines(report: Self.report([layer]))
-                == ["Terms in Text & Bytes: needs review on\(Self.nbsp)page\(Self.nbsp)1",
-                    "Terms in Text & Bytes: could not verify"])
+                == ["Boxed Text in the File: needs review on\(Self.nbsp)page\(Self.nbsp)1",
+                    "Boxed Text in the File: could not verify"])
     }
 
     // MARK: - The pin
@@ -243,8 +243,8 @@ struct VerificationRowPartTests {
                               terms: ["Acme"])
         #expect(Self.caption(review) == "\u{201C}Acme\u{201D} is still readable on\(Self.nbsp)page\(Self.nbsp)1.")
         #expect(DocumentEditorView.atRiskItemLines(report: Self.report([failed, review]))
-                == ["Text & Annotations in the Redacted PDF: failed on\(Self.nbsp)page\(Self.nbsp)1",
-                    "Terms in Text & Bytes: needs review on\(Self.nbsp)page\(Self.nbsp)1"])
+                == ["Leftover Text & Markup: failed on\(Self.nbsp)page\(Self.nbsp)1",
+                    "Boxed Text in the File: needs review on\(Self.nbsp)page\(Self.nbsp)1"])
         #expect(DocumentEditorView.couldNotVerifyItemLines(report: Self.report([failed, review])).isEmpty)
     }
 }
