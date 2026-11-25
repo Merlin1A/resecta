@@ -1,0 +1,17 @@
+Property: A row is measured from its first box, never from the box added last, so a box a little under each of its neighbours does not chain the rows together.
+Area: the editor, stepping through boxes
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild build-for-testing -scheme ResectaApp -destination id=<simulator>, then DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test-without-building -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BoxWalkTests
+Must go red: ResectaAppTests/BoxWalkTests tableCase(_:) [rows-anchor-on-their-first-box]; ResectaAppTests/BoxWalkTests tableCase(_:) [top-tie-anchors-on-the-earlier]; ResectaAppTests/BoxWalkTests theSeededPagesMatchTheReference()
+Apply in a scratch worktree with `git apply`; discard after.
+
+--- a/Sources/ResectaApp/State/BoxWalk.swift
++++ b/Sources/ResectaApp/State/BoxWalk.swift
+@@ -78,7 +78,7 @@
+             }
+             var rows: [[Box]] = []
+             for box in down {
+-                if let first = rows.last?.first,
++                if let first = rows.last?.last,
+                    box.rect.minY - first.rect.minY < rowShare * min(box.rect.height, first.rect.height) {
+                     rows[rows.count - 1].append(box)
+                 } else {

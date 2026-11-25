@@ -1,0 +1,17 @@
+Property: Within a row, boxes with the same left edge keep the order they entered the page's list, whatever their tops.
+Area: the editor, stepping through boxes
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild build-for-testing -scheme ResectaApp -destination id=<simulator>, then DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test-without-building -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BoxWalkTests
+Must go red: ResectaAppTests/BoxWalkTests tableCase(_:) [same-left-in-a-row-keeps-creation-order]; ResectaAppTests/BoxWalkTests theSeededPagesMatchTheReference()
+Apply in a scratch worktree with `git apply`; discard after.
+
+--- a/Sources/ResectaApp/State/BoxWalk.swift
++++ b/Sources/ResectaApp/State/BoxWalk.swift
+@@ -87,7 +87,7 @@
+             }
+             for row in rows {
+                 out += row.sorted { a, b in
+-                    a.rect.minX != b.rect.minX ? a.rect.minX < b.rect.minX : a.created < b.created
++                    a.rect.minX < b.rect.minX
+                 }.map(\.id)
+             }
+         }
