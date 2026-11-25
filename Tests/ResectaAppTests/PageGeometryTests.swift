@@ -22,7 +22,7 @@ private final class PageGeometryTableBundle: NSObject {}
 struct PageGeometryTests {
 
     typealias Row = [String: Any]
-    static let tableSHA256 = "69cd43eaeceaad633fd714ee53c2982ae39d18475a643f8b5b30283b61a77b38"
+    static let tableSHA256 = "2c3f05a67b3f9014330b605e31b8ed09b9e763cdadf0a5f545b95c66dbbda9b4"
     static let letter = CGRect(x: 0, y: 0, width: 612, height: 792)
 
     static func table() throws -> (data: Data, rows: [Row]) {
