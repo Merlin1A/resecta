@@ -44,7 +44,8 @@ struct SavedSearchListSheet: View {
     @State private var savePromptError: String?
     @State private var renameError: String?
     /// A Save or a Rename the store did not take for a reason that is no
-    /// refusal: the prompt comes back with the typed name and no new words.
+    /// refusal: the prompt comes back with the typed name and the
+    /// not-saved line, `ListChange.notSavedMessage`.
     @State private var savePromptNotSaved = false
     @State private var renameNotSaved = false
     /// The entry whose rename collided, held across the
