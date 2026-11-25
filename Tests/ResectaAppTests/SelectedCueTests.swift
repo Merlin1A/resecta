@@ -41,6 +41,7 @@ struct SelectedCueTests {
     func redrawsOnTheSettingChange() {
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 400, height: 400))
         let overlay = RedactionOverlayView(frame: window.bounds)
+        overlay.geometry = .testUnturned
         window.addSubview(overlay)
         window.isHidden = false
         overlay.layer.displayIfNeeded()

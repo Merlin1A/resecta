@@ -301,7 +301,10 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
 
         let overlay = RedactionOverlayView()
         overlay.pageIndex = pageIndex
-        overlay.pageRotation = page.rotation
+        // The app shows the crop box and never sets another display box, so
+        // the geometry's crop and the page size below read one box.
+        assert(view.displayBox == .cropBox)
+        overlay.geometry = RunRecord.PageGeometry(page: page, box: view.displayBox)
         overlay.pageSize = page.bounds(for: view.displayBox).size
         overlay.coordinator = self
         overlay.isUserInteractionEnabled = isDrawingEnabled
@@ -359,6 +362,7 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
     // MARK: - Region Management (called from overlay touch handlers)
 
     func addRegion(_ region: RedactionRegion, page: Int, undoManager: UndoManager?) {
+        assert(RedactionState.admitsEditorShare(region.normalizedRect))
         redactionState?.addRegion(region, page: page, undoManager: undoManager)
         refreshOverlay(for: page)
     }
@@ -412,6 +416,7 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
     /// the rect changed.
     func commitResize(_ id: UUID, page: Int, newRect: CGRect, drawnPageRect: CGRect? = nil,
                       undoManager: UndoManager?) {
+        assert(RedactionState.admitsEditorShare(newRect))
         if redactionState?.resizeRegion(id, page: page, newRect: newRect, undoManager: undoManager,
                                         drawnPageRect: drawnPageRect) == true {
             UIAccessibility.post(notification: .announcement, argument: Self.commitAnnouncement(.resized))
@@ -422,6 +427,7 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
     // Commit region move after drag ends.
     func commitMove(_ id: UUID, page: Int, newRect: CGRect, drawnPageRect: CGRect? = nil,
                     undoManager: UndoManager?) {
+        assert(RedactionState.admitsEditorShare(newRect))
         redactionState?.moveRegion(id, page: page, newRect: newRect, undoManager: undoManager,
                                    drawnPageRect: drawnPageRect)
         refreshOverlay(for: page)
@@ -430,6 +436,14 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
     /// Commit a batch move of multiple regions on the same page.
     func commitMoveMultiple(_ moves: [(id: UUID, newRect: CGRect)], page: Int,
                             drawnPageRects: [UUID: CGRect] = [:], undoManager: UndoManager?) {
+        #if DEBUG
+        // A group whose union lay past the page before the move (a member
+        // stored past an edge) keeps that excess: each member is held to it.
+        let ids = Set(moves.map(\.id))
+        let before = (redactionState?.regions[page] ?? []).filter { ids.contains($0.id) }.map(\.normalizedRect)
+        let excess = before.dropFirst().reduce(before.first) { $0?.union($1) }.map(RedactionState.excessPastThePage) ?? 0
+        for move in moves { assert(RedactionState.admitsEditorShare(move.newRect, slack: excess)) }
+        #endif
         redactionState?.moveRegions(moves, page: page, undoManager: undoManager, drawnPageRects: drawnPageRects)
         refreshOverlay(for: page)
     }

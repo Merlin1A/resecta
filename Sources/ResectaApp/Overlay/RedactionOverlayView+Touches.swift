@@ -14,6 +14,9 @@ extension RedactionOverlayView {
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard touches.count == 1, let touch = touches.first else { return }
+        // An overlay with no page geometry begins no gesture: nothing is
+        // stored or drawn from it.
+        guard geometry.cropBox.width > 0, geometry.cropBox.height > 0 else { Self.noGeometry(); return }
         // Ignore secondary touchesBegan while a gesture is already
         // in flight. Prevents a finger landing during a Pencil drag from
         // hijacking the gesture state machine.

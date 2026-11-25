@@ -137,8 +137,8 @@ struct CoordinatorCommitGuardTests {
         state.addRegion(region, page: 0, undoManager: nil)
         let undoManager = UndoManager()
         let version = state.regionVersion
-        let step = DocumentEditorView.nudgeDelta(pageSize: CGSize(width: 612, height: 792))
-        let nudged = DocumentEditorView.nudgedRect(region.normalizedRect, dx: step.dx, dy: 0)
+        let step = RunRecord.PageGeometry(cropBox: CGRect(x: 0, y: 0, width: 612, height: 792), rotation: 0).pointStep
+        let nudged = DocumentEditorView.nudgedRect(region.normalizedRect, dx: step.width, dy: 0)
         #expect(nudged == region.normalizedRect, "the clamp holds the region at the right edge")
         state.moveRegion(region.id, page: 0, newRect: nudged, undoManager: undoManager)
         #expect(undoManager.canUndo == false)

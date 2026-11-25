@@ -220,6 +220,7 @@ struct CanvasZoomFloorTests {
         let (view, _) = makeView()
         let doubleTap = try #require((view.gestureRecognizers ?? []).first { $0.name == FitFlooredPDFView.returnToFitGestureName })
         let overlay = RedactionOverlayView(frame: CGRect(origin: .zero, size: Self.letter))
+        overlay.geometry = .testUnturned
         func receives(_ touchView: UIView) -> Bool {
             doubleTap.delegate?.gestureRecognizer?(doubleTap, shouldReceive: StubTouch(location: .zero, view: touchView)) ?? true
         }

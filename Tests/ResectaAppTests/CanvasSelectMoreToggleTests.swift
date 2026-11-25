@@ -55,12 +55,14 @@ struct CanvasSelectMoreToggleTests {
     @Test("Overlay's multi-select flag defaults to off so the legacy path is the default")
     func overlayDefaultsOff() {
         let overlay = RedactionOverlayView()
+        overlay.geometry = .testUnturned
         #expect(overlay.isMultiSelectActive == false)
     }
 
     @Test("Setting the flag on the overlay is read back in lock-step")
     func overlayFlagRoundTrips() {
         let overlay = RedactionOverlayView()
+        overlay.geometry = .testUnturned
         overlay.isMultiSelectActive = true
         #expect(overlay.isMultiSelectActive == true)
         overlay.isMultiSelectActive = false
