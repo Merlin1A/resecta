@@ -1,0 +1,17 @@
+Property: A step goes round by default: forward from the last box goes to the first, and back from the first to the last.
+Area: the editor, stepping through boxes
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild build-for-testing -scheme ResectaApp -destination id=<simulator>, then DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test-without-building -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BoxWalkTests
+Must go red: ResectaAppTests/BoxWalkTests tableCase(_:) [step-default-wraps-at-the-end]; ResectaAppTests/BoxWalkTests tableCase(_:) [step-default-wraps-back-at-the-start]; ResectaAppTests/BoxWalkTests tableCase(_:) [step-default-wrap-skips-a-deleted-first]
+Apply in a scratch worktree with `git apply`; discard after.
+
+--- a/Sources/ResectaApp/State/BoxWalk.swift
++++ b/Sources/ResectaApp/State/BoxWalk.swift
+@@ -102,7 +102,7 @@
+     /// an end the index stays if its box is alive, and otherwise the step goes the
+     /// other way.
+     static func step(_ order: [UUID], from index: Int, _ direction: Direction,
+-                     ends: Ends = .wrap, alive: (UUID) -> Bool) -> Int? {
++                     ends: Ends = .stop, alive: (UUID) -> Bool) -> Int? {
+         let n = order.count
+         guard n > 0, order.indices.contains(index), order.contains(where: alive) else { return nil }
+         var i = index
