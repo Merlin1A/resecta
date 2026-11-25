@@ -145,6 +145,81 @@ struct ContentGlyphWalkTests {
     }
 }
 
+/// The walk's two bounds: every operator counted, and the form content
+/// walked charged each time a form is drawn. Past either, the page is unread.
+@Suite("The glyph walk's limits")
+struct ContentGlyphWalkLimitTests {
+    /// The visible line's own operators: BT, Tf, Td, Tj, ET.
+    static let lineOperators = 5
+
+    /// A form of `body`, with F1 in its resources.
+    static func form(_ id: Int, _ body: String) -> PDFObject {
+        PDFObject(id: id, content: "<< /Type /XObject /Subtype /Form /BBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Length \(body.utf8.count) >>\nstream\n\(body)\nendstream")
+    }
+
+    /// The visible line, after `times` drawings of a form of `body`.
+    static func glyphs(drawing body: String, times: Int) throws -> [ShownGlyph]? {
+        try ContentGlyphWalkTests.glyphs(String(repeating: "/X1 Do\n", count: times) + ContentGlyphWalkTests.visible,
+                                         resources: "/Font << /F1 5 0 R >> /XObject << /X1 6 0 R >>", extra: [form(6, body)])
+    }
+
+    @Test("Operators the walk does not read count too: a page of exactly the limit reads, one more leaves it unread")
+    func everyOperatorCounts() throws {
+        let filler = ContentGlyphWalk.operatorLimit - Self.lineOperators
+        let at = try ContentGlyphWalkTests.glyphs(String(repeating: "n\n", count: filler) + ContentGlyphWalkTests.visible)
+        #expect(at?.count == 35, "at the limit the line reads")
+        #expect(try ContentGlyphWalkTests.glyphs(String(repeating: "n\n", count: filler + 1) + ContentGlyphWalkTests.visible) == nil,
+                "one path operator past the limit")
+    }
+
+    @Test("A form's operators count each time it is drawn")
+    func formOperatorsCountPerDrawing() throws {
+        let half = ContentGlyphWalk.operatorLimit / 2
+        let body = String(repeating: "n\n", count: half)
+        #expect(try Self.glyphs(drawing: body, times: 1)?.count == 35, "drawn once, under the limit")
+        #expect(try Self.glyphs(drawing: body, times: 2) == nil, "drawn twice, the form's operators and the two Do are past it")
+    }
+
+    @Test("Form content walked is charged each time it is drawn: exactly the limit reads, one drawing more leaves the page unread")
+    func formBytesChargedPerDrawing() throws {
+        // Comment lines, 64 bytes each: content no operator count sees.
+        let quarter = ContentGlyphWalk.formBytesLimit / 4
+        let body = String(repeating: "%" + String(repeating: "x", count: 62) + "\n", count: quarter / 64)
+        try #require(body.utf8.count == quarter)
+        #expect(try Self.glyphs(drawing: body, times: 4)?.count == 35, "four drawings are the limit exactly")
+        #expect(try Self.glyphs(drawing: body, times: 5) == nil, "a fifth drawing is past it")
+    }
+
+    /// The visible line, after a form drawn `outer` times that draws a leaf of
+    /// 100,000 bare numbers `inner` times.
+    static func glyphs(bareNumbersDrawn outer: Int, by inner: Int) throws -> [ShownGlyph]? {
+        let body = String(repeating: "1 ", count: 100_000)
+        let middle = String(repeating: "/L Do\n", count: inner)
+        let page = String(repeating: "/M Do\n", count: outer) + ContentGlyphWalkTests.visible
+        return try ContentGlyphWalkTests.glyphs(page, resources: "/Font << /F1 5 0 R >> /XObject << /M 6 0 R >>", extra: [
+            PDFObject(id: 6, content: "<< /Type /XObject /Subtype /Form /BBox [0 0 612 792] /Resources << /XObject << /L 7 0 R >> >> /Length \(middle.utf8.count) >>\nstream\n\(middle)\nendstream"),
+            Self.form(7, body),
+        ])
+    }
+
+    @Test("A small form of bare numbers drawn ten thousand times is refused, not walked; the same form drawn once reads")
+    func redrawnBareNumbersRefused() throws {
+        #expect(try Self.glyphs(bareNumbersDrawn: 1, by: 1)?.count == 35, "the control: drawn once, the line reads")
+        #expect(try Self.glyphs(bareNumbersDrawn: 100, by: 100) == nil)
+    }
+
+    @Test("A page that draws an empty form reads")
+    func emptyFormRead() throws {
+        #expect(try Self.glyphs(drawing: "", times: 1)?.count == 35)
+    }
+
+    @Test("A page that draws a small form with text many times, as a filled-in form does, reads every glyph")
+    func manySmallFormsRead() throws {
+        let glyphs = try Self.glyphs(drawing: "BT /F1 12 Tf 72 600 Td (Field) Tj ET", times: 200)
+        #expect(glyphs?.count == 35 + 200 * 5)
+    }
+}
+
 @Suite("Fonts as the page draws them")
 struct ContentGlyphFontTests {
     /// Helvetica with its own two widths from `first`, and a descriptor

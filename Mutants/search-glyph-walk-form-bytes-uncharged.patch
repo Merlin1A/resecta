@@ -1,0 +1,18 @@
+Property: The form content the walk reads is bounded: each drawing of a form is charged its decoded size, and past the limit the page is unread.
+Area: Search, the match boxes from the page's own drawing
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter ContentGlyphWalkLimitTests
+Must go red: RedactionEngineTests/ContentGlyphWalkLimitTests formBytesChargedPerDrawing; RedactionEngineTests/ContentGlyphWalkLimitTests redrawnBareNumbersRefused
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphWalk.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphWalk.swift
+index c0bc5b61..b725bdfe 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphWalk.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/ContentGlyphWalk.swift
+@@ -320,7 +320,6 @@ enum ContentGlyphWalk {
+         var resources: CGPDFDictionaryRef?
+         guard s.depth < formDepthLimit, let table = s.table,
+               CGPDFDictionaryGetDictionary(dictionary, "Resources", &resources), let resources else { s.fail(scanner); return }
+-        guard charge(stream, s) else { s.fail(scanner); return }
+         var matrix = CGAffineTransform.identity
+         var array: CGPDFArrayRef?
+         if CGPDFDictionaryGetArray(dictionary, "Matrix", &array), let array {
