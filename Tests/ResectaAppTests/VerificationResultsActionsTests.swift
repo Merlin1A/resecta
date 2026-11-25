@@ -33,15 +33,82 @@ struct VerificationResultsActionsTests {
         #expect(Actions.swapsPrimaryAction(report: Self.report(status), shareDisabled: true))
     }
 
-    @Test("Share is filled teal; outlined red on FAIL and pink on ATTENTION under the filled Keep Editing")
+    @Test("Share is filled teal, and outlined teal under the filled Keep Editing on every verdict")
     func shareCapsuleStyle() {
         #expect(Actions.shareCapsuleKind(report: Self.report(.pass), swapped: false) == .filled(.teal))
         #expect(Actions.shareCapsuleKind(report: Self.report(.skipped), swapped: false) == .filled(.teal))
-        #expect(Actions.shareCapsuleKind(report: Self.report(.fail("f")), swapped: true) == .outlined(.red))
-        #expect(Actions.shareCapsuleKind(report: Self.report(.attention("a")), swapped: true) == .outlined(.pink))
+        #expect(Actions.shareCapsuleKind(report: Self.report(.fail("f")), swapped: true) == .outlined(.teal))
+        #expect(Actions.shareCapsuleKind(report: Self.report(.attention("a")), swapped: true) == .outlined(.teal))
         // Disabled on a clean run: swapped, outlined — and grey, because the
         // style reads `isEnabled`.
         #expect(Actions.shareCapsuleKind(report: Self.report(.pass), swapped: true) == .outlined(.teal))
+        // Every seeded report as the screen draws it: the swap sets the
+        // shape, and the tint is teal in both.
+        var swappedVerdicts: Set<String> = []
+        for (name, report) in Fixtures.all {
+            let swapped = Actions.swapsPrimaryAction(report: report, shareDisabled: false)
+            #expect(Actions.shareCapsuleKind(report: report, swapped: swapped)
+                        == (swapped ? .outlined(.teal) : .filled(.teal)), "seed \(name)")
+            if swapped { swappedVerdicts.insert(report.overallStatus.isFail ? "fail" : "attention") }
+        }
+        #expect(swappedVerdicts == ["fail", "attention"], "the seeds hold a failed and a needs-review verdict")
+    }
+
+    @Test("Share's stroke takes its tint, and the file draws no red")
+    func shareDrawsNoRed() throws {
+        let code = try Self.codeLines("Sources/ResectaApp/Views/VerificationResultsActions.swift")
+        let strokes = code.components(separatedBy: "strokeBorder(").count - 1
+        #expect(strokes >= 1, "the outline is drawn")
+        #expect(code.components(separatedBy: "strokeBorder(Self.text(").count - 1 == strokes,
+                "every outline takes its tint's colour")
+        for name in ["SemanticColor.failText", "SemanticColor.attentionText", ".red", ".pink",
+                     "Color.red", "systemRed", ".stroke("] {
+            #expect(Self.tokenCount(name, in: code) == 0, "\(name) on a code line")
+        }
+        let textArm = try #require(code.range(of: "static func text(_ tint: Tint) -> Color {"))
+        let teal = try #require(code.range(of: "case .teal:", range: textArm.upperBound..<code.endIndex))
+        let line = code[teal.upperBound...].prefix { $0 != "\n" }
+        #expect(line.trimmingCharacters(in: .whitespaces) == "ResectaTokens.BrandTeal.text",
+                "the teal arm draws the brand teal's text colour")
+        // The drawing reads the swap the friction ladder counts.
+        #expect(code.contains("let swapped = Self.swapsPrimaryAction(report: report, shareDisabled: shareDisabled)"))
+    }
+
+    @Test("The ring keeps the verdict's colours")
+    func ringKeepsTheVerdictColours() throws {
+        let code = try Self.codeLines("Sources/ResectaApp/Views/VerificationMasthead.swift")
+        let start = try #require(code.range(of: "static func arcColor(_ tone: Tone) -> Color {"))
+        let end = try #require(code.range(of: "\n    }\n", range: start.upperBound..<code.endIndex))
+        let body = code[start.upperBound..<end.lowerBound]
+        for name in ["SemanticColor.passText", "Results.warnRing", "SemanticColor.attentionText",
+                     "SemanticColor.failText"] {
+            #expect(body.contains(name), "the arc draws \(name)")
+        }
+    }
+
+    /// A source file's code lines, joined: lines whose first non-space
+    /// characters are `//` are left out.
+    static func codeLines(_ relativePath: String) throws -> String {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let source = try String(contentsOf: root.appendingPathComponent(relativePath), encoding: .utf8)
+        return source.components(separatedBy: "\n")
+            .filter { !$0.drop(while: { $0 == " " || $0 == "\t" }).hasPrefix("//") }
+            .joined(separator: "\n")
+    }
+
+    /// How often `name` stands in `code` as a whole token: the character
+    /// after it is not a letter, a digit or an underscore, so `.red` does
+    /// not count `.redacted`.
+    static func tokenCount(_ name: String, in code: String) -> Int {
+        var count = 0
+        var from = code.startIndex
+        while let hit = code.range(of: name, range: from..<code.endIndex) {
+            let next = hit.upperBound < code.endIndex ? code[hit.upperBound] : " "
+            if !(next.isLetter || next.isNumber || next == "_") { count += 1 }
+            from = hit.upperBound
+        }
+        return count
     }
 
     @Test("The action rows: Run Verification on a skipped report with its output, Keep Editing unless it leads, Preview with the output")

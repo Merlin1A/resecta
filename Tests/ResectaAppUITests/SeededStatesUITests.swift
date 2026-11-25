@@ -100,6 +100,21 @@ nonisolated final class SeededStatesUITests: XCTestCase {
                        "The seeded form values reached the editor with no report.")
     }
 
+    /// On a failed run the failed check's row still says it failed, in
+    /// its main line, whatever colour Share is drawn in.
+    func testFailedFindingStillSaysFailed() {
+        app.launchArguments = ["--uitesting", "--seedVerifiedReport=secureFail", "--seedOutput"]
+        app.launch()
+        XCTAssertTrue(element("verificationResults").waitForExistence(timeout: 30),
+                      "The seeded results screen never appeared.")
+        let rows = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'finding_'"))
+        XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 10), "No findings row appeared.")
+        let saysFailed = "label CONTAINS ': failed'"
+        let inRow = rows.descendants(matching: .any).matching(NSPredicate(format: saysFailed)).firstMatch
+        XCTAssertTrue(inRow.waitForExistence(timeout: 5) || rows.matching(NSPredicate(format: saysFailed)).firstMatch.exists,
+                      "The failed check's row does not say it failed.")
+    }
+
     // MARK: - Helpers
 
     private func launchResults(_ seeds: [String]) {
