@@ -1,0 +1,23 @@
+Property: The failure card after verification names the check that could not finish, or no check, in the approved words; never the old "issue at layer N" body.
+Area: the failure card
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -parallel-testing-enabled NO -only-testing:ResectaAppTests/ErrorRecoveryTests
+Must go red: ResectaAppTests/ErrorRecoveryTests failureCardNamesTheCheck; ResectaAppTests/ErrorRecoveryTests failureCardNamesNoCheck
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Extensions/AppError+Display.swift b/Sources/ResectaApp/Extensions/AppError+Display.swift
+index d0f28962..7be244d4 100644
+--- a/Sources/ResectaApp/Extensions/AppError+Display.swift
++++ b/Sources/ResectaApp/Extensions/AppError+Display.swift
+@@ -148,11 +148,7 @@ extension PipelineError {
+             }
+ 
+         case .verificationError(.engineCrash(let check)):
+-            if let check {
+-                "\(VerificationRowModel.title(for: check)) could not finish, so this PDF has no verification result. Run Verification again, or share it without verification."
+-            } else {
+-                "Verification could not finish, so this PDF has no verification result. Run Verification again, or share it without verification."
+-            }
++            "The verification process encountered an issue at layer \((check.flatMap { VerificationLayer.allCases.firstIndex(of: $0) } ?? 0) + 1). The redacted document may still be valid — you can export it without verification or try again."
+ 
+         case .exportError(let f):
+             switch f {

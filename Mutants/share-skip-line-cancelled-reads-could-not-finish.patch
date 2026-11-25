@@ -1,0 +1,19 @@
+Property: The skipped share confirm says verification stopped early when it was cancelled, not that it could not finish.
+Area: the share confirm
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -parallel-testing-enabled NO -only-testing:ResectaAppTests/VerificationResultsShareGateTests
+Must go red: ResectaAppTests/VerificationResultsShareGateTests skipFactLineNamesTheReason
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/ShareRiskConfirm.swift b/Sources/ResectaApp/Views/ShareRiskConfirm.swift
+index 4b1eb5a0..20dcc8ee 100644
+--- a/Sources/ResectaApp/Views/ShareRiskConfirm.swift
++++ b/Sources/ResectaApp/Views/ShareRiskConfirm.swift
+@@ -209,7 +209,7 @@ extension DocumentEditorView {
+         switch reason {
+         case .autoVerifyOff: "Verification did not run on this PDF."
+         case .error: "Verification could not finish on this PDF."
+-        case .cancelled: "Verification stopped early on this PDF."
++        case .cancelled: "Verification could not finish on this PDF."
+         }
+     }
+ 

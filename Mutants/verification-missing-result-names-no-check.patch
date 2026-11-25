@@ -1,0 +1,19 @@
+Property: A scheduled check that stored no result ends the run with the error naming that check.
+Area: verification's report assembly
+Test command: cd Packages/RedactionEngine && swift test --skip-build --no-parallel --filter UnfinishedRunTests (after swift build --build-tests); and DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -parallel-testing-enabled NO -only-testing:ResectaAppTests/ErrorRecoveryTests
+Must go red: RedactionEngineTests/UnfinishedRunTests eachCase (a scheduled check that stored no result ends the run naming that check, …); ResectaAppTests/ErrorRecoveryTests onlyAMissingResultNamesACheck
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationOrchestrator.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationOrchestrator.swift
+index 7fa048ec..2378edb3 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationOrchestrator.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationOrchestrator.swift
+@@ -289,7 +289,7 @@ public struct VerificationOrchestrator: Sendable {
+         orderedResults.reserveCapacity(layers.count)
+         for layer in layers {
+             guard let result = resultsByLayer[layer] else {
+-                throw PipelineError.verificationError(.engineCrash(check: layer))
++                throw PipelineError.verificationError(.engineCrash(check: nil))
+             }
+             orderedResults.append(result)
+         }
