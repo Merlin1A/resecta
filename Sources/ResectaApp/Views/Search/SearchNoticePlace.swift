@@ -15,7 +15,7 @@ struct SearchNoticeLine: Equatable, Sendable {
         case notSearched
         /// The session's name detection is degraded (Scan only).
         case degraded
-        /// Boxes drawn wider than their words.
+        /// Boxes drawn larger than their words.
         case fit
     }
 
@@ -53,7 +53,7 @@ enum SearchNoticePlace {
 
     /// The run's lines, in a fixed order, each present only while its fact
     /// holds: pages too large to scan, pages where the pattern timed out,
-    /// the result limit, then boxes drawn wider than their words.
+    /// the result limit, then boxes drawn larger than their words.
     static func runLines(_ facts: Facts) -> [SearchNoticeLine] {
         var lines: [SearchNoticeLine] = []
         if !facts.tooLargePages.isEmpty {

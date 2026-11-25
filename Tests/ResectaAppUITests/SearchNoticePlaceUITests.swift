@@ -113,7 +113,7 @@ nonisolated final class SearchNoticePlaceUITests: XCTestCase {
                       || app.descendants(matching: .any)
                         .matching(NSPredicate(format: "label CONTAINS 'too large to scan'")).firstMatch.exists)
         XCTAssertTrue(app.descendants(matching: .any)
-            .matching(NSPredicate(format: "label CONTAINS 'drawn wider than their words'")).firstMatch.exists)
+            .matching(NSPredicate(format: "label CONTAINS 'drawn larger than their words'")).firstMatch.exists)
         attachScreenshot(named: "notice-details")
         app.buttons["Go to page 7"].firstMatch.tap()
         XCTAssertTrue(details.waitForNonExistence(timeout: 10), "The chip did not close the details.")

@@ -27,8 +27,8 @@ struct SearchNoticePlaceTests {
     static let notSearched = line(.notSearched, tooLarge7, [6], "ocrSkipBanner")
     static let timedOut = line(.notSearched, timedOut3and5, [2, 4], "regexTimeoutNotice")
     static let degraded = line(.degraded, degradedCorpus, [], "degradedDetectionBanner")
-    static let fit = line(.fit, "Some boxes on page 1 were drawn wider than their words, because the text could not be "
-        + "fitted to the printed words. Keep them wide: shrinking one can leave part of a word readable.", [0],
+    static let fit = line(.fit, "Some boxes on page 1 were drawn larger than their words, because the text could not be "
+        + "fitted to the printed words. Keep them that size: shrinking one can leave part of a word readable.", [0],
         "widenedBoxBanner")
 
     static func source(_ path: String) throws -> String {
@@ -199,10 +199,10 @@ struct SearchNoticePlaceTests {
             (SearchResultsSection.regexTimeoutBannerHeadline(pages: [6]), "The active regex pattern timed out on page 7."),
             (SearchResultsSection.regexTimeoutBannerHeadline(pages: [2, 4]),
              "The active regex pattern timed out on pages 3 and 5."),
-            (SearchResultsSection.widenedBoxBannerHeadline(pages: [0]), "Some boxes on page 1 were drawn wider than "
+            (SearchResultsSection.widenedBoxBannerHeadline(pages: [0]), "Some boxes on page 1 were drawn larger than "
                 + "their words, because the text could not be fitted to the printed words."),
             (SearchResultsSection.widenedBoxBannerHeadline(pages: [0, 2]), "Some boxes on pages 1 and 3 were drawn "
-                + "wider than their words, because the text could not be fitted to the printed words."),
+                + "larger than their words, because the text could not be fitted to the printed words."),
             (DetectionDegradeCopy.banner(failedGazetteers: []),
              "Detection is degraded for this session because the detection corpus failed to load."),
             (DetectionDegradeCopy.banner(failedGazetteers: ner), "Name detection is degraded for this session "
