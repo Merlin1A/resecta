@@ -73,11 +73,11 @@ public struct PDFPageData: @unchecked Sendable {
     package var planSource: PlanSource = RunRecord.planSource
 
     /// What the ink check reads for a box, by the box's place in the plan:
-    /// the height of its line and the boxes of the page's other words. Empty
-    /// until the run reads the page's words at entry; a test fills it. A box
-    /// the check would read with nothing here is painted as placed, its ink
-    /// growth as today, and recorded as not judged.
-    package var inkCheckInputs: [Int: InkCheckInputs] = [:]
+    /// the height of its line and the boxes of the page's other words. From
+    /// the record's page, made with its plan from the page's read at entry;
+    /// a test can set it. A box the check would read with nothing here is
+    /// painted as placed, its ink growth as today, and recorded as not judged.
+    package var inkCheckInputs: [Int: InkCheckInputs]
 
     public init(page: PDFPage, pageIndex: Int, regions: [RedactionRegion],
                 fillColor: FillColor, targetDPI: Int, pipelineMode: PipelineMode,
@@ -98,6 +98,7 @@ public struct PDFPageData: @unchecked Sendable {
         self.cgPage = cgPage
         self.hasText = hasText
         self.fallbackReason = fallbackReason
+        self.inkCheckInputs = confirmedPage?.inkCheckInputs ?? [:]
         self.confirmedPage = confirmedPage
     }
 }
