@@ -1,0 +1,18 @@
+Property: The field where a pattern is saved under a label has Writing Tools off, so the label is not offered to a rewrite tool.
+Area: typing fields (Search)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/TypingFieldCorrectionTests
+Must go red: ResectaAppTests/TypingFieldCorrectionTests "A term, pattern or name field has autocorrection and Writing Tools disabled"
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/SearchAndRedactSheet.swift b/Sources/ResectaApp/Views/SearchAndRedactSheet.swift
+index fecf63ba..aefdb1e1 100644
+--- a/Sources/ResectaApp/Views/SearchAndRedactSheet.swift
++++ b/Sources/ResectaApp/Views/SearchAndRedactSheet.swift
+@@ -285,7 +285,6 @@ struct SearchAndRedactSheet: View {
+             TextField("Label", text: $savedRegexSaveLabel)
+                 .textInputAutocapitalization(.words)
+                 .autocorrectionDisabled(true)
+-                .writingToolsBehavior(.disabled)
+             Button("Save") {
+                 Task { await saveCurrentRegex() }
+             }

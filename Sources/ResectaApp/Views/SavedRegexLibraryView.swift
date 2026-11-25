@@ -128,12 +128,15 @@ struct SavedRegexLibraryView: View {
             VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xs) {
                 TextField("Label", text: $newLabel)
                     .textInputAutocapitalization(.words)
+                    .autocorrectionDisabled(true)
+                    .writingToolsBehavior(.disabled)
                     .disabled(addInFlight)
 
                 HStack {
                     TextField("Pattern", text: $newPattern)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled(true)
+                        .writingToolsBehavior(.disabled)
                         .font(.body.monospaced())
                         .disabled(addInFlight)
 

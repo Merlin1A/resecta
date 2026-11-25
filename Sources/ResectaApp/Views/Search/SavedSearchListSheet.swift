@@ -128,6 +128,8 @@ struct SavedSearchListSheet: View {
                 set: { if !$0 { renameTarget = nil } }
             ), presenting: renameTarget) { search in
                 TextField("Name", text: $renameText)
+                    .autocorrectionDisabled(true)
+                    .writingToolsBehavior(.disabled)
                 Button("Rename") {
                     let trimmed = renameText.trimmingCharacters(in: .whitespaces)
                     switch trimmed.isEmpty ? nil : savedSearchStore.rename(id: search.id, to: trimmed) {
@@ -170,6 +172,8 @@ struct SavedSearchListSheet: View {
             .holdsMessages(toastManager, while: showSavePrompt)
             .alert(Self.savePromptTitle(for: activeInterface), isPresented: $showSavePrompt) {
                 TextField("Name", text: $savePromptName)
+                    .autocorrectionDisabled(true)
+                    .writingToolsBehavior(.disabled)
                 Button("Save") {
                     let trimmed = savePromptName.trimmingCharacters(in: .whitespaces)
                     guard !trimmed.isEmpty else { return }

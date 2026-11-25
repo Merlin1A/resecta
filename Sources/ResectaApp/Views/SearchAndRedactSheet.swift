@@ -284,6 +284,8 @@ struct SearchAndRedactSheet: View {
         .alert(Self.saveCurrentRegexAlertTitle, isPresented: $showSavedRegexSavePrompt) {
             TextField("Label", text: $savedRegexSaveLabel)
                 .textInputAutocapitalization(.words)
+                .autocorrectionDisabled(true)
+                .writingToolsBehavior(.disabled)
             Button("Save") {
                 Task { await saveCurrentRegex() }
             }
