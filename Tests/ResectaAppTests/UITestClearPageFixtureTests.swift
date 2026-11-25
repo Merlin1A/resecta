@@ -89,11 +89,14 @@ struct UITestClearPageFixtureTests {
         let text = try #require(page.string) as NSString
         var inBlock = ""
         var letters = 0
-        for i in 0..<page.numberOfCharacters {
+        for i in 0..<text.length {
             let character = text.substring(with: NSRange(location: i, length: 1))
             guard !character.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
-            let r = page.characterBounds(at: i)
-            guard !r.isEmpty else { continue }
+            // A one-letter selection's bounds, in the stored page's space.
+            // (`characterBounds(at:)` is not: on these pages it runs an index
+            // off the string, and on a turned page it comes back turned.)
+            guard let r = page.selection(for: NSRange(location: i, length: 1))?.bounds(for: page),
+                  !r.isNull, !r.isEmpty else { continue }
             letters += 1
             let d = f.displayedRect(r)
             if f.clearBlock.contains(CGPoint(x: d.midX, y: d.midY)) { inBlock += character }

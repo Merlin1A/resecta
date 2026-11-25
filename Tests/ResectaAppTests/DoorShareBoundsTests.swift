@@ -111,7 +111,13 @@ struct DoorShareBoundsTests {
     }
 
     /// A finger from `start` to `end`, in the overlay's points, in four steps.
+    /// The gesture's Undo steps go in one group, as one event's would; a
+    /// case that holds a group open already keeps it.
     static func gesture(_ c: Canvas, from start: CGPoint, to end: CGPoint) {
+        let undo = c.window.undo
+        let opens = undo.groupingLevel == 0
+        if opens { undo.beginUndoGrouping() }
+        defer { if opens { undo.endUndoGrouping() } }
         let touch = DoorTouch(at: start, on: c.overlay)
         c.overlay.touchesBegan([touch], with: nil)
         for step in 1...4 {

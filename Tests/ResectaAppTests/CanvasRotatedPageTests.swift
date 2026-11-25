@@ -204,6 +204,18 @@ struct CanvasRotatedPageTests {
         return (view, window, coordinator)
     }
 
+    /// The canvas shown at page 1, laid out, so a framing on that page
+    /// crosses no page. (Crossing one, PDFKit re-fits the new page when the
+    /// floor moves, and only a later bounds change re-asserts the framing;
+    /// these cases read the framing's own rule.)
+    private static func onTurnedPage(_ c: (view: FitFlooredPDFView, window: UIWindow, coordinator: PDFViewCoordinator)) throws {
+        let page = try #require(c.view.document?.page(at: 1))
+        c.view.go(to: page)
+        c.view.layoutIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+        try #require(c.view.currentPage == page, "the canvas shows page 1")
+    }
+
     private static func target(page: Int, share: CGRect, zoom: DocumentState.CanvasZoomIntent,
                                anchor: DocumentState.CanvasScrollAnchor) -> DocumentState.CanvasScrollTarget {
         DocumentState.CanvasScrollTarget(pageIndex: page, normalizedRect: share, zoom: zoom, anchor: anchor, token: UUID())
@@ -212,6 +224,7 @@ struct CanvasRotatedPageTests {
     @Test("Case 12: on a turned page the readable zoom is read from the box as shown, not from its page rectangle")
     func zoomReadsTheBoxAsShown() throws {
         let c = try Self.canvas()
+        try Self.onTurnedPage(c)
         let fit = c.view.scaleFactorForSizeToFit
         _ = PDFDocumentView.consumeCanvasScrollTarget(
             Self.target(page: 1, share: Self.s, zoom: .readability, anchor: .center), in: c.view, lastHandledToken: nil)
@@ -224,6 +237,7 @@ struct CanvasRotatedPageTests {
     @Test("Case 11: the framing re-applied after the canvas changes size keeps the turned page's readable zoom and the box on screen")
     func reassertKeepsTheTurnedFraming() throws {
         let c = try Self.canvas()
+        try Self.onTurnedPage(c)
         let page = try #require(c.view.document?.page(at: 1))
         _ = PDFDocumentView.consumeCanvasScrollTarget(
             Self.target(page: 1, share: Self.s, zoom: .readability, anchor: .center), in: c.view, lastHandledToken: nil)
@@ -243,6 +257,7 @@ struct CanvasRotatedPageTests {
     @Test("Case 11b: a plain scroll request clears the armed framing, so a later layout pass does not re-apply it")
     func plainRequestClearsTheFraming() throws {
         let c = try Self.canvas()
+        try Self.onTurnedPage(c)
         let first = try #require(c.view.document?.page(at: 0))
         let framed = PDFDocumentView.consumeCanvasScrollTarget(
             Self.target(page: 1, share: Self.s, zoom: .readability, anchor: .center), in: c.view, lastHandledToken: nil)

@@ -29,9 +29,38 @@ struct PageGeometryTests {
         let url = try #require(Bundle(for: PageGeometryTableBundle.self).url(forResource: "page-geometry", withExtension: "json"),
                                "page-geometry.json not bundled")
         let data = try Data(contentsOf: url)
-        let object = try #require(try JSONSerialization.jsonObject(with: data) as? Row)
+        // Through the decoder, which reads each number as the nearest double:
+        // `JSONSerialization` hands long decimals back as `NSDecimalNumber`,
+        // whose `doubleValue` is a bit off on 1,600 of the table's numbers,
+        // and the table is compared bit for bit.
+        let object = try #require(try JSONDecoder().decode(TableValue.self, from: data).any as? Row)
         let rows = try #require(object["cases"] as? [Row])
         return (data, rows)
+    }
+
+    /// A JSON value as `JSONDecoder` reads it, handed back in the shapes
+    /// `JSONSerialization` gives (numbers as `NSNumber` of the exact double).
+    enum TableValue: Decodable {
+        case number(Double), string(String), bool(Bool), list([TableValue]), object([String: TableValue]), null
+        init(from decoder: Decoder) throws {
+            let c = try decoder.singleValueContainer()
+            if c.decodeNil() { self = .null }
+            else if let b = try? c.decode(Bool.self) { self = .bool(b) }
+            else if let x = try? c.decode(Double.self) { self = .number(x) }
+            else if let t = try? c.decode(String.self) { self = .string(t) }
+            else if let l = try? c.decode([TableValue].self) { self = .list(l) }
+            else { self = .object(try c.decode([String: TableValue].self)) }
+        }
+        var any: Any {
+            switch self {
+            case .number(let x): NSNumber(value: x)
+            case .string(let t): t
+            case .bool(let b): b
+            case .list(let l): l.map(\.any)
+            case .object(let o): o.mapValues(\.any)
+            case .null: NSNull()
+            }
+        }
     }
 
     static func number(_ any: Any?) throws -> Double {
