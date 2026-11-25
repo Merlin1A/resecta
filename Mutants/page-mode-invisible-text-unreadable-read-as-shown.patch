@@ -1,0 +1,18 @@
+Property: A page whose content could not be read records the extraction-failed reason, never the invisible-text reason.
+Area: page mode (Detection)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/InvisibleTextPageTests (or on the host: cd Packages/RedactionEngine && swift test --no-parallel --filter InvisibleTextPageTests)
+Must go red: RedactionEngineTests/InvisibleTextPageTests reading [nine form objects nested one inside the next: content that could not be read]; RedactionEngineTests/InvisibleTextPageTests exported [nine form objects nested one inside the next: content that could not be read]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
+@@ -102,7 +102,7 @@
+         let read = CGPDFScannerScan(scanner)
+         CGPDFScannerRelease(scanner)
+         CGPDFContentStreamRelease(content)
+-        if state.found { return .shows }
++        if state.found || state.unreadable || !read { return .shows }
+         return state.unreadable || !read ? .unreadable : .showsNone
+     }
+ }

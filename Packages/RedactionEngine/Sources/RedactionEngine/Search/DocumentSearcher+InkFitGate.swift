@@ -104,41 +104,78 @@ extension DocumentSearcher {
     }
 
     /// Whether the page's content shows text in render mode 3 or 7 (no fill,
-    /// no stroke): `Tr` tracked through `q`/`Q` and into Form XObjects (to a
-    /// depth of 8), any text-showing operator while it is set answers true. A
-    /// stream the scanner cannot read, a form chain past the depth, or more
-    /// than `PagePictureMap.formLimit` forms drawn, answers true as well: a
-    /// page not known to be clean is fitted.
+    /// no stroke), or could not be read: a page not known to be clean is
+    /// fitted. The walk is `invisibleTextReading`.
     nonisolated static func showsInvisibleText(_ cgPage: CGPDFPage) -> Bool {
+        invisibleTextReading(cgPage) != .showsNone
+    }
+
+    /// The page's content read for text in render mode 3 or 7: `Tr` tracked
+    /// through `q`/`Q` and into Form XObjects (to a depth of 8); any
+    /// text-showing operator while it is set reads `shows`. The mode is
+    /// tracked twice, as a viewer that takes any PDF number draws it and as
+    /// Quartz draws it (Quartz drops a `Tr` whose operand is a real number
+    /// and keeps the mode before it), and either one at 3 or 7 reads
+    /// `shows`, compared exactly: `3 Tr 0.0 Tr` is mode 3 to Quartz, and
+    /// `3.0 Tr` is mode 3 to the other viewer. A form draws inside its own
+    /// saved state: a `Q` in it never restores a state saved before it, and
+    /// the caller's modes and saved states are as they were once it is
+    /// drawn, however its `q` and `Q` pair. A `Tr` whose operand is not a
+    /// number, a stream the scanner cannot read, a form chain past the
+    /// depth, or more than `PagePictureMap.formLimit` forms drawn reads
+    /// `unreadable`; the walk stops at the first of the two.
+    nonisolated static func invisibleTextReading(_ cgPage: CGPDFPage) -> InvisibleTextReading {
         final class State {
-            var mode: Int = 0
-            var saved: [Int] = []
+            /// The mode as a viewer that takes any number draws it.
+            var mode: CGPDFReal = 0
+            /// The mode as Quartz draws it: a real-number operand is dropped.
+            var quartzMode: CGPDFReal = 0
+            var saved: [(mode: CGPDFReal, quartzMode: CGPDFReal)] = []
+            var floor = 0
             var found = false
+            var unreadable = false
             var depth = 0
             var drawn = 0
             var table: CGPDFOperatorTableRef?
         }
-        guard let table = CGPDFOperatorTableCreate() else { return true }
+        guard let table = CGPDFOperatorTableCreate() else { return .unreadable }
         defer { CGPDFOperatorTableRelease(table) }
         CGPDFOperatorTableSetCallback(table, "Tr") { scanner, info in
-            var value: CGPDFInteger = 0
-            guard let info, CGPDFScannerPopInteger(scanner, &value) else { return }
-            Unmanaged<State>.fromOpaque(info).takeUnretainedValue().mode = Int(value)
+            guard let info else { return }
+            let state = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
+            var operand: CGPDFObjectRef?
+            var integer: CGPDFInteger = 0
+            var real: CGPDFReal = 0
+            guard CGPDFScannerPopObject(scanner, &operand), let operand else {
+                state.unreadable = true; CGPDFScannerStop(scanner); return
+            }
+            switch CGPDFObjectGetType(operand) {
+            case .integer where CGPDFObjectGetValue(operand, .integer, &integer):
+                state.mode = CGPDFReal(integer); state.quartzMode = CGPDFReal(integer)
+            case .real where CGPDFObjectGetValue(operand, .real, &real):
+                state.mode = real
+            default:
+                state.unreadable = true; CGPDFScannerStop(scanner)
+            }
         }
         CGPDFOperatorTableSetCallback(table, "q") { _, info in
             guard let info else { return }
             let state = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
-            state.saved.append(state.mode)
+            state.saved.append((state.mode, state.quartzMode))
         }
         CGPDFOperatorTableSetCallback(table, "Q") { _, info in
             guard let info else { return }
             let state = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
-            if let mode = state.saved.popLast() { state.mode = mode }
+            if state.saved.count > state.floor, let modes = state.saved.popLast() {
+                state.mode = modes.mode; state.quartzMode = modes.quartzMode
+            }
         }
         let show: CGPDFOperatorCallback = { scanner, info in
             guard let info else { return }
             let state = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
-            if state.mode == 3 || state.mode == 7 { state.found = true; CGPDFScannerStop(scanner) }
+            if [state.mode, state.quartzMode].contains(where: { $0 == 3 || $0 == 7 }) {
+                state.found = true; CGPDFScannerStop(scanner)
+            }
         }
         for op in ["Tj", "TJ", "'", "\""] { CGPDFOperatorTableSetCallback(table, op, show) }
         CGPDFOperatorTableSetCallback(table, "Do") { scanner, info in
@@ -156,20 +193,23 @@ extension DocumentSearcher {
                   String(cString: subtype) == "Form" else { return }
             state.drawn += 1
             guard state.depth < 8, state.drawn <= PagePictureMap.formLimit, let table = state.table else {
-                state.found = true; CGPDFScannerStop(scanner); return
+                state.unreadable = true; CGPDFScannerStop(scanner); return
             }
             var resources: CGPDFDictionaryRef?
             _ = CGPDFDictionaryGetDictionary(dictionary, "Resources", &resources)
             let inner = CGPDFContentStreamCreateWithStream(stream, resources ?? dictionary, content)
             let innerScanner = CGPDFScannerCreate(inner, table, info)
-            let mode = state.mode
+            let (mode, quartzMode, savedCount, floor) = (state.mode, state.quartzMode, state.saved.count, state.floor)
             state.depth += 1
-            if !CGPDFScannerScan(innerScanner) && !state.found { state.found = true }
+            state.floor = savedCount
+            if !CGPDFScannerScan(innerScanner) && !state.found && !state.unreadable { state.unreadable = true }
             state.depth -= 1
-            state.mode = mode
+            state.mode = mode; state.quartzMode = quartzMode
+            state.saved.removeLast(state.saved.count - savedCount)
+            state.floor = floor
             CGPDFScannerRelease(innerScanner)
             CGPDFContentStreamRelease(inner)
-            if state.found { CGPDFScannerStop(scanner) }
+            if state.found || state.unreadable { CGPDFScannerStop(scanner) }
         }
         let state = State()
         state.table = table
@@ -178,6 +218,7 @@ extension DocumentSearcher {
         let read = CGPDFScannerScan(scanner)
         CGPDFScannerRelease(scanner)
         CGPDFContentStreamRelease(content)
-        return state.found || !read
+        if state.found { return .shows }
+        return state.unreadable || !read ? .unreadable : .showsNone
     }
 }

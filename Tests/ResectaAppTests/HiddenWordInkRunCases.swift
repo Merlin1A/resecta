@@ -9,31 +9,32 @@ import PDFKit
 // Frozen app-side cases for the hidden-word check, written before the check.
 //
 // V15 runs a page through the app's own run (`runFullPipeline`, so the pages
-// are built by `RunInputs.pageData`) and reads the masthead. The page is the
-// seeded scan, its layer drifted 4 pt, with a two-word line "Approved:
-// Okafor" and a Search box applied over "Okafor". An applied Search box keeps
-// the page's text layer, so the export keeps "Approved:" beside the box, the
-// line's only anchor: the check cannot place it, so it must read not
-// inspected, and the masthead must read "Some Checks Incomplete" for this
-// check's row alone. A precondition case pins that today the same run keeps
-// the layer and no row could not verify. If the run stops keeping that page's
-// layer, V15 is a design question, not a case to re-scope.
+// are built by `RunInputs.pageData`). The page is the seeded scan, its layer
+// drifted 4 pt, with a two-word line "Approved: Okafor" and a Search box
+// applied over "Okafor". Its layer is in an invisible render mode, so the run
+// writes the page as an image only, with the invisible-text reason: no text
+// layer is kept, nothing beside the box is left for the check to place, and
+// the check's row is not applicable. A precondition case pins the page's mode
+// and reason and that no row could not verify.
+//
+// V15 (pair) builds the export the run once wrote, with the page kept
+// Searchable, directly (the rasterizer and the writer), and runs the verifier
+// and the masthead on it: there the check cannot place "Approved:", so it
+// reads not inspected, and the masthead reads "Some Checks Incomplete" for
+// this check's row alone.
 //
 // The drift puts the colon of "Approved:" under the box. A word that loses a
-// letter to a box now leaves the hidden text whole, so the run writes neither
-// word of that line and the check has nothing it cannot place. V15 and its
-// pair therefore run with that rule turned off (`PageTextPath.$wholeWordsOff`,
-// a test-only switch), which keeps "Approved" beside the box as before. A
-// sibling case pins the export as it is: with the rule on, the line's words
-// are gone and the masthead reads "Checks Passed".
-//
-// V15 (pair) builds the same export directly (the rasterizer and the writer)
-// and runs the verifier and the masthead on it.
+// letter to a box now leaves the hidden text whole, so that export would carry
+// neither word of the line and the check would have nothing it cannot place.
+// V15 (pair) therefore builds with that rule turned off
+// (`PageTextPath.$wholeWordsOff`, a test-only switch), which keeps "Approved"
+// beside the box as before. A sibling case pins the export as it is: with the
+// rule on, the line's words are gone and the masthead reads "Checks Passed".
 //
 // The cross-check runs the seeded page with its layer drifted 30 pt through
-// the app's run, for each box the run either strips by ink or sends to the
-// image-only floor: the check reads pass or a note where the run kept the
-// layer, and not applicable where it went to the floor; never a fail.
+// the app's run, for each box: every one writes the page as an image only,
+// with the invisible-text reason, and the check reads not applicable; never a
+// fail.
 
 /// The check's `VerificationLayer` case. Not built: nil. The engine lane
 /// returns the check's case here and changes nothing else in this file.
@@ -198,25 +199,27 @@ struct HiddenWordInkRunCases {
 
     // MARK: - V15
 
-    @Test("V15 precondition: today the run keeps the page's layer and no check other than this one reads could-not-verify",
+    @Test("V15 precondition: the run writes the page as an image only, for its invisible text, and no row reads could-not-verify",
           .timeLimit(.minutes(3)), .disabled("Searchable Redaction is not offered: the app's run is Secure Rasterization for every input, so it keeps no text layer to check"))
     func v15Precondition() async throws {
         let report = try await Self.approvalRun()
-        #expect(report.perPageModes == [.searchableRedaction], "the run keeps the page's text layer")
-        let others = report.layers.filter { $0.couldNotVerify && $0.layer != HiddenWordInkAppSeam.layer }
-        #expect(others.isEmpty, "no row other than this check's could not verify: \(others.map(\.name))")
+        #expect(report.perPageModes == [.secureRasterization], "the run writes the page as an image only")
+        #expect(report.perPageFallbackReasons == [.invisibleText], "for its invisible text")
+        let unverified = report.layers.filter(\.couldNotVerify)
+        #expect(unverified.isEmpty, "no row could not verify: \(unverified.map(\.name))")
         #expect(!report.overallStatus.isFail && !report.overallStatus.isAttention)
     }
 
-    @Test("V15: through the app's run, a word beside the box that cannot be placed reads Some Checks Incomplete, from this check",
+    @Test("V15: through the app's run, the page is an image only, and the check is not applicable",
           .timeLimit(.minutes(3)), .disabled("Searchable Redaction is not offered: the app's run is Secure Rasterization for every input, so it keeps no text layer to check"))
     func v15() async throws {
-        let report = try await PageTextPath.$wholeWordsOff.withValue(true) { try await Self.approvalRun() }
-        #expect(report.perPageModes == [.searchableRedaction], "STOP if not: the run no longer keeps this page's layer")
-        #expect(VerificationResultsView.mastheadTitle(report: report) == "Some Checks Incomplete")
+        let report = try await Self.approvalRun()
+        #expect(report.perPageModes == [.secureRasterization])
+        #expect(report.perPageFallbackReasons == [.invisibleText])
         let layer = try #require(HiddenWordInkAppSeam.layer, "the check is not built")
-        #expect(report.layers.filter(\.couldNotVerify).map(\.layer) == [layer],
-                "the check's row is the one that could not verify")
+        let row = try #require(report.layers.first { $0.layer == layer }, "the report carries the check's row")
+        #expect(row.status.isNotApplicable, "\(row.status)")
+        #expect(!row.couldNotVerify)
     }
 
     @Test("V15 (pair): the same export, built directly and verified, reads Some Checks Incomplete, from this check",
@@ -283,38 +286,34 @@ struct HiddenWordInkRunCases {
 
     // MARK: - The cross-check over the strip-by-ink cells
 
-    @Test("Cross-check: through the app's run, the check passes or notes where the run kept the layer, and is not applicable at the floor",
+    @Test("Cross-check: through the app's run, every box's page is an image only, for its invisible text, and the check is not applicable",
           .timeLimit(.minutes(6)), .disabled("Searchable Redaction is not offered: the app's run is Secure Rasterization for every input, so it keeps no text layer to check"))
     func crossCheck() async throws {
         let lines = Self.seededLines
         let data = Self.page(lines, drift: 30)
-        func check(_ id: String, kept: Bool, setUp: (PipelineCoordinator) throws -> Void) async throws {
+        func check(_ id: String, setUp: (PipelineCoordinator) throws -> Void) async throws {
             let coord = try Self.coordinator(data)
             try setUp(coord)
             let report = try await Self.run(coord)
-            #expect(report.perPageModes == [kept ? .searchableRedaction : .secureRasterization],
-                    "\(id): precondition, the run \(kept ? "keeps the layer" : "goes to the floor")")
+            #expect(report.perPageModes == [.secureRasterization], "\(id): the run writes the page as an image only")
+            #expect(report.perPageFallbackReasons == [.invisibleText], "\(id): for its invisible text")
             guard let layer = HiddenWordInkAppSeam.layer else {
                 Issue.record("\(id): the check is not built")
                 return
             }
             let row = try #require(report.layers.first { $0.layer == layer }, "\(id): the report carries the check's row")
-            if kept {
-                #expect(row.status == .pass || row.status.isInfo, "\(id): \(row.status)")
-            } else {
-                #expect(row.status.isNotApplicable, "\(id): \(row.status)")
-            }
+            #expect(row.status.isNotApplicable, "\(id): \(row.status)")
             #expect(!row.status.isFail, "\(id): a fail here is a STOP")
         }
         func hand(_ rect: CGRect) -> (PipelineCoordinator) throws -> Void {
             { $0.redactionState.addRegion(RedactionRegion(id: UUID(), normalizedRect: rect, source: .manual),
                                           page: 0, undoManager: nil) }
         }
-        try await check("P4 name", kept: true, setUp: hand(Self.inkRect(lines, line: 5, phrase: "Marisol", through: "Vance-Oduya")))
-        try await check("P9 narrow first word", kept: true, setUp: hand(Self.inkRect(lines, line: 0, phrase: "The")))
-        try await check("P6 short word", kept: false, setUp: hand(Self.inkRect(lines, line: 11, phrase: "Lee")))
-        try await check("P8 first word", kept: false, setUp: hand(Self.inkRect(lines, line: 11, phrase: "Signed")))
-        try await check("P7 widened Search box", kept: false) { coord in
+        try await check("P4 name", setUp: hand(Self.inkRect(lines, line: 5, phrase: "Marisol", through: "Vance-Oduya")))
+        try await check("P9 narrow first word", setUp: hand(Self.inkRect(lines, line: 0, phrase: "The")))
+        try await check("P6 short word", setUp: hand(Self.inkRect(lines, line: 11, phrase: "Lee")))
+        try await check("P8 first word", setUp: hand(Self.inkRect(lines, line: 11, phrase: "Signed")))
+        try await check("P7 widened Search box") { coord in
             try Self.applySearch(coord, word: "Signed", ink: Self.inkRect(lines, line: 11, phrase: "Signed"))
             let id = try #require(coord.redactionState.regions[0]?.first?.id)
             _ = coord.redactionState.resizeRegion(id, page: 0, newRect: Self.inkRect(lines, line: 11, phrase: "Signed", through: "Lee"),

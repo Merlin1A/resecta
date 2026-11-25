@@ -129,6 +129,11 @@ public enum TextLayerDetector {
         /// runs, only under the plan switch's policy; never by the
         /// pre-flight trigger check.
         case inkEscapesBox
+        /// The page's content shows text in an invisible render mode (3 or 7):
+        /// a hidden layer over a picture of the page, or words drawn without
+        /// ink. Recorded by the page mode decision, before the page is read
+        /// for its text.
+        case invisibleText
     }
 
     // MARK: - Private Helpers
