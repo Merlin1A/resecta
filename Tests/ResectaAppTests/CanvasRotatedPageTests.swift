@@ -304,10 +304,12 @@ struct CanvasRotatedPageTests {
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let sources = root.appendingPathComponent("Sources")
         let files = try #require(FileManager.default.enumerator(at: sources, includingPropertiesForKeys: nil))
+        // An assignment with any spacing; a comparison (`==`) is not one.
+        let assigns = try Regex(#"displayBox\s*=(?!=)"#)
         var read = 0
         for case let url as URL in files where url.pathExtension == "swift" {
             let text = try String(contentsOf: url, encoding: .utf8)
-            #expect(!text.contains("displayBox ="), "\(url.lastPathComponent) assigns the display box")
+            #expect(text.firstMatch(of: assigns) == nil, "\(url.lastPathComponent) assigns the display box")
             read += 1
         }
         #expect(read > 100)
