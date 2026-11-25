@@ -1,0 +1,18 @@
+Property: The writer records the SHA-256 of each page's picture as it hands the picture to the draw.
+Area: the Box Fill row (the run's record)
+Test command: cd Packages/RedactionEngine && swift test --skip-build --no-parallel --filter BoxFillOwnRecordTests (after swift build --build-tests)
+Must go red: RedactionEngineTests/BoxFillOwnRecordTests digestIsOfTheStoredPicture, ownRecordPasses
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
+index 7d8510db..bfe2eaf9 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PDFStreamReconstructor.swift
+@@ -111,7 +111,6 @@ public actor PDFStreamReconstructor {
+             throw PipelineError.redactionError(.reconstructionFailed)
+         }
+         let buffered = try Self.encodeBufferedPage(from: output)
+-        recordDigest(of: buffered)
+         drawBufferedPage(buffered)
+         _appendedPageCount += 1
+     }
