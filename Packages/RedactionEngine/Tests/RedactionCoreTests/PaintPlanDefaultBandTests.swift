@@ -123,6 +123,22 @@ import RedactionCore
         #expect(box.defaultWidth == .taken)
     }
 
+    @Test("A box painted with its default band carries its line margin for the picture's net; a box whose default adds nothing carries none")
+    func defaultBandCarriesItsLineMargin() throws {
+        let (sheet, _, value) = Self.labelRow(value: "Smith")
+        let region = T.matched(sheet, value)
+        let made = Self.plan(sheet, [region])
+        let fallback = try #require(made.facts.defaultFallbacks[0])
+        let lineMargin = Self.box(sheet, region, drawing: .notRead)
+        #expect(fallback.inner == lineMargin.inner && fallback.paint == lineMargin.paint)
+        #expect(fallback.limitAbove == lineMargin.limitAbove && fallback.limitBelow == lineMargin.limitBelow)
+        #expect(fallback.defaultWidth == .notTaken(.inkInSlot) && !fallback.bandMade)
+        #expect(fallback.regionIDs == made.plan.boxes[0].regionIDs)
+        var mid = Sheet()
+        let lines = ComplementReadingTests.paragraph(&mid, counts: [6, 6, 6])
+        #expect(Self.plan(mid, [T.matched(mid, lines[1][2])]).facts.defaultFallbacks.isEmpty)
+    }
+
     // MARK: - Where it is not taken
 
     @Test("Nothing of the page's drawing read: no default band, the line margin")

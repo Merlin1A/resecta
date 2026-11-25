@@ -1,0 +1,21 @@
+Property: The box check judges a box whose default band the producer withdrew by the line margin the record made with its plan.
+Area: the box check's input (BoxCheckInput.init(record:))
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter DefaultBandNetTests
+Must go red: RedactionEngineTests/DefaultBandNetTests boxCheckReadsTheWithdrawal
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
+index 8f56d73c..80b5dec5 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
+@@ -48,9 +48,7 @@ extension BoxCheckInput {
+             // is judged by its band, so its report reads smaller.
+             var boxes = plan.boxes
+             for position in record.produced.defaultBandsWithdrawn where position.pageIndex == page.pageIndex {
+-                if position.box < boxes.count, let fallback = page.defaultFallbacks[position.box] {
+-                    boxes[position.box] = fallback
+-                }
++                _ = position
+             }
+             pages.append(Page(widthSixtyFourths: plan.widthSixtyFourths, heightSixtyFourths: plan.heightSixtyFourths,
+                               boxes: boxes, reported: reported, outsidePlan: drawn + rest))

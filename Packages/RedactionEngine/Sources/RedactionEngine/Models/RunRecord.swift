@@ -83,6 +83,10 @@ public struct RunRecord: Equatable, Sendable {
         /// place in the plan, made with the plan from the page's read: empty
         /// with no read, and under "as placed".
         package let inkCheckInputs: [Int: InkCheckInputs]
+        /// For each box painted with its default band, by its place in the
+        /// plan: the same box with its line margin, painted instead when the
+        /// page's picture shows ink in the band's slot. Made with the plan.
+        package let defaultFallbacks: [Int: PaintedBox]
 
         /// The page's regions that admission refuses, each with its reason,
         /// in the order they were drawn. Given by the regions as drawn, so it
@@ -112,7 +116,7 @@ public struct RunRecord: Equatable, Sendable {
                                read: read)
             self.init(pageIndex: pageIndex, regions: regions, plan: planned.plan,
                       geometry: geometry, geometryAtStore: geometryAtStore, shownDPI: shownDPI,
-                      inkCheckInputs: planned.inkCheckInputs)
+                      inkCheckInputs: planned.inkCheckInputs, defaultFallbacks: planned.defaultFallbacks)
         }
 
         /// One page as confirmed, with its plan made at run entry from the
@@ -138,7 +142,7 @@ public struct RunRecord: Equatable, Sendable {
             let made = Self.makePlanAndInputs(regions: regions, cropBox: cropBox, rotation: rotation,
                                               switchOn: switchOn, read: read, source: source)
             self.init(pageIndex: pageIndex, regions: regions, plan: made?.plan, shownDPI: shownDPI,
-                      inkCheckInputs: made?.inputs ?? [:])
+                      inkCheckInputs: made?.inputs ?? [:], defaultFallbacks: made?.fallbacks ?? [:])
         }
 
         /// The one maker of a page's plan from its regions as drawn: the run's
@@ -163,7 +167,7 @@ public struct RunRecord: Equatable, Sendable {
         /// under the switch's policy.
         package static func makePlanAndInputs(regions: [DrawnRegion], cropBox: CGSize, rotation: Int, switchOn: Bool,
                                               read: PageRead?, source: PlanSource)
-            -> (plan: PaintPlan, inputs: [Int: InkCheckInputs])? {
+            -> (plan: PaintPlan, inputs: [Int: InkCheckInputs], fallbacks: [Int: PaintedBox])? {
             let turned = ((rotation % 360) + 360) % 180 != 0
             guard let width = PixelPlan.sixtyFourths(ofSide: Double(turned ? cropBox.height : cropBox.width)),
                   let height = PixelPlan.sixtyFourths(ofSide: Double(turned ? cropBox.width : cropBox.height))
@@ -178,22 +182,23 @@ public struct RunRecord: Equatable, Sendable {
                     regions: planRegions, words: read.words, text: read.text, facts: read.facts,
                     widthSixtyFourths: width, heightSixtyFourths: height,
                     policy: .release, source: choice.source, switchOn: choice.switchOn)
-                guard choice.source == .switchPolicy else { return (made.plan, [:]) }
+                guard choice.source == .switchPolicy else { return (made.plan, [:], [:]) }
                 let inputs = made.facts.inkLineHeights.mapValues {
                     InkCheckInputs(lineHeight: $0, others: made.facts.otherWords)
                 }
-                return (made.plan, inputs)
+                return (made.plan, inputs, made.facts.defaultFallbacks)
             }
             return (PaintPlan.make(
                 regions: planRegions, words: PageWords(words: []), text: "",
                 facts: .noPageRead,
                 widthSixtyFourths: width, heightSixtyFourths: height,
-                policy: .release, source: choice.source, switchOn: choice.switchOn).plan, [:])
+                policy: .release, source: choice.source, switchOn: choice.switchOn).plan, [:], [:])
         }
 
         package init(pageIndex: Int, regions: [DrawnRegion], plan: PaintPlan?,
                      geometry: RunRecord.PageGeometry? = nil, geometryAtStore: RunRecord.PageGeometry? = nil,
-                     shownDPI: Int? = nil, inkCheckInputs: [Int: InkCheckInputs] = [:]) {
+                     shownDPI: Int? = nil, inkCheckInputs: [Int: InkCheckInputs] = [:],
+                     defaultFallbacks: [Int: PaintedBox] = [:]) {
             self.pageIndex = pageIndex
             self.regions = regions
             self.plan = plan
@@ -201,6 +206,7 @@ public struct RunRecord: Equatable, Sendable {
             self.geometryAtStore = geometryAtStore
             self.shownDPI = shownDPI
             self.inkCheckInputs = inkCheckInputs
+            self.defaultFallbacks = defaultFallbacks
         }
     }
 
@@ -254,6 +260,9 @@ public struct RunRecord: Equatable, Sendable {
         /// The ink check's verdict for each box it ran on, by box. A box the
         /// check did not run on has none.
         package var inkVerdicts: [BoxPosition: InkCheck.Verdict] = [:]
+        /// The boxes painted with their line margin in place of their default
+        /// band, because the page's picture showed ink in the band's slot.
+        package var defaultBandsWithdrawn: Set<BoxPosition> = []
         /// Which way found the information dictionary for its rewrite; nil
         /// until the rewrite has run.
         package var infoDictionary: InfoDictionaryWay?
@@ -282,14 +291,17 @@ public struct RunRecord: Equatable, Sendable {
 extension RunRecord.Produced {
     /// Records what the rasterizer reports for one page: the rectangle it
     /// painted for each box of the page's plan, the ink check's verdict for
-    /// each box it ran on, and the regions it painted outside the plan. The
-    /// one writer of the three fields.
+    /// each box it ran on, the boxes whose default band it withdrew, and the
+    /// regions it painted outside the plan. The one writer of the four fields.
     public mutating func record(_ result: RasterizeResult, pageIndex: Int) {
         for (box, pixels) in result.paintedBoxes {
             paintedRectangles[RunRecord.BoxPosition(pageIndex: pageIndex, box: box)] = pixels
         }
         for (box, verdict) in result.inkVerdicts {
             inkVerdicts[RunRecord.BoxPosition(pageIndex: pageIndex, box: box)] = verdict
+        }
+        for box in result.defaultBandsWithdrawn {
+            defaultBandsWithdrawn.insert(RunRecord.BoxPosition(pageIndex: pageIndex, box: box))
         }
         if !result.regionsPaintedOutsideThePlan.isEmpty {
             regionsPaintedOutsideThePlan[pageIndex] = result.regionsPaintedOutsideThePlan

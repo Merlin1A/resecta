@@ -1,0 +1,19 @@
+Property: A box painted with its default band where the page's picture shows ink in the band's slot is painted with its line margin instead.
+Area: the plan path's default band net (PageRasterizer.paintPlan)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter DefaultBandNetTests
+Must go red: RedactionEngineTests/DefaultBandNetTests markInTheSlotWithdrawsTheBand
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
+index 77bfbc9c..2827ec53 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
+@@ -281,7 +281,7 @@ extension PageRasterizer {
+         var boxes = page.boxes
+         var withdrawn: Set<Int> = []
+         for (index, fallback) in page.defaultFallbacks.sorted(by: { $0.key < $1.key })
+-        where index < boxes.count && boxes[index].defaultWidth == .taken {
++        where index < 0 {
+             let box = boxes[index]
+             if let band = PixelPlan.project(inner: box.inner, paint: box.paint, limitAbove: box.limitAbove,
+                                             limitBelow: box.limitBelow, raster: raster)?.painted,

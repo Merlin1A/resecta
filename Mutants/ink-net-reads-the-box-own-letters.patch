@@ -1,0 +1,20 @@
+Property: The net reads only the band's pixels its line margin does not hold, so the box's own letters never withdraw its band.
+Area: the ink check's net (InkCheck.inkInSlot)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter "InkCheckTests|DefaultBandNetTests"
+Must go red: RedactionCoreTests/InkCheckApplyingTests netReadsTheSlot; RedactionEngineTests/DefaultBandNetTests blankSlotKeepsTheBand
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/InkCheck.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/InkCheck.swift
+index 31d87a7d..eda474f4 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/InkCheck.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/InkCheck.swift
+@@ -366,8 +366,7 @@ extension InkCheck {
+         let y0 = max(0, band.minY), y1 = min(height, band.maxY)
+         guard x0 < x1 && y0 < y1 else { return false }
+         for y in y0..<y1 {
+-            for x in x0..<x1
+-            where !(x >= lineMargin.minX && x < lineMargin.maxX && y >= lineMargin.minY && y < lineMargin.maxY) {
++            for x in x0..<x1 {
+                 if abs(value(x, y) - paper) > inkContrast { return true }
+             }
+         }
