@@ -151,17 +151,16 @@ extension DocumentEditorView {
                         switch occupant {
                         case .drawingCaption: drawingCaptionWords
                         case .selection(adding: true): addModeWords
-                        case .selection(adding: false):
-                            SelectionBar(toolbar: editorToolbar)
-                                // The glass's frame at the bottom place: the
-                                // bar's words grown by the slot's padding.
-                                .onGeometryChange(for: CGRect.self) {
-                                    $0.frame(in: .named(Self.canvasSpaceName))
-                                } action: { frame in
-                                    guard !atTop else { return }
-                                    selectionBarFrame = frame.insetBy(
-                                        dx: -Self.bottomSlotHorizontalPadding, dy: -Self.bottomSlotVerticalPadding)
-                                }
+                        case .selection(adding: false): SelectionBar(toolbar: editorToolbar)
+                            // The glass's frame at the bottom place: the bar's
+                            // words grown by the slot's padding.
+                            .onGeometryChange(for: CGRect.self) {
+                                $0.frame(in: .named(Self.canvasSpaceName))
+                            } action: { frame in
+                                guard !atTop else { return }
+                                selectionBarFrame = frame.insetBy(
+                                    dx: -Self.bottomSlotHorizontalPadding, dy: -Self.bottomSlotVerticalPadding)
+                            }
                         // Drawn by the message host.
                         case .message: EmptyView()
                         // Drawn beside the slot, at its own size.
