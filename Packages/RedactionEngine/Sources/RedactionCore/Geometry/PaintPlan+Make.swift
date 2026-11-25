@@ -207,9 +207,25 @@ private struct Maker {
         func root(_ i: Int) -> Int { var i = i; while parent[i] != i { i = parent[i] }; return i }
         let joinable = placed.indices.filter(readsALayout)
         let rows = Dictionary(uniqueKeysWithValues: joinable.map { ($0, selectedRows(placed[$0].region.selected)) })
+        let tights = Dictionary(uniqueKeysWithValues: joinable.map { i in
+            (i, letterRects(placed[i].region.selected).reduce(placed[i].rect) { $0.union($1) })
+        })
+        let others = complement.lines.flatMap { $0.words.flatMap(\.letters) }.map(\.rect)
+        // The join guard: regions join only when their joined tight rectangle
+        // holds the middle of no unselected letter that no member's own tight
+        // rectangle holds. Each pair is guarded, then each group once; a group
+        // that fails is split into single regions.
+        func guarded(_ group: [Int]) -> Bool {
+            let own = group.compactMap { tights[$0] }
+            guard let first = own.first else { return true }
+            let joined = own.dropFirst().reduce(first) { $0.union($1) }
+            return !others.contains { letter in
+                Self.holdsMiddle(joined, letter) && !own.contains { Self.holdsMiddle($0, letter) }
+            }
+        }
         for (k, a) in joinable.enumerated() {
             for b in joinable[(k + 1)...] where root(a) != root(b) {
-                if adjoin(rows[a] ?? [], rows[b] ?? []) { parent[root(b)] = root(a) }
+                if adjoin(rows[a] ?? [], rows[b] ?? []) && guarded([a, b]) { parent[root(b)] = root(a) }
             }
         }
         var order: [Int] = []
@@ -219,7 +235,17 @@ private struct Maker {
             if members[r] == nil { order.append(r) }
             members[r, default: []].append(i)
         }
-        return order.map { members[$0]! }
+        return order.flatMap { r -> [[Int]] in
+            let group = members[r]!
+            return group.count > 1 && !guarded(group) ? group.map { [$0] } : [group]
+        }
+    }
+
+    /// Whether the middle of `letter` lies inside `rect`, edges included,
+    /// kept whole as twice the middle against twice the sides.
+    static func holdsMiddle(_ rect: PageRect64, _ letter: PageRect64) -> Bool {
+        let x = letter.minX + letter.maxX, y = letter.minY + letter.maxY
+        return 2 * rect.minX <= x && x <= 2 * rect.maxX && 2 * rect.minY <= y && y <= 2 * rect.maxY
     }
 
     /// A set of selected letters' rows, each as one rectangle.

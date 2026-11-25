@@ -1,0 +1,19 @@
+Property: A letter whose middle lies inside a member's own tight rectangle does not block, even when the letter is not wholly inside it.
+Area: the plan's join guard (PaintPlan.make, groups)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter PaintPlanJoinGuardTests
+Must go red: RedactionCoreTests/PaintPlanJoinGuardTests heldBoxInsideAContainerJoins
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+index f1f353ae..b2c7d6f8 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+@@ -220,7 +220,7 @@ private struct Maker {
+             guard let first = own.first else { return true }
+             let joined = own.dropFirst().reduce(first) { $0.union($1) }
+             return !others.contains { letter in
+-                Self.holdsMiddle(joined, letter) && !own.contains { Self.holdsMiddle($0, letter) }
++                Self.holdsMiddle(joined, letter) && !own.contains { $0.contains(letter) }
+             }
+         }
+         for (k, a) in joinable.enumerated() {

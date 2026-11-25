@@ -1,0 +1,19 @@
+Property: Two regions join only when their own pair is guarded, so a line of found words stays one box beside a two-line match the guard keeps apart.
+Area: the plan's join guard (PaintPlan.make, groups)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter PaintPlanJoinGuardTests
+Must go red: RedactionCoreTests/PaintPlanJoinGuardTests lineOfFoundWordsStaysOneBox
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+index f1f353ae..5733fe0b 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+@@ -225,7 +225,7 @@ private struct Maker {
+         }
+         for (k, a) in joinable.enumerated() {
+             for b in joinable[(k + 1)...] where root(a) != root(b) {
+-                if adjoin(rows[a] ?? [], rows[b] ?? []) && guarded([a, b]) { parent[root(b)] = root(a) }
++                if adjoin(rows[a] ?? [], rows[b] ?? []) { parent[root(b)] = root(a) }
+             }
+         }
+         var order: [Int] = []
