@@ -5,10 +5,10 @@ Must go red: ResectaAppTests/BottomSlotTests oneOccupant
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Views/DocumentEditorView+Caption.swift b/Sources/ResectaApp/Views/DocumentEditorView+Caption.swift
-index 29a0adf1..4d105cf5 100644
+index e71a98f2..80a7119b 100644
 --- a/Sources/ResectaApp/Views/DocumentEditorView+Caption.swift
 +++ b/Sources/ResectaApp/Views/DocumentEditorView+Caption.swift
-@@ -105,11 +105,11 @@ extension DocumentEditorView {
+@@ -89,11 +89,11 @@ extension DocumentEditorView {
          let selection: BottomSlotOccupant? = addToSelection
              ? .selection(adding: true)
              : (selectedCount > 0 ? .selection(adding: false) : nil)
@@ -19,5 +19,5 @@ index 29a0adf1..4d105cf5 100644
          }
 -        if firstTimeLineDue { return .firstTimeLine }
          if let selection { return selection }
-         if drawingModeCaptionShouldShow(activeTool: activeTool, phaseKind: phaseKind) { return .drawingCaption }
-         return widenedOnPage ? .widenedBoxes : nil
+         return drawingModeCaptionShouldShow(activeTool: activeTool, phaseKind: phaseKind) ? .drawingCaption : nil
+     }
