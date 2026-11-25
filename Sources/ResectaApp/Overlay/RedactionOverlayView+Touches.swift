@@ -332,8 +332,8 @@ extension RedactionOverlayView {
         // run under `isActivelyDragging`, which makes the coordinator's
         // `configure` a no-op, and the later state sync sees `regions`
         // unchanged (the overlay already holds the final rect) — so this
-        // is the only repaint that erases a rejected rubber band, its
-        // label and guides, or drops the lifted look after a move/resize.
+        // is the only repaint that erases a rejected rubber band and its
+        // guides, or drops the lifted look after a move/resize.
         setNeedsDisplay()
     }
 
@@ -349,11 +349,13 @@ extension RedactionOverlayView {
                 argument: RedactionOverlayView.subThresholdRejectionAnnouncement)
         }
 
-        // Visual: create a temporary view that shrinks to center and fades out
+        // Visual: a temporary view in page teal that shrinks to centre and
+        // fades out; its border keeps one on-screen width.
+        let style = Self.rejectedBandStyle(fingerScale: fingerScale)
         let rejectView = UIView(frame: rect)
-        rejectView.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.15)
-        rejectView.layer.borderColor = UIColor.systemBlue.cgColor
-        rejectView.layer.borderWidth = 2.0
+        rejectView.backgroundColor = style.fill
+        rejectView.layer.borderColor = style.border.cgColor
+        rejectView.layer.borderWidth = style.width
         addSubview(rejectView)
 
         if UIAccessibility.isReduceMotionEnabled {

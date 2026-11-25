@@ -1,84 +1,14 @@
 import UIKit
 
-// Pure helpers and adaptive-stroke constants
-// for the canvas a11y polish bundle. Extracted from
+// A pure helper for the move-drag, extracted from
 // `RedactionOverlayView.swift` so the hub file stays smaller and the
-// helpers are unit-testable without a UIView host.
+// helper is unit-testable without a UIView host.
 //
-//   `badgeOuterStrokeWidth`     (badge perimeter contrast)
-//
-//   `DimensionLabelPosition` + `dimensionLabelPosition(…)`
-//           (above-vs-below placement for small/tall regions; suppress
-//           when neither slot fits in the overlay)
 //   `clampedDragOrigin(…)`
 //           (grab point stays under finger up to overlay edge; degenerate
 //           region-bigger-than-overlay case pinned at origin corner)
 
 extension RedactionOverlayView {
-
-    // MARK: - Badge outer stroke
-
-    /// Hairline outer stroke around the PII-type badge so its perimeter
-    /// stays visible when the badge color blends with the region fill
-    /// underneath (orange badge on orange fill, purple on purple) or
-    /// with adjacent document content in dark mode. Adaptive
-    /// `UIColor.separator` colour at the call site; 0.5pt is sub-pixel
-    /// on 2× / 3× retina — just enough for an edge.
-    static let badgeOuterStrokeWidth: CGFloat = 0.5
-
-    // MARK: - Dimension label placement
-
-    /// Regions shorter than this threshold prefer the dimension label
-    /// above the rect (the label feels crowded sitting below a thin
-    /// strip); regions at-or-above the threshold prefer the legacy
-    /// below posture. 40pt was chosen so the typical text-line height
-    /// (~20-30pt) lands on the above branch and the typical PII
-    /// bounding-box (~50pt+) lands on the below branch.
-    static let dimensionLabelSmallRegionThreshold: CGFloat = 40.0
-
-    /// Result of the dimension-label position helper. The suppressed
-    /// case is reached when neither above nor below has room inside
-    /// the overlay; the call site skips the draw entirely rather than
-    /// clamping into an unreadable position on top of the region.
-    enum DimensionLabelPosition: Equatable {
-        case above(y: CGFloat)
-        case below(y: CGFloat)
-        case suppressed
-    }
-
-    /// Pure helper for dimension-label vertical placement. Small
-    /// regions (< `dimensionLabelSmallRegionThreshold` pt tall) try
-    /// `above` first so the label doesn't crowd a thin region from
-    /// below; taller regions try `below` first (legacy posture). If
-    /// the preferred position falls outside the overlay, the helper
-    /// falls back to the alternate position; if neither fits, the
-    /// call site suppresses the label so it never lands on top of
-    /// the region.
-    ///
-    /// `gap` is the spacing between the region edge and the pill
-    /// (4pt by existing convention). `pillHeight` and `overlayHeight`
-    /// are in overlay-view points.
-    static func dimensionLabelPosition(
-        regionRect: CGRect,
-        pillHeight: CGFloat,
-        overlayHeight: CGFloat,
-        gap: CGFloat = 4
-    ) -> DimensionLabelPosition {
-        let aboveY = regionRect.minY - pillHeight - gap
-        let belowY = regionRect.maxY + gap
-        let aboveFits = aboveY >= 0
-        let belowFits = belowY + pillHeight <= overlayHeight
-        let preferAbove = regionRect.height < dimensionLabelSmallRegionThreshold
-
-        if preferAbove {
-            if aboveFits { return .above(y: aboveY) }
-            if belowFits { return .below(y: belowY) }
-        } else {
-            if belowFits { return .below(y: belowY) }
-            if aboveFits { return .above(y: aboveY) }
-        }
-        return .suppressed
-    }
 
     // MARK: - Drag-offset clamping
 

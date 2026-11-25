@@ -13,7 +13,7 @@ import XCTest
 nonisolated struct CanvasPixelProbe {
 
     enum Tint {
-        case red, blue, green, teal, veil
+        case red, blue, green, teal, veil, tagFill
 
         func matches(_ r: Int, _ g: Int, _ b: Int) -> Bool {
             switch self {
@@ -25,6 +25,8 @@ nonisolated struct CanvasPixelProbe {
             case .teal: return b - r > 50 && g - r > 50 && r < 90 && (70...175).contains(g) && (80...190).contains(b)
             // The veil over white is 213, 215, 217.
             case .veil: return [r, g, b].allSatisfy { (205...224).contains($0) } && max(r, g, b) - min(r, g, b) <= 8
+            // A tag's opaque ink fill, 20, 34, 43; black text never matches.
+            case .tagFill: return abs(r - 20) <= 10 && abs(g - 34) <= 10 && abs(b - 43) <= 10 && b - r >= 15
             }
         }
     }
