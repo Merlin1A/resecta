@@ -89,7 +89,11 @@ struct ResectaApp: App {
     ///   after the launch-time clear. It also clears Verify Before
     ///   Export back to its default (on): a test that turns it off and
     ///   stops before its tearDown restores it would otherwise leave every
-    ///   later run on that simulator at "Verification Skipped".
+    ///   later run on that simulator at "Verification Skipped". And it
+    ///   clears the stored fill colour and export quality, so a test never
+    ///   runs at a colour or quality an earlier launch chose.
+    /// --seedExportQuality=<150|200|300>: Write that export quality AFTER
+    ///   the --uitesting clear (`DebugSeedOptions`).
     /// --keepVerifySetting: With --uitesting, keep the stored Verify Before
     ///   Export value: for a test that turned it off in Settings and
     ///   relaunches to run with it off.
@@ -119,6 +123,11 @@ struct ResectaApp: App {
             if !CommandLine.arguments.contains("--keepVerifySetting") {
                 defaults.removeObject(forKey: "autoVerify")
             }
+            defaults.removeObject(forKey: "fillColor")
+            defaults.removeObject(forKey: "exportDPI")
+        }
+        if let quality = DebugSeedOptions.parse(arguments: CommandLine.arguments).exportQuality {
+            defaults.set(quality, forKey: "exportDPI")
         }
         // The first-time line: a test launch sets its flag, so no suite meets
         // the line, unless it asks for a fresh one or for the stored value.
@@ -521,6 +530,19 @@ struct ResectaApp: App {
                                             named: sampleName,
                                             documentState: ws.documentState,
                                             redactionState: ws.redactionState)
+                                    }
+                                    // The editor's seeds (`DebugSeedOptions`),
+                                    // on any launch that loads a document:
+                                    // hand boxes stored at their shares as
+                                    // given, and the run's quality cap.
+                                    let editorSeeds = DebugSeedOptions.parse(arguments: launchArguments)
+                                    for box in editorSeeds.handBoxesAt {
+                                        ws.redactionState.addRegion(
+                                            RedactionRegion(id: UUID(), normalizedRect: box.rect, source: .manual),
+                                            page: box.page, undoManager: nil)
+                                    }
+                                    if let cap = editorSeeds.runQualityCap {
+                                        ws.coordinator.dpiCap = cap
                                     }
                                     // `--seedVerifiedReport=<name>`: the results
                                     // screen on a forged report
