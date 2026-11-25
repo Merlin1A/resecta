@@ -245,6 +245,34 @@ struct FirstEditStartTests {
         #expect(Self.misses(side: side, mins: mins, spans: Self.spans(side)) == 0)
     }
 
+    /// The edges of record that reach the share's fourth step, as (S, k₀,
+    /// k₁): three and two on A4's sides, two on 401.123 pt, one on Letter's
+    /// height. Over every k₁ at the six spans the seven named sides hold 73
+    /// such edges, all with k₀ ≤ 467; these eight are held by name, whatever
+    /// the sweep above takes.
+    static let stepFourEdges: [(side: Int, k0: Int, k1: Int)] = [
+        (38098, 19, 719), (38098, 316, 1016), (38098, 467, 1167),
+        (53881, 23, 87), (53881, 140, 840),
+        (25672, 4, 11), (25672, 32, 96),
+        (50688, 51, 751),
+    ]
+
+    @Test("Eight edges of record reach the share's fourth step, and each reads back to its sixty-fourths exactly")
+    func stepFourEdgesReadBack() {
+        #expect(Self.stepFourEdges.count == 8)
+        for (s, k0, k1) in Self.stepFourEdges {
+            // Steps 1 to 3 alone, as the rule's comment gives them: the sum
+            // still misses k₁, so the edge needs step 4.
+            let side = Double(s), hi = Double(k1)
+            var x = Double(k0) / side
+            if Int((x * side).rounded(.down)) != k0 { x = x.nextUp }
+            var m = hi / side
+            if Int((m * side).rounded(.up)) != k1 { m = m * side > hi ? m.nextDown : m.nextUp }
+            #expect(Int(((x + (m - x)) * side).rounded(.up)) != k1, "side \(s) (\(k0), \(k1)) reaches step 4")
+            #expect(Self.misses(side: s, mins: [k0], spans: [k1 - k0]) == 0, "side \(s) (\(k0), \(k1)) reads back")
+        }
+    }
+
     /// The model's 200 seeded sides: mulberry32 with its seed, each side from
     /// 72 to 14,400 pt at a thousandth of a point, in sixty-fourths by
     /// `PixelPlan.sixtyFourths(ofSide:)`.
@@ -418,9 +446,11 @@ extension FirstEditStartTests {
         let plan = DrawnPlan(pageIndex: index, regions: regions, cropBox: side, rotation: 0, switchOn: switchOn,
                              exportDPI: 300, fillColor: .black, read: read, source: .switchPolicy)
         // Each named box's start, as the rule gives it on the real plan's own
-        // boxes. Provisional: the model's clause (2, 2, 2, 4) for the four the
-        // rows name differs, as the real plan joins nothing to a box without
-        // characters.
+        // boxes. The four the rows name start by clause 1, not by the model's
+        // (2, 2, 2, 4): the real plan joins nothing to a box without
+        // characters, so each stands alone in its plan box and has no
+        // neighbour (rule 1). The reason is held as assertions: the
+        // characterless boxes above, and each box alone below.
         for expected in table.expected {
             let matching = regions.filter { Self.readBack($0.normalizedRect, table.page) == expected.rect.r64 }
             try #require(!matching.isEmpty, "a region at \(expected.rect.r64)")
