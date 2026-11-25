@@ -269,16 +269,24 @@ final class SettingsStateTests {
             .appendingPathComponent("Sources/ResectaApp")
         var keyUses = 0
         var readers: [String] = []
+        var keyReaders: [String] = []
         let files = FileManager.default.enumerator(at: sources, includingPropertiesForKeys: nil)?
             .compactMap { $0 as? URL }.filter { $0.pathExtension == "swift" } ?? []
         for file in files {
             let text = try String(contentsOf: file, encoding: .utf8)
             keyUses += text.components(separatedBy: "\"boxesAcrossColumn.v1\"").count - 1
             if text.contains("boxesAcrossColumn") { readers.append(file.lastPathComponent) }
+            if text.contains("boxesAcrossColumnKey") { keyReaders.append(file.lastPathComponent) }
         }
         #expect(keyUses == 1, "the key's literal is written once")
         let view = try String(contentsOf: sources.appendingPathComponent("Views/SettingsView.swift"), encoding: .utf8)
         #expect(view.contains("get: { settingsState.boxesAcrossColumn }"))
-        #expect(Set(readers) == ["SettingsState.swift", "SettingsView.swift"])
+        // The screen reads the settings state; the run takes the switch from
+        // its snapshot of the settings state (the pipeline's snapshot, the
+        // plan made from it). Each reads the property, and only the settings
+        // state names the key.
+        #expect(Set(readers) == ["SettingsState.swift", "SettingsView.swift",
+                                 "PipelineCoordinator.swift", "RunInputs.swift"])
+        #expect(keyReaders == ["SettingsState.swift"])
     }
 }
