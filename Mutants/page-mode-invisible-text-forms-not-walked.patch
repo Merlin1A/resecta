@@ -1,0 +1,18 @@
+Property: The invisible-text reading walks into every form object the page draws.
+Area: page mode (Detection)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/InvisibleTextPageTests (or on the host: cd Packages/RedactionEngine && swift test --no-parallel --filter InvisibleTextPageTests)
+Must go red: RedactionEngineTests/InvisibleTextPageTests reading [invisible text inside a form object]; RedactionEngineTests/InvisibleTextPageTests exported [invisible text inside a form object]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+InkFitGate.swift
+@@ -169,7 +169,7 @@
+                   let dictionary = CGPDFStreamGetDictionary(stream) else { return }
+             var subtype: UnsafePointer<CChar>?
+             guard CGPDFDictionaryGetName(dictionary, "Subtype", &subtype), let subtype,
+-                  String(cString: subtype) == "Form" else { return }
++                  String(cString: subtype) == "Form " else { return }
+             state.drawn += 1
+             guard state.depth < 8, state.drawn <= PagePictureMap.formLimit, let table = state.table else {
+                 state.unreadable = true; CGPDFScannerStop(scanner); return

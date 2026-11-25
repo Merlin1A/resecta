@@ -1,0 +1,18 @@
+Property: A Searchable page whose content shows text in an invisible render mode is written as an image only, with its own reason; no hidden text is written on a hidden-layer scan.
+Area: page mode (Detection)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/InvisibleTextPageTests (or on the host: cd Packages/RedactionEngine && swift test --no-parallel --filter InvisibleTextPageTests)
+Must go red: RedactionEngineTests/InvisibleTextPageTests exported [a hidden layer over a scan, mode 3]; RedactionEngineTests/InvisibleTextPageTests exported [one invisible word on a typed page]; RedactionEngineTests/InvisibleTextPageTests exported [invisible text inside a form object]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageModeDecision.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageModeDecision.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageModeDecision.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageModeDecision.swift
+@@ -67,7 +67,7 @@
+             if let trigger = TextLayerDetector.checkFallbackTriggers(page) {
+                 pageMode = .secureRasterization
+                 fallbackReason = trigger
+-            } else if let reason = Self.invisibleTextReason(readInvisibleText(page.pageRef)) {
++            } else if let reason = Self.invisibleTextReason(.showsNone) {
+                 // The page shows text in an invisible render mode (a hidden
+                 // layer over a picture of the page, or a word drawn without
+                 // ink), or its content could not be read: it is written as
