@@ -171,11 +171,42 @@ nonisolated final class SearchNoticePlaceUITests: XCTestCase {
         sleep(1)
         let top = notice.frame.minY
         field.typeText("s")
-        for _ in 0..<40 {
-            XCTAssertTrue(notice.exists, "The notice left while the new search ran.")
-            XCTAssertEqual(notice.frame.minY, top, accuracy: 1, "The notice moved while the new search ran.")
+        // The toolbar's searching row stands above the place while a run is in
+        // progress, so the place itself comes down by that row and goes back
+        // when the run ends. The notice must not move within its place: under
+        // the row it keeps one distance from the row's foot, and with no run
+        // it stands where it stood. Each sample is one snapshot of the screen.
+        var underRow: CGFloat?
+        var sawTheRun = false
+        let deadline = Date().addingTimeInterval(2)
+        repeat {
+            guard let screen = try? app.snapshot() else { continue }
+            guard let shown = Self.first(in: screen, where: { $0.identifier == "ocrSkipBanner" }) else {
+                XCTFail("The notice left while the new search ran."); return
+            }
+            if let row = Self.first(in: screen, where: { $0.elementType == .staticText && $0.label.hasPrefix("Scanning page") }) {
+                sawTheRun = true
+                let gap = shown.frame.minY - row.frame.maxY
+                XCTAssertGreaterThanOrEqual(gap, 0, "The notice stood over the searching row.")
+                if let underRow {
+                    XCTAssertEqual(gap, underRow, accuracy: 1, "The notice moved in its place while the new search ran.")
+                } else {
+                    underRow = gap
+                }
+            } else {
+                XCTAssertEqual(shown.frame.minY, top, accuracy: 1, "The notice moved while no search ran.")
+            }
             usleep(50_000)
+        } while Date() < deadline
+        XCTAssertTrue(sawTheRun, "No sample caught the new search running.")
+    }
+
+    private static func first(in node: XCUIElementSnapshot, where match: (XCUIElementSnapshot) -> Bool) -> XCUIElementSnapshot? {
+        if match(node) { return node }
+        for child in node.children {
+            if let found = first(in: child, where: match) { return found }
         }
+        return nil
     }
 
     func testParkedStrip_carriesTheMark_besideTheArrows() {
