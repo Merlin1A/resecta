@@ -1,0 +1,1639 @@
+{
+  "rule": "first-edit-start",
+  "units": "sixty-fourths of a point, origin bottom-left; painted rects in whole pixels, rows from the bottom",
+  "cases": [
+    {
+      "id": "start-name",
+      "inputs": {
+        "startOf": {
+          "minX": 3374,
+          "minY": 41386,
+          "maxX": 8831,
+          "maxY": 42422
+        },
+        "page": {
+          "W": 39168,
+          "H": 50688
+        }
+      },
+      "expected": {
+        "share": {
+          "minX": 0.08614174836601307,
+          "minY": 0.8164851641414141,
+          "maxX": 0.22546466503267973,
+          "maxY": 0.8369239267676768
+        },
+        "rect": {
+          "minX": 3374,
+          "minY": 41386,
+          "maxX": 8831,
+          "maxY": 42422
+        }
+      }
+    },
+    {
+      "id": "start-past-the-left-and-top",
+      "inputs": {
+        "startOf": {
+          "minX": -40,
+          "minY": 50600,
+          "maxX": 2000,
+          "maxY": 50750
+        },
+        "page": {
+          "W": 39168,
+          "H": 50688
+        }
+      },
+      "expected": {
+        "share": {
+          "minX": 0.0,
+          "minY": 0.9982638888888888,
+          "maxX": 0.05106209150326797,
+          "maxY": 1.0
+        },
+        "rect": {
+          "minX": 0,
+          "minY": 50600,
+          "maxX": 2000,
+          "maxY": 50688
+        }
+      }
+    },
+    {
+      "id": "start-past-the-left",
+      "inputs": {
+        "startOf": {
+          "minX": -150,
+          "minY": 30000,
+          "maxX": 4000,
+          "maxY": 30900
+        },
+        "page": {
+          "W": 39168,
+          "H": 50688
+        }
+      },
+      "expected": {
+        "share": {
+          "minX": 0.0,
+          "minY": 0.5918560606060606,
+          "maxX": 0.10212418300653595,
+          "maxY": 0.6096117424242424
+        },
+        "rect": {
+          "minX": 0,
+          "minY": 30000,
+          "maxX": 4000,
+          "maxY": 30900
+        },
+        "slidShare": {
+          "minX": 0.0,
+          "minY": 0.5918560606060606,
+          "maxX": 0.10595383986928104,
+          "maxY": 0.6096117424242423
+        }
+      }
+    },
+    {
+      "id": "start-past-the-bottom",
+      "inputs": {
+        "startOf": {
+          "minX": 10000,
+          "minY": -120,
+          "maxX": 14000,
+          "maxY": 700
+        },
+        "page": {
+          "W": 39168,
+          "H": 50688
+        }
+      },
+      "expected": {
+        "share": {
+          "minX": 0.25531045751633985,
+          "minY": 0.0,
+          "maxX": 0.3574346405228758,
+          "maxY": 0.013809974747474748
+        },
+        "rect": {
+          "minX": 10000,
+          "minY": 0,
+          "maxX": 14000,
+          "maxY": 700
+        },
+        "slidShare": {
+          "minX": 0.25531045751633985,
+          "minY": 0.0,
+          "maxX": 0.35743464052287577,
+          "maxY": 0.016177398989898988
+        }
+      }
+    },
+    {
+      "id": "J-start-alone",
+      "inputs": {
+        "start": {
+          "box": {
+            "rect": {
+              "minX": 3456,
+              "minY": 41437,
+              "maxX": 8627,
+              "maxY": 42252
+            },
+            "neighbours": [],
+            "paint": {
+              "minX": 3374,
+              "minY": 41386,
+              "maxX": 8831,
+              "maxY": 42422
+            },
+            "oneLineBox": true
+          }
+        },
+        "page": {
+          "W": 39168,
+          "H": 50688
+        }
+      },
+      "expected": {
+        "rect": {
+          "minX": 3374,
+          "minY": 41386,
+          "maxX": 8831,
+          "maxY": 42422
+        },
+        "clause": 1
+      }
+    },
+    {
+      "id": "J-start-held",
+      "inputs": {
+        "start": {
+          "box": {
+            "rect": {
+              "minX": 3000,
+              "minY": 2100,
+              "maxX": 4000,
+              "maxY": 2500
+            },
+            "neighbours": [
+              {
+                "minX": 1000,
+                "minY": 1000,
+                "maxX": 5000,
+                "maxY": 3000
+              }
+            ],
+            "paint": {
+              "minX": 900,
+              "minY": 900,
+              "maxX": 5100,
+              "maxY": 3100
+            },
+            "oneLineBox": false
+          }
+        },
+        "page": {
+          "W": 39168,
+          "H": 50688
+        }
+      },
+      "expected": {
+        "rect": {
+          "minX": 3000,
+          "minY": 2100,
+          "maxX": 4000,
+          "maxY": 2500
+        },
+        "clause": 2
+      }
+    },
+    {
+      "id": "J-start-held-edges-coincide",
+      "inputs": {
+        "start": {
+          "box": {
+            "rect": {
+              "minX": 3000,
+              "minY": 2100,
+              "maxX": 5000,
+              "maxY": 3000
+            },
+            "neighbours": [
+              {
+                "minX": 1000,
+                "minY": 1000,
+                "maxX": 5000,
+                "maxY": 3000
+              }
+            ],
+            "paint": {
+              "minX": 900,
+              "minY": 900,
+              "maxX": 5100,
+              "maxY": 3100
+            },
+            "oneLineBox": false
+          }
+        },
+        "page": {
+          "W": 39168,
+          "H": 50688
+        }
+      },
+      "expected": {
+        "rect": {
+          "minX": 3000,
+          "minY": 2100,
+          "maxX": 5000,
+          "maxY": 3000
+        },
+        "clause": 2
+      }
+    },
+    {
+      "id": "J-start-held-left-edge",
+      "inputs": {
+        "start": {
+          "box": {
+            "rect": {
+              "minX": 1000,
+              "minY": 2100,
+              "maxX": 2000,
+              "maxY": 2500
+            },
+            "neighbours": [
+              {
+                "minX": 1000,
+                "minY": 1000,
+                "maxX": 5000,
+                "maxY": 3000
+              }
+            ],
+            "paint": {
+              "minX": 900,
+              "minY": 900,
+              "maxX": 5100,
+              "maxY": 3100
+            },
+            "oneLineBox": false
+          }
+        },
+        "page": {
+          "W": 39168,
+          "H": 50688
+        }
+      },
+      "expected": {
+        "rect": {
+          "minX": 1000,
+          "minY": 2100,
+          "maxX": 2000,
+          "maxY": 2500
+        },
+        "clause": 2
+      }
+    },
+    {
+      "id": "J-start-held-one-line",
+      "inputs": {
+        "start": {
+          "box": {
+            "rect": {
+              "minX": 2000,
+              "minY": 2010,
+              "maxX": 2500,
+              "maxY": 2590
+            },
+            "neighbours": [
+              {
+                "minX": 1000,
+                "minY": 2000,
+                "maxX": 3000,
+                "maxY": 2600
+              }
+            ],
+            "paint": {
+              "minX": 900,
+              "minY": 1900,
+              "maxX": 3100,
+              "maxY": 2700
+            },
+            "oneLineBox": true
+          }
+        },
+        "page": {
+          "W": 39168,
+          "H": 50688
+        }
+      },
+      "expected": {
+        "rect": {
+          "minX": 2000,
+          "minY": 2010,
+          "maxX": 2500,
+          "maxY": 2590
+        },
+        "clause": 2
+      }
+    },
+    {
+      "id": "J-start-held-level-one-line",
+      "inputs": {
+        "start": {
+          "box": {
+            "rect": {
+              "minX": 2000,
+              "minY": 2000,
+              "maxX": 2500,
+              "maxY": 2600
+            },
+            "neighbours": [
+              {
+                "minX": 1000,
+                "minY": 2000,
+                "maxX": 3000,
+                "maxY": 2600
+              }
+            ],
+            "paint": {
+              "minX": 900,
+              "minY": 1900,
+              "maxX": 3100,
+              "maxY": 2700
+            },
+            "oneLineBox": true
+          }
+        },
+        "page": {
+          "W": 39168,
+          "H": 50688
+        }
+      },
+      "expected": {
+        "rect": {
+          "minX": 2000,
+          "minY": 2000,
+          "maxX": 2500,
+          "maxY": 2600
+        },
+        "clause": 2
+      }
+    },
+    {
+      "id": "J-start-held-by-1-64-out",
+      "inputs": {
+        "start": {
+          "box": {
+            "rect": {
+              "minX": 3000,
+              "minY": 2100,
+              "maxX": 4000,
+              "maxY": 3001
+            },
+            "neighbours": [
+              {
+                "minX": 1000,
+                "minY": 1000,
+                "maxX": 5000,
+                "maxY": 3000
+              }
+            ],
+            "paint": {
+              "minX": 900,
+              "minY": 900,
+              "maxX": 5100,
+              "maxY": 3101
+            },
+            "oneLineBox": false
+          }
+        },
+        "page": {
+          "W": 39168,
+          "H": 50688
+        }
+      },
+      "expected": {
+        "rect": {
+          "minX": 900,
+          "minY": 900,
+          "maxX": 5100,
+          "maxY": 3101
+        },
+        "clause": 4
+      }
+    },
+    {
+      "id": "J-start-not-held-by-two",
+      "inputs": {
+        "start": {
+          "box": {
+            "rect": {
+              "minX": 2000,
+              "minY": 2000,
+              "maxX": 3000,
+              "maxY": 2600
+            },
+            "neighbours": [
+              {
+                "minX": 1000,
+                "minY": 2000,
+                "maxX": 2500,
+                "maxY": 2600
+              },
+              {
+                "minX": 2500,
+                "minY": 2000,
+                "maxX": 4000,
+                "maxY": 2600
+              }
+            ],
+            "paint": {
+              "minX": 900,
+              "minY": 1800,
+              "maxX": 4100,
+              "maxY": 2800
+            },
+            "oneLineBox": true
+          }
+        },
+        "page": {
+          "W": 39168,
+          "H": 50688
+        }
+      },
+      "expected": {
+        "rect": {
+          "minX": 2000,
+          "minY": 1800,
+          "maxX": 3000,
+          "maxY": 2800
+        },
+        "clause": 3
+      }
+    },
+    {
+      "id": "J-start-personal",
+      "inputs": {
+        "start": {
+          "box": {
+            "rect": {
+              "minX": 31338,
+              "minY": 40124,
+              "maxX": 33613,
+              "maxY": 40783
+            },
+            "neighbours": [
+              {
+                "minX": 33758,
+                "minY": 40124,
+                "maxX": 36224,
+                "maxY": 40783
+              }
+            ],
+            "paint": {
+              "minX": 31240,
+              "minY": 40062,
+              "maxX": 36469,
+              "maxY": 40987
+            },
+            "oneLineBox": true
+          }
+        },
+        "page": {
+          "W": 39168,
+          "H": 50688
+        }
+      },
+      "expected": {
+        "rect": {
+          "minX": 31240,
+          "minY": 40062,
+          "maxX": 33758,
+          "maxY": 40987
+        },
+        "clause": 3
+      }
+    },
+    {
+      "id": "J-start-checking",
+      "inputs": {
+        "start": {
+          "box": {
+            "rect": {
+              "minX": 33758,
+              "minY": 40124,
+              "maxX": 36224,
+              "maxY": 40783
+            },
+            "neighbours": [
+              {
+                "minX": 31338,
+                "minY": 40124,
+                "maxX": 33613,
+                "maxY": 40783
+              }
+            ],
+            "paint": {
+              "minX": 31240,
+              "minY": 40062,
+              "maxX": 36469,
+              "maxY": 40987
+            },
+            "oneLineBox": true
+          }
+        },
+        "page": {
+          "W": 39168,
+          "H": 50688
+        }
+      },
+      "expected": {
+        "rect": {
+          "minX": 33613,
+          "minY": 40062,
+          "maxX": 36469,
+          "maxY": 40987
+        },
+        "clause": 3
+      }
+    },
+    {
+      "id": "J-start-middle-of-three",
+      "inputs": {
+        "start": {
+          "box": {
+            "rect": {
+              "minX": 2200,
+              "minY": 2000,
+              "maxX": 3100,
+              "maxY": 2600
+            },
+            "neighbours": [
+              {
+                "minX": 1000,
+                "minY": 2000,
+                "maxX": 2000,
+                "maxY": 2600
+              },
+              {
+                "minX": 3300,
+                "minY": 2000,
+                "maxX": 4400,
+                "maxY": 2600
+              }
+            ],
+            "paint": {
+              "minX": 900,
+              "minY": 1900,
+              "maxX": 4500,
+              "maxY": 2700
+            },
+            "oneLineBox": true
+          }
+        },
+        "page": {
+          "W": 39168,
+          "H": 50688
+        }
+      },
+      "expected": {
+        "rect": {
+          "minX": 2000,
+          "minY": 1900,
+          "maxX": 3300,
+          "maxY": 2700
+        },
+        "clause": 3
+      }
+    },
+    {
+      "id": "J-start-end-of-three",
+      "inputs": {
+        "start": {
+          "box": {
+            "rect": {
+              "minX": 3300,
+              "minY": 2000,
+              "maxX": 4400,
+              "maxY": 2600
+            },
+            "neighbours": [
+              {
+                "minX": 1000,
+                "minY": 2000,
+                "maxX": 2000,
+                "maxY": 2600
+              },
+              {
+                "minX": 2200,
+                "minY": 2000,
+                "maxX": 3100,
+                "maxY": 2600
+              }
+            ],
+            "paint": {
+              "minX": 900,
+              "minY": 1900,
+              "maxX": 4500,
+              "maxY": 2700
+            },
+            "oneLineBox": true
+          }
+        },
+        "page": {
+          "W": 39168,
+          "H": 50688
+        }
+      },
+      "expected": {
+        "rect": {
+          "minX": 3100,
+          "minY": 1900,
+          "maxX": 4500,
+          "maxY": 2700
+        },
+        "clause": 3
+      }
+    },
+    {
+      "id": "J-start-touching-left",
+      "inputs": {
+        "start": {
+          "box": {
+            "rect": {
+              "minX": 2000,
+              "minY": 2000,
+              "maxX": 3000,
+              "maxY": 2600
+            },
+            "neighbours": [
+              {
+                "minX": 1000,
+                "minY": 2000,
+                "maxX": 2000,
+                "maxY": 2600
+              }
+            ],
+            "paint": {
+              "minX": 900,
+              "minY": 1900,
+              "maxX": 3100,
+              "maxY": 2700
+            },
+            "oneLineBox": true
+          }
+        },
+        "page": {
+          "W": 39168,
+          "H": 50688
+        }
+      },
+      "expected": {
+        "rect": {
+          "minX": 2000,
+          "minY": 1900,
+          "maxX": 3100,
+          "maxY": 2700
+        },
+        "clause": 3
+      }
+    },
+    {
+      "id": "J-start-touching-right",
+      "inputs": {
+        "start": {
+          "box": {
+            "rect": {
+              "minX": 1000,
+              "minY": 2000,
+              "maxX": 2000,
+              "maxY": 2600
+            },
+            "neighbours": [
+              {
+                "minX": 2000,
+                "minY": 2000,
+                "maxX": 3000,
+                "maxY": 2600
+              }
+            ],
+            "paint": {
+              "minX": 900,
+              "minY": 1900,
+              "maxX": 3100,
+              "maxY": 2700
+            },
+            "oneLineBox": true
+          }
+        },
+        "page": {
+          "W": 39168,
+          "H": 50688
+        }
+      },
+      "expected": {
+        "rect": {
+          "minX": 900,
+          "minY": 1900,
+          "maxX": 2000,
+          "maxY": 2700
+        },
+        "clause": 3
+      }
+    },
+    {
+      "id": "J-start-overlap-sticks-out-right",
+      "inputs": {
+        "start": {
+          "box": {
+            "rect": {
+              "minX": 1000,
+              "minY": 2000,
+              "maxX": 2000,
+              "maxY": 2600
+            },
+            "neighbours": [
+              {
+                "minX": 1900,
+                "minY": 2000,
+                "maxX": 3000,
+                "maxY": 2600
+              }
+            ],
+            "paint": {
+              "minX": 900,
+              "minY": 1900,
+              "maxX": 3100,
+              "maxY": 2700
+            },
+            "oneLineBox": true
+          }
+        },
+        "page": {
+          "W": 39168,
+          "H": 50688
+        }
+      },
+      "expected": {
+        "rect": {
+          "minX": 900,
+          "minY": 1900,
+          "maxX": 2000,
+          "maxY": 2700
+        },
+        "clause": 3
+      }
+    },
+    {
+      "id": "J-start-overlap-sticks-out-left",
+      "inputs": {
+        "start": {
+          "box": {
+            "rect": {
+              "minX": 2000,
+              "minY": 2000,
+              "maxX": 3000,
+              "maxY": 2600
+            },
+            "neighbours": [
+              {
+                "minX": 1000,
+                "minY": 2000,
+                "maxX": 2100,
+                "maxY": 2600
+              }
+            ],
+            "paint": {
+              "minX": 900,
+              "minY": 1900,
+              "maxX": 3100,
+              "maxY": 2700
+            },
+            "oneLineBox": true
+          }
+        },
+        "page": {
+          "W": 39168,
+          "H": 50688
+        }
+      },
+      "expected": {
+        "rect": {
+          "minX": 2000,
+          "minY": 1900,
+          "maxX": 3100,
+          "maxY": 2700
+        },
+        "clause": 3
+      }
+    },
+    {
+      "id": "J-start-edge-shared-left",
+      "inputs": {
+        "start": {
+          "box": {
+            "rect": {
+              "minX": 1000,
+              "minY": 2000,
+              "maxX": 3000,
+              "maxY": 2600
+            },
+            "neighbours": [
+              {
+                "minX": 1000,
+                "minY": 2000,
+                "maxX": 2000,
+                "maxY": 2600
+              }
+            ],
+            "paint": {
+              "minX": 900,
+              "minY": 1900,
+              "maxX": 3100,
+              "maxY": 2700
+            },
+            "oneLineBox": true
+          }
+        },
+        "page": {
+          "W": 39168,
+          "H": 50688
+        }
+      },
+      "expected": {
+        "rect": {
+          "minX": 900,
+          "minY": 1900,
+          "maxX": 3100,
+          "maxY": 2700
+        },
+        "clause": 3
+      }
+    },
+    {
+      "id": "J-start-edge-shared-right",
+      "inputs": {
+        "start": {
+          "box": {
+            "rect": {
+              "minX": 1000,
+              "minY": 2000,
+              "maxX": 3000,
+              "maxY": 2600
+            },
+            "neighbours": [
+              {
+                "minX": 2000,
+                "minY": 2000,
+                "maxX": 3000,
+                "maxY": 2600
+              }
+            ],
+            "paint": {
+              "minX": 900,
+              "minY": 1900,
+              "maxX": 3100,
+              "maxY": 2700
+            },
+            "oneLineBox": true
+          }
+        },
+        "page": {
+          "W": 39168,
+          "H": 50688
+        }
+      },
+      "expected": {
+        "rect": {
+          "minX": 900,
+          "minY": 1900,
+          "maxX": 3100,
+          "maxY": 2700
+        },
+        "clause": 3
+      }
+    },
+    {
+      "id": "J-start-nearest-cut",
+      "inputs": {
+        "start": {
+          "box": {
+            "rect": {
+              "minX": 1000,
+              "minY": 2000,
+              "maxX": 2000,
+              "maxY": 2600
+            },
+            "neighbours": [
+              {
+                "minX": 1900,
+                "minY": 2000,
+                "maxX": 2050,
+                "maxY": 2600
+              },
+              {
+                "minX": 2100,
+                "minY": 2000,
+                "maxX": 2500,
+                "maxY": 2600
+              }
+            ],
+            "paint": {
+              "minX": 900,
+              "minY": 1900,
+              "maxX": 2600,
+              "maxY": 2700
+            },
+            "oneLineBox": true
+          }
+        },
+        "page": {
+          "W": 39168,
+          "H": 50688
+        }
+      },
+      "expected": {
+        "rect": {
+          "minX": 900,
+          "minY": 1900,
+          "maxX": 2000,
+          "maxY": 2700
+        },
+        "clause": 3
+      }
+    },
+    {
+      "id": "J-start-bridge",
+      "inputs": {
+        "start": {
+          "box": {
+            "rect": {
+              "minX": 2000,
+              "minY": 2000,
+              "maxX": 3000,
+              "maxY": 2600
+            },
+            "neighbours": [
+              {
+                "minX": 1000,
+                "minY": 2000,
+                "maxX": 2100,
+                "maxY": 2600
+              },
+              {
+                "minX": 2900,
+                "minY": 2000,
+                "maxX": 4000,
+                "maxY": 2600
+              }
+            ],
+            "paint": {
+              "minX": 900,
+              "minY": 1900,
+              "maxX": 4100,
+              "maxY": 2700
+            },
+            "oneLineBox": true
+          }
+        },
+        "page": {
+          "W": 39168,
+          "H": 50688
+        }
+      },
+      "expected": {
+        "rect": {
+          "minX": 2000,
+          "minY": 1900,
+          "maxX": 3000,
+          "maxY": 2700
+        },
+        "clause": 3
+      }
+    },
+    {
+      "id": "J-start-poke-one-line",
+      "inputs": {
+        "start": {
+          "box": {
+            "rect": {
+              "minX": 3000,
+              "minY": 2100,
+              "maxX": 4000,
+              "maxY": 2601
+            },
+            "neighbours": [
+              {
+                "minX": 1000,
+                "minY": 2000,
+                "maxX": 5000,
+                "maxY": 2600
+              }
+            ],
+            "paint": {
+              "minX": 900,
+              "minY": 1900,
+              "maxX": 5100,
+              "maxY": 2701
+            },
+            "oneLineBox": true
+          }
+        },
+        "page": {
+          "W": 39168,
+          "H": 50688
+        }
+      },
+      "expected": {
+        "rect": {
+          "minX": 900,
+          "minY": 1900,
+          "maxX": 5100,
+          "maxY": 2701
+        },
+        "clause": 4
+      }
+    },
+    {
+      "id": "J-start-not-level",
+      "inputs": {
+        "start": {
+          "box": {
+            "rect": {
+              "minX": 1000,
+              "minY": 2000,
+              "maxX": 2000,
+              "maxY": 2600
+            },
+            "neighbours": [
+              {
+                "minX": 2000,
+                "minY": 1990,
+                "maxX": 3000,
+                "maxY": 2610
+              }
+            ],
+            "paint": {
+              "minX": 900,
+              "minY": 1890,
+              "maxX": 3100,
+              "maxY": 2710
+            },
+            "oneLineBox": true
+          }
+        },
+        "page": {
+          "W": 39168,
+          "H": 50688
+        }
+      },
+      "expected": {
+        "rect": {
+          "minX": 900,
+          "minY": 1890,
+          "maxX": 3100,
+          "maxY": 2710
+        },
+        "clause": 4
+      }
+    },
+    {
+      "id": "J-start-level-off-by-one",
+      "inputs": {
+        "start": {
+          "box": {
+            "rect": {
+              "minX": 1000,
+              "minY": 2000,
+              "maxX": 2000,
+              "maxY": 2600
+            },
+            "neighbours": [
+              {
+                "minX": 2000,
+                "minY": 1999,
+                "maxX": 3000,
+                "maxY": 2600
+              }
+            ],
+            "paint": {
+              "minX": 900,
+              "minY": 1899,
+              "maxX": 3100,
+              "maxY": 2700
+            },
+            "oneLineBox": true
+          }
+        },
+        "page": {
+          "W": 39168,
+          "H": 50688
+        }
+      },
+      "expected": {
+        "rect": {
+          "minX": 900,
+          "minY": 1899,
+          "maxX": 3100,
+          "maxY": 2700
+        },
+        "clause": 4
+      }
+    },
+    {
+      "id": "J-start-poke-several-lines",
+      "inputs": {
+        "start": {
+          "box": {
+            "rect": {
+              "minX": 3000,
+              "minY": 2100,
+              "maxX": 4000,
+              "maxY": 3001
+            },
+            "neighbours": [
+              {
+                "minX": 1000,
+                "minY": 1000,
+                "maxX": 5000,
+                "maxY": 3000
+              }
+            ],
+            "paint": {
+              "minX": 900,
+              "minY": 900,
+              "maxX": 5100,
+              "maxY": 3101
+            },
+            "oneLineBox": false
+          }
+        },
+        "page": {
+          "W": 39168,
+          "H": 50688
+        }
+      },
+      "expected": {
+        "rect": {
+          "minX": 900,
+          "minY": 900,
+          "maxX": 5100,
+          "maxY": 3101
+        },
+        "clause": 4
+      }
+    },
+    {
+      "id": "J-start-stickout",
+      "inputs": {
+        "start": {
+          "box": {
+            "rect": {
+              "minX": 4000,
+              "minY": 2100,
+              "maxX": 6000,
+              "maxY": 2500
+            },
+            "neighbours": [
+              {
+                "minX": 1000,
+                "minY": 1000,
+                "maxX": 5000,
+                "maxY": 3000
+              }
+            ],
+            "paint": {
+              "minX": 900,
+              "minY": 900,
+              "maxX": 6100,
+              "maxY": 3100
+            },
+            "oneLineBox": false
+          }
+        },
+        "page": {
+          "W": 39168,
+          "H": 50688
+        }
+      },
+      "expected": {
+        "rect": {
+          "minX": 900,
+          "minY": 900,
+          "maxX": 6100,
+          "maxY": 3100
+        },
+        "clause": 4
+      }
+    },
+    {
+      "id": "J-start-one-line-holding-a-letter",
+      "inputs": {
+        "start": {
+          "box": {
+            "rect": {
+              "minX": 1000,
+              "minY": 2000,
+              "maxX": 2000,
+              "maxY": 2600
+            },
+            "neighbours": [
+              {
+                "minX": 2000,
+                "minY": 2000,
+                "maxX": 3000,
+                "maxY": 2600
+              }
+            ],
+            "paint": {
+              "minX": 900,
+              "minY": 1900,
+              "maxX": 3100,
+              "maxY": 3400
+            },
+            "oneLineBox": false
+          }
+        },
+        "page": {
+          "W": 39168,
+          "H": 50688
+        }
+      },
+      "expected": {
+        "rect": {
+          "minX": 900,
+          "minY": 1900,
+          "maxX": 3100,
+          "maxY": 3400
+        },
+        "clause": 4
+      }
+    },
+    {
+      "id": "J-start-E4-level-by-tight",
+      "inputs": {
+        "start": {
+          "box": {
+            "rect": {
+              "minX": 9600,
+              "minY": 26112,
+              "maxX": 12160,
+              "maxY": 26881
+            },
+            "neighbours": [
+              {
+                "minX": 12352,
+                "minY": 26112,
+                "maxX": 15360,
+                "maxY": 26881
+              }
+            ],
+            "paint": {
+              "minX": 9523,
+              "minY": 26062,
+              "maxX": 15553,
+              "maxY": 27042
+            },
+            "oneLineBox": true,
+            "tight": {
+              "minX": 9600,
+              "minY": 26111,
+              "maxX": 12160,
+              "maxY": 26881
+            },
+            "neighbourTights": [
+              {
+                "minX": 12352,
+                "minY": 26112,
+                "maxX": 15360,
+                "maxY": 26881
+              }
+            ]
+          }
+        },
+        "page": {
+          "W": 39168,
+          "H": 50688
+        }
+      },
+      "expected": {
+        "rect": {
+          "minX": 9523,
+          "minY": 26062,
+          "maxX": 15553,
+          "maxY": 27042
+        },
+        "clause": 4
+      }
+    },
+    {
+      "id": "J-start-E2-equal-not-held",
+      "inputs": {
+        "start": {
+          "box": {
+            "rect": {
+              "minX": 12800,
+              "minY": 24320,
+              "maxX": 14720,
+              "maxY": 25088
+            },
+            "neighbours": [
+              {
+                "minX": 12800,
+                "minY": 24320,
+                "maxX": 14720,
+                "maxY": 25088
+              }
+            ],
+            "paint": {
+              "minX": 12723,
+              "minY": 24272,
+              "maxX": 14912,
+              "maxY": 25248
+            },
+            "oneLineBox": true
+          }
+        },
+        "page": {
+          "W": 39168,
+          "H": 50688
+        }
+      },
+      "expected": {
+        "rect": {
+          "minX": 12723,
+          "minY": 24272,
+          "maxX": 14912,
+          "maxY": 25248
+        },
+        "clause": 3
+      }
+    },
+    {
+      "id": "J-start-E2-equal-several-lines",
+      "inputs": {
+        "start": {
+          "box": {
+            "rect": {
+              "minX": 12800,
+              "minY": 24320,
+              "maxX": 14720,
+              "maxY": 25088
+            },
+            "neighbours": [
+              {
+                "minX": 12800,
+                "minY": 24320,
+                "maxX": 14720,
+                "maxY": 25088
+              }
+            ],
+            "paint": {
+              "minX": 12723,
+              "minY": 24272,
+              "maxX": 14912,
+              "maxY": 25248
+            },
+            "oneLineBox": false
+          }
+        },
+        "page": {
+          "W": 39168,
+          "H": 50688
+        }
+      },
+      "expected": {
+        "rect": {
+          "minX": 12723,
+          "minY": 24272,
+          "maxX": 14912,
+          "maxY": 25248
+        },
+        "clause": 4
+      }
+    },
+    {
+      "id": "J-start-mixed-309-not-level",
+      "inputs": {
+        "start": {
+          "box": {
+            "rect": {
+              "minX": 15614,
+              "minY": 9238,
+              "maxX": 18934,
+              "maxY": 10732
+            },
+            "neighbours": [
+              {
+                "minX": 10716,
+                "minY": 9243,
+                "maxX": 15362,
+                "maxY": 10457
+              }
+            ],
+            "paint": {
+              "minX": 10596,
+              "minY": 9163,
+              "maxX": 19234,
+              "maxY": 10760
+            },
+            "oneLineBox": true
+          }
+        },
+        "page": {
+          "W": 39168,
+          "H": 50688
+        }
+      },
+      "expected": {
+        "rect": {
+          "minX": 10596,
+          "minY": 9163,
+          "maxX": 19234,
+          "maxY": 10760
+        },
+        "clause": 4
+      }
+    },
+    {
+      "id": "J-start-columns-2224-not-level",
+      "inputs": {
+        "start": {
+          "box": {
+            "rect": {
+              "minX": 15038,
+              "minY": 15605,
+              "maxX": 15968,
+              "maxY": 16440
+            },
+            "neighbours": [
+              {
+                "minX": 11048,
+                "minY": 15594,
+                "maxX": 14668,
+                "maxY": 16451
+              }
+            ],
+            "paint": {
+              "minX": 10955,
+              "minY": 15536,
+              "maxX": 16199,
+              "maxY": 16644
+            },
+            "oneLineBox": true
+          }
+        },
+        "page": {
+          "W": 39168,
+          "H": 50688
+        }
+      },
+      "expected": {
+        "rect": {
+          "minX": 10955,
+          "minY": 15536,
+          "maxX": 16199,
+          "maxY": 16644
+        },
+        "clause": 4
+      }
+    },
+    {
+      "id": "J-start-pokedeep-5342-not-level",
+      "inputs": {
+        "start": {
+          "box": {
+            "rect": {
+              "minX": 20742,
+              "minY": 36194,
+              "maxX": 22193,
+              "maxY": 37194
+            },
+            "neighbours": [
+              {
+                "minX": 4554,
+                "minY": 36194,
+                "maxX": 22196,
+                "maxY": 36859
+              }
+            ],
+            "paint": {
+              "minX": 4488,
+              "minY": 36153,
+              "maxX": 22299,
+              "maxY": 37194
+            },
+            "oneLineBox": true
+          }
+        },
+        "page": {
+          "W": 39168,
+          "H": 50688
+        }
+      },
+      "expected": {
+        "rect": {
+          "minX": 4488,
+          "minY": 36153,
+          "maxX": 22299,
+          "maxY": 37194
+        },
+        "clause": 4
+      }
+    },
+    {
+      "id": "J-start-taller-region-not-level",
+      "inputs": {
+        "start": {
+          "box": {
+            "rect": {
+              "minX": 2491,
+              "minY": 32169,
+              "maxX": 7221,
+              "maxY": 33429
+            },
+            "neighbours": [
+              {
+                "minX": 7585,
+                "minY": 32167,
+                "maxX": 8971,
+                "maxY": 33416
+              },
+              {
+                "minX": 9336,
+                "minY": 32167,
+                "maxX": 14086,
+                "maxY": 33419
+              }
+            ],
+            "paint": {
+              "minX": 2368,
+              "minY": 32090,
+              "maxX": 14272,
+              "maxY": 33685
+            },
+            "oneLineBox": true
+          }
+        },
+        "page": {
+          "W": 39168,
+          "H": 50688
+        }
+      },
+      "expected": {
+        "rect": {
+          "minX": 2368,
+          "minY": 32090,
+          "maxX": 14272,
+          "maxY": 33685
+        },
+        "clause": 4
+      }
+    },
+    {
+      "id": "J-start-pokedeep-519-reach",
+      "inputs": {
+        "start": {
+          "box": {
+            "rect": {
+              "minX": 7198,
+              "minY": 14405,
+              "maxX": 8573,
+              "maxY": 17031
+            },
+            "neighbours": [
+              {
+                "minX": 3395,
+                "minY": 14405,
+                "maxX": 18148,
+                "maxY": 15647
+              }
+            ],
+            "paint": {
+              "minX": 3272,
+              "minY": 14328,
+              "maxX": 18283,
+              "maxY": 17031
+            },
+            "oneLineBox": false
+          }
+        },
+        "page": {
+          "W": 39168,
+          "H": 50688
+        }
+      },
+      "expected": {
+        "rect": {
+          "minX": 3272,
+          "minY": 14328,
+          "maxX": 18283,
+          "maxY": 17031
+        },
+        "clause": 4
+      }
+    }
+  ]
+}
