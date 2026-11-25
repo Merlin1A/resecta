@@ -15,11 +15,13 @@ struct FindingRowTests {
 
     static func layer(_ status: VerificationStatus, _ identity: VerificationLayer?, terms: [String]? = nil,
                       lines: [SearchRecheckQueryLine]? = nil, pages: [Int]? = nil, fragment: Bool = false,
-                      cnv: Bool = false, short: String = "Short line.") -> LayerResult {
+                      cnv: Bool = false, short: String = "Short line.", part: String? = nil,
+                      partPages: [Int]? = nil) -> LayerResult {
         LayerResult(name: identity?.name ?? "Page Count Check", symbolName: "shield", status: status,
                     shortDescription: short, detailDescription: "Detail line.", pageReferences: pages,
                     durationSeconds: 0, reviewTermTexts: terms, layer: identity, queryLines: lines,
-                    couldNotVerify: cnv, reviewIsFragment: fragment)
+                    couldNotVerify: cnv, reviewIsFragment: fragment, couldNotVerifyPart: part,
+                    couldNotVerifyPartPages: partPages)
     }
 
     static func report(_ layers: [LayerResult], modes: [PipelineMode] = []) -> VerificationReport {
@@ -142,7 +144,7 @@ struct FindingRowTests {
 
     @Test("Each kind's step: the Secure step only where a Secure export does not run the check, the remedy by its count")
     func stepsByKind() throws {
-        // Kind 1: the Secure step on exactly the checks a Secure export does not run.
+        // A failed check: the Secure step on exactly the checks a Secure export does not run.
         var withStep = 0
         for identity in VerificationLayer.allCases {
             let report = Self.report([Self.layer(.fail("f"), identity)])
@@ -157,12 +159,12 @@ struct FindingRowTests {
         let gate = Self.report([Self.layer(.fail("f"), nil)])
         #expect(Model.step(try Self.only(gate), report: gate, previewAvailable: true) == nil)
 
-        // Kind 2: no step.
+        // Boxed text still readable: no step.
         let words = Self.report([Self.layer(.attention("a"), .binaryStringSearch, terms: ["a"], pages: [0])])
         #expect(Model.step(try Self.only(words), report: words, previewAvailable: true) == nil)
 
-        // Kind 3: the shipped remedy, its form by the count of words, as the
-        // tail of the shipped caption.
+        // Part of boxed text beside its box: the shipped remedy, its form by
+        // the count of words, as the tail of the shipped caption.
         let one = Self.report([Self.layer(.attention("a"), .ocrCheck, terms: ["a"], pages: [0], fragment: true)])
         let two = Self.report([Self.layer(.attention("a"), .ocrCheck, terms: ["a", "b"], pages: [0], fragment: true)])
         let none = Self.report([Self.layer(.fail("f"), .searchRecheck, pages: [0])])
@@ -179,13 +181,14 @@ struct FindingRowTests {
         #expect(VerificationRowModel.adjustTheBoxRemedy == "Adjust the box and redact again.")
         #expect(VerificationRowModel.adjustTheBoxesRemedy == "Adjust the boxes and redact again.")
 
-        // Kind 4: the shipped lead of the check.
+        // Searches that still match: the shipped lead of the check.
         let searchLayer = Self.layer(.attention("a"), .searchRecheck, lines: [Self.search("“a”", remaining: 1)], pages: [0])
         let searches = Self.report([searchLayer])
         let lead = VerificationRowModel.lead(for: searchLayer, outcome: .needsReview, perPageModes: [])
         #expect(Model.step(try Self.only(searches), report: searches, previewAvailable: true) == .sentence(lead[0]))
 
-        // Kinds 5 and 6: Review in Scan on the Detection Sweep, by kind;
+        // Another check that needs review, and possible items left: Review
+        // in Scan on the Detection Sweep, by kind;
         // nothing on another check that needs review.
         let sweep = Self.report([Self.layer(.attention("a"), .detectionSweep, lines: [Self.sweepLine], pages: [0])])
         let sweepNothingLeft = Self.report([Self.layer(.attention("a"), .detectionSweep, pages: [0])])
@@ -197,7 +200,8 @@ struct FindingRowTests {
         #expect(Model.step(try Self.only(items), report: items, previewAvailable: true) == .reviewInScan)
         #expect(Model.step(try Self.only(other), report: other, previewAvailable: true) == nil)
 
-        // Kind 7: look at the page in Preview, while the PDF exists.
+        // Checks that could not run in full on named pages: look at the page
+        // in Preview, while the PDF exists.
         let onePage = Self.report([Self.layer(.warn("w"), .ocrCheck, pages: [2], cnv: true)])
         let twoPages = Self.report([Self.layer(.warn("w"), .ocrCheck, pages: [2, 4], cnv: true)])
         #expect(Model.step(try Self.only(onePage), report: onePage, previewAvailable: true)
@@ -261,31 +265,113 @@ struct FindingRowTests {
 
     // MARK: - One place for every check
 
-    @Test("Every check has one place; every check that makes Share ask is named by exactly one line of the findings")
+    /// Built reports with a failed or needs-review check that could not read
+    /// part of its input: no seeded report has one.
+    static var withUnreadParts: [(key: String, value: VerificationReport)] {
+        [(key: "failed, its part on a page",
+          value: report([layer(.fail("f"), .metadataCheck, pages: [0], part: "1 page could not be checked: 2",
+                               partPages: [1]),
+                         layer(.warn("w"), .ocrCheck, pages: [3], cnv: true)])),
+         (key: "needs review, its part on no page",
+          value: report([layer(.attention("a"), .structureCheck, pages: [0], part: "Could not inspect metadata",
+                               partPages: [])])),
+         (key: "part of boxed text, its part on a page",
+          value: report([layer(.attention("a"), .ocrCheck, terms: ["a"], pages: [0], fragment: true,
+                               part: "1 page could not be checked: 3", partPages: [2])]))]
+    }
+
+    @Test("Every check has one place; every check that makes Share ask is named by one line of the findings, or two where the second is its unread part")
     func everyCheckHasOnePlace() {
-        var examined = 0, named = 0
-        for (name, report) in Fixtures.all.sorted(by: { $0.key < $1.key }) {
+        var examined = 0, named = 0, withPart = 0
+        let seeded = Fixtures.all.sorted(by: { $0.key < $1.key })
+        for (name, report) in seeded + Self.withUnreadParts {
             let partition = VerificationLayerPartition(layers: report.layers, perPageModes: report.perPageModes)
             let placed = Section.groups(partition).flatMap(\.indices) + Section.listRowMembers(partition)
             #expect(placed.sorted() == Array(report.layers.indices), "\(name)")
             let problems = VerificationProblemModel.derive(report: report, coveredPages: [], formValueCount: 0)
-            var lines: [Int] = []
+            var lines: [(index: Int, line: String)] = []
             for problem in problems {
                 if problem.kind == .failedCheck || problem.kind == .possibleItems {
-                    lines += problem.checks.map(\.layerIndex)
+                    let main = Model.mainLine(problem, report: report, previewAvailable: false)
+                    lines += problem.checks.map { (index: $0.layerIndex, line: main) }
                 } else {
-                    lines += Model.checkLines(problem, report: report).map(\.layerIndex)
+                    lines += Model.checkLines(problem, report: report).map { (index: $0.layerIndex, line: $0.line) }
                 }
             }
+            let isSeeded = Fixtures.all[name] != nil
             for index in report.layers.indices where partition.outcomes[index].gatesSharing {
-                #expect(lines.filter { $0 == index }.count == 1, "\(name) check \(index)")
-                named += 1
+                let mine = lines.filter { $0.index == index }.map(\.line)
+                if let part = DocumentEditorView.couldNotVerifyPartLine(layer: report.layers[index]) {
+                    #expect(mine.count == 2, "\(name) check \(index)")
+                    #expect(mine.filter { $0 == part }.count == 1, "\(name) check \(index): its unread part")
+                    withPart += 1
+                } else {
+                    #expect(mine.count == 1, "\(name) check \(index)")
+                }
+                named += isSeeded ? 1 : 0
             }
-            examined += 1
+            examined += isSeeded ? 1 : 0
         }
-        print("[problem-places] seeded reports \(examined), checks that make Share ask \(named)")
+        print("[problem-places] seeded reports \(examined), checks that make Share ask \(named), "
+              + "built checks with an unread part \(withPart)")
         #expect(examined == 18)
-        #expect(named > 0)
+        #expect(named == 23, "the seeded reports' checks that make Share ask")
+        #expect(withPart == 3)
+    }
+
+    // MARK: - A check's unread part
+
+    @Test("A failed or needs-review check that could not read part of its input: a row of its own says that part as the Share sheet prints it")
+    func theUnreadPartHasARowOfItsOwn() throws {
+        // A failed check whose part is on a page: its own row, and the part
+        // among the checks that could not run in full.
+        let part = "1 page could not be checked: 2"
+        let failed = Self.report([Self.layer(.fail("f"), .metadataCheck, pages: [0], part: part, partPages: [1])])
+        let problems = VerificationProblemModel.derive(report: failed, coveredPages: [], formValueCount: 0)
+        #expect(problems.map(\.kind) == [.failedCheck, .couldNotRunOnPages])
+        try #require(problems.count == 2)
+        let unread = problems[1]
+        #expect(problems[0].checks.map(\.outcome) == [.failed] && problems[0].pages == [0])
+        #expect(unread.checks == [Problem.Check(layerIndex: 0, outcome: .couldNotVerify, pages: [1], words: [],
+                                                sentence: part)])
+        #expect(unread.pages == [1] && unread.mark == .couldNotVerify && unread.count == 1 && unread.words.isEmpty)
+        let sheet = DocumentEditorView.couldNotVerifyItemLines(report: failed)
+        #expect(sheet == ["Document Metadata: could not verify on\u{00A0}page\u{00A0}2"])
+        let lines = Model.checkLines(unread, report: failed)
+        #expect(lines.map(\.line) == sheet)
+        #expect(lines.map(\.sentence) == [part])
+        #expect(lines.allSatisfy { $0.words.isEmpty && $0.stopLines.isEmpty })
+        #expect(Model.mainLine(unread, report: failed, previewAvailable: true)
+                == Model.couldNotRunInFull(checks: 1, pages: [1]))
+        #expect(Model.chipPages(unread, isOpen: true) == [1])
+        #expect(Model.step(unread, report: failed, previewAvailable: true) == .sentence(Model.lookAtThatPage))
+
+        // A check that needs review whose part names no page: its own row as
+        // it is without the part, and the part as a check that could not finish.
+        let whole = "Could not inspect metadata"
+        let review = Self.report([Self.layer(.attention("a"), .structureCheck, pages: [0], part: whole, partPages: [])])
+        let without = Self.report([Self.layer(.attention("a"), .structureCheck, pages: [0])])
+        let two = VerificationProblemModel.derive(report: review, coveredPages: [], formValueCount: 0)
+        #expect(two.map(\.kind) == [.otherNeedsReview, .couldNotFinish])
+        try #require(two.count == 2)
+        let alone = try Self.only(without)
+        #expect(two[0] == alone)
+        #expect(Model.mainLine(two[0], report: review, previewAvailable: true)
+                == Model.mainLine(alone, report: without, previewAvailable: true))
+        let finish = two[1]
+        #expect(finish.id == "couldNotFinish-0" && finish.pages.isEmpty)
+        #expect(finish.checks.map(\.outcome) == [.couldNotVerify] && finish.checks.map(\.sentence) == [whole])
+        let reviewSheet = DocumentEditorView.couldNotVerifyItemLines(report: review)
+        #expect(reviewSheet == ["Active Content & Structure: could not verify"])
+        #expect(Model.mainLine(finish, report: review, previewAvailable: true) == reviewSheet.first)
+        #expect(Model.subLine(finish, report: review) == whole)
+        #expect(Model.checkLines(finish, report: review).map(\.line) == reviewSheet)
+        #expect(Model.step(finish, report: review, previewAvailable: true) == nil)
+
+        // A check that could not verify on its own, with no failure or
+        // review: one entry, as before.
+        let warn = Self.report([Self.layer(.warn("w"), .ocrCheck, pages: [3], cnv: true)])
+        #expect(try Self.only(warn).kind == .couldNotRunOnPages)
     }
 
     // MARK: - Every word can be read
@@ -308,7 +394,7 @@ struct FindingRowTests {
 
     // MARK: - Pages
 
-    @Test("Pages: closed, at most five chips or four and +n more; opened, every page; kind 7 lists every page")
+    @Test("Pages: closed, at most five chips or four and +n more; opened, every page; a row of checks that could not run in full names every page")
     func pagesAreCapped() throws {
         let report = Self.report([Self.layer(.attention("a"), .binaryStringSearch, terms: ["a"], pages: Array(0..<12))])
         let problem = try Self.only(report)
@@ -426,6 +512,22 @@ struct FindingRowTests {
         #expect(!source.contains("\"Could not verify\""))
         #expect(!source.contains("\"Incomplete\""))
         #expect(source.contains("\"Findings\""))
+    }
+
+    @Test("Source pin: a page chip answers a tap anywhere in its 46-pt touch target, its hit frame set before its tap shape")
+    func pageChipKeepsItsTouchTarget() throws {
+        let source = try String(contentsOf: URL(fileURLWithPath: "\(#filePath)")
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/ResectaApp/Views/PageChip.swift"), encoding: .utf8)
+        let lines = source.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
+        let capsule = try #require(lines.firstIndex { $0.hasPrefix(".background(") && $0.contains("Capsule()") })
+        let frame = try #require(lines.firstIndex { $0 == ".frame(minHeight: ResectaTokens.TouchTarget.minimum)" })
+        let shape = try #require(lines.firstIndex { $0 == ".contentShape(Rectangle())" })
+        let pull = try #require(lines.firstIndex {
+            $0.hasPrefix(".padding(.vertical, -(ResectaTokens.TouchTarget.minimum - ResectaTokens.Results.chipHeight)")
+        })
+        #expect(capsule < frame && frame < shape && shape < pull)
+        #expect(ResectaTokens.TouchTarget.minimum == 46)
     }
 
     // MARK: - The results view's two values

@@ -346,8 +346,8 @@ struct VerificationResultsActionsTests {
         print("[list-row] seeded reports \(examined), with checks that had nothing to check in the row \(joined), "
               + "with a plain warning outside it \(warned)")
         #expect(examined == 18)
-        #expect(joined > 0)
-        #expect(warned > 0)
+        #expect(joined == 6, "the seeded reports whose row takes in checks that had nothing to check")
+        #expect(warned == 4, "the seeded reports with a plain warning outside the row")
         // A run where every check passed: one row holding every check, closed.
         let clean = partition(Fixtures.secureAllPass)
         #expect(VerificationDetailsSection.listRowMembers(clean) == Array(Fixtures.secureAllPass.layers.indices))

@@ -107,6 +107,7 @@ enum FindingRowModel {
         case .couldNotRunOnPages:
             return couldNotRunInFull(checks: problem.count ?? problem.checks.count, pages: problem.pages)
         case .couldNotFinish:
+            if let part = unreadPartLine(problem.checks.first, report: report) { return part }
             return factLine(first, outcome: "could not verify", withoutPages: chips)
         case .skippedChecks:
             return skippedChecks(problem.count ?? problem.checks.count)
@@ -119,8 +120,12 @@ enum FindingRowModel {
                         fits: (String) -> Bool = { _ in true }) -> String? {
         let first = problem.checks.first.map { report.layers[$0.layerIndex] }
         switch problem.kind {
-        case .failedCheck, .couldNotFinish:
+        case .failedCheck:
             return first?.shortDescription
+        case .couldNotFinish:
+            // The check's own sentence, or the sentence of the part it could
+            // not read.
+            return problem.checks.first?.sentence
         case .otherNeedsReview:
             return first?.layer == .detectionSweep ? nil : first?.shortDescription
         case .coveredTextInOriginal:
@@ -206,6 +211,12 @@ enum FindingRowModel {
         let wordKind = problem.kind == .boxedTextReadable || problem.kind == .partOfBoxedText
         let sentenceKind = problem.kind == .couldNotRunOnPages || problem.kind == .couldNotFinish
         return problem.checks.map { check in
+            // The part a failed or needs-review check could not read: the
+            // share sheet's line for that part, its sentence, nothing else.
+            if let part = unreadPartLine(check, report: report) {
+                return CheckLine(layerIndex: check.layerIndex, line: part, sentence: sentenceKind ? check.sentence : nil,
+                                 words: [], stopLines: [])
+            }
             let layer = report.layers[check.layerIndex]
             let line = layer.status.isSkipped
                 ? "\(VerificationRowModel.title(for: layer)): skipped"
@@ -226,6 +237,14 @@ enum FindingRowModel {
     }
 
     // MARK: - Helpers
+
+    /// The share sheet's line for the part a failed or needs-review check
+    /// could not read, when `check` is that part's entry: its outcome could
+    /// not verify while its check failed or needs review. Nil otherwise.
+    static func unreadPartLine(_ check: VerificationProblem.Check?, report: VerificationReport) -> String? {
+        guard let check, check.outcome == .couldNotVerify else { return nil }
+        return DocumentEditorView.couldNotVerifyPartLine(layer: report.layers[check.layerIndex])
+    }
 
     /// The share confirm's line for a check; while chips carry the pages, the
     /// same call on a copy of the result with no pages.
