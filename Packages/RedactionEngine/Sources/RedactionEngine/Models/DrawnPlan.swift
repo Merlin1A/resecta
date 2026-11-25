@@ -85,8 +85,17 @@ public struct DrawnPlan: Equatable, Sendable {
     /// (`DocumentState.pageReads`), so the two make the same plan.
     public init(pageIndex: Int, regions: [RedactionRegion], cropBox: CGSize, rotation: Int,
                 switchOn: Bool, exportDPI: Int, fillColor: FillColor, read: RunRecord.PageRead? = nil) {
+        self.init(pageIndex: pageIndex, regions: regions, cropBox: cropBox, rotation: rotation, switchOn: switchOn,
+                  exportDPI: exportDPI, fillColor: fillColor, read: read, source: RunRecord.planSource)
+    }
+
+    /// The same page under a plan source given here, as `RunRecord.Page`
+    /// takes one: the editor passes the run's own; a test can name another.
+    package init(pageIndex: Int, regions: [RedactionRegion], cropBox: CGSize, rotation: Int,
+                 switchOn: Bool, exportDPI: Int, fillColor: FillColor, read: RunRecord.PageRead?, source: PlanSource) {
         let plan = RunRecord.Page.makePlan(regions: regions.map(RunRecord.DrawnRegion.init(region:)),
-                                           cropBox: cropBox, rotation: rotation, switchOn: switchOn, read: read)
+                                           cropBox: cropBox, rotation: rotation, switchOn: switchOn, read: read,
+                                           source: source)
         self.init(pageIndex: pageIndex, switchOn: switchOn, exportDPI: exportDPI, fillColor: fillColor, plan: plan,
                   filledPixels: Self.filledPixels(regions: regions, cropBox: cropBox, rotation: rotation,
                                                   dpi: exportDPI),
