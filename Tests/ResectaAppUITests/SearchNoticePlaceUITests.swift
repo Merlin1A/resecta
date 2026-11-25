@@ -156,6 +156,8 @@ nonisolated final class SearchNoticePlaceUITests: XCTestCase {
         XCTAssertLessThan(notice.frame.minY, empty.frame.minY)
     }
 
+    // On the main actor: a screen snapshot is read there.
+    @MainActor
     func testANewRun_keepsTheNoticeInPlace() {
         launch(["--searchDetent=large", "--uitestNoticeSeed=tooLarge:6"])
         let notice = element("ocrSkipBanner")
