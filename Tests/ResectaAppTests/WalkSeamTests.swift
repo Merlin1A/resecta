@@ -34,6 +34,10 @@ struct WalkSeamTests {
             "Sources/ResectaApp/Views/Search/SearchAndRedactSheet+DegradeBanner.swift",
             "Sources/ResectaApp/Views/Search/SearchAndRedactSheet+SaveRegex.swift",
             "Sources/ResectaApp/Views/Search/SearchModal.swift",
+            "Sources/ResectaApp/Views/Search/SearchNoticePlace.swift",
+            "Sources/ResectaApp/Views/Search/SearchNoticePlaceView.swift",
+            "Sources/ResectaApp/Views/Search/NotSearchedDetailsSheet.swift",
+            "Sources/ResectaApp/Views/Search/SearchAndRedactSheet+Notices.swift",
         ] {
             let source = try loadRepoFile(path)
             #expect(!source.contains("requestCanvasScroll("),

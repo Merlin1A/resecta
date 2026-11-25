@@ -13,12 +13,15 @@ enum SearchModal: Identifiable {
     case rowRationale(rowID: UUID)
     /// Saved-searches recall list.
     case savedSearches
+    /// The notice place's details.
+    case noticeDetails
 
     var id: String {
         switch self {
         case .rationale(let request): return "rationale.\(request.id)"
         case .rowRationale(let rowID): return "rowRationale.\(rowID)"
         case .savedSearches: return "savedSearches"
+        case .noticeDetails: return "noticeDetails"
         }
     }
 }

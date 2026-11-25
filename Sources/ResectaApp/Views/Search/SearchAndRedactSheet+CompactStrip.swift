@@ -115,6 +115,10 @@ extension SearchAndRedactSheet {
             isSearching: searchState.isSearching, found: searchState.totalCount))
             .font(.headline)
             .lineLimit(1)
+            // The notice mark stands before the title without moving it.
+            .overlay(alignment: .leading) {
+                stripNoticeMark.alignmentGuide(.leading) { $0[.trailing] }
+            }
     }
 
     /// "Scanning… N found" while a Scan runs; the interface name otherwise.

@@ -17,17 +17,6 @@ struct SearchFooterSection: View {
 
     var body: some View {
         VStack(spacing: ResectaTokens.Spacing.xxs) {
-            if searchState.resultsAtCap {
-                // The cap banner carries the unscanned remainder
-                // so "showing first N" stops reading as full coverage.
-                Text(Self.capBannerText(
-                    resultCount: searchState.totalCount,
-                    unscannedPageCount: searchState.capUnscannedPageCount,
-                    interface: searchState.searchModeType.interface
-                ))
-                    .font(.caption)
-                    .foregroundStyle(ResectaTokens.SemanticColor.warnText)
-            }
             HStack {
                 // One label family for the whole surface: "M of N
                 // selected" in every state (the zero state
