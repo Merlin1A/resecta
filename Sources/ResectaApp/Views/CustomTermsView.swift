@@ -276,6 +276,7 @@ struct AddTermRow: View {
                 TextField(placeholder, text: $pattern)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled(true)
+                    .writingToolsBehavior(.disabled)
                     .focused($isFocused)
                     .disabled(isAtCap || submitInFlight)
                     .onSubmit { Task { await submit() } }
