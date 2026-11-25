@@ -90,4 +90,51 @@ struct SearchBoxNoSelectionCoverTests {
             } else if case .couldNotWiden = box.treatment {} else { Issue.record("treatment \(box.treatment)") }
         }
     }
+
+    /// "Smith" ending a typed line, placed by Search, then its right edge
+    /// dragged back through the "h": no longer anchored, placed from text.
+    static func smithDragged(source: PlanSource, read: Bool) async throws -> (black: Set<Int>, cut: CGRect, width: Int) {
+        let document = try MatchCharactersTests.document(MatchCharactersTests.paragraph + ["", "Account holder: Smith"])
+        let data = try #require(document.dataRepresentation())
+        let reopened = try #require(PDFDocument(data: data))
+        defer { withExtendedLifetime(reopened) {} }
+        let page = try #require(reopened.page(at: 0))
+        let found = try await MatchCharactersTests.results(.text("Smith", options: SearchOptions()), in: reopened)
+        var region = RedactionRegion(placing: try #require(found.first))
+        let r = region.normalizedRect
+        region.normalizedRect = CGRect(x: r.minX, y: r.minY, width: r.width * 0.9, height: r.height)
+        region.textAnchored = false
+        let drawn = RunRecord.DrawnRegion(region: region)
+        #expect(drawn.kind == .placedFromTextThenEdited)
+        let pageRead = read ? try await RunRecordPageReadTests.read(data) : nil
+        let crop = page.bounds(for: .cropBox)
+        let confirmed = RunRecord.Page(pageIndex: 0, regions: [drawn], cropBox: crop.size, rotation: page.rotation,
+                                       switchOn: true, read: pageRead, source: source)
+        var pageData = PDFPageData(
+            page: page, pageIndex: 0, regions: [region], fillColor: .black, targetDPI: 150,
+            pipelineMode: .secureRasterization, rotation: page.rotation, cropBoxBounds: crop, cgPage: page.pageRef,
+            hasText: true, confirmedPage: confirmed)
+        pageData.planSource = source
+        let result = try await PageRasterizer().rasterize(pageData, dpiCap: 150)
+        let bitmap = try PlanPaintTests.Bitmap(result.pageOutput.image)
+        let k = 150.0 / 72
+        let cut = CGRect(x: region.normalizedRect.minX * crop.width * k, y: region.normalizedRect.minY * crop.height * k,
+                         width: region.normalizedRect.width * crop.width * k, height: region.normalizedRect.height * crop.height * k)
+        return (Self.black(bitmap), cut, bitmap.width)
+    }
+
+    @Test("\"Smith\" placed by Search, its edge dragged back through the h: at the switch it still covers every pixel today paints, growth included")
+    func smithDraggedThroughTheHKeepsTodaysCover() async throws {
+        let today = try await Self.smithDragged(source: .asPlaced, read: false)
+        let head = try await Self.smithDragged(source: .switchPolicy, read: true)
+        #expect(today.black.subtracting(head.black).isEmpty,
+                "\(today.black.subtracting(head.black).count) pixels painted today and not at the switch")
+        // Today's growth fills past the dragged edge: the pixel column just
+        // past it is black across the box's rows, as no letter alone is.
+        let x = Int(today.cut.maxX.rounded(.up)) + 1
+        let rows = Int(today.cut.minY.rounded(.up))..<Int(today.cut.maxY.rounded(.down))
+        let filled = rows.filter { today.black.contains($0 * today.width + x) }.count
+        #expect(!rows.isEmpty && filled == rows.count, "\(filled) of \(rows.count) rows filled past the edge today")
+    }
+
 }
