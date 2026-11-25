@@ -67,9 +67,9 @@ public struct PDFPageData: @unchecked Sendable {
         confirmedPage?.plan.map { ($0.widthSixtyFourths, $0.heightSixtyFourths) }
     }
 
-    /// The plan source the producer paints under: the run's, which is "as
-    /// placed". Only a test, inside the package, sets the switch's policy,
-    /// together with a plan it made under that policy.
+    /// The plan source the producer paints under: the run's, which is the
+    /// switch's policy. Only a test, inside the package, sets another,
+    /// together with a plan it made under that source.
     package var planSource: PlanSource = RunRecord.planSource
 
     /// What the ink check reads for a box, by the box's place in the plan:

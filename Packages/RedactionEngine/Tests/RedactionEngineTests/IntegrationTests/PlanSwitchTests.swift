@@ -142,9 +142,9 @@ struct PlanSwitchTests {
 
     // MARK: - The source and the choice
 
-    @Test("The run's plan source is \"as placed\", and under it the user's switch is not read")
+    @Test("The run's plan source is the switch's policy, under which the user's switch is read; under \"as placed\" it is not")
     func sourceAndChoice() {
-        #expect(RunRecord.planSource == .asPlaced)
+        #expect(RunRecord.planSource == .switchPolicy)
         for (source, on, wantSource, wantOn) in [(PlanSource.asPlaced, true, PlanSource.asPlaced, false),
                                                  (.asPlaced, false, .asPlaced, false),
                                                  (.switchPolicy, true, .switchPolicy, true),
@@ -155,19 +155,20 @@ struct PlanSwitchTests {
         let doc = PDFDocument(data: Self.pdf())
         let page = doc?.page(at: 0)
         #expect(PDFPageData(page: page ?? PDFPage(), pageIndex: 0, regions: [], fillColor: .black, targetDPI: 300,
-                            pipelineMode: .secureRasterization, rotation: 0).planSource == .asPlaced)
+                            pipelineMode: .secureRasterization, rotation: 0).planSource == .switchPolicy)
     }
 
-    @Test("The record's page makes the same as-placed plan with the switch on or off")
+    @Test("Handed \"as placed\", the record's page makes the same plan with the switch on or off; under the run's source a box drawn by hand keeps those rectangles")
     func pageInitIgnoresTheSwitch() throws {
         let drawn = Self.boxes.flatMap(\.regions).map {
             RunRecord.DrawnRegion(id: UUID(), normalizedRect: Self.share($0), kind: .drawnByHand)
         }
         let size = CGSize(width: Self.width, height: Self.height)
-        let on = try #require(RunRecord.Page(pageIndex: 0, regions: drawn, cropBox: size, rotation: 0,
-                                             switchOn: true).plan)
-        let off = try #require(RunRecord.Page(pageIndex: 0, regions: drawn, cropBox: size, rotation: 0,
-                                              switchOn: false).plan)
+        func plan(_ on: Bool, _ source: PlanSource) throws -> PaintPlan {
+            try #require(RunRecord.Page(pageIndex: 0, regions: drawn, cropBox: size, rotation: 0, switchOn: on,
+                                        read: nil, source: source).plan)
+        }
+        let on = try plan(true, .asPlaced), off = try plan(false, .asPlaced)
         let asPlaced = PaintPlan.asPlaced(
             regions: drawn.map { d in
                 let r = d.normalizedRect
@@ -178,6 +179,14 @@ struct PlanSwitchTests {
         #expect(on == off)
         #expect(on.boxes == asPlaced.boxes)
         #expect(on.boxes.allSatisfy { !$0.bandMade && !$0.inkEnlargedCovered && !$0.inkEnlargedToCap })
+        // Under the run's source a box drawn by hand is painted as drawn: the
+        // same rectangles, switch on or off, never judged.
+        for switchOn in [false, true] {
+            let run = try plan(switchOn, RunRecord.planSource)
+            #expect(run.boxes.map(\.paint) == asPlaced.boxes.map(\.paint))
+            #expect(run.boxes.map(\.inner) == asPlaced.boxes.map(\.inner))
+            #expect(run.boxes.allSatisfy { $0.asDrawn && !$0.inkCheckable && !$0.bandMade })
+        }
     }
 
     // MARK: - The check where growth runs

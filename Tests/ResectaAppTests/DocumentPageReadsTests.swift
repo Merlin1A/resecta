@@ -88,9 +88,8 @@ struct DocumentPageReadsTests {
         #expect(runner.contains("reads: coordinator.documentState.pageReads, settings: runSettings)"))
     }
 
-    @Test("While the plan places every box as it stands, the run reads no page")
-    func asPlacedReadsNoPage() {
-        #expect(RunRecord.planReadsWords == false,
-                "at the flip this reads true: re-cut this case with the run's read cost")
+    @Test("The plan reads the page's words, so the run reads each page that holds a box at entry: one text read per such page per run")
+    func planReadsWordsSoTheRunReads() {
+        #expect(RunRecord.planReadsWords)
     }
 }
