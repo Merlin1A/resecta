@@ -147,6 +147,22 @@ struct SaveCurrentRegexCommitTests {
         #expect(outcome == .notSaved)
         #expect(store.userSavedRegexes.isEmpty)
     }
+
+    @Test("A pattern whose write fails is reported as not saved, not as refused")
+    func failedWriteIsNotSavedFromSearch() async throws {
+        let fileURL = Self.makeScratchRegexFileURL()
+        let folder = fileURL.deletingLastPathComponent()
+        defer { UnreadableFile.unlockFolder(folder); try? FileManager.default.removeItem(at: folder) }
+        let store = SavedRegexStore(fileURL: fileURL, legacyDefaults: Self.makeSuite())
+        #expect(store.add(label: "Stored", pattern: #"\d{2}"#) == .saved)
+        try UnreadableFile.lockFolder(folder)
+
+        let outcome = await SearchAndRedactSheet.commitSaveCurrentRegex(
+            label: "ZIP code", pattern: #"\b\d{5}\b"#, store: store)
+
+        #expect(outcome == .notSaved)
+        #expect(store.userSavedRegexes.map(\.label) == ["Stored"])
+    }
 }
 
 // MARK: - Presentation path

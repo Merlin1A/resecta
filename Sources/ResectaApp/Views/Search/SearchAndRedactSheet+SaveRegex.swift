@@ -48,7 +48,7 @@ extension SearchAndRedactSheet {
             UINotificationFeedbackGenerator().notificationOccurred(.error)
             showSavedRegexSavePrompt = true
         case .notSaved:
-            savedRegexSaveError = nil
+            savedRegexSaveError = ListChange.notSavedMessage
             UINotificationFeedbackGenerator().notificationOccurred(.error)
             showSavedRegexSavePrompt = true
         }

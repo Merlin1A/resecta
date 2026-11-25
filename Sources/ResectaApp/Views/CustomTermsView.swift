@@ -67,7 +67,7 @@ struct CustomTermsView: View {
             titleVisibility: .visible
         ) {
             Button("Delete All", role: .destructive) {
-                userTermsStore.clearAllTerms()
+                if userTermsStore.clearAllTerms() != .saved { alwaysError = ListChange.notSavedMessage }
             }
             .accessibilityIdentifier("customTermsClearAllConfirm")
             Button("Cancel", role: .cancel) { }
@@ -116,7 +116,7 @@ struct CustomTermsView: View {
                 TermRow(term: term)
             }
             .onDelete { offsets in
-                userTermsStore.removeAlwaysFlag(at: offsets)
+                if userTermsStore.removeAlwaysFlag(at: offsets) != .saved { alwaysError = ListChange.notSavedMessage }
             }
 
             AddTermRow(
@@ -160,7 +160,7 @@ struct CustomTermsView: View {
                     alwaysError = Self.addRefusalText(for: change)
                     UINotificationFeedbackGenerator().notificationOccurred(.error)
                 case .notSaved, .held:
-                    alwaysError = nil
+                    alwaysError = ListChange.notSavedMessage
                     UINotificationFeedbackGenerator().notificationOccurred(.error)
                 }
             }
@@ -179,7 +179,7 @@ struct CustomTermsView: View {
                 TermRow(term: term)
             }
             .onDelete { offsets in
-                userTermsStore.removeNeverFlag(at: offsets)
+                if userTermsStore.removeNeverFlag(at: offsets) != .saved { neverError = ListChange.notSavedMessage }
             }
 
             AddTermRow(
@@ -212,7 +212,7 @@ struct CustomTermsView: View {
                     neverError = Self.addRefusalText(for: change)
                     UINotificationFeedbackGenerator().notificationOccurred(.error)
                 case .notSaved, .held:
-                    neverError = nil
+                    neverError = ListChange.notSavedMessage
                     UINotificationFeedbackGenerator().notificationOccurred(.error)
                 }
             }

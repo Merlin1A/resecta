@@ -126,9 +126,12 @@ nonisolated struct FileJSONBlob<T: Codable & Sendable>: Sendable {
     /// `.completeFileProtection` and the backup-exclusion flag BEFORE
     /// the atomic replace, so no crash window exists in which a
     /// complete, correctly-named file sits under the directory's
-    /// default attributes. Silent on failure beyond a log line —
-    /// mirrors the UserDefaults sibling's degrade-gracefully posture.
-    func save(_ value: T) {
+    /// default attributes. Returns true exactly when, on return, the file
+    /// holds the new value: once the file is placed, a later failure to
+    /// re-assert its attributes is logged and the answer stays true.
+    @discardableResult
+    func save(_ value: T) -> Bool {
+        var placed = false
         let envelope = Envelope(schemaVersion: schemaVersion, payload: value)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
@@ -150,6 +153,7 @@ nonisolated struct FileJSONBlob<T: Codable & Sendable>: Sendable {
             } else {
                 try FileManager.default.moveItem(at: tmpURL, to: fileURL)
             }
+            placed = true
             // Re-assert on the final URL — the engine-helper route does
             // not read attributes back on every host, and the belt keeps
             // the previous per-save re-application contract.
@@ -163,6 +167,7 @@ nonisolated struct FileJSONBlob<T: Codable & Sendable>: Sendable {
             logger.warning(
                 "FileJSONBlob[\(self.fileURL.lastPathComponent, privacy: .public)] write failed: \(LogSafeError.publicSummary(error), privacy: .public); \(String(describing: error), privacy: .private)")
         }
+        return placed
     }
 
     /// Remove the stored file. Subsequent `load()` calls return `fallback`.

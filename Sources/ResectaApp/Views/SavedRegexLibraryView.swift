@@ -46,7 +46,7 @@ struct SavedRegexLibraryView: View {
             titleVisibility: .visible
         ) {
             Button("Delete All", role: .destructive) {
-                savedRegexStore.clearAllUserSaved()
+                if savedRegexStore.clearAllUserSaved() != .saved { addError = ListChange.notSavedMessage }
             }
             .accessibilityIdentifier("savedRegexClearAllConfirm")
             Button("Cancel", role: .cancel) { }
@@ -113,7 +113,7 @@ struct SavedRegexLibraryView: View {
                     regexRow(regex)
                 }
                 .onDelete { offsets in
-                    savedRegexStore.deleteUserSaved(at: offsets)
+                    if savedRegexStore.deleteUserSaved(at: offsets) != .saved { addError = ListChange.notSavedMessage }
                 }
             }
         } header: {
@@ -194,7 +194,7 @@ struct SavedRegexLibraryView: View {
             addError = message
             UINotificationFeedbackGenerator().notificationOccurred(.error)
         case .notSaved:
-            addError = nil
+            addError = ListChange.notSavedMessage
             UINotificationFeedbackGenerator().notificationOccurred(.error)
         }
     }
