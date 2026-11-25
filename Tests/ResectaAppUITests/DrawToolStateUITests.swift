@@ -56,7 +56,9 @@ nonisolated final class DrawToolStateUITests: XCTestCase {
     }
 
     /// The points of `frame`, one a point, read from a fresh screenshot:
-    /// how many match the brand teal, and how many are white.
+    /// how many match the brand teal, and how many are white with teal on
+    /// both sides in their row (the glyph on the pill, not the bar's glass
+    /// round it).
     private func tealAndWhitePoints(in frame: CGRect) -> (teal: Int, white: Int, total: Int) {
         let shot = XCUIScreen.main.screenshot()
         guard let probe = CanvasPixelProbe(shot, windowSize: shot.image.size) else {
@@ -64,11 +66,15 @@ nonisolated final class DrawToolStateUITests: XCTestCase {
         }
         var teal = 0, white = 0, total = 0
         for y in stride(from: frame.minY + 0.5, to: frame.maxY, by: 1) {
+            var tealXs: [CGFloat] = [], whiteXs: [CGFloat] = []
             for x in stride(from: frame.minX + 0.5, to: frame.maxX, by: 1) {
                 let (r, g, b) = probe.rgb(x, y)
                 total += 1
-                if CanvasPixelProbe.Tint.teal.matches(r, g, b) { teal += 1 }
-                if r >= 235 && g >= 235 && b >= 235 { white += 1 }
+                if CanvasPixelProbe.Tint.teal.matches(r, g, b) { teal += 1; tealXs.append(x) }
+                if r >= 235 && g >= 235 && b >= 235 { whiteXs.append(x) }
+            }
+            if let left = tealXs.first, let right = tealXs.last {
+                white += whiteXs.filter { $0 > left && $0 < right }.count
             }
         }
         return (teal, white, total)
@@ -96,9 +102,10 @@ nonisolated final class DrawToolStateUITests: XCTestCase {
         attachScreenshot(named: "rectangle-tool-on")
         let frame = on[0].1
         let lit = tealAndWhitePoints(in: frame)
+        print("PILL-POINTS on: teal \(lit.teal) of \(lit.total), white inside the pill \(lit.white)")
         XCTAssertGreaterThanOrEqual(Double(lit.teal), 0.6 * Double(lit.total),
                                     "on: \(lit.teal) of \(lit.total) points in the tool's frame are brand teal")
-        XCTAssertGreaterThanOrEqual(lit.white, 12, "on: \(lit.white) white points in the tool's frame (the glyph)")
+        XCTAssertGreaterThanOrEqual(lit.white, 12, "on: \(lit.white) white points inside the teal pill (the glyph)")
         // Off again: no teal in the frame, as shipped.
         XCTAssertTrue(toggle(tool, until: false), "the tool did not turn off")
         sleep(1)
