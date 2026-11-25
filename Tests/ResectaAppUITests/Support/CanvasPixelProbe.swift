@@ -126,6 +126,30 @@ nonisolated struct CanvasPixelProbe {
     /// One pixel's width in points.
     var pixel: CGFloat { 1 / scale }
 
+    /// The bounds of a tint inside `rect`, read pixel by pixel, exact to a
+    /// pixel where `tintBounds` steps whole points from `rect`'s corner (up
+    /// to a point out); nil under 12 matching pixels.
+    func tintPixelBounds(_ tint: Tint, in rect: CGRect) -> CGRect? {
+        let x0 = max(Int((rect.minX * scale).rounded(.down)), 0), x1 = min(Int((rect.maxX * scale).rounded(.up)), width)
+        let y0 = max(Int((rect.minY * scale).rounded(.down)), 0), y1 = min(Int((rect.maxY * scale).rounded(.up)), height)
+        guard x0 < x1, y0 < y1 else { return nil }
+        var minX = Int.max, minY = Int.max, maxX = Int.min, maxY = Int.min
+        var n = 0
+        for py in y0..<y1 {
+            for px in x0..<x1 {
+                // The pixel's centre, so `rgb` reads this pixel and not its neighbour.
+                let (r, g, b) = rgb((CGFloat(px) + 0.5) / scale, (CGFloat(py) + 0.5) / scale)
+                if tint.matches(r, g, b) {
+                    n += 1
+                    minX = min(minX, px); minY = min(minY, py); maxX = max(maxX, px); maxY = max(maxY, py)
+                }
+            }
+        }
+        guard n >= 12 else { return nil }
+        return CGRect(x: CGFloat(minX) / scale, y: CGFloat(minY) / scale,
+                      width: CGFloat(maxX - minX + 1) / scale, height: CGFloat(maxY - minY + 1) / scale)
+    }
+
     /// Where this shot differs from `other` by more than 24 levels in a
     /// channel, inside `rect`, read pixel by pixel; nil where nothing does.
     func differenceBounds(from other: CanvasPixelProbe, in rect: CGRect) -> CGRect? {
