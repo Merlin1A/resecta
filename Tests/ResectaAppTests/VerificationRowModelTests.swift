@@ -350,6 +350,15 @@ struct VerificationRowModelTests {
         for name in Self.shippedNames { #expect(!model.contains("\"\(name)\""), "the title table quotes \(name)") }
     }
 
+    @Test("The engine keeps its own names for the checks; only the rows' titles are plainer")
+    func engineNamesUnchanged() {
+        #expect(VerificationLayer.allCases.map(\.name) == [
+            "Text Extraction", "OCR Check", "Binary String Search", "Structure Check", "Metadata Check",
+            "Spatial Verification", "Character Count", "Font Verification", "Character Lineage",
+            "Operator Re-Extraction", "Hidden Words Under Boxes", "Search Re-check", "Detection Sweep", "Box Fill",
+        ])
+    }
+
     @Test("An identity-less row named for another check keeps its engine name")
     func identityLessRowKeepsItsName() {
         let row = LayerResult(name: "Binary String Search", symbolName: "shield", status: .pass,
