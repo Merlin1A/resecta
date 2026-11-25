@@ -382,7 +382,14 @@ extension PageRasterizer {
             return rect
         }
         // A box's paint at "as placed": its projection, its regions' own
-        // fills, and its growth over the ink that crosses its edge.
+        // fills, and its growth over the ink that crosses its edge. Growth is
+        // read from the box's margin edge and also from each growing
+        // region's own "as placed" box (its paint its own rectangle, no
+        // limit), where growth started before the plan read the page,
+        // wherever that edge is not inside the box's: a limit holds the box's
+        // edge in, up to two pixels inside where "as placed" starts, and
+        // growth from there misses a detached mark (an accent above, a dot
+        // below) whose lowest row lies between the two.
         // The quality the page was shown at: each box's paint holds the fill
         // shown there (`boxFill`).
         let shownDPI = page.confirmedPage?.shownDPI
@@ -391,8 +398,20 @@ extension PageRasterizer {
                 box: box, regions: regionsByID, raster: raster, content: content,
                 shownDPI: shownDPI) else { return nil }
             var rect = fill.bitmapRect
-            if grows,
-               let grown = try inkGrowthRect(context: ctx, fillRect: projection.marginEdge.bitmapRect) {
+            guard grows else { return rect }
+            let edge = projection.marginEdge.bitmapRect
+            if let grown = try inkGrowthRect(context: ctx, fillRect: edge) { rect = rect.union(grown) }
+            let own: [(id: UUID, share: PointRect)] = box.regionIDs.compactMap { id in
+                guard growsOnInk[id] == true, let r = regionsByID[id]?.normalizedRect else { return nil }
+                return (id, PointRect(minX: Double(r.minX), minY: Double(r.minY), maxX: Double(r.maxX), maxY: Double(r.maxY)))
+            }
+            let today = PaintPlan.asPlaced(regions: own, widthSixtyFourths: raster.widthSixtyFourths,
+                                           heightSixtyFourths: raster.heightSixtyFourths)
+            for placed in today.boxes {
+                guard let p = PixelPlan.project(inner: placed.inner, paint: placed.paint, limitAbove: nil,
+                                                limitBelow: nil, raster: raster),
+                      !edge.contains(p.marginEdge.bitmapRect),
+                      let grown = try inkGrowthRect(context: ctx, fillRect: p.marginEdge.bitmapRect) else { continue }
                 rect = rect.union(grown)
             }
             return rect

@@ -98,7 +98,8 @@ struct PlanSwitchTests {
     /// the page's picture).
     static func run(source: PlanSource, inputsFor: Set<Int>, uncheckable: Set<Int> = [],
                     bars: [CGRect] = bars, boxes: [Box] = boxes,
-                    dpi: Int = PlanSwitchTests.dpi, shownDPI: Int? = nil) async throws -> Run {
+                    dpi: Int = PlanSwitchTests.dpi, shownDPI: Int? = nil,
+                    limitAbove: CGFloat? = nil) async throws -> Run {
         let doc = try #require(PDFDocument(data: pdf(bars: bars)))
         defer { withExtendedLifetime(doc) {} }
         let page = try #require(doc.page(at: 0))
@@ -116,7 +117,8 @@ struct PlanSwitchTests {
                 drawn.append(RunRecord.DrawnRegion(region: region))
             }
             let r = rect64(box.rect)
-            planBoxes.append(PaintedBox(regionIDs: ids, inner: r, paint: r, tight: r, limitAbove: nil, limitBelow: nil,
+            planBoxes.append(PaintedBox(regionIDs: ids, inner: r, paint: r, tight: r,
+                                        limitAbove: limitAbove.map { Int($0 * 64) }, limitBelow: nil,
                                         exposure: GeometryPolicy.release.asPlaced.exposure, treatment: .notAsked,
                                         bandMade: false, inkEnlargedCovered: false, inkEnlargedToCap: false,
                                         asDrawn: false, inkCheckable: box.search && !uncheckable.contains(index)))
@@ -324,6 +326,28 @@ struct PlanSwitchTests {
             // this argument cannot see it. The paper's case as written.
             #expect(alone == painted, "the grids nest: the join changes nothing")
         }
+    }
+
+    /// One Search box at 36-58 pt across rows 38-50 pt, held above by a line
+    /// at its own top (a line whose letters reach into the box sets the limit
+    /// there), with ink inside it and a detached mark above it, rows 50.2 to
+    /// 53.2 pt. At 300 dpi the held edge is pixel 208, "as placed" starts its
+    /// growth at pixel 210 (the top rounded up, plus one), and the box's
+    /// block paints to 216: the mark's lowest row, 209, lies between the two
+    /// edges, so only growth from where "as placed" starts reaches it.
+    static let markAbove = [CGRect(x: 40, y: 40, width: 14, height: 8), CGRect(x: 44, y: 50.2, width: 4, height: 3)]
+
+    @Test("A box held by a limit above still paints its \"as placed\" growth: a detached mark above it is covered, judged or not",
+          arguments: [true, false])
+    func limitedSideKeepsTheAsPlacedGrowth(judged: Bool) async throws {
+        let box: Box = (CGRect(x: 36, y: 38, width: 22, height: 12), [CGRect(x: 36, y: 38, width: 22, height: 12)], true)
+        let held = try await Self.run(source: .switchPolicy, inputsFor: judged ? [0] : [], bars: Self.markAbove,
+                                      boxes: [box], limitAbove: 50)
+        let placed = try await Self.run(source: .asPlaced, inputsFor: [], bars: Self.markAbove, boxes: [box])
+        #expect((held.result.inkVerdicts[0] != .indeterminate) == judged, "\(held.result.inkVerdicts)")
+        let a = try placed.reported(0)
+        #expect(a.maxY > (try placed.projection(0)).maxY, "growth at \"as placed\" reaches the mark: \(a)")
+        #expect(held.bitmap.misses(a, level: 0) == 0, "the pixels \"as placed\" fills are filled with the limit too")
     }
 
     @Test("A judged box keeps today's growth in its floor until the differential count passes")
