@@ -50,7 +50,7 @@ struct FixedMetadataValuesTests {
         #expect(PDFStreamReconstructor.fixedProducerValue == Self.producerWords)
         let bytes = try await Self.export()
         #expect(Self.infoValue("Producer", in: bytes) == Self.producerWords)
-        #expect(bytes.range(of: Data("(\(Self.producerWords)".utf8)) != nil)
+        #expect(bytes.range(of: Data("(\(Self.producerWords))".utf8)) != nil)
     }
 
     @Test("An export's creation and change dates read the fixed date")
