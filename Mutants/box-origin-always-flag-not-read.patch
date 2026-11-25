@@ -1,0 +1,19 @@
+Property: A Scan result with no category, a pattern the user always flags, reads as a Scan result by its rationale's signal, never as a Search for the word Custom.
+Area: the editor, a box's origin
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild build-for-testing -scheme ResectaApp -destination id=<simulator>, then DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test-without-building -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BoxOriginTests
+Must go red: ResectaAppTests/BoxOriginTests appliedAlwaysFlagResult(); ResectaAppTests/BoxOriginTests acceptedNudge(_:) [alwaysFlag]
+Apply in a scratch worktree with `git apply`; discard after.
+
+--- a/Sources/ResectaApp/State/BoxOrigin.swift
++++ b/Sources/ResectaApp/State/BoxOrigin.swift
+@@ -33,9 +33,7 @@
+             return .face
+         case .searchMatch(let term, let rationale):
+             if case .pii(let kind)? = metadata?.piiKind { return .scan(kind: kind) }
+-            if rationale?.signals.contains(where: { if case .userAlwaysFlag = $0 { true } else { false } }) == true {
+-                return .scan(kind: nil)
+-            }
++            _ = rationale
+             return .search(term: term)
+         }
+     }
