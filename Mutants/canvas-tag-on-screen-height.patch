@@ -1,0 +1,19 @@
+Property: A box shows its tag only once its own rectangle is at least 15 points tall on screen, at every zoom.
+Area: canvas overlay (the Ink box)
+Test command: xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/CanvasInkMarksTests -only-testing:ResectaAppUITests/CanvasGeometryUITests/testTheTagShowsOutsideTheBoxOnlyWhenItsLineIsTallEnough
+Must go red: ResectaAppTests/CanvasInkMarksTests tagShowsOnlyOnABoxAtRestTallAndWideEnough (at 1/0.64 and 0.5); ResectaAppUITests/CanvasGeometryUITests testTheTagShowsOutsideTheBoxOnlyWhenItsLineIsTallEnough (no tag at zoom)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Ink.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Ink.swift
+index a77cbcf30..29f320ed2 100644
+--- a/Sources/ResectaApp/Overlay/RedactionOverlayView+Ink.swift
++++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+Ink.swift
+@@ -205,7 +205,7 @@ extension RedactionOverlayView {
+     static func tagRect(for tight: CGRect, words: String, page: CGRect, fingerScale f: CGFloat) -> CGRect? {
+         typealias C = ResectaTokens.Canvas
+         let width = tagWidth(words)
+-        guard tight.height / f >= C.tagShortestBox - 1e-9, tight.width / f >= width - 1e-9 else { return nil }
++        guard tight.height >= C.tagShortestBox - 1e-9, tight.width / f >= width - 1e-9 else { return nil }
+         let height = C.tag.height * f, gap = C.tag.gap * f
+         let x = tight.minX - C.line.width / 2 * f
+         var y = tight.minY - gap - height
