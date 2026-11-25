@@ -437,7 +437,9 @@ nonisolated final class EditorChromeUITests: XCTestCase {
         let bar = element("pageNav")
         XCTAssertTrue(bar.waitForExistence(timeout: 60), "The page bar never appeared.")
         raiseDeletedTwoRegions()
-        let message = element("toastMessage")
+        // "Deleted 2 regions." offers Undo, so its receipt carries the
+        // with-action identifier; its frame is the capsule either way.
+        let message = element("toastMessageWithAction")
         XCTAssertTrue(message.waitForExistence(timeout: 10), "The bottom message never appeared.")
         var frame = message.frame
         let deadline = Date().addingTimeInterval(3)
