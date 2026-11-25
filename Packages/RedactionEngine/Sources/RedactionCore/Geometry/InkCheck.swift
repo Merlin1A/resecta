@@ -332,7 +332,6 @@ private func floorDivision(_ a: Int, _ b: Int) -> Int {
     return (a % b != 0 && a < 0) ? q - 1 : q
 }
 
-/// ⌈a / b⌉ for a positive `b`, for any sign of `a`.
 extension InkCheck {
     /// The default band's net: whether the page's picture, before any fill,
     /// shows ink in the pixels of `band` that `lineMargin` does not hold, by
@@ -375,6 +374,7 @@ extension InkCheck {
     }
 }
 
+/// ⌈a / b⌉ for a positive `b`, for any sign of `a`.
 private func ceilDivision(_ a: Int, _ b: Int) -> Int {
     let q = a / b
     return (a % b != 0 && a > 0) ? q + 1 : q
