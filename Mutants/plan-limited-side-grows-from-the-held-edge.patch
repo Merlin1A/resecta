@@ -1,0 +1,25 @@
+Property: A box held by a limit line still paints the growth "as placed" starts: growth is read from each growing region's own "as placed" edge as well as from the box's held edge, so a detached mark between the two is covered.
+Area: the producer's plan paint (PageRasterizer.paintPlan, asPlacedRect)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter PlanSwitchTests
+Must go red: RedactionEngineTests/PlanSwitchTests limitedSideKeepsTheAsPlacedGrowth
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
+index 8dddf23..d86bde9 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
+@@ -327,13 +327,7 @@ extension PageRasterizer {
+             }
+             let today = PaintPlan.asPlaced(regions: own, widthSixtyFourths: raster.widthSixtyFourths,
+                                            heightSixtyFourths: raster.heightSixtyFourths)
+-            for placed in today.boxes {
+-                guard let p = PixelPlan.project(inner: placed.inner, paint: placed.paint, limitAbove: nil,
+-                                                limitBelow: nil, raster: raster),
+-                      !edge.contains(p.marginEdge.bitmapRect),
+-                      let grown = try inkGrowthRect(context: ctx, fillRect: p.marginEdge.bitmapRect) else { continue }
+-                rect = rect.union(grown)
+-            }
++            _ = today
+             return rect
+         }
+         for (index, box) in boxes.enumerated() {
