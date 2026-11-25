@@ -5,10 +5,10 @@ Must go red: RedactionCoreTests/PaintPlanMakeTests inkCheckableOnlyOnTypedText
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
-index f7fe787b..d7a33a56 100644
+index 6bbbcfa..7c1b4cb 100644
 --- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
-@@ -284,8 +284,7 @@ private struct Maker {
+@@ -335,8 +335,7 @@ private struct Maker {
              Made(box: PaintedBox(regionIDs: ids, inner: inner, paint: paint, tight: tight, limitAbove: above,
                                   limitBelow: below, exposure: rule.exposure, treatment: treatment, bandMade: band,
                                   inkEnlargedCovered: false, inkEnlargedToCap: false, asDrawn: asDrawn,
@@ -16,5 +16,5 @@ index f7fe787b..d7a33a56 100644
 -                                     && (lineReading == .column || lineReading == .noColumn),
 +                                 inkCheckable: !asDrawn,
                                   defaultWidth: width),
-                  regions: group)
+                  regions: group, lineHeight: (read?.rows ?? []).map { self.lineHeight($0) }.max())
          }

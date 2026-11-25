@@ -5,14 +5,15 @@ Must go red: RedactionEngineTests/DrawnPlanTests onePlanForEditorAndRun
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift
+index d8896a1..b6480fb 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift
-@@ -84,7 +84,7 @@ public struct DrawnPlan: Equatable, Sendable {
+@@ -86,7 +86,7 @@ public struct DrawnPlan: Equatable, Sendable {
      public init(pageIndex: Int, regions: [RedactionRegion], cropBox: CGSize, rotation: Int,
-                 switchOn: Bool, exportDPI: Int, fillColor: FillColor) {
+                 switchOn: Bool, exportDPI: Int, fillColor: FillColor, read: RunRecord.PageRead? = nil) {
          let plan = RunRecord.Page.makePlan(regions: regions.map(RunRecord.DrawnRegion.init(region:)),
--                                           cropBox: cropBox, rotation: rotation, switchOn: switchOn)
-+                                           cropBox: cropBox, rotation: 0, switchOn: switchOn)
+-                                           cropBox: cropBox, rotation: rotation, switchOn: switchOn, read: read)
++                                           cropBox: cropBox, rotation: 0, switchOn: switchOn, read: read)
          self.init(pageIndex: pageIndex, switchOn: switchOn, exportDPI: exportDPI, fillColor: fillColor, plan: plan,
                    filledPixels: Self.filledPixels(regions: regions, cropBox: cropBox, rotation: rotation,
                                                    dpi: exportDPI),

@@ -5,15 +5,15 @@ Must go red: RedactionEngineTests/RunRecordPageReadTests noReadOnlyBesideNoWords
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
-index 201ef8fb..14544cf7 100644
+index d08be39..a9b4870 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
-@@ -129,7 +129,7 @@ public struct RunRecord: Equatable, Sendable {
+@@ -149,7 +149,7 @@ public struct RunRecord: Equatable, Sendable {
              let planRegions = RunRecord.planRegions(admitted, text: read?.text ?? "")
              if let read {
-                 return PaintPlan.make(
+                 let made = PaintPlan.make(
 -                    regions: planRegions, words: read.words, text: read.text, facts: read.facts,
 +                    regions: planRegions, words: PageWords(words: []), text: read.text, facts: read.facts,
                      widthSixtyFourths: width, heightSixtyFourths: height,
-                     policy: .release, source: choice.source, switchOn: choice.switchOn).plan
-             }
+                     policy: .release, source: choice.source, switchOn: choice.switchOn)
+                 guard choice.source == .switchPolicy else { return (made.plan, [:], [:]) }
