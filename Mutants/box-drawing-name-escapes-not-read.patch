@@ -4,11 +4,11 @@ Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcod
 Must go red: RedactionEngineTests/BoxCheckDrawingTests eachCase [D87: a trailer that names an earlier one with an escape]
 Apply in a scratch worktree with `git apply`; discard after.
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
-index 86dc26d9..202c88e2 100644
+index ff0fae18..78415afe 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
-@@ -110,7 +110,7 @@ enum PageDrawingReader {
-         guard let s = data.range(of: startxref), tableOffset(data, after: s) != nil, t.upperBound <= s.lowerBound else {
+@@ -111,7 +111,7 @@ enum PageDrawingReader {
+         guard let s = data.range(of: startxref), let x = tableOffset(data, after: s), x < t.lowerBound, t.upperBound <= s.lowerBound else {
              return .fileRevised
          }
 -        let tail = nameEscapesRead(data[t.upperBound..<e.lowerBound])
