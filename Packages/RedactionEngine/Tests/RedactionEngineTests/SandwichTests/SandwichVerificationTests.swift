@@ -508,6 +508,10 @@ struct SandwichVerificationTests {
                     "\(mode): Box Fill with no record")
             #expect(report.overallStatus == .warn("Some verification checks were skipped — results may be incomplete"),
                     "\(mode): overall \(report.overallStatus)")
+            // `==` on a status compares its case only; the sentence is held here.
+            if case .warn(let sentence) = report.overallStatus {
+                #expect(sentence == "Some verification checks were skipped — results may be incomplete")
+            }
             #expect(report.layers.count == VerificationEngine().layers(for: mode).count,
                     "\(mode): every layer of the mode reports")
             for result in report.layers {

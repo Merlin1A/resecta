@@ -116,6 +116,12 @@ struct BoxFillRowTests {
         }
     }
 
+    /// The row's sentence: `==` on a status compares its case only, so a
+    /// test that names the sentence holds it through this as well.
+    static func rowSentence(_ r: BoxFillRow.Reading) -> String? {
+        if case .row(let row, _) = r { sentence(row.status) } else { nil }
+    }
+
     @Test("An issue is never an ordinary warning, a could-not-finish never Passed, no record never Nothing to check")
     func neverMapped() {
         for cell in Self.cells {
@@ -156,6 +162,7 @@ struct BoxFillRowTests {
         #expect(!BoxFillRow.isCovered(narrow, on: page))
         let reading = BoxFillRow.reading(report: .pages([Self.read([Self.done, Self.done])]), record: Self.record([page]))
         #expect(reading == .row(CheckRow(status: .warn("2 boxes on page 1 could not be checked."), pages: [0], couldNotVerify: true), nil))
+        #expect(Self.rowSentence(reading) == "2 boxes on page 1 could not be checked.")
         if case .row(let row, _) = reading { #expect(Self.sentence(row.status) == "2 boxes on page 1 could not be checked.") }
     }
 
@@ -174,6 +181,7 @@ struct BoxFillRowTests {
         picture.outsidePlan = input.pages[0].outsidePlan
         let reading = BoxFillRow.reading(report: .pages([picture]), record: record)
         #expect(reading == .row(CheckRow(status: .warn("A box on page 1 could not be checked."), pages: [0], couldNotVerify: true), nil))
+        #expect(Self.rowSentence(reading) == "A box on page 1 could not be checked.")
     }
 
     @Test("A region the producer reports painted outside the plan could not be checked, even where a box of the plan names and holds it")
@@ -186,6 +194,7 @@ struct BoxFillRowTests {
         picture.outsidePlan = try #require(BoxCheckInput(record: record)).pages[0].outsidePlan
         let reading = BoxFillRow.reading(report: .pages([picture]), record: record)
         #expect(reading == .row(CheckRow(status: .warn("A box on page 1 could not be checked."), pages: [0], couldNotVerify: true), nil))
+        #expect(Self.rowSentence(reading) == "A box on page 1 could not be checked.")
     }
 
     @Test("Wholly off its page is the region as drawn sharing no area with the page; one past the left edge by a hair is on it")
@@ -202,6 +211,7 @@ struct BoxFillRowTests {
         let page = Self.page(0, [Self.share(0.1, 0.1, 0.3, 0.2), Self.share(0.5, 0.5, 0.7, 0.6)])
         let reading = BoxFillRow.reading(report: .pages([Self.read([Self.done])]), record: Self.record([page]))
         #expect(reading == .row(CheckRow(status: .warn("A box on page 1 could not be checked."), pages: [0], couldNotVerify: true), nil))
+        #expect(Self.rowSentence(reading) == "A box on page 1 could not be checked.")
     }
 
     @Test("A record the check could not take reads Could not verify on every page, never Skipped; a file page the record lacks is unread")
@@ -210,6 +220,7 @@ struct BoxFillRowTests {
         #expect(BoxCheckInput(record: outOfOrder) == nil)
         let reading = BoxFillRow.reading(report: .noRecord, record: outOfOrder)
         #expect(reading == .row(CheckRow(status: .warn("2 pages could not be read for this check: 1, 2"), pages: [0, 1], couldNotVerify: true), nil))
+        #expect(Self.rowSentence(reading) == "2 pages could not be read for this check: 1, 2")
         if case .row(let row, _) = reading { #expect(Self.sentence(row.status) == "2 pages could not be read for this check: 1, 2") }
         // Page numbers checked on every page, not the first alone: a repeated number and a gap.
         let repeated = Self.record([Self.page(0, [Self.share(0.1, 0.1, 0.3, 0.2)]), Self.page(0, [Self.share(0.1, 0.1, 0.3, 0.2)])])
@@ -218,10 +229,12 @@ struct BoxFillRowTests {
         #expect(BoxCheckInput(record: gap) == nil)
         #expect(BoxFillRow.reading(report: .noRecord, record: gap)
                 == .row(CheckRow(status: .warn("2 pages could not be read for this check: 1, 3"), pages: [0, 2], couldNotVerify: true), nil))
+        #expect(Self.rowSentence(BoxFillRow.reading(report: .noRecord, record: gap)) == "2 pages could not be read for this check: 1, 3")
         let one = Self.record([Self.page(0, [Self.share(0.1, 0.1, 0.3, 0.2)])])
         let outside = BoxCheckPage(picture: .fault(.wrongSubject), quality: nil, belowChosen: false, noColour: false, boxes: [])
         let extra = BoxFillRow.reading(report: .pages([Self.read([Self.done]), outside]), record: one)
         #expect(extra == .row(CheckRow(status: .warn("Page 2 could not be read for this check"), pages: [1], couldNotVerify: true), nil))
+        #expect(Self.rowSentence(extra) == "Page 2 could not be read for this check")
     }
 
     @Test("The sentences' forms: one box, boxes on one page, two pages, three pages")
