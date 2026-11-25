@@ -5,10 +5,10 @@ Must go red: ResectaAppTests/VerificationProblemModelTests seededReportsGiveThes
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Views/VerificationProblemModel.swift b/Sources/ResectaApp/Views/VerificationProblemModel.swift
-index c070f072..1220677b 100644
+index 747e174e1..8796e42e3 100644
 --- a/Sources/ResectaApp/Views/VerificationProblemModel.swift
 +++ b/Sources/ResectaApp/Views/VerificationProblemModel.swift
-@@ -129,7 +129,7 @@ nonisolated enum VerificationProblemModel {
+@@ -136,7 +136,7 @@ nonisolated enum VerificationProblemModel {
                  items.append(check)
              } else if layer.status.isSkipped {
                  skipped.append(check)
@@ -16,4 +16,4 @@ index c070f072..1220677b 100644
 +            } else if check.outcome == .couldNotVerify || check.outcome == .warning {
                  if check.pages.isEmpty { unfinished.append(check) } else { onPages.append(check) }
              }
-         }
+             // The one second entry: the part a failed or needs-review check
