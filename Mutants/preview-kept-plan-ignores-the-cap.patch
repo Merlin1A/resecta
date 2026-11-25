@@ -1,0 +1,19 @@
+Property: A drawn page's plan is kept at the quality a run started now uses, the chosen quality under the run's cap. Here the editor keeps it at the chosen quality whatever the cap, so after a memory warning the preview shows rectangles at 300 dpi that the run fills at 150.
+Area: kept plan
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/OverlayDrawnPlanTests
+Must go red: ResectaAppTests/OverlayDrawnPlanTests keptPlanReadsTheCap
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
+index 43f86b14..7477b46b 100644
+--- a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
++++ b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
+@@ -376,7 +376,7 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
+               let page = documentState?.sourceDocument?.page(at: pageIndex) else { return }
+         let cropBox = page.bounds(for: .cropBox).size
+         // Nil where the run refuses the page for its size; no run fills it.
+-        let quality = runQuality(chosenDPI: settings.exportDPI, dpiCap: qualityCap, cropBox: cropBox,
++        let quality = runQuality(chosenDPI: settings.exportDPI, dpiCap: defaultDPICap, cropBox: cropBox,
+                                  rotation: page.rotation) ?? min(settings.exportDPI, qualityCap)
+         let drawn = DrawnPlan(pageIndex: pageIndex, regions: regions, cropBox: cropBox,
+                               rotation: page.rotation, switchOn: false,

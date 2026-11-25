@@ -1,0 +1,21 @@
+Property: The kept plan's fill pixels are made by the run's own fill rule, which grows each rectangle one pixel past its whole-pixel bounds. Here the kept plan rounds by a copy that leaves the growth out, so every box it says is filled is a pixel short of the run's on each side.
+Area: kept plan
+Test command: cd Packages/RedactionEngine && swift test --filter PreviewFillsAsTheRunTests
+Must go red: RedactionEngineTests/PreviewFillsAsTheRunTests keptPlanFillsAsTheRun
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift
+index 99cec106..c749ab20 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift
+@@ -71,7 +71,9 @@ public struct DrawnPlan: Equatable, Sendable {
+             bounds: CGRect(origin: .zero, size: cropBox), rotation: rotation, dpi: CGFloat(dpi)) else { return [:] }
+         var filled: [UUID: CGRect] = [:]
+         for region in regions where RedactionRegion.isAdmitted(normalizedRect: region.normalizedRect) {
+-            filled[region.id] = normalizedToFillPixels(region.normalizedRect.clampedToNormalized(), content: content)
++            let r = region.normalizedRect.clampedToNormalized()
++            filled[region.id] = CGRect(x: r.minX * content.width, y: r.minY * content.height,
++                                       width: r.width * content.width, height: r.height * content.height).pixelAligned()
+         }
+         return filled
+     }

@@ -10,6 +10,8 @@ struct PDFDocumentView: UIViewRepresentable {
     @Environment(DocumentState.self) private var documentState
     @Environment(RedactionState.self) private var redactionState
     @Environment(SettingsState.self) private var settingsState
+    /// Read for its quality cap, which a drawn page's kept plan reads.
+    @Environment(PipelineCoordinator.self) private var pipelineCoordinator
     @Environment(ToastQueueManager.self) private var toastManager
 
     /// Whether any drawing tool is active. Controls new-region creation.
@@ -149,6 +151,7 @@ struct PDFDocumentView: UIViewRepresentable {
         // Propagate state to coordinator
         coordinator.redactionState = redactionState
         coordinator.settingsState = settingsState
+        coordinator.qualityCap = pipelineCoordinator.dpiCap
         coordinator.toastManager = toastManager
         let isEditing = documentState.phaseKind == .editing
         coordinator.updateDrawingMode(isEditing, isDrawing: isEditing && isDrawingMode)

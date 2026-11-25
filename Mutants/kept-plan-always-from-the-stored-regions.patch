@@ -1,0 +1,19 @@
+Property: A kept plan says whether it was drawn from the page's stored regions or from a working copy, as during a drag. Here it always says stored, so a plan of a drag reads as a plan of the page.
+Area: kept plan
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/OverlayDrawnPlanTests
+Must go red: ResectaAppTests/OverlayDrawnPlanTests keptPlanIsStamped
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
+index 814ef401..cc61945e 100644
+--- a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
++++ b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
+@@ -391,7 +391,7 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
+                               rotation: page.rotation, switchOn: false,
+                               exportDPI: quality, fillColor: settings.fillColor)
+             .stamped(pageVersion: state.pageVersion(pageIndex),
+-                     fromStoredRegions: regions == state.regions[pageIndex] ?? [])
++                     fromStoredRegions: true)
+         if state.drawnPlans[pageIndex] != drawn { state.drawnPlans[pageIndex] = drawn }
+     }
+ 

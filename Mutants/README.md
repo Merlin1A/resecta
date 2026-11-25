@@ -700,3 +700,13 @@ with its reason and the mutant that is caught in its place.
 | `drawn-plan-keeps-a-fill-it-was-not-drawn-under.patch` | The kept plan names the fill colour the page was drawn under. | RedactionEngineTests/DrawnPlanTests keptWithItsSettings |
 | `drawn-plan-draws-across-by-the-height.patch` | A box is drawn across by the page's width and up by its height, so under "as placed" it is the region. | RedactionEngineTests/DrawnPlanTests asPlacedDrawsTheRegion |
 | `overlay-does-not-keep-the-plan-it-draws.patch` | Drawing a page's regions keeps the plan the page is drawn from. | ResectaAppTests/OverlayDrawnPlanTests drawingKeepsThePlan |
+| `preview-kept-plan-ignores-the-cap.patch` | A drawn page's plan is kept at the run's quality, under the run's cap. | ResectaAppTests/OverlayDrawnPlanTests keptPlanReadsTheCap |
+| `preview-fill-rounded-by-a-copy-without-the-growth.patch` | The kept plan's fills are made by the run's own fill rule, not a copy. | RedactionEngineTests/PreviewFillsAsTheRunTests keptPlanFillsAsTheRun |
+| `kept-box-fill-without-its-regions.patch` | Each kept box's fill is the run's box rule: its projection joined with its regions' fills. | RedactionEngineTests/PreviewFillsAsTheRunTests aBoxHoldsItsRegionsFills |
+| `kept-box-not-projected-kept-empty.patch` | A kept box that does not project keeps its regions' own fills, as the run fills them then. | RedactionEngineTests/PreviewFillsAsTheRunTests aBoxThatDoesNotProject |
+| `page-version-moves-for-every-page.patch` | A page's version moves only when that page's stored regions change. | ResectaAppTests/OverlayDrawnPlanTests pageVersionsMoveByPage |
+| `kept-plan-always-from-the-stored-regions.patch` | A kept plan says whether it was drawn from the stored regions or a working copy. | ResectaAppTests/OverlayDrawnPlanTests keptPlanIsStamped |
+| `cap-change-re-keeps-a-plan-of-an-older-version.patch` | A cap change leaves a kept plan of an older version of its page as it was. | ResectaAppTests/OverlayDrawnPlanTests aCapChangeKeepsOnlyWhatWasDrawn |
+| `cap-change-re-keeps-only-the-pages-on-screen.patch` | A cap change keeps every current kept plan at the new quality, on screen or not. | ResectaAppTests/OverlayDrawnPlanTests aCapChangeRedrawsThePagesOnScreen |
+| `reset-keeps-the-drawn-plans.patch` | A new document, or clearing all, drops the plans kept for the last one. | ResectaAppTests/OverlayDrawnPlanTests aNewDocumentDropsTheKeptPlans |
+| `view-does-not-hand-the-settings.patch` | The editor's view hands the coordinator the settings when it makes it and on each update. | ResectaAppTests/OverlayDrawnPlanTests theViewHandsOnTheSettings |
