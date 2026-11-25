@@ -527,6 +527,36 @@ import RedactionCore
             #expect(Self.plan(sheet, regions, on: on).plan == Self.plan(sheet, regions, on: on).plan)
         }
     }
+
+    /// A match on the lines at 700 and 672, word 1 of each, with a line at
+    /// `middle` between them that carries none of its rows (nil: none).
+    static func skippedLineBox(middle: Double?) -> PaintedBox {
+        var page = Sheet()
+        let top = page.line(count: 4, y: 700)
+        if let middle { page.line(count: 4, y: middle) }
+        let bottom = page.line(count: 4, y: 672)
+        let region = Self.matched(page, top[1].union(bottom[1]))
+        return Self.plan(page, [region]).box(region)
+    }
+
+    @Test("A match on two lines with no line between its rows takes both margins whole")
+    func noLineBetweenTheRows() {
+        let box = Self.skippedLineBox(middle: nil)
+        let m = Self.margins(Self.s(10))
+        #expect(box.paint.maxY == box.inner.maxY + m.top)
+        #expect(box.paint.minY == box.inner.minY - m.bottom)
+    }
+
+    @Test("A line inside a two-line match's rectangle, carrying none of its rows, limits neither margin",
+          arguments: [688.0, 684.0])
+    func lineInsideTheMatchIsNoNeighbour(middle: Double) {
+        let box = Self.skippedLineBox(middle: middle)
+        let m = Self.margins(Self.s(10))
+        #expect(box.paint.maxY == box.inner.maxY + m.top, "top margin whole")
+        #expect(box.paint.minY == box.inner.minY - m.bottom, "bottom margin whole")
+        #expect(box.limitAbove == nil && box.limitBelow == nil, "no neighbour above or below")
+        #expect(box.paint.contains(box.inner))
+    }
 }
 
 extension PageRect64 {
