@@ -62,6 +62,27 @@ struct SwitchThroughTheRecordTests {
         }
     }
 
+    @Test("The editor's kept plan, made with the page's read and the switch, is the record's plan", arguments: [false, true])
+    func keptPlanIsTheRecordsPlan(switchOn: Bool) async throws {
+        let document = try M.document(Self.lines)
+        let data = try #require(document.dataRepresentation())
+        let reopened = try #require(PDFDocument(data: data))
+        defer { withExtendedLifetime(reopened) {} }
+        let page = try #require(reopened.page(at: 0))
+        let found = try await M.results(.text("Mara Lindqvist", options: SearchOptions()), in: reopened)
+        let regions = found.map { RedactionRegion(placing: $0) }
+        let read = try await RunRecordPageReadTests.read(data)
+        let cropBox = page.bounds(for: .cropBox).size
+        let record = RunRecord.Page(pageIndex: 0, regions: regions.map(RunRecord.DrawnRegion.init(region:)),
+                                    cropBox: cropBox, rotation: page.rotation, switchOn: switchOn, read: read)
+        let kept = DrawnPlan(pageIndex: 0, regions: regions, cropBox: cropBox, rotation: page.rotation,
+                             switchOn: switchOn, exportDPI: 300, fillColor: .black, read: read)
+        #expect(kept.plan == record.plan)
+        let wordless = DrawnPlan(pageIndex: 0, regions: regions, cropBox: cropBox, rotation: page.rotation,
+                                 switchOn: switchOn, exportDPI: 300, fillColor: .black)
+        #expect(wordless.plan != record.plan, "the read changes the plan, so the case means something")
+    }
+
     @Test("Under \"as placed\" the record carries no ink-check inputs and nothing is judged")
     func asPlacedCarriesNoInputs() async throws {
         let made = try await Self.run(source: .asPlaced, switchOn: true, terms: ["Quentin Ashby"])

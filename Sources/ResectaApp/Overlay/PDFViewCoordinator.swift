@@ -75,6 +75,8 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
 
     /// Active overlays keyed by page index, for targeted refresh.
     private var activeOverlays: [Int: RedactionOverlayView] = [:]
+    /// The pages whose read a kept plan waits on (`noteDrawn`).
+    private var pageReadsAsked: Set<Int> = []
 
     /// O(1) dirty-checking via version counter + selection snapshot.
     /// Replaces O(n) deep dictionary comparison.
@@ -533,25 +535,46 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
     /// regions the overlay draws and the source document's crop box and
     /// rotation, which the run's entry reads too, with the settings now, at
     /// the quality a run started now uses (`runQuality`, the run's own
-    /// function, under `qualityCap`). No user switch exists yet, so the switch
-    /// is passed off, as at run entry.
+    /// function, under `qualityCap`), with the user's switch and the page's
+    /// read, as the run's entry hands them to the same maker. While the plan
+    /// reads words, a page with regions whose read is not held yet keeps no
+    /// plan: its read is asked for, and the page redraws when it is held.
     /// `drawn` is false when a change of the cap re-keys a kept plan: the
     /// plan is made again, but the quality the page was shown at stays
-    /// until the page is drawn.
+    /// until the page is drawn. A page drawn while its read is asked for
+    /// still notes the quality it was shown at.
     func noteDrawn(pageIndex: Int, regions: [RedactionRegion], drawn isDrawn: Bool = true) {
-        guard let state = redactionState, let settings = settingsState,
-              let page = documentState?.sourceDocument?.page(at: pageIndex) else { return }
+        guard let state = redactionState, let settings = settingsState, let documentState,
+              let page = documentState.sourceDocument?.page(at: pageIndex) else { return }
         let cropBox = page.bounds(for: .cropBox).size
         // Nil where the run refuses the page for its size; no run fills it.
         let quality = runQuality(chosenDPI: settings.exportDPI, dpiCap: qualityCap, cropBox: cropBox,
                                  rotation: page.rotation) ?? min(settings.exportDPI, qualityCap)
+        if isDrawn, state.shownDPIs[pageIndex] != quality { state.shownDPIs[pageIndex] = quality }
+        let read = documentState.pageReads[pageIndex]
+        if RunRecord.planReadsWords, read == nil, !regions.isEmpty {
+            state.drawnPlans[pageIndex] = nil
+            askPageRead(pageIndex, of: documentState)
+            return
+        }
         let drawn = DrawnPlan(pageIndex: pageIndex, regions: regions, cropBox: cropBox,
-                              rotation: page.rotation, switchOn: false,
-                              exportDPI: quality, fillColor: settings.fillColor)
+                              rotation: page.rotation, switchOn: settings.boxesAcrossColumn,
+                              exportDPI: quality, fillColor: settings.fillColor, read: read)
             .stamped(pageVersion: state.pageVersion(pageIndex),
                      fromStoredRegions: regions == state.regions[pageIndex] ?? [])
         if state.drawnPlans[pageIndex] != drawn { state.drawnPlans[pageIndex] = drawn }
-        if isDrawn, state.shownDPIs[pageIndex] != quality { state.shownDPIs[pageIndex] = quality }
+    }
+
+    /// Reads one page for its kept plan, once at a time, and redraws the page
+    /// when its read is held, so the page keeps a plan of what it draws.
+    private func askPageRead(_ pageIndex: Int, of documentState: DocumentState) {
+        guard pageReadsAsked.insert(pageIndex).inserted else { return }
+        Task { @MainActor [weak self] in
+            await documentState.fillPageReads(for: [pageIndex])
+            guard let self else { return }
+            self.pageReadsAsked.remove(pageIndex)
+            if documentState.pageReads[pageIndex] != nil { self.activeOverlays[pageIndex]?.setNeedsDisplay() }
+        }
     }
 
     // MARK: - Overlay Refresh
