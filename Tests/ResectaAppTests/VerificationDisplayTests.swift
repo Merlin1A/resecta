@@ -230,8 +230,8 @@ struct VerificationDisplayTests {
                 == "Read the findings below before you share the PDF.") // LegalPhrases:safe (approved words)
         let box = LayerResult(
             name: VerificationLayer.boxFill.name, symbolName: VerificationLayer.boxFill.symbolName,
-            status: .attention("A box on page 4 is not exactly the fill."),
-            shortDescription: "A box on page 4 is not exactly the fill.", detailDescription: "",
+            status: .attention("A box on page 4 is not exactly the fill"),
+            shortDescription: "A box on page 4 is not exactly the fill", detailDescription: "",
             pageReferences: [3], durationSeconds: 0, layer: .boxFill)
         let one = VerificationReport(
             layers: [box], overallStatus: .attention("x"), durationSeconds: 0)

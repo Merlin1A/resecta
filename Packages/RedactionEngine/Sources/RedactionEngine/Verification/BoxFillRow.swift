@@ -100,26 +100,30 @@ enum BoxFillRow {
         return plan.boxes.contains { $0.regionIDs.contains(region.id) && $0.inner.contains(drawn) }
     }
 
-    /// "A box on page 4 is not exactly the fill." · "3 boxes on pages 4 and 9 are not exactly the fill."
+    /// "A box on page 4 is not exactly the fill" · "3 boxes on pages 4 and 9 are not exactly the fill".
+    /// No final full stop: a new line in the results list carries none.
     static func findSentence(_ boxPages: [Int]) -> String {
         boxPages.count == 1
-            ? "A box on page \(boxPages[0] + 1) is not exactly the fill."
-            : "\(boxPages.count) boxes on \(pagesPhrase(boxPages)) are not exactly the fill."
+            ? "A box on page \(boxPages[0] + 1) is not exactly the fill"
+            : "\(boxPages.count) boxes on \(pagesPhrase(boxPages)) are not exactly the fill"
     }
 
-    /// "A box on page 4 could not be checked." · "3 boxes on pages 4 and 9 could not be checked."
+    /// "A box on page 4 could not be checked" · "3 boxes on pages 4 and 9 could not be checked".
+    /// No final full stop, as above.
     static func notCheckedSentence(_ boxPages: [Int]) -> String {
         boxPages.count == 1
-            ? "A box on page \(boxPages[0] + 1) could not be checked."
-            : "\(boxPages.count) boxes on \(pagesPhrase(boxPages)) could not be checked."
+            ? "A box on page \(boxPages[0] + 1) could not be checked"
+            : "\(boxPages.count) boxes on \(pagesPhrase(boxPages)) could not be checked"
     }
 
-    /// "page 4", "pages 4 and 9", "pages 4, 9 and 12": each page once, 1-based, in order.
+    /// "page 4", "pages 4 and 9", "pages 4, 9, and 12": each page once,
+    /// 1-based, in order, with the serial comma the app's other lists use.
     static func pagesPhrase(_ pages: [Int]) -> String {
         let numbers = Array(Set(pages)).sorted().map { String($0 + 1) }
         switch numbers.count {
         case 1: return "page \(numbers[0])"
-        default: return "pages \(numbers.dropLast().joined(separator: ", ")) and \(numbers[numbers.count - 1])"
+        case 2: return "pages \(numbers[0]) and \(numbers[1])"
+        default: return "pages \(numbers.dropLast().joined(separator: ", ")), and \(numbers[numbers.count - 1])"
         }
     }
 }

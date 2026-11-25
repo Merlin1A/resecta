@@ -73,24 +73,24 @@ struct BoxFillRowTests {
              report: allRead(except: [:]), hasRecord: true, expected: .row(.passed, nil)),
         Cell(name: "a box on page 4 not the fill: Needs Review, the new-check line under it",
              report: allRead(except: [3: read([found, .offPage])]), hasRecord: true,
-             expected: .row(CheckRow(status: .attention("A box on page 4 is not exactly the fill."), pages: [3], couldNotVerify: false),
-                            LayerCopy(short: "A box on page 4 is not exactly the fill.", detail: BoxFillRow.newCheckLine))),
+             expected: .row(CheckRow(status: .attention("A box on page 4 is not exactly the fill"), pages: [3], couldNotVerify: false),
+                            LayerCopy(short: "A box on page 4 is not exactly the fill", detail: BoxFillRow.newCheckLine))),
         Cell(name: "page 4's picture unread, no issue: Could not verify, the page's sentence",
              report: allRead(except: [3: unread(2)]), hasRecord: true,
              expected: .row(CheckRow(status: .warn("Page 4 could not be read for this check"), pages: [3], couldNotVerify: true), nil)),
         Cell(name: "a box on page 4 not judged, no issue: Could not verify, the box's sentence",
              report: allRead(except: [3: read([unjudged, .offPage])]), hasRecord: true,
-             expected: .row(CheckRow(status: .warn("A box on page 4 could not be checked."), pages: [3], couldNotVerify: true), nil)),
+             expected: .row(CheckRow(status: .warn("A box on page 4 could not be checked"), pages: [3], couldNotVerify: true), nil)),
         Cell(name: "page 9 unread and a box on page 4 not judged: both, the page's sentence first",
              report: allRead(except: [3: read([unjudged, .offPage]), 8: unread(1)]), hasRecord: true,
-             expected: .row(CheckRow(status: .warn("Page 9 could not be read for this check; A box on page 4 could not be checked."),
+             expected: .row(CheckRow(status: .warn("Page 9 could not be read for this check; A box on page 4 could not be checked"),
                                      pages: [3, 8], couldNotVerify: true), nil)),
         Cell(name: "no record of the run: Skipped", report: .noRecord, hasRecord: false, expected: .skipped),
         Cell(name: "an issue on page 4 and page 9 unread: Needs Review with the could-not-verify part beside it",
              report: allRead(except: [3: read([found, .offPage]), 8: unread(1)]), hasRecord: true,
-             expected: .row(CheckRow(status: .attention("A box on page 4 is not exactly the fill."), pages: [3], couldNotVerify: false,
+             expected: .row(CheckRow(status: .attention("A box on page 4 is not exactly the fill"), pages: [3], couldNotVerify: false,
                                      partSentence: "Page 9 could not be read for this check", partPages: [8]),
-                            LayerCopy(short: "A box on page 4 is not exactly the fill.", detail: BoxFillRow.newCheckLine))),
+                            LayerCopy(short: "A box on page 4 is not exactly the fill", detail: BoxFillRow.newCheckLine))),
     ]
 
     @Test("The mapping has seven cells")
@@ -161,9 +161,9 @@ struct BoxFillRowTests {
         #expect(!BoxFillRow.isCovered(orphan, on: page))
         #expect(!BoxFillRow.isCovered(narrow, on: page))
         let reading = BoxFillRow.reading(report: .pages([Self.read([Self.done, Self.done])]), record: Self.record([page]))
-        #expect(reading == .row(CheckRow(status: .warn("2 boxes on page 1 could not be checked."), pages: [0], couldNotVerify: true), nil))
-        #expect(Self.rowSentence(reading) == "2 boxes on page 1 could not be checked.")
-        if case .row(let row, _) = reading { #expect(Self.sentence(row.status) == "2 boxes on page 1 could not be checked.") }
+        #expect(reading == .row(CheckRow(status: .warn("2 boxes on page 1 could not be checked"), pages: [0], couldNotVerify: true), nil))
+        #expect(Self.rowSentence(reading) == "2 boxes on page 1 could not be checked")
+        if case .row(let row, _) = reading { #expect(Self.sentence(row.status) == "2 boxes on page 1 could not be checked") }
     }
 
     @Test("A region painted outside the plan, named by the row's containment test and by the producer alike, could not be checked, and is counted once")
@@ -180,8 +180,8 @@ struct BoxFillRowTests {
         var picture = Self.read([Self.done])
         picture.outsidePlan = input.pages[0].outsidePlan
         let reading = BoxFillRow.reading(report: .pages([picture]), record: record)
-        #expect(reading == .row(CheckRow(status: .warn("A box on page 1 could not be checked."), pages: [0], couldNotVerify: true), nil))
-        #expect(Self.rowSentence(reading) == "A box on page 1 could not be checked.")
+        #expect(reading == .row(CheckRow(status: .warn("A box on page 1 could not be checked"), pages: [0], couldNotVerify: true), nil))
+        #expect(Self.rowSentence(reading) == "A box on page 1 could not be checked")
     }
 
     @Test("A region the producer reports painted outside the plan could not be checked, even where a box of the plan names and holds it")
@@ -193,8 +193,8 @@ struct BoxFillRowTests {
         var picture = Self.read([Self.done])
         picture.outsidePlan = try #require(BoxCheckInput(record: record)).pages[0].outsidePlan
         let reading = BoxFillRow.reading(report: .pages([picture]), record: record)
-        #expect(reading == .row(CheckRow(status: .warn("A box on page 1 could not be checked."), pages: [0], couldNotVerify: true), nil))
-        #expect(Self.rowSentence(reading) == "A box on page 1 could not be checked.")
+        #expect(reading == .row(CheckRow(status: .warn("A box on page 1 could not be checked"), pages: [0], couldNotVerify: true), nil))
+        #expect(Self.rowSentence(reading) == "A box on page 1 could not be checked")
     }
 
     @Test("Wholly off its page is the region as drawn sharing no area with the page; one past the left edge by a hair is on it")
@@ -210,8 +210,8 @@ struct BoxFillRowTests {
     func boxLeftOut() {
         let page = Self.page(0, [Self.share(0.1, 0.1, 0.3, 0.2), Self.share(0.5, 0.5, 0.7, 0.6)])
         let reading = BoxFillRow.reading(report: .pages([Self.read([Self.done])]), record: Self.record([page]))
-        #expect(reading == .row(CheckRow(status: .warn("A box on page 1 could not be checked."), pages: [0], couldNotVerify: true), nil))
-        #expect(Self.rowSentence(reading) == "A box on page 1 could not be checked.")
+        #expect(reading == .row(CheckRow(status: .warn("A box on page 1 could not be checked"), pages: [0], couldNotVerify: true), nil))
+        #expect(Self.rowSentence(reading) == "A box on page 1 could not be checked")
     }
 
     @Test("A record the check could not take reads Could not verify on every page, never Skipped; a file page the record lacks is unread")
@@ -239,12 +239,12 @@ struct BoxFillRowTests {
 
     @Test("The sentences' forms: one box, boxes on one page, two pages, three pages")
     func forms() {
-        #expect(BoxFillRow.findSentence([3]) == "A box on page 4 is not exactly the fill.")
-        #expect(BoxFillRow.findSentence([3, 3, 8]) == "3 boxes on pages 4 and 9 are not exactly the fill.")
-        #expect(BoxFillRow.notCheckedSentence([3]) == "A box on page 4 could not be checked.")
-        #expect(BoxFillRow.notCheckedSentence([3, 8, 8]) == "3 boxes on pages 4 and 9 could not be checked.")
-        #expect(BoxFillRow.notCheckedSentence([0, 0]) == "2 boxes on page 1 could not be checked.")
-        #expect(BoxFillRow.findSentence([0, 3, 8]) == "3 boxes on pages 1, 4 and 9 are not exactly the fill.")
+        #expect(BoxFillRow.findSentence([3]) == "A box on page 4 is not exactly the fill")
+        #expect(BoxFillRow.findSentence([3, 3, 8]) == "3 boxes on pages 4 and 9 are not exactly the fill")
+        #expect(BoxFillRow.notCheckedSentence([3]) == "A box on page 4 could not be checked")
+        #expect(BoxFillRow.notCheckedSentence([3, 8, 8]) == "3 boxes on pages 4 and 9 could not be checked")
+        #expect(BoxFillRow.notCheckedSentence([0, 0]) == "2 boxes on page 1 could not be checked")
+        #expect(BoxFillRow.findSentence([0, 3, 8]) == "3 boxes on pages 1, 4, and 9 are not exactly the fill")
     }
 
     // MARK: - the check's place, and one export through the engine
@@ -294,7 +294,7 @@ struct BoxFillRowTests {
         }
         let found = await run(record)
         #expect(found.status == .attention(""))
-        #expect(found.shortDescription == "A box on page 1 is not exactly the fill.")
+        #expect(found.shortDescription == "A box on page 1 is not exactly the fill")
         #expect(found.detailDescription == BoxFillRow.newCheckLine)
         #expect(found.pageReferences == [0])
         #expect(found.couldNotVerify == false)
