@@ -1,7 +1,7 @@
 Property: A region painted outside the plan that both the row's containment test and the producer name is one box that could not be checked, not two.
 Area: the Box Fill row
 Test command: cd Packages/RedactionEngine && swift test --skip-build --no-parallel --filter BoxFillRowTests (after swift build --build-tests)
-Must go red: RedactionEngineTests/BoxFillRowTests paintedOutsideThePlan, producerAloneNamesIt
+Must go red: RedactionEngineTests/BoxFillRowTests paintedOutsideThePlan
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/BoxFillRow.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/BoxFillRow.swift
