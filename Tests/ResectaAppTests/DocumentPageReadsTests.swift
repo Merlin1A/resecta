@@ -88,6 +88,20 @@ struct DocumentPageReadsTests {
         #expect(runner.contains("reads: coordinator.documentState.pageReads, settings: runSettings)"))
     }
 
+    @Test("Source pin: the editor keeps each page's plan with the user's switch and the page's read, as the run's entry makes it")
+    func keptPlanTakesTheReadAndTheSwitch() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let coordinator = try String(contentsOf: root.appendingPathComponent("Sources/ResectaApp/Overlay/PDFViewCoordinator.swift"),
+                                     encoding: .utf8)
+        let start = try #require(coordinator.range(of: "func noteDrawn("))
+        let body = coordinator[start.upperBound...]
+        #expect(body.contains("let read = documentState.pageReads[pageIndex]"))
+        #expect(body.contains("if RunRecord.planReadsWords, read == nil, !regions.isEmpty {"))
+        #expect(body.contains("switchOn: settings.boxesAcrossColumn,"))
+        #expect(body.contains("fillColor: settings.fillColor, read: read)"))
+    }
+
     @Test("The plan reads the page's words, so the run reads each page that holds a box at entry: one text read per such page per run")
     func planReadsWordsSoTheRunReads() {
         #expect(RunRecord.planReadsWords)

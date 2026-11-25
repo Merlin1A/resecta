@@ -80,11 +80,13 @@ public struct DrawnPlan: Equatable, Sendable {
     }
 
     /// The page's plan from `regions` as drawn, the page's crop box and
-    /// rotation, and the settings it is drawn under.
+    /// rotation, the page's read, and the settings it is drawn under. The
+    /// read is the one the run's entry hands the same maker
+    /// (`DocumentState.pageReads`), so the two make the same plan.
     public init(pageIndex: Int, regions: [RedactionRegion], cropBox: CGSize, rotation: Int,
-                switchOn: Bool, exportDPI: Int, fillColor: FillColor) {
+                switchOn: Bool, exportDPI: Int, fillColor: FillColor, read: RunRecord.PageRead? = nil) {
         let plan = RunRecord.Page.makePlan(regions: regions.map(RunRecord.DrawnRegion.init(region:)),
-                                           cropBox: cropBox, rotation: rotation, switchOn: switchOn)
+                                           cropBox: cropBox, rotation: rotation, switchOn: switchOn, read: read)
         self.init(pageIndex: pageIndex, switchOn: switchOn, exportDPI: exportDPI, fillColor: fillColor, plan: plan,
                   filledPixels: Self.filledPixels(regions: regions, cropBox: cropBox, rotation: rotation,
                                                   dpi: exportDPI),
