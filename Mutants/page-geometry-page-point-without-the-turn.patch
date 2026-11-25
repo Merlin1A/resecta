@@ -1,0 +1,20 @@
+Property: A point of the page as shown is carried into the page's own space through the turn.
+Area: the canvas's page geometry (turned pages)
+Test command: xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/PageGeometryTests
+Must go red: ResectaAppTests/PageGeometryTests everyRow
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/RunRecordPageGeometry+Canvas.swift b/Sources/ResectaApp/State/RunRecordPageGeometry+Canvas.swift
+index 724f28b..c819ac4 100644
+--- a/Sources/ResectaApp/State/RunRecordPageGeometry+Canvas.swift
++++ b/Sources/ResectaApp/State/RunRecordPageGeometry+Canvas.swift
+@@ -59,7 +59,8 @@ nonisolated extension RunRecord.PageGeometry {
+     func pagePoint(displayed p: CGPoint) -> CGPoint {
+         guard hasSides else { return .zero }
+         let size = displayedSize
+-        return pagePoint(ofDisplayedShare: CGPoint(x: p.x / size.width, y: p.y / size.height))
++        return RunRecord.PageGeometry(cropBox: cropBox, rotation: 0)
++            .pagePoint(ofDisplayedShare: CGPoint(x: p.x / size.width, y: p.y / size.height))
+     }
+ 
+     /// One displayed point as a share of the page as shown.

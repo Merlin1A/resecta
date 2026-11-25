@@ -1,0 +1,19 @@
+Property: The page geometry keeps the page's rotation, so its sides swap at a quarter turn and every map on it turns.
+Area: the canvas's page geometry (turned pages)
+Test command: xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/PageGeometryTests
+Must go red: ResectaAppTests/PageGeometryTests everyRow
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord+BoxPlace.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord+BoxPlace.swift
+index d87ca2d..71fecb3 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord+BoxPlace.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord+BoxPlace.swift
+@@ -40,7 +40,7 @@ extension RunRecord {
+ 
+         public init(cropBox: CGRect, rotation: Int) {
+             self.cropBox = cropBox
+-            self.rotation = ((rotation % 360) + 360) % 360
++            self.rotation = 0
+         }
+ 
+         /// The engine's frame for this page: the displayed size is the crop
