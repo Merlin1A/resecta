@@ -5,9 +5,10 @@ Must go red: RedactionEngineTests/ContentGlyphScanTests hiddenLayerPaintHoldsIts
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
+index f1e44893..2fb6e53d 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
-@@ -160,7 +160,7 @@
+@@ -166,7 +166,7 @@ extension DocumentSearcher {
              let fit = Self.inkFit(raw, page: page, text: line.string, range: lineRange, paintOnly: true)
              strip.append(raw)
              // Its own line's glyphs only, as in `lineBoxes`.
@@ -15,4 +16,4 @@ diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSea
 +            let box = fit.rect
              paint.append(box)
              identity.append(fit.identity ?? (box == fit.rect ? nil : fit.rect))
-             degraded = degraded || fit.degraded
+             characters.append(lineRange)

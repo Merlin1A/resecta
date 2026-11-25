@@ -19,6 +19,7 @@ extension RedactionRegion {
                   source: .searchMatch(term: result.term, rationale: result.rationale),
                   textLayerRect: result.textLayerRect,
                   textAnchored: result.source == .textLayer)
+        pageCharacters = result.source == .textLayer ? result.pageCharacters : nil
     }
 }
 

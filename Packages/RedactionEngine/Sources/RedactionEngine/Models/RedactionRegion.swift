@@ -57,6 +57,11 @@ public struct RedactionRegion: Sendable, Identifiable, Equatable, Codable {
     /// picture of the page (`InkStripPlan`), wherever they sit. A Searchable
     /// export strips under them too. Never encoded; empty outside a run.
     public var inkStripRects: [CGRect] = []
+    /// The characters its match selected, as a range of its page's string
+    /// (UTF-16): set where a region is placed from a text-layer match, nil
+    /// for every other region. Encoded; a region encoded without it reads as
+    /// nil. Read only while the region is anchored to its text.
+    package var pageCharacters: Range<Int>? = nil
 
     public init(
         id: UUID,
@@ -77,7 +82,7 @@ public struct RedactionRegion: Sendable, Identifiable, Equatable, Codable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, normalizedRect, source, textLayerRect, textAnchored, placedFromPageText
+        case id, normalizedRect, source, textLayerRect, textAnchored, placedFromPageText, pageCharacters
     }
 
     public init(from decoder: Decoder) throws {
@@ -90,6 +95,7 @@ public struct RedactionRegion: Sendable, Identifiable, Equatable, Codable {
         let placed = try container.decodeIfPresent(Bool.self, forKey: .placedFromPageText) ?? anchored
         placedFromPageText = placed
         textAnchored = anchored && placed
+        pageCharacters = try container.decodeIfPresent(Range<Int>.self, forKey: .pageCharacters)
     }
 
     /// The rects a Searchable export strips the text layer under: the box,

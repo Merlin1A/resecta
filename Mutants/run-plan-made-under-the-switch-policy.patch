@@ -5,14 +5,15 @@ Must go red: RedactionEngineTests/RunPlanKeptTests keptPlanIsAsPlaced; Redaction
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
+index 22b04adc..51d3436d 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
-@@ -105,7 +105,7 @@
+@@ -105,7 +105,7 @@ public struct RunRecord: Equatable, Sendable {
                    let height = PixelPlan.sixtyFourths(ofSide: Double(turned ? cropBox.width : cropBox.height))
              else { return nil }
              let admitted = regions.filter { RedactionRegion.isAdmitted(normalizedRect: $0.normalizedRect) }
 -            let choice = RunRecord.planChoice(source: RunRecord.planSource, switchOn: switchOn)
 +            let choice = RunRecord.planChoice(source: .switchPolicy, switchOn: switchOn)
              // Each region goes with its kind; under "as placed" the plan
-             // reads none.
-             let planRegions = admitted.map { region in
+             // reads none. Neither the run's capture nor the editor's drawing
+             // reads page text here, so no characters are selected.

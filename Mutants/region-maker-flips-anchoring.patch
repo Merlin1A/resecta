@@ -13,6 +13,6 @@ diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RedactionRe
                    textLayerRect: result.textLayerRect,
 -                  textAnchored: result.source == .textLayer)
 +                  textAnchored: result.source != .textLayer)
+         pageCharacters = result.source == .textLayer ? result.pageCharacters : nil
      }
  }
- 

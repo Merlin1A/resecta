@@ -17,4 +17,24 @@ extension RunRecord {
         case .switchPolicy: (.switchPolicy, switchOn)
         }
     }
+
+    /// The plan's regions for a page's admitted regions, in their order: each
+    /// with its share and kind, and, for a region still anchored to the text
+    /// it was placed from, the characters its match selected in `text`, the
+    /// page's string (`WordSelection.characters`: white space and offsets
+    /// outside `text` are left out). Every other region selects nothing.
+    package static func planRegions(_ regions: [DrawnRegion], text: String) -> [PlanRegion] {
+        regions.map { region in
+            let r = region.normalizedRect
+            let selected: Set<Int> = if region.kind == .placedFromTextAnchored, let range = region.pageCharacters {
+                WordSelection.characters([range], in: text).offsets
+            } else {
+                []
+            }
+            return PlanRegion(id: region.id,
+                              share: PointRect(minX: Double(r.minX), minY: Double(r.minY),
+                                               maxX: Double(r.maxX), maxY: Double(r.maxY)),
+                              kind: region.kind, selected: selected)
+        }
+    }
 }
