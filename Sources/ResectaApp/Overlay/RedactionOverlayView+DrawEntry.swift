@@ -8,6 +8,7 @@ extension RedactionOverlayView {
     // MARK: - Drawing
 
     override func draw(_ rect: CGRect) {
+        drawPassCount += 1
         guard let ctx = UIGraphicsGetCurrentContext() else { return }
 
         // Clip to dirty rect for performance with many regions.
