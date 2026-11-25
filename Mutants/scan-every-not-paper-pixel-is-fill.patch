@@ -1,0 +1,19 @@
+Property: The classed reading tells the teal line from the fill, so an outline with nothing inside reads as no fill.
+Area: the canvas probe's classed reading
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppUITests/EdgeScanTests
+Must go red: ResectaAppUITests/EdgeScanTests testAnOutlineWithNoFillInsideTheWindowGivesNoFillEdges
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Tests/ResectaAppUITests/Support/CanvasPixelProbe.swift b/Tests/ResectaAppUITests/Support/CanvasPixelProbe.swift
+index e5697e411..8c678f8fe 100644
+--- a/Tests/ResectaAppUITests/Support/CanvasPixelProbe.swift
++++ b/Tests/ResectaAppUITests/Support/CanvasPixelProbe.swift
+@@ -175,7 +175,7 @@ nonisolated extension CanvasPixelProbe {
+                      paper: (r: Int, g: Int, b: Int), step: Int) -> Mark {
+         let d = (r: paper.r - pixel.r, g: paper.g - pixel.g, b: paper.b - pixel.b)
+         if abs(d.r) <= step, abs(d.g) <= step, abs(d.b) <= step { return .paper }
+-        return 5 * (d.r - max(d.g, d.b)) > d.r ? .line : .fill
++        return .fill
+     }
+ 
+     struct Reading: Equatable {
