@@ -35,6 +35,7 @@ struct PipelineFailureStageTests {
             PipelineError.redactionError(.bitmapCreationFailed(pageIndex: 1)),
             PipelineError.redactionError(.insufficientMemory(pageIndex: 0)),
             PipelineError.redactionError(.unsupportedPageGeometry(pageIndex: 0)),
+            PipelineError.redactionError(.boxCannotShowLength(pageIndex: 0)),
             PipelineError.redactionError(.reconstructionFailed),
           ])
     func prePromotionErrorsClassifyAsRedaction(error: PipelineError) {

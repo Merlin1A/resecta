@@ -40,6 +40,17 @@ public struct RunRecord: Equatable, Sendable {
             self.exportDPI = exportDPI
             self.pages = pages
         }
+
+        /// The first page, from 0, whose plan holds a box that cannot be
+        /// applied as planned: one whose exposure is not "can show the
+        /// value's length", the one exposure every rule of this release
+        /// gives. Nil when every planned box can be applied. The run does
+        /// not start while it is not nil.
+        public var firstPageWithBoxThatCannotShowLength: Int? {
+            pages.first { page in
+                page.plan?.boxes.contains { $0.exposure != .canShowLength } ?? false
+            }?.pageIndex
+        }
     }
 
     /// One page as the user confirmed it.
@@ -85,14 +96,14 @@ public struct RunRecord: Equatable, Sendable {
                let height = PixelPlan.sixtyFourths(ofSide: Double(turned ? cropBox.width : cropBox.height)) {
                 let admitted = regions.filter { RedactionRegion.isAdmitted(normalizedRect: $0.normalizedRect) }
                 let choice = RunRecord.planChoice(source: RunRecord.planSource, switchOn: switchOn)
-                // A drawn region carries no kind; under "as placed" the plan
-                // never reads one.
+                // Each region goes with its kind; under "as placed" the plan
+                // reads none.
                 let planRegions = admitted.map { region in
                     let r = region.normalizedRect
                     return PlanRegion(id: region.id,
                                       share: PointRect(minX: Double(r.minX), minY: Double(r.minY),
                                                        maxX: Double(r.maxX), maxY: Double(r.maxY)),
-                                      kind: .drawnByHand)
+                                      kind: region.kind)
                 }
                 plan = PaintPlan.make(
                     regions: planRegions, words: PageWords(words: []), text: "",
@@ -110,15 +121,23 @@ public struct RunRecord: Equatable, Sendable {
         }
     }
 
-    /// A region as drawn: its id and its rectangle as a share of the page
-    /// (0 to 1, origin bottom-left), unclamped. An edge may lie off the page.
+    /// A region as drawn: its id, its rectangle as a share of the page
+    /// (0 to 1, origin bottom-left), unclamped (an edge may lie off the
+    /// page), and its kind, which the plan reads.
     public struct DrawnRegion: Equatable, Sendable {
         public let id: UUID
         public let normalizedRect: CGRect
+        /// Read from the region's source and its two marks (`RegionKind(of:)`).
+        package let kind: RegionKind
 
-        public init(id: UUID, normalizedRect: CGRect) {
+        public init(region: RedactionRegion) {
+            self.init(id: region.id, normalizedRect: region.normalizedRect, kind: RegionKind(of: region))
+        }
+
+        package init(id: UUID, normalizedRect: CGRect, kind: RegionKind) {
             self.id = id
             self.normalizedRect = normalizedRect
+            self.kind = kind
         }
     }
 

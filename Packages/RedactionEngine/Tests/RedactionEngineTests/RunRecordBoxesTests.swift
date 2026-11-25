@@ -19,7 +19,7 @@ struct RunRecordBoxesTests {
     static let letterS = (width: 39_168, height: 50_688)
 
     static func region(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat) -> RunRecord.DrawnRegion {
-        RunRecord.DrawnRegion(id: UUID(), normalizedRect: CGRect(x: x, y: y, width: w, height: h))
+        RunRecord.DrawnRegion(id: UUID(), normalizedRect: CGRect(x: x, y: y, width: w, height: h), kind: .drawnByHand)
     }
 
     static func plan(_ regions: [RunRecord.DrawnRegion], cropBox: CGSize = letter, rotation: Int = 0) throws -> PaintPlan {
@@ -86,7 +86,7 @@ struct RunRecordBoxesTests {
             #expect((unturned.widthSixtyFourths, unturned.heightSixtyFourths) == (39_168, 50_688))
 
         case .outwardRounding:
-            let r = RunRecord.DrawnRegion(id: UUID(), normalizedRect: CGRect(x: 0.1, y: 0.25, width: 0.2, height: 0.25))
+            let r = RunRecord.DrawnRegion(id: UUID(), normalizedRect: CGRect(x: 0.1, y: 0.25, width: 0.2, height: 0.25), kind: .drawnByHand)
             let plan = try Self.plan([r])
             let inner = try #require(plan.boxes.first?.inner)
             // 0.1 × 39,168 = 3,916.8 and 0.3 × 39,168 = 11,750.4 are not whole

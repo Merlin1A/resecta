@@ -1,0 +1,18 @@
+Property: A Searchable page keeps its text only where every box is still anchored to the text it was placed from: a Search box moved by hand on a page that is not plain sends the page to a picture. Here the rule reads the mark that never changes, so the moved box keeps the page's text.
+Area: page mode
+Test command: cd Packages/RedactionEngine && swift test --filter RunPlanKeptTests
+Must go red: RedactionEngineTests/RunPlanKeptTests movedSearchBoxSendsThePageToAPicture
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageContentFacts.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageContentFacts.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageContentFacts.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Detection/PageContentFacts.swift
+@@ -53,7 +53,7 @@
+     /// or covers the whole page; otherwise only when the page is plain. The
+     /// facts are read only when some region is neither.
+     public static func keepsTextLayer(regions: [RedactionRegion], facts: () -> PageContentFacts) -> Bool {
+-        let unanchored = regions.contains { !$0.textAnchored && !$0.coversWholePage }
++        let unanchored = regions.contains { !$0.placedFromPageText && !$0.coversWholePage }
+         return !unanchored || facts().isPlain
+     }
+ 

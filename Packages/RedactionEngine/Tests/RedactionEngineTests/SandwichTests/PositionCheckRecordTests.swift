@@ -103,7 +103,7 @@ struct PositionCheckRecordTests {
             inkEnlargedCovered: false, inkEnlargedToCap: false, asDrawn: false)
         let plan = PaintPlan(widthSixtyFourths: Int(p.width) * 64, heightSixtyFourths: Int(p.height) * 64,
                              boxes: [box])
-        let drawn = RunRecord.DrawnRegion(id: region, normalizedRect: .zero)
+        let drawn = RunRecord.DrawnRegion(id: region, normalizedRect: .zero, kind: .drawnByHand)
         return RunRecord(
             confirmed: RunRecord.Confirmed(fillColor: .black, exportDPI: 300, pages: [
                 RunRecord.Page(pageIndex: 0, regions: [drawn], plan: plan)]),

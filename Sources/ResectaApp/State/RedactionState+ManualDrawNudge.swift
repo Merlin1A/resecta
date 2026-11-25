@@ -73,11 +73,7 @@ extension RedactionState {
         documentState: DocumentState? = nil
     ) -> RedactionRegion? {
         if let documentState, !documentState.canMutateRegions { return nil }
-        let region = RedactionRegion(
-            id: UUID(), normalizedRect: nudge.normalizedRect,
-            source: .searchMatch(term: nudge.term, rationale: nudge.rationale), textLayerRect: nudge.textLayerRect,
-            textAnchored: nudge.source == .textLayer
-        )
+        let region = RedactionRegion(placing: nudge)
         // Category stamp — mirrors `prepareApply` so a nudge-accepted
         // region stays indistinguishable from a sheet-applied region.
         let nudgeKind: DetectionResult.Kind = nudge.piiCategory

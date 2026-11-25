@@ -253,6 +253,7 @@ struct ResectaApp: App {
         .detectionError(.detectionCorpusInvalid),
         .redactionError(.insufficientMemory(pageIndex: 0)),
         .redactionError(.unsupportedPageGeometry(pageIndex: 0)),
+        .redactionError(.boxCannotShowLength(pageIndex: 0)),
         .redactionError(.bitmapCreationFailed(pageIndex: 0)),
         .redactionError(.fillVerificationFailed(pageIndex: 0)),
         .redactionError(.renderTimeout(pageIndex: 0)),
@@ -287,6 +288,7 @@ struct ResectaApp: App {
             switch failure {
             case .insufficientMemory: "redactionError.insufficientMemory"
             case .unsupportedPageGeometry: "redactionError.unsupportedPageGeometry"
+            case .boxCannotShowLength: "redactionError.boxCannotShowLength"
             case .bitmapCreationFailed: "redactionError.bitmapCreationFailed"
             case .fillVerificationFailed: "redactionError.fillVerificationFailed"
             case .renderTimeout: "redactionError.renderTimeout"

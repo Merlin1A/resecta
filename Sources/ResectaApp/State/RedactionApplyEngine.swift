@@ -344,13 +344,7 @@ nonisolated func prepareApply(
         // the region's Source so downstream surfaces (RegionInfoPopover
         // disclosure, canvas long-press action sheet) can
         // read it without re-querying MatchAuditSnapshot.
-        let region = RedactionRegion(
-            id: UUID(),
-            normalizedRect: result.normalizedRect,
-            source: .searchMatch(term: result.term, rationale: result.rationale),
-            textLayerRect: result.textLayerRect,
-            textAnchored: result.source == .textLayer
-        )
+        let region = RedactionRegion(placing: result)
         createdRegions[result.pageIndex, default: []].append(region)
         coveringRectsByPage[result.pageIndex, default: []].append(result.normalizedRect)
         if let strip = result.textLayerRect { coveringStripRectsByPage[result.pageIndex, default: []].append(strip) }

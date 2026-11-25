@@ -31,7 +31,7 @@ struct PageSidesNotAsRecordedTests {
         let page = try #require(doc.page(at: 0))
         let box = CGRect(x: 40.3, y: 50.7, width: 50.1, height: 20.2)
         let id = UUID()
-        let drawn = [RunRecord.DrawnRegion(id: id, normalizedRect: P.share(box))]
+        let drawn = [RunRecord.DrawnRegion(id: id, normalizedRect: P.share(box), kind: .drawnByHand)]
         let confirmed = RunRecord.Page(pageIndex: 0, regions: drawn, cropBox: page.bounds(for: .cropBox).size,
                                        rotation: page.rotation, switchOn: false)
         switch change {
