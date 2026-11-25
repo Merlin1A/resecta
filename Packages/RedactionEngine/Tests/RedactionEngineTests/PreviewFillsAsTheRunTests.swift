@@ -143,7 +143,8 @@ struct PreviewFillsAsTheRunTests {
             for box in kept.boxes {
                 #expect(box.fill.count == 1, "every box projects")
                 let id = try #require(box.regionIDs.first)
-                expected[id] = try #require(box.fill.first)
+                let fill = try #require(box.fill.first)
+                expected[id] = fill
             }
             // The run's own record of what it painted, by box.
             let painted = result.paintedBoxes
