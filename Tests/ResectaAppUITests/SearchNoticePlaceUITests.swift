@@ -209,11 +209,13 @@ nonisolated final class SearchNoticePlaceUITests: XCTestCase {
         let plain = app.staticTexts["Search"].firstMatch
         XCTAssertTrue(plain.waitForExistence(timeout: 30))
         XCTAssertFalse(element("parkedStripNoticeMark").exists)
-        // The mark is an overlay before the title, and the title's element
-        // reports a frame that takes the overlay in; where the words stand
-        // is read from the edge the mark is not on.
+        // The mark is an overlay before the title, centred on it and taller
+        // than it, and the title's element may report a frame that takes the
+        // overlay in; where the words stand is read from the edge the mark is
+        // not on, and from the middle the overlay shares with them.
+        print("strip title with the mark \(withMark), without \(plain.frame)")
         XCTAssertEqual(plain.frame.maxX, withMark.maxX, accuracy: 1, "The mark moved the title.")
-        XCTAssertEqual(plain.frame.minY, withMark.minY, accuracy: 1, "The mark moved the title.")
+        XCTAssertEqual(plain.frame.midY, withMark.midY, accuracy: 1, "The mark moved the title.")
     }
 
     func testScan_theDegradedNoticeStandsAboveTheList() {
