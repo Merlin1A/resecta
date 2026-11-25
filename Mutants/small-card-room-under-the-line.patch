@@ -1,0 +1,28 @@
+Property: The room under the parked card's row holds the line drawn there.
+Area: the parked Search card's metrics
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/CompactCardMetricsTests
+Must go red: ResectaAppTests/CompactCardMetricsTests roomHoldsTheLine, ResectaAppTests/CompactCardMetricsTests valuesOfRecord
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/Search/CompactFloatDetent.swift b/Sources/ResectaApp/Views/Search/CompactFloatDetent.swift
+index a3bdf1eaa..9a62b6bd8 100644
+--- a/Sources/ResectaApp/Views/Search/CompactFloatDetent.swift
++++ b/Sources/ResectaApp/Views/Search/CompactFloatDetent.swift
+@@ -67,7 +67,7 @@ struct CompactFloatDetent: CustomPresentationDetent {
+     /// The room under the controls row: hugHeight − grabberInset −
+     /// CompactCard.rowTopPadding − rowHeight (101 − 15 − 0 − 46). It holds
+     /// the line under the row at xxLarge.
+-    static let bottomInset: CGFloat = 40
++    static let bottomInset: CGFloat = 28
+ }
+ 
+ /// The small card's own numbers, read by the parked Search card. Card-local,
+@@ -80,7 +80,7 @@ nonisolated enum CompactCard {
+     /// The row's top padding inside the card, under the grabber's inset:
+     /// the row sits CompactFloatDetent.grabberInset + rowTopPadding below
+     /// the card's top.
+-    static let rowTopPadding: CGFloat = 0
++    static let rowTopPadding: CGFloat = 12
+     /// The row's side inset.
+     static let sideInset: CGFloat = 16
+     /// The gap from the row to the line under it.

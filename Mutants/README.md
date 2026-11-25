@@ -815,3 +815,10 @@ with its reason and the mutant that is caught in its place.
 | `results-findings-placed-twice-when-they-come-first.patch` | The Findings group is placed once: before the small print on Checks Passed, else after it. | ResectaAppTests/ResultsOrderAndSentenceTests orderUnderTheButtons |
 | `masthead-hand-drawn-sentence-outranks-the-findings.patch` | On a passing run with a Findings row the sentence points to the findings, whatever else the run has. | ResectaAppTests/ResultsOrderAndSentenceTests passingSentenceTable |
 | `toolbar-active-tool-keeps-its-frame.patch` | The Rectangle tool's item keeps one frame on and off, so turning it on moves nothing on the bar. | ResectaAppUITests/DrawToolStateUITests testTheRectangleTool_onIsAFilledPill_andNothingMoves |
+| `small-card-apply-floor-bared.patch` | Each of Apply's two heights keeps the touch-floor token. | ResectaAppTests/CompactCardMetricsTests applyHeightsKeepTheFloor |
+| `small-card-bar-cluster-gap.patch` | The search bar's cluster keeps its 4-pt outer stack (its counter gap and the mark's gap). | ResectaAppTests/CompactCardMetricsTests lineGapAndTheBarsCluster |
+| `small-card-circle-frame-at-floor.patch` | A circle over the touch floor is laid out at its own size, not squeezed to the floor. | ResectaAppTests/CompactCardMetricsTests circleOuterFrame |
+| `small-card-hug-capsule.patch` | The parked card's hug stays in the attached sheet regime (101 or more). | ResectaAppTests/CompactDetentAnchoredRowTests hugStaysInTheAttachedRegime |
+| `small-card-hug-unclamped.patch` | The parked card's height never exceeds the available height. | ResectaAppTests/CompactDetentAnchoredRowTests clampsToAvailableHeight |
+| `small-card-pair-gap-moved.patch` | The parked card's gap between the arrows is the card's value, on its named site. | ResectaAppTests/CompactCardMetricsTests valuesOfRecord |
+| `small-card-room-under-the-line.patch` | The room under the parked card's row holds the line drawn there. | ResectaAppTests/CompactCardMetricsTests roomHoldsTheLine; ResectaAppTests/CompactCardMetricsTests valuesOfRecord |

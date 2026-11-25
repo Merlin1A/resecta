@@ -1,0 +1,19 @@
+Property: Each of Apply's two heights keeps the touch-floor token.
+Area: the parked Search card's metrics
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/CompactCardMetricsTests
+Must go red: ResectaAppTests/CompactCardMetricsTests applyHeightsKeepTheFloor
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/Search/SearchAndRedactSheet+CompactApply.swift b/Sources/ResectaApp/Views/Search/SearchAndRedactSheet+CompactApply.swift
+index fa56e4155..011cfe692 100644
+--- a/Sources/ResectaApp/Views/Search/SearchAndRedactSheet+CompactApply.swift
++++ b/Sources/ResectaApp/Views/Search/SearchAndRedactSheet+CompactApply.swift
+@@ -84,7 +84,7 @@ extension SearchAndRedactSheet {
+                         .font(.headline)
+                         .foregroundStyle(.secondary)
+                         .padding(.horizontal, CompactCard.applyPadding)
+-                        .frame(minHeight: max(ResectaTokens.TouchTarget.minimum, CompactCard.applyHeight))
++                        .frame(minHeight: CompactCard.applyHeight)
+                         .background(CircularIconButtonStyle.wash, in: Capsule())
+                         .contentShape(Rectangle())
+                 }
