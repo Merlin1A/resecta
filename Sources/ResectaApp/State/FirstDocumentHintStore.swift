@@ -26,7 +26,7 @@ nonisolated struct FirstDocumentHintStore {
         defaults.set(true, forKey: Self.doneKey)
     }
 
-    /// Only the test launch clears it (`--firstDocumentHintFresh`).
+    /// Only the test launch clears it (the DEBUG launch handler in `ResectaApp`).
     func clear() {
         defaults.removeObject(forKey: Self.doneKey)
     }

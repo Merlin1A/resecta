@@ -5,7 +5,7 @@ Must go red: ResectaAppTests/FirstDocumentHintTests onceLeftNeverAgain; ResectaA
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/State/FirstDocumentHintStore.swift b/Sources/ResectaApp/State/FirstDocumentHintStore.swift
-index c1e6afe6..efcb20dc 100644
+index 9e1af56d..d7e1afdc 100644
 --- a/Sources/ResectaApp/State/FirstDocumentHintStore.swift
 +++ b/Sources/ResectaApp/State/FirstDocumentHintStore.swift
 @@ -23,7 +23,7 @@ nonisolated struct FirstDocumentHintStore {
@@ -16,4 +16,4 @@ index c1e6afe6..efcb20dc 100644
 +        _ = defaults
      }
  
-     /// Only the test launch clears it (`--firstDocumentHintFresh`).
+     /// Only the test launch clears it (the DEBUG launch handler in `ResectaApp`).
