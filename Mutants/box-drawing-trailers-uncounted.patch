@@ -3,17 +3,16 @@ Area: the box check's own reading of what each page draws
 Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/BoxCheckDrawingTests (or on the host: cd Packages/RedactionEngine && swift test --filter BoxCheckDrawingTests)
 Must go red: RedactionEngineTests/BoxCheckDrawingTests eachCase [D98: a second trailer word after the name of an earlier one]
 Apply in a scratch worktree with `git apply`; discard after.
-
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
-index 70c2ca23..d0365266 100644
+index ff0fae18..a50797c0 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
-@@ -87,7 +87,7 @@ enum PageDrawingReader {
-     /// its names are spelled.
+@@ -105,7 +105,7 @@ enum PageDrawingReader {
+     /// writer was measured to write. The trailer comes before startxref.
      static func fileReason(_ data: Data, _ document: CGPDFDocument) -> Reason? {
          let startxref = Data("startxref".utf8), trailer = Data("trailer".utf8), end = Data("%%EOF".utf8)
 -        guard count(of: startxref, in: data) == 1, count(of: trailer, in: data) == 1, let e = data.range(of: end, options: .backwards) else { return .fileRevised }
 +        guard count(of: startxref, in: data) == 1, let e = data.range(of: end, options: .backwards) else { return .fileRevised }
          guard data[e.upperBound...].allSatisfy({ $0 == 10 || $0 == 13 }) else { return .fileRevised }
          guard let t = data.range(of: trailer, options: .backwards, in: data.startIndex..<e.lowerBound) else { return .fileRevised }
-         let tail = nameEscapesRead(data[t.upperBound..<e.lowerBound])
+         guard let s = data.range(of: startxref), let x = tableOffset(data, after: s), x < t.lowerBound, t.upperBound <= s.lowerBound else {

@@ -1,20 +1,23 @@
 Property: The file is one revision.
 Area: the box check's own reading of what each page draws
 Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/BoxCheckDrawingTests (or on the host: cd Packages/RedactionEngine && swift test --filter BoxCheckDrawingTests)
-Must go red: RedactionEngineTests/BoxCheckDrawingTests eachCase [D85: a second revision appended]; RedactionEngineTests/BoxCheckDrawingTests eachCase [D86: a trailer that names an earlier one]; RedactionEngineTests/BoxCheckDrawingTests eachCase [D87: a trailer that names an earlier one with an escape]; RedactionEngineTests/BoxCheckDrawingTests eachCase [D88: a trailer that names a cross-reference stream]; RedactionEngineTests/BoxCheckDrawingTests eachCase [D89: an object after the end of the file]; RedactionEngineTests/BoxCheckDrawingTests eachCase [D98: a second trailer word after the name of an earlier one]
+Must go red: RedactionEngineTests/BoxCheckDrawingTests eachCase [D85: a second revision appended]; RedactionEngineTests/BoxCheckDrawingTests eachCase [D86: a trailer that names an earlier one]; RedactionEngineTests/BoxCheckDrawingTests eachCase [D87: a trailer that names an earlier one with an escape]; RedactionEngineTests/BoxCheckDrawingTests eachCase [D88: a trailer that names a cross-reference stream]; RedactionEngineTests/BoxCheckDrawingTests eachCase [D89: an object after the end of the file]; RedactionEngineTests/BoxCheckDrawingTests eachCase [D98: a second trailer word after the name of an earlier one]; RedactionEngineTests/BoxCheckDrawingTests eachCase [D104: startxref names a cross-reference stream that names an earlier one, the one trailer word left in the file]; RedactionEngineTests/BoxCheckDrawingTests eachCase [D105: startxref names a byte past the start of the table]; RedactionEngineTests/BoxCheckDrawingTests eachCase [D106: startxref's number in thirteen digits: the table's offset zero-padded to twelve, then one digit more]; RedactionEngineTests/BoxCheckDrawingTests eachCase [D107: startxref's number followed by a byte that is not a line end]; RedactionEngineTests/BoxCheckDrawingTests eachCase [D108: startxref names the xref inside its own keyword, after the trailer]
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
-index 70c2ca23..03e69148 100644
+index ff0fae18..0bda2a25 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
-@@ -87,11 +87,7 @@ enum PageDrawingReader {
-     /// its names are spelled.
+@@ -105,14 +105,7 @@ enum PageDrawingReader {
+     /// writer was measured to write. The trailer comes before startxref.
      static func fileReason(_ data: Data, _ document: CGPDFDocument) -> Reason? {
          let startxref = Data("startxref".utf8), trailer = Data("trailer".utf8), end = Data("%%EOF".utf8)
 -        guard count(of: startxref, in: data) == 1, count(of: trailer, in: data) == 1, let e = data.range(of: end, options: .backwards) else { return .fileRevised }
 -        guard data[e.upperBound...].allSatisfy({ $0 == 10 || $0 == 13 }) else { return .fileRevised }
 -        guard let t = data.range(of: trailer, options: .backwards, in: data.startIndex..<e.lowerBound) else { return .fileRevised }
+-        guard let s = data.range(of: startxref), let x = tableOffset(data, after: s), x < t.lowerBound, t.upperBound <= s.lowerBound else {
+-            return .fileRevised
+-        }
 -        let tail = nameEscapesRead(data[t.upperBound..<e.lowerBound])
 -        if tail.range(of: Data("/Prev".utf8)) != nil || tail.range(of: Data("/XRefStm".utf8)) != nil { return .fileRevised }
 +        _ = (startxref, trailer, end)

@@ -1,0 +1,19 @@
+Property: The picture holds one Exif segment.
+Area: the box check's own reading of what each page draws
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/BoxCheckDrawingTests (or on the host: cd Packages/RedactionEngine && swift test --filter BoxCheckDrawingTests)
+Must go red: RedactionEngineTests/BoxCheckDrawingTests eachCase [D103: the writer's Exif segment twice]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+index 86dc26d9..d01ba69f 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+@@ -255,7 +255,7 @@ enum PageDrawingReader {
+             case 0xE0:
+                 guard body.starts(with: Array("JFIF\0".utf8)) else { return .unlistedSegment }
+             case 0xE1:
+-                guard exifSides == nil, let sides = writersExifSides(body) else { return .unlistedSegment }
++                guard let sides = writersExifSides(body) else { return .unlistedSegment }
+                 exifSides = sides
+             case 0xC0...0xC3, 0xC5...0xC7, 0xC9...0xCB, 0xCD...0xCF:
+                 if body.count >= 5 { frameSides = (Int(body[3]) << 8 | Int(body[4]), Int(body[1]) << 8 | Int(body[2])) }

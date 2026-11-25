@@ -33,7 +33,10 @@ enum BoxCheckFixtures {
             if let (r, g, b) = m.rgb, !gray { ctx.setFillColor(red: r, green: g, blue: b, alpha: 1) } else { ctx.setFillColor(gray: m.gray, alpha: 1) }
             ctx.fill(rect(m.lines, h))
         }
-        return ctx.makeImage()!
+        // The writer's pictures are sRGB (PixelOperations), and it encodes their
+        // Exif in that one form: the colour picture is tagged so, its bytes unchanged.
+        let image = ctx.makeImage()!
+        return gray ? image : image.copy(colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)!
     }
 
     /// Lines counted from the top, as a Core Graphics rectangle (origin bottom-left).

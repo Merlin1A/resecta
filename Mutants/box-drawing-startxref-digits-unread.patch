@@ -1,0 +1,25 @@
+Property: startxref's number is read whole: at most 12 digits, and a line end right after the last.
+Area: the box check's own reading of what each page draws
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/BoxCheckDrawingTests (or on the host: cd Packages/RedactionEngine && swift test --filter BoxCheckDrawingTests)
+Must go red: RedactionEngineTests/BoxCheckDrawingTests eachCase [D106: startxref's number in thirteen digits: the table's offset zero-padded to twelve, then one digit more]; RedactionEngineTests/BoxCheckDrawingTests eachCase [D107: startxref's number followed by a byte that is not a line end]
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+index ff0fae18..987e6298 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck+PageDrawing.swift
+@@ -123,12 +123,8 @@ enum PageDrawingReader {
+     static func tableOffset(_ data: Data, after keyword: Range<Data.Index>) -> Data.Index? {
+         var i = keyword.upperBound, value = 0, digits = 0
+         while i < data.endIndex, data[i] == 10 || data[i] == 13 || data[i] == 32 { i += 1 }
+-        while i < data.endIndex, (48...57).contains(data[i]) {
+-            digits += 1
+-            guard digits <= 12 else { return nil }
+-            value = value * 10 + Int(data[i] - 48); i += 1
+-        }
+-        guard digits > 0, i < data.endIndex, data[i] == 10 || data[i] == 13, value <= data.count - 5 else { return nil }
++        while i < data.endIndex, (48...57).contains(data[i]), digits < 12 { value = value * 10 + Int(data[i] - 48); digits += 1; i += 1 }
++        guard digits > 0, value <= data.count - 5 else { return nil }
+         let x = data.startIndex + value
+         guard data[x..<(x + 4)].elementsEqual("xref".utf8), data[x + 4] == 10 || data[x + 4] == 13 else { return nil }
+         return x
