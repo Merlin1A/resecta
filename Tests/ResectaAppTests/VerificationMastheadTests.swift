@@ -160,15 +160,84 @@ struct VerificationMastheadTests {
                 == "\(Self.keepEditing) and run your search again with Include OCR Pages on.")
     }
 
-    @Test("Output missing: the arms that name Preview or Run Verification give way; the others stay")
-    func outputMissingSubstitution() {
+    // MARK: - A result that no longer stands
+
+    /// The four states a result can be in: standing, the boxes changed since
+    /// the PDF was made (the PDF present), the PDF gone, and both.
+    static let states: [(name: String, outputExists: Bool, isStale: Bool)] = [
+        ("standing", true, false), ("boxes changed", true, true), ("PDF gone", false, false), ("both", false, true),
+    ]
+
+    static func stands(_ state: (name: String, outputExists: Bool, isStale: Bool)) -> Bool {
+        state.outputExists && !state.isStale
+    }
+
+    /// Every seeded report, plus two arms no seeded report reaches: a pass
+    /// with several notes, and a WARN whose check could not run in full.
+    static var everyArm: [(name: String, report: VerificationReport, findingCount: Int)] {
+        Fixtures.all.sorted { $0.key < $1.key }.map { ($0.key, $0.value, 0) } + [
+            ("a pass with several notes", Fixtures.secureAllPass, 2),
+            ("a check that could not run in full", report(.warn("w"), [row(.warn("w"), .ocrCheck, cnv: true)]), 0),
+        ]
+    }
+
+    @Test("A result that no longer stands (the PDF gone, or the boxes changed since): every verdict's sentence gives way to the one that says to run Redact again")
+    func sentenceWhenTheResultDoesNotStand() {
+        // The rule this replaces let only the arms that name Preview or Run
+        // Verification give way, and only when the PDF was gone: a failed
+        // run, or a pass with a note, still invited a share the Share button
+        // could not make. Of that test's four expectations, the pass with no
+        // note and the run whose checks did not run hold as written; the
+        // failed run and the pass with a note are reversed by this rule.
         let missing = "\(Self.keepEditing), then run Redact again to share the PDF."
-        #expect(Results.mastheadSubtitle(report: Fixtures.secureAllPass, outputExists: false) == missing)
-        #expect(Results.mastheadSubtitle(report: Fixtures.secureSkippedOff, outputExists: false) == missing)
-        #expect(Results.mastheadSubtitle(report: Fixtures.secureFail, outputExists: false)
-                == Results.mastheadSubtitle(report: Fixtures.secureFail))
-        #expect(Results.mastheadSubtitle(report: Fixtures.secureScreenshot, outputExists: false)
-                == "Read the note below before you share the PDF.")
+        #expect(Results.outputMissingSentence == missing)
+        #expect(Fixtures.all.count == 18)
+        var rows = 0
+        for arm in Self.everyArm {
+            let standing = Results.mastheadSubtitle(report: arm.report, findingCount: arm.findingCount)
+            #expect(standing != nil && standing != missing, "\(arm.name): a standing result keeps its own sentence")
+            for state in Self.states {
+                let shown = Results.mastheadSubtitle(
+                    report: arm.report, outputExists: state.outputExists, isStale: state.isStale,
+                    findingCount: arm.findingCount)
+                #expect(shown == (Self.stands(state) ? standing : missing), "\(arm.name), \(state.name): \(shown ?? "nil")")
+                rows += 1
+            }
+        }
+        #expect(rows == 20 * 4)
+    }
+
+    @Test("The spoken label of a result that no longer stands: the title and the counts, then that sentence, and no review term")
+    func spokenLabelWhenTheResultDoesNotStand() {
+        let missing = Results.outputMissingSentence
+        #expect(Results.mastheadAccessibilityLabel(report: Fixtures.secureFail, isStale: true)
+                == "Checks Failed. 6 of 7 checks passed. 1\u{00A0}failed. \(missing)")
+        #expect(Results.mastheadAccessibilityLabel(report: Fixtures.secureSkippedOff, outputExists: false, mode: .secure)
+                == "Checks Not Run. \(missing)")
+        let attention = Fixtures.searchableAttentionFull
+        let terms = Results.reviewTermTexts(report: attention)
+        #expect(!terms.isEmpty)
+        // Standing, the label quotes the terms (its sentence does).
+        #expect(terms.contains { Results.mastheadAccessibilityLabel(report: attention).contains($0) })
+        for state in Self.states where !Self.stands(state) {
+            let label = Results.mastheadAccessibilityLabel(
+                report: attention, outputExists: state.outputExists, isStale: state.isStale)
+            #expect(label.hasPrefix("\(Results.mastheadTitle(report: attention))."), "\(state.name): \(label)")
+            #expect(label.hasSuffix(missing), "\(state.name): \(label)")
+            for term in terms {
+                #expect(!label.contains(term), "\(state.name): the label speaks \(term)")
+            }
+        }
+    }
+
+    @Test("The masthead's privacy flag is off when the result no longer stands: its sentence quotes nothing")
+    func privacyFlagIsOffWhenNothingIsQuoted() {
+        let report = Fixtures.searchableAttentionFull
+        for state in Self.states {
+            #expect(Results.mastheadSubtitleIsPrivacySensitive(
+                report: report, outputExists: state.outputExists, isStale: state.isStale) == Self.stands(state),
+                "\(state.name)")
+        }
     }
 
     @Test("The run's mode: Secure only when every page rasterized with no fallback reason")

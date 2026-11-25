@@ -31,12 +31,13 @@ extension VerificationResultsView {
     /// spoken as commas) and the sentence; on SKIPPED, the title and the
     /// sentence.
     static func mastheadAccessibilityLabel(
-        report: VerificationReport, outputExists: Bool = true, mode: RunMode = .searchableOrUnknown,
-        findingCount: Int = 0
+        report: VerificationReport, outputExists: Bool = true, isStale: Bool = false,
+        mode: RunMode = .searchableOrUnknown, findingCount: Int = 0
     ) -> String {
         let title = mastheadTitle(report: report)
         let sentence = mastheadSubtitle(
-            report: report, outputExists: outputExists, mode: mode, findingCount: findingCount) ?? ""
+            report: report, outputExists: outputExists, isStale: isStale, mode: mode,
+            findingCount: findingCount) ?? ""
         guard !report.overallStatus.isSkipped else { return "\(title). \(sentence)" }
         let partition = partition(report)
         var parts = ["\(title).", "\(partition.summaryLine1)."]
@@ -100,14 +101,25 @@ extension VerificationResultsView {
         return "\(cause) \(step)"
     }
 
-    /// The sentence when the redacted PDF no longer exists: every arm that
-    /// names Preview or Run Verification gives way to it.
+    /// The sentence when the result no longer stands: every verdict's
+    /// sentence gives way to it, since each would invite a share the Share
+    /// button cannot make.
     static let outputMissingSentence = "\(keepEditing), then run Redact again to share the PDF."
+
+    /// Whether the result stands: the redacted PDF exists and the boxes have
+    /// not changed since it was made, exactly when Share is enabled
+    /// (`canExport(report:)`, DocumentEditorView+Export.swift).
+    static func resultStands(outputExists: Bool, isStale: Bool) -> Bool {
+        outputExists && !isStale
+    }
 
     /// Whether the masthead sentence names user text: true exactly when it
     /// quotes a review term. Static so the predicate is unit-testable
     /// without a SwiftUI host.
-    static func mastheadSubtitleIsPrivacySensitive(report: VerificationReport) -> Bool {
+    static func mastheadSubtitleIsPrivacySensitive(
+        report: VerificationReport, outputExists: Bool = true, isStale: Bool = false
+    ) -> Bool {
+        guard resultStands(outputExists: outputExists, isStale: isStale) else { return false }
         guard report.overallStatus.isAttention else { return false }
         return attentionSentence(report: report).quotesTerms
     }
@@ -118,17 +130,16 @@ extension VerificationResultsView {
     /// (`ResultsFindings`); a passing run counts them as notes. Static so
     /// every arm is unit-testable without a SwiftUI host.
     static func mastheadSubtitle(
-        report: VerificationReport, outputExists: Bool = true, mode: RunMode = .searchableOrUnknown,
-        findingCount: Int = 0
+        report: VerificationReport, outputExists: Bool = true, isStale: Bool = false,
+        mode: RunMode = .searchableOrUnknown, findingCount: Int = 0
     ) -> String? {
+        guard resultStands(outputExists: outputExists, isStale: isStale) else { return outputMissingSentence }
         let partition = partition(report)
         switch report.overallStatus {
         case .pass, .info, .notApplicable:
             let notes = visibleNoteCount(partition) + findingCount
             switch notes {
-            case 0:
-                return outputExists
-                    ? "Look over the redacted PDF in Preview before you share it." : outputMissingSentence
+            case 0:  return "Look over the redacted PDF in Preview before you share it."
             case 1:  return "Read the note below before you share the PDF."
             default: return "Read the notes below before you share the PDF."
             }
@@ -156,7 +167,6 @@ extension VerificationResultsView {
                 ? "\(keepEditing) and run Redact again; the other checks did not run."
                 : "\(keepEditing) to fix what failed, or share after review."
         case .skipped:
-            guard outputExists else { return outputMissingSentence }
             return skippedSubtitle(reason: report.skipReason, mode: mode)
         }
     }
@@ -261,16 +271,20 @@ extension VerificationResultsView {
 struct VerificationMasthead: View {
     let report: VerificationReport
     let outputExists: Bool
+    /// The boxes changed since the redacted PDF was made.
+    var isStale: Bool = false
     let mode: VerificationResultsView.RunMode
     /// The number of the results screen's findings (`ResultsFindings`).
     var findingCount: Int = 0
 
     var body: some View {
         let sentence = VerificationResultsView.mastheadSubtitle(
-            report: report, outputExists: outputExists, mode: mode, findingCount: findingCount)
-        let quotesTerms = VerificationResultsView.mastheadSubtitleIsPrivacySensitive(report: report)
+            report: report, outputExists: outputExists, isStale: isStale, mode: mode, findingCount: findingCount)
+        let quotesTerms = VerificationResultsView.mastheadSubtitleIsPrivacySensitive(
+            report: report, outputExists: outputExists, isStale: isStale)
         VStack(spacing: 0) {
-            CountRing(content: VerificationMasthead.ringContent(report: report))
+            CountRing(content: VerificationMasthead.ringContent(
+                report: report, outputExists: outputExists, isStale: isStale))
             BalancedText(string: VerificationResultsView.mastheadTitle(report: report), font: .title.bold())
                 .foregroundStyle(.primary)
                 .padding(.top, ResectaTokens.Results.ringToTitle)
@@ -287,7 +301,7 @@ struct VerificationMasthead: View {
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(VerificationResultsView.mastheadAccessibilityLabel(
-            report: report, outputExists: outputExists, mode: mode, findingCount: findingCount))
+            report: report, outputExists: outputExists, isStale: isStale, mode: mode, findingCount: findingCount))
         .accessibilityAddTraits(.isHeader)
         .accessibilityIdentifier("verificationMasthead")
         .privacySensitive(quotesTerms)
@@ -295,11 +309,16 @@ struct VerificationMasthead: View {
 
     /// What the ring shows: SKIPPED's slot, or P of T with the verdict's
     /// tone. T counts the checks that had something to check; INFO reads
-    /// as a pass.
-    static func ringContent(report: VerificationReport) -> CountRing.Content {
+    /// as a pass. A result that no longer stands keeps its count in grey,
+    /// without the verdict's tone; SKIPPED keeps its slot.
+    static func ringContent(
+        report: VerificationReport, outputExists: Bool = true, isStale: Bool = false
+    ) -> CountRing.Content {
+        let stands = VerificationResultsView.resultStands(outputExists: outputExists, isStale: isStale)
         let tone: CountRing.Tone
         switch report.overallStatus {
         case .skipped: return .skipped
+        case _ where !stands: tone = .noLongerStands
         case .pass, .info, .notApplicable: tone = .pass
         case .warn: tone = .warn
         case .attention: tone = .attention
@@ -320,7 +339,9 @@ struct VerificationMasthead: View {
 /// swept in. Fixed size at every Dynamic Type size; hidden from VoiceOver
 /// (the block around it speaks the count).
 struct CountRing: View {
-    enum Tone: Equatable { case pass, warn, attention, fail }
+    /// The verdict's tone; `noLongerStands` is a result whose PDF is gone
+    /// or whose boxes changed since, drawn in the caption grey.
+    enum Tone: Equatable { case pass, warn, attention, fail, noLongerStands }
     enum Content: Equatable {
         case count(passed: Int, total: Int, tone: Tone)
         case skipped
@@ -351,7 +372,8 @@ struct CountRing: View {
                         .stroke(Self.arcColor(tone), style: StrokeStyle(lineWidth: stroke, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                 }
-                figure(passed, of: total, word: "passed", wordSize: ResectaTokens.Results.ringWord)
+                figure(passed, of: total, word: "passed", wordSize: ResectaTokens.Results.ringWord,
+                       grey: tone == .noLongerStands)
             case .running(let finished, let total):
                 if total > 0 {
                     if finished > 0 {
@@ -383,12 +405,12 @@ struct CountRing: View {
         }
     }
 
-    private func figure(_ count: Int, of total: Int, word: String, wordSize: CGFloat) -> some View {
+    private func figure(_ count: Int, of total: Int, word: String, wordSize: CGFloat, grey: Bool = false) -> some View {
         let size = Self.figureSize(total: total)
         return VStack(spacing: 1) {
             Text("\(count)\(Text("/").font(.system(size: size, weight: .light)).foregroundStyle(ResectaTokens.SemanticColor.supportText))\(total)")
                 .font(.system(size: size, weight: .semibold).monospacedDigit())
-                .foregroundStyle(.primary)
+                .foregroundStyle(grey ? AnyShapeStyle(ResectaTokens.SemanticColor.supportText) : AnyShapeStyle(HierarchicalShapeStyle.primary))
                 .contentTransition(.numericText())
             Text(word)
                 .font(.system(size: wordSize))
@@ -417,9 +439,11 @@ struct CountRing: View {
         total < 10 ? ResectaTokens.Results.ringFigureSmallCount : ResectaTokens.Results.ringFigureLargeCount
     }
 
-    /// The arc in the text tier; the light WARN arc is the ring-only orange.
+    /// The arc in the text tier; the light WARN arc is the ring-only orange;
+    /// a result that no longer stands, the caption grey.
     static func arcColor(_ tone: Tone) -> Color {
         switch tone {
+        case .noLongerStands: ResectaTokens.SemanticColor.supportText
         case .pass: ResectaTokens.SemanticColor.passText
         case .warn: ResectaTokens.Results.warnRing
         case .attention: ResectaTokens.SemanticColor.attentionText
