@@ -1,0 +1,19 @@
+Property: A box with one row is on one line only when no letter of another line lies wholly inside its paint. Here one row is enough.
+Area: the first edit's start (engine)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'FirstEditStartTests'
+Must go red: RedactionEngineTests/FirstEditStartTests tableCase; RedactionEngineTests/FirstEditStartTests oneLineBox
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/FirstEditStart.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/FirstEditStart.swift
+index 1bb9af39c..250ebda54 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/FirstEditStart.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/FirstEditStart.swift
+@@ -77,7 +77,7 @@ package enum FirstEditStartRule {
+     /// by its direction, has no rows, so it is never on one line.
+     package static func oneLineBox(rows: [PageRect64], paint: PageRect64, pageLetters: [PageRect64]) -> Bool {
+         guard rows.count == 1, let row = rows.first else { return false }
+-        return !pageLetters.contains { !$0.sharesALine(with: row) && paint.contains($0) }
++        return true
+     }
+ 
+     /// A start's share on one axis of a page S sixty-fourths long, from its
