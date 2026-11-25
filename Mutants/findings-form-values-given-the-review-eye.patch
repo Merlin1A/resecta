@@ -1,0 +1,18 @@
+Property: The form-values row draws its problem's mark, the grey i of possible items. Here it draws the needs-review eye.
+Area: findings on the results screen
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/FindingRowTests
+Must go red: ResectaAppTests/FindingRowTests marksByKind
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/FindingRow.swift b/Sources/ResectaApp/Views/FindingRow.swift
+index a597dcb1e..43442c569 100644
+--- a/Sources/ResectaApp/Views/FindingRow.swift
++++ b/Sources/ResectaApp/Views/FindingRow.swift
+@@ -64,6 +64,7 @@ enum FindingRowModel {
+     /// ones. The form-values row takes its problem's mark, the grey "i" of
+     /// possible items: the values were left out of the export, nothing leaked.
+     static func markOutcome(_ problem: VerificationProblem) -> VerificationOutcome {
++        if problem.kind == .formValuesNotCarried { return .needsReview }
+         switch problem.mark {
+         case .failed: return .failed
+         case .needsReview: return .needsReview
