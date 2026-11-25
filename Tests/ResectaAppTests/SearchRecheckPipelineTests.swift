@@ -335,7 +335,10 @@ struct SearchRecheckPipelineTests {
         #expect(last.shortDescription == SearchRecheck.infoMessage)
         #expect(last.queryLines == nil)
         #expect(LayerResultRow.queryLineTexts(layer: last).isEmpty)
-        #expect(!report.layers.contains { $0.status.isSkipped }, ".notApplicable never .skipped")
+        #expect(!report.layers.contains { $0.layer != .boxFill && $0.status.isSkipped }, ".notApplicable never .skipped")
+        // The inputs kept here carry no record of the run, so Box Fill has
+        // nothing to compare with and reads Skipped.
+        #expect(report.layers.first { $0.layer == .boxFill }?.status == .skipped)
 
         // The Details summary counts only the passes and names the idle
         // re-check as a check that had nothing to check.
