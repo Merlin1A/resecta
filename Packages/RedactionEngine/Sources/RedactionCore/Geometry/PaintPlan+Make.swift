@@ -56,6 +56,13 @@ package struct PlanFacts: Hashable, Sendable {
     package var fellBack = 0
     /// The page's unselected words whose box shares area with a box's paint.
     package var unselectedWordsInsidePaint = 0
+    /// What the ink check reads, for each box it may judge (`inkCheckable`),
+    /// by the box's place in the plan: the height of the box's line of
+    /// text, the tallest line its rows lie on, in sixty-fourths.
+    package var inkLineHeights: [Int: Int] = [:]
+    /// The boxes of the page's words that no box selects or covers, in
+    /// whole sixty-fourths: the ink check's flood never enters them.
+    package var otherWords: [PageRect64] = []
 
     package init() {}
 }
@@ -137,6 +144,8 @@ private struct Maker {
     struct Made {
         var box: PaintedBox
         var regions: [Int]
+        /// The tallest line the box's rows lie on, when it has any.
+        var lineHeight: Int? = nil
     }
 
     init(placed: [(region: PlanRegion, rect: PageRect64)], words: PageWords, text: String, pageFacts: PageTextFacts,
@@ -322,7 +331,7 @@ private struct Maker {
                                  inkCheckable: anchored && !asDrawn
                                      && (lineReading == .column || lineReading == .noColumn),
                                  defaultWidth: width),
-                 regions: group)
+                 regions: group, lineHeight: (read?.rows ?? []).map { self.lineHeight($0) }.max())
         }
         let outcome: SwitchTreatment = switch rule.outcome {
         case .notAsked: .notAsked
@@ -565,6 +574,10 @@ private struct Maker {
         facts.unselectedWordsInsidePaint = complement.lines.reduce(0) { sum, line in
             sum + line.words.filter { word in paints.contains { $0.sharesArea(with: word.box) } }.count
         }
+        for (index, m) in made.enumerated() where m.box.inkCheckable {
+            if let h = m.lineHeight { facts.inkLineHeights[index] = h }
+        }
+        facts.otherWords = complement.lines.flatMap { $0.words.map(\.box) }
         return facts
     }
 }

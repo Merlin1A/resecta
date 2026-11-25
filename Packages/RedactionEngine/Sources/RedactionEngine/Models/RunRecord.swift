@@ -79,6 +79,10 @@ public struct RunRecord: Equatable, Sendable {
         /// fill with the fill it showed at this one, so the run never paints
         /// less than was shown.
         public let shownDPI: Int?
+        /// What the ink check reads for each box it may judge, by the box's
+        /// place in the plan, made with the plan from the page's read: empty
+        /// with no read, and under "as placed".
+        package let inkCheckInputs: [Int: InkCheckInputs]
 
         /// The page's regions that admission refuses, each with its reason,
         /// in the order they were drawn. Given by the regions as drawn, so it
@@ -107,7 +111,8 @@ public struct RunRecord: Equatable, Sendable {
                                cropBox: geometry.cropBox.size, rotation: geometry.rotation, switchOn: switchOn,
                                read: read)
             self.init(pageIndex: pageIndex, regions: regions, plan: planned.plan,
-                      geometry: geometry, geometryAtStore: geometryAtStore, shownDPI: shownDPI)
+                      geometry: geometry, geometryAtStore: geometryAtStore, shownDPI: shownDPI,
+                      inkCheckInputs: planned.inkCheckInputs)
         }
 
         /// One page as confirmed, with its plan made at run entry from the
@@ -130,10 +135,10 @@ public struct RunRecord: Equatable, Sendable {
         /// own; a test can name the switch's policy before the run reads it.
         package init(pageIndex: Int, regions: [DrawnRegion], cropBox: CGSize, rotation: Int, switchOn: Bool,
                      read: PageRead?, source: PlanSource, shownDPI: Int? = nil) {
-            self.init(pageIndex: pageIndex, regions: regions,
-                      plan: Self.makePlan(regions: regions, cropBox: cropBox, rotation: rotation, switchOn: switchOn,
-                                          read: read, source: source),
-                      shownDPI: shownDPI)
+            let made = Self.makePlanAndInputs(regions: regions, cropBox: cropBox, rotation: rotation,
+                                              switchOn: switchOn, read: read, source: source)
+            self.init(pageIndex: pageIndex, regions: regions, plan: made?.plan, shownDPI: shownDPI,
+                      inkCheckInputs: made?.inputs ?? [:])
         }
 
         /// The one maker of a page's plan from its regions as drawn: the run's
@@ -148,6 +153,17 @@ public struct RunRecord: Equatable, Sendable {
         package static func makePlan(regions: [DrawnRegion], cropBox: CGSize, rotation: Int, switchOn: Bool,
                                      read: PageRead? = nil,
                                      source: PlanSource = RunRecord.planSource) -> PaintPlan? {
+            makePlanAndInputs(regions: regions, cropBox: cropBox, rotation: rotation, switchOn: switchOn,
+                              read: read, source: source)?.plan
+        }
+
+        /// The plan as `makePlan` makes it, with what the ink check reads for
+        /// each box it may judge: the box's line height and the boxes of the
+        /// page's words no box selects or covers. Inputs only with a read and
+        /// under the switch's policy.
+        package static func makePlanAndInputs(regions: [DrawnRegion], cropBox: CGSize, rotation: Int, switchOn: Bool,
+                                              read: PageRead?, source: PlanSource)
+            -> (plan: PaintPlan, inputs: [Int: InkCheckInputs])? {
             let turned = ((rotation % 360) + 360) % 180 != 0
             guard let width = PixelPlan.sixtyFourths(ofSide: Double(turned ? cropBox.height : cropBox.width)),
                   let height = PixelPlan.sixtyFourths(ofSide: Double(turned ? cropBox.width : cropBox.height))
@@ -158,27 +174,33 @@ public struct RunRecord: Equatable, Sendable {
             // reads none.
             let planRegions = RunRecord.planRegions(admitted, text: read?.text ?? "")
             if let read {
-                return PaintPlan.make(
+                let made = PaintPlan.make(
                     regions: planRegions, words: read.words, text: read.text, facts: read.facts,
                     widthSixtyFourths: width, heightSixtyFourths: height,
-                    policy: .release, source: choice.source, switchOn: choice.switchOn).plan
+                    policy: .release, source: choice.source, switchOn: choice.switchOn)
+                guard choice.source == .switchPolicy else { return (made.plan, [:]) }
+                let inputs = made.facts.inkLineHeights.mapValues {
+                    InkCheckInputs(lineHeight: $0, others: made.facts.otherWords)
+                }
+                return (made.plan, inputs)
             }
-            return PaintPlan.make(
+            return (PaintPlan.make(
                 regions: planRegions, words: PageWords(words: []), text: "",
                 facts: .noPageRead,
                 widthSixtyFourths: width, heightSixtyFourths: height,
-                policy: .release, source: choice.source, switchOn: choice.switchOn).plan
+                policy: .release, source: choice.source, switchOn: choice.switchOn).plan, [:])
         }
 
         package init(pageIndex: Int, regions: [DrawnRegion], plan: PaintPlan?,
                      geometry: RunRecord.PageGeometry? = nil, geometryAtStore: RunRecord.PageGeometry? = nil,
-                     shownDPI: Int? = nil) {
+                     shownDPI: Int? = nil, inkCheckInputs: [Int: InkCheckInputs] = [:]) {
             self.pageIndex = pageIndex
             self.regions = regions
             self.plan = plan
             self.geometry = geometry
             self.geometryAtStore = geometryAtStore
             self.shownDPI = shownDPI
+            self.inkCheckInputs = inkCheckInputs
         }
     }
 

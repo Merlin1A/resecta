@@ -1,0 +1,22 @@
+Property: At the switch's policy the record's page makes, with its plan, what the ink check reads for each box it may judge, so a Search or Scan box carrying its characters is judged, not left undecided.
+Area: the run's record (RunRecord.Page.makePlanAndInputs)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter SwitchThroughTheRecordTests
+Must go red: RedactionEngineTests/SwitchThroughTheRecordTests searchAndScanBoxesAreJudged
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
+index 4cca263d..03470301 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
+@@ -148,10 +148,7 @@ public struct RunRecord: Equatable, Sendable {
+                     widthSixtyFourths: width, heightSixtyFourths: height,
+                     policy: .release, source: choice.source, switchOn: choice.switchOn)
+                 guard choice.source == .switchPolicy else { return (made.plan, [:]) }
+-                let inputs = made.facts.inkLineHeights.mapValues {
+-                    InkCheckInputs(lineHeight: $0, others: made.facts.otherWords)
+-                }
+-                return (made.plan, inputs)
++                return (made.plan, [:])
+             }
+             return (PaintPlan.make(
+                 regions: planRegions, words: PageWords(words: []), text: "",
