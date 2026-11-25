@@ -1,0 +1,19 @@
+Property: A failed or needs-review check that also could not read part of its input has a second row for that part, among the checks that could not run in full or could not finish. Here the part is left out of the findings: it shows only in the list of checks.
+Area: findings on the results screen
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/FindingRowTests
+Must go red: ResectaAppTests/FindingRowTests theUnreadPartHasARowOfItsOwn, everyCheckHasOnePlace
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationProblemModel.swift b/Sources/ResectaApp/Views/VerificationProblemModel.swift
+index 747e174e1..435ae68d3 100644
+--- a/Sources/ResectaApp/Views/VerificationProblemModel.swift
++++ b/Sources/ResectaApp/Views/VerificationProblemModel.swift
+@@ -145,7 +145,7 @@ nonisolated enum VerificationProblemModel {
+                 let unread = VerificationProblem.Check(
+                     layerIndex: index, outcome: .couldNotVerify, pages: sortedPages(layer.couldNotVerifyPartPages ?? []),
+                     words: [], sentence: part)
+-                if unread.pages.isEmpty { unfinished.append(unread) } else { onPages.append(unread) }
++                _ = unread
+             }
+         }
+ 

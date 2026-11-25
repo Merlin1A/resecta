@@ -1,4 +1,4 @@
-Property: A failed Search Re-check with no pages is a failed check, said by the share confirm's line, never the sentence about part of boxed text. Here it is said with kind 3's sentence.
+Property: A failed Search Re-check with no pages is a failed check, said by the share confirm's line, never the sentence about part of boxed text. Here it is said with the sentence about part of boxed text.
 Area: findings on the results screen
 Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/FindingRowTests
 Must go red: ResectaAppTests/FindingRowTests wordsByKind

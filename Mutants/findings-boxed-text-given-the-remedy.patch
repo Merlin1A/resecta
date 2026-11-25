@@ -1,4 +1,4 @@
-Property: Boxed text still readable (kind 2) has no step; part of boxed text beside its box (kind 3) has the remedy by its count. Here kind 2 is given kind 3's remedy.
+Property: Boxed text still readable has no step; part of boxed text beside its box has the remedy by its count. Here boxed text still readable is given the remedy of part of boxed text.
 Area: findings on the results screen
 Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/FindingRowTests
 Must go red: ResectaAppTests/FindingRowTests stepsByKind
