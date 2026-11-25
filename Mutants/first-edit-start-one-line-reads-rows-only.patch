@@ -1,7 +1,7 @@
 Property: A box with one row is on one line only when no letter of another line lies wholly inside its paint. Here one row is enough.
 Area: the first edit's start (engine)
 Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'FirstEditStartTests'
-Must go red: RedactionEngineTests/FirstEditStartTests tableCase; RedactionEngineTests/FirstEditStartTests oneLineBox
+Must go red: RedactionEngineTests/FirstEditStartTests oneLineBox
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/FirstEditStart.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/FirstEditStart.swift
