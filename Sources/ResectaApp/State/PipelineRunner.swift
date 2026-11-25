@@ -504,7 +504,7 @@ struct PipelineRunner {
             }.value
         } catch { // LegalPhrases:safe (Swift keyword)
             sink(.phase(.failed(
-                error: .verificationError(.engineCrash(layerIndex: 0)),
+                error: .verificationError(.engineCrash(check: nil)),
                 returnPhase: .verified(report: .skipped(reason: .error))
             )))
             return .verificationLoadFailed

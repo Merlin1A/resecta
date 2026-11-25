@@ -59,13 +59,13 @@ extension PipelineCoordinator {
     /// site, so the CPU-bound `PDFDocument(url:)` parse on a 100-page
     /// output does not stall the `.verifying` progress UI on MainActor.
     /// `nonisolated`: explicitly opts out of SE-0466 MainActor default.
-    /// Throws `PipelineError.verificationError(.engineCrash(layerIndex: 0))`
+    /// Throws `PipelineError.verificationError(.engineCrash(check: nil))`
     /// on parse failure to match the prior in-place guard's failure shape.
     nonisolated static func loadOutputDocumentOffMainActor(
         _ url: URL
     ) throws -> SendablePDFDocument {
         guard let doc = PDFDocument(url: url) else {
-            throw PipelineError.verificationError(.engineCrash(layerIndex: 0))
+            throw PipelineError.verificationError(.engineCrash(check: nil))
         }
         return SendablePDFDocument(doc)
     }

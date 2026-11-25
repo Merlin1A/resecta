@@ -49,7 +49,7 @@ struct PipelineFailureStageTests {
 
     @Test("Post-promotion stage errors classify as .verification",
           arguments: [
-            PipelineError.verificationError(.engineCrash(layerIndex: 0)),
+            PipelineError.verificationError(.engineCrash(check: nil)),
             PipelineError.exportError(.diskFull),
             PipelineError.exportError(.filePurged),
           ])

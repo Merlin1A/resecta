@@ -74,7 +74,11 @@ public enum PipelineError: Sendable, LocalizedError {
     }
 
     public enum VerificationFailure: Sendable {
-        case engineCrash(layerIndex: Int)
+        /// Verification ended before it had a result for every check. `check`
+        /// names the scheduled check that stored no result; it is nil when the
+        /// failure is not a check's (the output has no pages, does not load,
+        /// or the error came from elsewhere).
+        case engineCrash(check: VerificationLayer?)
     }
 
     public enum ExportFailure: Sendable, CaseIterable {

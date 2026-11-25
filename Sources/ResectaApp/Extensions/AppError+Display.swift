@@ -162,8 +162,12 @@ extension PipelineError {
                 "The redacted document could not be assembled. Your redaction regions are preserved — you can try again."
             }
 
-        case .verificationError(.engineCrash(let layer)):
-            "The verification process encountered an issue at layer \(layer + 1). The redacted document may still be valid — you can export it without verification or try again."
+        case .verificationError(.engineCrash(let check)):
+            if let check {
+                "\(VerificationRowModel.title(for: check)) could not finish, so this PDF has no verification result. Run Verification again, or share it without verification."
+            } else {
+                "Verification could not finish, so this PDF has no verification result. Run Verification again, or share it without verification."
+            }
 
         case .exportError(let f):
             switch f {

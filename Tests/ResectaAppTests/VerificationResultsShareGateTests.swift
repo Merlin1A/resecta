@@ -499,9 +499,25 @@ struct SkippedShareGateTests {
             report: acknowledged, acknowledged: doc.skippedShareAcknowledged) == false)
     }
 
-    @Test("Skip-fact line names the state (mechanism description)")
-    func skipFactLineNamesState() {
-        #expect(DocumentEditorView.shareRiskConfirmSkipFactLine
+    @Test("Skip-fact line names why verification has no result, one line per reason")
+    func skipFactLineNamesTheReason() {
+        let table: [(VerificationReport.SkipReason, String)] = [
+            (.autoVerifyOff, "Verification did not run on this PDF."),
+            (.error, "Verification could not finish on this PDF."),
+            (.cancelled, "Verification stopped early on this PDF."),
+        ]
+        #expect(table.count == 3)
+        #expect(Set(table.map(\.1)).count == 3)
+        for (reason, line) in table {
+            #expect(DocumentEditorView.shareRiskConfirmSkipFactLine(reason: reason) == line, "\(reason)")
+        }
+    }
+
+    @Test("A skipped report given no reason reads the off-in-Settings line, not the could-not-finish line")
+    func skipFactLineForADefaultSkippedReport() {
+        let report = VerificationReport.skipped
+        #expect(report.skipReason == .autoVerifyOff)
+        #expect(DocumentEditorView.shareRiskConfirmSkipFactLine(reason: report.skipReason)
             == "Verification did not run on this PDF.")
     }
 }
