@@ -14,7 +14,7 @@ enum PatternAdmission {
         case refused(message: String)
         /// The store did not take the change for a reason that is no
         /// refusal: its write did not report success, or its file could
-        /// not be read. Nothing is said.
+        /// not be read. The caller shows `ListChange.notSavedMessage`.
         case notSaved
     }
 
