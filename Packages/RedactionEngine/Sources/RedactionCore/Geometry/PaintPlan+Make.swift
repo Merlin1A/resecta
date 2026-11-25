@@ -67,6 +67,10 @@ package struct PlanFacts: Hashable, Sendable {
     /// the same box with its line margin, which the producer paints instead
     /// when the page's picture shows ink in the band's slot.
     package var defaultFallbacks: [Int: PaintedBox] = [:]
+    /// Each region's first-edit start, by region id: for every region placed
+    /// from the page's text and still anchored, and every region placed from
+    /// a picture; none for a region drawn or edited by hand.
+    package var firstEditStarts: [UUID: PlannedStart] = [:]
 
     package init() {}
 }
@@ -125,7 +129,8 @@ extension PaintPlan {
             PageRect64(share: region.share, widthSixtyFourths: width, heightSixtyFourths: height).map { (region, $0) }
         }
         let maker = Maker(placed: placed, words: words, text: text, pageFacts: pageFacts, drawing: drawing,
-                          policy: policy, source: source, switchOn: switchOn)
+                          policy: policy, source: source, switchOn: switchOn,
+                          widthSixtyFourths: width, heightSixtyFourths: height)
         let boxes = maker.boxes()
         return (PaintPlan(widthSixtyFourths: width, heightSixtyFourths: height, boxes: boxes.map(\.box)),
                 maker.facts(of: boxes))
@@ -143,6 +148,11 @@ private struct Maker {
     let source: PlanSource
     let switchOn: Bool
     let complement: PageComplement
+    /// The page's sides S in whole sixty-fourths, which a start is cut to.
+    let width: Int
+    let height: Int
+    /// Every letter of the page in whole sixty-fourths, rounded outward.
+    let pageLetters: [PageRect64]
 
     /// A box and the regions it covers, in the order of the input.
     struct Made {
@@ -153,11 +163,21 @@ private struct Maker {
         /// A box painted with its default band: the same box with its line
         /// margin.
         var fallback: PaintedBox? = nil
+        /// The box's rows as its reading gives them, top to bottom: none for
+        /// a box with no reading or one read as a scan, a picture or by its
+        /// direction.
+        var rowTights: [PageRect64] = []
+        /// The first-edit start of each region the box covers that has one.
+        var starts: [UUID: PlannedStart] = [:]
     }
 
     init(placed: [(region: PlanRegion, rect: PageRect64)], words: PageWords, text: String, pageFacts: PageTextFacts,
-         drawing: PageDrawing, policy: GeometryPolicy, source: PlanSource, switchOn: Bool) {
+         drawing: PageDrawing, policy: GeometryPolicy, source: PlanSource, switchOn: Bool,
+         widthSixtyFourths: Int, heightSixtyFourths: Int) {
         self.placed = placed
+        self.width = widthSixtyFourths
+        self.height = heightSixtyFourths
+        self.pageLetters = words.words.flatMap { word in word.letterBoxes.compactMap { PageRect64(outward: $0.rect) } }
         self.words = words
         self.text = text
         self.pageFacts = pageFacts
@@ -193,9 +213,34 @@ private struct Maker {
                                             treatment: .notAsked, bandMade: false, inkEnlargedCovered: false,
                                             inkEnlargedToCap: false, asDrawn: false),
                             regions: [i])
-            }
+            }.map(withStarts)
         }
-        return groups().map { group in make(group) }
+        return groups().map { group in withStarts(make(group)) }
+    }
+
+    /// `made` with the first-edit start of each region it covers: by the
+    /// start rule for a region placed from the text and still anchored, its
+    /// box's whole paint for one placed from a picture (which never joins),
+    /// none for a region drawn or edited by hand. Whether the box stands on
+    /// one line is read only for a box that joins regions, the one case the
+    /// rule reads it.
+    func withStarts(_ made: Made) -> Made {
+        var made = made
+        let members = made.regions
+        let paint = made.box.paint
+        let oneLine = members.count > 1
+            && FirstEditStartRule.oneLineBox(rows: made.rowTights, paint: paint, pageLetters: pageLetters)
+        let tights = members.map { i in letterRects(placed[i].region.selected).reduce(placed[i].rect) { $0.union($1) } }
+        for (k, i) in members.enumerated() {
+            let region = placed[i].region
+            guard region.kind == .placedFromTextAnchored || region.kind == .placedFromPicture else { continue }
+            let others = members.indices.filter { $0 != k }
+            made.starts[region.id] = FirstEditStartRule.start(
+                own: placed[i].rect, paint: paint, neighbours: others.map { placed[members[$0]].rect },
+                tight: tights[k], neighbourTights: others.map { tights[$0] }, oneLineBox: oneLine,
+                widthSixtyFourths: width, heightSixtyFourths: height)
+        }
+        return made
     }
 
     /// The reading of a set of selected characters, or nil when none has a box.
@@ -338,7 +383,8 @@ private struct Maker {
                                  inkCheckable: anchored && !asDrawn
                                      && (lineReading == .column || lineReading == .noColumn),
                                  defaultWidth: width),
-                 regions: group, lineHeight: (read?.rows ?? []).map { self.lineHeight($0) }.max())
+                 regions: group, lineHeight: (read?.rows ?? []).map { self.lineHeight($0) }.max(),
+                 rowTights: (read?.rows ?? []).map(\.tight))
         }
         let outcome: SwitchTreatment = switch rule.outcome {
         case .notAsked: .notAsked
@@ -613,6 +659,7 @@ private struct Maker {
             if let fallback = m.fallback { facts.defaultFallbacks[index] = fallback }
         }
         facts.otherWords = complement.lines.flatMap { $0.words.map(\.box) }
+        for m in made { facts.firstEditStarts.merge(m.starts) { first, _ in first } }
         return facts
     }
 }
