@@ -191,10 +191,12 @@ struct ResultsRunLinesTests {
 
     // MARK: - The two page counts, from the closed runs
 
-    static func account(_ pages: [PageFacts], recognitionOff: Set<Int> = []) -> SearchAccount {
+    static func account(_ pages: [PageFacts], recognitionOff: Set<Int> = [],
+                        timedOut: [Int: String] = [:]) -> SearchAccount {
         var account = SearchAccount(pageCount: pages.count)
         for (page, facts) in pages.enumerated() { account.record(facts, forPage: page) }
         for page in recognitionOff { account.recordRecognitionOff(page: page) }
+        for (page, text) in timedOut { account.recordPatternTimedOut(page: page, text: text) }
         account.end(.completed)
         return account
     }
@@ -205,10 +207,15 @@ struct ResultsRunLinesTests {
 
     @Test("A page named for two reasons, or for two texts, counts once")
     func namedPagesCountOnce() {
-        let first = Self.account([[.ownText], [.ownText, .patternTimedOut], []], recognitionOff: [2])
-        let second = Self.account([[.ownText], [.ownText], []], recognitionOff: [2])
+        // A time-out is kept only for the text that ran out of time, so it is
+        // recorded with its text. Page 1 is named for Delia's time-out and for
+        // Brook's recognition off; page 2 for recognition off in both runs.
+        let first = Self.account([[.ownText], [.ownText], []], recognitionOff: [2], timedOut: [1: "Delia"])
+        let second = Self.account([[.ownText], [], []], recognitionOff: [1, 2])
         let runs: [RedactStop.Run] = [(Self.text("Delia"), first), (Self.text("Brook"), second)]
-        #expect(RedactStop.namedPages(runs: runs, answered: []).count > 2, "the stop names page 3 for two texts")
+        let perText = RedactStop.pagesToName(runs: runs, answered: [])
+        #expect(perText.values.map(\.count).reduce(0, +) == 4, "two names for each text")
+        #expect(RedactStop.namedPages(runs: runs, answered: []).count == 3, "page 1 for two reasons, page 2 for one")
         #expect(RedactStop.pagesNotSearchedInFull(runs: runs) == [1, 2])
     }
 
