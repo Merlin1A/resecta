@@ -475,8 +475,8 @@ struct VerificationRowModelTests {
         for identity in [VerificationLayer.characterCount, .characterLineage] {
             let model = VerificationRowModel(layer: Self.layer(.skipped, identity: identity), perPageModes: [])
             #expect(model.outcome == .couldNotVerify)
-            #expect(model.caption == "Skipped. No record to compare with.")
-            #expect(model.lead == ["Only a full Redact run saves that record."])
+            #expect(model.caption == "Skipped. This check needs a full Redact run.")
+            #expect(model.lead == ["A full run saves the record it compares with."])
             #expect(model.showsEngineDetail == false)
         }
     }
@@ -765,7 +765,7 @@ struct VerificationRowModelTests {
                     .rule(VerificationRowModel.rule(for: .characterCount)), .detail("Engine detail."), took])
         // Skipped: the lead first; no engine detail (it names a reason that does not apply).
         #expect(items(Self.layer(.skipped, identity: .characterLineage))
-                == [.lead("Only a full Redact run saves that record."),
+                == [.lead("A full run saves the record it compares with."),
                     .explainer("Compares kept characters with the record."),
                     .rule(VerificationRowModel.rule(for: .characterLineage)), took])
         // The sweep note: its lines and its pages; its time is the re-check's.
@@ -810,7 +810,7 @@ struct VerificationRowModelTests {
                               lines: [line("\u{201C}Delia\u{201D}", 1), line("\u{201C}Fox\u{201D}", 0)]),
             perPageModes: [])
         #expect(one.caption == "Your search \u{201C}Delia\u{201D} still has 1 match on\u{00A0}page\u{00A0}2.")
-        #expect(one.lead == ["Run it again with OCR on to redact the rest."])
+        #expect(one.lead == ["Run it again with Include OCR Pages on to redact the rest."])
         #expect(one.captionIsPrivacySensitive)
         let two = VerificationRowModel(
             layer: Self.layer(.attention("x"), identity: .searchRecheck, pages: [0, 1],
@@ -818,7 +818,7 @@ struct VerificationRowModelTests {
             perPageModes: [])
         #expect(two.caption == "Your searches \u{201C}Delia\u{201D} and \u{201C}\\d{4}\u{201D} still have 3 matches "
                 + "on pages 1\u{00A0}and\u{00A0}2.")
-        #expect(two.lead == ["Run them again with OCR on to redact the rest."])
+        #expect(two.lead == ["Run them again with Include OCR Pages on to redact the rest."])
     }
 
     @Test("The spoken pages: up to five, then four and a count")

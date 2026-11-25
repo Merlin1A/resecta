@@ -333,9 +333,9 @@ nonisolated struct VerificationRowModel: Equatable {
     }
 
     /// A skipped check's caption: the state and its cause.
-    static let skippedCaption = "Skipped. No record to compare with."
+    static let skippedCaption = "Skipped. This check needs a full Redact run."
     /// A skipped check's lead: what would have saved the record.
-    static let skippedLead = "Only a full Redact run saves that record."
+    static let skippedLead = "A full run saves the record it compares with."
 
     /// The caption under the title, by outcome — never by text. A failed or
     /// needs-review row whose check also could not read part of its input
@@ -415,8 +415,8 @@ nonisolated struct VerificationRowModel: Equatable {
         case .needsReview:
             if composesRecheckCaption(layer) {
                 return [matchingQueryLines(layer).count == 1
-                    ? "Run it again with OCR on to redact the rest."
-                    : "Run them again with OCR on to redact the rest."]
+                    ? "Run it again with Include OCR Pages on to redact the rest."
+                    : "Run them again with Include OCR Pages on to redact the rest."]
             }
             if composesTermCaption(layer) {
                 let terms = normalizedTerms(layer.reviewTermTexts ?? [])
