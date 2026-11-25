@@ -303,7 +303,7 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
         overlay.pageIndex = pageIndex
         // The app shows the crop box and never sets another display box, so
         // the geometry's crop and the page size below read one box.
-        assert(view.displayBox == .cropBox)
+        assert(PDFDisplayBox.cropBox == view.displayBox)
         overlay.geometry = RunRecord.PageGeometry(page: page, box: view.displayBox)
         overlay.pageSize = page.bounds(for: view.displayBox).size
         overlay.coordinator = self
