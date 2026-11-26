@@ -33,7 +33,8 @@ struct BoxFillOwnRecordTests {
             let region = RedactionRegion(
                 id: UUID(), normalizedRect: CGRect(x: 0.1, y: 0.8, width: 0.5, height: 0.05), source: .manual)
             let recorded = RunRecord.Page(
-                pageIndex: i, regions: [RunRecord.DrawnRegion(id: region.id, normalizedRect: region.normalizedRect)],
+                pageIndex: i, regions: [RunRecord.DrawnRegion(id: region.id, normalizedRect: region.normalizedRect,
+                                                                kind: .drawnByHand)],
                 cropBox: page.bounds(for: .cropBox).size, rotation: page.rotation, switchOn: false)
             confirmed.append(recorded)
             pages.append(PDFPageData(

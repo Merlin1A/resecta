@@ -16,7 +16,8 @@ struct BoxFillRowTests {
     static let side = 9216
 
     static func share(_ minX: CGFloat, _ minY: CGFloat, _ maxX: CGFloat, _ maxY: CGFloat) -> RunRecord.DrawnRegion {
-        RunRecord.DrawnRegion(id: UUID(), normalizedRect: CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY))
+        RunRecord.DrawnRegion(id: UUID(), normalizedRect: CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY),
+                              kind: .drawnByHand)
     }
 
     /// A page of the record whose plan holds one box per admitted region, as placed (the plan main makes at run entry).
@@ -138,7 +139,7 @@ struct BoxFillRowTests {
     @Test("Duplicate and nested regions, each with its own box, are covered")
     func duplicateAndNested() {
         let a = Self.share(0.1, 0.1, 0.5, 0.3)
-        let copy = RunRecord.DrawnRegion(id: UUID(), normalizedRect: a.normalizedRect)
+        let copy = RunRecord.DrawnRegion(id: UUID(), normalizedRect: a.normalizedRect, kind: .drawnByHand)
         let inside = Self.share(0.2, 0.15, 0.3, 0.25)
         let page = Self.page(0, [a, copy, inside])
         #expect(page.plan?.boxes.count == 3)
@@ -271,7 +272,7 @@ struct BoxFillRowTests {
         let i = b.inner, s = CGFloat(side)
         let region = RunRecord.DrawnRegion(id: try #require(b.regionIDs.first), normalizedRect: CGRect(
             x: CGFloat(i.minX + 1) / s, y: CGFloat(i.minY + 1) / s,
-            width: CGFloat(i.maxX - i.minX - 2) / s, height: CGFloat(i.maxY - i.minY - 2) / s))
+            width: CGFloat(i.maxX - i.minX - 2) / s, height: CGFloat(i.maxY - i.minY - 2) / s), kind: .drawnByHand)
         let record = RunRecord(
             confirmed: .init(fillColor: .black, exportDPI: 300, pages: [
                 RunRecord.Page(pageIndex: 0, regions: [region],
