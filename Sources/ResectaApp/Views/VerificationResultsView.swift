@@ -88,12 +88,17 @@ struct VerificationResultsView: View {
                         // The small print about what Checks Passed means: no
                         // sentences are supplied yet, so it draws nothing.
                         ResultsScopeNote(report: report, sentences: [])
+                        // Covered text and form values are Findings rows below;
+                        // this section keeps what Share does not ask about.
                         ResultsFindingsSection(
-                            findings: findings, pagesOnChips: previewAvailable, onOpenPage: openPreview(at:))
+                            findings: Self.findingsOutsideTheGroup(findings), pagesOnChips: previewAvailable,
+                            onOpenPage: openPreview(at:))
                         VerificationDetailsSection(
                             report: report, deselectionSnapshot: deselectionSnapshot,
                             runFactsLines: runFactsLines, previewAvailable: previewAvailable,
                             onOpenPage: openPreview(at:),
+                            coveredPages: VerificationResultsActions.concealedPages(in: findings),
+                            formValueCount: Self.formValueCount(in: findings),
                             onReviewInScan: {
                                 Self.reviewInScan(documentState: documentState, redactionState: redactionState)
                             })
@@ -121,6 +126,22 @@ struct VerificationResultsView: View {
         // VerificationActionBar is placed by the phase router in
         // DocumentEditorView as .safeAreaInset, not embedded here. Export
         // dialogs are also mounted on DocumentEditorView.
+    }
+
+    /// The items the shipped section above the checks still draws: only the
+    /// hand-drawn regions on pages with no text, which Share does not ask
+    /// about. Covered text and form values are rows of the Findings group.
+    static func findingsOutsideTheGroup(_ findings: [ResultsFinding]) -> [ResultsFinding] {
+        findings.filter { if case .handRegionsOnPagesWithoutText = $0 { true } else { false } }
+    }
+
+    /// The original's filled form values, as the findings count them; 0 when
+    /// none is listed.
+    static func formValueCount(in findings: [ResultsFinding]) -> Int {
+        for entry in findings {
+            if case .filledFormValuesNotCarried(let count) = entry { return count }
+        }
+        return 0
     }
 
     /// A page link: push the Preview at that page. A page past the

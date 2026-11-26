@@ -5,15 +5,16 @@ Must go red: ResectaAppTests/VerificationLayerPartitionTests idleChecksJoinTheLi
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Views/VerificationDetailsSection.swift b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
-index c854dbc1..02b338f4 100644
+index c986ff72..5f56a077 100644
 --- a/Sources/ResectaApp/Views/VerificationDetailsSection.swift
 +++ b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
-@@ -75,7 +75,7 @@ struct VerificationDetailsSection: View {
-             ("Findings", partition.findings),
-             ("Could not verify", partition.couldNotVerify),
-             ("Notes", partition.notes),
--            ("Nothing to check", partition.cluster.isEmpty ? partition.nothingToCheck : []),
-+            ("Nothing to check", partition.nothingToCheck),
-         ].filter { !$0.1.isEmpty }
+@@ -116,7 +116,8 @@ struct VerificationDetailsSection: View {
+     /// Findings row or needs none, and is in the list of checks.
+     static func groups(_ partition: VerificationLayerPartition) -> [(header: String?, indices: [Int])] {
+         let warnings = plainWarnings(partition)
+-        return warnings.isEmpty ? [] : [(nil, warnings)]
++        let idle: [(header: String?, indices: [Int])] = partition.nothingToCheck.isEmpty ? [] : [(header: "Nothing to check", indices: partition.nothingToCheck)]
++        return (warnings.isEmpty ? [] : [(header: nil, indices: warnings)]) + idle
      }
  
+     /// The checks whose outcome is a plain warning: not a problem, so in no

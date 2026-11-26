@@ -392,6 +392,15 @@ struct VerificationRowModelTests {
         strings += [VerificationRowModel.skippedCaption, VerificationRowModel.skippedLead,
                     VerificationRowModel.pageCountGateRule, "Findings", "Could not verify", "Notes",
                     "Nothing to check", "Page Count"]
+        // The Findings rows' sentences and steps.
+        strings += [FindingRowModel.boxedTextReadable, FindingRowModel.partOfBoxedText,
+                    FindingRowModel.searchesStillMatch(1), FindingRowModel.searchesStillMatch(2),
+                    FindingRowModel.couldNotRunInFull(checks: 1, pages: [2]),
+                    FindingRowModel.couldNotRunInFull(checks: 2, pages: [2, 6]),
+                    FindingRowModel.skippedChecks(1), FindingRowModel.skippedChecks(2),
+                    FindingRowModel.lookAtThatPage, FindingRowModel.lookAtThosePages,
+                    FindingRowModel.secureAvoidsThis, VerificationRowModel.adjustTheBoxRemedy,
+                    VerificationRowModel.adjustTheBoxesRemedy]
         return strings.filter { !$0.isEmpty }
     }
 
