@@ -1,0 +1,19 @@
+Property: A group whose union lies past the page is checked with that excess plus the slack, so a found box padded past the edge moves with its group.
+Area: the canvas's page geometry (turned pages)
+Test command: xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/DoorShareBoundsTests
+Must go red: ResectaAppTests/DoorShareBoundsTests wideGroupKeepsItsExcess
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
+index 01cf9a3..89b931b 100644
+--- a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
++++ b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
+@@ -418,7 +418,7 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
+         let ids = Set(moves.map(\.id))
+         let before = (redactionState?.regions[page] ?? []).filter { ids.contains($0.id) }.map(\.normalizedRect)
+         let excess = before.dropFirst().reduce(before.first) { $0?.union($1) }.map(RedactionState.excessPastThePage) ?? 0
+-        for move in moves { assert(RedactionState.admitsEditorShare(move.newRect, slack: excess)) }
++        for move in moves { assert(RedactionState.admitsEditorShare(move.newRect, slack: 0)) }
+         #endif
+         redactionState?.moveRegions(moves, page: page, undoManager: undoManager, drawnPageRects: drawnPageRects)
+         refreshOverlay(for: page)

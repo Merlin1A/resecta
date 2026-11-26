@@ -1,0 +1,19 @@
+Property: One displayed point is a share of the page as shown, so a turned page's step is read across its shown sides.
+Area: the canvas's page geometry (turned pages)
+Test command: xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/PageGeometryTests
+Must go red: ResectaAppTests/PageGeometryTests everyRow; ResectaAppTests/CanvasRotatedPageTests keyboardStepOnATurnedPage
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/RunRecordPageGeometry+Canvas.swift b/Sources/ResectaApp/State/RunRecordPageGeometry+Canvas.swift
+index 724f28b..bff52cc 100644
+--- a/Sources/ResectaApp/State/RunRecordPageGeometry+Canvas.swift
++++ b/Sources/ResectaApp/State/RunRecordPageGeometry+Canvas.swift
+@@ -65,7 +65,7 @@ nonisolated extension RunRecord.PageGeometry {
+     /// One displayed point as a share of the page as shown.
+     var pointStep: CGSize {
+         guard hasSides else { return CGSize(width: Self.fallbackStep, height: Self.fallbackStep) }
+-        let size = displayedSize
++        let size = cropBox.size
+         return CGSize(width: 1 / size.width, height: 1 / size.height)
+     }
+ }

@@ -1,0 +1,19 @@
+Property: The keyboard's step is read from the page's geometry, not from its crop box unturned.
+Area: the canvas's page geometry (turned pages)
+Test command: xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/CanvasRotatedPageTests
+Must go red: ResectaAppTests/CanvasRotatedPageTests stepAndScrollReadTheGeometry; ResectaAppTests/CanvasRotatedPageTests keyboardStepOnATurnedPage
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/DocumentEditorKeyboard.swift b/Sources/ResectaApp/Views/DocumentEditorKeyboard.swift
+index 8330b82..18d16f4 100644
+--- a/Sources/ResectaApp/Views/DocumentEditorKeyboard.swift
++++ b/Sources/ResectaApp/Views/DocumentEditorKeyboard.swift
+@@ -17,7 +17,7 @@ extension DocumentEditorView {
+     /// crop box's sides are swapped); the pre-1.1.0 0.0025 stands in when
+     /// there is no page.
+     static func nudgeStep(page: PDFPage?) -> (dx: CGFloat, dy: CGFloat) {
+-        let step = page.map { RunRecord.PageGeometry(page: $0, box: .cropBox).pointStep }
++        let step = page.map { p -> CGSize in let s = p.bounds(for: .cropBox).size; return CGSize(width: 1 / s.width, height: 1 / s.height) }
+             ?? CGSize(width: RunRecord.PageGeometry.fallbackStep, height: RunRecord.PageGeometry.fallbackStep)
+         return (dx: step.width, dy: step.height)
+     }

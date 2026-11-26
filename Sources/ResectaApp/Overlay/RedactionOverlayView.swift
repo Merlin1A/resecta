@@ -12,9 +12,19 @@ import RedactionEngine
 class RedactionOverlayView: UIView {
 
     var pageIndex: Int = 0
-    /// The page's `/Rotate`, set when PDFKit asks for this overlay; the
-    /// app never turns a page, so it holds for the overlay's life.
-    var pageRotation: Int = 0
+    /// The page's geometry (its crop box, with its origin, and its
+    /// `/Rotate`), set when PDFKit asks for this overlay; the app never
+    /// turns a page, so it holds for the overlay's life. The default has
+    /// no crop and refuses: an overlay no page made maps nothing and
+    /// begins no gesture (`noGeometry`).
+    var geometry = RunRecord.PageGeometry(cropBox: .zero, rotation: 0)
+#if DEBUG
+    /// Called when a map or a touch meets an overlay with no geometry. A
+    /// test may set it to count the refusal instead of trapping.
+    static var noGeometry: () -> Void = { assertionFailure("overlay with no page geometry") }
+#else
+    static func noGeometry() {}
+#endif
     /// The page's own size in points (its display box, before the turn),
     /// set when PDFKit asks for this overlay. PDFKit sizes the overlay to
     /// the page rounded to the screen's pixels (A4's 595.276 x 841.89 pt

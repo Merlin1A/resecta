@@ -42,6 +42,7 @@ struct RectangleDrawGestureTests {
         let overlay = RedactionOverlayView(
             frame: CGRect(origin: .zero, size: Self.overlaySize)
         )
+        overlay.geometry = .testUnturned
         overlay.isDrawingMode = drawing
         overlay.activeShapeTool = .rectangle
         let coordinator = RecordingCoordinator()

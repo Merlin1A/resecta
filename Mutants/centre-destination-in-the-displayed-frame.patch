@@ -1,0 +1,19 @@
+Property: The centring destination is carried from the page as shown into the page's own space before PDFKit reads it.
+Area: the canvas's page geometry (turned pages)
+Test command: xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppUITests/RotatedPageWalkUITests
+Must go red: ResectaAppUITests/RotatedPageWalkUITests testNextFramesTheMatchOnTheTurnedPage (iOS 26)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/PDFDocumentView.swift b/Sources/ResectaApp/Views/PDFDocumentView.swift
+index 881cc28..86b911d 100644
+--- a/Sources/ResectaApp/Views/PDFDocumentView.swift
++++ b/Sources/ResectaApp/Views/PDFDocumentView.swift
+@@ -390,7 +390,7 @@ final class FitFlooredPDFView: PDFView {
+                 height: bounds.height / scaleFactor),
+             pageBounds: CGRect(origin: .zero, size: geometry.displayedSize)
+         )
+-        go(to: PDFDestination(page: page, at: geometry.pagePoint(displayed: point)))
++        go(to: PDFDestination(page: page, at: point))
+     }
+ 
+     /// iOS 27's `go(to:)` refits the page, undoing the scale just written,

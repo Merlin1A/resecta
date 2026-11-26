@@ -1,0 +1,53 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /CropBox [36 54 576 738] /Rotate 90 /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Length 305 >>
+stream
+BT
+/F1 14 Tf
+0 1 -1 0 88 126 Tm
+(Clear page fixture) Tj
+ET
+BT
+/F1 11 Tf
+0 1 -1 0 496 126 Tm
+(A short paragraph near the foot of the page, so the page) Tj
+ET
+BT
+/F1 11 Tf
+0 1 -1 0 510 126 Tm
+(carries a real text layer around its clear block.) Tj
+ET
+BT
+/F1 12 Tf
+0 1 -1 0 228.066 266.33 Tm
+(Wrenlowe) Tj
+ET
+
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000121 00000 n 
+0000000283 00000 n 
+0000000353 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+709
+%%EOF

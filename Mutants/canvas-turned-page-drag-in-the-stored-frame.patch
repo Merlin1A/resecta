@@ -5,14 +5,14 @@ Must go red: ResectaAppTests/CanvasTurnedPageTests dragIsStoredInTheShownFrame; 
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Coordinates.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Coordinates.swift
-index fbb98e5c..bbfd8cfe 100644
+index 5e8c49b..d5a6b18 100644
 --- a/Sources/ResectaApp/Overlay/RedactionOverlayView+Coordinates.swift
 +++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+Coordinates.swift
-@@ -21,7 +21,7 @@ extension RedactionOverlayView {
+@@ -24,7 +24,7 @@ extension RedactionOverlayView {
              width: rect.width / w,
              height: rect.height / h
          )
--        return CanvasTurn.shown(fromStored: stored, rotation: pageRotation)
+-        return CanvasTurn.shown(fromStored: stored, rotation: geometry.rotation)
 +        return stored
      }
  

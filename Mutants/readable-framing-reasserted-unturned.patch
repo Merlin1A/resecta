@@ -1,0 +1,20 @@
+Property: The armed framing is re-applied with the page's own geometry, turn included, after a layout pass.
+Area: the canvas's page geometry (turned pages)
+Test command: xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/CanvasRotatedPageTests
+Must go red: ResectaAppTests/CanvasRotatedPageTests reassertKeepsTheTurnedFraming
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/PDFDocumentView.swift b/Sources/ResectaApp/Views/PDFDocumentView.swift
+index 881cc28..d4faecf 100644
+--- a/Sources/ResectaApp/Views/PDFDocumentView.swift
++++ b/Sources/ResectaApp/Views/PDFDocumentView.swift
+@@ -327,7 +327,8 @@ final class FitFlooredPDFView: PDFView {
+         pending.passes += 1
+         pendingReadabilityFraming = pending
+         applyReadabilityFraming(
+-            share: pending.share, geometry: pending.geometry, on: pending.page, anchor: pending.anchor)
++            share: pending.share, geometry: RunRecord.PageGeometry(cropBox: pending.geometry.cropBox, rotation: 0),
++            on: pending.page, anchor: pending.anchor)
+     }
+ 
+     /// Write the computed scale up or down when it differs meaningfully

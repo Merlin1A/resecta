@@ -1,0 +1,19 @@
+Property: The editor's check that a stored share lies on the page allows the slack, which the conversions through a page of fractional sides need.
+Area: the canvas's page geometry (turned pages)
+Test command: xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/DoorShareBoundsTests
+Must go red: ResectaAppTests/DoorShareBoundsTests everyEntryStoresOnThePage
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/RedactionState.swift b/Sources/ResectaApp/State/RedactionState.swift
+index 688c4ee..8a6a201 100644
+--- a/Sources/ResectaApp/State/RedactionState.swift
++++ b/Sources/ResectaApp/State/RedactionState.swift
+@@ -266,7 +266,7 @@ class RedactionState {
+     /// found box, an Undo or a seed is stored as handed. `slack` is a group
+     /// move's: how far the group lay past the page before it moved.
+     nonisolated static func admitsEditorShare(_ rect: CGRect, slack: CGFloat = 0) -> Bool {
+-        let e = shareSlack + slack
++        let e = slack
+         return rect.minX >= -e && rect.minY >= -e && rect.maxX <= 1 + e && rect.maxY <= 1 + e
+     }
+ 

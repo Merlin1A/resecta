@@ -7,9 +7,9 @@ import CoreGraphics
 // `DocumentState.requestCanvasScroll` is the writer contract every
 // result-navigation site shares; `PDFDocumentView.shouldRectScroll`
 // is the consumer's zoom gate. The normalized→page-space conversion
-// is deliberately NOT re-pinned here — the consumer reuses the
-// engine's canonical `normalizedToPDFPageCoordinates`,
-// which the engine suite owns.
+// is deliberately NOT re-pinned here: the consumer converts through the
+// page's geometry (`RunRecord.PageGeometry.pageRect(share:)`), whose
+// cases `PageGeometryTests` holds.
 
 @Suite("Canvas scroll-to-match target")
 @MainActor

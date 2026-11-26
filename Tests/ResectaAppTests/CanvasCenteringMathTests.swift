@@ -68,8 +68,9 @@ struct CanvasCenteringMathTests {
 
     @Test("A rotated (landscape) page with an offset crop box: the rect from the engine's canonical conversion centres inside that box")
     func rotatedPageRectThroughTheCanonicalConversion() {
-        // A landscape crop box whose origin is not (0, 0) — the shape a
-        // rotated page's `bounds(for:)` takes. The normalized rect goes
+        // A landscape crop box whose origin is not (0, 0). (`bounds(for:)`
+        // gives the crop box unturned, for every rotation; this is a
+        // landscape page, not a turned one.) The normalized rect goes
         // through the same conversion the consumer uses.
         let box = CGRect(x: 20, y: 30, width: 792, height: 612)
         let rect = normalizedToPDFPageCoordinates(
