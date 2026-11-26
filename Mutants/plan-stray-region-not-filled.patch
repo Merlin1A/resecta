@@ -5,14 +5,14 @@ Must go red: RedactionEngineTests/PlanPaintTests regionOutsideThePlan
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
-index bf781ea2..b4d9041c 100644
+index 3db368c61..d4745e824 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
-@@ -207,7 +207,6 @@ extension PageRasterizer {
+@@ -416,7 +416,6 @@ extension PageRasterizer {
          for (_, rect) in rects {
              try fillInBands(context: ctx, rect: rect, fillColor: page.fillColor)
          }
 -        try applyRedactionFills(context: ctx, regions: strays, fillColor: page.fillColor, content: content)
-         for rect in strayGrowth {
+         for rect in strayGrowth + strayShown {
              try fillInBands(context: ctx, rect: rect, fillColor: page.fillColor)
          }
