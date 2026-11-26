@@ -1,0 +1,18 @@
+Property: The results screen tells the masthead when the boxes changed since the PDF was made. Planted: the screen leaves that argument out, so its default of false applies and a result that no longer stands looks as if it stood.
+Area: the results masthead, a result that no longer stands
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/ResultsOrderAndSentenceTests
+Must go red: ResectaAppTests/ResultsOrderAndSentenceTests theScreenTellsTheMastheadTheBoxesChanged
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationResultsView.swift b/Sources/ResectaApp/Views/VerificationResultsView.swift
+index c370238..25402fe 100644
+--- a/Sources/ResectaApp/Views/VerificationResultsView.swift
++++ b/Sources/ResectaApp/Views/VerificationResultsView.swift
+@@ -77,7 +77,6 @@ struct VerificationResultsView: View {
+                 ScrollView(.vertical, showsIndicators: false) {
+                     VStack(spacing: 0) {
+                         VerificationMasthead(report: report, outputExists: outputExists,
+-                                             isStale: isVerificationStale,
+                                              mode: runFacts.runMode,
+                                              findingRows: Self.findingRowCount(report: report, findings: findings),
+                                              handDrawnBoxes: Self.handDrawnBoxCount(in: findings))
