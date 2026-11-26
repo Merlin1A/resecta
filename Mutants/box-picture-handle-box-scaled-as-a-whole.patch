@@ -1,0 +1,19 @@
+Property: A handle's touch box is half the box's shorter side, held between the floor and the touch target in screen points; the half side is not scaled again.
+Area: the editor, one picture of a box
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild build-for-testing -scheme ResectaApp -destination id=<simulator>, then DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test-without-building -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BoxPictureTests
+Must go red: ResectaAppTests/BoxPictureTests tableCase(_:) [hand-single-fs-0.5]; ResectaAppTests/BoxPictureTests tableCase(_:) [case5-side-59.9-fs-1/0.64]; ResectaAppTests/BoxPictureTests tableCase(_:) [case5-side-59.9-fs-0.5]; ResectaAppTests/BoxPictureTests tableCase(_:) [case5-side-60-fs-1/0.64]; ResectaAppTests/BoxPictureTests tableCase(_:) [case5-side-60-fs-0.5]; ResectaAppTests/BoxPictureTests tableCase(_:) [case5-side-105-fs-0.5]
+Apply in a scratch worktree with `git apply`; discard after.
+
+--- a/Sources/ResectaApp/Overlay/BoxPicture.swift
++++ b/Sources/ResectaApp/Overlay/BoxPicture.swift
+@@ -123,8 +123,8 @@
+             : []
+ 
+         let page = CGRect(origin: .zero, size: input.page)
+-        let boxSide = min(ResectaTokens.TouchTarget.minimum * f,
+-                          max(handleBoxFloor * f, min(lineRect.width, lineRect.height) / 2))
++        let boxSide = min(ResectaTokens.TouchTarget.minimum,
++                          max(handleBoxFloor, min(lineRect.width, lineRect.height) / 2)) * f
+         func handleBox(at centre: CGPoint) -> CGRect {
+             var box = CGRect(x: centre.x - boxSide / 2, y: centre.y - boxSide / 2, width: boxSide, height: boxSide)
+             box.origin.x = max(page.minX, min(box.origin.x, page.maxX - boxSide))

@@ -154,7 +154,7 @@ extension RedactionOverlayView {
 
     // MARK: - Resize Handle Hit Testing
 
-    enum ResizeHandle {
+    nonisolated enum ResizeHandle {
         case topLeft, topRight, bottomLeft, bottomRight
         case topCenter, bottomCenter, leftCenter, rightCenter
     }
@@ -167,7 +167,7 @@ extension RedactionOverlayView {
     /// corners, and that axis's middle handles) step outward by half the
     /// shortfall, at most `Canvas.handleLargestStep`, so they stand clear
     /// of a thin box. `fingerScale` is overlay points per on-screen point.
-    static func handleCentres(for rect: CGRect, fingerScale: CGFloat = 1) -> [(ResizeHandle, CGPoint)] {
+    nonisolated static func handleCentres(for rect: CGRect, fingerScale: CGFloat = 1) -> [(ResizeHandle, CGPoint)] {
         typealias C = ResectaTokens.Canvas
         func step(_ length: CGFloat) -> CGFloat {
             let onScreen = length / fingerScale

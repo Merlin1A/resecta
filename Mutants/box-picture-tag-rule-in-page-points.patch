@@ -1,0 +1,17 @@
+Property: The tag's height and width rule is read in screen points, so zoom decides whether a box is tall and wide enough for its tag.
+Area: the editor, one picture of a box
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild build-for-testing -scheme ResectaApp -destination id=<simulator>, then DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test-without-building -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BoxPictureTests
+Must go red: ResectaAppTests/BoxPictureTests tableCase(_:) [found-rest]; ResectaAppTests/BoxPictureTests tableCase(_:) [tag-line-14.9-fs-1/0.64]; ResectaAppTests/BoxPictureTests tableCase(_:) [tag-line-15-fs-0.5]
+Apply in a scratch worktree with `git apply`; discard after.
+
+--- a/Sources/ResectaApp/Overlay/BoxPicture.swift
++++ b/Sources/ResectaApp/Overlay/BoxPicture.swift
+@@ -181,7 +181,7 @@
+               let words = input.tagTextWidth else { return nil }
+         let f = input.fingerScale
+         let widthOnScreen = words + 2 * tagPadding
+-        guard line.height / f >= tagShortestLine, line.width / f >= widthOnScreen else { return nil }
++        guard line.height >= tagShortestLine, line.width >= widthOnScreen else { return nil }
+         let x = line.minX - tagLeadOut * f, width = widthOnScreen * f, height = tagHeight * f
+         let above = CGRect(x: x, y: line.minY - (tagGap + tagHeight) * f, width: width, height: height)
+         if above.minY >= 0 { return above }

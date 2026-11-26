@@ -234,7 +234,7 @@ extension RedactionOverlayView {
     /// stepped outward on an axis shorter on screen than
     /// `Canvas.dotsStepOutBelow` by half the shortfall, at most
     /// `Canvas.dotLargestStep`.
-    static func selectionDotCentres(for rect: CGRect, fingerScale: CGFloat = 1) -> [CGPoint] {
+    nonisolated static func selectionDotCentres(for rect: CGRect, fingerScale: CGFloat = 1) -> [CGPoint] {
         typealias C = ResectaTokens.Canvas
         func step(_ length: CGFloat) -> CGFloat {
             let onScreen = length / fingerScale
