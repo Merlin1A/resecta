@@ -163,11 +163,13 @@ nonisolated final class CanvasGeometryUITests: XCTestCase {
         var tag: CGRect?
         let canvas = app.scrollViews.allElementsBoundByIndex.max { $0.frame.height < $1.frame.height } ?? app.scrollViews.firstMatch
         // The pinch zooms about the window's middle, which moves the amount
-        // column off the left edge; each step brings it back to the middle.
+        // column off the left edge; each step brings it back to the middle,
+        // then has the overlay redraw at the new zoom.
         for _ in 1...3 where tag == nil {
             canvas.pinch(withScale: 2.0, velocity: 1.0)
             sleep(3)
             try centreTheBoxes()
+            try redrawAtThisZoom()
             tag = try probe().tintBounds(.tagFill, in: canvasArea().insetBy(dx: 4, dy: 4))
         }
         let zoomed = try probe()
@@ -610,8 +612,9 @@ private extension CanvasGeometryUITests {
     /// Pinch PDFKit's scroll view (the tallest) 2x, proven by the canvas
     /// background just above the fit page turning page-white.
     /// Pans the canvas so the boxes, read by their teal lines in the
-    /// window's middle half, sit at its middle across. The drag starts beside
-    /// them, on no box, so it pans and neither moves nor selects one; it ends
+    /// window's middle half, sit at its middle across. The drag starts 30
+    /// points beside them, clear of any box's touch area, so it pans and
+    /// neither moves nor selects one; it ends
     /// slowly so the canvas does not glide on.
     nonisolated func centreTheBoxes() throws {
         let band = CGRect(x: 0, y: window.frame.height * 0.25, width: window.frame.width, height: window.frame.height * 0.5)
@@ -619,10 +622,40 @@ private extension CanvasGeometryUITests {
         guard let boxes = try probe().tintBounds(.teal, in: band) else { return }
         let shift = window.frame.midX - boxes.midX
         guard abs(shift) > 20 else { return }
-        let start = CGPoint(x: shift > 0 ? boxes.maxX + 10 : boxes.minX - 10, y: band.midY)
+        let start = CGPoint(x: shift > 0 ? boxes.maxX + 30 : boxes.minX - 30, y: band.midY)
         point(start).press(forDuration: 0.05, thenDragTo: point(CGPoint(x: start.x + shift, y: start.y)),
                            withVelocity: .slow, thenHoldForDuration: 0.2)
         sleep(2)
+    }
+
+    /// Has the overlay redraw at the zoom on screen, with the trigger it has
+    /// today: a tap inside a box selects it, a tap on the page at the
+    /// window's trailing edge clears it. A change of zoom alone does not ask
+    /// for a redraw yet. The box is read down the middle of the boxes in the
+    /// window's middle half: a gap over 12 points between two runs of teal
+    /// is a box's inside (between boxes it is about 8 at this zoom). Does
+    /// nothing while the boxes are shorter than that.
+    nonisolated func redrawAtThisZoom() throws {
+        let band = CGRect(x: 0, y: window.frame.height * 0.25, width: window.frame.width, height: window.frame.height * 0.5)
+            .intersection(canvasArea())
+        let shot = try probe()
+        guard let boxes = shot.tintBounds(.teal, in: band) else { return }
+        var starts: [CGFloat] = []
+        var inRun = false
+        var y = band.minY
+        while y < band.maxY {
+            let (r, g, b) = shot.rgb(boxes.midX, y)
+            let teal = CanvasPixelProbe.Tint.teal.matches(r, g, b)
+            if teal, !inRun { starts.append(y) }
+            inRun = teal
+            y += 1
+        }
+        guard let i = starts.indices.dropLast().first(where: { starts[$0 + 1] - starts[$0] > 12 }) else { return }
+        let inside = CGPoint(x: boxes.midX, y: (starts[i] + starts[i + 1]) / 2)
+        tap(inside)
+        sleep(1)
+        tap(CGPoint(x: window.frame.width - 16, y: inside.y))
+        sleep(1)
     }
 
     nonisolated func pinchToZoom(above page: CGRect) throws -> Bool {
