@@ -150,7 +150,10 @@ nonisolated struct BoxPicture: Equatable {
                                                      width: coreSide, height: coreSide))
         }
 
-        let shown = fill.union(lineRect)
+        // fill ∪ lineRect, taken as the larger rectangle itself when one
+        // holds the other: CGRect.union works the width out as maxX - minX,
+        // which can differ from a hand box's own width in the last bit.
+        let shown = lineRect.contains(fill) ? lineRect : fill.contains(lineRect) ? fill : fill.union(lineRect)
         return BoxPicture(
             fill: fill,
             veilShares: input.veilShares,
