@@ -157,7 +157,10 @@ struct SearchAndRedactSheet: View {
                         activeModal = .rowRationale(rowID: rowID)
                     },
                     onTriggerSearch: triggerSearch,
-                    onFocusWalk: focusWalk(on:parking:)
+                    onFocusWalk: focusWalk(on:parking:),
+                    degradedLine: noticeDegradedLine,
+                    onShowNoticeDetails: { activeModal = .noticeDetails },
+                    onAnnounce: { toastManager.announce($0) }
                 )
                 .safeAreaInset(edge: .top, spacing: 0) {
                     // The Search interface's whole fixed chrome
@@ -257,6 +260,8 @@ struct SearchAndRedactSheet: View {
                 rowRationaleSheet(rowID: rowID)
                     .messageHost(toastManager, place: .otherSheet)
                     .messageLayer(toastManager, role: .draws)
+            case .noticeDetails:
+                noticeDetailsSheet.messageHost(toastManager, place: .otherSheet).messageLayer(toastManager, role: .draws)
             case .savedSearches:
                 // Store re-injected (sheet content does not
                 // inherit the presenting hierarchy's environment) and the

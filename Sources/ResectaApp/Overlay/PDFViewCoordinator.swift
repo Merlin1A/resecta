@@ -618,6 +618,79 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
         guard held != canvasHoldsTouch else { return }
         canvasHoldsTouch = held
         applyScrollFingers()
+        // A place that waited for the finger is decided as it lifts.
+        if !held, selectionBarPlacePending, let pdfView {
+            selectionBarPlacePending = false
+            placeSelectionBar(in: pdfView)
+        }
+    }
+
+    // MARK: - The selection bar's place
+
+    /// The selection bar's frame at the bottom of the canvas, in the PDF
+    /// view's own points; nil while the bar does not hold the slot.
+    var selectionBarFrame: CGRect?
+    /// Where the editor hears the bar's place: true for the top.
+    var onSelectionBarPlace: (@MainActor (Bool) -> Void)?
+    private var lastSelectionBarInputs: SelectionBarClearance.Inputs?
+    private var selectionBarPlacePending = false
+
+    /// Decides the selection bar's place when its inputs change
+    /// (`SelectionBarClearance.step`). Called at the end of every update.
+    func keepSelectionClearOfBar(in pdfView: PDFView, framedThisPass: Bool) {
+        guard let state = redactionState else { return }
+        let inputs = SelectionBarClearance.Inputs(
+            selectedIDs: state.selectedRegionIDs,
+            regionVersion: state.regionVersion,
+            bar: selectionBarFrame,
+            canvasSize: pdfView.bounds.size,
+            pageIndex: documentState?.currentPageIndex ?? 0)
+        let changed = inputs != lastSelectionBarInputs
+        lastSelectionBarInputs = inputs
+        if selectionBarFrame == nil { selectionBarPlacePending = false }
+        let scrollView = pdfView.subviews.first { $0 is UIScrollView } as? UIScrollView
+        let scrolling = scrollView.map { $0.isDragging || $0.isDecelerating || $0.isZooming || $0.isZoomBouncing } ?? false
+        switch SelectionBarClearance.step(
+            inputsChanged: changed, barUp: selectionBarFrame != nil, fingerDown: canvasHoldsTouch,
+            personScrolling: scrolling, framedThisPass: framedThisPass) {
+        case .none: break
+        case .drop: selectionBarPlacePending = false
+        case .wait: selectionBarPlacePending = true
+        case .run:
+            selectionBarPlacePending = false
+            placeSelectionBar(in: pdfView)
+        }
+    }
+
+    /// The selected boxes on the page in view, in the PDF view's points,
+    /// with the page's frame there. A region is kept in the frame the page
+    /// is shown in, so it is turned back to the stored page first, as the
+    /// overlay draws it.
+    func selectedBoxesInView(_ pdfView: PDFView) -> (boxes: [CGRect], page: CGRect)? {
+        guard let state = redactionState, let document = pdfView.document else { return nil }
+        let index = documentState?.currentPageIndex ?? 0
+        guard let page = document.page(at: index) else { return nil }
+        let pageBounds = page.bounds(for: pdfView.displayBox)
+        let boxes = (state.regions[index] ?? [])
+            .filter { state.selectedRegionIDs.contains($0.id) }
+            .map { pdfView.convert(PDFDocumentView.pageRect(forShown: $0.normalizedRect, on: page, box: pdfView.displayBox),
+                                   from: page) }
+        return (boxes, pdfView.convert(pageBounds, from: page))
+    }
+
+    /// Hands out the bar's place one turn later: the update pass that
+    /// decided it writes no SwiftUI state.
+    private func placeSelectionBar(in pdfView: PDFView) {
+        guard let bar = selectionBarFrame, let read = selectedBoxesInView(pdfView) else { return }
+        let atTop = SelectionBarClearance.barAtTop(
+            selection: SelectionBarClearance.selectionRect(boxes: read.boxes, page: read.page),
+            bottomBar: bar, canvas: pdfView.bounds)
+        Task { @MainActor [weak self] in
+            // A bar taken down before this turn hears nothing: the next bar
+            // starts at the bottom and is measured there.
+            guard let self, self.selectionBarFrame != nil else { return }
+            self.onSelectionBarPlace?(atTop)
+        }
     }
 
     /// The one home for when one finger scrolls: while the Rectangle tool

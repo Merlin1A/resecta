@@ -43,6 +43,12 @@ struct SearchResultsSection: View {
     /// row tap, like the hub's chevrons / ⌘G, passes `true` and parks
     /// the sheet at the compact float.
     let onFocusWalk: (UUID, Bool) -> Void
+    /// The session's degraded-detection line, for the notice place.
+    var degradedLine: SearchNoticeLine? = nil
+    /// Opens the notice place's details.
+    var onShowNoticeDetails: () -> Void = {}
+    /// Speaks a notice through the message queue.
+    var onAnnounce: (String) -> Void = { _ in }
 
     /// Anchored-row contract — when
     /// tap-on-row drops the sheet to compact, the row the user tapped
@@ -52,6 +58,10 @@ struct SearchResultsSection: View {
     /// `proxy.scrollTo(_:anchor:)` then resets to nil so the same row
     /// can be re-anchored later.
     @State private var pendingAnchorID: UUID?
+    /// The list's room and width, read below the sheet's fixed top and
+    /// above the footer or the keyboard; re-measured at every mount.
+    @State private var noticeRoom: CGFloat = 0
+    @State private var noticeWidth: CGFloat = 0
 
     /// Reduce Motion gate for any animation introduced
     /// by the saturation banner (currently a no-op — the banner appears
@@ -97,36 +107,32 @@ struct SearchResultsSection: View {
                 sectionTopChrome
             }
             .background { keyboardShortcutButtons }
+            // The list's room: the section's own size, which already
+            // leaves out the sheet's fixed top and the footer or the
+            // keyboard (a geometry proxy's size is inside its safe area;
+            // taking the insets off again counted them twice). Measured
+            // outside the section's own inset, so the place's height
+            // never feeds its own limit.
+            .onGeometryChange(for: CGSize.self) { proxy in
+                proxy.size
+            } action: { size in
+                noticeWidth = size.width
+                noticeRoom = size.height
+            }
     }
 
-    /// Everything that used to sit above the results list as fixed
-    /// VStack chrome — banners, live preview, Select-Where — riding
+    /// Everything that sits above the results list as fixed chrome —
+    /// the one notice place and the live preview — riding
     /// the list's top safe-area inset under the hub's sheet chrome.
     /// Opaque background — rows scroll UNDER
     /// the inset region.
     private var sectionTopChrome: some View {
         VStack(spacing: 0) {
-            // Per-page regex-timeout banner. Surfaces
-            // when `DocumentSearcher`'s timeout sink fired for one or more
-            // pages during the active scan. Copy NEVER echoes pattern text —
-            // only generic active-pattern phrasing — so a
-            // pasted PII-like regex can't leak via the banner.
-            if !searchState.regexTimeoutPages.isEmpty {
-                SearchRegexTimeoutBanner(searchState: searchState)
-            }
-
-            // Per-page OCR-skip banner. Surfaces when
-            // `DocumentSearcher`'s OCR-skip sink fired for one or more
-            // pages during the active scan: those pages exceeded the OCR
-            // pixel caps, so their image content was never text-scanned.
-            if !searchState.ocrSkippedPages.isEmpty {
-                SearchOCRSkipBanner(searchState: searchState)
-            }
-
-            // Per-page widened-box banner: a result's box was drawn wider
-            // than its word (`SearchWidenedBoxBanner`).
-            let widened = searchState.widenedBoxPages
-            if !widened.isEmpty { SearchWidenedBoxBanner(pages: widened) }
+            // The one notice place: what the search did not read, one
+            // notice at most (`SearchNoticePlaceView`).
+            SearchNoticePlaceView(
+                searchState: searchState, degradedLine: degradedLine, room: noticeRoom, width: noticeWidth,
+                onShowDetails: onShowNoticeDetails, onAnnounce: onAnnounce)
 
             // Live preview row (counts + saturation/invalid signal).
             livePreviewRow

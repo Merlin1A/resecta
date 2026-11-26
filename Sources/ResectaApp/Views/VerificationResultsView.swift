@@ -77,6 +77,7 @@ struct VerificationResultsView: View {
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 0) {
                         VerificationMasthead(report: report, outputExists: outputExists,
+                                             isStale: isVerificationStale,
                                              mode: runFacts.runMode, findingCount: findings.count)
                         VerificationResultsActions(
                             report: report, canExport: canExport, outputExists: outputExists,

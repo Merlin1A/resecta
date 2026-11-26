@@ -120,6 +120,16 @@ struct ResectaApp: App {
                 defaults.removeObject(forKey: "autoVerify")
             }
         }
+        // The first-time line: a test launch sets its flag, so no suite meets
+        // the line, unless it asks for a fresh one or for the stored value.
+        if CommandLine.arguments.contains("--uitesting") {
+            let hint = FirstDocumentHintStore(defaults: defaults)
+            if CommandLine.arguments.contains("--firstDocumentHintFresh") {
+                hint.clear()
+            } else if !CommandLine.arguments.contains("--firstDocumentHintStored") {
+                hint.markDone()
+            }
+        }
         if CommandLine.arguments.contains("--searchSourceFilter=ocr"),
            let data = try? JSONEncoder().encode(SearchState.LastSearchFilterShape(
                sourceFilter: .ocrOnly, minimumOCRConfidence: 0, sortOrder: .discoveryOrder
@@ -160,6 +170,10 @@ struct ResectaApp: App {
         // One page carrying one note annotation and no popup
         // (Scripts/generate_uitest_annotated.py): the import notice.
         "--annotatedDoc": "uitest_annotated",
+        // Two US Legal pages, 612 x 1008 pt, with a text line at each page's
+        // foot (Scripts/generate_uitest_legal.py): a page taller than
+        // Letter, whose foot the bottom controls cover at fit zoom.
+        "--legalDoc": "uitest_legal",
     ]
 
     /// The `--loadTestDocument` fixture name for a launch-argument list.

@@ -1,13 +1,12 @@
 import SwiftUI
 import RedactionEngine
 
-// The three banners the results list mounts above its rows, each a
-// `View` with explicit inputs rather than a read of the section's own
-// state: the saturation banner with its re-target shortcuts, the
-// per-page regex-timeout banner and the per-page OCR-skip banner. The
-// headline builders stay addressable as `SearchResultsSection.` statics
-// (the extension at the end) because the scan review, the verification
-// results screen and their tests read them there.
+// The saturation banner the results list mounts in its live preview row,
+// and the headline builders of what a search did not read. The notice place
+// above the results (`SearchNoticePlaceView`) shows those sentences. The
+// builders stay addressable as `SearchResultsSection.` statics (the
+// extension at the end) because the notice place, the scan review, the
+// verification results screen and their tests read them there.
 
     /// Saturation message promoted from a flat
     /// `Image + Text` row to an actionable banner with two inline
@@ -20,6 +19,8 @@ import RedactionEngine
     /// via the `reduceMotion` environment threaded above.
     /// "Add whole-word filter" / "Toggle case-sensitive" are
     /// mechanism-description action labels.
+    /// The caution is said twice: the glyph in the caution mark and the fill
+    /// in the warning tint. The headline is in the label colour.
 struct SearchSaturationBanner: View {
     let searchState: SearchState
     let onTriggerSearch: () -> Void
@@ -28,10 +29,10 @@ struct SearchSaturationBanner: View {
         VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xs) {
             HStack(spacing: ResectaTokens.Spacing.xs) {
                 Image(systemName: "exclamationmark.circle.fill")
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(ResectaTokens.Ink.cautionMark)
                 Text(SaturationBannerCopy.headline)
                     .font(.caption.weight(.medium))
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(.primary)
                 Spacer()
             }
             .accessibilityElement(children: .combine)
@@ -65,92 +66,7 @@ struct SearchSaturationBanner: View {
         }
         .padding(.horizontal, ResectaTokens.Spacing.md)
         .padding(.vertical, ResectaTokens.Spacing.xs)
-        .background(Color.orange.opacity(0.08))
-    }
-}
-
-    /// Surfaces when one or more pages bailed on
-    /// the regex per-page timeout. Copy NEVER echoes pattern text —
-    /// uses only the generic active-pattern phrasing so a
-    /// pasted PII-like regex can't leak via the banner. Pinned by
-    /// `RegexTimeoutBannerTests.bannerCopyNeverEchoesPattern` (the test
-    /// feeds a known-distinctive pattern and greps the banner output).
-struct SearchRegexTimeoutBanner: View {
-    let searchState: SearchState
-
-    var body: some View {
-        let pages = searchState.regexTimeoutPages.sorted()
-        let headline = SearchResultsSection.regexTimeoutBannerHeadline(pages: pages)
-        return HStack(alignment: .top, spacing: ResectaTokens.Spacing.sm) {
-            Image(systemName: "clock.badge.exclamationmark")
-                .foregroundStyle(.secondary)
-            Text(headline)
-                .font(.caption.weight(.medium))
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: ResectaTokens.Spacing.xs)
-        }
-        .padding(.horizontal, ResectaTokens.Spacing.md)
-        .padding(.vertical, ResectaTokens.Spacing.xs)
-        .background(Color.orange.opacity(0.08))
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(headline)
-    }
-}
-
-    /// Surfaces when one or more pages exceeded the OCR pixel caps during
-    /// the active scan, so OCR never ran there. Same shape as the
-    /// regex-timeout banner above; copy names only page numbers, never
-    /// document content. Pinned by `OCRSkipBannerTests`.
-struct SearchOCRSkipBanner: View {
-    let searchState: SearchState
-
-    var body: some View {
-        let pages = searchState.ocrSkippedPages.sorted()
-        let headline = SearchResultsSection.ocrSkipBannerHeadline(pages: pages)
-        return HStack(alignment: .top, spacing: ResectaTokens.Spacing.sm) {
-            Image(systemName: "exclamationmark.triangle")
-                .foregroundStyle(.secondary)
-            Text(headline)
-                .font(.caption.weight(.medium))
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: ResectaTokens.Spacing.xs)
-        }
-        .padding(.horizontal, ResectaTokens.Spacing.md)
-        .padding(.vertical, ResectaTokens.Spacing.xs)
-        .background(Color.orange.opacity(0.08))
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(headline)
-        .accessibilityIdentifier("ocrSkipBanner")
-    }
-}
-
-    /// Surfaces when a result's box was drawn wider than its word: the
-    /// text could not be fitted to the printed word, so the box covers
-    /// where the word can be (`SearchResult.inkFitDegraded`). Same shape
-    /// as the banners above; names only page numbers. Pinned by
-    /// `WidenedBoxNoticeTests`.
-struct SearchWidenedBoxBanner: View {
-    let pages: Set<Int>
-
-    var body: some View {
-        let headline = SearchResultsSection.widenedBoxBannerHeadline(pages: pages.sorted())
-        return HStack(alignment: .top, spacing: ResectaTokens.Spacing.sm) {
-            Image(systemName: "arrow.left.and.right.square")
-                .foregroundStyle(.secondary)
-            Text(headline)
-                .font(.caption.weight(.medium))
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: ResectaTokens.Spacing.xs)
-        }
-        .padding(.horizontal, ResectaTokens.Spacing.md)
-        .padding(.vertical, ResectaTokens.Spacing.xs)
-        .background(Color.orange.opacity(0.08))
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(headline)
-        .accessibilityIdentifier("widenedBoxBanner")
+        .background(ResectaTokens.SemanticColor.warningTint.opacity(0.08))
     }
 }
 

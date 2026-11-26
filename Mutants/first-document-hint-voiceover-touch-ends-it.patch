@@ -1,0 +1,19 @@
+Property: With VoiceOver running a touch does not end the line; only a state change does.
+Area: the first-time line in the editor
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/FirstDocumentHintTests
+Must go red: ResectaAppTests/FirstDocumentHintTests voiceOverTouchesDoNotCount
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/FirstDocumentHintStore.swift b/Sources/ResectaApp/State/FirstDocumentHintStore.swift
+index c1e6afe6..2e19b8be 100644
+--- a/Sources/ResectaApp/State/FirstDocumentHintStore.swift
++++ b/Sources/ResectaApp/State/FirstDocumentHintStore.swift
+@@ -89,7 +89,7 @@ enum FirstDocumentHintRules {
+     /// With VoiceOver running a touch is exploring, not acting: only the
+     /// state changes count.
+     static func ends(_ action: Action, voiceOverRunning: Bool) -> Bool {
+-        action != .touch || !voiceOverRunning
++        true
+     }
+ 
+     /// The state change between two snapshots that counts as an action, if

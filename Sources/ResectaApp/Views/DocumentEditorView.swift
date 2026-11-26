@@ -41,6 +41,21 @@ struct DocumentEditorView: View {
     /// the selection — iPhone parity for the iPad Shift+tap path. iPad
     /// Shift+tap continues to work whether the toggle is on or off.
     @State var isMultiSelectActive: Bool = false
+    /// The selection bar's frame at its bottom place, in the canvas's
+    /// points (measured only while it is drawn there); nil while the bar
+    /// does not hold the slot.
+    @State var selectionBarFrame: CGRect?
+    /// The bar's place is the top: the selection is under its bottom place.
+    @State var selectionBarAtTop = false
+    /// The canvas's coordinate space, where the bar's frame is read.
+    static let canvasSpaceName = "editorCanvas"
+
+    /// The first-time line: whether the person has acted (the stored flag,
+    /// read when the editor appears), whether the line has been spoken, and
+    /// the canvas it is sized in.
+    @State var firstDocumentHintDone = FirstDocumentHintStore.standard.isDone
+    @State var firstDocumentHintSpoken = false
+    @State var firstDocumentHintCanvas: CGSize = .zero
 
     /// The band's places whose notice has been spoken and still holds.
     /// Cleared when another document replaces this one.
@@ -94,6 +109,10 @@ struct DocumentEditorView: View {
 
     /// Bindings to trigger import/settings from parent ContentView
     @Binding var showSettings: Bool
+    /// The workspace's password sheet and its dialog for a drop over an
+    /// open document: up over the editor, so the first-time line waits.
+    var passwordSheetUp = false
+    var dropDialogUp = false
 
     enum DrawingTool {
         case rectangle
@@ -198,7 +217,9 @@ struct DocumentEditorView: View {
                 PDFDocumentView(
                     isDrawingMode: activeTool != nil,
                     activeShapeTool: Self.shapeTool(for: activeTool),
-                    isMultiSelectActive: isMultiSelectActive
+                    isMultiSelectActive: isMultiSelectActive,
+                    selectionBarFrame: selectionBarFrame,
+                    onSelectionBarPlace: { selectionBarAtTop = $0 }
                 )
                     .disabled(documentState.canvasLocked)
                     .blur(radius: documentState.canvasLocked ? 3 : 0,
@@ -226,6 +247,8 @@ struct DocumentEditorView: View {
                     .background { GeometryReader { canvas in
                         Color.clear.preference(key: MessageReadableSpace.self, value: canvas.size.height)
                     } }
+                    .onGeometryChange(for: CGSize.self) { $0.size } action: { firstDocumentHintCanvas = $0 }
+                    .coordinateSpace(.named(Self.canvasSpaceName))
 
             case .verifying:
                 // Full-screen replacement — verification is a distinct
@@ -476,6 +499,11 @@ struct DocumentEditorView: View {
         }
         // Keyboard shortcuts for editing, handled by one modifier
         .modifier(DocumentEditorKeyboard(activeTool: $activeTool, isMultiSelectActive: $isMultiSelectActive))
+        // The first-time line ends at the person's first action.
+        .modifier(FirstDocumentHintObservers(
+            done: firstDocumentHintDone, editing: documentState.phaseKind == .editing,
+            shows: firstDocumentHintShows, snapshot: firstDocumentHintSnapshot,
+            act: firstDocumentHintAct, shown: firstDocumentHintShown))
         .onChange(of: showSettings) { _, shown in if !shown { restoreParkedSearchIfNeeded() } }
         // Add to Selection turns off on a page with no regions (its row
         // unmounts there), through the one tool-and-toggle reset.
