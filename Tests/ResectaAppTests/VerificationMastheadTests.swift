@@ -234,7 +234,7 @@ struct VerificationMastheadTests {
     func spokenLabelWhenTheResultDoesNotStand() {
         let missing = Results.outputMissingSentence
         #expect(Results.mastheadAccessibilityLabel(report: Fixtures.secureFail, isStale: true)
-                == "Out of Date. 6 of 7 checks passed. 1\u{00A0}failed. \(missing)")
+                == "Out of Date. 7 of 8 checks passed. 1\u{00A0}failed. \(missing)")
         #expect(Results.mastheadAccessibilityLabel(report: Fixtures.secureSkippedOff, outputExists: false, mode: .secure)
                 == "Out of Date. \(missing)")
         let attention = Fixtures.searchableAttentionFull
