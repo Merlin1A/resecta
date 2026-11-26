@@ -5,9 +5,10 @@ Must go red: RedactionEngineTests/DrawnPlanTests keptWithItsSettings
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift
+index c037955cc..439b4243b 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift
-@@ -139,7 +139,7 @@ public struct DrawnPlan: Equatable, Sendable {
+@@ -193,7 +193,7 @@ public struct DrawnPlan: Equatable, Sendable {
          self.pageIndex = pageIndex
          self.switchOn = switchOn
          self.exportDPI = exportDPI
@@ -15,4 +16,4 @@ diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.s
 +        self.fillColor = .black
          self.plan = plan
          self.filledPixels = filledPixels
-         guard let plan else { boxes = []; return }
+         self.wordsGiven = wordsGiven
