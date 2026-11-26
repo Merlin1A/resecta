@@ -107,6 +107,16 @@ nonisolated final class ResultWalkUITests: XCTestCase {
             XCTAssertGreaterThanOrEqual(element.frame.height, 44, "\(name) height \(element.frame.height) is under the 44-pt effective floor.")
             XCTAssertGreaterThanOrEqual(element.frame.width, 44, "\(name) width \(element.frame.width) is under the 44-pt effective floor.")
         }
+        // The card's value on screen: the card's number (ResultNavSite.parked)
+        // × 0.96, the attached sheet's scale, within 1 pt. The side inset is
+        // not read here: the strip is a containing element, and on screen its
+        // frame's edges were measured at its outermost children's (Apply on
+        // the leading side, the counter on the trailing side), so no
+        // element's frame carries the card's edge. CompactCardMetricsTests
+        // pins the inset's value.
+        let scale: CGFloat = 0.96
+        XCTAssertEqual(compactNext.frame.minX - prev.frame.maxX, 8 * scale, accuracy: 1,
+                       "The gap between the card's arrows (8) on screen.")
         attachScreenshot(named: "rw-strip-floor")
     }
 

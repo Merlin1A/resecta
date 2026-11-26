@@ -90,6 +90,24 @@ nonisolated final class UIFixChromeUITests: XCTestCase {
 
     /// Floor band: 46pt layout ⇒ [44.2, 46] rendered (render
     /// scale); the retired chrome measured ≥48 on the same element.
+    /// Grabber drag from the parked card up to the medium detent (a copy of
+    /// `ResultWalkUITests`' helper, which is private there).
+    private func expandParkedCardToMedium() {
+        let window = app.windows.firstMatch
+        for _ in 0..<3 {
+            let start = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95))
+            let end = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45))
+            start.press(forDuration: 0.1, thenDragTo: end)
+            let dismiss = app.buttons["searchDismissButton"].firstMatch
+            if dismiss.waitForExistence(timeout: 3) {
+                let headerY = dismiss.frame.minY
+                if headerY > window.frame.height * 0.3 && headerY < window.frame.height * 0.7 { return }
+                if headerY <= window.frame.height * 0.3 { return }
+            }
+        }
+        XCTFail("The grabber drag did not leave the compact float.")
+    }
+
     private func assertRuledFloor(_ value: CGFloat, axis: String, of name: String) {
         XCTAssertGreaterThanOrEqual(
             value, 43.5,
@@ -158,6 +176,22 @@ nonisolated final class UIFixChromeUITests: XCTestCase {
         XCTAssertTrue(selectAll.waitForExistence(timeout: 10), "Footer Select All not found.")
         assertRuledFloor(selectAll.frame.height, axis: "height", of: "Select All")
         attachScreenshot(named: "uifix-search-geometry")
+
+        // The search bar keeps its counter beside the pair, 4 pt after ›:
+        // one step parks the card; back at medium, the bar's own counter
+        // is measured against its own ›.
+        next.tap()
+        let strip = app.descendants(matching: .any).matching(identifier: "compactFloatStrip").firstMatch
+        XCTAssertTrue(strip.waitForExistence(timeout: 10), "The step did not park the sheet at the compact float.")
+        expandParkedCardToMedium()
+        let barNext = app.buttons["resultNavNext"].firstMatch
+        let counter = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Result 1 of ")).firstMatch
+        XCTAssertTrue(barNext.waitForExistence(timeout: 10) && counter.waitForExistence(timeout: 10),
+                      "The search bar's › or its counter is missing at medium.")
+        let counterGap = counter.frame.minX - barNext.frame.maxX
+        XCTAssertTrue(counterGap >= 3 && counterGap <= 6,
+                      "The search bar's counter gap \(counterGap) is outside 3…6 (4).")
+        attachScreenshot(named: "uifix-search-bar-counter-gap")
     }
 
     // MARK: - Strip cooperation (leg a — post-scan substrate strip)

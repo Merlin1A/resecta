@@ -822,3 +822,10 @@ with its reason and the mutant that is caught in its place.
 | `overlay-zoom-observer-holds-coordinator.patch` | The scale observer holds the coordinator weakly, so the coordinator and its overlays are released. | ResectaAppTests/OverlayZoomRedrawTests "The scale observer holds neither the coordinator nor its overlays" |
 | `search-border-in-page-units.patch` | The picked Search highlight's border is 2 screen points wide at every zoom. | ResectaAppTests/SearchMarksScreenPointTests "The search layer draws its border and ring from the screen-point strokes" |
 | `search-ring-outset-in-page-units.patch` | The result walk's ring sits 3 screen points outside its highlight at every zoom. | ResectaAppTests/SearchMarksScreenPointTests "The search layer draws its border and ring from the screen-point strokes" |
+| `small-card-apply-floor-bared.patch` | Each of Apply's two heights keeps the touch-floor token. | ResectaAppTests/CompactCardMetricsTests applyHeightsKeepTheFloor |
+| `small-card-bar-cluster-gap.patch` | The search bar's cluster keeps its 4-pt outer stack (its counter gap and the mark's gap). | ResectaAppTests/CompactCardMetricsTests lineGapAndTheBarsCluster |
+| `small-card-circle-frame-at-floor.patch` | A circle over the touch floor is laid out at its own size, not squeezed to the floor. | ResectaAppTests/CompactCardMetricsTests circleOuterFrame |
+| `small-card-hug-capsule.patch` | The parked card's hug stays in the attached sheet regime (101 or more). | ResectaAppTests/CompactDetentAnchoredRowTests hugStaysInTheAttachedRegime |
+| `small-card-hug-unclamped.patch` | The parked card's height never exceeds the available height. | ResectaAppTests/CompactDetentAnchoredRowTests clampsToAvailableHeight |
+| `small-card-pair-gap-moved.patch` | The parked card's gap between the arrows is the card's value, on its named site. | ResectaAppTests/CompactCardMetricsTests valuesOfRecord |
+| `small-card-room-under-the-line.patch` | The room under the parked card's row holds the line drawn there. | ResectaAppTests/CompactCardMetricsTests roomHoldsTheLine; ResectaAppTests/CompactCardMetricsTests valuesOfRecord |

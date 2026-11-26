@@ -83,8 +83,8 @@ extension SearchAndRedactSheet {
                     Label(AppliedFilter.applied.rawValue, systemImage: "checkmark")
                         .font(.headline)
                         .foregroundStyle(.secondary)
-                        .padding(.horizontal, ResectaTokens.Spacing.md)
-                        .frame(minHeight: ResectaTokens.TouchTarget.minimum)
+                        .padding(.horizontal, CompactCard.applyPadding)
+                        .frame(minHeight: max(ResectaTokens.TouchTarget.minimum, CompactCard.applyHeight))
                         .background(CircularIconButtonStyle.wash, in: Capsule())
                         .contentShape(Rectangle())
                 }
@@ -94,8 +94,8 @@ extension SearchAndRedactSheet {
                     Text("Apply")
                         .font(.headline)
                         .foregroundStyle(.white)
-                        .padding(.horizontal, ResectaTokens.Spacing.md)
-                        .frame(minHeight: ResectaTokens.TouchTarget.minimum)
+                        .padding(.horizontal, CompactCard.applyPadding)
+                        .frame(minHeight: max(ResectaTokens.TouchTarget.minimum, CompactCard.applyHeight))
                         .background(ResectaTokens.BrandTeal.fill, in: Capsule())
                         .contentShape(Rectangle())
                 }
