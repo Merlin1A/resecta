@@ -107,17 +107,14 @@ nonisolated final class ResultWalkUITests: XCTestCase {
             XCTAssertGreaterThanOrEqual(element.frame.height, 44, "\(name) height \(element.frame.height) is under the 44-pt effective floor.")
             XCTAssertGreaterThanOrEqual(element.frame.width, 44, "\(name) width \(element.frame.width) is under the 44-pt effective floor.")
         }
-        // The card's values on screen: each is the card's number (CompactCard
-        // and ResultNavSite.parked) × 0.96, the attached sheet's scale, within 1 pt.
-        // The side inset is read on the trailing side: on the leading side it
-        // is padding on Apply's own view, so Apply's frame holds it. The
-        // counter is the last element of the arrows' cluster and has no
-        // padding of its own.
+        // The card's value on screen: the card's number (ResultNavSite.parked)
+        // × 0.96, the attached sheet's scale, within 1 pt. The side inset is
+        // not read here: the strip is a containing element, and on screen its
+        // frame's edges were measured at its outermost children's (Apply on
+        // the leading side, the counter on the trailing side), so no
+        // element's frame carries the card's edge. CompactCardMetricsTests
+        // pins the inset's value.
         let scale: CGFloat = 0.96
-        let counter = compactStrip.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Result ")).firstMatch
-        XCTAssertTrue(counter.waitForExistence(timeout: 5), "The parked strip's counter is missing.")
-        XCTAssertEqual(compactStrip.frame.maxX - counter.frame.maxX, 16 * scale, accuracy: 1,
-                       "The card's side inset (16) on screen, after the counter.")
         XCTAssertEqual(compactNext.frame.minX - prev.frame.maxX, 8 * scale, accuracy: 1,
                        "The gap between the card's arrows (8) on screen.")
         attachScreenshot(named: "rw-strip-floor")
