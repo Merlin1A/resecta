@@ -257,15 +257,13 @@ enum ResectaTokens {
         /// Distance (in screen points; × the overlay's finger scale) within
         /// which an edge aligns to a guide.
         static let proximityThreshold: CGFloat = 5
-        /// Width of rendered guide lines.
-        static let guideLineWidth: CGFloat = 1.0
-        /// Guide line color — orange for contrast (matches WARN color rationale).
-        static let guideColor: UIColor = .systemOrange
+        // The guide's look is `Canvas.guide`.
     }
 
     // MARK: - Canvas
 
-    /// The marks drawn on the page: the resize handles and the corner dots.
+    /// The marks drawn on the page: the boxes' lines, the resize handles and
+    /// the corner dots, the box being drawn, the lasso, the tags and the guides.
     /// Sizes are on-screen points, multiplied by the overlay's finger scale
     /// before drawing. The colours are fixed, the same in light and dark
     /// appearance, because the page under them does not change with it.
@@ -289,6 +287,44 @@ enum ResectaTokens {
         /// appearances. Every teal drawn on the page is this one.
         static let pageTeal = Tone(red: 0x0B / 255, green: 0x64 / 255, blue: 0x6F / 255, alpha: 1)
 
+        /// A stroke: its colour and its width in on-screen points.
+        nonisolated struct Stroke: Equatable, Sendable {
+            let tone: Tone
+            let width: CGFloat
+        }
+
+        /// Ink, #14222B: the colour of the veil and the faint edge.
+        static let ink = Tone(red: 0x14 / 255, green: 0x22 / 255, blue: 0x2B / 255, alpha: 1)
+        /// The veil over the area a run will paint: ink at 18 %.
+        static let veil = Tone(red: ink.red, green: ink.green, blue: ink.blue, alpha: 0.18)
+        /// The veil with Reduce Transparency on: ink at 26 %.
+        static let veilReducedTransparency = Tone(red: ink.red, green: ink.green, blue: ink.blue, alpha: 0.26)
+        /// The faint edge on the painted area: ink at 50 %, half a point.
+        static let edge = Stroke(tone: Tone(red: ink.red, green: ink.green, blue: ink.blue, alpha: 0.5), width: 0.5)
+        /// The faint edge with Increase Contrast on: ink at 80 %.
+        static let edgeIncreasedContrast = Stroke(tone: Tone(red: ink.red, green: ink.green, blue: ink.blue, alpha: 0.8), width: 0.5)
+        /// The line round a box's own rectangle at rest: page teal, 1.4 points.
+        static let line = Stroke(tone: pageTeal, width: 1.4)
+        /// The line round a selected box's own rectangle: page teal, 2.4 points.
+        static let lineSelected = Stroke(tone: pageTeal, width: 2.4)
+        /// The keyline just outside whichever line is drawn: white at 90 %,
+        /// 0.8 points, outset by half the line's width plus `keylineGap`.
+        static let keyline = Stroke(tone: Tone(red: 1, green: 1, blue: 1, alpha: 0.9), width: 0.8)
+        static let keylineGap: CGFloat = 0.4
+        /// The ink line beside the teal line, and the ink ring round each
+        /// handle and corner dot: ink, opaque, one point. Drawn only where
+        /// `showsInkLine(increaseContrast:)` is true.
+        static let inkLine = Stroke(tone: ink, width: 1)
+        /// Whether the ink line is drawn at the default settings too.
+        static let inkLineAlways = false
+        /// The keyline round the painted area: white at 55 %, half a point,
+        /// outset by `edgeKeylineOutset`.
+        static let edgeKeyline = Stroke(tone: Tone(red: 1, green: 1, blue: 1, alpha: 0.55), width: 0.5)
+        static let edgeKeylineOutset: CGFloat = 0.5
+
+        /// Whether the ink line and rings are drawn.
+        static func showsInkLine(increaseContrast: Bool) -> Bool { inkLineAlways || increaseContrast }
+
         /// A resize handle: a white disc with a page-teal ring.
         static let handle = Disc(radius: 4.5, fill: Tone(red: 1, green: 1, blue: 1, alpha: 1),
                                  ring: pageTeal, ringWidth: 1.75)
@@ -302,6 +338,60 @@ enum ResectaTokens {
         /// white 90 % ring centred on its edge.
         static let selectionDot = Disc(radius: 2.75, fill: pageTeal,
                                        ring: Tone(red: 1, green: 1, blue: 1, alpha: 0.9), ringWidth: 0.8)
+
+        // MARK: The marks of drawing and choosing
+
+        /// The white under-stroke beneath a mark's stroke: white at 90 %, the
+        /// stroke's own width plus `underStrokeGrowth`, on the same path and
+        /// dash, so the mark reads on any page colour.
+        static let underStroke = Tone(red: 1, green: 1, blue: 1, alpha: 0.9)
+        static let underStrokeGrowth: CGFloat = 1.6
+
+        /// A mark drawn over the page while a finger moves: its stroke, its
+        /// dash in on-screen points (none when empty), its fill, and whether
+        /// its caps are round (a dash of almost nothing then draws a dot).
+        nonisolated struct Mark: Equatable, Sendable {
+            let stroke: Stroke
+            let dash: [CGFloat]
+            let fill: Tone
+            let roundCaps: Bool
+        }
+
+        /// The box being drawn: page teal, 1.75 points, dashes 6 on 3.5 off,
+        /// filled with page teal at 10 %.
+        static let band = Mark(stroke: Stroke(tone: pageTeal, width: 1.75), dash: [6, 3.5],
+                               fill: Tone(red: pageTeal.red, green: pageTeal.green, blue: pageTeal.blue, alpha: 0.1),
+                               roundCaps: false)
+        /// The lasso: page teal, 1.5 points, drawn as round dots 3.6 points
+        /// apart, filled with page teal at 5 %.
+        static let lasso = Mark(stroke: Stroke(tone: pageTeal, width: 1.5), dash: [0.01, 3.6],
+                                fill: Tone(red: pageTeal.red, green: pageTeal.green, blue: pageTeal.blue, alpha: 0.05),
+                                roundCaps: true)
+        /// A box too small to keep, as it shrinks away: a solid border of
+        /// page teal, 1.75 points, filled with page teal at 10 %.
+        static let rejectedBand = Mark(stroke: Stroke(tone: pageTeal, width: 1.75), dash: [], fill: band.fill,
+                                       roundCaps: false)
+        /// An alignment guide: page teal, opaque, one point, the page's full
+        /// width or height.
+        static let guide = Stroke(tone: pageTeal, width: 1)
+
+        /// A box's tag: the words naming what found it, white on ink, outside
+        /// the box above its leading corner. Sizes in on-screen points.
+        nonisolated struct Tag: Equatable, Sendable {
+            let height: CGFloat
+            let corner: CGFloat
+            let fontSize: CGFloat
+            /// Between the words and each side.
+            let padding: CGFloat
+            /// Between the tag and the box's edge.
+            let gap: CGFloat
+            let fill: Tone
+            let words: Tone
+        }
+        static let tag = Tag(height: 15, corner: 3.5, fontSize: 10, padding: 5, gap: 1.5, fill: ink,
+                             words: Tone(red: 1, green: 1, blue: 1, alpha: 1))
+        /// A box shorter than this on screen shows no tag.
+        static let tagShortestBox: CGFloat = 15
 
         /// On an axis shorter than this, the handles at its ends step outward.
         static let handlesStepOutBelow: CGFloat = 22

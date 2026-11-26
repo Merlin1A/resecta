@@ -166,6 +166,11 @@ struct PipelineRunner {
                 progress: .init(currentPage: 0, totalPages: pages.count,
                                 currentStep: "Starting\u{2026}")
             )))
+            // The box-place check refuses here: the phase table leaves
+            // editing only for redacting, and no page has been drawn yet.
+            if let page = entry.unconfirmedBoxPage {
+                throw PipelineError.redactionError(.boxPlaceUnconfirmed(pageIndex: page))
+            }
 
             let runContext = try await coordinator.processDocument(
                 pages, outputURL: outputURL,
@@ -250,6 +255,10 @@ struct PipelineRunner {
         /// The confirmed part of the run's record, read from the same
         /// region state as `pages`.
         let confirmed: RunRecord.Confirmed
+        /// The first page whose boxes are not all confirmed where they were
+        /// drawn (`RunRecord.Confirmed.firstPageWithUnconfirmedBoxPlace`);
+        /// nil when every page's are.
+        let unconfirmedBoxPage: Int?
     }
 
     /// Read the full run's entry snapshot. The manual-term capture
@@ -303,12 +312,19 @@ struct PipelineRunner {
         let confirmed = RunInputs.confirmedRecord(
             pageCount: coordinator.documentState.pageCount,
             geometry: coordinator.documentState.sourceDocument.map(RunInputs.pageGeometry(of:)) ?? [:],
+            geometryAtStore: redactionState.geometryAtStore,
             regions: redactionState.regions, reads: coordinator.documentState.pageReads, settings: runSettings)
         // A box the release cannot apply as planned refuses the run here,
         // before any page is built or rasterised.
         if let page = confirmed.firstPageWithBoxThatCannotShowLength {
             throw PipelineError.redactionError(.boxCannotShowLength(pageIndex: page))
         }
+        // The box-place check, read from the same region state: the first
+        // page whose boxes are not all where they were drawn, by the run's
+        // own frame. The run refuses it once it enters redacting, before any
+        // page is drawn.
+        let unconfirmedBoxPage = confirmed.firstPageWithUnconfirmedBoxPlace(
+            canvasFailures: redactionState.canvasProbeFailuresAtRunEntry())
         let pages = coordinator.buildPDFPageData(
             effectiveMode: effectiveMode, runSettings: runSettings, inkPlans: sensitiveTerms.inkPlans,
             record: confirmed)
@@ -351,7 +367,7 @@ struct PipelineRunner {
             ocrSkippedPages: ocrSkippedPages, degradeFailures: degradeFailures,
             appliedSearches: appliedSearches,
             burnedRegionVersion: burnedRegionVersion, captureRuns: captureRuns,
-            confirmed: confirmed)
+            confirmed: confirmed, unconfirmedBoxPage: unconfirmedBoxPage)
     }
 
     // MARK: - Verify-only re-run

@@ -1,0 +1,21 @@
+Property: The row for the part a check could not read says the Share sheet's line for that part, with the part's own pages. Here it says the check's line with the issue's pages.
+Area: findings on the results screen
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/FindingRowTests
+Must go red: ResectaAppTests/FindingRowTests theUnreadPartHasARowOfItsOwn
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/FindingRow.swift b/Sources/ResectaApp/Views/FindingRow.swift
+index 59cdd8813..be44c867c 100644
+--- a/Sources/ResectaApp/Views/FindingRow.swift
++++ b/Sources/ResectaApp/Views/FindingRow.swift
+@@ -243,7 +243,9 @@ enum FindingRowModel {
+     /// not verify while its check failed or needs review. Nil otherwise.
+     static func unreadPartLine(_ check: VerificationProblem.Check?, report: VerificationReport) -> String? {
+         guard let check, check.outcome == .couldNotVerify else { return nil }
+-        return DocumentEditorView.couldNotVerifyPartLine(layer: report.layers[check.layerIndex])
++        let layer = report.layers[check.layerIndex]
++        guard DocumentEditorView.couldNotVerifyPartLine(layer: layer) != nil else { return nil }
++        return DocumentEditorView.confirmFactLine(layer: layer, outcome: "could not verify")
+     }
+ 
+     /// The share confirm's line for a check; while chips carry the pages, the

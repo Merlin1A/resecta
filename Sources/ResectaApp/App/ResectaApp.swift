@@ -170,6 +170,16 @@ struct ResectaApp: App {
         // One page carrying one note annotation and no popup
         // (Scripts/generate_uitest_annotated.py): the import notice.
         "--annotatedDoc": "uitest_annotated",
+        // Two US Legal pages, 612 x 1008 pt, with a text line at each page's
+        // foot (Scripts/generate_uitest_legal.py): a page taller than
+        // Letter, whose foot the bottom controls cover at fit zoom.
+        "--legalDoc": "uitest_legal",
+        // One unturned Letter page, and one page with an offset crop box shown
+        // turned a quarter, each with one word off the centre in a clear
+        // block (Scripts/generate_uitest_clear_page.py): where a result is
+        // framed on a turned page.
+        "--clearPageDoc": "uitest_clear_page",
+        "--clearPageTurnedDoc": "uitest_clear_page_turned",
     ]
 
     /// The `--loadTestDocument` fixture name for a launch-argument list.
@@ -266,6 +276,7 @@ struct ResectaApp: App {
         .redactionError(.boxCannotShowLength(pageIndex: 0)),
         .redactionError(.bitmapCreationFailed(pageIndex: 0)),
         .redactionError(.fillVerificationFailed(pageIndex: 0)),
+        .redactionError(.boxPlaceUnconfirmed(pageIndex: 0)),
         .redactionError(.renderTimeout(pageIndex: 0)),
         .redactionError(.pageTooLarge(pageIndex: 0)),
         .redactionError(.pageSidesNotAsRecorded(pageIndex: 0)),
@@ -301,6 +312,7 @@ struct ResectaApp: App {
             case .boxCannotShowLength: "redactionError.boxCannotShowLength"
             case .bitmapCreationFailed: "redactionError.bitmapCreationFailed"
             case .fillVerificationFailed: "redactionError.fillVerificationFailed"
+            case .boxPlaceUnconfirmed: "redactionError.boxPlaceUnconfirmed"
             case .renderTimeout: "redactionError.renderTimeout"
             case .pageTooLarge: "redactionError.pageTooLarge"
             case .pageSidesNotAsRecorded: "redactionError.pageSidesNotAsRecorded"

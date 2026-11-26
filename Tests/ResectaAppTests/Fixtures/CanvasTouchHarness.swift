@@ -40,6 +40,7 @@ final class RecordingCoordinator: PDFViewCoordinator {
     override func commitMoveMultiple(
         _ moves: [(id: UUID, newRect: CGRect)],
         page: Int,
+        drawnPageRects: [UUID: CGRect],
         undoManager: UndoManager?
     ) {
         groupMoves.append(moves)
@@ -61,6 +62,7 @@ final class RecordingCoordinator: PDFViewCoordinator {
         _ id: UUID,
         page: Int,
         newRect: CGRect,
+        drawnPageRect: CGRect?,
         undoManager: UndoManager?
     ) {
         movedRegions.append((id: id, newRect: newRect))
@@ -70,6 +72,7 @@ final class RecordingCoordinator: PDFViewCoordinator {
         _ id: UUID,
         page: Int,
         newRect: CGRect,
+        drawnPageRect: CGRect?,
         undoManager: UndoManager?
     ) {
         resizedRegions.append((id: id, newRect: newRect))

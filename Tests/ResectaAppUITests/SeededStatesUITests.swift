@@ -36,14 +36,14 @@ nonisolated final class SeededStatesUITests: XCTestCase {
 
     func testFormValuesShowTheirRowAndShareAsksFirst() {
         launchResults(["--seedOutput", "--seedFormValues=2"])
-        XCTAssertTrue(element("resultsFinding_formValues").waitForExistence(timeout: 10),
+        XCTAssertTrue(element("finding_formValuesNotCarried").waitForExistence(timeout: 10),
                       "The form values row never appeared.")
         assertShareAsksFirst()
     }
 
     func testCoveredTextShowsItsRowAndShareAsksFirst() {
         launchResults(["--seedOutput", "--seedCoveredText"])
-        XCTAssertTrue(element("resultsFinding_coveredText").waitForExistence(timeout: 10),
+        XCTAssertTrue(element("finding_coveredTextInOriginal").waitForExistence(timeout: 10),
                       "The covered text row never appeared.")
         assertShareAsksFirst()
     }

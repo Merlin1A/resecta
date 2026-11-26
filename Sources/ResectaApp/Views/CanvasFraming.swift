@@ -21,7 +21,9 @@ extension PDFDocumentView {
     }
 
     /// The readability formula. The navigation scale that renders
-    /// `rectInPage` (page points) at `ReadabilityZoom.textHeightTarget`
+    /// `rectInPage`, the box as the reader sees it (displayed points: on a
+    /// turned page its sides are the page as shown, not the page's own
+    /// space), at `ReadabilityZoom.textHeightTarget`
     /// on screen, width-guarded so the whole rect stays visible, clamped
     /// to [fit … min(navZoomCap × fit, maxScale)]. A page-wide rect's
     /// width fit lands at-or-below fit ⇒ clamps to fit = no zoom (no
@@ -47,9 +49,12 @@ extension PDFDocumentView {
     }
 
     /// The point that centres `rectInPage` in the visible canvas — the
-    /// top-left corner of the visible area in page space (PDFKit's
-    /// destination semantics: the `/XYZ` point lands at the view's
-    /// top-left; page space is y-up). `visibleSizeInPage` is the view's
+    /// top-left corner of the visible area (PDFKit's destination
+    /// semantics: the `/XYZ` point lands at the view's top-left; y-up).
+    /// On the path before iOS 27 it is worked out in the page as shown
+    /// (the displayed rectangle on a zero-origin page of the displayed
+    /// size), and the page's geometry carries the point into the page's
+    /// own space. `visibleSizeInPage` is the view's
     /// bounds divided by the scale the framing just wrote. Clamped to
     /// the page on each axis so the view never shows off-page space;
     /// on an axis where the page is smaller than the viewport the

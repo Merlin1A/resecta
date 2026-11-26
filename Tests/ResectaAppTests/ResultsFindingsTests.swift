@@ -65,16 +65,16 @@ struct ResultsFindingsTests {
         #expect(item.spokenLabel == "Covered text in the original. \(ConcealingAnnotations.confirmLine(pages: [0, 2]))")
     }
 
-    @Test("A clean PASS with one listed item asks the reader to read the note; with none, to look over Preview")
+    @Test("A clean PASS with Findings rows asks the reader to read them; with none, to look over Preview")
     func mastheadCountsFindingsAsNotes() {
-        #expect(VerificationResultsView.mastheadSubtitle(report: Self.passReport, findingCount: 1)
-                == "Read the note below before you share the PDF.")
-        #expect(VerificationResultsView.mastheadSubtitle(report: Self.passReport, findingCount: 2)
-                == "Read the notes below before you share the PDF.")
-        #expect(VerificationResultsView.mastheadSubtitle(report: Self.passReport, findingCount: 0)
+        #expect(VerificationResultsView.mastheadSubtitle(report: Self.passReport, findingRows: 1)
+                == "Read the finding below before you share the PDF.")  // LegalPhrases:safe (approved row words, test data)
+        #expect(VerificationResultsView.mastheadSubtitle(report: Self.passReport, findingRows: 2)
+                == "Read the findings below before you share the PDF.")
+        #expect(VerificationResultsView.mastheadSubtitle(report: Self.passReport, findingRows: 0)
                 == "Look over the redacted PDF in Preview before you share it.")
-        #expect(VerificationResultsView.mastheadAccessibilityLabel(report: Self.passReport, findingCount: 1)
-                .hasSuffix("Read the note below before you share the PDF."))
+        #expect(VerificationResultsView.mastheadAccessibilityLabel(report: Self.passReport, findingRows: 1)
+                .hasSuffix("Read the finding below before you share the PDF."))  // LegalPhrases:safe (approved row words, test data)
     }
 
     @Test("The text-layer check is titled for the redacted PDF it reads")
@@ -135,13 +135,15 @@ struct ResultsFindingsTests {
                 == "1 hand-drawn region sits on a page with no text layer, so no check could read what it covers.")
     }
 
-    @Test("Each listed item counts in the masthead's note sentence; the verdict and the title are unchanged")
+    @Test("A listed item that is a Findings row counts in the masthead's sentence; the verdict and the title are unchanged")
     func everyItemCountsAsANote() {
         let documentState = DocumentState()
         documentState.sourceFilledFormFieldCount = 2
-        let count = ResultsFindings.derive(documentState: documentState, redactionState: RedactionState()).count
-        #expect(VerificationResultsView.mastheadSubtitle(report: Self.passReport, findingCount: count)
-                == "Read the note below before you share the PDF.")
+        let findings = ResultsFindings.derive(documentState: documentState, redactionState: RedactionState())
+        let rows = VerificationResultsView.findingRowCount(report: Self.passReport, findings: findings)
+        #expect(rows == 1)
+        #expect(VerificationResultsView.mastheadSubtitle(report: Self.passReport, findingRows: rows)
+                == "Read the finding below before you share the PDF.")  // LegalPhrases:safe (approved row words, test data)
         #expect(VerificationResultsView.mastheadTitle(report: Self.passReport) == "Checks Passed")
     }
 }

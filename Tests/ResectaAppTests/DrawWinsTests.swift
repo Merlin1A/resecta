@@ -42,6 +42,7 @@ struct DrawWinsTests {
         let overlay = RedactionOverlayView(
             frame: CGRect(origin: .zero, size: Self.overlaySize)
         )
+        overlay.geometry = .testUnturned
         overlay.isDrawingMode = drawing
         overlay.activeShapeTool = .rectangle
         overlay.snapZoomScaleOverride = zoom
@@ -255,14 +256,14 @@ struct DrawWinsTests {
         #expect(!exiting.clearSelection && !exiting.disableMultiSelect)
     }
 
-    @Test("nudgeDelta is one PDF point per axis (Letter → 1/612, 1/792); nil/degenerate → 0.0025")
+    @Test("The nudge step is one point per axis (Letter → 1/612, 1/792); no page or a degenerate one → 0.0025")
     func testNudgeDelta() {
-        let letter = DocumentEditorView.nudgeDelta(pageSize: CGSize(width: 612, height: 792))
-        #expect(abs(letter.dx - 1 / 612) < 1e-12 && abs(letter.dy - 1 / 792) < 1e-12)
-        let none = DocumentEditorView.nudgeDelta(pageSize: nil)
+        let letter = RunRecord.PageGeometry(cropBox: CGRect(x: 0, y: 0, width: 612, height: 792), rotation: 0).pointStep
+        #expect(abs(letter.width - 1 / 612) < 1e-12 && abs(letter.height - 1 / 792) < 1e-12)
+        let none = DocumentEditorView.nudgeStep(page: nil)
         #expect(none.dx == 0.0025 && none.dy == 0.0025)
-        let zero = DocumentEditorView.nudgeDelta(pageSize: .zero)
-        #expect(zero.dx == 0.0025 && zero.dy == 0.0025)
+        let zero = RunRecord.PageGeometry(cropBox: .zero, rotation: 0).pointStep
+        #expect(zero.width == 0.0025 && zero.height == 0.0025)
     }
 
     // MARK: - Source contract

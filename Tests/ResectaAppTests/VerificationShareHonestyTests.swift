@@ -97,7 +97,7 @@ struct VerificationShareHonestyTests {
 
     // MARK: - (iii) Could not verify stays visible
 
-    @Test("Every could-not-verify or skipped check sits in Could not verify, and the summary names it")
+    @Test("Every could-not-verify or skipped check is behind a Findings row and in the list, and the summary names it")
     func couldNotVerifyStaysVisible() {
         for report in Self.reports {
             let partition = VerificationLayerPartition(layers: report.layers, perPageModes: report.perPageModes)
@@ -108,10 +108,17 @@ struct VerificationShareHonestyTests {
             #expect(Set(incomplete).isDisjoint(with: partition.cluster + partition.notes + partition.nothingToCheck))
             #expect(VerificationResultsView.detailsSummaryText(for: report).contains("could not verify")
                     == !incomplete.isEmpty)
+            // Drawn: each is behind exactly one Findings row, and in the list of checks.
+            let rows = VerificationDetailsSection.findingRows(report: report, coveredPages: [], formValueCount: 0)
+            let members = VerificationDetailsSection.listRowMembers(partition)
+            for index in incomplete {
+                #expect(rows.filter { $0.checks.contains { $0.layerIndex == index } }.count == 1)
+                #expect(members.contains(index))
+            }
         }
     }
 
-    @Test("The Could not verify group renders above the notes and the pass cluster")
+    @Test("The card of plain warnings renders above the list row; every other check is in the list")
     func couldNotVerifyGroupRendersAboveTheCluster() throws {
         let source = try String(contentsOf: URL(fileURLWithPath: "\(#filePath)")
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
@@ -125,15 +132,19 @@ struct VerificationShareHonestyTests {
                           remainingCount: 2, route: .ocr)], pages: [0]),
                       Self.layer(.notApplicable("i"), .searchRecheck), Self.layer(.pass, .structureCheck)]
         let partition = VerificationLayerPartition(layers: layers, perPageModes: [])
-        #expect(VerificationDetailsSection.groups(partition).map(\.header)
-                == ["Findings", "Could not verify", "Notes"])
-        #expect(VerificationDetailsSection.listRowMembers(partition) == [3, 4])
-        // With the pass removed there is no list row, and the idle check
-        // keeps its own group.
+        // No plain warning: no card; every check in the list.
+        #expect(VerificationDetailsSection.groups(partition).isEmpty)
+        #expect(VerificationDetailsSection.listRowMembers(partition) == [0, 1, 2, 3, 4])
+        // With the pass removed the list still holds every check.
         let noPass = VerificationLayerPartition(layers: Array(layers.dropLast()), perPageModes: [])
-        #expect(VerificationDetailsSection.groups(noPass).map(\.header)
-                == ["Findings", "Could not verify", "Notes", "Nothing to check"])
-        #expect(VerificationDetailsSection.listRowMembers(noPass).isEmpty)
+        #expect(VerificationDetailsSection.groups(noPass).isEmpty)
+        #expect(VerificationDetailsSection.listRowMembers(noPass) == [0, 1, 2, 3])
+        // A plain warning has its own card, headed Warnings, and is not in the list.
+        let warned = VerificationLayerPartition(layers: layers + [Self.layer(.warn("w"), .metadataCheck)],
+                                                perPageModes: [])
+        #expect(VerificationDetailsSection.groups(warned).map(\.header) == ["Warnings"])
+        #expect(VerificationDetailsSection.groups(warned).map(\.indices) == [[5]])
+        #expect(VerificationDetailsSection.listRowMembers(warned) == [0, 1, 2, 3, 4])
     }
 
     // MARK: - (iv) Content-free
@@ -160,7 +171,12 @@ struct VerificationShareHonestyTests {
         let report = VerificationReport(layers: layers, overallStatus: .attention("a"), durationSeconds: 0)
         let partition = VerificationLayerPartition(layers: layers, perPageModes: [])
         var shown = [VerificationResultsView.detailsSummaryText(for: report), partition.clusterTitle,
-                     "Findings", "Could not verify", "Notes", "Nothing to check"]
+                     "Findings", "Could not verify", "Notes", "Nothing to check",
+                     FindingRowModel.boxedTextReadable, FindingRowModel.partOfBoxedText,
+                     FindingRowModel.searchesStillMatch(1), FindingRowModel.searchesStillMatch(2),
+                     FindingRowModel.couldNotRunInFull(checks: 2, pages: [0, 2]), FindingRowModel.skippedChecks(1),
+                     FindingRowModel.skippedChecks(2), FindingRowModel.lookAtThatPage,
+                     FindingRowModel.lookAtThosePages, FindingRowModel.secureAvoidsThis]
         shown += DocumentEditorView.atRiskItemLines(report: report)
         shown += DocumentEditorView.couldNotVerifyItemLines(report: report)
         for layer in layers {

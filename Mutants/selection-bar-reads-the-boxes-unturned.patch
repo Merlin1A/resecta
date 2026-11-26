@@ -1,0 +1,20 @@
+Property: The selection bar's place reads each selected box turned back from the frame its page is shown in, as the overlay draws it. Here the box is read as if the page were upright.
+Area: the editor's selection bar, its place over the canvas
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/SelectionBarPlaceHostedTests
+Must go red: ResectaAppTests/SelectionBarPlaceHostedTests turnedHalf; ResectaAppTests/SelectionBarPlaceHostedTests turnedQuarter
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
+index 57919ba9..f0b7f812 100644
+--- a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
++++ b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
+@@ -603,8 +603,7 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
+         let pageBounds = page.bounds(for: pdfView.displayBox)
+         let boxes = (state.regions[index] ?? [])
+             .filter { state.selectedRegionIDs.contains($0.id) }
+-            .map { pdfView.convert(PDFDocumentView.pageRect(forShown: $0.normalizedRect, on: page, box: pdfView.displayBox),
+-                                   from: page) }
++            .map { pdfView.convert(normalizedToPDFPageCoordinates($0.normalizedRect, pageRect: pageBounds), from: page) }
+         return (boxes, pdfView.convert(pageBounds, from: page))
+     }
+ 

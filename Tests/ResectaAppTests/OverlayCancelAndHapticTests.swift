@@ -58,6 +58,7 @@ struct OverlayCancelAndHapticTests {
         coordinator.redactionState = state
         coordinator.isMultiSelectActive = addToSelection
         let overlay = RedactionOverlayView(frame: CGRect(origin: .zero, size: Self.overlaySize))
+        overlay.geometry = .testUnturned
         overlay.pageIndex = 0
         overlay.isDrawingMode = false
         overlay.activeShapeTool = .rectangle
@@ -225,6 +226,7 @@ struct OverlayCancelAndHapticTests {
     @Test("The overlay supplies the long-press menu's highlight preview")
     func contextMenuSuppliesAHighlightPreview() {
         let overlay = RedactionOverlayView(frame: CGRect(origin: .zero, size: Self.overlaySize))
+        overlay.geometry = .testUnturned
         #expect(overlay.responds(to: NSSelectorFromString(
             "contextMenuInteraction:previewForHighlightingMenuWithConfiguration:")))
     }

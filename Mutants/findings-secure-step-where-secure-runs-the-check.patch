@@ -1,0 +1,19 @@
+Property: The Secure step is shown only on a failed check that a Secure export does not run. Here it is shown on every failed check, including those a Secure export also runs.
+Area: findings on the results screen
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/FindingRowTests
+Must go red: ResectaAppTests/FindingRowTests stepsByKind
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/FindingRow.swift b/Sources/ResectaApp/Views/FindingRow.swift
+index de7cfd24..22fcde0f 100644
+--- a/Sources/ResectaApp/Views/FindingRow.swift
++++ b/Sources/ResectaApp/Views/FindingRow.swift
+@@ -175,7 +175,7 @@ enum FindingRowModel {
+         case .failedCheck:
+             // The checks a Secure export does not run: what they fail on is
+             // text on a Searchable page, which a Secure export does not hold.
+-            guard let identity = first?.layer, !identity.appliesTo(.secureRasterization) else { return nil }
++            guard first?.layer != nil else { return nil }
+             return .sentence(secureAvoidsThis)
+         case .partOfBoxedText:
+             return .sentence(problem.words.count == 1

@@ -14,6 +14,9 @@ extension RedactionOverlayView {
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard touches.count == 1, let touch = touches.first else { return }
+        // An overlay with no page geometry begins no gesture: nothing is
+        // stored or drawn from it.
+        guard geometry.cropBox.width > 0, geometry.cropBox.height > 0 else { Self.noGeometry(); return }
         // Ignore secondary touchesBegan while a gesture is already
         // in flight. Prevents a finger landing during a Pencil drag from
         // hijacking the gesture state machine.
@@ -180,7 +183,9 @@ extension RedactionOverlayView {
                 // Clamp the rubber band to the page —
                 // mirrors the resize clamp in `updateSelectedRegionForResize`.
                 // A band entirely off-page leaves the last rect in place.
-                rect = rect.intersection(bounds)
+                // The page is where PDFKit puts it (`pageRectOnCanvas`),
+                // which the maps divide by, not the overlay's rounded bounds.
+                rect = rect.intersection(pageRectOnCanvas)
                 guard !rect.isNull else { return }
                 currentDragRect = rect
                 setNeedsDisplay()
@@ -228,6 +233,7 @@ extension RedactionOverlayView {
             moveCommitFeedback.impactOccurred()
             coordinator?.commitMove(id, page: pageIndex,
                                     newRect: region.normalizedRect,
+                                    drawnPageRect: drawnPageRects(for: [id])[id],
                                     undoManager: window?.undoManager)
             return
         }
@@ -238,6 +244,7 @@ extension RedactionOverlayView {
             moveCommitFeedback.impactOccurred(intensity: 0.4)  // a light tick: the resize landed
             coordinator?.commitResize(id, page: pageIndex,
                                       newRect: region.normalizedRect,
+                                      drawnPageRect: drawnPageRects(for: [id])[id],
                                       undoManager: window?.undoManager)
             return
         }
@@ -256,11 +263,13 @@ extension RedactionOverlayView {
         }
 
         let normalizedRect = overlayToPDFNormalized(rect)
-        let region = RedactionRegion(
+        var region = RedactionRegion(
             id: UUID(),
             normalizedRect: normalizedRect,
             source: .manual
         )
+        // Where PDFKit puts the band on the page, for the run's box-place check.
+        region.drawnPageRect = pageRectByPDFKit(rect)
         moveCommitFeedback.impactOccurred(intensity: 0.4)  // a light tick: the box landed
         coordinator?.addRegion(region, page: pageIndex, undoManager: window?.undoManager)
         // VoiceOver announcement on region commit
@@ -300,12 +309,18 @@ extension RedactionOverlayView {
             // Restore the pre-resize rect (nothing was committed)
             regions[idx].normalizedRect = preResizeNormalizedRect
         }
+        // The page rectangles the gesture's steps took go back with the places.
+        for i in regions.indices {
+            if let before = preGestureDrawnPageRects[regions[i].id] { regions[i].drawnPageRect = before }
+        }
         resetDragState()
         setNeedsDisplay()
     }
 
     private func resetDragState() {
         coordinator?.setCanvasHoldsTouch(false)
+        gestureOverlayRects = [:]
+        preGestureDrawnPageRects = [:]
         primaryTouch = nil
         dragOrigin = nil
         currentDragRect = nil
@@ -332,8 +347,8 @@ extension RedactionOverlayView {
         // run under `isActivelyDragging`, which makes the coordinator's
         // `configure` a no-op, and the later state sync sees `regions`
         // unchanged (the overlay already holds the final rect) — so this
-        // is the only repaint that erases a rejected rubber band, its
-        // label and guides, or drops the lifted look after a move/resize.
+        // is the only repaint that erases a rejected rubber band and its
+        // guides, or drops the lifted look after a move/resize.
         setNeedsDisplay()
     }
 
@@ -349,11 +364,13 @@ extension RedactionOverlayView {
                 argument: RedactionOverlayView.subThresholdRejectionAnnouncement)
         }
 
-        // Visual: create a temporary view that shrinks to center and fades out
+        // Visual: a temporary view in page teal that shrinks to centre and
+        // fades out; its border keeps one on-screen width.
+        let style = Self.rejectedBandStyle(fingerScale: fingerScale)
         let rejectView = UIView(frame: rect)
-        rejectView.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.15)
-        rejectView.layer.borderColor = UIColor.systemBlue.cgColor
-        rejectView.layer.borderWidth = 2.0
+        rejectView.backgroundColor = style.fill
+        rejectView.layer.borderColor = style.border.cgColor
+        rejectView.layer.borderWidth = style.width
         addSubview(rejectView)
 
         if UIAccessibility.isReduceMotionEnabled {

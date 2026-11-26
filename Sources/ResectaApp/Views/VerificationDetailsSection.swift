@@ -1,14 +1,16 @@
 import SwiftUI
 import RedactionEngine
 
-// The results page's check sections, below the actions: Findings → Could
-// not verify → Notes → Nothing to check, each with its count; the
-// headerless card of facts about the PDF (handed-in facts, the run's own
-// lines, Page Modes, the deselection row: `ResultsFactCard.items`);
-// then one row for the checks that passed, on every run with a passed check
-// or a riding note, which a tap opens to those checks. One item is open at
-// a time across the rows and
-// Page Modes. A page link asks the results view to push the Preview at
+// The results page's check sections, below the actions: the Findings group,
+// one row per problem of the run (`VerificationProblemModel.derive`) with its
+// count (and after it, where `ResultsBlock.order` puts it, the small print
+// about what Checks Passed means); the card of plain warnings, headed
+// "Warnings · n"; the headerless card of
+// facts about the PDF (handed-in facts, the run's own lines, Page Modes, the
+// deselection row: `ResultsFactCard.items`); then one row for the list of
+// checks, every check but the plain warnings, which a tap opens to those
+// checks. One item is open at a time across the rows, the facts and Page
+// Modes. A page link asks the results view to push the Preview at
 // that page; it never changes the phase. The static copy builders the
 // display tests pin stay on `VerificationResultsView`, in the extension at
 // the bottom of this file.
@@ -25,6 +27,16 @@ struct VerificationDetailsSection: View {
     var previewAvailable: Bool = false
     /// Push the Preview at a page (0-based) on the results view's stack.
     var onOpenPage: (Int) -> Void = { _ in }
+    /// The pages (0-based) where an annotation in the original covers text
+    /// no box covers, and the original's filled form values: the results
+    /// view's own values (`ResultsFindings`), for the model's two problems
+    /// that no check reports.
+    var coveredPages: [Int] = []
+    var formValueCount: Int = 0
+    /// The small print's sentences when the screen's order draws it directly
+    /// after the Findings group (`ResultsBlock.order`); nil where the
+    /// results view draws it above this section.
+    var smallPrintAfterFindings: [String]? = nil
     /// Back to the editor with Scan running (the sweep's Review in Scan).
     var onReviewInScan: () -> Void = {}
     /// Facts handed in for the card, each placed by its `place`.
@@ -35,9 +47,11 @@ struct VerificationDetailsSection: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
 
-    /// The one open item: a row (by engine index) or Page Modes.
+    /// The one open item: a check's row (by engine index), a problem's row
+    /// (by its id), a fact or Page Modes.
     enum OpenItem: Hashable {
         case layer(Int)
+        case problem(String)
         case pageModes
         case fact(String)
     }
@@ -49,13 +63,25 @@ struct VerificationDetailsSection: View {
 
     var body: some View {
         let partition = VerificationLayerPartition(layers: report.layers, perPageModes: report.perPageModes)
+        let problems = Self.findingRows(report: report, coveredPages: coveredPages, formValueCount: formValueCount)
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(Self.groups(partition), id: \.header) { group in
+            if let heading = Self.findingsHeading(problems) {
+                GroupedSection(header: heading.shown, spokenHeader: heading.spoken) {
+                    findingRows(problems)
+                }
+                .padding(.top, ResectaTokens.Results.blockGap)
+                if let smallPrintAfterFindings {
+                    ResultsScopeNote(report: report, sentences: smallPrintAfterFindings)
+                }
+            }
+            ForEach(Self.groups(partition), id: \.indices) { group in
                 GroupedSection(
                     header: VerificationLayerPartition.sectionHeader(group.header, count: group.indices.count),
-                    spokenHeader: VerificationLayerPartition.sectionHeaderSpoken(group.header, count: group.indices.count)
+                    spokenHeader: VerificationLayerPartition.sectionHeaderSpoken(group.header,
+                                                                                 count: group.indices.count)
                 ) {
-                    layerRows(group.indices, layout: .lead, showsStatusWord: group.header == "Findings")
+                    // The heading names the outcome; the rows do not repeat it.
+                    layerRows(group.indices, layout: .lead, showsStatusWord: false)
                 }
                 .padding(.top, ResectaTokens.Results.blockGap)
             }
@@ -73,26 +99,81 @@ struct VerificationDetailsSection: View {
 
     // MARK: - The rules
 
-    /// The groups above the cluster, in screen order, each with its rows'
-    /// engine indices; an empty group is left out. While the list row
-    /// exists the checks that had nothing to check are inside it, so their
-    /// group is drawn only on a run with no list row.
+    /// The Findings group's heading; its count is the number of rows.
+    static let findingsHeader = "Findings"
+
+    /// The Findings group's rows: one for each problem the model returns, in
+    /// its order, and nothing else.
+    static func findingRows(report: VerificationReport, coveredPages: [Int],
+                            formValueCount: Int) -> [VerificationProblem] {
+        VerificationProblemModel.derive(report: report, coveredPages: coveredPages, formValueCount: formValueCount)
+    }
+
+    /// The group's heading, "Findings · n" (spoken "Findings, n."), n the
+    /// number of rows; nil when there is no row, and then no group.
+    static func findingsHeading(_ rows: [VerificationProblem]) -> (shown: String, spoken: String)? {
+        guard !rows.isEmpty else { return nil }
+        return (VerificationLayerPartition.sectionHeader(findingsHeader, count: rows.count),
+                VerificationLayerPartition.sectionHeaderSpoken(findingsHeader, count: rows.count))
+    }
+
+    /// The plain warnings' card's heading; its count is the number of rows.
+    static let warningsHeader = "Warnings"
+
+    /// The groups of check rows drawn between the Findings group and the
+    /// card of facts, each with its rows' engine indices: only the plain
+    /// warnings, in their card. Every other check is behind a Findings row
+    /// or needs none, and is in the list of checks.
     static func groups(_ partition: VerificationLayerPartition) -> [(header: String, indices: [Int])] {
-        [
-            ("Findings", partition.findings),
-            ("Could not verify", partition.couldNotVerify),
-            ("Notes", partition.notes),
-            ("Nothing to check", partition.cluster.isEmpty ? partition.nothingToCheck : []),
-        ].filter { !$0.1.isEmpty }
+        let warnings = plainWarnings(partition)
+        return warnings.isEmpty ? [] : [(warningsHeader, warnings)]
+    }
+
+    /// The checks whose outcome is a plain warning: not a problem, so in no
+    /// Findings row; they keep their own rows.
+    static func plainWarnings(_ partition: VerificationLayerPartition) -> [Int] {
+        partition.outcomes.indices.filter { partition.outcomes[$0] == .warning }
     }
 
     /// The checks the list row opens to, by engine index, in the checks'
-    /// own order: the passed checks, the notes riding with them and the
-    /// checks that had nothing to check. A run with no passed check and no
-    /// riding note has no row. The row is drawn exactly when this is not
-    /// empty.
+    /// own order: every check of the report but the plain warnings, which
+    /// have their own card. The row is drawn exactly when this is not empty.
     static func listRowMembers(_ partition: VerificationLayerPartition) -> [Int] {
-        partition.cluster.isEmpty ? [] : (partition.cluster + partition.nothingToCheck).sorted()
+        partition.outcomes.indices.filter { partition.outcomes[$0] != .warning }
+    }
+
+    /// Whether the list row reports a pass: it holds a passed check, and
+    /// every check in it passed, is a note with nothing left or had nothing
+    /// to check. Otherwise it opens a record of the checks and reports no
+    /// pass.
+    static func listRowReportsAPass(_ partition: VerificationLayerPartition) -> Bool {
+        partition.passedCount > 0
+            && Set(listRowMembers(partition)).isSubset(of: Set(partition.cluster + partition.nothingToCheck))
+    }
+
+    /// The list row's words: the shipped title and its clauses when it
+    /// reports a pass; otherwise "P of T checks passed", then the clause
+    /// for the checks that had nothing to check, when there are any.
+    static func listRowWords(_ partition: VerificationLayerPartition) -> (first: String, second: String?) {
+        if listRowReportsAPass(partition) {
+            let clauses = partition.clusterTitleClauses
+            return (partition.clusterTitleBase, clauses.isEmpty ? nil : clauses.joined(separator: " · "))
+        }
+        return (partition.summaryLine1,
+                VerificationOutcome.nothingToCheck.headerClause(count: partition.nothingToCheck.count))
+    }
+
+    /// The list row's spoken label.
+    static func listRowSpokenLabel(_ partition: VerificationLayerPartition) -> String {
+        if listRowReportsAPass(partition) { return partition.clusterSpokenLabel }
+        let words = listRowWords(partition)
+        return ([words.first] + [words.second].compactMap { $0 }).joined(separator: ", ")
+    }
+
+    /// The list row's mark: the pass tick when it reports a pass, else the
+    /// list symbol.
+    static func listRowMarkSymbol(_ partition: VerificationLayerPartition) -> String {
+        listRowReportsAPass(partition) ? "checkmark" : "list.bullet"
     }
 
     /// A member's row: a passed check has no mark; a riding note and a
@@ -166,6 +247,21 @@ struct VerificationDetailsSection: View {
     // MARK: - Rows
 
     @ViewBuilder
+    private func findingRows(_ problems: [VerificationProblem]) -> some View {
+        ForEach(Array(problems.enumerated()), id: \.element.id) { position, problem in
+            if position > 0 {
+                GroupedRowDivider(inset: ResectaTokens.Results.titleInset)
+            }
+            FindingRow(
+                problem: problem, report: report, isOpen: openItem == .problem(problem.id),
+                previewAvailable: previewAvailable,
+                onTap: { toggle(.problem(problem.id)) },
+                onOpenPage: { page in onOpenPage(page) },
+                onReviewInScan: onReviewInScan)
+        }
+    }
+
+    @ViewBuilder
     private func layerRows(_ indices: [Int], layout: LayerResultRow.GroupedLayout, showsStatusWord: Bool) -> some View {
         ForEach(Array(indices.enumerated()), id: \.element) { position, index in
             if position > 0 {
@@ -175,7 +271,8 @@ struct VerificationDetailsSection: View {
         }
     }
 
-    private func layerRow(index: Int, layout: LayerResultRow.GroupedLayout, showsStatusWord: Bool) -> some View {
+    private func layerRow(index: Int, layout: LayerResultRow.GroupedLayout, showsStatusWord: Bool,
+                          showsTrailingWord: Bool = false) -> some View {
         LayerResultRow(
             layer: report.layers[index],
             layerIndex: index + 1,
@@ -187,21 +284,24 @@ struct VerificationDetailsSection: View {
             perPageModes: report.perPageModes,
             groupedLayout: layout,
             showsStatusWord: showsStatusWord,
-            pagesOnChips: previewAvailable
+            pagesOnChips: previewAvailable,
+            showsTrailingWord: showsTrailingWord
         )
     }
 
     // MARK: - The pass cluster
 
-    /// One row — the pass mark, "N checks passed[ · k notes][ · i had
-    /// nothing to check]", a chevron — that opens to its members. The
-    /// clauses follow on the title's line when the whole title fits, and
-    /// go on a second line in the caption grey when it does not.
-    /// Collapsing it closes an open member.
+    /// One row — its mark, its words (`listRowWords`), a chevron — that
+    /// opens to its members. On a pass the clauses follow on the title's
+    /// line when the whole title fits, and go on a second line in the
+    /// caption grey when it does not; otherwise the second line is always
+    /// its own. Collapsing it closes an open member.
     @ViewBuilder
     private func passCluster(_ partition: VerificationLayerPartition) -> some View {
         let isOpen = clusterExpanded ?? Self.clusterOpensByDefault(partition)
         let members = Self.listRowMembers(partition)
+        let reportsAPass = Self.listRowReportsAPass(partition)
+        let words = Self.listRowWords(partition)
         Button {
             withAnimation(ResectaTokens.Anim.resolved(ResectaTokens.Anim.stateChange, reduceMotion: reduceMotion)) {
                 openItem = Self.openItemAfterTogglingList(isOpen: isOpen, openItem: openItem, partition: partition)
@@ -212,24 +312,27 @@ struct VerificationDetailsSection: View {
                 // A fixed size, as the marks of the rows around it: at the
                 // largest text sizes a tick that grew with the text outgrew
                 // its column.
-                Image(systemName: "checkmark")
+                Image(systemName: Self.listRowMarkSymbol(partition))
                     .font(.system(size: ResectaTokens.Results.clusterTick, weight: .semibold))
-                    .foregroundStyle(VerificationOutcome.passed.textColor)
+                    .foregroundStyle(reportsAPass ? VerificationOutcome.passed.textColor
+                                     : ResectaTokens.SemanticColor.supportText)
                     .frame(width: ResectaTokens.Results.leadColumn)
                     .padding(.leading, ResectaTokens.Spacing.md)
                     .padding(.trailing, ResectaTokens.Results.titleInset
                              - ResectaTokens.Spacing.md - ResectaTokens.Results.leadColumn)
                 ViewThatFits(in: .horizontal) {
-                    Text(partition.clusterTitle)
-                        .font(.body)
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                    VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xxs) {
-                        Text(partition.clusterTitleBase)
+                    if reportsAPass {
+                        Text(partition.clusterTitle)
                             .font(.body)
                             .foregroundStyle(.primary)
-                        if !partition.clusterTitleClauses.isEmpty {
-                            Text(partition.clusterTitleClauses.joined(separator: " · "))
+                            .lineLimit(1)
+                    }
+                    VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xxs) {
+                        Text(words.first)
+                            .font(.body)
+                            .foregroundStyle(.primary)
+                        if let second = words.second {
+                            Text(second)
                                 .font(.subheadline)
                                 .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                         }
@@ -246,14 +349,16 @@ struct VerificationDetailsSection: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(ResultsRowButtonStyle())
-        .accessibilityLabel(partition.clusterSpokenLabel)
-        .accessibilityHint(isOpen ? "Hides the passed checks" : "Shows the passed checks")
+        .accessibilityLabel(Self.listRowSpokenLabel(partition))
+        .accessibilityHint(reportsAPass
+            ? (isOpen ? "Hides the passed checks" : "Shows the passed checks")
+            : LayerResultRow.accessibilityHint(isExpandable: true, isExpanded: isOpen))
         .accessibilityIdentifier("passedChecksCluster")
         if isOpen {
             ForEach(members, id: \.self) { index in
                 GroupedRowDivider()
                 layerRow(index: index, layout: Self.memberLayout(partition.outcomes[index]),
-                         showsStatusWord: false)
+                         showsStatusWord: false, showsTrailingWord: partition.outcomes[index] != .passed)
             }
             .transition(.opacity)
         }

@@ -1,0 +1,19 @@
+Property: The selection bar stays at its bottom place while a notice holds the editor's band, the fit notice among them. Here the band is read without the fit notice.
+Area: the editor's selection bar, its place over the canvas
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppUITests/SelectionBarClearanceUITests
+Must go red: ResectaAppUITests/SelectionBarClearanceUITests testWhileTheFitNoticeHoldsTheBandABoxAtTheFootLeavesTheBarAtTheBottom
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/DocumentEditorView+Caption.swift b/Sources/ResectaApp/Views/DocumentEditorView+Caption.swift
+index 85ee9e16c..315ec0cbc 100644
+--- a/Sources/ResectaApp/Views/DocumentEditorView+Caption.swift
++++ b/Sources/ResectaApp/Views/DocumentEditorView+Caption.swift
+@@ -138,7 +138,7 @@ extension DocumentEditorView {
+         let barUp = occupant == .selection(adding: false)
+         let atTop = SelectionBarClearance.drawnAtTop(
+             barUp: barUp, placeIsTop: selectionBarAtTop,
+-            topNoticeShowing: TopBannerSlot.winner(documentState: documentState, widenedOnPage: fitNoticeHolds) != nil)
++            topNoticeShowing: TopBannerSlot.winner(documentState: documentState) != nil)
+         return ZStack(alignment: .bottom) {
+             Group {
+                 if let occupant, Self.bottomSlotDrawsHere(occupant) {

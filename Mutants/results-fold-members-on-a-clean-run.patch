@@ -5,15 +5,15 @@ Must go red: ResectaAppTests/VerificationResultsActionsTests listRowHoldsThePass
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Views/VerificationDetailsSection.swift b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
-index a28ccc9f..4d995ad2 100644
+index c986ff72..98fc27ab 100644
 --- a/Sources/ResectaApp/Views/VerificationDetailsSection.swift
 +++ b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
-@@ -92,7 +92,7 @@ struct VerificationDetailsSection: View {
-     /// riding note has no row. The row is drawn exactly when this is not
-     /// empty.
+@@ -129,7 +129,7 @@ struct VerificationDetailsSection: View {
+     /// own order: every check of the report but the plain warnings, which
+     /// have their own card. The row is drawn exactly when this is not empty.
      static func listRowMembers(_ partition: VerificationLayerPartition) -> [Int] {
--        partition.cluster.isEmpty ? [] : (partition.cluster + partition.nothingToCheck).sorted()
-+        partition.passedCount == partition.total ? [] : partition.cluster.isEmpty ? [] : (partition.cluster + partition.nothingToCheck).sorted()
+-        partition.outcomes.indices.filter { partition.outcomes[$0] != .warning }
++        partition.passedCount == partition.total ? [] : partition.outcomes.indices.filter { partition.outcomes[$0] != .warning }
      }
  
-     /// A member's row: a passed check has no mark; a riding note and a
+     /// Whether the list row reports a pass: it holds a passed check, and

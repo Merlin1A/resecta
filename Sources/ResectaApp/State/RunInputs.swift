@@ -16,12 +16,15 @@ enum RunInputs {
     ///
     /// `geometry` holds each page's crop box and rotation, read from the
     /// document at run entry; a page with it gets its plan of boxes, made
-    /// once here under the run's plan source. A page without it has no plan.
-    /// The switch is the run's snapshot of the Settings switch; under "as
-    /// placed" the plan does not read it.
+    /// once here under the run's plan source, and the run's frame for the
+    /// box-place check. A page without it has neither. The switch is the
+    /// run's snapshot of the Settings switch; under "as placed" the plan
+    /// does not read it. `geometryAtStore` holds the geometry noted when
+    /// each page's boxes were stored (`RedactionState`).
     static func confirmedRecord(
         pageCount: Int,
         geometry: [Int: PageGeometry],
+        geometryAtStore: [Int: PageGeometry] = [:],
         regions: [Int: [RedactionRegion]],
         reads: [Int: RunRecord.PageRead],
         settings snapshot: PipelineCoordinator.RunSettings
@@ -35,16 +38,13 @@ enum RunInputs {
                 }
                 guard let sides = geometry[page] else { return RunRecord.Page(pageIndex: page, regions: drawn) }
                 return RunRecord.Page(pageIndex: page, regions: drawn,
-                                      cropBox: sides.cropBox.size, rotation: sides.rotation,
+                                      geometry: sides, geometryAtStore: geometryAtStore[page],
                                       switchOn: snapshot.boxesAcrossColumn, read: reads[page])
             })
     }
 
     /// A page's crop box and rotation, as the run's record reads them.
-    struct PageGeometry: Equatable {
-        let cropBox: CGRect
-        let rotation: Int
-    }
+    typealias PageGeometry = RunRecord.PageGeometry
 
     /// Every page's crop box and rotation, read serially from `doc`.
     static func pageGeometry(of doc: PDFDocument) -> [Int: PageGeometry] {

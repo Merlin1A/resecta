@@ -5,15 +5,15 @@ Must go red: ResectaAppTests/VerificationLayerPartitionTests idleChecksJoinTheLi
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Views/VerificationDetailsSection.swift b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
-index c854dbc1..7641b4a0 100644
+index c986ff72..914747e3 100644
 --- a/Sources/ResectaApp/Views/VerificationDetailsSection.swift
 +++ b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
-@@ -85,7 +85,7 @@ struct VerificationDetailsSection: View {
-     /// riding note has no row. The row is drawn exactly when this is not
-     /// empty.
+@@ -129,7 +129,7 @@ struct VerificationDetailsSection: View {
+     /// own order: every check of the report but the plain warnings, which
+     /// have their own card. The row is drawn exactly when this is not empty.
      static func listRowMembers(_ partition: VerificationLayerPartition) -> [Int] {
--        partition.cluster.isEmpty ? [] : (partition.cluster + partition.nothingToCheck).sorted()
-+        partition.cluster
+-        partition.outcomes.indices.filter { partition.outcomes[$0] != .warning }
++        partition.outcomes.indices.filter { partition.outcomes[$0] != .warning && partition.outcomes[$0] != .nothingToCheck }
      }
  
-     /// A member's row: a passed check has no mark; a riding note and a
+     /// Whether the list row reports a pass: it holds a passed check, and

@@ -45,6 +45,7 @@ struct OverlayDrawnPlanTests {
         let overlay = RedactionOverlayView(frame: CGRect(x: 0, y: 0, width: 300, height: 420))
         overlay.coordinator = coordinator
         overlay.pageIndex = 0
+        overlay.geometry = RunRecord.PageGeometry(page: try #require(pdf.page(at: 0)), box: .cropBox)
         overlay.configure(with: regions, selectedIDs: [])
         #expect(state.drawnPlans[0] == nil)
 

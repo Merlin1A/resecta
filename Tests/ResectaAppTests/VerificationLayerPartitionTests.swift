@@ -138,7 +138,7 @@ struct VerificationLayerPartitionTests {
                     durationSeconds: 0, layer: identity)
     }
 
-    @Test("Checks that had nothing to check join the list row, in the checks' own order")
+    @Test("Checks that had nothing to check join the list row, in the checks' own order, on every run")
     func idleChecksJoinTheList() {
         typealias Section = VerificationDetailsSection
         // (layers, expected members, "Nothing to check" drawn as a group)
@@ -149,8 +149,8 @@ struct VerificationLayerPartitionTests {
              Array(0..<13), false),
             // Passes, a riding note and an idle check.
             ([layer(.pass), layer(.info("i")), idle(.searchRecheck)], [0, 1, 2], false),
-            // No pass and no riding note: the group stays, there is no row.
-            ([layer(.fail("f")), idle(.searchRecheck)], [], true),
+            // No pass and no riding note: the row still holds every check.
+            ([layer(.fail("f")), idle(.searchRecheck)], [0, 1], false),
             // No idle check.
             ([layer(.pass), layer(.pass)], [0, 1], false),
             // An idle check between two passed ones sits between them.
@@ -190,16 +190,19 @@ struct VerificationLayerPartitionTests {
     @Test("Closing the list closes its open member, of any kind; other open items stay")
     func closingTheListClosesItsOpenMember() {
         typealias Open = VerificationDetailsSection.OpenItem
-        // A passed check, a riding note and an idle check in the row; a
-        // failed check in a group above.
+        // A passed check, a riding note, an idle check and a failed check in
+        // the row; a plain warning in its card above; the failed check also
+        // behind a Findings row.
         let p = VerificationLayerPartition(layers: [layer(.pass), layer(.info("i")), idle(.searchRecheck),
-                                                    layer(.fail("f"))], perPageModes: [])
-        #expect(VerificationDetailsSection.listRowMembers(p) == [0, 1, 2])
+                                                    layer(.fail("f")), layer(.warn("w"))], perPageModes: [])
+        #expect(VerificationDetailsSection.listRowMembers(p) == [0, 1, 2, 3])
         // (open before, expected after closing)
         let rows: [(Open?, Open?)] = [
             (.layer(2), nil),          // an open idle member closes
             (.layer(0), nil),          // an open passed member closes
-            (.layer(3), .layer(3)),    // a row of a group above stays open
+            (.layer(3), nil),          // an open failed member closes
+            (.layer(4), .layer(4)),    // the warning's row above stays open
+            (.problem("failedCheck-3"), .problem("failedCheck-3")),  // a Findings row stays open
             (.pageModes, .pageModes),  // Page Modes stays open
             (nil, nil),                // nothing open
         ]
@@ -207,7 +210,7 @@ struct VerificationLayerPartitionTests {
             #expect(VerificationDetailsSection.openItemAfterTogglingList(isOpen: true, openItem: before,
                                                                          partition: p) == after)
         }
-        #expect(rows.count == 5)
+        #expect(rows.count == 7)
         // Opening the list closes nothing.
         #expect(VerificationDetailsSection.openItemAfterTogglingList(isOpen: false, openItem: .layer(2),
                                                                      partition: p) == .layer(2))

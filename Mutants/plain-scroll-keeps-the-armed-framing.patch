@@ -1,0 +1,18 @@
+Property: A scroll target not framed for readability drops the armed framing, so a later layout pass does not re-apply it.
+Area: the canvas's page geometry (turned pages)
+Test command: xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/CanvasRotatedPageTests
+Must go red: ResectaAppTests/CanvasRotatedPageTests plainRequestClearsTheFraming
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/PDFDocumentView.swift b/Sources/ResectaApp/Views/PDFDocumentView.swift
+index 881cc28..f71679f 100644
+--- a/Sources/ResectaApp/Views/PDFDocumentView.swift
++++ b/Sources/ResectaApp/Views/PDFDocumentView.swift
+@@ -105,7 +105,6 @@ struct PDFDocumentView: UIViewRepresentable {
+                 on: page, anchor: target.anchor)
+             return target.token
+         }
+-        pdfView.clearReadabilityFraming()
+         if let page = pdfView.document?.page(at: target.pageIndex),
+            Self.shouldRectScroll(scaleFactor: pdfView.scaleFactor, fitScaleFactor: pdfView.scaleFactorForSizeToFit) {
+             let geometry = RunRecord.PageGeometry(page: page, box: pdfView.displayBox)

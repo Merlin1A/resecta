@@ -1,0 +1,19 @@
+Property: The Findings group holds one row for each problem the model returns, in its order, and nothing else. Here the group drops the model's last problem.
+Area: findings on the results screen
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/FindingRowTests
+Must go red: ResectaAppTests/FindingRowTests theGroupDrawsTheModel
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationDetailsSection.swift b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
+index c986ff72..618475ac 100644
+--- a/Sources/ResectaApp/Views/VerificationDetailsSection.swift
++++ b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
+@@ -99,7 +99,7 @@ struct VerificationDetailsSection: View {
+     /// its order, and nothing else.
+     static func findingRows(report: VerificationReport, coveredPages: [Int],
+                             formValueCount: Int) -> [VerificationProblem] {
+-        VerificationProblemModel.derive(report: report, coveredPages: coveredPages, formValueCount: formValueCount)
++        Array(VerificationProblemModel.derive(report: report, coveredPages: coveredPages, formValueCount: formValueCount).dropLast())
+     }
+ 
+     /// The group's heading, "Findings · n" (spoken "Findings, n."), n the

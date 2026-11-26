@@ -1,19 +1,21 @@
-Property: With no list row, the checks that had nothing to check keep their group.
+Property: With no passed check, the checks that had nothing to check stay in the list row (it holds every check but the plain warnings on every run). Here they leave it when nothing passed.
 Area: results (the passed checks' row)
 Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationLayerPartitionTests -only-testing:ResectaAppTests/VerificationShareHonestyTests
 Must go red: ResectaAppTests/VerificationLayerPartitionTests idleChecksJoinTheList; ResectaAppTests/VerificationShareHonestyTests couldNotVerifyGroupRendersAboveTheCluster
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Views/VerificationDetailsSection.swift b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
-index c854dbc1..73649526 100644
+index c986ff72..17dec40b 100644
 --- a/Sources/ResectaApp/Views/VerificationDetailsSection.swift
 +++ b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
-@@ -75,7 +75,7 @@ struct VerificationDetailsSection: View {
-             ("Findings", partition.findings),
-             ("Could not verify", partition.couldNotVerify),
-             ("Notes", partition.notes),
--            ("Nothing to check", partition.cluster.isEmpty ? partition.nothingToCheck : []),
-+            ("Nothing to check", []),
-         ].filter { !$0.1.isEmpty }
+@@ -129,7 +129,9 @@ struct VerificationDetailsSection: View {
+     /// own order: every check of the report but the plain warnings, which
+     /// have their own card. The row is drawn exactly when this is not empty.
+     static func listRowMembers(_ partition: VerificationLayerPartition) -> [Int] {
+-        partition.outcomes.indices.filter { partition.outcomes[$0] != .warning }
++        partition.outcomes.indices.filter {
++            partition.outcomes[$0] != .warning && (partition.passedCount > 0 || partition.outcomes[$0] != .nothingToCheck)
++        }
      }
  
+     /// Whether the list row reports a pass: it holds a passed check, and

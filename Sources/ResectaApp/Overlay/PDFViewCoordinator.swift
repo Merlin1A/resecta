@@ -15,11 +15,13 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
 
     weak var pdfView: PDFView?
     /// The region state. The coordinator sets itself as the state's canvas,
-    /// so the run door can ask whether a finger is down on a page.
+    /// so the run door can ask whether a finger is down on a page, and the
+    /// run entry probes every live canvas through it.
     var redactionState: RedactionState? {
         didSet {
             if oldValue !== redactionState, oldValue?.canvas === self { oldValue?.canvas = nil }
             redactionState?.canvas = self
+            redactionState?.probeLiveCanvases = { [weak self] in self?.boxPlaceProbeFailures() ?? [] }
         }
     }
     /// The settings a drawn page's plan is kept with (`noteDrawn`).
@@ -299,7 +301,11 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
 
         let overlay = RedactionOverlayView()
         overlay.pageIndex = pageIndex
-        overlay.pageRotation = page.rotation
+        // The app shows the crop box and never sets another display box, so
+        // the geometry's crop and the page size below read one box.
+        assert(PDFDisplayBox.cropBox == view.displayBox)
+        overlay.geometry = RunRecord.PageGeometry(page: page, box: view.displayBox)
+        overlay.pageSize = page.bounds(for: view.displayBox).size
         overlay.coordinator = self
         overlay.isUserInteractionEnabled = isDrawingEnabled
         overlay.isDrawingMode = isDrawingMode
@@ -332,6 +338,20 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
         return search.livePreviewRects
     }
 
+    // MARK: - Box places (the canvas probe)
+
+    /// A canvas's probe answer when PDFKit first placed it: a failure is kept
+    /// on the page for the document, and the run refuses the page.
+    func recordBoxPlaceProbe(pageIndex: Int, passes: Bool) {
+        if !passes { redactionState?.canvasProbeFailures.insert(pageIndex) }
+    }
+
+    /// Probes every live canvas now: the pages whose canvas fails, or that
+    /// PDFKit has not yet placed.
+    func boxPlaceProbeFailures() -> Set<Int> {
+        Set(activeOverlays.compactMap { page, overlay in overlay.boxPlaceProbePasses() == true ? nil : page })
+    }
+
     func pdfView(_ view: PDFView,
                  willEndDisplayingOverlayView overlayView: UIView,
                  for page: PDFPage) {
@@ -342,6 +362,7 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
     // MARK: - Region Management (called from overlay touch handlers)
 
     func addRegion(_ region: RedactionRegion, page: Int, undoManager: UndoManager?) {
+        assert(RedactionState.admitsEditorShare(region.normalizedRect))
         redactionState?.addRegion(region, page: page, undoManager: undoManager)
         refreshOverlay(for: page)
     }
@@ -393,22 +414,37 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
     /// began; the mutators judge that no-op themselves (no step, no Redo
     /// re-armed, the output kept), and the resize is announced only when
     /// the rect changed.
-    func commitResize(_ id: UUID, page: Int, newRect: CGRect, undoManager: UndoManager?) {
-        if redactionState?.resizeRegion(id, page: page, newRect: newRect, undoManager: undoManager) == true {
+    func commitResize(_ id: UUID, page: Int, newRect: CGRect, drawnPageRect: CGRect? = nil,
+                      undoManager: UndoManager?) {
+        assert(RedactionState.admitsEditorShare(newRect))
+        if redactionState?.resizeRegion(id, page: page, newRect: newRect, undoManager: undoManager,
+                                        drawnPageRect: drawnPageRect) == true {
             UIAccessibility.post(notification: .announcement, argument: Self.commitAnnouncement(.resized))
         }
         refreshOverlay(for: page)
     }
 
     // Commit region move after drag ends.
-    func commitMove(_ id: UUID, page: Int, newRect: CGRect, undoManager: UndoManager?) {
-        redactionState?.moveRegion(id, page: page, newRect: newRect, undoManager: undoManager)
+    func commitMove(_ id: UUID, page: Int, newRect: CGRect, drawnPageRect: CGRect? = nil,
+                    undoManager: UndoManager?) {
+        assert(RedactionState.admitsEditorShare(newRect))
+        redactionState?.moveRegion(id, page: page, newRect: newRect, undoManager: undoManager,
+                                   drawnPageRect: drawnPageRect)
         refreshOverlay(for: page)
     }
 
     /// Commit a batch move of multiple regions on the same page.
-    func commitMoveMultiple(_ moves: [(id: UUID, newRect: CGRect)], page: Int, undoManager: UndoManager?) {
-        redactionState?.moveRegions(moves, page: page, undoManager: undoManager)
+    func commitMoveMultiple(_ moves: [(id: UUID, newRect: CGRect)], page: Int,
+                            drawnPageRects: [UUID: CGRect] = [:], undoManager: UndoManager?) {
+        #if DEBUG
+        // A group whose union lay past the page before the move (a member
+        // stored past an edge) keeps that excess: each member is held to it.
+        let ids = Set(moves.map(\.id))
+        let before = (redactionState?.regions[page] ?? []).filter { ids.contains($0.id) }.map(\.normalizedRect)
+        let excess = before.dropFirst().reduce(before.first) { $0?.union($1) }.map(RedactionState.excessPastThePage) ?? 0
+        for move in moves { assert(RedactionState.admitsEditorShare(move.newRect, slack: excess)) }
+        #endif
+        redactionState?.moveRegions(moves, page: page, undoManager: undoManager, drawnPageRects: drawnPageRects)
         refreshOverlay(for: page)
     }
 
@@ -596,6 +632,79 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
         guard held != canvasHoldsTouch else { return }
         canvasHoldsTouch = held
         applyScrollFingers()
+        // A place that waited for the finger is decided as it lifts.
+        if !held, selectionBarPlacePending, let pdfView {
+            selectionBarPlacePending = false
+            placeSelectionBar(in: pdfView)
+        }
+    }
+
+    // MARK: - The selection bar's place
+
+    /// The selection bar's frame at the bottom of the canvas, in the PDF
+    /// view's own points; nil while the bar does not hold the slot.
+    var selectionBarFrame: CGRect?
+    /// Where the editor hears the bar's place: true for the top.
+    var onSelectionBarPlace: (@MainActor (Bool) -> Void)?
+    private var lastSelectionBarInputs: SelectionBarClearance.Inputs?
+    private var selectionBarPlacePending = false
+
+    /// Decides the selection bar's place when its inputs change
+    /// (`SelectionBarClearance.step`). Called at the end of every update.
+    func keepSelectionClearOfBar(in pdfView: PDFView, framedThisPass: Bool) {
+        guard let state = redactionState else { return }
+        let inputs = SelectionBarClearance.Inputs(
+            selectedIDs: state.selectedRegionIDs,
+            regionVersion: state.regionVersion,
+            bar: selectionBarFrame,
+            canvasSize: pdfView.bounds.size,
+            pageIndex: documentState?.currentPageIndex ?? 0)
+        let changed = inputs != lastSelectionBarInputs
+        lastSelectionBarInputs = inputs
+        if selectionBarFrame == nil { selectionBarPlacePending = false }
+        let scrollView = pdfView.subviews.first { $0 is UIScrollView } as? UIScrollView
+        let scrolling = scrollView.map { $0.isDragging || $0.isDecelerating || $0.isZooming || $0.isZoomBouncing } ?? false
+        switch SelectionBarClearance.step(
+            inputsChanged: changed, barUp: selectionBarFrame != nil, fingerDown: canvasHoldsTouch,
+            personScrolling: scrolling, framedThisPass: framedThisPass) {
+        case .none: break
+        case .drop: selectionBarPlacePending = false
+        case .wait: selectionBarPlacePending = true
+        case .run:
+            selectionBarPlacePending = false
+            placeSelectionBar(in: pdfView)
+        }
+    }
+
+    /// The selected boxes on the page in view, in the PDF view's points,
+    /// with the page's frame there. A region is kept in the frame the page
+    /// is shown in, so it is turned back to the stored page first, as the
+    /// overlay draws it.
+    func selectedBoxesInView(_ pdfView: PDFView) -> (boxes: [CGRect], page: CGRect)? {
+        guard let state = redactionState, let document = pdfView.document else { return nil }
+        let index = documentState?.currentPageIndex ?? 0
+        guard let page = document.page(at: index) else { return nil }
+        let pageBounds = page.bounds(for: pdfView.displayBox)
+        let boxes = (state.regions[index] ?? [])
+            .filter { state.selectedRegionIDs.contains($0.id) }
+            .map { pdfView.convert(PDFDocumentView.pageRect(forShown: $0.normalizedRect, on: page, box: pdfView.displayBox),
+                                   from: page) }
+        return (boxes, pdfView.convert(pageBounds, from: page))
+    }
+
+    /// Hands out the bar's place one turn later: the update pass that
+    /// decided it writes no SwiftUI state.
+    private func placeSelectionBar(in pdfView: PDFView) {
+        guard let bar = selectionBarFrame, let read = selectedBoxesInView(pdfView) else { return }
+        let atTop = SelectionBarClearance.barAtTop(
+            selection: SelectionBarClearance.selectionRect(boxes: read.boxes, page: read.page),
+            bottomBar: bar, canvas: pdfView.bounds)
+        Task { @MainActor [weak self] in
+            // A bar taken down before this turn hears nothing: the next bar
+            // starts at the bottom and is measured there.
+            guard let self, self.selectionBarFrame != nil else { return }
+            self.onSelectionBarPlace?(atTop)
+        }
     }
 
     /// The one home for when one finger scrolls: while the Rectangle tool

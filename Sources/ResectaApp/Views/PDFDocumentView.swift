@@ -26,6 +26,12 @@ struct PDFDocumentView: UIViewRepresentable {
     /// continues to work whether the toggle is on or off.
     var isMultiSelectActive: Bool
 
+    /// The selection bar's frame at the bottom of the canvas, in this
+    /// view's points; nil while the bar does not hold the slot.
+    var selectionBarFrame: CGRect? = nil
+    /// Hears the bar's place (true: the top), decided after the update.
+    var onSelectionBarPlace: (@MainActor (Bool) -> Void)? = nil
+
     // `shouldRectScroll` and `readabilityTargetScale` — the framing math
     // — live in `CanvasFraming.swift` beside the centring point.
 
@@ -82,13 +88,40 @@ struct PDFDocumentView: UIViewRepresentable {
     }
 
     /// A shown-frame normalized rect (a region's) in `page`'s own space, for
-    /// scrolling to it: the page's bounds are the stored page, so the rect
-    /// is turned back first (`CanvasTurn`).
+    /// scrolling to it, through the page's geometry: the page's bounds are
+    /// the stored page, so the rect is turned back first.
     static func pageRect(forShown normalized: CGRect, on page: PDFPage, box: PDFDisplayBox) -> CGRect {
-        normalizedToPDFPageCoordinates(
-            CanvasTurn.stored(fromShown: normalized, rotation: page.rotation),
-            pageRect: page.bounds(for: box)
-        )
+        RunRecord.PageGeometry(page: page, box: box).pageRect(share: normalized)
+    }
+
+    /// Consumes one scroll target: frames it (`.readability`) or scrolls to
+    /// it, clearing the armed framing first, so a plain step never leaves an
+    /// earlier framing to be re-applied. Returns the token it handled;
+    /// `updateUIView` keeps it in the coordinator's
+    /// `lastHandledCanvasScrollToken`. A target already handled is left.
+    static func consumeCanvasScrollTarget(
+        _ target: DocumentState.CanvasScrollTarget, in pdfView: FitFlooredPDFView, lastHandledToken: UUID?
+    ) -> UUID? {
+        guard lastHandledToken != target.token else { return lastHandledToken }
+        // `.readability` normalizes the scale to the readability target
+        // FIRST (in or out, never below the zoom floor), then positions the
+        // rect per the request's anchor: `.visible` rect-scrolls through the
+        // same `shouldRectScroll` gate below; `.center` (the walk) centres
+        // it in the visible canvas, instant, no animation.
+        if target.zoom == .readability, let page = pdfView.document?.page(at: target.pageIndex) {
+            pdfView.frameForReadability(
+                share: target.normalizedRect,
+                geometry: RunRecord.PageGeometry(page: page, box: pdfView.displayBox),
+                on: page, anchor: target.anchor)
+            return target.token
+        }
+        pdfView.clearReadabilityFraming()
+        if let page = pdfView.document?.page(at: target.pageIndex),
+           Self.shouldRectScroll(scaleFactor: pdfView.scaleFactor, fitScaleFactor: pdfView.scaleFactorForSizeToFit) {
+            let geometry = RunRecord.PageGeometry(page: page, box: pdfView.displayBox)
+            pdfView.go(to: geometry.pageRect(share: target.normalizedRect), on: page)
+        }
+        return target.token
     }
 
     func updateUIView(_ pdfView: FitFlooredPDFView, context: Context) {
@@ -112,36 +145,18 @@ struct PDFDocumentView: UIViewRepresentable {
         // write during the update pass), and only when the view is
         // zoomed past fit: at fit scale the whole page is visible,
         // page-granular navigation suffices, and an unconditional
-        // `go(to:on:)` would zoom unexpectedly. The rect converts
-        // through the engine's canonical
-        // `normalizedToPDFPageCoordinates` — the same mapping the burn
-        // path uses, so the scroll target and the drawn redaction
-        // agree by construction. The page's bounds are the stored page,
-        // so the shown-frame rect is turned back first (`CanvasTurn`).
-        if let target = documentState.pendingCanvasScrollTarget,
-           coordinator.lastHandledCanvasScrollToken != target.token {
-            coordinator.lastHandledCanvasScrollToken = target.token
-            // `.readability` normalizes the scale to the readability
-            // target FIRST (in or out, never below the zoom floor),
-            // then positions the rect per the request's anchor —
-            // `.visible` rect-scrolls through the same `shouldRectScroll`
-            // gate below; `.center` (the walk) centres it in the visible
-            // canvas — instant, no animation. The `.none` path is
-            // untouched.
-            if target.zoom == .readability,
-               let doc = pdfView.document,
-               let page = doc.page(at: target.pageIndex) {
-                let pageRect = Self.pageRect(forShown: target.normalizedRect, on: page, box: pdfView.displayBox)
-                pdfView.frameForReadability(
-                    rectInPage: pageRect, on: page, anchor: target.anchor)
-            } else if let doc = pdfView.document,
-               let page = doc.page(at: target.pageIndex),
-               Self.shouldRectScroll(
-                   scaleFactor: pdfView.scaleFactor,
-                   fitScaleFactor: pdfView.scaleFactorForSizeToFit
-               ) {
-                let pageRect = Self.pageRect(forShown: target.normalizedRect, on: page, box: pdfView.displayBox)
-                pdfView.go(to: pageRect, on: page)
+        // `go(to:on:)` would zoom unexpectedly. The rect converts at the
+        // consumer through the page's geometry (`RunRecord.PageGeometry`),
+        // whose page map is the engine's canonical
+        // `normalizedToPDFPageCoordinates` on the rect turned back to the
+        // stored page: the page's bounds are the stored page.
+        var framedThisPass = false
+        if let target = documentState.pendingCanvasScrollTarget {
+            let handled = Self.consumeCanvasScrollTarget(
+                target, in: pdfView, lastHandledToken: coordinator.lastHandledCanvasScrollToken)
+            if handled != coordinator.lastHandledCanvasScrollToken {
+                coordinator.lastHandledCanvasScrollToken = handled
+                framedThisPass = true
             }
         }
 
@@ -173,6 +188,10 @@ struct PDFDocumentView: UIViewRepresentable {
         if documentState.canvasPageFramesWanted {
             coordinator.requestPageFramePublish()
         }
+        // The selection bar's place, from the boxes as now drawn.
+        coordinator.selectionBarFrame = isEditing ? selectionBarFrame : nil
+        coordinator.onSelectionBarPlace = onSelectionBarPlace
+        coordinator.keepSelectionClearOfBar(in: pdfView, framedThisPass: framedThisPass)
     }
 }
 
@@ -279,7 +298,8 @@ final class FitFlooredPDFView: PDFView {
     /// once at consumption and the store expires unused.
     private struct ReadabilityFramingTarget {
         let page: PDFPage
-        let rectInPage: CGRect
+        let share: CGRect
+        let geometry: RunRecord.PageGeometry
         let anchor: DocumentState.CanvasScrollAnchor
         let armedAt: TimeInterval
         var lastAppliedBounds: CGRect
@@ -296,14 +316,20 @@ final class FitFlooredPDFView: PDFView {
     /// Consume a `.readability` scroll target: normalize + position now,
     /// and arm the post-layout re-assert.
     func frameForReadability(
-        rectInPage: CGRect, on page: PDFPage,
+        share: CGRect, geometry: RunRecord.PageGeometry, on page: PDFPage,
         anchor: DocumentState.CanvasScrollAnchor
     ) {
-        applyReadabilityFraming(rectInPage: rectInPage, on: page, anchor: anchor)
+        applyReadabilityFraming(share: share, geometry: geometry, on: page, anchor: anchor)
         pendingReadabilityFraming = ReadabilityFramingTarget(
-            page: page, rectInPage: rectInPage, anchor: anchor,
+            page: page, share: share, geometry: geometry, anchor: anchor,
             armedAt: CACurrentMediaTime(), lastAppliedBounds: bounds, passes: 0
         )
+    }
+
+    /// Drops the armed framing: a scroll target that is not framed for
+    /// readability replaces it, so a later layout pass does not re-apply it.
+    func clearReadabilityFraming() {
+        pendingReadabilityFraming = nil
     }
 
     private func reassertReadabilityFramingIfNeeded() {
@@ -319,7 +345,7 @@ final class FitFlooredPDFView: PDFView {
         pending.passes += 1
         pendingReadabilityFraming = pending
         applyReadabilityFraming(
-            rectInPage: pending.rectInPage, on: pending.page, anchor: pending.anchor)
+            share: pending.share, geometry: pending.geometry, on: pending.page, anchor: pending.anchor)
     }
 
     /// Write the computed scale up or down when it differs meaningfully
@@ -332,12 +358,15 @@ final class FitFlooredPDFView: PDFView {
     /// rule settled on (at fit the page is smaller than the viewport
     /// and PDFKit centres the page itself).
     private func applyReadabilityFraming(
-        rectInPage: CGRect, on page: PDFPage,
+        share: CGRect, geometry: RunRecord.PageGeometry, on page: PDFPage,
         anchor: DocumentState.CanvasScrollAnchor
     ) {
+        let rectInPage = geometry.pageRect(share: share)
         let fit = scaleFactorForSizeToFit
+        // The zoom reads the box as the reader sees it: on a turned page
+        // the page rectangle's sides are swapped against the page as shown.
         if let target = PDFDocumentView.readabilityTargetScale(
-            rectInPage: rectInPage,
+            rectInPage: geometry.displayedRect(share: share),
             viewportSize: bounds.size,
             fitScale: fit,
             maxScale: maxScaleFactor
@@ -352,33 +381,34 @@ final class FitFlooredPDFView: PDFView {
             // The 8-pt page-unit pad keeps the selection ring off the viewport edge.
             let padded = rectInPage
                 .insetBy(dx: -8, dy: -8)
-                .intersection(page.bounds(for: displayBox))
+                .intersection(geometry.cropBox)
             guard !padded.isNull else { return }
             go(to: padded, on: page)
         case .center:
-            centre(rectInPage, on: page)
+            centre(share: share, geometry: geometry, on: page)
         }
     }
 
-    /// Centre `rectInPage` in the visible canvas at the current scale:
+    /// Centre the box in the visible canvas at the current scale:
     /// ONE `PDFDestination` covers the page change and the position
-    /// (the point is the visible area's top-left in page space, clamped
-    /// to the page by `centeringDestinationPoint`). Instant; the
+    /// (the point is the visible area's top-left, worked out in the page
+    /// as shown and clamped to it by `centeringDestinationPoint`, then
+    /// carried into the page's own space by the geometry). Instant; the
     /// re-assert store above rides the parked inset's animation.
-    private func centre(_ rectInPage: CGRect, on page: PDFPage) {
+    private func centre(share: CGRect, geometry: RunRecord.PageGeometry, on page: PDFPage) {
         guard scaleFactor > 0, bounds.width > 0, bounds.height > 0 else { return }
         if #available(iOS 27, *), let scrollView {
-            centreByScrolling(rectInPage, on: page, in: scrollView)
+            centreByScrolling(geometry.pageRect(share: share), on: page, in: scrollView)
             return
         }
         let point = PDFDocumentView.centeringDestinationPoint(
-            rectInPage: rectInPage,
+            rectInPage: geometry.displayedRect(share: share),
             visibleSizeInPage: CGSize(
                 width: bounds.width / scaleFactor,
                 height: bounds.height / scaleFactor),
-            pageBounds: page.bounds(for: displayBox)
+            pageBounds: CGRect(origin: .zero, size: geometry.displayedSize)
         )
-        go(to: PDFDestination(page: page, at: point))
+        go(to: PDFDestination(page: page, at: geometry.pagePoint(displayed: point)))
     }
 
     /// iOS 27's `go(to:)` refits the page, undoing the scale just written,

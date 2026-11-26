@@ -1,0 +1,19 @@
+Property: The hand-drawn boxes are counted one per box: two on one page are two.
+Area: results screen
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/ResultsOrderAndSentenceTests
+Must go red: ResectaAppTests/ResultsOrderAndSentenceTests handDrawnSentence
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationResultsView.swift b/Sources/ResectaApp/Views/VerificationResultsView.swift
+index 25402fec..d8ed0c22 100644
+--- a/Sources/ResectaApp/Views/VerificationResultsView.swift
++++ b/Sources/ResectaApp/Views/VerificationResultsView.swift
+@@ -157,7 +157,7 @@ struct VerificationResultsView: View {
+     /// page are two), as the row's own sentence counts them.
+     static func handDrawnBoxCount(in findings: [ResultsFinding]) -> Int {
+         for entry in findings {
+-            if case .handRegionsOnPagesWithoutText(let regionPages) = entry { return regionPages.count }
++            if case .handRegionsOnPagesWithoutText(let regionPages) = entry { return Set(regionPages).count }
+         }
+         return 0
+     }

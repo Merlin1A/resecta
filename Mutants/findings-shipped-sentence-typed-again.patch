@@ -1,0 +1,19 @@
+Property: A shipped sentence is read from its shipped constant, never typed again. Here the covered-text title is typed again with a letter dropped.
+Area: findings on the results screen
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/FindingRowTests
+Must go red: ResectaAppTests/FindingRowTests wordsByKind
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/FindingRow.swift b/Sources/ResectaApp/Views/FindingRow.swift
+index de7cfd24..2b37484a 100644
+--- a/Sources/ResectaApp/Views/FindingRow.swift
++++ b/Sources/ResectaApp/Views/FindingRow.swift
+@@ -90,7 +90,7 @@ enum FindingRowModel {
+         case .boxedTextReadable:
+             return boxedTextReadable
+         case .coveredTextInOriginal:
+-            return ResultsFinding.coveredTextTitle
++            return "Covered text in the orignal"
+         case .partOfBoxedText:
+             return partOfBoxedText
+         case .searchesStillMatch:

@@ -7,99 +7,143 @@ import RedactionEngine
 // context, the dirty-rect clip and the ORDER; its body's three segments
 // are the three methods below, each drawn exactly as the body drew them
 // (the committed regions; the search layer — live preview, highlights,
-// the walk's ring; the in-progress shapes — rubber band,
-// marquee, the resize label), followed by the helpers those
-// segments call (resize handles, the type badge, the
-// dimension label and the snap guides).
+// the walk's ring; the in-progress shapes — the box being drawn and the
+// lasso), followed by the helpers those segments call (the steps' drawing
+// and the snap guides).
 
 extension RedactionOverlayView {
 
     // MARK: - draw(_:) segments
 
-    /// The committed regions with their lift, badge, dimension label and
-    /// resize handles — the first segment of `draw(_:)`.
+    /// The committed regions, drawn as Ink boxes layer by layer across all
+    /// of them (`inkSteps`), with the tags of the boxes at rest and the
+    /// handles or corner dots of a selection — the first segment of `draw(_:)`.
     func drawCommittedRegions(ctx: CGContext, in rect: CGRect) {
         // The plan this page is drawn from is kept with its settings.
         coordinator?.noteDrawn(pageIndex: pageIndex, regions: regions)
-        // Draw committed regions
+        let paints = paintRects()
+        // Perf: skip boxes entirely outside the dirty rect. The margin covers
+        // the shadow (20 overlay points), and whichever reaches further of a
+        // handle stepped clear of a thin box (16 on-screen points) and a tag
+        // with its gap and keyline, round both the box's own rectangle and
+        // the area it paints.
+        typealias C = ResectaTokens.Canvas
+        let tagReach = C.tag.height + C.tag.gap + C.keylineGap + C.keyline.width
+        let margin = max(20, max(16, tagReach) * fingerScale)
+        let metadata = coordinator?.redactionState?.regionMetadata
+        var boxes: [InkBox] = []
         for region in regions {
-            let viewRect = pdfNormalizedToOverlay(region.normalizedRect)
-            // Perf: Skip regions entirely outside the dirty rect. The margin
-            // covers the badge, the shadow and a handle stepped clear of a
-            // thin box (16 on-screen points reach it), whichever is larger.
-            let margin = max(20, 16 * fingerScale)
-            guard viewRect.insetBy(dx: -margin, dy: -margin).intersects(rect) else { continue }
-            let isSelected = selectedIDs.contains(region.id)
-            let color = region.displayColor(isSelected: isSelected)
-            let isBeingMoved = isSelected && isDraggingExistingRegion
+            let tight = pdfNormalizedToOverlay(region.normalizedRect)
+            let paint = paints[region.id] ?? tight
+            guard tight.union(paint).insetBy(dx: -margin, dy: -margin).intersects(rect) else { continue }
+            let tag = region.source == .manual ? nil : metadata?[region.id]?.badgeLabel
+            boxes.append(InkBox(id: region.id, tight: tight, paint: paint,
+                                isSelected: selectedIDs.contains(region.id), tag: tag))
+        }
+        let moving: Set<UUID> = isDraggingExistingRegion ? selectedIDs : []
+        let steps = Self.inkSteps(boxes: boxes, selectionCount: selectedIDs.count,
+                                  handlesActive: resizeHandlesActive, moving: moving,
+                                  settings: .current, fingerScale: fingerScale, page: bounds)
+        for step in steps where !step.lifted { draw(step, ctx: ctx) }
 
-            // Lift effect during move — 1.02× scale + drop shadow
-            let drawRect: CGRect
-            if isBeingMoved {
-                let dx = viewRect.width * 0.01
-                let dy = viewRect.height * 0.01
-                drawRect = viewRect.insetBy(dx: -dx, dy: -dy)
-                ctx.saveGState()
-                // The shadow falls on the page, which is white in either
-                // appearance, so one dark shadow reads in both; its offset
-                // and blur keep one on-screen size at every zoom.
-                ctx.setShadow(
-                    offset: CGSize(width: 0, height: 4 * fingerScale),
-                    blur: 12 * fingerScale,
-                    color: Self.liftShadowColor.cgColor
-                )
+        // The box being moved is drawn whole, on top, on its own rectangles:
+        // the shadow alone marks it. The shadow falls on the page, which is
+        // white in either appearance, so one dark shadow reads in both; its
+        // offset and blur keep one on-screen size at every zoom.
+        let lifted = steps.filter(\.lifted)
+        guard !lifted.isEmpty else { return }
+        ctx.saveGState()
+        ctx.setShadow(offset: CGSize(width: 0, height: 4 * fingerScale), blur: 12 * fingerScale,
+                      color: Self.liftShadowColor.cgColor)
+        ctx.beginTransparencyLayer(auxiliaryInfo: nil)
+        for step in lifted { draw(step, ctx: ctx) }
+        ctx.endTransparencyLayer()
+        ctx.restoreGState()
+    }
+
+    /// Each region's painted area, in overlay points, from the plan this
+    /// page was last drawn from; a region the plan holds no box for paints
+    /// its own rectangle.
+    private func paintRects() -> [UUID: CGRect] {
+        guard let plan = coordinator?.redactionState?.drawnPlans[pageIndex] else { return [:] }
+        var paints: [UUID: CGRect] = [:]
+        for box in plan.boxes {
+            let paint = pdfNormalizedToOverlay(box.paint)
+            for id in box.regionIDs { paints[id] = paint }
+        }
+        return paints
+    }
+
+    /// Draws one step: a fill of all its rectangles as one path (a width of
+    /// zero), a stroke of them and of its lines, or its handles, dots or
+    /// rings; a tag's words over its fill.
+    private func draw(_ step: InkStep, ctx: CGContext) {
+        typealias C = ResectaTokens.Canvas
+        ctx.setLineDash(phase: 0, lengths: step.dash)
+        switch step.layer {
+        case .handles:
+            // The disc and its shadow grow in with `handleScale`; the ring
+            // keeps its width.
+            guard handleScale > 0.001 else { return }
+            let radius = C.handle.radius * handleScale * fingerScale
+            let shadowRadius = (C.handle.radius + C.handleShadowGrowth) * handleScale * fingerScale
+            let drop = C.handleShadowDrop * handleScale * fingerScale
+            for p in step.rects.map({ CGPoint(x: $0.midX, y: $0.midY) }) {
+                ctx.setFillColor(C.handleShadow.uiColor.cgColor)
+                ctx.fillEllipse(in: Self.disc(at: CGPoint(x: p.x, y: p.y + drop), radius: shadowRadius))
+                let disc = Self.disc(at: p, radius: radius)
+                ctx.setFillColor(C.handle.fill.uiColor.cgColor)
+                ctx.fillEllipse(in: disc)
+                ctx.setStrokeColor(step.tone.uiColor.cgColor)
+                ctx.setLineWidth(step.width)
+                ctx.strokeEllipse(in: disc)
+            }
+        case .dots:
+            for dot in step.rects {
+                ctx.setFillColor(step.tone.uiColor.cgColor)
+                ctx.fillEllipse(in: dot)
+                ctx.setStrokeColor(C.selectionDot.ring.uiColor.cgColor)
+                ctx.setLineWidth(step.width)
+                ctx.strokeEllipse(in: dot)
+            }
+        case .inkRings:
+            ctx.setStrokeColor(step.tone.uiColor.cgColor)
+            ctx.setLineWidth(step.width)
+            for ring in step.rects { ctx.strokeEllipse(in: ring) }
+        default:
+            ctx.saveGState()
+            ctx.setLineCap(step.roundCaps ? .round : .butt)
+            for r in step.rects {
+                ctx.addPath(step.corner > 0
+                    ? UIBezierPath(roundedRect: r, cornerRadius: step.corner).cgPath
+                    : CGPath(rect: r, transform: nil))
+            }
+            if step.width == 0 {
+                ctx.setFillColor(step.tone.uiColor.cgColor)
+                ctx.fillPath(using: .winding)
             } else {
-                drawRect = viewRect
-            }
-
-            // Fill at 30% opacity (60% when reduceTransparency enabled),
-            // the border opaque. Stroke: 2 on-screen points unselected, 2.5 selected.
-            let fillOpacity: CGFloat = UIAccessibility.isReduceTransparencyEnabled ? 0.6 : 0.3
-            ctx.setFillColor(color.withAlphaComponent(fillOpacity).cgColor)
-            ctx.setStrokeColor(color.cgColor)
-            ctx.setLineWidth(Self.regionStrokeWidth(isSelected: isSelected, fingerScale: fingerScale))
-            ctx.setLineDash(phase: 0, lengths: [])
-            ctx.addRect(drawRect)
-            ctx.drawPath(using: .fillStroke)
-
-            if isBeingMoved {
-                ctx.restoreGState()
-            }
-
-            // With Differentiate Without Color on, a selection is not told
-            // by its colour alone: every member of a multi-selection also
-            // carries a dashed outline (a single selection shows handles).
-            if let cue = Self.selectionCue(
-                isSelected: isSelected, selectionCount: selectedIDs.count,
-                differentiateWithoutColor: UIAccessibility.shouldDifferentiateWithoutColor,
-                fingerScale: fingerScale) {
-                ctx.saveGState()
-                ctx.setStrokeColor(UIColor.black.cgColor)
-                ctx.setLineWidth(cue.lineWidth)
-                ctx.setLineDash(phase: 0, lengths: cue.dash)
-                ctx.stroke(drawRect.insetBy(dx: -cue.lineWidth * 1.5, dy: -cue.lineWidth * 1.5))
-                ctx.restoreGState()
-            }
-
-            // PII type badge for detected regions
-            drawRegionBadge(ctx: ctx, region: region, rect: drawRect)
-
-            // Dimension label during move
-            if isBeingMoved {
-                drawDimensionLabel(ctx: ctx, rect: drawRect)
-            }
-
-            // A selected box shows handles when it is the one selection and
-            // Add to Selection is off, and corner dots otherwise. A box being
-            // moved shows neither.
-            if isSelected && !isBeingMoved {
-                if Self.showsHandles(isSelected: isSelected, selectionCount: selectedIDs.count,
-                                     handlesActive: resizeHandlesActive) {
-                    drawResizeHandles(ctx: ctx, rect: viewRect)
-                } else {
-                    drawSelectionDots(ctx: ctx, rect: viewRect)
+                for i in stride(from: 0, to: step.lines.count - 1, by: 2) {
+                    ctx.move(to: step.lines[i])
+                    ctx.addLine(to: step.lines[i + 1])
                 }
+                ctx.setStrokeColor(step.tone.uiColor.cgColor)
+                ctx.setLineWidth(step.width)
+                ctx.strokePath()
             }
+            ctx.restoreGState()
+            if step.layer == .tag { drawTagWords(step) }
+        }
+    }
+
+    /// A tag's words, white, centred on its height after its leading padding.
+    private func drawTagWords(_ step: InkStep) {
+        let tag = ResectaTokens.Canvas.tag
+        let font = Self.tagFont(fingerScale: fingerScale)
+        let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: tag.words.uiColor]
+        for (rect, words) in zip(step.rects, step.words) {
+            (words as NSString).draw(
+                at: CGPoint(x: rect.minX + tag.padding * fingerScale, y: rect.midY - font.lineHeight / 2),
+                withAttributes: attributes)
         }
     }
 
@@ -157,78 +201,15 @@ extension RedactionOverlayView {
         }
     }
 
-    /// The in-progress shapes — the rubber band, the lasso marquee and the
-    /// resize dimension label — the last segment of `draw(_:)`.
+    /// The in-progress shapes — the box being drawn and the lasso — the
+    /// last segment of `draw(_:)`. Each keeps one on-screen size at every zoom.
     func drawInProgressShapes(ctx: CGContext) {
-        // Draw in-progress rubber-band rectangle
+        let settings = CanvasDisplaySettings.current
         if let dragRect = currentDragRect {
-            ctx.setFillColor(UIColor.systemBlue.withAlphaComponent(0.15).cgColor)
-            ctx.setStrokeColor(UIColor.systemBlue.cgColor)
-            ctx.setLineWidth(2.0)
-            ctx.setLineDash(phase: 0, lengths: [6, 3])
-            ctx.addRect(dragRect)
-            ctx.drawPath(using: .fillStroke)
-            // Dimension label during drawing
-            drawDimensionLabel(ctx: ctx, rect: dragRect)
+            for step in Self.bandSteps(dragRect, settings: settings, fingerScale: fingerScale) { draw(step, ctx: ctx) }
         }
-
-        // Draw in-progress lasso marquee. Distinguished from the
-        // new-region rubber-band by a tint-only system-purple stroke + a
-        // sparser dash so the user sees this rectangle as a selection
-        // cursor rather than a region commitment. No dimension label —
-        // the marquee is transient and the user does not care about its
-        // exact size, only the regions it overlaps.
         if let marqueeRect {
-            ctx.setFillColor(UIColor.systemPurple.withAlphaComponent(0.10).cgColor)
-            ctx.setStrokeColor(UIColor.systemPurple.cgColor)
-            ctx.setLineWidth(1.5)
-            ctx.setLineDash(phase: 0, lengths: [4, 4])
-            ctx.addRect(marqueeRect)
-            ctx.drawPath(using: .fillStroke)
-        }
-
-        // Dimension label during resize
-        if activeResizeHandle != nil, let selectedID,
-           let region = regions.first(where: { $0.id == selectedID }) {
-            let resizeRect = pdfNormalizedToOverlay(region.normalizedRect)
-            drawDimensionLabel(ctx: ctx, rect: resizeRect)
-        }
-    }
-
-    /// The resize handles at `handleCentres`: a white disc with a page-teal
-    /// ring over a faint shadow disc. The disc and its shadow grow in with
-    /// `handleScale`; the ring keeps its width.
-    private func drawResizeHandles(ctx: CGContext, rect: CGRect) {
-        guard handleScale > 0.001 else { return }
-        let style = ResectaTokens.Canvas.handle
-        let radius = style.radius * handleScale * fingerScale
-        let shadowRadius = (style.radius + ResectaTokens.Canvas.handleShadowGrowth) * handleScale * fingerScale
-        let drop = ResectaTokens.Canvas.handleShadowDrop * handleScale * fingerScale
-        ctx.setLineDash(phase: 0, lengths: [])
-        for (_, p) in Self.handleCentres(for: rect, fingerScale: fingerScale) {
-            ctx.setFillColor(ResectaTokens.Canvas.handleShadow.uiColor.cgColor)
-            ctx.fillEllipse(in: Self.disc(at: CGPoint(x: p.x, y: p.y + drop), radius: shadowRadius))
-            let disc = Self.disc(at: p, radius: radius)
-            ctx.setFillColor(style.fill.uiColor.cgColor)
-            ctx.fillEllipse(in: disc)
-            ctx.setStrokeColor(style.ring.uiColor.cgColor)
-            ctx.setLineWidth(style.ringWidth * fingerScale)
-            ctx.strokeEllipse(in: disc)
-        }
-    }
-
-    /// The four corner dots of a selected box that shows no handles.
-    private func drawSelectionDots(ctx: CGContext, rect: CGRect) {
-        let style = ResectaTokens.Canvas.selectionDot
-        let radius = style.radius * fingerScale
-        ctx.setLineDash(phase: 0, lengths: [])
-        for p in Self.selectionDotCentres(for: rect, fingerScale: fingerScale) {
-            let dot = Self.disc(at: p, radius: radius)
-            ctx.setFillColor(style.fill.uiColor.cgColor)
-            ctx.fillEllipse(in: dot)
-            ctx.setStrokeColor(style.ring.uiColor.cgColor)
-            ctx.setLineWidth(style.ringWidth * fingerScale)
-            ctx.strokeEllipse(in: dot)
+            for step in Self.lassoSteps(marqueeRect, settings: settings, fingerScale: fingerScale) { draw(step, ctx: ctx) }
         }
     }
 
@@ -261,131 +242,6 @@ extension RedactionOverlayView {
         ]
     }
 
-    // MARK: - Region Badge
-
-    /// Draw a small type badge at the top-right corner of detected regions.
-    /// Suppressed for manual regions, selected regions (resize handles
-    /// overlap top-right corner), and regions too small to fit (<30pt width).
-    private func drawRegionBadge(ctx: CGContext, region: RedactionRegion, rect: CGRect) {
-        guard region.source != .manual,
-              region.id != selectedID,
-              rect.width >= 30,
-              let metadata = coordinator?.redactionState?.regionMetadata[region.id]
-        else { return }
-
-        let label = metadata.badgeLabel as NSString
-        let fontSize: CGFloat = 9
-        let font = UIFont.systemFont(ofSize: fontSize, weight: .bold)
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: font,
-            .foregroundColor: UIColor.white,
-        ]
-        let textSize = label.size(withAttributes: attributes)
-        let badgePadding: CGFloat = ResectaTokens.Spacing.xxs + 1 // 3pt
-        let badgeSize = CGSize(
-            width: textSize.width + badgePadding * 2,
-            height: textSize.height + badgePadding
-        )
-
-        // Position: top-right corner of the region rect, inset slightly
-        let badgeOrigin = CGPoint(
-            x: rect.maxX - badgeSize.width - 2,
-            y: rect.minY + 2
-        )
-        let badgeRect = CGRect(origin: badgeOrigin, size: badgeSize)
-
-        // Badge background — orange for PII, purple for faces
-        let badgeColor: UIColor = switch region.source {
-        case .detectedPII: .systemOrange
-        case .detectedFace: .systemPurple
-        case .manual: .systemRed // Unreachable due to guard
-        case .searchMatch: .systemGreen
-        }
-        let path = UIBezierPath(
-            roundedRect: badgeRect,
-            cornerRadius: ResectaTokens.CornerRadius.small / 2
-        )
-        ctx.setFillColor(badgeColor.cgColor)
-        ctx.addPath(path.cgPath)
-        ctx.fillPath()
-
-        // Hairline outer stroke for dark-mode contrast. Drawn
-        // after the fill so the stroke sits on the perimeter, not the
-        // interior. `UIColor.separator` adapts across light/dark trait.
-        ctx.setStrokeColor(UIColor.separator.cgColor)
-        ctx.setLineWidth(Self.badgeOuterStrokeWidth)
-        ctx.setLineDash(phase: 0, lengths: [])
-        ctx.addPath(path.cgPath)
-        ctx.strokePath()
-
-        // Badge text
-        label.draw(
-            at: CGPoint(
-                x: badgeOrigin.x + badgePadding,
-                y: badgeOrigin.y + badgePadding / 2
-            ),
-            withAttributes: attributes
-        )
-    }
-
-    // MARK: - Dimension Label
-
-    /// Draw a dimension label (W x H) near the bottom-right of a rect.
-    /// Small regions (<40pt tall) prefer above so the label
-    /// doesn't crowd a thin strip from below; taller regions retain the
-    /// legacy below posture. When neither above nor below has room inside
-    /// the overlay, the label is suppressed rather than clamped on top
-    /// of the region.
-    private func drawDimensionLabel(ctx: CGContext, rect: CGRect) {
-        // The value is page points; the pill keeps one on-screen size.
-        let text = "\(Int(rect.width)) \u{00D7} \(Int(rect.height))" as NSString
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: Self.dimensionLabelFont(fingerScale: fingerScale),
-            .foregroundColor: UIColor.label,
-        ]
-        let padding = 4 * fingerScale
-        let pillSize = Self.dimensionLabelPillSize(for: text, fingerScale: fingerScale)
-
-        let position = Self.dimensionLabelPosition(
-            regionRect: rect,
-            pillHeight: pillSize.height,
-            overlayHeight: bounds.height,
-            gap: 4 * fingerScale
-        )
-
-        let pillY: CGFloat
-        switch position {
-        case .suppressed:
-            return
-        case .above(let y), .below(let y):
-            pillY = y
-        }
-
-        // Horizontal: align to the right edge of the region, clamped to
-        // overlay bounds so the pill never spills past the left/right edge.
-        let rawX = rect.maxX - pillSize.width
-        let pillOrigin = CGPoint(
-            x: max(0, min(rawX, bounds.width - pillSize.width)),
-            y: pillY
-        )
-
-        let pillRect = CGRect(origin: pillOrigin, size: pillSize)
-
-        // Background pill
-        let pillPath = UIBezierPath(roundedRect: pillRect, cornerRadius: 4 * fingerScale)
-        ctx.saveGState()
-        ctx.setFillColor(UIColor.systemBackground.withAlphaComponent(0.85).cgColor)
-        ctx.addPath(pillPath.cgPath)
-        ctx.fillPath()
-        ctx.restoreGState()
-
-        // Text
-        text.draw(
-            at: CGPoint(x: pillOrigin.x + padding, y: pillOrigin.y + padding / 2),
-            withAttributes: attributes
-        )
-    }
-
     // MARK: - On-screen sizes
 
     /// Overlay points are page points, shown at 1 / `fingerScale`; each size
@@ -394,61 +250,50 @@ extension RedactionOverlayView {
     /// The lift shadow's colour: the page is white in either appearance.
     static let liftShadowColor = UIColor.black.withAlphaComponent(0.20)
 
-    /// A region's outline: 2.5 on-screen points selected, 2 otherwise.
-    static func regionStrokeWidth(isSelected: Bool, fingerScale: CGFloat) -> CGFloat {
-        (isSelected ? 2.5 : 2.0) * fingerScale
-    }
-
-    static func dimensionLabelFont(fingerScale: CGFloat) -> UIFont {
-        UIFont.monospacedDigitSystemFont(ofSize: 11 * fingerScale, weight: .medium)
-    }
-
-    /// The size label's pill: the text plus 4 on-screen points of padding.
-    static func dimensionLabelPillSize(for text: NSString, fingerScale: CGFloat) -> CGSize {
-        let textSize = text.size(withAttributes: [.font: dimensionLabelFont(fingerScale: fingerScale)])
-        let padding = 4 * fingerScale
-        return CGSize(width: textSize.width + padding * 2, height: textSize.height + padding)
+    /// A box's line round its own rectangle, in overlay points:
+    /// `Canvas.lineSelected` selected, `Canvas.line` at rest.
+    static func regionLineWidth(isSelected: Bool, fingerScale: CGFloat) -> CGFloat {
+        (isSelected ? ResectaTokens.Canvas.lineSelected : ResectaTokens.Canvas.line).width * fingerScale
     }
 
     /// The selection cue under Differentiate Without Color: a dashed outline
-    /// 2 on-screen points wide on every member of a multi-selection, nil
+    /// 2 on-screen points wide on every selected box that shows no handles
+    /// (a multi-selection, or one box with Add to Selection on), nil
     /// otherwise (a single selection shows its handles).
     static func selectionCue(
-        isSelected: Bool, selectionCount: Int, differentiateWithoutColor: Bool, fingerScale: CGFloat
+        isSelected: Bool, selectionCount: Int, differentiateWithoutColor: Bool, fingerScale: CGFloat,
+        handlesActive: Bool = true
     ) -> (lineWidth: CGFloat, dash: [CGFloat])? {
-        guard differentiateWithoutColor, isSelected, selectionCount > 1 else { return nil }
+        guard differentiateWithoutColor, isSelected,
+              !showsHandles(isSelected: isSelected, selectionCount: selectionCount, handlesActive: handlesActive)
+        else { return nil }
         return (2 * fingerScale, [4 * fingerScale, 3 * fingerScale])
     }
 
-    /// Redraw when Differentiate Without Color changes, so the cue follows it.
+    /// Redraw when a display setting the boxes read changes: Differentiate
+    /// Without Color (the cue), Reduce Transparency (the veil) and Increase
+    /// Contrast (the faint edge, the ink line and rings, and the ink strokes
+    /// of the band, the lasso and the guides). One observer each.
     func observeDifferentiateWithoutColor() {
-        let name = UIAccessibility.differentiateWithoutColorDidChangeNotification
-        NotificationCenter.default.removeObserver(self, name: name, object: nil)
-        NotificationCenter.default.addObserver(
-            self, selector: #selector(differentiateWithoutColorDidChange), name: name, object: nil)
+        for name in [UIAccessibility.differentiateWithoutColorDidChangeNotification,
+                     UIAccessibility.reduceTransparencyStatusDidChangeNotification,
+                     UIAccessibility.darkerSystemColorsStatusDidChangeNotification] {
+            NotificationCenter.default.removeObserver(self, name: name, object: nil)
+            NotificationCenter.default.addObserver(
+                self, selector: #selector(displaySettingDidChange), name: name, object: nil)
+        }
     }
 
-    @objc private func differentiateWithoutColorDidChange() { setNeedsDisplay() }
+    @objc private func displaySettingDidChange() { setNeedsDisplay() }
 
-    /// Draw active snap guide lines spanning the full overlay.
+    /// Draw the active snap guides, each the overlay's full width or height.
     func drawSnapGuides(ctx: CGContext) {
         guard !snapEngine.activeGuides.isEmpty else { return }
-
-        ctx.saveGState()
-        ctx.setStrokeColor(ResectaTokens.Snap.guideColor.cgColor)
-        ctx.setLineWidth(ResectaTokens.Snap.guideLineWidth)
-        ctx.setLineDash(phase: 0, lengths: [])
-
-        for guide in snapEngine.activeGuides {
-            if guide.isHorizontal {
-                ctx.move(to: CGPoint(x: 0, y: guide.position))
-                ctx.addLine(to: CGPoint(x: bounds.width, y: guide.position))
-            } else {
-                ctx.move(to: CGPoint(x: guide.position, y: 0))
-                ctx.addLine(to: CGPoint(x: guide.position, y: bounds.height))
-            }
+        let lines = snapEngine.activeGuides.flatMap { guide in
+            guide.isHorizontal
+                ? [CGPoint(x: 0, y: guide.position), CGPoint(x: bounds.width, y: guide.position)]
+                : [CGPoint(x: guide.position, y: 0), CGPoint(x: guide.position, y: bounds.height)]
         }
-        ctx.strokePath()
-        ctx.restoreGState()
+        for step in Self.guideSteps(lines: lines, settings: .current, fingerScale: fingerScale) { draw(step, ctx: ctx) }
     }
 }

@@ -1,0 +1,20 @@
+Property: A finger's box is read for its words where PDFKit put it on the page, not where its share is stored.
+Area: run entry (hand-box terms)
+Test command: xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BoxPlaceCheckTests
+Must go red: ResectaAppTests/BoxPlaceCheckTests termsReadFromTheDrawnPlace
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/PipelineRunSupport+ManualTerms.swift b/Sources/ResectaApp/State/PipelineRunSupport+ManualTerms.swift
+index 95af439e..b6430a56 100644
+--- a/Sources/ResectaApp/State/PipelineRunSupport+ManualTerms.swift
++++ b/Sources/ResectaApp/State/PipelineRunSupport+ManualTerms.swift
+@@ -109,7 +109,8 @@ extension PipelineCoordinator {
+                             .displayedShare(ofPageRect: drawn)
+                     }
+                 }
+-                let rect = (drawnShare ?? region.normalizedRect).clampedToNormalized()
++                _ = drawnShare
++                let rect = region.normalizedRect.clampedToNormalized()
+                 if rect.width * rect.height >= Self.wholePageRegionArea {
+                     withoutText += 1
+                     continue

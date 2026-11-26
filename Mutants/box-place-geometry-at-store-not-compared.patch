@@ -1,0 +1,19 @@
+Property: A page whose crop box or rotation differs from when its boxes were stored, or was never noted, is refused.
+Area: engine (box-place check)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter RunRecordBoxPlaceTests
+Must go red: RedactionEngineTests/RunRecordBoxPlaceTests refusedPages
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord+BoxPlace.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord+BoxPlace.swift
+index d87ca2dd..7c236412 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord+BoxPlace.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord+BoxPlace.swift
+@@ -114,7 +114,7 @@ extension RunRecord.Page {
+     /// the run's frame, within the tolerance of it on every side.
+     public func boxPlacesConfirmed(canvasFailed: Bool) -> Bool {
+         guard !regions.isEmpty else { return true }
+-        guard !canvasFailed, let geometry, geometryAtStore == geometry else { return false }
++        guard !canvasFailed, let geometry else { return false }
+         return regions.allSatisfy { region in
+             guard let drawn = region.drawnPageRect else { return true }
+             return RunRecord.sideGap(geometry.pageRect(ofDisplayedShare: region.normalizedRect), drawn)

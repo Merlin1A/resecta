@@ -42,6 +42,7 @@ struct RectangleDrawGestureTests {
         let overlay = RedactionOverlayView(
             frame: CGRect(origin: .zero, size: Self.overlaySize)
         )
+        overlay.geometry = .testUnturned
         overlay.isDrawingMode = drawing
         overlay.activeShapeTool = .rectangle
         let coordinator = RecordingCoordinator()
@@ -337,7 +338,7 @@ struct RectangleDrawGestureTests {
                 width: r.width / size.width, height: r.height / size.height), source: .manual)
         }
         let page = SnapGuideEngine.Page(
-            regions: regions, bounds: CGRect(origin: .zero, size: size), fingerScale: 1,
+            regions: regions, fingerScale: 1,
             toOverlay: { n in CGRect(x: n.minX * size.width, y: (1 - n.maxY) * size.height,
                                      width: n.width * size.width, height: n.height * size.height) })
         return (page, regions.map(\.id))

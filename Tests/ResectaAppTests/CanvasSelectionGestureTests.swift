@@ -32,6 +32,7 @@ struct CanvasSelectionGestureTests {
         regions: [RedactionRegion], selectedIDs: Set<UUID>
     ) -> (overlay: RedactionOverlayView, coordinator: RecordingCoordinator) {
         let overlay = RedactionOverlayView(frame: CGRect(origin: .zero, size: Self.overlaySize))
+        overlay.geometry = .testUnturned
         overlay.snapZoomScaleOverride = 1
         let coordinator = RecordingCoordinator()
         overlay.coordinator = coordinator
@@ -56,6 +57,7 @@ struct CanvasSelectionGestureTests {
         coordinator.redactionState = state
         let window = UIWindow(frame: CGRect(origin: .zero, size: Self.overlaySize))
         let overlay = RedactionOverlayView(frame: window.bounds)
+        overlay.geometry = .testUnturned
         overlay.snapZoomScaleOverride = 1
         overlay.coordinator = coordinator
         overlay.configure(with: regions, selectedIDs: selectedIDs)

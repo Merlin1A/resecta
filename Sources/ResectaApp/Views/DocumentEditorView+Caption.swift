@@ -135,11 +135,15 @@ extension DocumentEditorView {
             addToSelection: isMultiSelectActive,
             activeTool: activeTool
         )
+        let barUp = occupant == .selection(adding: false)
+        let atTop = SelectionBarClearance.drawnAtTop(
+            barUp: barUp, placeIsTop: selectionBarAtTop,
+            topNoticeShowing: TopBannerSlot.winner(documentState: documentState, widenedOnPage: fitNoticeHolds) != nil)
         return ZStack(alignment: .bottom) {
             Group {
                 if let occupant, Self.bottomSlotDrawsHere(occupant) {
                     BottomSlot(
-                        footPadding: Self.bottomSlotFootPadding + parkedChromeLayout.hintCapsuleLift,
+                        footPadding: atTop ? 0 : Self.bottomSlotFootPadding + parkedChromeLayout.hintCapsuleLift,
                         identifier: Self.bottomSlotIdentifier(occupant),
                         label: slotAccessibilityLabel(occupant),
                         takesTouches: occupant == .selection(adding: true) || occupant == .selection(adding: false)
@@ -148,12 +152,26 @@ extension DocumentEditorView {
                         case .drawingCaption: drawingCaptionWords
                         case .selection(adding: true): addModeWords
                         case .selection(adding: false): SelectionBar(toolbar: editorToolbar)
+                            // The glass's frame at the bottom place: the bar's
+                            // words grown by the slot's padding.
+                            .onGeometryChange(for: CGRect.self) {
+                                $0.frame(in: .named(Self.canvasSpaceName))
+                            } action: { frame in
+                                guard !atTop else { return }
+                                selectionBarFrame = frame.insetBy(
+                                    dx: -Self.bottomSlotHorizontalPadding, dy: -Self.bottomSlotVerticalPadding)
+                            }
                         // Drawn by the message host.
                         case .message: EmptyView()
                         // Drawn beside the slot, at its own size.
                         case .firstTimeLine: EmptyView()
                         }
                     }
+                    // The top place: 8 pt under the canvas's top. The change of
+                    // place fades, as the slot's occupants do.
+                    .padding(.top, atTop ? SelectionBarClearance.gap : 0)
+                    .frame(maxHeight: .infinity, alignment: atTop ? .top : .bottom)
+                    .id(atTop)
                     .transition(.opacity)
                 }
             }
@@ -165,6 +183,14 @@ extension DocumentEditorView {
             }
         }
         .animation(ResectaTokens.Anim.resolved(ResectaTokens.Anim.stateChange, reduceMotion: reduceMotion), value: occupant)
+        .animation(ResectaTokens.Anim.resolved(ResectaTokens.Anim.stateChange, reduceMotion: reduceMotion), value: atTop)
+        // When the bar leaves the slot its place goes back to the bottom.
+        .onChange(of: barUp) { _, up in
+            if !up {
+                selectionBarFrame = nil
+                selectionBarAtTop = false
+            }
+        }
     }
 
     /// The occupants this view draws: the drawing caption and the selection

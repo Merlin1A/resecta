@@ -1,0 +1,23 @@
+Property: The row about hand-drawn boxes comes before the small print.
+Area: results screen
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/ResultsOrderAndSentenceTests
+Must go red: ResectaAppTests/ResultsOrderAndSentenceTests orderUnderTheButtons
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationResultsView.swift b/Sources/ResectaApp/Views/VerificationResultsView.swift
+index 25402fec..5312ed1d 100644
+--- a/Sources/ResectaApp/Views/VerificationResultsView.swift
++++ b/Sources/ResectaApp/Views/VerificationResultsView.swift
+@@ -495,9 +495,10 @@ nonisolated enum ResultsBlock: Equatable, Hashable, CaseIterable {
+     static func order(present: Set<ResultsBlock>, checksPassed: Bool,
+                       findingsFirst: Bool = findingsBeforeTheSmallPrint) -> [ResultsBlock] {
+         let early = checksPassed && findingsFirst
+-        var blocks: [ResultsBlock] = [.handDrawnBoxes]
+-        if early { blocks.append(.findings) }
++        var blocks: [ResultsBlock] = []
+         if checksPassed { blocks.append(.smallPrint) }
++        blocks.append(.handDrawnBoxes)
++        if early { blocks.append(.findings) }
+         if !early { blocks.append(.findings) }
+         blocks += [.warnings, .facts, .checksList]
+         return blocks.filter(present.contains)

@@ -513,6 +513,11 @@ nonisolated struct VerificationRowModel: Equatable {
             + " Use text\u{00A0}search to redact the rest."
     }
 
+    /// The remedy for part of a word left beside its box, one box and
+    /// several: the tail of `fragmentSentence`, and a findings row's step.
+    static let adjustTheBoxRemedy = "Adjust the box and redact again."
+    static let adjustTheBoxesRemedy = "Adjust the boxes and redact again."
+
     /// The needs-review caption of the OCR Check's edge-fragment arm
     /// (`LayerResult.reviewIsFragment`): part of the term is readable
     /// beside a redaction box — the box is short of its text, so the remedy
@@ -523,7 +528,7 @@ nonisolated struct VerificationRowModel: Equatable {
         // One box per term: the count follows the terms, not the pages.
         let oneBox = terms.count == 1
         let boxes = oneBox ? "a redaction box" : "redaction boxes"
-        let remedy = oneBox ? "Adjust the box and redact again." : "Adjust the boxes and redact again."
+        let remedy = oneBox ? adjustTheBoxRemedy : adjustTheBoxesRemedy
         let hasPages = !(pages ?? []).isEmpty
         let location = pagesOnChips && hasPages ? "" : " \(pageLocation(pages) ?? "in the PDF")"
         return "\(one ? "Part" : "Parts") of \(quotedList(terms)) \(one ? "is" : "are") readable beside \(boxes)\(location). \(remedy)"

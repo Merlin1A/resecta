@@ -1,0 +1,19 @@
+Property: The selection bar takes the top of the canvas only when the selection, with its handles' reach, meets its bottom place and not its top place; a selection near both keeps the bar at the bottom.
+Area: the editor's selection bar, its place over the canvas
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/SelectionBarClearanceTests -only-testing:ResectaAppTests/SelectionBarPlaceHostedTests
+Must go red: ResectaAppTests/SelectionBarClearanceTests topPlaceRule; ResectaAppTests/SelectionBarPlaceHostedTests wholePage
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/SelectionBarClearance.swift b/Sources/ResectaApp/Views/SelectionBarClearance.swift
+index 0fdcbc84..a9f36a42 100644
+--- a/Sources/ResectaApp/Views/SelectionBarClearance.swift
++++ b/Sources/ResectaApp/Views/SelectionBarClearance.swift
+@@ -48,7 +48,7 @@ enum SelectionBarClearance {
+         guard let selection else { return false }
+         let bottom = bottomBar.insetBy(dx: -gap, dy: -gap)
+         let top = topPlace(of: bottomBar, canvas: canvas).insetBy(dx: -gap, dy: -gap)
+-        return meets(selection, bottom) && !meets(selection, top)
++        return meets(selection, bottom)
+     }
+ 
+     /// Whether the bar is drawn at the top: only while the bar holds the

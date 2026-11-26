@@ -151,6 +151,7 @@ struct LassoMultiSelectTests {
         // from any "tool is active" state.
 
         let overlay = RedactionOverlayView()
+        overlay.geometry = .testUnturned
         overlay.isDrawingMode = true
 
         // Default: off. New-region draw path remains the only empty-
