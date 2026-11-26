@@ -131,9 +131,9 @@ import RedactionCore
         }
     }
 
-    @Test("A value 1 pt after its label: the default band's paint holds the line margin's, though the band starts at the label's end")
+    @Test("A value half a point after its label: the default band's paint holds the line margin's, though the band starts at the label's end")
     func narrowGapHoldsTheLineMargin() throws {
-        let (sheet, _, value) = Self.labelRow(value: "Smith", gap: 1)
+        let (sheet, _, value) = Self.labelRow(value: "Smith", gap: 0.5)
         let region = T.matched(sheet, value)
         let box = Self.box(sheet, region)
         let lineMargin = Self.box(sheet, region, drawing: .notRead)
@@ -146,7 +146,7 @@ import RedactionCore
     func closerSmallTypeNeighbourHoldsTheLineMargin() throws {
         var sheet = Sheet()
         sheet.line(count: 14, y: 704)
-        sheet.word("x", x: 300, y: 698, width: 3, height: 4)
+        sheet.word("x", x: 300, y: 696.5, width: 3, height: 4)
         sheet.word("Name:", x: 72, y: 686)
         let value = sheet.word("Smith", x: 106, y: 686)
         sheet.line(count: 14, y: 672)
@@ -154,7 +154,7 @@ import RedactionCore
         let box = Self.box(sheet, region)
         let lineMargin = Self.box(sheet, region, drawing: .notRead)
         #expect(box.defaultWidth == .taken && box.bandMade)
-        #expect(T.s(698) + Self.policy.margin.entry(letterSize: T.s(4)) < lineMargin.paint.maxY,
+        #expect(T.s(696.5) + Self.policy.margin.entry(letterSize: T.s(4)) < lineMargin.paint.maxY,
                 "the small line's limit lies below the line margin's top, so the case means something")
         try Self.expectHoldsTheLineMargin(box, lineMargin)
     }
