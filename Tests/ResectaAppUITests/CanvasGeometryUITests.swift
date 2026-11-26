@@ -162,9 +162,12 @@ nonisolated final class CanvasGeometryUITests: XCTestCase {
 
         var tag: CGRect?
         let canvas = app.scrollViews.allElementsBoundByIndex.max { $0.frame.height < $1.frame.height } ?? app.scrollViews.firstMatch
+        // The pinch zooms about the window's middle, which moves the amount
+        // column off the left edge; each step brings it back to the middle.
         for _ in 1...3 where tag == nil {
             canvas.pinch(withScale: 2.0, velocity: 1.0)
             sleep(3)
+            try centreTheBoxes()
             tag = try probe().tintBounds(.tagFill, in: canvasArea().insetBy(dx: 4, dy: 4))
         }
         let zoomed = try probe()
@@ -606,6 +609,22 @@ private extension CanvasGeometryUITests {
 
     /// Pinch PDFKit's scroll view (the tallest) 2x, proven by the canvas
     /// background just above the fit page turning page-white.
+    /// Pans the canvas so the boxes, read by their teal lines in the
+    /// window's middle half, sit at its middle across. The drag starts beside
+    /// them, on no box, so it pans and neither moves nor selects one; it ends
+    /// slowly so the canvas does not glide on.
+    nonisolated func centreTheBoxes() throws {
+        let band = CGRect(x: 0, y: window.frame.height * 0.25, width: window.frame.width, height: window.frame.height * 0.5)
+            .intersection(canvasArea())
+        guard let boxes = try probe().tintBounds(.teal, in: band) else { return }
+        let shift = window.frame.midX - boxes.midX
+        guard abs(shift) > 20 else { return }
+        let start = CGPoint(x: shift > 0 ? boxes.maxX + 10 : boxes.minX - 10, y: band.midY)
+        point(start).press(forDuration: 0.05, thenDragTo: point(CGPoint(x: start.x + shift, y: start.y)),
+                           withVelocity: .slow, thenHoldForDuration: 0.2)
+        sleep(2)
+    }
+
     nonisolated func pinchToZoom(above page: CGRect) throws -> Bool {
         let probePoint = CGPoint(x: page.midX, y: page.minY - 8)
         let canvas = app.scrollViews.allElementsBoundByIndex.max { $0.frame.height < $1.frame.height } ?? app.scrollViews.firstMatch
