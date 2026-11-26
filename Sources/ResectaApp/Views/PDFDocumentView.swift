@@ -26,6 +26,12 @@ struct PDFDocumentView: UIViewRepresentable {
     /// continues to work whether the toggle is on or off.
     var isMultiSelectActive: Bool
 
+    /// The selection bar's frame at the bottom of the canvas, in this
+    /// view's points; nil while the bar does not hold the slot.
+    var selectionBarFrame: CGRect? = nil
+    /// Hears the bar's place (true: the top), decided after the update.
+    var onSelectionBarPlace: (@MainActor (Bool) -> Void)? = nil
+
     // `shouldRectScroll` and `readabilityTargetScale` — the framing math
     // — live in `CanvasFraming.swift` beside the centring point.
 
@@ -118,9 +124,11 @@ struct PDFDocumentView: UIViewRepresentable {
         // path uses, so the scroll target and the drawn redaction
         // agree by construction. The page's bounds are the stored page,
         // so the shown-frame rect is turned back first (`CanvasTurn`).
+        var framedThisPass = false
         if let target = documentState.pendingCanvasScrollTarget,
            coordinator.lastHandledCanvasScrollToken != target.token {
             coordinator.lastHandledCanvasScrollToken = target.token
+            framedThisPass = true
             // `.readability` normalizes the scale to the readability
             // target FIRST (in or out, never below the zoom floor),
             // then positions the rect per the request's anchor —
@@ -173,6 +181,10 @@ struct PDFDocumentView: UIViewRepresentable {
         if documentState.canvasPageFramesWanted {
             coordinator.requestPageFramePublish()
         }
+        // The selection bar's place, from the boxes as now drawn.
+        coordinator.selectionBarFrame = isEditing ? selectionBarFrame : nil
+        coordinator.onSelectionBarPlace = onSelectionBarPlace
+        coordinator.keepSelectionClearOfBar(in: pdfView, framedThisPass: framedThisPass)
     }
 }
 
