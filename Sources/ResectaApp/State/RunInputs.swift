@@ -20,11 +20,15 @@ enum RunInputs {
     /// box-place check. A page without it has neither. The switch is the
     /// run's snapshot of the Settings switch; under "as placed" the plan
     /// does not read it. `geometryAtStore` holds the geometry noted when
-    /// each page's boxes were stored (`RedactionState`).
+    /// each page's boxes were stored (`RedactionState`). `shownDPIs` holds,
+    /// for each page the editor drew in this document, the quality it was
+    /// last drawn at; the run joins each box's paint with what that quality
+    /// showed.
     static func confirmedRecord(
         pageCount: Int,
         geometry: [Int: PageGeometry],
         geometryAtStore: [Int: PageGeometry] = [:],
+        shownDPIs: [Int: Int],
         regions: [Int: [RedactionRegion]],
         reads: [Int: RunRecord.PageRead],
         settings snapshot: PipelineCoordinator.RunSettings
@@ -39,7 +43,8 @@ enum RunInputs {
                 guard let sides = geometry[page] else { return RunRecord.Page(pageIndex: page, regions: drawn) }
                 return RunRecord.Page(pageIndex: page, regions: drawn,
                                       geometry: sides, geometryAtStore: geometryAtStore[page],
-                                      switchOn: snapshot.boxesAcrossColumn, read: reads[page])
+                                      switchOn: snapshot.boxesAcrossColumn, read: reads[page],
+                                      shownDPI: shownDPIs[page])
             })
     }
 

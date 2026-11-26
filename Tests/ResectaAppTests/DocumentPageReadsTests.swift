@@ -75,7 +75,7 @@ struct DocumentPageReadsTests {
             try String(contentsOf: root.appendingPathComponent(path), encoding: .utf8)
         }
         let inputs = try file("Sources/ResectaApp/State/RunInputs.swift")
-        #expect(inputs.contains("switchOn: snapshot.boxesAcrossColumn, read: reads[page])"))
+        #expect(inputs.contains("switchOn: snapshot.boxesAcrossColumn, read: reads[page],"))
         #expect(inputs.components(separatedBy: "reads[").count == 2, "one read handed, by the page's own index")
         let runner = try file("Sources/ResectaApp/State/PipelineRunner.swift")
         let start = try #require(runner.range(of: "static func captureRunEntry("))

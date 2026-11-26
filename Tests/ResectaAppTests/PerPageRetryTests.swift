@@ -3,6 +3,7 @@ import Foundation
 import PDFKit
 import UIKit
 import CoreGraphics
+import RedactionCore
 @testable import ResectaApp
 @testable import RedactionEngine
 
@@ -129,6 +130,66 @@ struct PerPageRetryTests {
         #expect(history.count == 2, "Both attempts must run before propagation")
         #expect(history.first?.dpiCap == capturedDPICap)
         #expect(history.last?.dpiCap == 150)
+    }
+
+    // MARK: - retryKeepsTheJoin
+
+    @Test("A page shown at 200 whose first render fails its fill check: the retry at 150 holds the join",
+          .timeLimit(.minutes(1)))
+    func retryKeepsTheJoin() async throws {
+        let coord = makeCoordinatorWithMultiPagePDF(pages: 1, regions: false)
+        let doc = try #require(coord.documentState.sourceDocument)
+        let pdfPage = try #require(doc.page(at: 0))
+        let cropBox = pdfPage.bounds(for: .cropBox).size
+        // The first of a few boxes whose own fill at 150 falls short of what
+        // 200 showed, so the retry's paint differs with the join and without.
+        var chosen: (region: RedactionRegion, plan: PaintPlan)?
+        for i in 0..<40 {
+            let region = RedactionRegion(
+                id: UUID(), normalizedRect: CGRect(x: 0.1 + 0.0137 * Double(i), y: 0.2 + 0.0113 * Double(i),
+                                                   width: 0.2311, height: 0.0219),
+                source: .manual)
+            let page = RunRecord.Page(pageIndex: 0, regions: [RunRecord.DrawnRegion(region: region)],
+                                      cropBox: cropBox, rotation: 0, switchOn: false, shownDPI: 200)
+            guard let plan = page.plan, let box = plan.boxes.first,
+                  let raster = PixelPlan.Raster(widthSixtyFourths: plan.widthSixtyFourths,
+                                                heightSixtyFourths: plan.heightSixtyFourths, dpi: 150) else { continue }
+            let content = CGSize(width: PageRasterizer.contentSpan(plan.widthSixtyFourths, dpi: 150),
+                                 height: PageRasterizer.contentSpan(plan.heightSixtyFourths, dpi: 150))
+            let own = PageRasterizer.boxFill(box: box, regions: [region.id: region], raster: raster, content: content)
+            let joined = PageRasterizer.boxFill(box: box, regions: [region.id: region], raster: raster,
+                                                content: content, shownDPI: 200)
+            if own != joined { chosen = (region, plan); break }
+        }
+        let (region, plan) = try #require(chosen, "a box the join changes at 150 against 200")
+        coord.redactionState.regions[0] = [region]
+        let record = RunInputs.confirmedRecord(
+            pageCount: 1, geometry: RunInputs.pageGeometry(of: doc), shownDPIs: [0: 200],
+            regions: coord.redactionState.regions, reads: [:], settings: .snapshot(from: coord.settingsState))
+        let pageData = try #require(
+            coord.buildPDFPageData(effectiveMode: .secureRasterization, record: record).first)
+        #expect(pageData.confirmedPage?.shownDPI == 200)
+
+        let recorder = PageRasterizerTestSeam.Recorder(simulatedVerifyFailures: [pageData.pageIndex])
+        var result: RasterizeResult?
+        try await PageRasterizerTestSeam.withActivated(recorder) {
+            result = try await coord.rasterizeWithRetry(pageData, rasterizer: PageRasterizer(), primaryDPICap: 300)
+        }
+        #expect(recorder.dpiCapHistory.last?.dpiCap == 150, "the retry ran at 150")
+        let painted = try #require(result?.paintedBoxes[0], "the retry reports its box")
+        let raster = try #require(PixelPlan.Raster(widthSixtyFourths: plan.widthSixtyFourths,
+                                                   heightSixtyFourths: plan.heightSixtyFourths, dpi: 150))
+        let content = CGSize(width: PageRasterizer.contentSpan(plan.widthSixtyFourths, dpi: 150),
+                             height: PageRasterizer.contentSpan(plan.heightSixtyFourths, dpi: 150))
+        let box = try #require(pageData.confirmedPage?.plan?.boxes.first)
+        var byID: [UUID: RedactionRegion] = [:]
+        for clamped in pageData.regions { byID[clamped.id] = clamped }
+        let joined = try #require(PageRasterizer.boxFill(box: box, regions: byID, raster: raster, content: content,
+                                                         shownDPI: 200))
+        #expect(painted == RunRecord.PaintedPixels(firstColumn: joined.minX, firstRowFromBottom: joined.minY,
+                                                   columns: joined.maxX - joined.minX,
+                                                   rows: joined.maxY - joined.minY),
+                "the retry's paint is the join: \(painted), joined \(joined)")
     }
 
     // MARK: - Helpers

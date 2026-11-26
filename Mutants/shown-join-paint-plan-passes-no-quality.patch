@@ -1,0 +1,19 @@
+Property: The run's painter hands the floor function the quality the page was shown at.
+Area: the run never paints less than was shown
+Test command: cd Packages/RedactionEngine && swift test --skip-build --no-parallel --filter 'ShownJoinTests' (after swift build --build-tests)
+Must go red: RedactionEngineTests/ShownJoinTests paintedPageHoldsWhatWasShown
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
+index 3db368c61..e34e6db86 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
+@@ -357,7 +357,7 @@ extension PageRasterizer {
+         func asPlacedRect(_ box: PaintedBox, grows: Bool) throws -> CGRect? {
+             guard let (fill, projection) = Self.boxFillAndProjection(
+                 box: box, regions: regionsByID, raster: raster, content: content,
+-                shownDPI: shownDPI) else { return nil }
++                shownDPI: nil) else { return nil }
+             var rect = fill.bitmapRect
+             if grows,
+                let grown = try inkGrowthRect(context: ctx, fillRect: projection.marginEdge.bitmapRect) {
