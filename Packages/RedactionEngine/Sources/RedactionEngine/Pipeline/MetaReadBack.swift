@@ -52,6 +52,9 @@ package enum MetaReadBack {
     /// system reader. `complete` is false unless all five strings were read.
     package static func originals(of url: URL) -> Originals {
         guard let doc = CGPDFDocument(url as CFURL), let info = doc.info else { return .none }
+        // `info` and the strings read through it point into `doc`, which
+        // nothing below names: it is held until the reading is done.
+        defer { withExtendedLifetime(doc) {} }
         var needles: [Data] = []
         var read = 0
         for key in fixedKeys {
@@ -86,6 +89,9 @@ package enum MetaReadBack {
               let data = try? Data(contentsOf: url, options: .alwaysMapped),
               let provider = CGDataProvider(data: data as CFData),
               let doc = CGPDFDocument(provider) else { return .unreadable }
+        // `info`, `pair` and their strings point into `doc`: it is held until
+        // the four rules are read.
+        defer { withExtendedLifetime(doc) {} }
 
         // M1.
         guard let info = doc.info else { return .valuesNotFixed }
