@@ -1,0 +1,18 @@
+Property: A pixel line a hair from a whole number is taken as that number before the floor or ceiling.
+Area: canvas overlay (the screen link)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/ScreenLinkTests
+Must go red: ResectaAppTests/ScreenLinkTests table()
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/ScreenLink.swift b/Sources/ResectaApp/Overlay/ScreenLink.swift
+--- a/Sources/ResectaApp/Overlay/ScreenLink.swift
++++ b/Sources/ResectaApp/Overlay/ScreenLink.swift
+@@ -96,6 +96,7 @@
+     /// floor or a ceiling does not move a true pixel line by a whole pixel.
+     private static func onLine(_ v: CGFloat) -> CGFloat {
+         let r = v.rounded()
+-        return abs(v - r) <= 1e-9 * max(1, abs(v)) ? r : v
++        _ = r
++        return v
+     }
+ }

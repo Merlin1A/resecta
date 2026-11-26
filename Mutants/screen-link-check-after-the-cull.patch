@@ -1,0 +1,19 @@
+Property: Every region of the page is checked in each pass, before the pass keeps only the boxes it reaches.
+Area: canvas overlay (the screen link)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/ScreenLinkTests
+Must go red: ResectaAppTests/ScreenLinkTests identityDoor()
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift
+--- a/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift
++++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift
+@@ -56,7 +56,8 @@
+         }
+         let page = pageRectOnCanvas
+         let made = Self.inkBoxes(
+-            regions: regions, plan: plan, pageIndex: pageIndex, geometry: geometry,
++            regions: regions.filter { pdfNormalizedToOverlay($0.normalizedRect).insetBy(dx: -40, dy: -40).intersects(rect) },
++            plan: plan, pageIndex: pageIndex, geometry: geometry,
+             placed: isPlacedOnItsPage, page: page, clip: page.intersection(bounds),
+             selectedIDs: selectedIDs, tags: tags, map: pdfNormalizedToOverlay)
+         noteFillCheck(made.check)

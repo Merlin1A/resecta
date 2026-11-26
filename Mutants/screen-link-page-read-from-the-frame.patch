@@ -1,0 +1,18 @@
+Property: The page on the canvas is compared with the crop's size by PDFKit's own page rectangle, never by the canvas's frame.
+Area: canvas overlay (the screen link)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/ScreenLinkTests
+Must go red: ResectaAppTests/ScreenLinkTests identityOnTurnedPages()
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift
+--- a/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift
++++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift
+@@ -57,7 +57,7 @@
+         let page = pageRectOnCanvas
+         let made = Self.inkBoxes(
+             regions: regions, plan: plan, pageIndex: pageIndex, geometry: geometry,
+-            placed: isPlacedOnItsPage, page: page, clip: page.intersection(bounds),
++            placed: isPlacedOnItsPage, page: CGRect(origin: .zero, size: frame.size), clip: page.intersection(bounds),
+             selectedIDs: selectedIDs, tags: tags, map: pdfNormalizedToOverlay)
+         noteFillCheck(made.check)
+         // Perf: skip boxes entirely outside the dirty rect. The margin covers
