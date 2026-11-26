@@ -273,34 +273,42 @@ struct ShownJoinTests {
         #expect(joinedSomewhere, "on B5 shown at 300 and run at 150 a box's own fill falls short")
     }
 
-    @Test("A region no box holds, shown at 300 and run at 200: its fill joins its own fill shown there, read back")
+    @Test("A region no box holds, shown at one quality and run at another: its fill joins its own fill shown there, read back")
     func strayHoldsWhatWasShown() async throws {
         let page = try Self.blankPage(width: "612", height: "792")
         let w = try #require(PixelPlan.sixtyFourths(ofSide: 612)), h = try #require(PixelPlan.sixtyFourths(ofSide: 792))
-        let run = try Self.raster(w, h, 200), shown = try Self.raster(w, h, 300)
-        // The first candidate whose own fill at 200 falls short of what 300 showed.
+        // A lone region's own fill carries a pixel of margin, so a pair whose
+        // pixels are close rarely leaves it short: the first pair and
+        // candidate whose own fill at the run's quality falls short of what
+        // the shown one showed.
         let candidates = (0..<40).map { i in
             CGRect(x: 0.1 + 0.0137 * Double(i), y: 0.2 + 0.0113 * Double(i), width: 0.2311, height: 0.0219)
         }
-        let share = try #require(candidates.first { share in
-            let own = normalizedToFillPixels(share, content: Self.content(run))
-            let seen = normalizedToFillPixels(share, content: Self.content(shown))
-            let carried = PixelPlan.carried(PixelPlan.PixelRect(bitmapRect: seen), shownDPI: 300, onto: run)
-            return PixelPlan.PixelRect(bitmapRect: own).joined(with: carried) != PixelPlan.PixelRect(bitmapRect: own)
-        })
+        var found: (share: CGRect, shown: Int, run: PixelPlan.Raster)?
+        search: for (s, d) in [(300, 200), (200, 150), (150, 300)] {
+            let run = try Self.raster(w, h, d), shown = try Self.raster(w, h, s)
+            for share in candidates {
+                let own = PixelPlan.PixelRect(bitmapRect: normalizedToFillPixels(share, content: Self.content(run)))
+                let seen = normalizedToFillPixels(share, content: Self.content(shown))
+                let carried = PixelPlan.carried(PixelPlan.PixelRect(bitmapRect: seen), shownDPI: s, onto: run)
+                if own.joined(with: carried) != own { found = (share, s, run); break search }
+            }
+        }
+        let (share, shownDPI, run) = try #require(found, "some region falls short without the join")
         let region = RedactionRegion(id: UUID(), normalizedRect: share, source: .manual)
         // A record whose plan holds no box: the region is filled on its own.
         let empty = PaintPlan(widthSixtyFourths: w, heightSixtyFourths: h, boxes: [])
         let record = RunRecord.Page(pageIndex: 0, regions: [RunRecord.DrawnRegion(region: region)], plan: empty,
-                                    shownDPI: 300)
-        let data = Self.pageData(page, regions: [region], chosen: 200, confirmed: record)
+                                    shownDPI: shownDPI)
+        let data = Self.pageData(page, regions: [region], chosen: run.dpi, confirmed: record)
         let result = try await PageRasterizer().rasterize(data)
         #expect(result.regionsPaintedOutsideThePlan == [region.id])
         let own = PixelPlan.PixelRect(bitmapRect: normalizedToFillPixels(share, content: Self.content(run)))
-        let carried = try #require(PageRasterizer.shownRegionFill(region, raster: run, shownDPI: 300))
+        let carried = try #require(PageRasterizer.shownRegionFill(region, raster: run, shownDPI: shownDPI))
         let expected = own.joined(with: PixelPlan.PixelRect(bitmapRect: carried))
         #expect(expected != own)
-        #expect(Self.blackAround(expected.bitmapRect, in: result.pageOutput.image) == expected)
+        #expect(Self.blackAround(expected.bitmapRect, in: result.pageOutput.image) == expected,
+                "shown at \(shownDPI), run at \(run.dpi)")
     }
 
     @Test("Every page run at the quality it was shown at is byte for byte the page with no shown quality",
