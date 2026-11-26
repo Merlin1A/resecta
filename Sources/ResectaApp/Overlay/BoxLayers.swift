@@ -1,5 +1,7 @@
 import CoreGraphics
 import Foundation
+import RedactionEngine
+import UIKit
 
 /// What a box layer is: a filled rectangle, a stroked one, a disc, a ring, a
 /// shadow, a path (a hatch, or a dashed outline) or a mark drawn into the
@@ -223,5 +225,370 @@ nonisolated enum BoxLayers {
     /// A tone at full opacity.
     private static func opaque(_ tone: ResectaTokens.Canvas.Tone) -> ResectaTokens.Canvas.Tone {
         ResectaTokens.Canvas.Tone(red: tone.red, green: tone.green, blue: tone.blue, alpha: 1)
+    }
+}
+
+// MARK: - The layers
+
+/// Which box layers a pass applies: every one; those of the boxes whose
+/// region ids these are (as their `uuidString`), with every box that shares
+/// a fill with one of them; or the handles and dots.
+enum BoxLayerScope: Equatable {
+    case all
+    case keys(Set<String>)
+    case handles
+}
+
+/// One pass's description of a page's box layers, from the overlay.
+struct BoxLayerPass {
+    var specs: [LayerSpec]
+    var groups: [BoxLayerGroup: GroupStyle]
+    /// The kept plan's boxes the steps were made from.
+    var planBoxes: [DrawnPlan.Box]
+}
+
+/// Where a host's passes come from: the overlay, given the map from its
+/// points to the screen's device pixels.
+@MainActor
+protocol BoxLayerSource: AnyObject {
+    func boxLayerPass(toDevice: CGAffineTransform) -> BoxLayerPass
+}
+
+/// The committed boxes' layers of one overlay: one container, clipped to the
+/// overlay's bounds, holding a plain layer for each group in the boxes'
+/// order, each holding a layer for each key. It is the only code that
+/// touches them. A pass is asked for with `mark(_:)` and runs in the
+/// container's `layoutSublayers(of:)`, once a transaction, never through the
+/// view's `layoutSubviews`.
+///
+/// The look's colours are the same in light and dark, so no layer follows the
+/// appearance. A box mark given a dynamic colour would need the layers
+/// applied on a trait change too.
+@MainActor
+final class BoxLayerHost: NSObject, CALayerDelegate {
+    /// The container, beneath the top canvas in the overlay's layer.
+    let root = CALayer()
+    weak var source: BoxLayerSource?
+    /// The view the boxes lie in, whose window gives the device's pixels.
+    weak var view: UIView?
+    private(set) var groupLayers: [BoxLayerGroup: CALayer] = [:]
+    private(set) var layers: [String: CALayer] = [:]
+    private var applied: [String: LayerSpec] = [:]
+    private var lastPlanBoxes: [DrawnPlan.Box]?
+    private var pendingAll = false
+    private var pendingRegions: Set<String> = []
+    private var pendingHandles = false
+    /// The passes run, and the keys the last one applied, for the tests.
+    private(set) var boxPassCount = 0
+    private(set) var lastAppliedKeys: [String] = []
+
+    /// The properties the host sets, each with its implicit action off.
+    static let quietActions: [String: CAAction] = Dictionary(uniqueKeysWithValues: [
+        "bounds", "position", "frame", "contents", "contentsScale", "backgroundColor", "borderColor",
+        "borderWidth", "cornerRadius", "opacity", "hidden", "sublayers", "onOrderIn", "onOrderOut",
+        "shadowColor", "shadowOpacity", "shadowRadius", "shadowOffset", "shadowPath",
+        "path", "strokeColor", "fillColor", "lineWidth", "lineDashPattern", "lineDashPhase",
+    ].map { ($0, NSNull() as CAAction) })
+
+    override init() {
+        super.init()
+        root.masksToBounds = true
+        root.actions = Self.quietActions
+        root.delegate = self
+        for group in BoxLayerGroup.allCases {
+            let layer = CALayer()
+            layer.actions = Self.quietActions
+            root.addSublayer(layer)
+            groupLayers[group] = layer
+        }
+    }
+
+    /// Whether a pass is asked for and not yet run.
+    var isPassPending: Bool { pendingAll || !pendingRegions.isEmpty || pendingHandles }
+
+    /// Asks for a pass over `scope`; scopes asked for in one turn merge by
+    /// the union of their keys, and `.all` takes in every other.
+    func mark(_ scope: BoxLayerScope) {
+        switch scope {
+        case .all: pendingAll = true
+        case .keys(let keys): pendingRegions.formUnion(keys)
+        case .handles: pendingHandles = true
+        }
+        root.setNeedsLayout()
+    }
+
+    nonisolated func action(for layer: CALayer, forKey event: String) -> CAAction? { NSNull() }
+
+    nonisolated func layoutSublayers(of layer: CALayer) {
+        let laidOut = ObjectIdentifier(layer)
+        MainActor.assumeIsolated {
+            guard laidOut == ObjectIdentifier(root) else { return }
+            applyPendingPass()
+        }
+    }
+
+    /// The key's region id: the first part after the mark's name.
+    static func regionID(of key: String) -> Substring {
+        let parts = key.split(separator: ":", maxSplits: 2, omittingEmptySubsequences: false)
+        return parts.count > 1 ? parts[1] : Substring(key)
+    }
+
+    /// A handle's or a dot's key.
+    static func isHandleKey(_ key: String) -> Bool {
+        let mark = key.prefix { $0 != ":" }
+        return ["handle", "handleRing", "handleShadow", "handleInkRing", "dot", "dotRing", "dotInkRing"]
+            .contains(String(mark))
+    }
+
+    /// Runs the pass asked for, if one is.
+    func applyPendingPass() {
+        guard isPassPending, let source else { return }
+        let all = pendingAll, handles = pendingHandles
+        var regions = pendingRegions
+        pendingAll = false; pendingRegions = []; pendingHandles = false
+        let (toDevice, unsnapped) = deviceMap()
+        let pass = source.boxLayerPass(toDevice: toDevice)
+        // Per touch, every box whose plan box changed since the last pass
+        // comes too, so a neighbour follows when a join forms or breaks.
+        if !all, let last = lastPlanBoxes {
+            let now = pass.planBoxes
+            for box in now where !last.contains(box) { regions.formUnion(box.regionIDs.map(\.uuidString)) }
+            for box in last where !now.contains(box) { regions.formUnion(box.regionIDs.map(\.uuidString)) }
+        }
+        // A box's keys are those of every region in its plan box.
+        for box in pass.planBoxes {
+            let ids = Set(box.regionIDs.map(\.uuidString))
+            if !ids.isDisjoint(with: regions) { regions.formUnion(ids) }
+        }
+        lastPlanBoxes = pass.planBoxes
+        func inScope(_ key: String) -> Bool {
+            all || (handles && Self.isHandleKey(key)) || regions.contains(String(Self.regionID(of: key)))
+        }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        for group in BoxLayerGroup.allCases {
+            guard let layer = groupLayers[group] else { continue }
+            layer.frame = root.bounds
+            let style = pass.groups[group] ?? GroupStyle(opacity: 1, groupOpacity: false)
+            layer.opacity = Float(style.opacity)
+            layer.allowsGroupOpacity = style.groupOpacity
+        }
+        var appliedKeys: [String] = []
+        var given = Set<String>()
+        for spec in pass.specs where inScope(spec.key) {
+            apply(spec)
+            appliedKeys.append(spec.key)
+            given.insert(spec.key)
+        }
+        for key in Array(layers.keys) where inScope(key) && !given.contains(key) {
+            layers[key]?.removeFromSuperlayer()
+            layers[key] = nil
+            applied[key] = nil
+        }
+        // Within a group, the layers lie in the steps' order.
+        var order: [BoxLayerGroup: [CALayer]] = [:]
+        for spec in pass.specs { if let layer = layers[spec.key] { order[spec.group, default: []].append(layer) } }
+        for (group, wanted) in order {
+            guard let parent = groupLayers[group] else { continue }
+            let now = parent.sublayers ?? []
+            if now.count != wanted.count || !zip(now, wanted).allSatisfy({ $0 === $1 }) { parent.sublayers = wanted }
+        }
+        CATransaction.commit()
+        lastAppliedKeys = appliedKeys
+        boxPassCount += 1
+        // With no window the frames are unsnapped: the pass is still needed,
+        // and the window's arrival asks for it.
+        if unsnapped { pendingAll = true }
+    }
+
+    /// The map from the view's points to the screen's device pixels: where
+    /// the view puts its origin and two unit points in its window, times the
+    /// screen's scale. With no window, the identity, and the frames are not
+    /// on the pixel lines.
+    func deviceMap() -> (toDevice: CGAffineTransform, unsnapped: Bool) {
+        guard let view, let window = view.window else { return (.identity, true) }
+        let o = view.convert(CGPoint.zero, to: nil)
+        let x = view.convert(CGPoint(x: 1, y: 0), to: nil)
+        let y = view.convert(CGPoint(x: 0, y: 1), to: nil)
+        let k = window.screen.scale
+        let toDevice = CGAffineTransform(a: (x.x - o.x) * k, b: (x.y - o.y) * k,
+                                         c: (y.x - o.x) * k, d: (y.y - o.y) * k,
+                                         tx: o.x * k, ty: o.y * k)
+        // The boxes are snapped to whole pixels only on a screen that is
+        // square to the view, or a quarter turn of it.
+        assert(ScreenLink.isAxisAligned(toDevice) || ScreenLink.isQuarterTurn(toDevice),
+               "the boxes' view is turned or sheared on the screen")
+        return (toDevice, false)
+    }
+
+    /// Makes, updates or moves the layer of one key.
+    private func apply(_ spec: LayerSpec) {
+        guard let parent = groupLayers[spec.group] else { return }
+        let layer: CALayer
+        if let existing = layers[spec.key], Self.fits(existing, spec.kind) {
+            layer = existing
+        } else {
+            layers[spec.key]?.removeFromSuperlayer()
+            layer = Self.make(spec.kind)
+            layer.actions = Self.quietActions
+            layers[spec.key] = layer
+            applied[spec.key] = nil
+        }
+        if layer.superlayer !== parent { parent.addSublayer(layer) }
+        guard applied[spec.key] != spec else { return }
+        applied[spec.key] = spec
+        Self.configure(layer, spec, scale: root.contentsScale)
+    }
+
+    private static func fits(_ layer: CALayer, _ kind: StepKind) -> Bool {
+        switch kind {
+        case .path: layer is CAShapeLayer
+        case .drawn: layer is DrawnMarkLayer
+        default: !(layer is CAShapeLayer) && !(layer is DrawnMarkLayer)
+        }
+    }
+
+    private static func make(_ kind: StepKind) -> CALayer {
+        switch kind {
+        case .path: CAShapeLayer()
+        case .drawn: DrawnMarkLayer()
+        default: CALayer()
+        }
+    }
+
+    private static func cg(_ tone: ResectaTokens.Canvas.Tone?) -> CGColor? {
+        tone.map { UIColor(red: $0.red, green: $0.green, blue: $0.blue, alpha: $0.alpha).cgColor }
+    }
+
+    /// Sets every property a kind uses, and clears the rest.
+    private static func configure(_ layer: CALayer, _ spec: LayerSpec, scale: CGFloat) {
+        layer.frame = spec.frame
+        layer.cornerRadius = spec.cornerRadius
+        // A fill outside the veils' group carries its own opacity, and its
+        // shadow fades with it, as a shadow cast by a faint fill does.
+        layer.opacity = Float(spec.opacity ?? 1)
+        switch spec.kind {
+        case .fill, .disc:
+            layer.backgroundColor = cg(spec.fill)
+            layer.borderWidth = 0
+        case .stroke, .ring:
+            layer.backgroundColor = nil
+            layer.borderWidth = spec.borderWidth
+            layer.borderColor = cg(spec.borderColor)
+        case .shadow, .path, .drawn:
+            layer.backgroundColor = nil
+            layer.borderWidth = 0
+        }
+        if let shadow = spec.shadow {
+            let tone = shadow.color
+            layer.shadowColor = UIColor(red: tone.red, green: tone.green, blue: tone.blue, alpha: 1).cgColor
+            layer.shadowOpacity = Float(tone.alpha)
+            // Core Graphics' blur is about twice Core Animation's radius.
+            layer.shadowRadius = shadow.blur / 2
+            layer.shadowOffset = shadow.offset
+            let bounds = CGRect(origin: .zero, size: spec.frame.size)
+            layer.shadowPath = spec.shadowPath == .ellipse ? CGPath(ellipseIn: bounds, transform: nil)
+                : CGPath(rect: bounds, transform: nil)
+        } else {
+            layer.shadowOpacity = 0
+            layer.shadowPath = nil
+        }
+        if let shape = layer as? CAShapeLayer {
+            shape.fillColor = nil
+            shape.strokeColor = cg(spec.borderColor)
+            shape.lineWidth = spec.borderWidth
+            shape.lineDashPattern = spec.dash?.map { NSNumber(value: Double($0)) }
+            shape.lineDashPhase = spec.dashPhase ?? 0
+            shape.path = path(spec.path, frame: spec.frame)
+        }
+        if let drawn = layer as? DrawnMarkLayer {
+            drawn.contentsScale = spec.contentScale ?? scale
+            drawn.mark = spec.draw
+            drawn.setNeedsDisplay()
+        }
+    }
+
+    /// A path layer's lines, in the layer's own space.
+    static func path(_ descriptor: PathDescriptor?, frame: CGRect) -> CGPath? {
+        guard let descriptor else { return nil }
+        let toLayer = CGAffineTransform(translationX: -frame.minX, y: -frame.minY)
+        switch descriptor {
+        case .rect(let r):
+            return CGPath(rect: r, transform: [toLayer])
+        case .hatch(let h):
+            let path = CGMutablePath()
+            for (a, b) in hatchSegments(h, in: frame) { path.move(to: a.applying(toLayer)); path.addLine(to: b.applying(toLayer)) }
+            return path
+        }
+    }
+
+    /// The hatch's lines cut to `rect`, in overlay points: lines at `angle`
+    /// degrees, rising to the right, `spacing` apart measured square to them,
+    /// the line n · p = phase + k × spacing for each whole k, n the lines'
+    /// normal, so the first lies `phase` from the overlay's origin.
+    static func hatchSegments(_ h: InkStep.Hatch, in rect: CGRect) -> [(CGPoint, CGPoint)] {
+        guard h.spacing > 0, !rect.isEmpty, !rect.isNull else { return [] }
+        let t = h.angle * .pi / 180
+        let n = CGPoint(x: sin(t), y: cos(t)), d = CGPoint(x: cos(t), y: -sin(t))
+        let corners = [CGPoint(x: rect.minX, y: rect.minY), CGPoint(x: rect.maxX, y: rect.minY),
+                       CGPoint(x: rect.minX, y: rect.maxY), CGPoint(x: rect.maxX, y: rect.maxY)]
+        let along = corners.map { $0.x * n.x + $0.y * n.y }
+        guard let lo = along.min(), let hi = along.max() else { return [] }
+        var k = ((lo - h.phase) / h.spacing).rounded(.up)
+        var out: [(CGPoint, CGPoint)] = []
+        while h.phase + k * h.spacing <= hi {
+            let c = h.phase + k * h.spacing
+            let p0 = CGPoint(x: n.x * c, y: n.y * c)
+            // Cut the line p0 + s d to the rectangle.
+            var s0 = -CGFloat.infinity, s1 = CGFloat.infinity
+            for (pos, dir, minV, maxV) in [(p0.x, d.x, rect.minX, rect.maxX), (p0.y, d.y, rect.minY, rect.maxY)] {
+                if abs(dir) < 1e-12 {
+                    if pos < minV || pos > maxV { s0 = 1; s1 = 0 }
+                } else {
+                    let a = (minV - pos) / dir, b = (maxV - pos) / dir
+                    s0 = max(s0, min(a, b)); s1 = min(s1, max(a, b))
+                }
+            }
+            if s0 < s1 {
+                out.append((CGPoint(x: p0.x + s0 * d.x, y: p0.y + s0 * d.y), CGPoint(x: p0.x + s1 * d.x, y: p0.y + s1 * d.y)))
+            }
+            k += 1
+        }
+        return out
+    }
+}
+
+/// A tag's layer: its fill, its keyline and its words, drawn into its own
+/// bitmap at its `contentsScale`, in the words' transform about the tag's
+/// centre.
+nonisolated final class DrawnMarkLayer: CALayer {
+    var mark: DrawnMark?
+
+    override func draw(in ctx: CGContext) {
+        guard let mark else { return }
+        let toLayer = CGAffineTransform(translationX: -frame.minX, y: -frame.minY)
+        let tag = mark.tag.applying(toLayer)
+        let k = mark.keyline
+        let keyline = tag.insetBy(dx: -k.outset, dy: -k.outset)
+        ctx.setStrokeColor(UIColor(red: k.color.red, green: k.color.green, blue: k.color.blue, alpha: k.color.alpha).cgColor)
+        ctx.setLineWidth(k.width)
+        ctx.addPath(UIBezierPath(roundedRect: keyline, cornerRadius: k.corner).cgPath)
+        ctx.strokePath()
+        let f = mark.fill
+        ctx.setFillColor(UIColor(red: f.red, green: f.green, blue: f.blue, alpha: f.alpha).cgColor)
+        ctx.addPath(UIBezierPath(roundedRect: tag, cornerRadius: mark.corner).cgPath)
+        ctx.fillPath()
+        let text = mark.text, w = mark.wordsTransform
+        let font = UIFont.systemFont(ofSize: text.size, weight: text.weight >= 600 ? .semibold : .regular)
+        let colour = UIColor(red: text.color.red, green: text.color.green, blue: text.color.blue, alpha: text.color.alpha)
+        UIGraphicsPushContext(ctx)
+        ctx.saveGState()
+        ctx.translateBy(x: tag.midX, y: tag.midY)
+        ctx.concatenate(CGAffineTransform(a: w.a, b: w.b, c: w.c, d: w.d, tx: 0, ty: 0))
+        ctx.translateBy(x: -tag.midX, y: -tag.midY)
+        let origin = CGPoint(x: text.x - frame.minX, y: text.baseline - frame.minY - font.ascender)
+        (text.word as NSString).draw(at: origin, withAttributes: [.font: font, .foregroundColor: colour])
+        ctx.restoreGState()
+        UIGraphicsPopContext()
     }
 }
