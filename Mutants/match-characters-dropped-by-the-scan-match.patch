@@ -1,0 +1,19 @@
+Property: A match Scan reads from the text layer keeps the characters it selected on its page.
+Area: search
+Test command: cd Packages/RedactionEngine && swift test --filter 'MatchCharactersTests'
+Must go red: RedactionEngineTests/MatchCharactersTests "A match Scan reads from the text layer keeps its characters too"
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift
+index fc2f0122..c52b6971 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift
+@@ -125,7 +125,7 @@ extension DocumentSearcher {
+                         piiConfidence: match.confidence,
+                         rationale: match.rationale,
+                         matchRangeInSnippet: window.matchRange, textLayerRect: box.textLayerRect, inkFitDegraded: box.degraded
+-                    ).identified(by: box.identity).carrying(box.characters))
++                    ).identified(by: box.identity))
+                     totalYielded += 1
+ 
+                     for tail in tails {

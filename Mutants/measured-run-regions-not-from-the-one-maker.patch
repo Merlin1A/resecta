@@ -1,0 +1,20 @@
+Property: The entry makes each region by the one maker the app uses, so a match read from the page's text is anchored to it.
+Area: measured run entry
+Test command: cd Packages/RedactionEngine && swift test --filter MeasuredRunTests
+Must go red: RedactionEngineTests/MeasuredRunTests "Under the switch's policy the on arm widens the value's box and the off arm does not"; RedactionEngineTests/MeasuredRunTests "A short, long or empty run is unreadable"; RedactionEngineTests/MeasuredRunTests "Two runs of one page give the same boxes"
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Tests/RedactionEngineTests/Fixtures/MeasuredRun.swift b/Packages/RedactionEngine/Tests/RedactionEngineTests/Fixtures/MeasuredRun.swift
+index e6d159d7..09747bd3 100644
+--- a/Packages/RedactionEngine/Tests/RedactionEngineTests/Fixtures/MeasuredRun.swift
++++ b/Packages/RedactionEngine/Tests/RedactionEngineTests/Fixtures/MeasuredRun.swift
+@@ -112,7 +112,8 @@ enum MeasuredRun {
+         let stream = DocumentSearcher().search(SendablePDFDocument(document), mode: .text(value, options: SearchOptions()),
+                                                progress: { _, _ in })
+         for await result in stream where result.pageIndex == 0 {
+-            regions.append(RedactionRegion(placing: result))
++            regions.append(RedactionRegion(id: UUID(), normalizedRect: result.normalizedRect,
++                                           source: .searchMatch(term: result.term, rationale: result.rationale)))
+         }
+         return regions
+     }

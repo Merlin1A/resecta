@@ -1,0 +1,19 @@
+Property: A run whose on arm widened no box is unreadable, whatever plans it made.
+Area: measured run entry
+Test command: cd Packages/RedactionEngine && swift test --filter MeasuredRunTests
+Must go red: RedactionEngineTests/MeasuredRunTests "Under the plan as placed the two arms give one plan, and the run is unreadable"
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Tests/RedactionEngineTests/Fixtures/MeasuredRun.swift b/Packages/RedactionEngine/Tests/RedactionEngineTests/Fixtures/MeasuredRun.swift
+index e6d159d7..23fd6eed 100644
+--- a/Packages/RedactionEngine/Tests/RedactionEngineTests/Fixtures/MeasuredRun.swift
++++ b/Packages/RedactionEngine/Tests/RedactionEngineTests/Fixtures/MeasuredRun.swift
+@@ -283,7 +283,7 @@ enum MeasuredRun {
+         if rows.isEmpty || rows.count != expected { reasons.append("rows \(rows.count) of \(expected)") }
+         let byArm = Dictionary(grouping: rows, by: \.arm)
+         if (byArm[.off]?.count ?? 0) != (byArm[.on]?.count ?? 0) { reasons.append("arms differ in rows") }
+-        if (byArm[.on] ?? []).allSatisfy({ $0.widened == 0 }) { reasons.append("no widened box in the on arm") }
++        if (byArm[.on] ?? []).allSatisfy({ $0.plan == nil }) { reasons.append("no widened box in the on arm") }
+         if (byArm[.off] ?? []).contains(where: { $0.widened > 0 }) { reasons.append("a widened box in the off arm") }
+         return reasons
+     }

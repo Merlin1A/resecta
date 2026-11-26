@@ -1,0 +1,19 @@
+Property: A page's read takes the page's own answer to whether its print is a picture.
+Area: the run record's page read (its facts)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'RunRecordPageReadTests|InkFitPiecewiseScanTests'
+Must go red: RedactionEngineTests/RunRecordPageReadTests pictureRead; RedactionEngineTests/InkFitPiecewiseScanTests pageFactsTakeThePrintAnswer
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord+PageRead.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord+PageRead.swift
+index edd74b96..83ce942d 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord+PageRead.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord+PageRead.swift
+@@ -30,7 +30,7 @@ extension RunRecord {
+                 .extractCharacters(from: page, hasHiddenOCG: hasHiddenOCG) else { return nil }
+             let invisible = DocumentSearcher.showsInvisibleText(cgPage)
+             let facts = PageTextFacts(showsInvisibleText: invisible,
+-                                      carriesPageScaleImage: DocumentSearcher.printIsAPicture(page, cgPage: cgPage))
++                                      carriesPageScaleImage: false)
+             return PageRead(words: PageWordReader.words(text: text, characters: characters), text: text, facts: facts)
+         }
+ 

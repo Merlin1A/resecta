@@ -5,15 +5,15 @@ Must go red: RedactionEngineTests/RunRecordBoxesTests "Each case" (quarterTurn)
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
-index 60e8f40a..b64e9438 100644
+index 201ef8fb..cc3162c6 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
-@@ -68,7 +68,7 @@ public struct RunRecord: Equatable, Sendable {
-         /// holds one box for each of them, as placed, and the switch is not
-         /// read. The plan is nil when a side cannot be read.
-         public init(pageIndex: Int, regions: [DrawnRegion], cropBox: CGSize, rotation: Int, switchOn: Bool) {
+@@ -118,7 +118,7 @@ public struct RunRecord: Equatable, Sendable {
+         package static func makePlan(regions: [DrawnRegion], cropBox: CGSize, rotation: Int, switchOn: Bool,
+                                      read: PageRead? = nil,
+                                      source: PlanSource = RunRecord.planSource) -> PaintPlan? {
 -            let turned = ((rotation % 360) + 360) % 180 != 0
 +            let turned = false && ((rotation % 360) + 360) % 180 != 0
-             var plan: PaintPlan?
-             if let width = PixelPlan.sixtyFourths(ofSide: Double(turned ? cropBox.height : cropBox.width)),
-                let height = PixelPlan.sixtyFourths(ofSide: Double(turned ? cropBox.width : cropBox.height)) {
+             guard let width = PixelPlan.sixtyFourths(ofSide: Double(turned ? cropBox.height : cropBox.width)),
+                   let height = PixelPlan.sixtyFourths(ofSide: Double(turned ? cropBox.width : cropBox.height))
+             else { return nil }

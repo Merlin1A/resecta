@@ -1,0 +1,17 @@
+Property: Drawing a page's regions keeps the plan the page is drawn from. Here the overlay draws without keeping it, so the run's start has no plan the user was shown.
+Area: drawn plan
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/OverlayDrawnPlanTests
+Must go red: ResectaAppTests/OverlayDrawnPlanTests drawingKeepsThePlan
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift
+--- a/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift
++++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift
+@@ -20,7 +20,6 @@
+     /// resize handles — the first segment of `draw(_:)`.
+     func drawCommittedRegions(ctx: CGContext, in rect: CGRect) {
+         // The plan this page is drawn from is kept with its settings.
+-        coordinator?.noteDrawn(pageIndex: pageIndex, regions: regions)
+         // Draw committed regions
+         for region in regions {
+             let viewRect = pdfNormalizedToOverlay(region.normalizedRect)

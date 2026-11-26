@@ -1,0 +1,23 @@
+Property: The default band excuses no word as the box's own run, so a label beside the value is never painted over.
+Area: the plan's default band (PaintPlan.make, switch off)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter PaintPlanDefaultBandTests
+Must go red: RedactionCoreTests/PaintPlanDefaultBandTests labelBlockLabelNotTaken
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+@@ -440,9 +440,10 @@ private struct Maker {
+         for row in rows {
+             let h = lineHeight(row)
+             let stop = Swift.max(LineMargin.ceil(h, c.stopLineHeights), c.stopPixelsSixtyFourths)
+-            var lo = [row.tight.minX, row.columnLeft].compactMap { $0 }.min()!
+-            var hi = [row.tight.maxX, row.columnRight].compactMap { $0 }.max()!
+-            let lineWords = row.line.map { complement.lines[$0].words } ?? []
++            var lo = [row.tight.minX, row.columnLeft, row.ownRun?.minX].compactMap { $0 }.min()!
++            var hi = [row.tight.maxX, row.columnRight, row.ownRun?.maxX].compactMap { $0 }.max()!
++            func inOwnRun(_ w: ComplementWord) -> Bool { row.ownRun.map { w.box.minX >= $0.minX && w.box.maxX <= $0.maxX } ?? false }
++            let lineWords = (row.line.map { complement.lines[$0].words } ?? []).filter { !inOwnRun($0) }
+             let next = lineWords.filter { $0.box.minX >= row.tight.maxX }.map(\.box.minX).min()
+             if let next { hi = Swift.max(Swift.min(hi, next - stop), row.tight.maxX) }
+             if let prev = lineWords.filter({ $0.box.maxX <= row.tight.minX }).map(\.box.maxX).max() {

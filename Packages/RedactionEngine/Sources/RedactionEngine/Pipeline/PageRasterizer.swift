@@ -8,21 +8,21 @@ import os
 // Page rasterization, render timeout,
 // and per-page processing loop.
 
-/// KI-5: `os_proc_available_memory()` does not accurately reflect CGImage
-/// allocations due to mmap/copy-on-write backing, so it cannot drive DPI
-/// budgeting. The dpiCap (lowered to 150 on
-/// UIApplication.didReceiveMemoryWarningNotification by the app-layer
-/// PipelineCoordinator) is the effective memory guard. A large sentinel is
-/// passed into `selectDPI` so the ceiling is imposed via `userMaxDPI`.
-///
-/// `rasterize` runs the two pre-flight halves as its front gate —
-/// `validatePageGeometry` rejects out-of-range dimensions / non-default
-/// `/UserUnit` pages as `.unsupportedPageGeometry`, then `validatePageMemory`
-/// rejects, on real hardware, pages whose raster would not fit the
-/// three-bitmap estimate as `.insufficientMemory`. The 10,000-pt `pageDimensionLimit` pre-flight inside
-/// `renderCGPageWithTimeout` sits behind it as defense-in-depth for any
-/// path that reaches the synchronous draw without the front gate.
-private let dpiBudgetSentinel: Int = Int.max / 4
+// KI-5: `os_proc_available_memory()` does not accurately reflect CGImage
+// allocations due to mmap/copy-on-write backing, so it cannot drive DPI
+// budgeting. The dpiCap (lowered to 150 on
+// UIApplication.didReceiveMemoryWarningNotification by the app-layer
+// PipelineCoordinator) is the effective memory guard. The sentinel budget
+// (`runTierBudget`) is passed into `selectDPI` by `runQuality`, so the
+// ceiling is imposed via `userMaxDPI`.
+//
+// `rasterize` runs the two pre-flight halves as its front gate —
+// `validatePageGeometry` rejects out-of-range dimensions / non-default
+// `/UserUnit` pages as `.unsupportedPageGeometry`, then `validatePageMemory`
+// rejects, on real hardware, pages whose raster would not fit the
+// three-bitmap estimate as `.insufficientMemory`. The 10,000-pt `pageDimensionLimit` pre-flight inside
+// `renderCGPageWithTimeout` sits behind it as defense-in-depth for any
+// path that reaches the synchronous draw without the front gate.
 
 /// Default DPI ceiling used when rasterize is called without an explicit cap.
 public let defaultDPICap: Int = 300
@@ -252,17 +252,16 @@ public final class PageRasterizer: @unchecked Sendable {
             "searchableRedaction mode set for page \(page.pageIndex) with no text layer"
         )
 
-        // 1. Select DPI. The user's targetDPI is further capped by dpiCap
+        // 1. Select DPI: `runQuality`, the one function the editor's kept
+        // plan reads too. The user's targetDPI is further capped by dpiCap
         // (lowered under memory pressure); size-based tier selection still
         // runs inside selectDPI but over a sentinel budget (see KI-5 note
         // above).
         // Pre-extracted geometry (serial), not a live `page.page` read.
         let rawBounds = page.cropBoxBounds
         let effectiveSize = effectiveBounds(rawBounds, rotation: page.rotation).size
-        let effectiveMaxDPI = min(page.targetDPI, dpiCap)
-        guard let dpi = selectDPI(
-            availableMemory: dpiBudgetSentinel, userMaxDPI: effectiveMaxDPI,
-            pageWidth: effectiveSize.width, pageHeight: effectiveSize.height
+        guard let dpi = runQuality(
+            chosenDPI: page.targetDPI, dpiCap: dpiCap, cropBox: rawBounds.size, rotation: page.rotation
         ) else {
             // selectDPI returns nil only when no DPI tier fits under the
             // cap — a memory/DPI-budget condition, never geometry (the

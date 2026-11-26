@@ -361,7 +361,7 @@ struct NoticeFoldedMark: View {
 /// The message surface behind a notice or its folded mark, drawn with the
 /// receipt's calls: the material and the ink fill set from the app's
 /// appearance, the two edges under the content's scheme, the two shadows.
-private struct NoticeSurface<S: InsettableShape>: View {
+struct NoticeSurface<S: InsettableShape>: View {
     let shape: S
     /// The app's appearance, which the fill and the shadows are set from.
     let appearance: ColorScheme

@@ -1,0 +1,18 @@
+Property: Under the release's plan source, as placed, the user's switch is not read. Here it is passed on.
+Area: run record
+Test command: cd Packages/RedactionEngine && swift test --filter RunPlanKeptTests
+Must go red: RedactionEngineTests/RunPlanKeptTests switchIgnoredAsPlaced
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord+PlanSource.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord+PlanSource.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord+PlanSource.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord+PlanSource.swift
+@@ -13,7 +13,7 @@
+     /// reaches the plan.
+     package static func planChoice(source: PlanSource, switchOn: Bool) -> (source: PlanSource, switchOn: Bool) {
+         switch source {
+-        case .asPlaced: (.asPlaced, false)
++        case .asPlaced: (.asPlaced, switchOn)
+         case .switchPolicy: (.switchPolicy, switchOn)
+         }
+     }

@@ -42,6 +42,7 @@ extension SearchAndRedactSheet {
     /// controls and hides the counter from XXXL up (measured).
     func resultNavCluster(site: ResultNavSite) -> some View {
         HStack(spacing: ResectaTokens.Spacing.xs) {
+            if site == .parked { stripNoticeMark }
             HStack(spacing: site.pairSpacing) {
                 resultNavButton(.previous, site: site)
                 resultNavButton(.next, site: site)

@@ -1,0 +1,23 @@
+Property: A message holds the slot ahead of the first-time line.
+Area: the first-time line in the editor
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BottomSlotTests
+Must go red: ResectaAppTests/BottomSlotTests oneOccupant
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/DocumentEditorView+Caption.swift b/Sources/ResectaApp/Views/DocumentEditorView+Caption.swift
+index e71a98f2..80a7119b 100644
+--- a/Sources/ResectaApp/Views/DocumentEditorView+Caption.swift
++++ b/Sources/ResectaApp/Views/DocumentEditorView+Caption.swift
+@@ -89,11 +89,11 @@ extension DocumentEditorView {
+         let selection: BottomSlotOccupant? = addToSelection
+             ? .selection(adding: true)
+             : (selectedCount > 0 ? .selection(adding: false) : nil)
++        if firstTimeLineDue { return .firstTimeLine }
+         if messageShowing {
+             if let selection, selectionNewerThanMessage { return selection }
+             return .message
+         }
+-        if firstTimeLineDue { return .firstTimeLine }
+         if let selection { return selection }
+         return drawingModeCaptionShouldShow(activeTool: activeTool, phaseKind: phaseKind) ? .drawingCaption : nil
+     }

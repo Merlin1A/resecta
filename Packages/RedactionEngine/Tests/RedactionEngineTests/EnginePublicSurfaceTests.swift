@@ -80,6 +80,8 @@ struct EnginePublicSurfaceTests {
         _ = page.confirmedPage
         _ = RedactionRegion.isAdmitted(normalizedRect: .zero)
         _ = RunRecord.Page(pageIndex: 0, regions: [], cropBox: .zero, rotation: 0, switchOn: false)
+        let read = await RunRecord.PageRead.reads(of: document, pages: [0], hasHiddenOCG: false)[0]
+        _ = RunRecord.Page(pageIndex: 0, regions: [], cropBox: .zero, rotation: 0, switchOn: false, read: read)
         _ = DocumentSearcher.sharedLoadDiagnostics
         _ = engine.layers(for: .searchableRedaction)
         _ = engine.aggregateStatus(layers)

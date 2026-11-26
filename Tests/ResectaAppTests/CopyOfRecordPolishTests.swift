@@ -93,12 +93,11 @@ struct CopyOfRecordPolishTests {
         #expect(trigger.contains("argument: \"Scanning page \\(current) of \\(total)\""))
     }
 
-    @Test("The Search options' warnings and the result-cap banner use the warning token, not a raw colour")
+    @Test("The Search options' warnings use the warning token, not a raw colour")
     func warningToken() throws {
         let toolbar = try source("Sources/ResectaApp/Views/Search/SearchToolbarSection.swift")
         let footer = try source("Sources/ResectaApp/Views/Search/SearchFooterSection.swift")
         #expect(!toolbar.contains(".foregroundStyle(.orange)"))
         #expect(!footer.contains(".foregroundStyle(.orange)"))
-        #expect(footer.contains(".foregroundStyle(ResectaTokens.SemanticColor.warnText)"))
     }
 }

@@ -2,15 +2,13 @@ Property: Two boxes are equal only when both limit lines are; an absent limit li
 Area: the box record's equality
 Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/PaintedBoxTests (or on the host: cd Packages/RedactionEngine && swift test --filter PaintedBoxTests)
 Must go red: RedactionCoreTests/PaintedBoxTests boxesAlikeButForOneLimitLineAreNotEqual
-Apply in a scratch worktree with `git apply`; discard after.
-
-diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintedBox.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintedBox.swift
-index f3b2a6ee..f5aa7d19 100644
+Apply in a scratch worktree with `git apply`; discard after.diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintedBox.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintedBox.swift
+index 53f25537..ff75fe34 100644
 --- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintedBox.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintedBox.swift
-@@ -138,6 +138,13 @@ package struct PaintedBox: Hashable, Sendable {
-     /// picture. The plan sets it; the producer reads it.
-     package var inkCheckable: Bool
+@@ -168,6 +168,13 @@ package struct PaintedBox: Hashable, Sendable {
+     /// What the plan did with the box's default band.
+     package var defaultWidth: DefaultWidth
  
 +    package static func == (lhs: PaintedBox, rhs: PaintedBox) -> Bool {
 +        lhs.regionIDs == rhs.regionIDs && lhs.inner == rhs.inner && lhs.paint == rhs.paint && lhs.tight == rhs.tight

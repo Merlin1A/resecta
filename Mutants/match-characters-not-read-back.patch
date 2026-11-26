@@ -1,0 +1,19 @@
+Property: A region's characters are read back from its encoding, and a region encoded without them reads as before.
+Area: search
+Test command: cd Packages/RedactionEngine && swift test --filter 'MatchCharactersTests'
+Must go red: RedactionEngineTests/MatchCharactersTests "A region saved before regions carried characters reads exactly as before"
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RedactionRegion.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RedactionRegion.swift
+index c0e6a530..c6a70e3c 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RedactionRegion.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RedactionRegion.swift
+@@ -95,7 +95,7 @@ public struct RedactionRegion: Sendable, Identifiable, Equatable, Codable {
+         let placed = try container.decodeIfPresent(Bool.self, forKey: .placedFromPageText) ?? anchored
+         placedFromPageText = placed
+         textAnchored = anchored && placed
+-        pageCharacters = try container.decodeIfPresent(Range<Int>.self, forKey: .pageCharacters)
++        pageCharacters = nil
+     }
+ 
+     /// The rects a Searchable export strips the text layer under: the box,

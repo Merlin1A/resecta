@@ -454,6 +454,10 @@ import RedactionCore
                     case .placedPlusFixedMargin: #expect(box.paint == Self.placed(region).outset96, "\(key)")
                     case .lineMargin: #expect(!box.bandMade && box.paint.contains(box.inner) && box.paint != box.inner, "\(key)")
                     case .band: #expect(box.bandMade, "\(key)")
+                    // No page drawing is given, so no default band is taken.
+                    case .defaultBand:
+                        #expect(!box.bandMade && box.paint.contains(box.inner) && box.paint != box.inner
+                                    && box.defaultWidth == .notTaken(.drawingNotRead), "\(key)")
                     case .asPlaced: Issue.record("no row of the table paints as placed")
                     }
                     switch rule.outcome {

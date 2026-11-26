@@ -40,6 +40,17 @@ public struct RunRecord: Equatable, Sendable {
             self.exportDPI = exportDPI
             self.pages = pages
         }
+
+        /// The first page, from 0, whose plan holds a box that cannot be
+        /// applied as planned: one whose exposure is not "can show the
+        /// value's length", the one exposure every rule of this release
+        /// gives. Nil when every planned box can be applied. The run does
+        /// not start while it is not nil.
+        public var firstPageWithBoxThatCannotShowLength: Int? {
+            pages.first { page in
+                page.plan?.boxes.contains { $0.exposure != .canShowLength } ?? false
+            }?.pageIndex
+        }
     }
 
     /// One page as the user confirmed it.
@@ -77,30 +88,56 @@ public struct RunRecord: Equatable, Sendable {
         /// `RunRecord.planChoice(source: RunRecord.planSource, switchOn:)`
         /// over the regions admission lets through: under "as placed" it
         /// holds one box for each of them, as placed, and the switch is not
-        /// read. The plan is nil when a side cannot be read.
-        public init(pageIndex: Int, regions: [DrawnRegion], cropBox: CGSize, rotation: Int, switchOn: Bool) {
+        /// read. The plan is nil when a side cannot be read. The page's read,
+        /// when there is one, gives the plan the page's words, text and facts;
+        /// with none the plan is made with no words.
+        public init(pageIndex: Int, regions: [DrawnRegion], cropBox: CGSize, rotation: Int, switchOn: Bool,
+                    read: PageRead? = nil) {
+            self.init(pageIndex: pageIndex, regions: regions, cropBox: cropBox, rotation: rotation, switchOn: switchOn,
+                      read: read, source: RunRecord.planSource)
+        }
+
+        /// The same page under a plan source given here: the run passes its
+        /// own; a test can name the switch's policy before the run reads it.
+        package init(pageIndex: Int, regions: [DrawnRegion], cropBox: CGSize, rotation: Int, switchOn: Bool,
+                     read: PageRead?, source: PlanSource) {
+            self.init(pageIndex: pageIndex, regions: regions,
+                      plan: Self.makePlan(regions: regions, cropBox: cropBox, rotation: rotation, switchOn: switchOn,
+                                          read: read, source: source))
+        }
+
+        /// The one maker of a page's plan from its regions as drawn: the run's
+        /// entry and the editor's drawing (`DrawnPlan`) both call it, so the
+        /// two make the same plan from the same inputs. The page's two sides
+        /// S are read here, through `PixelPlan.sixtyFourths(ofSide:)`, in the
+        /// frame as the page is rasterised. Nil when a side cannot be read.
+        /// The page's read, when there is one, gives the plan the page's
+        /// words, text and facts, and a region still anchored to its text
+        /// selects its match's characters in that text; with none the plan
+        /// is made with no words and nothing is selected.
+        package static func makePlan(regions: [DrawnRegion], cropBox: CGSize, rotation: Int, switchOn: Bool,
+                                     read: PageRead? = nil,
+                                     source: PlanSource = RunRecord.planSource) -> PaintPlan? {
             let turned = ((rotation % 360) + 360) % 180 != 0
-            var plan: PaintPlan?
-            if let width = PixelPlan.sixtyFourths(ofSide: Double(turned ? cropBox.height : cropBox.width)),
-               let height = PixelPlan.sixtyFourths(ofSide: Double(turned ? cropBox.width : cropBox.height)) {
-                let admitted = regions.filter { RedactionRegion.isAdmitted(normalizedRect: $0.normalizedRect) }
-                let choice = RunRecord.planChoice(source: RunRecord.planSource, switchOn: switchOn)
-                // A drawn region carries no kind; under "as placed" the plan
-                // never reads one.
-                let planRegions = admitted.map { region in
-                    let r = region.normalizedRect
-                    return PlanRegion(id: region.id,
-                                      share: PointRect(minX: Double(r.minX), minY: Double(r.minY),
-                                                       maxX: Double(r.maxX), maxY: Double(r.maxY)),
-                                      kind: .drawnByHand)
-                }
-                plan = PaintPlan.make(
-                    regions: planRegions, words: PageWords(words: []), text: "",
-                    facts: .noPageRead,
+            guard let width = PixelPlan.sixtyFourths(ofSide: Double(turned ? cropBox.height : cropBox.width)),
+                  let height = PixelPlan.sixtyFourths(ofSide: Double(turned ? cropBox.width : cropBox.height))
+            else { return nil }
+            let admitted = regions.filter { RedactionRegion.isAdmitted(normalizedRect: $0.normalizedRect) }
+            let choice = RunRecord.planChoice(source: source, switchOn: switchOn)
+            // Each region goes with its kind; under "as placed" the plan
+            // reads none.
+            let planRegions = RunRecord.planRegions(admitted, text: read?.text ?? "")
+            if let read {
+                return PaintPlan.make(
+                    regions: planRegions, words: read.words, text: read.text, facts: read.facts,
                     widthSixtyFourths: width, heightSixtyFourths: height,
                     policy: .release, source: choice.source, switchOn: choice.switchOn).plan
             }
-            self.init(pageIndex: pageIndex, regions: regions, plan: plan)
+            return PaintPlan.make(
+                regions: planRegions, words: PageWords(words: []), text: "",
+                facts: .noPageRead,
+                widthSixtyFourths: width, heightSixtyFourths: height,
+                policy: .release, source: choice.source, switchOn: choice.switchOn).plan
         }
 
         package init(pageIndex: Int, regions: [DrawnRegion], plan: PaintPlan?) {
@@ -110,15 +147,28 @@ public struct RunRecord: Equatable, Sendable {
         }
     }
 
-    /// A region as drawn: its id and its rectangle as a share of the page
-    /// (0 to 1, origin bottom-left), unclamped. An edge may lie off the page.
+    /// A region as drawn: its id, its rectangle as a share of the page
+    /// (0 to 1, origin bottom-left), unclamped (an edge may lie off the
+    /// page), and its kind, which the plan reads.
     public struct DrawnRegion: Equatable, Sendable {
         public let id: UUID
         public let normalizedRect: CGRect
+        /// Read from the region's source and its two marks (`RegionKind(of:)`).
+        package let kind: RegionKind
+        /// The characters its match selected on the page's string
+        /// (`RedactionRegion.pageCharacters`).
+        package let pageCharacters: Range<Int>?
 
-        public init(id: UUID, normalizedRect: CGRect) {
+        public init(region: RedactionRegion) {
+            self.init(id: region.id, normalizedRect: region.normalizedRect, kind: RegionKind(of: region),
+                      pageCharacters: region.pageCharacters)
+        }
+
+        package init(id: UUID, normalizedRect: CGRect, kind: RegionKind, pageCharacters: Range<Int>? = nil) {
             self.id = id
             self.normalizedRect = normalizedRect
+            self.kind = kind
+            self.pageCharacters = pageCharacters
         }
     }
 

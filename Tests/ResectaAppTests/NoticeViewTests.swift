@@ -61,11 +61,15 @@ struct NoticeViewTests {
             drawers.insert(file)
         }
         // The band's file, the paused notice's file (its view keeps its
-        // name there), the view's own measure, and Settings' form.
+        // name there), the view's own measure, Settings' form, and the
+        // Search sheet's notice place: its view on the notice surface and
+        // the place that holds it.
         #expect(drawers == [
             "Sources/ResectaApp/Views/DocumentEditorView+TopBanner.swift",
             "Sources/ResectaApp/Views/DocumentEditorView+ResumeBanner.swift",
             "Sources/ResectaApp/Views/Messages/NoticeView.swift",
+            "Sources/ResectaApp/Views/Messages/SheetNoticeView.swift",
+            "Sources/ResectaApp/Views/Search/SearchNoticePlaceView.swift",
             "Sources/ResectaApp/Views/SettingsView.swift",
         ])
     }

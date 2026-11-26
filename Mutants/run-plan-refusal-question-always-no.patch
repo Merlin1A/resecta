@@ -1,0 +1,18 @@
+Property: The record's confirmed part names the first page whose plan holds a box that cannot be applied as planned, so the run is refused before any page is built. Here the question never finds one.
+Area: run record
+Test command: cd Packages/RedactionEngine && swift test --filter RunPlanKeptTests
+Must go red: RedactionEngineTests/RunPlanKeptTests refusalFindsTheFirstPage
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
+@@ -48,7 +48,7 @@
+         /// not start while it is not nil.
+         public var firstPageWithBoxThatCannotShowLength: Int? {
+             pages.first { page in
+-                page.plan?.boxes.contains { $0.exposure != .canShowLength } ?? false
++                false
+             }?.pageIndex
+         }
+     }

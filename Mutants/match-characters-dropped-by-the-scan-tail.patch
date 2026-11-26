@@ -1,0 +1,19 @@
+Property: The part of a widened address its own box does not reach, boxed by Scan as its own result, keeps the characters it selected on its page.
+Area: search
+Test command: cd Packages/RedactionEngine && swift test --filter 'MatchCharactersTests'
+Must go red: RedactionEngineTests/MatchCharactersTests "The part of a widened address its own box does not reach keeps its own characters"
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift
+index fc2f0122..60940962 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+PIIScan.swift
+@@ -156,7 +156,7 @@ extension DocumentSearcher {
+                             piiConfidence: match.confidence,
+                             rationale: match.rationale,
+                             matchRangeInSnippet: tailWindow.matchRange, textLayerRect: box.textLayerRect, inkFitDegraded: box.degraded
+-                        ).identified(by: box.identity).carrying(box.characters))
++                        ).identified(by: box.identity))
+                         totalYielded += 1
+                     }
+                 }

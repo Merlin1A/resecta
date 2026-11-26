@@ -26,6 +26,10 @@ extension DocumentSearcher {
         var identity: CGRect? = nil
         /// The box the hybrid merge compares (`mergeHybridResults`).
         var mergeIdentity: CGRect { identity ?? rect }
+        /// The box's characters as a range of the page's string (UTF-16), when
+        /// the box is one line of a match or one match's whole range; nil for
+        /// a box that stands for no single range.
+        var characters: Range<Int>? = nil
     }
 
     /// One box per line the range's selection touches (the `lineRects`
@@ -33,10 +37,13 @@ extension DocumentSearcher {
     nonisolated func textLayerLines(for nsRange: NSRange, page: PDFPage) -> [TextLayerBox]? {
         if let split = textLayerAndInkRects(for: nsRange, page: page) {
             return split.paint.indices.map {
-                TextLayerBox(rect: split.paint[$0], textLayerRect: split.strip[$0], degraded: split.degraded, identity: split.identity[$0])
+                TextLayerBox(rect: split.paint[$0], textLayerRect: split.strip[$0], degraded: split.degraded,
+                             identity: split.identity[$0], characters: Range(split.characters[$0]))
             }
         }
-        return lineBoxes(for: nsRange, page: page)?.map { TextLayerBox(rect: $0.rect, textLayerRect: nil, identity: $0.identity) }
+        return lineBoxes(for: nsRange, page: page)?.map {
+            TextLayerBox(rect: $0.rect, textLayerRect: nil, identity: $0.identity, characters: Range($0.characters))
+        }
     }
 
     /// One box for the whole range (the `boundingRect` rule, used by the PII
@@ -49,8 +56,11 @@ extension DocumentSearcher {
             let identity = identities.dropFirst().reduce(identities[0]) { $0.union($1) }
             return TextLayerBox(rect: rect,
                                 textLayerRect: split.strip.dropFirst().reduce(strip) { $0.union($1) },
-                                degraded: split.degraded, identity: identity == rect ? nil : identity)
+                                degraded: split.degraded, identity: identity == rect ? nil : identity,
+                                characters: Range(nsRange))
         }
-        return boundingBox(for: nsRange, page: page).map { TextLayerBox(rect: $0.rect, textLayerRect: nil, identity: $0.identity) }
+        return boundingBox(for: nsRange, page: page).map {
+            TextLayerBox(rect: $0.rect, textLayerRect: nil, identity: $0.identity, characters: Range(nsRange))
+        }
     }
 }

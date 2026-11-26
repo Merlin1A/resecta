@@ -1,0 +1,26 @@
+Property: The editor's view hands the coordinator the settings when it makes it and on each update, so the editor keeps a plan for each page it draws. Here it hands none, and no plan is kept.
+Area: kept plan
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/OverlayDrawnPlanTests
+Must go red: ResectaAppTests/OverlayDrawnPlanTests theViewHandsOnTheSettings
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/PDFDocumentView.swift b/Sources/ResectaApp/Views/PDFDocumentView.swift
+index 2e9a0326..c7b410ef 100644
+--- a/Sources/ResectaApp/Views/PDFDocumentView.swift
++++ b/Sources/ResectaApp/Views/PDFDocumentView.swift
+@@ -33,7 +33,6 @@ struct PDFDocumentView: UIViewRepresentable {
+         let coordinator = PDFViewCoordinator()
+         coordinator.documentState = documentState
+         coordinator.redactionState = redactionState
+-        coordinator.settingsState = settingsState
+         coordinator.toastManager = toastManager
+         return coordinator
+     }
+@@ -150,7 +149,6 @@ struct PDFDocumentView: UIViewRepresentable {
+ 
+         // Propagate state to coordinator
+         coordinator.redactionState = redactionState
+-        coordinator.settingsState = settingsState
+         coordinator.qualityCap = pipelineCoordinator.dpiCap
+         coordinator.toastManager = toastManager
+         let isEditing = documentState.phaseKind == .editing

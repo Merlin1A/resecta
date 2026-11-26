@@ -1,0 +1,21 @@
+Property: A kept box that does not project keeps its regions' own fills, as the run fills those regions then. Here it keeps no fill, so the preview shows nothing where the run fills.
+Area: kept plan
+Test command: cd Packages/RedactionEngine && swift test --filter PreviewFillsAsTheRunTests
+Must go red: RedactionEngineTests/PreviewFillsAsTheRunTests aBoxThatDoesNotProject
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift
+index 1e99f818..a6f29973 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift
+@@ -114,9 +114,7 @@ public struct DrawnPlan: Equatable, Sendable {
+             if let fill = PageRasterizer.boxFill(box: box, regions: byID, raster: raster, content: pixels.content) {
+                 return [fill.bitmapRect]
+             }
+-            return box.regionIDs.sorted { $0.uuidString < $1.uuidString }.compactMap { id in
+-                byID[id].map { normalizedToFillPixels($0.normalizedRect, content: pixels.content) }
+-            }
++            return []
+         }
+     }
+ 

@@ -22,6 +22,30 @@ package struct PlanRegion: Hashable, Sendable {
     }
 }
 
+/// What the plan is told of the page's drawing besides its words, in whole
+/// sixty-fourths in the page's frame as it is rasterised, origin bottom-left.
+/// A default band is taken only on a page whose painting was followed to its
+/// end and paints no path or shading, and only where no object lies in it.
+package struct PageDrawing: Hashable, Sendable {
+    /// The page's painting was followed to its end.
+    package var read: Bool
+    /// The page paints a path or a shading. Their bounds are not read, so a
+    /// page that paints one takes no default band.
+    package var drawsLinesOrShading: Bool
+    /// The bounds of what the page draws besides its words: pictures, inline
+    /// images, forms and patterns.
+    package var objects: [PageRect64]
+
+    package init(read: Bool, drawsLinesOrShading: Bool, objects: [PageRect64]) {
+        self.read = read
+        self.drawsLinesOrShading = drawsLinesOrShading
+        self.objects = objects
+    }
+
+    /// Nothing of the page's drawing was read: no default band is taken.
+    package static let notRead = PageDrawing(read: false, drawsLinesOrShading: false, objects: [])
+}
+
 /// What a page's plan says, counted by region: one region is one counted
 /// box, and a region takes the state of the box that covers it.
 package struct PlanFacts: Hashable, Sendable {
@@ -78,18 +102,19 @@ extension PaintPlan {
     ///
     /// `width` and `height` are the page's sides S in whole sixty-fourths;
     /// `facts` say whether the page's words are the text its print is drawn
-    /// from. The plan never splits a region, and every region is in exactly
-    /// one box.
+    /// from, and `drawing` what else it draws, read by the default band. The
+    /// plan never splits a region, and every region is in exactly one box.
     package static func make(
         regions: [PlanRegion], words: PageWords, text: String, facts pageFacts: PageTextFacts,
+        drawing: PageDrawing = .notRead,
         widthSixtyFourths width: Int, heightSixtyFourths height: Int,
         policy: GeometryPolicy, source: PlanSource, switchOn: Bool
     ) -> (plan: PaintPlan, facts: PlanFacts) {
         let placed: [(region: PlanRegion, rect: PageRect64)] = regions.compactMap { region in
             PageRect64(share: region.share, widthSixtyFourths: width, heightSixtyFourths: height).map { (region, $0) }
         }
-        let maker = Maker(placed: placed, words: words, text: text, pageFacts: pageFacts, policy: policy,
-                          source: source, switchOn: switchOn)
+        let maker = Maker(placed: placed, words: words, text: text, pageFacts: pageFacts, drawing: drawing,
+                          policy: policy, source: source, switchOn: switchOn)
         let boxes = maker.boxes()
         return (PaintPlan(widthSixtyFourths: width, heightSixtyFourths: height, boxes: boxes.map(\.box)),
                 maker.facts(of: boxes))
@@ -102,6 +127,7 @@ private struct Maker {
     let words: PageWords
     let text: String
     let pageFacts: PageTextFacts
+    let drawing: PageDrawing
     let policy: GeometryPolicy
     let source: PlanSource
     let switchOn: Bool
@@ -114,11 +140,12 @@ private struct Maker {
     }
 
     init(placed: [(region: PlanRegion, rect: PageRect64)], words: PageWords, text: String, pageFacts: PageTextFacts,
-         policy: GeometryPolicy, source: PlanSource, switchOn: Bool) {
+         drawing: PageDrawing, policy: GeometryPolicy, source: PlanSource, switchOn: Bool) {
         self.placed = placed
         self.words = words
         self.text = text
         self.pageFacts = pageFacts
+        self.drawing = drawing
         self.policy = policy
         self.source = source
         self.switchOn = switchOn
@@ -147,10 +174,12 @@ private struct Maker {
     }
 
     /// The reading of a set of selected characters, or nil when none has a box.
+    /// With the switch off its direction is read from unselected words only,
+    /// so the default band does not turn on the selected text.
     func reading(of selected: Set<Int>) -> BoxReading? {
         guard !selected.isEmpty else { return nil }
         return Complement.reading(of: selected, on: complement, words: words, text: text, facts: pageFacts,
-                                  constants: policy.provisional)
+                                  constants: policy.provisional, directionFromUnselected: !switchOn)
     }
 
     /// Whether a region's selected extents are read from a layout: placed from
@@ -251,12 +280,13 @@ private struct Maker {
         let tight = letters.reduce(placedRect) { $0.union($1) }
 
         func box(inner: PageRect64, paint: PageRect64, tight: PageRect64, above: Int?, below: Int?,
-                 treatment: SwitchTreatment, band: Bool, asDrawn: Bool) -> Made {
+                 treatment: SwitchTreatment, band: Bool, asDrawn: Bool, width: DefaultWidth = .notAsked) -> Made {
             Made(box: PaintedBox(regionIDs: ids, inner: inner, paint: paint, tight: tight, limitAbove: above,
                                  limitBelow: below, exposure: rule.exposure, treatment: treatment, bandMade: band,
                                  inkEnlargedCovered: false, inkEnlargedToCap: false, asDrawn: asDrawn,
                                  inkCheckable: anchored && !asDrawn
-                                     && (lineReading == .column || lineReading == .noColumn)),
+                                     && (lineReading == .column || lineReading == .noColumn),
+                                 defaultWidth: width),
                  regions: group)
         }
         let outcome: SwitchTreatment = switch rule.outcome {
@@ -280,16 +310,23 @@ private struct Maker {
             let margin = marginPaint(inner: tight, rows: read?.rows ?? [])
             return box(inner: tight, paint: margin.paint, tight: tight, above: margin.above, below: margin.below,
                        treatment: outcome, band: false, asDrawn: false)
+        case .defaultBand:
+            let made = defaultPaint(tight: tight, rows: read?.rows ?? [], regions: regions.map(\.rect), letters: letters)
+            return box(inner: made.inner, paint: made.paint, tight: tight, above: made.above, below: made.below,
+                       treatment: outcome, band: made.inner != tight, asDrawn: false, width: made.width)
         case .band:
             let rows = read?.rows ?? []
             let band = self.band(tight: tight, rows: rows)
-            let off = marginPaint(inner: tight, rows: rows)
+            // "Widened" compares with the paint the switch-off row gives:
+            // the default band where it is taken, else the line margin.
+            let off = defaultPaint(tight: tight, rows: rows, regions: regions.map(\.rect), letters: letters)
             // The one place a band is made: it must hold every covered region
             // and every selected letter, or the box falls back.
             let holds = regions.allSatisfy { band.contains($0.rect) } && letters.allSatisfy { band.contains($0) }
             guard holds else {
                 if regions.allSatisfy({ tight.contains($0.rect) }) && letters.allSatisfy({ tight.contains($0) }) {
-                    return box(inner: tight, paint: off.paint, tight: tight, above: off.above, below: off.below,
+                    let margin = marginPaint(inner: tight, rows: rows)
+                    return box(inner: tight, paint: margin.paint, tight: tight, above: margin.above, below: margin.below,
                                treatment: .fellBack, band: false, asDrawn: false)
                 }
                 return box(inner: placedRect, paint: placedRect, tight: placedRect, above: nil, below: nil,
@@ -350,6 +387,77 @@ private struct Maker {
             }
         }
         return PageRect64(minX: Swift.min(left, tight.minX), minY: bottom, maxX: Swift.max(right, tight.maxX), maxY: top)
+    }
+
+    // MARK: - The default band
+
+    /// The switch-off paint of a box whose column is read: the default band
+    /// plus the line margin, held at the limit lines, where the band holds
+    /// every covered region and selected letter and is clear of the page's
+    /// other words and drawn objects; else the line margin.
+    func defaultPaint(tight: PageRect64, rows: [RowReading], regions: [PageRect64], letters: [PageRect64])
+        -> (inner: PageRect64, paint: PageRect64, above: Int?, below: Int?, width: DefaultWidth) {
+        let margin = marginPaint(inner: tight, rows: rows)
+        func lineMargin(_ width: DefaultWidth) -> (PageRect64, PageRect64, Int?, Int?, DefaultWidth) {
+            (tight, margin.paint, margin.above, margin.below, width)
+        }
+        guard drawing.read else { return lineMargin(.notTaken(.drawingNotRead)) }
+        guard !drawing.drawsLinesOrShading else { return lineMargin(.notTaken(.pageDrawsLinesOrShading)) }
+        let (band, start) = defaultBand(tight: tight, rows: rows)
+        guard regions.allSatisfy({ band.contains($0) }) && letters.allSatisfy({ band.contains($0) }) else {
+            return lineMargin(.fellBack)
+        }
+        // A band that reaches no further along the line than the selected
+        // text adds nothing: the box keeps its line margin.
+        guard band.minX < tight.minX || band.maxX > tight.maxX else { return lineMargin(.taken) }
+        var on = marginPaint(inner: band, rows: rows)
+        // Where the start is the end of the word before, the paint stops
+        // there too: the margin does not reach into that word's letters.
+        // Never inside the band, which holds every row's letters.
+        if let start { on.paint.minX = Swift.max(on.paint.minX, Swift.min(start, band.minX)) }
+        // The band is read whole, under the box's own letters too: what lies
+        // in it is not told by how far the selected text reaches.
+        let wordInBand = complement.lines.contains { $0.words.contains { $0.box.sharesArea(with: band) } }
+        let drawnInPaint = drawing.objects.contains { $0.sharesArea(with: on.paint) }
+        guard !wordInBand && !drawnInPaint else { return lineMargin(.notTaken(.wordOrDrawingInBand)) }
+        return (band, on.paint, on.above, on.below, .taken)
+    }
+
+    /// The default band: on each line, the column and the tight rectangle
+    /// across the line's height, each end then pulled back to stand the
+    /// stop's distance short of the nearest unselected word of the line,
+    /// never inside the tight rectangle; no word is excused as the box's own
+    /// run. On a line the box ends, its start is the end of the word before
+    /// it, with no stop, so the start does not move with the box's own first
+    /// letter, and `start` is the furthest such end, where the paint stops.
+    /// Over several lines, the least reach on each side.
+    func defaultBand(tight: PageRect64, rows: [RowReading]) -> (band: PageRect64, start: Int?) {
+        guard !rows.isEmpty else { return (tight, nil) }
+        var left = Int.min, right = Int.max
+        var start: Int?
+        var bottom = tight.minY, top = tight.maxY
+        let c = policy.provisional
+        for row in rows {
+            let h = lineHeight(row)
+            let stop = Swift.max(LineMargin.ceil(h, c.stopLineHeights), c.stopPixelsSixtyFourths)
+            var lo = [row.tight.minX, row.columnLeft].compactMap { $0 }.min()!
+            var hi = [row.tight.maxX, row.columnRight].compactMap { $0 }.max()!
+            let lineWords = row.line.map { complement.lines[$0].words } ?? []
+            let next = lineWords.filter { $0.box.minX >= row.tight.maxX }.map(\.box.minX).min()
+            if let next { hi = Swift.max(Swift.min(hi, next - stop), row.tight.maxX) }
+            if let prev = lineWords.filter({ $0.box.maxX <= row.tight.minX }).map(\.box.maxX).max() {
+                lo = Swift.min(Swift.max(lo, next == nil ? prev : prev + stop), row.tight.minX)
+                if next == nil { start = Swift.max(start ?? prev, prev) }
+            }
+            left = Swift.max(left, lo)
+            right = Swift.min(right, hi)
+            if let line = row.line {
+                bottom = Swift.min(bottom, complement.lines[line].box.minY)
+                top = Swift.max(top, complement.lines[line].box.maxY)
+            }
+        }
+        return (PageRect64(minX: Swift.min(left, tight.minX), minY: bottom, maxX: Swift.max(right, tight.maxX), maxY: top),
+                start)
     }
 
     // MARK: - The margin and its limit

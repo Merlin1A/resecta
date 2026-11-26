@@ -431,8 +431,14 @@ extension Complement {
     /// The reading of one box: `box` is its selected letters' offsets, and
     /// `page` the complement made with every box of the page selected. Nil
     /// when no selected letter has a box.
+    ///
+    /// With `directionFromUnselected`, the direction is read from the
+    /// unselected words of the box's lines alone, and a line with none gives
+    /// no evidence, so which letters are selected, and in what script, does
+    /// not change the reading.
     package static func reading(of box: Set<Int>, on page: PageComplement, words: PageWords, text: String,
-                                facts: PageTextFacts, constants: ProvisionalConstants) -> BoxReading? {
+                                facts: PageTextFacts, constants: ProvisionalConstants,
+                                directionFromUnselected: Bool = false) -> BoxReading? {
         let own = words.words.filter { word in word.letters.contains(where: box.contains) }
         let selectedLetters = own.flatMap { letters(of: $0, keeping: box.contains) }
         guard !selectedLetters.isEmpty else { return nil }
@@ -445,17 +451,28 @@ extension Complement {
         let lineIndices = rowRects.map { line(of: $0, in: page.lines) }
 
         // Direction: the box's own lines, read from every word on them, the
-        // selected ones included.
+        // selected ones included; or, with `directionFromUnselected`, from
+        // their unselected words alone.
         let units = Array(text.utf16)
-        let directionEvidence = zip(rowRects, lineIndices).contains { row, line in
-            let reference = line.map { page.lines[$0].box.union(row) } ?? row
-            let onLine = words.words.compactMap { word -> [ComplementLetter]? in
-                let letters = letters(of: word, keeping: { _ in true })
-                guard let first = letters.first else { return nil }
-                let wordBox = letters.dropFirst().reduce(first.rect) { $0.union($1.rect) }
-                return wordBox.sharesALine(with: reference) ? letters : nil
+        let directionEvidence: Bool
+        if directionFromUnselected {
+            let pageWords = page.lines.flatMap(\.words)
+            directionEvidence = zip(rowRects, lineIndices).contains { row, line in
+                let reference = line.map { page.lines[$0].box.union(row) } ?? row
+                let onLine = pageWords.filter { $0.box.sharesALine(with: reference) }.map(\.letters)
+                return givesEvidence(words: onLine, units: units, constants: constants)
             }
-            return givesEvidence(words: onLine, units: units, constants: constants)
+        } else {
+            directionEvidence = zip(rowRects, lineIndices).contains { row, line in
+                let reference = line.map { page.lines[$0].box.union(row) } ?? row
+                let onLine = words.words.compactMap { word -> [ComplementLetter]? in
+                    let letters = letters(of: word, keeping: { _ in true })
+                    guard let first = letters.first else { return nil }
+                    let wordBox = letters.dropFirst().reduce(first.rect) { $0.union($1.rect) }
+                    return wordBox.sharesALine(with: reference) ? letters : nil
+                }
+                return givesEvidence(words: onLine, units: units, constants: constants)
+            }
         }
 
         let reading: LineReading

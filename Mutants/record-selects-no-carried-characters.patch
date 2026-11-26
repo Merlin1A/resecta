@@ -1,0 +1,19 @@
+Property: Through the record, a region still anchored to its text selects its match's characters in the page's string, so the switch can widen it.
+Area: the run record's plan regions (their selection)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter 'RunRecordPageReadTests|MatchCharactersTests'
+Must go red: RedactionEngineTests/RunRecordPageReadTests switchWidensACarriedSelection; RedactionEngineTests/MatchCharactersTests anchoredRegionSelectsItsCharacters
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord+PlanSource.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord+PlanSource.swift
+index e2084a57..d0d58062 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord+PlanSource.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord+PlanSource.swift
+@@ -27,7 +27,7 @@ extension RunRecord {
+         regions.map { region in
+             let r = region.normalizedRect
+             let selected: Set<Int> = if region.kind == .placedFromTextAnchored, let range = region.pageCharacters {
+-                WordSelection.characters([range], in: text).offsets
++                WordSelection.characters([range], in: "").offsets
+             } else {
+                 []
+             }
