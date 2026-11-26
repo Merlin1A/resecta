@@ -84,19 +84,13 @@ struct CanvasPolishBundleTests {
         overlayPoints * viewScale
     }
 
-    @Test("The size label and the outline keep one on-screen size at 0.64 and 2.0")
+    @Test("The outline keeps one on-screen size at 0.64 and 2.0")
     func onScreenSizesHoldAcrossZoom() {
-        let label = "120 \u{00D7} 24" as NSString
-        func sizes(_ viewScale: CGFloat) -> (pill: CGFloat, stroke: CGFloat) {
-            let fingerScale = 1 / viewScale
-            return (
-                Self.onScreen(RedactionOverlayView.dimensionLabelPillSize(for: label, fingerScale: fingerScale).height, viewScale: viewScale),
-                Self.onScreen(RedactionOverlayView.regionLineWidth(isSelected: true, fingerScale: fingerScale), viewScale: viewScale)
-            )
+        func stroke(_ viewScale: CGFloat) -> CGFloat {
+            Self.onScreen(RedactionOverlayView.regionLineWidth(isSelected: true, fingerScale: 1 / viewScale), viewScale: viewScale)
         }
-        let fit = sizes(0.64), zoomed = sizes(2.0)
-        #expect(abs(fit.pill - zoomed.pill) < 0.5, "the label's pill: \(fit.pill) at fit, \(zoomed.pill) at 2x")
-        #expect(abs(fit.stroke - 2.4) < 0.01 && abs(zoomed.stroke - 2.4) < 0.01, "the selected line: 2.4 on-screen points")
+        let fit = stroke(0.64), zoomed = stroke(2.0)
+        #expect(abs(fit - 2.4) < 0.01 && abs(zoomed - 2.4) < 0.01, "the selected line: 2.4 on-screen points")
     }
 
     @Test("The lift shadow resolves to the same colour in dark appearance as in light")

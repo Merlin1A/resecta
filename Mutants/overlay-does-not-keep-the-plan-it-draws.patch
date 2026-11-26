@@ -3,16 +3,15 @@ Area: drawn plan
 Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/OverlayDrawnPlanTests
 Must go red: ResectaAppTests/OverlayDrawnPlanTests drawingKeepsThePlan
 Apply in a scratch worktree with `git apply`; discard after.
-
 diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift
-index 443e5e6a..acc693d9 100644
+index 8e9cb09bb..c70f71a2c 100644
 --- a/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift
 +++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift
-@@ -22,7 +22,6 @@ extension RedactionOverlayView {
-     /// segment of `draw(_:)`.
+@@ -20,7 +20,6 @@ extension RedactionOverlayView {
+     /// handles or corner dots of a selection — the first segment of `draw(_:)`.
      func drawCommittedRegions(ctx: CGContext, in rect: CGRect) {
          // The plan this page is drawn from is kept with its settings.
 -        coordinator?.noteDrawn(pageIndex: pageIndex, regions: regions)
          let paints = paintRects()
          // Perf: skip boxes entirely outside the dirty rect. The margin covers
-         // the badge, the shadow and a handle stepped clear of a thin box
+         // the shadow (20 overlay points), and whichever reaches further of a

@@ -171,8 +171,8 @@ class RedactionOverlayView: UIView {
     /// handle boxes, snap proximity) are specified in
     /// SCREEN points; the overlay's space is the page's unscaled bounds
     /// (PDFKit zooms the container), so a tolerance in overlay units is
-    /// the screen tolerance × 1/zoom. Document geometry (page-margin
-    /// inset, the dimension label) is deliberately NOT scaled.
+    /// the screen tolerance × 1/zoom. Document geometry (the page-margin
+    /// inset) is deliberately NOT scaled.
     var fingerScale: CGFloat {
         1 / max(snapZoomScaleOverride ?? currentZoomScale(), 0.01)
     }
@@ -199,12 +199,8 @@ class RedactionOverlayView: UIView {
     static let subThresholdRejectionAnnouncement =
         "Region too small. Zoom in to draw a smaller region."
 
-    // Polish helpers + adaptive-stroke constants live in
-    // the sibling extension file `RedactionOverlayView+CanvasPolish.swift`:
-    //   badgeOuterStrokeWidth / selectionHandleOuterStrokeWidth,
-    //   dimensionLabelSmallRegionThreshold,
-    //   DimensionLabelPosition + dimensionLabelPosition(…),
-    //   clampedDragOrigin(…).
+    // The move-drag's pure helper, `clampedDragOrigin(…)`, lives in the
+    // sibling extension file `RedactionOverlayView+CanvasPolish.swift`.
 
     // Predicate for the region tap that toggles on lift through
     // `coordinator?.toggleRegionSelection`. Returns true when either

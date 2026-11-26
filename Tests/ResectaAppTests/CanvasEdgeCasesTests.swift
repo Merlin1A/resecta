@@ -3,99 +3,13 @@ import Foundation
 import CoreGraphics
 @testable import ResectaApp
 
-// Canvas polish edge-cases. Two pure-function predicates pinned
-// independently so a drift on either branch surfaces in isolation.
-//
-// Dimension-label position helper. Small regions prefer above,
-//          taller regions prefer below; both fall back to the alternate
-//          slot, and suppress when neither slot fits in the overlay.
-// Drag-offset clamping helper. Grab point stays under finger up
-//          to the overlay edge; degenerate region-bigger-than-overlay
-//          case stays pinned at the origin corner.
+// Canvas polish edge-cases: the drag-offset clamping helper. The grab
+// point stays under the finger up to the overlay edge; a degenerate
+// region bigger than the overlay stays pinned at the origin corner.
 
 @Suite("Canvas edge cases")
 @MainActor
 struct CanvasEdgeCasesTests {
-
-    // MARK: - Dimension label position
-
-    @Test("Small region (<40pt tall) with room above prefers above")
-    func smallRegionPrefersAbove() {
-        // Region 200x20 in the middle of a 400x400 overlay. With pill
-        // height 16 and gap 4, above wants minY - 16 - 4 = 100 - 20 = 80.
-        let rect = CGRect(x: 50, y: 100, width: 200, height: 20)
-        let position = RedactionOverlayView.dimensionLabelPosition(
-            regionRect: rect,
-            pillHeight: 16,
-            overlayHeight: 400
-        )
-        #expect(position == .above(y: 80))
-    }
-
-    @Test("Tall region (>=40pt) with room below stays below (legacy posture)")
-    func tallRegionStaysBelow() {
-        // Region 200x80, plenty of room below: maxY (180) + gap (4) = 184.
-        let rect = CGRect(x: 50, y: 100, width: 200, height: 80)
-        let position = RedactionOverlayView.dimensionLabelPosition(
-            regionRect: rect,
-            pillHeight: 16,
-            overlayHeight: 400
-        )
-        #expect(position == .below(y: 184))
-    }
-
-    @Test("Small region with no room above falls back to below")
-    func smallRegionNoAboveFallsBack() {
-        // Region near top edge: minY=4. Above would need y = 4-16-4 = -16
-        // → out of bounds. Falls back to below: maxY(24) + gap(4) = 28.
-        let rect = CGRect(x: 50, y: 4, width: 200, height: 20)
-        let position = RedactionOverlayView.dimensionLabelPosition(
-            regionRect: rect,
-            pillHeight: 16,
-            overlayHeight: 400
-        )
-        #expect(position == .below(y: 28))
-    }
-
-    @Test("Tall region with no room below falls back to above")
-    func tallRegionNoBelowFallsBack() {
-        // Region near bottom: maxY = 390, overlayHeight 400. Below needs
-        // y + 16 <= 400 → 390+4+16 = 410 > 400. Falls back to above:
-        // minY(310) - 16 - 4 = 290.
-        let rect = CGRect(x: 50, y: 310, width: 200, height: 80)
-        let position = RedactionOverlayView.dimensionLabelPosition(
-            regionRect: rect,
-            pillHeight: 16,
-            overlayHeight: 400
-        )
-        #expect(position == .above(y: 290))
-    }
-
-    @Test("Region with no room above OR below is suppressed entirely")
-    func suppressedWhenNoRoomEitherSide() {
-        // Region fills the overlay vertically; neither above nor below
-        // fits. Label is suppressed rather than clamped onto the region.
-        let rect = CGRect(x: 50, y: 0, width: 200, height: 400)
-        let position = RedactionOverlayView.dimensionLabelPosition(
-            regionRect: rect,
-            pillHeight: 16,
-            overlayHeight: 400
-        )
-        #expect(position == .suppressed)
-    }
-
-    @Test("Threshold boundary: exactly 40pt tall uses the below branch")
-    func thresholdBoundary() {
-        // Threshold is `< 40` (strict less-than). A 40pt-tall region
-        // falls into the tall-branch and prefers below.
-        let rect = CGRect(x: 50, y: 100, width: 200, height: 40)
-        let position = RedactionOverlayView.dimensionLabelPosition(
-            regionRect: rect,
-            pillHeight: 16,
-            overlayHeight: 400
-        )
-        #expect(position == .below(y: 144))
-    }
 
     // MARK: - Drag-offset clamping
 
