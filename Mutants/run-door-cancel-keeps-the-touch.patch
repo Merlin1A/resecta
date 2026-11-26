@@ -5,12 +5,12 @@ Must go red: ResectaAppTests/RunDoorHeldTouchTests cancelledTouchOpensTheDoor; R
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Touches.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Touches.swift
-index 0fd7714f..89604bb5 100644
+index bec0a9d8..1cf14894 100644
 --- a/Sources/ResectaApp/Overlay/RedactionOverlayView+Touches.swift
 +++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+Touches.swift
-@@ -300,7 +300,9 @@ extension RedactionOverlayView {
-             // Restore the pre-resize rect (nothing was committed)
-             regions[idx].normalizedRect = preResizeNormalizedRect
+@@ -308,7 +308,9 @@ extension RedactionOverlayView {
+         for i in regions.indices {
+             if let before = preGestureDrawnPageRects[regions[i].id] { regions[i].drawnPageRect = before }
          }
 +        let held = primaryTouch
          resetDragState()

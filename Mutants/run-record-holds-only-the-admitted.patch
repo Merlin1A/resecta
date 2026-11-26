@@ -5,9 +5,10 @@ Must go red: ResectaAppTests/RunRecordBoxesCaptureTests admittedAndRefusedAreThe
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/State/RunInputs.swift b/Sources/ResectaApp/State/RunInputs.swift
+index 4f73f4df6..edcf320d7 100644
 --- a/Sources/ResectaApp/State/RunInputs.swift
 +++ b/Sources/ResectaApp/State/RunInputs.swift
-@@ -29,7 +29,7 @@
+@@ -32,7 +32,7 @@ enum RunInputs {
              fillColor: snapshot.fillColor,
              exportDPI: snapshot.exportDPI,
              pages: (0..<pageCount).map { page in

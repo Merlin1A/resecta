@@ -1,0 +1,19 @@
+Property: The canvas probe and the run refuse a storing map that is off by a twentieth of a point, so the 0.01 pt tolerance is not too loose.
+Area: canvas (box-place check)
+Test command: xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BoxPlaceCheckTests
+Must go red: ResectaAppTests/BoxPlaceCheckTests probePassesEverywhere; ResectaAppTests/BoxPlaceCheckTests drawnBoxCarriesItsPage
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Coordinates.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Coordinates.swift
+index f5b14995..55ceba70 100644
+--- a/Sources/ResectaApp/Overlay/RedactionOverlayView+Coordinates.swift
++++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+Coordinates.swift
+@@ -17,7 +17,7 @@ extension RedactionOverlayView {
+         // The page's rectangle is the STORED page (PDFKit turns this view
+         // with the page); a region lives in the SHOWN frame (`CanvasTurn`).
+         let stored = CGRect(
+-            x: (rect.minX - page.minX) / w,
++            x: (rect.minX - page.minX + 0.05) / w,
+             y: 1.0 - ((rect.maxY - page.minY) / h),   // Flip Y: UIKit top-left -> PDF bottom-left
+             width: rect.width / w,
+             height: rect.height / h

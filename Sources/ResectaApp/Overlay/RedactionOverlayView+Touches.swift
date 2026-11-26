@@ -228,6 +228,7 @@ extension RedactionOverlayView {
             moveCommitFeedback.impactOccurred()
             coordinator?.commitMove(id, page: pageIndex,
                                     newRect: region.normalizedRect,
+                                    drawnPageRect: drawnPageRects(for: [id])[id],
                                     undoManager: window?.undoManager)
             return
         }
@@ -238,6 +239,7 @@ extension RedactionOverlayView {
             moveCommitFeedback.impactOccurred(intensity: 0.4)  // a light tick: the resize landed
             coordinator?.commitResize(id, page: pageIndex,
                                       newRect: region.normalizedRect,
+                                      drawnPageRect: drawnPageRects(for: [id])[id],
                                       undoManager: window?.undoManager)
             return
         }
@@ -256,11 +258,13 @@ extension RedactionOverlayView {
         }
 
         let normalizedRect = overlayToPDFNormalized(rect)
-        let region = RedactionRegion(
+        var region = RedactionRegion(
             id: UUID(),
             normalizedRect: normalizedRect,
             source: .manual
         )
+        // Where PDFKit puts the band on the page, for the run's box-place check.
+        region.drawnPageRect = pageRectByPDFKit(rect)
         moveCommitFeedback.impactOccurred(intensity: 0.4)  // a light tick: the box landed
         coordinator?.addRegion(region, page: pageIndex, undoManager: window?.undoManager)
         // VoiceOver announcement on region commit
@@ -300,12 +304,18 @@ extension RedactionOverlayView {
             // Restore the pre-resize rect (nothing was committed)
             regions[idx].normalizedRect = preResizeNormalizedRect
         }
+        // The page rectangles the gesture's steps took go back with the places.
+        for i in regions.indices {
+            if let before = preGestureDrawnPageRects[regions[i].id] { regions[i].drawnPageRect = before }
+        }
         resetDragState()
         setNeedsDisplay()
     }
 
     private func resetDragState() {
         coordinator?.setCanvasHoldsTouch(false)
+        gestureOverlayRects = [:]
+        preGestureDrawnPageRects = [:]
         primaryTouch = nil
         dragOrigin = nil
         currentDragRect = nil

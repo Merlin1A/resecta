@@ -1,0 +1,21 @@
+Property: A box stored more than 0.01 pt off where PDFKit put it, by the run's frame, is refused.
+Area: engine (box-place check)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter RunRecordBoxPlaceTests
+Must go red: RedactionEngineTests/RunRecordBoxPlaceTests storedOffItsDrawnPlace
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord+BoxPlace.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord+BoxPlace.swift
+index d87ca2dd..32cfe05e 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord+BoxPlace.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord+BoxPlace.swift
+@@ -117,8 +117,8 @@ extension RunRecord.Page {
+         guard !canvasFailed, let geometry, geometryAtStore == geometry else { return false }
+         return regions.allSatisfy { region in
+             guard let drawn = region.drawnPageRect else { return true }
+-            return RunRecord.sideGap(geometry.pageRect(ofDisplayedShare: region.normalizedRect), drawn)
+-                <= RunRecord.boxPlaceTolerance
++            _ = drawn
++            return true
+         }
+     }
+ }

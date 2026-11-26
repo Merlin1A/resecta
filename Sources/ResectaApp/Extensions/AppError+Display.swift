@@ -52,6 +52,9 @@ extension PipelineError {
                 "Image Buffer Error"
             case .fillVerificationFailed:
                 "Redaction Verification Failed"
+            case .boxPlaceUnconfirmed:
+                // The sibling's title: the box-place check is a verification.
+                "Redaction Verification Failed"
             case .renderTimeout:
                 "Rendering Timed Out"
             case .pageTooLarge:
@@ -144,6 +147,11 @@ extension PipelineError {
                 "An image buffer could not be created for page \(p + 1). Try reducing output quality in Settings."
             case .fillVerificationFailed(let p):
                 "Redaction fill verification did not pass for page \(p + 1). The redaction may not be complete. Try again or reduce output quality in Settings."
+            case .boxPlaceUnconfirmed(let p):
+                // Refused as the run starts redacting, before any page is
+                // drawn or any file written; neither a retry nor a lower
+                // quality helps.
+                "A box on page \(p + 1) could not be confirmed where it was drawn. Redaction stopped before any file was written."
             case .renderTimeout(let p):
                 "Page \(p + 1) could not be rendered within the time limit. Try reducing output quality in Settings."
             case .pageTooLarge(let p):

@@ -71,8 +71,10 @@ struct RegionMarksEditsTests {
         let state = RedactionState()
         let region = Self.placed(.ocr(confidence: 0.9))
         state.addRegion(region, page: 0, undoManager: nil)
-        _ = state.moveRegion(region.id, page: 0, newRect: Self.rect.offsetBy(dx: 0.05, dy: 0), undoManager: nil, anchored: true)
-        let moved = try #require(state.regions[0]?.first)
+        _ = state.moveRegion(region.id, page: 0, newRect: Self.rect.offsetBy(dx: 0.05, dy: 0), undoManager: nil)
+        var moved = try #require(state.regions[0]?.first)
         #expect(!moved.placedFromPageText && !moved.textAnchored)
+        moved.textAnchored = true
+        #expect(!moved.textAnchored, "anchoring set on a box not placed from the text stays off")
     }
 }

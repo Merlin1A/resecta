@@ -181,6 +181,13 @@ final class PipelineCoordinator: @unchecked Sendable {
         self.redactionState = redactionState
         self.settingsState = settingsState
         self.userTermsStore = userTermsStore
+        // The box-place check's note: a page's geometry when its first box
+        // is stored, read from the open document as the run entry reads it.
+        redactionState.pageGeometryReader = { [weak documentState] index in
+            documentState?.sourceDocument?.page(at: index).map {
+                RunInputs.PageGeometry(cropBox: $0.bounds(for: .cropBox), rotation: $0.rotation)
+            }
+        }
 
         // Memory mitigation — on memory warning, both lower dpiCap and
         // collapse rasterization parallelism to 1 until workspace teardown.

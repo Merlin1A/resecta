@@ -78,7 +78,9 @@ extension RedactionOverlayView {
         }
         moveCommitFeedback.impactOccurred()
         coordinator?.commitMoveMultiple(members.map { (id: $0.id, newRect: $0.normalizedRect) },
-                                        page: pageIndex, undoManager: window?.undoManager)
+                                        page: pageIndex,
+                                        drawnPageRects: drawnPageRects(for: members.map(\.id)),
+                                        undoManager: window?.undoManager)
     }
 
     /// Update all selected regions' positions during a group move. One
@@ -99,7 +101,7 @@ extension RedactionOverlayView {
         for i in regions.indices where selectedIDs.contains(regions[i].id) {
             guard let originalNorm = preDragGroupRects[regions[i].id] else { continue }
             let moved = pdfNormalizedToOverlay(originalNorm).offsetBy(dx: dx, dy: dy)
-            regions[i].normalizedRect = overlayToPDFNormalized(moved)
+            storeFromGesture(i, overlayRect: moved)
         }
     }
 
@@ -132,7 +134,7 @@ extension RedactionOverlayView {
         newRect.origin = CGPoint(x: max(0, min(newRect.minX, bounds.width - newRect.width)),
                                  y: max(0, min(newRect.minY, bounds.height - newRect.height)))
 
-        regions[idx].normalizedRect = overlayToPDFNormalized(newRect)
+        storeFromGesture(idx, overlayRect: newRect)
 
         // Dirty-rect optimization: only invalidate old + new rect area (+ margin for shadow/handles)
         let margin: CGFloat = 20
