@@ -64,7 +64,7 @@ extension RedactionOverlayView: UIContextMenuInteractionDelegate {
     ) -> [ContextMenuRow] {
         let held = selectedIDs.contains(region.id)
         let onGroup = held && selectedIDs.count > 1
-        let wholePage = region.normalizedRect == CGRect(x: 0, y: 0, width: 1, height: 1)
+        let wholePage = RedactionState.isWholePage(region.normalizedRect)
         var rows: [ContextMenuRow] = []
         if let infoTitle { rows.append(.info(infoTitle)) }
         rows.append(.selectAllOnPage(enabled: canSelectAllOnPage))

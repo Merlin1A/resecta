@@ -95,8 +95,10 @@ extension RedactionOverlayView {
             }
         }
         guard !union.isNull else { return }
-        let dx = min(max(point.x - start.x, bounds.minX - union.minX), bounds.maxX - union.maxX)
-        let dy = min(max(point.y - start.y, bounds.minY - union.minY), bounds.maxY - union.maxY)
+        // Held so the group stays on the page as PDFKit places it.
+        let page = pageRectOnCanvas
+        let dx = min(max(point.x - start.x, page.minX - union.minX), page.maxX - union.maxX)
+        let dy = min(max(point.y - start.y, page.minY - union.minY), page.maxY - union.maxY)
 
         for i in regions.indices where selectedIDs.contains(regions[i].id) {
             guard let originalNorm = preDragGroupRects[regions[i].id] else { continue }
@@ -123,7 +125,7 @@ extension RedactionOverlayView {
             touchPoint: point,
             dragOffset: dragOffset,
             regionSize: regionSize,
-            overlaySize: bounds.size
+            page: pageRectOnCanvas
         )
 
         var newRect = CGRect(origin: newOrigin, size: regionSize)
@@ -131,8 +133,9 @@ extension RedactionOverlayView {
         // Apply snap guides during move, then keep the region on the page:
         // a guide near the edge may pull it past.
         newRect = snapEngine.applySnapping(to: newRect, excluding: selectedID, in: snapPage)
-        newRect.origin = CGPoint(x: max(0, min(newRect.minX, bounds.width - newRect.width)),
-                                 y: max(0, min(newRect.minY, bounds.height - newRect.height)))
+        let page = pageRectOnCanvas
+        newRect.origin = CGPoint(x: max(page.minX, min(newRect.minX, page.maxX - newRect.width)),
+                                 y: max(page.minY, min(newRect.minY, page.maxY - newRect.height)))
 
         storeFromGesture(idx, overlayRect: newRect)
 

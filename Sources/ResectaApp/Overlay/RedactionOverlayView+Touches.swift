@@ -180,7 +180,9 @@ extension RedactionOverlayView {
                 // Clamp the rubber band to the page —
                 // mirrors the resize clamp in `updateSelectedRegionForResize`.
                 // A band entirely off-page leaves the last rect in place.
-                rect = rect.intersection(bounds)
+                // The page is where PDFKit puts it (`pageRectOnCanvas`),
+                // which the maps divide by, not the overlay's rounded bounds.
+                rect = rect.intersection(pageRectOnCanvas)
                 guard !rect.isNull else { return }
                 currentDragRect = rect
                 setNeedsDisplay()

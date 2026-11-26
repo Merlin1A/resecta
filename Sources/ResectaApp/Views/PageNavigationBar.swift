@@ -268,7 +268,7 @@ extension PageNavigationBar {
     /// page's unit rectangle.
     private static func wholePageRegion(on page: Int, in redactionState: RedactionState) -> RedactionRegion? {
         redactionState.regions[page]?.first {
-            $0.source == .manual && $0.normalizedRect == CGRect(x: 0, y: 0, width: 1, height: 1)
+            $0.source == .manual && RedactionState.isWholePage($0.normalizedRect)
         }
     }
 
