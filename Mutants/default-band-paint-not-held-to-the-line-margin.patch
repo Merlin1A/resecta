@@ -1,0 +1,20 @@
+Property: With the switch off, a box painted with its default band is never painted less than its line margin: the band's paint is taken with the line margin's.
+Area: the plan's default band (PaintPlan+Make, defaultPaint)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter PaintPlanDefaultBandTests
+Must go red: RedactionCoreTests/PaintPlanDefaultBandTests narrowGapHoldsTheLineMargin; RedactionCoreTests/PaintPlanDefaultBandTests closerSmallTypeNeighbourHoldsTheLineMargin
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+index 46e363987..d8108650a 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+@@ -483,8 +483,7 @@ private struct Maker {
+         // the line margin's, and each limit is the looser of the two (none
+         // is looser than any), so the box's pixels hold the line margin's
+         // wherever the band's start or a closer neighbour stops its own.
+-        return (band, on.paint.union(margin.paint), Self.looserAbove(on.above, margin.above),
+-                Self.looserBelow(on.below, margin.below), .taken)
++        return (band, on.paint, on.above, on.below, .taken)
+     }
+ 
+     /// The looser of two limits above a box: the higher, or none if either is none.
