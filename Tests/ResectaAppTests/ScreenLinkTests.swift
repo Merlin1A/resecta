@@ -224,7 +224,16 @@ struct ScreenLinkTests {
             let ctx = context.cgContext
             ctx.translateBy(x: 0.37, y: 0.61)
             ctx.scaleBy(x: 1.37, y: 1.37)
-            if let dirty { ctx.clip(to: dirty) }
+            if let dirty {
+                // UIKit's dirty rectangles lie on the bitmap's pixel lines:
+                // the rectangle moved out to whole pixels, so the clip
+                // covers no pixel in part.
+                let t = ctx.userSpaceToDeviceSpaceTransform
+                let d = dirty.applying(t)
+                let x0 = d.minX.rounded(.down), y0 = d.minY.rounded(.down)
+                let onLines = CGRect(x: x0, y: y0, width: d.maxX.rounded(.up) - x0, height: d.maxY.rounded(.up) - y0)
+                ctx.clip(to: onLines.applying(t.inverted()))
+            }
             let toDevice = ctx.userSpaceToDeviceSpaceTransform
             lines = ScreenLink.deviceLines(rect, toDevice: toDevice, clip: CGRect(x: 0, y: 0, width: 80, height: 60))
             RedactionOverlayView.fillOnPixelLines([rect], clip: CGRect(x: 0, y: 0, width: 80, height: 60),
