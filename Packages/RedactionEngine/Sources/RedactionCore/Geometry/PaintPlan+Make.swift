@@ -479,7 +479,24 @@ private struct Maker {
         let wordInBand = complement.lines.contains { $0.words.contains { $0.box.sharesArea(with: band) } }
         let drawnInPaint = drawing.objects.contains { $0.sharesArea(with: on.paint) }
         guard !wordInBand && !drawnInPaint else { return lineMargin(.notTaken(.wordOrDrawingInBand)) }
-        return (band, on.paint, on.above, on.below, .taken)
+        // Never less than the line margin: the band's paint is taken with
+        // the line margin's, and each limit is the looser of the two (none
+        // is looser than any), so the box's pixels hold the line margin's
+        // wherever the band's start or a closer neighbour stops its own.
+        return (band, on.paint.union(margin.paint), Self.looserAbove(on.above, margin.above),
+                Self.looserBelow(on.below, margin.below), .taken)
+    }
+
+    /// The looser of two limits above a box: the higher, or none if either is none.
+    static func looserAbove(_ a: Int?, _ b: Int?) -> Int? {
+        guard let a, let b else { return nil }
+        return Swift.max(a, b)
+    }
+
+    /// The looser of two limits below a box: the lower, or none if either is none.
+    static func looserBelow(_ a: Int?, _ b: Int?) -> Int? {
+        guard let a, let b else { return nil }
+        return Swift.min(a, b)
     }
 
     /// The default band: on each line, the column and the tight rectangle
