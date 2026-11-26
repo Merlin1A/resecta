@@ -1272,7 +1272,7 @@
       }
     },
     {
-      "id": "J-start-E4-level-by-tight",
+      "id": "J-start-level-by-tight",
       "inputs": {
         "start": {
           "box": {
@@ -1329,7 +1329,7 @@
       }
     },
     {
-      "id": "J-start-E2-equal-not-held",
+      "id": "J-start-equal-not-held",
       "inputs": {
         "start": {
           "box": {
@@ -1372,7 +1372,7 @@
       }
     },
     {
-      "id": "J-start-E2-equal-several-lines",
+      "id": "J-start-equal-several-lines",
       "inputs": {
         "start": {
           "box": {
