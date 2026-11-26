@@ -5,9 +5,10 @@ Must go red: RedactionCoreTests/PaintPlanDefaultBandTests pictureInTheSlot
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+index 46e363987..63635c21a 100644
 --- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
-@@ -417,8 +417,9 @@ private struct Maker {
+@@ -476,8 +476,9 @@ private struct Maker {
          if let start { on.paint.minX = Swift.max(on.paint.minX, Swift.min(start, band.minX)) }
          // The band is read whole, under the box's own letters too: what lies
          // in it is not told by how far the selected text reaches.
@@ -17,5 +18,5 @@ diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+M
 +        let wordInBand = complement.lines.contains { $0.words.contains { $0.box.sharesArea(with: slot) } }
 +        let drawnInPaint = drawing.objects.contains { $0.sharesArea(with: slot) }
          guard !wordInBand && !drawnInPaint else { return lineMargin(.notTaken(.wordOrDrawingInBand)) }
-         return (band, on.paint, on.above, on.below, .taken)
-     }
+         // Never less than the line margin: the band's paint is taken with
+         // the line margin's, and each limit is the looser of the two (none
