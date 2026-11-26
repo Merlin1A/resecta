@@ -252,7 +252,8 @@ enum TestPipeline {
         mode: PipelineMode,
         regions: [Int: [RedactionRegion]]?,
         fillColor: FillColor = .black,
-        dpi: Int = 150
+        dpi: Int = 150,
+        outputURL chosenURL: URL? = nil
     ) async throws -> (url: URL, outcome: ProductionPageLoop.RedactionOutcome) {
         guard let doc = PDFDocument(data: fixtureData) else {
             throw TestPipelineError.invalidFixture
@@ -289,7 +290,7 @@ enum TestPipeline {
                 hasText: pageMode == .searchableRedaction)
         }
 
-        let outputURL = FileManager.default.temporaryDirectory
+        let outputURL = chosenURL ?? FileManager.default.temporaryDirectory
             .appendingPathComponent("test_pipeline_\(UUID().uuidString).pdf")
         let outcome = try await ProductionPageLoop.runRedaction(
             pages: pages, outputURL: outputURL, dpiCap: dpi)

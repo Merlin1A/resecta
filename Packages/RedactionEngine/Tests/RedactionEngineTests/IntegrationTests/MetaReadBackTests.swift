@@ -197,20 +197,28 @@ struct MetaReadBackTests {
 
     @Test("Values left as the writer wrote them stop the export before it is kept")
     func loopStopsOnValues() async throws {
+        let output = FileManager.default.temporaryDirectory.appendingPathComponent("refused_\(UUID().uuidString).pdf")
+        defer { try? FileManager.default.removeItem(at: output) }
         await #expect(throws: PipelineError.self) {
             try await PDFStreamReconstructor.$finalizeSkipsFixedValues.withValue(true) {
-                _ = try await TestPipeline.productionRun(Self.textPages(1), mode: .secureRasterization, regions: nil)
+                _ = try await TestPipeline.productionRun(Self.textPages(1), mode: .secureRasterization, regions: nil,
+                                                         outputURL: output)
             }
         }
+        #expect(!FileManager.default.fileExists(atPath: output.path), "a file was kept at the output")
     }
 
     @Test("An identifier left as the writer wrote it stops the export before it is kept")
     func loopStopsOnIdentifier() async throws {
+        let output = FileManager.default.temporaryDirectory.appendingPathComponent("refused_\(UUID().uuidString).pdf")
+        defer { try? FileManager.default.removeItem(at: output) }
         await #expect(throws: PipelineError.self) {
             try await PDFStreamReconstructor.$finalizeSkipsIdentifier.withValue(true) {
-                _ = try await TestPipeline.productionRun(Self.textPages(1), mode: .secureRasterization, regions: nil)
+                _ = try await TestPipeline.productionRun(Self.textPages(1), mode: .secureRasterization, regions: nil,
+                                                         outputURL: output)
             }
         }
+        #expect(!FileManager.default.fileExists(atPath: output.path), "a file was kept at the output")
     }
 
     // The dictionary past the old 256 KiB window, made directly as the

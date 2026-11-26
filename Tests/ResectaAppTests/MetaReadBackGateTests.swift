@@ -47,4 +47,21 @@ struct MetaReadBackGateTests {
         #expect(coord.redactionState.outputURL == nil, "an output was promoted")
         #expect(coord.documentState.phaseKind == .failed, "the run ended \(coord.documentState.phaseKind)")
     }
+
+    @Test("A read-back that does not hold promotes no output, and the run fails",
+          .timeLimit(.minutes(3)))
+    func readBackRefusalPromotesNoOutput() async throws {
+        let coord = makeLoadedCoordinator()
+        coord.redactionState.addRegion(RunRecordTests.region(CGRect(x: 0.1, y: 0.8, width: 0.6, height: 0.05)),
+                                       page: 0, undoManager: nil)
+        // The identifier left as the writer wrote it: the page count and the
+        // whole-patch flag hold, so the read-back alone stops the file.
+        try await PDFStreamReconstructor.$finalizeSkipsIdentifier.withValue(true) {
+            coord.runFullPipeline(documentOverride: .secureRasterization)
+            let run = try #require(coord.documentState.activePipelineTask, "the run started")
+            await run.value
+        }
+        #expect(coord.redactionState.outputURL == nil, "an output was promoted")
+        #expect(coord.documentState.phaseKind == .failed, "the run ended \(coord.documentState.phaseKind)")
+    }
 }
