@@ -7,12 +7,12 @@ Apply in a scratch worktree with `git apply`; discard after.
 diff --git a/Sources/ResectaApp/State/RunInputs.swift b/Sources/ResectaApp/State/RunInputs.swift
 --- a/Sources/ResectaApp/State/RunInputs.swift
 +++ b/Sources/ResectaApp/State/RunInputs.swift
-@@ -27,7 +27,7 @@
+@@ -29,7 +29,7 @@
              fillColor: snapshot.fillColor,
              exportDPI: snapshot.exportDPI,
              pages: (0..<pageCount).map { page in
 -                let drawn = (regions[page] ?? []).map {
 +                let drawn = (regions[page] ?? []).filter { RedactionRegion.isAdmitted(normalizedRect: $0.normalizedRect) }.map {
-                     RunRecord.DrawnRegion(id: $0.id, normalizedRect: $0.normalizedRect)
+                     RunRecord.DrawnRegion(region: $0)
                  }
                  guard let sides = geometry[page] else { return RunRecord.Page(pageIndex: page, regions: drawn) }

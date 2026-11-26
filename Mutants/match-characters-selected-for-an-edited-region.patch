@@ -1,0 +1,19 @@
+Property: The plan's regions select a match's characters only for a region still anchored to its text.
+Area: search
+Test command: cd Packages/RedactionEngine && swift test --filter 'MatchCharactersTests'
+Must go red: RedactionEngineTests/MatchCharactersTests "A region moved or resized after it was placed selects nothing, and its kind says so"
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord+PlanSource.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord+PlanSource.swift
+index e2084a57..a99b1af9 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord+PlanSource.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord+PlanSource.swift
+@@ -26,7 +26,7 @@ extension RunRecord {
+     package static func planRegions(_ regions: [DrawnRegion], text: String) -> [PlanRegion] {
+         regions.map { region in
+             let r = region.normalizedRect
+-            let selected: Set<Int> = if region.kind == .placedFromTextAnchored, let range = region.pageCharacters {
++            let selected: Set<Int> = if let range = region.pageCharacters {
+                 WordSelection.characters([range], in: text).offsets
+             } else {
+                 []

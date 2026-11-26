@@ -1,0 +1,18 @@
+Property: With the switch on, widened compares with the switch-off paint, the default band where it is taken.
+Area: the plan's default band (PaintPlan.make, switch off)
+Test command: cd Packages/RedactionEngine && swift test --no-parallel --filter PaintPlanDefaultBandTests
+Must go red: RedactionCoreTests/PaintPlanDefaultBandTests aloneOnLineAlreadyAsWideAgainstTheDefault
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+@@ -319,7 +319,7 @@ private struct Maker {
+             let band = self.band(tight: tight, rows: rows)
+             // "Widened" compares with the paint the switch-off row gives:
+             // the default band where it is taken, else the line margin.
+-            let off = defaultPaint(tight: tight, rows: rows, regions: regions.map(\.rect), letters: letters)
++            let off = marginPaint(inner: tight, rows: rows)
+             // The one place a band is made: it must hold every covered region
+             // and every selected letter, or the box falls back.
+             let holds = regions.allSatisfy { band.contains($0.rect) } && letters.allSatisfy { band.contains($0) }

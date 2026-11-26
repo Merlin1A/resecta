@@ -1,0 +1,19 @@
+Property: A test launch with neither of the line's arguments sets its flag, so no other suite meets the line.
+Area: the first-time line in the editor
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppUITests/FirstDocumentHintUITests
+Must go red: ResectaAppUITests/FirstDocumentHintUITests testUITestLaunch_withNeitherArgument_theLineNeverShows
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/App/ResectaApp.swift b/Sources/ResectaApp/App/ResectaApp.swift
+index 064462a5..a737eb08 100644
+--- a/Sources/ResectaApp/App/ResectaApp.swift
++++ b/Sources/ResectaApp/App/ResectaApp.swift
+@@ -126,8 +126,6 @@ struct ResectaApp: App {
+             let hint = FirstDocumentHintStore(defaults: defaults)
+             if CommandLine.arguments.contains("--firstDocumentHintFresh") {
+                 hint.clear()
+-            } else if !CommandLine.arguments.contains("--firstDocumentHintStored") {
+-                hint.markDone()
+             }
+         }
+         if CommandLine.arguments.contains("--searchSourceFilter=ocr"),

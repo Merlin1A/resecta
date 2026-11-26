@@ -136,6 +136,9 @@ import RedactionEngine
     /// such exit has already surfaced its notice and, for a Scan, its
     /// failed run record.
     private func prepareSearchRun() async -> PreparedRun? {
+        // Read before the cancel, which sets it false: a run cut short has
+        // recorded only part of its facts, so the place keeps what it held.
+        let wasSearching = searchState.isSearching
         // A run this one replaces keeps no account, unless an Apply took a
         // record from it while it was open (its boxes are on the document).
         searchState.closeAccount(.replaced)
@@ -150,7 +153,10 @@ import RedactionEngine
         searchState.captureFingerprintsBeforeScan()
         let cleared = SearchAndRedactSheet.rerunClearedCount(in: searchState)
         searchState.skipNextRerunNotice = false  // one shot (a recall)
+        let notices = searchState.notices.heldForNextRun(
+            lines: SearchNoticePlace.runLines(searchState.noticeFacts), wasSearching: wasSearching)
         searchState.clearResults()
+        searchState.notices = notices
         let interface = searchState.searchModeType.interface
         if SearchAndRedactSheet.rerunClearedMessage(selectedCount: cleared, interface: interface) != nil {
             toastManager.post(.searchRerunCleared(count: cleared, interface: interface))

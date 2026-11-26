@@ -1,0 +1,20 @@
+Property: A cap change keeps a current kept plan at the new quality, and leaves one of an older version of its page as it was. Here it makes every kept page's plan again from the stored regions, so a page changed since it was drawn gets a plan of regions it was never drawn with.
+Area: kept plan
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/OverlayDrawnPlanTests
+Must go red: ResectaAppTests/OverlayDrawnPlanTests aCapChangeKeepsOnlyWhatWasDrawn
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
+index 814ef401..49618683 100644
+--- a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
++++ b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
+@@ -28,8 +28,7 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
+     var qualityCap: Int = defaultDPICap {
+         didSet {
+             guard qualityCap != oldValue, let state = redactionState else { return }
+-            for (pageIndex, kept) in state.drawnPlans
+-            where kept.pageVersion == state.pageVersion(pageIndex) && kept.fromStoredRegions == true {
++            for (pageIndex, _) in state.drawnPlans {
+                 noteDrawn(pageIndex: pageIndex, regions: state.regions[pageIndex] ?? [])
+             }
+             for (pageIndex, overlay) in activeOverlays {

@@ -120,6 +120,16 @@ struct ResectaApp: App {
                 defaults.removeObject(forKey: "autoVerify")
             }
         }
+        // The first-time line: a test launch sets its flag, so no suite meets
+        // the line, unless it asks for a fresh one or for the stored value.
+        if CommandLine.arguments.contains("--uitesting") {
+            let hint = FirstDocumentHintStore(defaults: defaults)
+            if CommandLine.arguments.contains("--firstDocumentHintFresh") {
+                hint.clear()
+            } else if !CommandLine.arguments.contains("--firstDocumentHintStored") {
+                hint.markDone()
+            }
+        }
         if CommandLine.arguments.contains("--searchSourceFilter=ocr"),
            let data = try? JSONEncoder().encode(SearchState.LastSearchFilterShape(
                sourceFilter: .ocrOnly, minimumOCRConfidence: 0, sortOrder: .discoveryOrder
@@ -253,6 +263,7 @@ struct ResectaApp: App {
         .detectionError(.detectionCorpusInvalid),
         .redactionError(.insufficientMemory(pageIndex: 0)),
         .redactionError(.unsupportedPageGeometry(pageIndex: 0)),
+        .redactionError(.boxCannotShowLength(pageIndex: 0)),
         .redactionError(.bitmapCreationFailed(pageIndex: 0)),
         .redactionError(.fillVerificationFailed(pageIndex: 0)),
         .redactionError(.renderTimeout(pageIndex: 0)),
@@ -287,6 +298,7 @@ struct ResectaApp: App {
             switch failure {
             case .insufficientMemory: "redactionError.insufficientMemory"
             case .unsupportedPageGeometry: "redactionError.unsupportedPageGeometry"
+            case .boxCannotShowLength: "redactionError.boxCannotShowLength"
             case .bitmapCreationFailed: "redactionError.bitmapCreationFailed"
             case .fillVerificationFailed: "redactionError.fillVerificationFailed"
             case .renderTimeout: "redactionError.renderTimeout"

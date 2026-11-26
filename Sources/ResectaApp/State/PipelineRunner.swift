@@ -279,6 +279,19 @@ struct PipelineRunner {
             try Task.checkCancellation()
             captureRuns = 2
         }
+        // The plan's words: each page holding a box is read once per
+        // document, and only while the plan reads words. A box placed while
+        // the read ran is read on a second pass; a page whose read still
+        // fails is planned with no words.
+        if RunRecord.planReadsWords {
+            for _ in 0..<2 {
+                let version = redactionState.regionVersion
+                await coordinator.documentState.fillPageReads(
+                    for: Set(redactionState.regions.filter { !$0.value.isEmpty }.keys))
+                try Task.checkCancellation()
+                if redactionState.regionVersion == version { break }
+            }
+        }
         // A finger that came down on the canvas while the capture ran holds a
         // box away from its stored place: the run ends here, silently, as the
         // funnel's refusal would have (`DocumentState.redactRefusal(with:)`).
@@ -290,7 +303,12 @@ struct PipelineRunner {
         let confirmed = RunInputs.confirmedRecord(
             pageCount: coordinator.documentState.pageCount,
             geometry: coordinator.documentState.sourceDocument.map(RunInputs.pageGeometry(of:)) ?? [:],
-            regions: redactionState.regions, settings: runSettings)
+            regions: redactionState.regions, reads: coordinator.documentState.pageReads, settings: runSettings)
+        // A box the release cannot apply as planned refuses the run here,
+        // before any page is built or rasterised.
+        if let page = confirmed.firstPageWithBoxThatCannotShowLength {
+            throw PipelineError.redactionError(.boxCannotShowLength(pageIndex: page))
+        }
         let pages = coordinator.buildPDFPageData(
             effectiveMode: effectiveMode, runSettings: runSettings, inkPlans: sensitiveTerms.inkPlans,
             record: confirmed)

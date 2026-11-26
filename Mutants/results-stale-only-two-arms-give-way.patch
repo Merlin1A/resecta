@@ -1,0 +1,23 @@
+Property: Every verdict's sentence gives way to the one that says to run Redact again when the result does not stand. Planted: the earlier rule, under which only the pass with no note and the run whose checks did not run give way, and only for a missing PDF.
+Area: the results masthead, a result that no longer stands
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationMastheadTests -only-testing:ResectaAppTests/VerificationResultsActionsTests
+Must go red: ResectaAppTests/VerificationMastheadTests sentenceWhenTheResultDoesNotStand; ResectaAppTests/VerificationMastheadTests spokenLabelWhenTheResultDoesNotStand
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationMasthead.swift b/Sources/ResectaApp/Views/VerificationMasthead.swift
+index e5d024c..9689242 100644
+--- a/Sources/ResectaApp/Views/VerificationMasthead.swift
++++ b/Sources/ResectaApp/Views/VerificationMasthead.swift
+@@ -133,8 +133,11 @@ extension VerificationResultsView {
+         report: VerificationReport, outputExists: Bool = true, isStale: Bool = false,
+         mode: RunMode = .searchableOrUnknown, findingCount: Int = 0
+     ) -> String? {
+-        guard resultStands(outputExists: outputExists, isStale: isStale) else { return outputMissingSentence }
+         let partition = partition(report)
++        if case .pass = report.overallStatus, visibleNoteCount(partition) + findingCount == 0, !outputExists {
++            return outputMissingSentence
++        }
++        if report.overallStatus.isSkipped, !outputExists { return outputMissingSentence }
+         switch report.overallStatus {
+         case .pass, .info, .notApplicable:
+             let notes = visibleNoteCount(partition) + findingCount

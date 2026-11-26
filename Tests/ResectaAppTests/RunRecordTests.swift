@@ -77,7 +77,7 @@ struct RunRecordTests {
     }
 
     static func drawn(_ regions: [RedactionRegion]) -> [RunRecord.DrawnRegion] {
-        regions.map { RunRecord.DrawnRegion(id: $0.id, normalizedRect: $0.normalizedRect) }
+        regions.map { RunRecord.DrawnRegion(region: $0) }
     }
 
     /// A finished run of one page with one box, verified, its inputs kept.

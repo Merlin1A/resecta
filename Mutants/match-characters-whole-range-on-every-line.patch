@@ -1,0 +1,19 @@
+Property: A match that wraps keeps each line's own characters, never the whole match's on every line.
+Area: search
+Test command: cd Packages/RedactionEngine && swift test --filter 'MatchCharactersTests'
+Must go red: RedactionEngineTests/MatchCharactersTests "A match that wraps keeps each line's own characters"
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
+index f1e44893..dd99e83d 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+Geometry.swift
+@@ -136,7 +136,7 @@ extension DocumentSearcher {
+                 let lineRange = lines.count == 1 ? nsRange : line.range(at: 0, on: page)
+                 let fitted = Self.inkFittedRect($0, page: page, text: line.string, range: lineRange, paintOnly: true)
+                 let rect = grown(fitted, line: line.bounds(for: page), by: Self.ownGlyphs(for: lineRange, page: page), page: page)
+-                return (rect, rect == fitted ? nil : fitted, lineRange)
++                return (rect, rect == fitted ? nil : fitted, nsRange)
+             }
+         }
+         return boxes.isEmpty ? nil : boxes

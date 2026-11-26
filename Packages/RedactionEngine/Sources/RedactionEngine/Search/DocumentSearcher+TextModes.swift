@@ -183,7 +183,7 @@ extension DocumentSearcher {
                         term: pattern,
                         matchRangeInSnippet: window.matchRange,
                         occurrenceID: occurrence, textLayerRect: line.textLayerRect, inkFitDegraded: line.degraded
-                    ).identified(by: line.identity))
+                    ).identified(by: line.identity).carrying(line.characters))
                 }
                 return true
             }

@@ -126,36 +126,44 @@ extension DocumentEditorView {
     var captionOverlay: some View {
         let occupant = Self.bottomSlotOccupant(
             phaseKind: documentState.phaseKind,
-            // The message and the first-time line have no view yet, so they never ask for the slot.
+            // The message host draws the receipt and does not ask here; the
+            // first-time line waits behind a receipt in its own rule.
             messageShowing: false,
             selectionNewerThanMessage: false,
-            firstTimeLineDue: false,
+            firstTimeLineDue: firstDocumentHintShows,
             selectedCount: redactionState.selectedRegionIDs.count,
             addToSelection: isMultiSelectActive,
             activeTool: activeTool
         )
-        return Group {
-            if let occupant, Self.bottomSlotDrawsHere(occupant) {
-                BottomSlot(
-                    footPadding: Self.bottomSlotFootPadding + parkedChromeLayout.hintCapsuleLift,
-                    identifier: Self.bottomSlotIdentifier(occupant),
-                    label: slotAccessibilityLabel(occupant),
-                    takesTouches: occupant == .selection(adding: true) || occupant == .selection(adding: false)
-                ) {
-                    switch occupant {
-                    case .drawingCaption: drawingCaptionWords
-                    case .selection(adding: true): addModeWords
-                    case .selection(adding: false): SelectionBar(toolbar: editorToolbar)
-                    // Drawn by the message host.
-                    case .message: EmptyView()
-                    // The first-time line.
-                    case .firstTimeLine: EmptyView()
+        return ZStack(alignment: .bottom) {
+            Group {
+                if let occupant, Self.bottomSlotDrawsHere(occupant) {
+                    BottomSlot(
+                        footPadding: Self.bottomSlotFootPadding + parkedChromeLayout.hintCapsuleLift,
+                        identifier: Self.bottomSlotIdentifier(occupant),
+                        label: slotAccessibilityLabel(occupant),
+                        takesTouches: occupant == .selection(adding: true) || occupant == .selection(adding: false)
+                    ) {
+                        switch occupant {
+                        case .drawingCaption: drawingCaptionWords
+                        case .selection(adding: true): addModeWords
+                        case .selection(adding: false): SelectionBar(toolbar: editorToolbar)
+                        // Drawn by the message host.
+                        case .message: EmptyView()
+                        // Drawn beside the slot, at its own size.
+                        case .firstTimeLine: EmptyView()
+                        }
                     }
+                    .transition(.opacity)
                 }
-                .transition(.opacity)
+            }
+            .dynamicTypeSize(...Self.capsuleTypeSizeCeiling)
+            // The first-time line: its own size rule, not the capsules' ceiling.
+            if occupant == .firstTimeLine {
+                firstDocumentHintLine
+                    .transition(.opacity)
             }
         }
-        .dynamicTypeSize(...Self.capsuleTypeSizeCeiling)
         .animation(ResectaTokens.Anim.resolved(ResectaTokens.Anim.stateChange, reduceMotion: reduceMotion), value: occupant)
     }
 

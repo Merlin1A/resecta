@@ -1,0 +1,19 @@
+Property: A run with fewer or more rows than expected is unreadable.
+Area: measured run entry
+Test command: cd Packages/RedactionEngine && swift test --filter MeasuredRunTests
+Must go red: RedactionEngineTests/MeasuredRunTests "A short, long or empty run is unreadable"
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Tests/RedactionEngineTests/Fixtures/MeasuredRun.swift b/Packages/RedactionEngine/Tests/RedactionEngineTests/Fixtures/MeasuredRun.swift
+index e6d159d7..bfe33fbc 100644
+--- a/Packages/RedactionEngine/Tests/RedactionEngineTests/Fixtures/MeasuredRun.swift
++++ b/Packages/RedactionEngine/Tests/RedactionEngineTests/Fixtures/MeasuredRun.swift
+@@ -280,7 +280,7 @@ enum MeasuredRun {
+     /// all read as drawn by hand. A box widened in the "off" arm is a fault.
+     static func unreadable(rows: [Row], expected: Int) -> [String] {
+         var reasons: [String] = []
+-        if rows.isEmpty || rows.count != expected { reasons.append("rows \(rows.count) of \(expected)") }
++        if rows.isEmpty { reasons.append("rows \(rows.count) of \(expected)") }
+         let byArm = Dictionary(grouping: rows, by: \.arm)
+         if (byArm[.off]?.count ?? 0) != (byArm[.on]?.count ?? 0) { reasons.append("arms differ in rows") }
+         if (byArm[.on] ?? []).allSatisfy({ $0.widened == 0 }) { reasons.append("no widened box in the on arm") }

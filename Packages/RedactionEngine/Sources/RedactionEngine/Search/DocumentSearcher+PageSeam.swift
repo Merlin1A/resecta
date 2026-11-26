@@ -120,7 +120,7 @@ extension DocumentSearcher {
                     term: term,
                     matchRangeInSnippet: window.matchRange,
                     occurrenceID: occurrence, textLayerRect: box.textLayerRect, inkFitDegraded: box.degraded
-                ).identified(by: box.identity))
+                ).identified(by: box.identity).carrying(box.characters))
             }
         }
         return results

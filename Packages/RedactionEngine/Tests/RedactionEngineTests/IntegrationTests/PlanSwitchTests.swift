@@ -108,9 +108,10 @@ struct PlanSwitchTests {
             for r in box.regions {
                 let id = UUID()
                 ids.insert(id)
-                regions.append(RedactionRegion(id: id, normalizedRect: share(r),
-                                               source: box.search ? .searchMatch(term: "x") : .manual))
-                drawn.append(RunRecord.DrawnRegion(id: id, normalizedRect: share(r)))
+                let region = RedactionRegion(id: id, normalizedRect: share(r),
+                                             source: box.search ? .searchMatch(term: "x") : .manual)
+                regions.append(region)
+                drawn.append(RunRecord.DrawnRegion(region: region))
             }
             let r = rect64(box.rect)
             planBoxes.append(PaintedBox(regionIDs: ids, inner: r, paint: r, tight: r, limitAbove: nil, limitBelow: nil,
@@ -156,7 +157,7 @@ struct PlanSwitchTests {
     @Test("The record's page makes the same as-placed plan with the switch on or off")
     func pageInitIgnoresTheSwitch() throws {
         let drawn = Self.boxes.flatMap(\.regions).map {
-            RunRecord.DrawnRegion(id: UUID(), normalizedRect: Self.share($0))
+            RunRecord.DrawnRegion(id: UUID(), normalizedRect: Self.share($0), kind: .drawnByHand)
         }
         let size = CGSize(width: Self.width, height: Self.height)
         let on = try #require(RunRecord.Page(pageIndex: 0, regions: drawn, cropBox: size, rotation: 0,

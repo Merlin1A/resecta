@@ -5,7 +5,7 @@ Must go red: ResectaAppUITests/ShareRiskSheetUITests testVerifySettingLeftOff_ne
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/App/ResectaApp.swift b/Sources/ResectaApp/App/ResectaApp.swift
-index 99da491b..9ea6a516 100644
+index 064462a5..b7b7c246 100644
 --- a/Sources/ResectaApp/App/ResectaApp.swift
 +++ b/Sources/ResectaApp/App/ResectaApp.swift
 @@ -116,9 +116,6 @@ struct ResectaApp: App {
@@ -16,5 +16,5 @@ index 99da491b..9ea6a516 100644
 -                defaults.removeObject(forKey: "autoVerify")
 -            }
          }
-         if CommandLine.arguments.contains("--searchSourceFilter=ocr"),
-            let data = try? JSONEncoder().encode(SearchState.LastSearchFilterShape(
+         // The first-time line: a test launch sets its flag, so no suite meets
+         // the line, unless it asks for a fresh one or for the stored value.

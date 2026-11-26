@@ -54,6 +54,16 @@ extension SearchAndRedactSheet {
         }
     }
 
+    /// A page chip in the notice details: the page arrows' own page write
+    /// (which lets go of a current match on another page), then the park.
+    /// A whole page needs no scroll request.
+    func showPage(_ page: Int) {
+        PageNavigationBar.showPage(page, documentState: documentState, redactionState: redactionState)
+        if selectedDetent != .compactFloat {
+            selectedDetent = .compactFloat
+        }
+    }
+
     /// One chevron tap at either site: step the search walk from the page
     /// shown (`SearchState+WalkNavigator`), then focus through the seam.
     func stepWalk(_ direction: ResultNavDirection) {

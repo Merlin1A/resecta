@@ -130,7 +130,8 @@ struct PlanPaintTests {
         let page = try #require(doc.page(at: 0))
         let ids = boxes.map { _ in UUID() }
         let drawn = boxes.indices.filter { !recordOmits.contains($0) }.map {
-            RunRecord.DrawnRegion(id: ids[$0], normalizedRect: share(boxes[$0].offsetBy(dx: recordOffset, dy: 0)))
+            RunRecord.DrawnRegion(region: RedactionRegion(id: ids[$0], normalizedRect: share(boxes[$0].offsetBy(dx: recordOffset, dy: 0)),
+                                                          source: text ? .searchMatch(term: "x") : .manual))
         }
         // The run's regions as the app hands them over: clamped to the page
         // and through admission.
@@ -141,7 +142,8 @@ struct PlanPaintTests {
                                    source: text ? .searchMatch(term: "x") : .manual)
         }
         let crop = page.bounds(for: .cropBox)
-        let confirmed = RunRecord.Page(pageIndex: 0, regions: drawn, cropBox: crop.size, rotation: page.rotation, switchOn: false)
+        let confirmed = RunRecord.Page(pageIndex: 0, regions: drawn, cropBox: crop.size, rotation: page.rotation,
+                                       switchOn: false)
         let data = PDFPageData(
             page: page, pageIndex: 0, regions: regions, fillColor: fill, targetDPI: dpi,
             pipelineMode: .secureRasterization, rotation: page.rotation,

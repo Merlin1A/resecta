@@ -2,13 +2,11 @@ Property: A tight box's inner holds the region's rectangle as well as its select
 Area: the plan, the tight rectangle
 Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionCoreTests/PaintPlanMakeTests (or on the host: cd Packages/RedactionEngine && swift test --filter 'PaintPlanMakeTests')
 Must go red: RedactionCoreTests/PaintPlanMakeTests regionPastItsLetters; RedactionCoreTests/PaintPlanMakeTests mergedHeights
-Apply in a scratch worktree with `git apply`; discard after.
-
-diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
-index d31c2a6d..56bbfb68 100644
+Apply in a scratch worktree with `git apply`; discard after.diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
+index f7fe787b..af3440ba 100644
 --- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PaintPlan+Make.swift
-@@ -248,7 +248,7 @@ private struct Maker {
+@@ -277,7 +277,7 @@ private struct Maker {
          let rule = policy.rule(for: PolicyKey(kind: kind, reading: lineReading, switchOn: switchOn), source: source)
              ?? policy.asPlaced
          let letters = letterRects(selected)
@@ -16,4 +14,4 @@ index d31c2a6d..56bbfb68 100644
 +        let tight = letters.first.map { first in letters.reduce(first) { $0.union($1) } } ?? placedRect
  
          func box(inner: PageRect64, paint: PageRect64, tight: PageRect64, above: Int?, below: Int?,
-                  treatment: SwitchTreatment, band: Bool, asDrawn: Bool) -> Made {
+                  treatment: SwitchTreatment, band: Bool, asDrawn: Bool, width: DefaultWidth = .notAsked) -> Made {

@@ -1,0 +1,19 @@
+Property: At the largest sizes the line is drawn by the brief message's size rule, not always at the person's size.
+Area: the first-time line in the editor
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/FirstDocumentHintTests
+Must go red: ResectaAppTests/FirstDocumentHintTests drawnLineFitsOrStopsAtTheFloor
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/FirstDocumentHintView.swift b/Sources/ResectaApp/Views/FirstDocumentHintView.swift
+index a6bcd4d1..e9308f76 100644
+--- a/Sources/ResectaApp/Views/FirstDocumentHintView.swift
++++ b/Sources/ResectaApp/Views/FirstDocumentHintView.swift
+@@ -140,7 +140,7 @@ struct FirstDocumentHintView: View {
+     /// unless its block would then be taller than two fifths of the canvas;
+     /// then by the brief message's one sizing rule.
+     static func drawSize(personSize: DynamicTypeSize, canvas: CGSize) -> DynamicTypeSize {
+-        guard canvas.width > 0 else { return personSize }
++        guard canvas.width < 0 else { return personSize }
+         return MessageSizing.drawSize(person: personSize, limit: MessageSizing.limit(space: canvas.height)) {
+             height(personSize: personSize, size: $0, width: canvas.width)
+         }

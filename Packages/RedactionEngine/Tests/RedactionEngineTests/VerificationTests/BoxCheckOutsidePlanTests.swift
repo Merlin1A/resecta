@@ -21,7 +21,7 @@ struct BoxCheckOutsidePlanTests {
         let source = try #require(SystemPageImageSource(fileData: file))
         let (boxed, later, earlier) = (UUID(), UUID(), UUID())
         let share = CGRect(x: 0.1, y: 0.1, width: 0.2, height: 0.1)
-        let regions = [boxed, earlier, later].map { RunRecord.DrawnRegion(id: $0, normalizedRect: share) }
+        let regions = [boxed, earlier, later].map { RunRecord.DrawnRegion(id: $0, normalizedRect: share, kind: .drawnByHand) }
         var produced = RunRecord.Produced(
             pageImageDigests: [0: PageImageFixtures.sha256(jpeg)],
             paintedRectangles: [.init(pageIndex: 0, box: 0): F.report(p, height: 600)], infoDictionary: nil)

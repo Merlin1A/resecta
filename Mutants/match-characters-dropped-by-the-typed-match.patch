@@ -1,0 +1,19 @@
+Property: A typed match read from the text layer keeps the characters it selected on its page.
+Area: search
+Test command: cd Packages/RedactionEngine && swift test --filter 'MatchCharactersTests|MeasuredRunTests'
+Must go red: RedactionEngineTests/MatchCharactersTests "A typed match keeps its characters on the page's string, and the region placed from it carries them"; RedactionEngineTests/MatchCharactersTests "The run's maker selects a match's characters for a region still anchored to its text"; RedactionEngineTests/MeasuredRunTests "With the product's selection a Search box is read from its line, and the switch widens it"
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+TextMatches.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+TextMatches.swift
+index 8d1f45d8..61ea5488 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+TextMatches.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+TextMatches.swift
+@@ -115,7 +115,7 @@ extension DocumentSearcher {
+                         term: term,
+                         matchRangeInSnippet: window.matchRange,
+                         occurrenceID: occurrence, textLayerRect: line.textLayerRect, inkFitDegraded: line.degraded
+-                    ).identified(by: line.identity).carrying(line.characters))
++                    ).identified(by: line.identity))
+                 }
+             }
+         }
