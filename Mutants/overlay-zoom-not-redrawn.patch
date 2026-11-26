@@ -1,0 +1,18 @@
+Property: A scale change asks every overlay the coordinator holds to redraw.
+Area: editor canvas (overlay redraw on a zoom)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/OverlayZoomRedrawTests
+Must go red: ResectaAppTests/OverlayZoomRedrawTests "A scale change marks the overlay for a redraw and counts one request"
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
+index 24e788bcf..0720cb1bd 100644
+--- a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
++++ b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
+@@ -149,7 +149,6 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
+         ) { [weak self] _ in
+             MainActor.assumeIsolated {
+                 self?.requestPageFramePublish()
+-                self?.activeOverlays.values.forEach { $0.zoomChanged() }
+             }
+         }
+         observations.notices = [pageChangeObserver, scaleChangeObserver]

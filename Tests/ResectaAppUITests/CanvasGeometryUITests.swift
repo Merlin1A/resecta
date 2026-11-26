@@ -114,6 +114,24 @@ nonisolated final class CanvasGeometryUITests: XCTestCase {
         XCTAssertFalse(try probe().isBackground(CGPoint(x: page.midX, y: page.minY - 8)), "a double tap on a box keeps the zoom")
     }
 
+    /// A selected box's line keeps its screen size through a pinch: within
+    /// 1 screen point of 2.4 thick after it (2.5 as drawn today, inside the
+    /// tolerance). The line is read with the pixel probe's line thickness
+    /// read, which comes with the canvas's line change; this probe has none
+    /// yet, so the test draws, selects and pinches, then skips, saying so.
+    func testAfterAPinchTheSelectedLineKeepsItsScreenSize() throws {
+        launchMultipage()
+        let page = try fitPage()
+        let box = CGRect(x: page.minX + page.width * 0.3, y: page.minY + page.height * 0.42, width: page.width * 0.3, height: 40)
+        drawBoxes([box])
+        tap(CGPoint(x: box.midX, y: box.midY))
+        sleep(1)
+        XCTAssertTrue(try pinchToZoom(above: page), "the pinch zooms the page")
+        let zoomed = try probe()
+        XCTAssertNotNil(zoomed.tintBounds(.teal, in: CGRect(origin: .zero, size: window.frame.size)), "the selected box at zoom")
+        throw XCTSkip("The line's thickness is read with the pixel probe's line thickness read, which this probe does not have yet.")
+    }
+
     func testTheZoomSurvivesTheSearchSheetsMoves() throws {
         launchMultipage(extra: ["--searchQuery=Amount"])
         let page = try fitPage()
