@@ -5,17 +5,17 @@ Must go red: ResectaAppTests/FindingRowTests everyCheckHasOnePlace
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Views/VerificationDetailsSection.swift b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
-index c986ff72..9e956c4c 100644
+index b26c09eae..e9577468b 100644
 --- a/Sources/ResectaApp/Views/VerificationDetailsSection.swift
 +++ b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
-@@ -116,7 +116,10 @@ struct VerificationDetailsSection: View {
-     /// Findings row or needs none, and is in the list of checks.
-     static func groups(_ partition: VerificationLayerPartition) -> [(header: String?, indices: [Int])] {
+@@ -126,7 +126,10 @@ struct VerificationDetailsSection: View {
+     /// or needs none, and is in the list of checks.
+     static func groups(_ partition: VerificationLayerPartition) -> [(header: String, indices: [Int])] {
          let warnings = plainWarnings(partition)
--        return warnings.isEmpty ? [] : [(nil, warnings)]
+-        return warnings.isEmpty ? [] : [(warningsHeader, warnings)]
 +        let failed = partition.outcomes.indices.filter { partition.outcomes[$0] == .failed }
-+        let byCheck: [(header: String?, indices: [Int])] = failed.isEmpty ? [] : [(header: "Failed", indices: failed)]
-+        let plain: [(header: String?, indices: [Int])] = warnings.isEmpty ? [] : [(header: nil, indices: warnings)]
++        let byCheck: [(header: String, indices: [Int])] = failed.isEmpty ? [] : [(header: "Failed", indices: failed)]
++        let plain: [(header: String, indices: [Int])] = warnings.isEmpty ? [] : [(header: warningsHeader, indices: warnings)]
 +        return plain + byCheck
      }
  

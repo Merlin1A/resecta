@@ -78,27 +78,37 @@ struct VerificationResultsView: View {
                     VStack(spacing: 0) {
                         VerificationMasthead(report: report, outputExists: outputExists,
                                              isStale: isVerificationStale,
-                                             mode: runFacts.runMode, findingCount: findings.count)
+                                             mode: runFacts.runMode,
+                                             findingRows: Self.findingRowCount(report: report, findings: findings),
+                                             handDrawnBoxes: Self.handDrawnBoxCount(in: findings))
                         VerificationResultsActions(
                             report: report, canExport: canExport, outputExists: outputExists,
                             isVerificationStale: isVerificationStale, previewAvailable: previewAvailable,
                             onExport: onExport, onRunVerification: onRunVerification,
                             concealedPages: VerificationResultsActions.concealedPages(in: findings))
                             .padding(.top, ResectaTokens.Results.blockGap)
-                        // The small print about what Checks Passed means: no
-                        // sentences are supplied yet, so it draws nothing.
-                        ResultsScopeNote(report: report, sentences: [])
+                        // The blocks under the buttons in `ResultsBlock.order`:
+                        // the hand-drawn row first; the small print here, or
+                        // inside the section directly after its Findings group.
+                        let afterFindings = ResultsBlock.smallPrintFollowsFindings(
+                            ResultsBlock.order(present: Self.blocksPresent(report: report, findings: findings,
+                                                                           smallPrint: Self.smallPrint),
+                                               checksPassed: Self.isChecksPassed(report)))
                         // Covered text and form values are Findings rows below;
                         // this section keeps what Share does not ask about.
                         ResultsFindingsSection(
                             findings: Self.findingsOutsideTheGroup(findings), pagesOnChips: previewAvailable,
                             onOpenPage: openPreview(at:))
+                        if !afterFindings {
+                            ResultsScopeNote(report: report, sentences: Self.smallPrint)
+                        }
                         VerificationDetailsSection(
                             report: report, deselectionSnapshot: deselectionSnapshot,
                             runFactsLines: runFactsLines, previewAvailable: previewAvailable,
                             onOpenPage: openPreview(at:),
                             coveredPages: VerificationResultsActions.concealedPages(in: findings),
                             formValueCount: Self.formValueCount(in: findings),
+                            smallPrintAfterFindings: afterFindings ? Self.smallPrint : nil,
                             onReviewInScan: {
                                 Self.reviewInScan(documentState: documentState, redactionState: redactionState)
                             })
@@ -126,6 +136,44 @@ struct VerificationResultsView: View {
         // VerificationActionBar is placed by the phase router in
         // DocumentEditorView as .safeAreaInset, not embedded here. Export
         // dialogs are also mounted on DocumentEditorView.
+    }
+
+    /// The small print about what Checks Passed means: no sentences are
+    /// supplied yet, so it draws nothing.
+    static let smallPrint: [String] = []
+
+    /// Whether the run is titled Checks Passed.
+    static func isChecksPassed(_ report: VerificationReport) -> Bool {
+        mastheadTitle(report: report) == VerificationStatus.pass.title
+    }
+
+    /// The rows of the Findings group, from the same two values the group is given.
+    static func findingRowCount(report: VerificationReport, findings: [ResultsFinding]) -> Int {
+        VerificationDetailsSection.findingRows(
+            report: report, coveredPages: VerificationResultsActions.concealedPages(in: findings),
+            formValueCount: formValueCount(in: findings)).count
+    }
+
+    /// The hand-drawn boxes on pages with no text, one per box (two on one
+    /// page are two), as the row's own sentence counts them.
+    static func handDrawnBoxCount(in findings: [ResultsFinding]) -> Int {
+        for entry in findings {
+            if case .handRegionsOnPagesWithoutText(let regionPages) = entry { return regionPages.count }
+        }
+        return 0
+    }
+
+    /// The blocks under the buttons that have something to draw.
+    static func blocksPresent(report: VerificationReport, findings: [ResultsFinding],
+                              smallPrint: [String]) -> Set<ResultsBlock> {
+        let partition = VerificationLayerPartition(layers: report.layers, perPageModes: report.perPageModes)
+        var present: Set<ResultsBlock> = [.facts]
+        if !findingsOutsideTheGroup(findings).isEmpty { present.insert(.handDrawnBoxes) }
+        if findingRowCount(report: report, findings: findings) > 0 { present.insert(.findings) }
+        if ResultsScopeNote.shows(report: report, sentences: smallPrint) { present.insert(.smallPrint) }
+        if !VerificationDetailsSection.groups(partition).isEmpty { present.insert(.warnings) }
+        if !VerificationDetailsSection.listRowMembers(partition).isEmpty { present.insert(.checksList) }
+        return present
     }
 
     /// The items the shipped section above the checks still draws: only the
@@ -420,5 +468,47 @@ struct VerificationResultsView: View {
         // in rather than threading a count the component never reads.
         HonestyDisclaimer(profile: .redacted(markCount: 0), style: .sectionFooter)
             .accessibilityIdentifier("honestyDisclaimer")
+    }
+}
+
+/// The blocks under the results screen's buttons, in one order both the
+/// results view and the details section read.
+nonisolated enum ResultsBlock: Equatable, Hashable, CaseIterable {
+    /// The row about hand-drawn boxes on pages with no text.
+    case handDrawnBoxes
+    case findings
+    /// The small print about what Checks Passed means (`ResultsScopeNote`).
+    case smallPrint
+    case warnings
+    /// The card of facts about the PDF.
+    case facts
+    /// The row that opens the list of checks.
+    case checksList
+
+    /// On a run titled Checks Passed, the Findings group comes before the
+    /// small print.
+    static let findingsBeforeTheSmallPrint = true
+
+    /// Top to bottom, the blocks present: the hand-drawn row; on a run
+    /// titled Checks Passed the Findings group (when it comes first) and the
+    /// small print; the Findings group otherwise; the warnings; the facts;
+    /// the list of checks. Under any other title there is no small print.
+    static func order(present: Set<ResultsBlock>, checksPassed: Bool,
+                      findingsFirst: Bool = findingsBeforeTheSmallPrint) -> [ResultsBlock] {
+        let early = checksPassed && findingsFirst
+        var blocks: [ResultsBlock] = [.handDrawnBoxes]
+        if early { blocks.append(.findings) }
+        if checksPassed { blocks.append(.smallPrint) }
+        if !early { blocks.append(.findings) }
+        blocks += [.warnings, .facts, .checksList]
+        return blocks.filter(present.contains)
+    }
+
+    /// Whether the small print is drawn directly after the Findings group,
+    /// inside the details section.
+    static func smallPrintFollowsFindings(_ order: [ResultsBlock]) -> Bool {
+        guard let findings = order.firstIndex(of: .findings), let small = order.firstIndex(of: .smallPrint)
+        else { return false }
+        return small == findings + 1
     }
 }

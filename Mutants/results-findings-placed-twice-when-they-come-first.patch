@@ -1,0 +1,19 @@
+Property: The Findings group is placed once: before the small print on Checks Passed, else after it.
+Area: results screen
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/ResultsOrderAndSentenceTests
+Must go red: ResectaAppTests/ResultsOrderAndSentenceTests orderUnderTheButtons
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationResultsView.swift b/Sources/ResectaApp/Views/VerificationResultsView.swift
+index 25402fec..4eee5893 100644
+--- a/Sources/ResectaApp/Views/VerificationResultsView.swift
++++ b/Sources/ResectaApp/Views/VerificationResultsView.swift
+@@ -498,7 +498,7 @@ nonisolated enum ResultsBlock: Equatable, Hashable, CaseIterable {
+         var blocks: [ResultsBlock] = [.handDrawnBoxes]
+         if early { blocks.append(.findings) }
+         if checksPassed { blocks.append(.smallPrint) }
+-        if !early { blocks.append(.findings) }
++        blocks.append(.findings)
+         blocks += [.warnings, .facts, .checksList]
+         return blocks.filter(present.contains)
+     }

@@ -1,0 +1,20 @@
+Property: The hand-drawn boxes sentence is said only on a passing run.
+Area: results screen
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/ResultsOrderAndSentenceTests
+Must go red: ResectaAppTests/ResultsOrderAndSentenceTests handDrawnSentence
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationMasthead.swift b/Sources/ResectaApp/Views/VerificationMasthead.swift
+index 9a166d2b5..25adf8312 100644
+--- a/Sources/ResectaApp/Views/VerificationMasthead.swift
++++ b/Sources/ResectaApp/Views/VerificationMasthead.swift
+@@ -145,6 +145,9 @@ extension VerificationResultsView {
+     ) -> String? {
+         guard resultStands(outputExists: outputExists, isStale: isStale) else { return outputMissingSentence }
+         let partition = partition(report)
++        if handDrawnBoxes > 0 {
++            return passingSentence(findingRows: 0, handDrawnBoxes: handDrawnBoxes, notes: 0, outputExists: outputExists)
++        }
+         switch report.overallStatus {
+         case .pass, .info, .notApplicable:
+             return passingSentence(findingRows: findingRows, handDrawnBoxes: handDrawnBoxes,

@@ -5,10 +5,10 @@ Must go red: ResectaAppTests/FindingRowTests theGroupDrawsTheModel
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Views/VerificationDetailsSection.swift b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
-index c986ff72..cc1903c4 100644
+index b26c09eae..0baf789cf 100644
 --- a/Sources/ResectaApp/Views/VerificationDetailsSection.swift
 +++ b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
-@@ -106,8 +106,9 @@ struct VerificationDetailsSection: View {
+@@ -113,8 +113,9 @@ struct VerificationDetailsSection: View {
      /// number of rows; nil when there is no row, and then no group.
      static func findingsHeading(_ rows: [VerificationProblem]) -> (shown: String, spoken: String)? {
          guard !rows.isEmpty else { return nil }
@@ -19,4 +19,4 @@ index c986ff72..cc1903c4 100644
 +                VerificationLayerPartition.sectionHeaderSpoken(findingsHeader, count: checks))
      }
  
-     /// The groups of check rows drawn between the Findings group and the
+     /// The plain warnings' card's heading; its count is the number of rows.

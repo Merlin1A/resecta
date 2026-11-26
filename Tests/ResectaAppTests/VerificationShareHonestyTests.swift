@@ -139,10 +139,10 @@ struct VerificationShareHonestyTests {
         let noPass = VerificationLayerPartition(layers: Array(layers.dropLast()), perPageModes: [])
         #expect(VerificationDetailsSection.groups(noPass).isEmpty)
         #expect(VerificationDetailsSection.listRowMembers(noPass) == [0, 1, 2, 3])
-        // A plain warning has its own card, with no heading, and is not in the list.
+        // A plain warning has its own card, headed Warnings, and is not in the list.
         let warned = VerificationLayerPartition(layers: layers + [Self.layer(.warn("w"), .metadataCheck)],
                                                 perPageModes: [])
-        #expect(VerificationDetailsSection.groups(warned).map(\.header) == [nil])
+        #expect(VerificationDetailsSection.groups(warned).map(\.header) == ["Warnings"])
         #expect(VerificationDetailsSection.groups(warned).map(\.indices) == [[5]])
         #expect(VerificationDetailsSection.listRowMembers(warned) == [0, 1, 2, 3, 4])
     }

@@ -5,14 +5,14 @@ Must go red: ResectaAppTests/FindingRowTests everyCheckHasOnePlace
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Views/VerificationDetailsSection.swift b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
-index c986ff72..b57faee8 100644
+index b26c09eae..a805c61ac 100644
 --- a/Sources/ResectaApp/Views/VerificationDetailsSection.swift
 +++ b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
-@@ -116,7 +116,7 @@ struct VerificationDetailsSection: View {
-     /// Findings row or needs none, and is in the list of checks.
-     static func groups(_ partition: VerificationLayerPartition) -> [(header: String?, indices: [Int])] {
+@@ -126,7 +126,7 @@ struct VerificationDetailsSection: View {
+     /// or needs none, and is in the list of checks.
+     static func groups(_ partition: VerificationLayerPartition) -> [(header: String, indices: [Int])] {
          let warnings = plainWarnings(partition)
--        return warnings.isEmpty ? [] : [(nil, warnings)]
+-        return warnings.isEmpty ? [] : [(warningsHeader, warnings)]
 +        return warnings.isEmpty ? [] : []
      }
  
