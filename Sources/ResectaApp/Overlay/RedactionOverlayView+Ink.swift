@@ -32,15 +32,45 @@ nonisolated struct InkBox: Equatable, Sendable {
     var tag: String? = nil
 }
 
+/// The groups a page's box layers stack in, bottom to top: every box's edge
+/// keylines, then every box's keylines, veils, faint edges, ink lines and
+/// lines, then the tags, the whole page marked, the handles and the box
+/// being moved.
+nonisolated enum BoxLayerGroup: Int, CaseIterable, Comparable, Sendable {
+    case edgeKeylines, keylines, veils, edges, inkLines, lines, tags, wholePage, handles, moving
+
+    static func < (a: BoxLayerGroup, b: BoxLayerGroup) -> Bool { a.rawValue < b.rawValue }
+}
+
 /// One drawing step: every rectangle of a step is drawn as one path, in one
 /// style, so a layer costs one draw however many boxes it holds, and filled
-/// areas that overlap are filled once.
+/// areas that overlap are filled once. A step is a plain value: it says
+/// what is drawn, and holds nothing that draws.
 nonisolated struct InkStep: Equatable, Sendable {
-    enum Layer: Equatable, Sendable {
+    nonisolated enum Layer: Equatable, Sendable {
         case edgeKeyline, keyline, veil, edge, inkLine, line, cueUnder, cue, handles, dots, inkRings
         case tagKeyline, tag
+        /// The whole page marked: its second hatch, its inner keyline, its
+        /// veil, its hatch and its frame.
+        case wholeHatchKey, wholeKeyline, wholeVeil, wholeHatch, wholeFrame
         case bandUnder, bandFill, band, lassoUnder, lassoFill, lasso, guideUnder, guide
     }
+
+    /// The whole page's hatch: straight lines at `angle` degrees, `spacing`
+    /// apart, measured square to them, the first `phase` from the overlay's
+    /// origin.
+    nonisolated struct Hatch: Equatable, Sendable {
+        let angle: CGFloat
+        let spacing: CGFloat
+        let phase: CGFloat
+    }
+
+    /// A tag's words' transform about the tag's centre, without a move.
+    nonisolated struct WordsTransform: Equatable, Sendable {
+        let a: CGFloat, b: CGFloat, c: CGFloat, d: CGFloat
+        static let identity = WordsTransform(a: 1, b: 0, c: 0, d: 1)
+    }
+
     let layer: Layer
     /// Stroked or filled rectangles; for handles, dots and rings, the
     /// square of each disc at full size.
@@ -59,6 +89,47 @@ nonisolated struct InkStep: Equatable, Sendable {
     var corner: CGFloat = 0
     /// For a tag, the words drawn in each rectangle, in order.
     var words: [String] = []
+    /// One key for each of `rects`, in the same order, the same in every
+    /// pass over the same boxes: the mark's name and the box's id
+    /// (`line:<id>`). A fill rectangle shared by several boxes takes the
+    /// first box that has it; a box with several fill rectangles numbers
+    /// them (`veil:<id>:0`); a handle takes its name (`handle:<id>:topLeft`),
+    /// a dot its index (`dot:<id>:0`).
+    var keys: [String] = []
+    /// True for a mark the look puts on a box's fill (the edge keyline and
+    /// the faint edge): it is framed from that fill's veil, snapped to the
+    /// device's pixels, grown by `outset`, in overlay points.
+    var onPaint = false
+    var outset: CGFloat = 0
+    /// The overlay points in an on-screen point when the step was made.
+    var fingerScale: CGFloat = 1
+    /// For handles, how far they have grown in: the disc and its shadow are
+    /// drawn at this share of their size, the ring at its own width.
+    var handleScale: CGFloat = 1
+    /// For a tag, its words' transform, one for each of `rects`; none means
+    /// the identity for every one.
+    var wordsTransforms: [WordsTransform] = []
+    /// For the whole page's hatches.
+    var hatch: Hatch? = nil
+
+    /// The group the step's layers stack in, in the boxes' order; nil for
+    /// the marks of drawing and choosing, which are not a box's.
+    var group: BoxLayerGroup? {
+        let group: BoxLayerGroup
+        switch layer {
+        case .edgeKeyline: group = .edgeKeylines
+        case .keyline: group = .keylines
+        case .veil: group = .veils
+        case .edge: group = .edges
+        case .inkLine: group = .inkLines
+        case .line: group = .lines
+        case .tagKeyline, .tag: group = .tags
+        case .wholeHatchKey, .wholeKeyline, .wholeVeil, .wholeHatch, .wholeFrame: group = .wholePage
+        case .cueUnder, .cue, .handles, .dots, .inkRings: group = .handles
+        case .bandUnder, .bandFill, .band, .lassoUnder, .lassoFill, .lasso, .guideUnder, .guide: return nil
+        }
+        return lifted ? .moving : group
+    }
 }
 
 extension RedactionOverlayView {
@@ -75,16 +146,23 @@ extension RedactionOverlayView {
     /// a tag stays inside it.
     static func inkSteps(
         boxes: [InkBox], selectionCount: Int, handlesActive: Bool, moving: Set<UUID> = [],
-        settings: CanvasDisplaySettings, fingerScale: CGFloat = 1, page: CGRect = .infinite
+        settings: CanvasDisplaySettings, fingerScale: CGFloat = 1, page: CGRect = .infinite,
+        handleScale: CGFloat = 1
     ) -> [InkStep] {
         let resting = boxes.filter { !moving.contains($0.id) }
         let lifted = boxes.filter { moving.contains($0.id) }
-        return look(for: resting, settings: settings, fingerScale: fingerScale)
+        let steps = look(for: resting, settings: settings, fingerScale: fingerScale)
             + tagSteps(for: resting, page: page, fingerScale: fingerScale)
             + marks(for: resting, selectionCount: selectionCount, handlesActive: handlesActive,
                     settings: settings, fingerScale: fingerScale)
             + look(for: lifted, settings: settings, fingerScale: fingerScale)
                 .map { var s = $0; s.lifted = true; return s }
+        return steps.map { step in
+            var step = step
+            step.fingerScale = fingerScale
+            if step.layer == .handles { step.handleScale = handleScale }
+            return step
+        }
     }
 
     /// The layers of the boxes themselves, from the edge keylines to the lines.
@@ -93,32 +171,51 @@ extension RedactionOverlayView {
     ) -> [InkStep] {
         typealias C = ResectaTokens.Canvas
         guard !boxes.isEmpty else { return [] }
-        var paints: [CGRect] = []
-        for box in boxes { for rect in box.fill where !paints.contains(rect) { paints.append(rect) } }
-        let rest = boxes.filter { !$0.isSelected }.map(\.tight)
-        let selected = boxes.filter(\.isSelected).map(\.tight)
+        // Each different fill rectangle once, keyed by the first box that
+        // has it: by its id alone when that box has one rectangle, by its id
+        // and the rectangle's index when it has several.
+        var paints: [CGRect] = [], paintKeys: [String] = []
+        for box in boxes {
+            for (i, rect) in box.fill.enumerated() where !paints.contains(rect) {
+                paints.append(rect)
+                paintKeys.append(box.fill.count == 1 ? "\(box.id)" : "\(box.id):\(i)")
+            }
+        }
+        let rest = boxes.filter { !$0.isSelected }
+        let selected = boxes.filter(\.isSelected)
         let ink = C.showsInkLine(increaseContrast: settings.increaseContrast)
         let inkWidth = ink ? C.inkLine.width : 0
         func out(_ rects: [CGRect], _ by: CGFloat) -> [CGRect] { rects.map { $0.insetBy(dx: -by * f, dy: -by * f) } }
-        func stroke(_ layer: InkStep.Layer, _ rects: [CGRect], _ s: C.Stroke) -> InkStep? {
-            rects.isEmpty ? nil : InkStep(layer: layer, rects: rects, tone: s.tone, width: s.width * f)
+        func stroke(_ layer: InkStep.Layer, _ rects: [CGRect], _ s: C.Stroke, keys: [String]) -> InkStep? {
+            rects.isEmpty ? nil : InkStep(layer: layer, rects: rects, tone: s.tone, width: s.width * f, keys: keys)
         }
-        var steps: [InkStep?] = [stroke(.edgeKeyline, out(paints, C.edgeKeylineOutset), C.edgeKeyline)]
-        for (rects, line) in [(rest, C.line), (selected, C.lineSelected)] {
-            steps.append(stroke(.keyline, out(rects, line.width / 2 + C.keylineGap + inkWidth), C.keyline))
+        func keys(_ mark: String, _ boxes: [InkBox]) -> [String] { boxes.map { "\(mark):\($0.id)" } }
+        var edgeKeyline = stroke(.edgeKeyline, out(paints, C.edgeKeylineOutset), C.edgeKeyline,
+                                 keys: paintKeys.map { "edgeKeyline:\($0)" })
+        edgeKeyline?.onPaint = true
+        edgeKeyline?.outset = C.edgeKeylineOutset * f
+        var steps: [InkStep?] = [edgeKeyline]
+        for (boxes, line) in [(rest, C.line), (selected, C.lineSelected)] {
+            steps.append(stroke(.keyline, out(boxes.map(\.tight), line.width / 2 + C.keylineGap + inkWidth), C.keyline,
+                                keys: keys("keyline", boxes)))
         }
         if !paints.isEmpty {
             steps.append(InkStep(layer: .veil, rects: paints,
-                                 tone: settings.reduceTransparency ? C.veilReducedTransparency : C.veil, width: 0))
+                                 tone: settings.reduceTransparency ? C.veilReducedTransparency : C.veil, width: 0,
+                                 keys: paintKeys.map { "veil:\($0)" }))
         }
-        steps.append(stroke(.edge, paints, settings.increaseContrast ? C.edgeIncreasedContrast : C.edge))
+        var edge = stroke(.edge, paints, settings.increaseContrast ? C.edgeIncreasedContrast : C.edge,
+                          keys: paintKeys.map { "edge:\($0)" })
+        edge?.onPaint = true
+        steps.append(edge)
         if ink {
-            for (rects, line) in [(rest, C.line), (selected, C.lineSelected)] {
-                steps.append(stroke(.inkLine, out(rects, line.width / 2 + C.inkLine.width / 2), C.inkLine))
+            for (boxes, line) in [(rest, C.line), (selected, C.lineSelected)] {
+                steps.append(stroke(.inkLine, out(boxes.map(\.tight), line.width / 2 + C.inkLine.width / 2), C.inkLine,
+                                    keys: keys("inkLine", boxes)))
             }
         }
-        steps.append(stroke(.line, rest, C.line))
-        steps.append(stroke(.line, selected, C.lineSelected))
+        steps.append(stroke(.line, rest.map(\.tight), C.line, keys: keys("line", rest)))
+        steps.append(stroke(.line, selected.map(\.tight), C.lineSelected, keys: keys("line", selected)))
         return steps.compactMap { $0 }
     }
 
@@ -140,25 +237,33 @@ extension RedactionOverlayView {
                                   differentiateWithoutColor: true, fingerScale: f, handlesActive: handlesActive) {
             let rects = dotted.map { $0.tight.insetBy(dx: -cue.lineWidth * 1.5, dy: -cue.lineWidth * 1.5) }
             steps.append(InkStep(layer: .cueUnder, rects: rects, tone: C.keyline.tone,
-                                 width: cue.lineWidth + selectionCueUnderGrowth * f, dash: cue.dash))
+                                 width: cue.lineWidth + selectionCueUnderGrowth * f, dash: cue.dash,
+                                 keys: dotted.map { "cueUnder:\($0.id)" }))
             steps.append(InkStep(layer: .cue, rects: rects, tone: C.Tone(red: 0, green: 0, blue: 0, alpha: 1),
-                                 width: cue.lineWidth, dash: cue.dash))
+                                 width: cue.lineWidth, dash: cue.dash, keys: dotted.map { "cue:\($0.id)" }))
         }
-        let handleAt = handles.flatMap { box in Self.handleCentres(for: box.tight, fingerScale: f).map(\.1) }
-        let dotCentres = dotted.flatMap { selectionDotCentres(for: $0.tight, fingerScale: f) }
+        let handleAt = handles.flatMap { box in
+            Self.handleCentres(for: box.tight, fingerScale: f).map { (key: "\(box.id):\($0.0)", centre: $0.1) }
+        }
+        let dotCentres = dotted.flatMap { box in
+            selectionDotCentres(for: box.tight, fingerScale: f).enumerated().map { (key: "\(box.id):\($0)", centre: $1) }
+        }
         if !handleAt.isEmpty {
-            steps.append(InkStep(layer: .handles, rects: handleAt.map { disc(at: $0, radius: C.handle.radius * f) },
-                                 tone: C.handle.ring, width: C.handle.ringWidth * f))
+            steps.append(InkStep(layer: .handles, rects: handleAt.map { disc(at: $0.centre, radius: C.handle.radius * f) },
+                                 tone: C.handle.ring, width: C.handle.ringWidth * f,
+                                 keys: handleAt.map { "handle:\($0.key)" }))
         }
         if !dotCentres.isEmpty {
-            steps.append(InkStep(layer: .dots, rects: dotCentres.map { disc(at: $0, radius: C.selectionDot.radius * f) },
-                                 tone: C.selectionDot.fill, width: C.selectionDot.ringWidth * f))
+            steps.append(InkStep(layer: .dots, rects: dotCentres.map { disc(at: $0.centre, radius: C.selectionDot.radius * f) },
+                                 tone: C.selectionDot.fill, width: C.selectionDot.ringWidth * f,
+                                 keys: dotCentres.map { "dot:\($0.key)" }))
         }
         if ink {
-            let rings = handleAt.map { disc(at: $0, radius: (C.handle.radius + C.handle.ringWidth / 2 + C.inkLine.width / 2) * f) }
-                + dotCentres.map { disc(at: $0, radius: (C.selectionDot.radius + C.selectionDot.ringWidth / 2 + C.inkLine.width / 2) * f) }
+            let rings = handleAt.map { disc(at: $0.centre, radius: (C.handle.radius + C.handle.ringWidth / 2 + C.inkLine.width / 2) * f) }
+                + dotCentres.map { disc(at: $0.centre, radius: (C.selectionDot.radius + C.selectionDot.ringWidth / 2 + C.inkLine.width / 2) * f) }
             if !rings.isEmpty {
-                steps.append(InkStep(layer: .inkRings, rects: rings, tone: C.inkLine.tone, width: C.inkLine.width * f))
+                steps.append(InkStep(layer: .inkRings, rects: rings, tone: C.inkLine.tone, width: C.inkLine.width * f,
+                                     keys: handleAt.map { "handleInkRing:\($0.key)" } + dotCentres.map { "dotInkRing:\($0.key)" }))
             }
         }
         return steps.compactMap { $0 }
@@ -174,19 +279,22 @@ extension RedactionOverlayView {
     /// with its words. A box being moved or selected shows none.
     private static func tagSteps(for boxes: [InkBox], page: CGRect, fingerScale f: CGFloat) -> [InkStep] {
         typealias C = ResectaTokens.Canvas
-        var rects: [CGRect] = [], words: [String] = []
+        var rects: [CGRect] = [], words: [String] = [], ids: [UUID] = []
         for box in boxes where !box.isSelected {
             guard let word = box.tag, let rect = tagRect(for: box.tight, words: word, page: page, fingerScale: f)
             else { continue }
             rects.append(rect)
             words.append(word)
+            ids.append(box.id)
         }
         guard !rects.isEmpty else { return [] }
         let gap = C.keylineGap * f
         return [
             InkStep(layer: .tagKeyline, rects: rects.map { $0.insetBy(dx: -gap, dy: -gap) },
-                    tone: C.keyline.tone, width: C.keyline.width * f, corner: (C.tag.corner + C.keylineGap) * f),
-            InkStep(layer: .tag, rects: rects, tone: C.tag.fill, width: 0, corner: C.tag.corner * f, words: words),
+                    tone: C.keyline.tone, width: C.keyline.width * f, corner: (C.tag.corner + C.keylineGap) * f,
+                    keys: ids.map { "tagKeyline:\($0)" }),
+            InkStep(layer: .tag, rects: rects, tone: C.tag.fill, width: 0, corner: C.tag.corner * f, words: words,
+                    keys: ids.map { "tag:\($0)" }),
         ]
     }
 

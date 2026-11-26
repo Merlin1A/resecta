@@ -7,8 +7,8 @@ Apply in a scratch worktree with `git apply`; discard after.
 diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Ink.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Ink.swift
 --- a/Sources/ResectaApp/Overlay/RedactionOverlayView+Ink.swift
 +++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+Ink.swift
-@@ -78,7 +78,10 @@
-         settings: CanvasDisplaySettings, fingerScale: CGFloat = 1, page: CGRect = .infinite
+@@ -150,7 +150,10 @@
+         handleScale: CGFloat = 1
      ) -> [InkStep] {
          let resting = boxes.filter { !moving.contains($0.id) }
 -        let lifted = boxes.filter { moving.contains($0.id) }
@@ -16,6 +16,6 @@ diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Ink.swift b/Sources
 +            InkBox(id: $0.id, tight: $0.tight.insetBy(dx: -3, dy: -3), fill: $0.fill.map { $0.insetBy(dx: -3, dy: -3) },
 +                   isSelected: $0.isSelected, tag: $0.tag)
 +        }
-         return look(for: resting, settings: settings, fingerScale: fingerScale)
+         let steps = look(for: resting, settings: settings, fingerScale: fingerScale)
              + tagSteps(for: resting, page: page, fingerScale: fingerScale)
              + marks(for: resting, selectionCount: selectionCount, handlesActive: handlesActive,
