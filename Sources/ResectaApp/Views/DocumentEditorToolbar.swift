@@ -52,11 +52,11 @@ struct DocumentEditorToolbar {
     static let moreMenuIdentifier = "editorMoreMenu"
 
     /// The Rectangle tool's item on the bar, on and off: the shipped item's
-    /// own size (MEASURED 44.67 by 36 pt on iOS 26.4 and 27.2), so turning
+    /// own size (measured at 44.67 by 36 pt on iOS 26.4 and 27.2), so turning
     /// the tool on moves nothing.
     static let rectangleToolSize = CGSize(width: 44.67, height: 36)
 
-    /// The room the bar adds on each side of an item's own label (MEASURED
+    /// The room the bar adds on each side of an item's own label (measured
     /// on iOS 26.4 and 27.2: a label 44.7 pt wide made an item 59.00 pt
     /// wide). The label is the item's size less this room on both sides.
     static let barItemSideRoom: CGFloat = 7.17
@@ -111,10 +111,10 @@ struct DocumentEditorToolbar {
 
     /// Routine actions render neutral — the group's
     /// ambient tint is `.primary`, applied here (inside the property,
-    /// not at the `.toolbar {}` call site — see the comment above). Per-
-    /// element overrides (the draw tools' `.tint(active ? BrandTeal.tint
-    /// : nil)`) still win: `nil` now inherits this neutral instead of
-    /// the root's brand teal, so only the ACTIVE tool stays teal.
+    /// not at the `.toolbar {}` call site — see the comment above). A per-
+    /// element override still wins: the Add-to-Selection toggle's `nil`
+    /// tint inherits this neutral, so only an active toggle stays teal. The
+    /// Rectangle tool draws its own on state instead (`rectangleToolLabel`).
     @ViewBuilder
     var leadingToolbarItems: some View {
         Group {
