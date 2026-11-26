@@ -76,7 +76,7 @@ struct FirstEditStartTests {
         let cases: [Case]
     }
 
-    static let tableSHA256 = "f5c64fa5ac36803888f6df1d1ba7c9e5415206344e32de968cffea996460aa5c"
+    static let tableSHA256 = "ed3fc783ff997071d0783bc4f729fa7f8138244b837a92c83d61e992b73a4a47"
 
     static let caseIDs = [
         "start-name",
@@ -109,9 +109,9 @@ struct FirstEditStartTests {
         "J-start-poke-several-lines",
         "J-start-stickout",
         "J-start-one-line-holding-a-letter",
-        "J-start-E4-level-by-tight",
-        "J-start-E2-equal-not-held",
-        "J-start-E2-equal-several-lines",
+        "J-start-level-by-tight",
+        "J-start-equal-not-held",
+        "J-start-equal-several-lines",
         "J-start-mixed-309-not-level",
         "J-start-columns-2224-not-level",
         "J-start-pokedeep-5342-not-level",
