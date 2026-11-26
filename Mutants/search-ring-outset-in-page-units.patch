@@ -1,0 +1,19 @@
+Property: The result walk's ring sits 3 screen points outside its highlight at every zoom.
+Area: editor canvas (search layer)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/SearchMarksScreenPointTests
+Must go red: ResectaAppTests/SearchMarksScreenPointTests "The search layer draws its border and ring from the screen-point strokes"
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift
+index 958770eb4..256aa80c9 100644
+--- a/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift
++++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift
+@@ -149,7 +149,7 @@ extension RedactionOverlayView {
+         if let focusedHighlightID,
+            let focused = searchHighlights.first(where: { $0.id == focusedHighlightID }) {
+             let ringRect = pdfNormalizedToOverlay(focused.normalizedRect)
+-                .insetBy(dx: -strokes.ringOutset, dy: -strokes.ringOutset)
++                .insetBy(dx: -3, dy: -3)
+             if ringRect.intersects(rect) {
+                 ctx.setStrokeColor(UIColor(ResectaTokens.BrandTeal.tint).cgColor)
+                 ctx.setLineWidth(strokes.ring)

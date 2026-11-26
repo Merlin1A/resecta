@@ -165,8 +165,9 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
             }
         }
 
-        // Scale change: the overlays resize with the view's transform and
-        // need nothing; the band's page frames move with the page.
+        // Scale change: every overlay held redraws its marks sized in
+        // screen points (`zoomChanged()`); the band's page frames move
+        // with the page.
         let scaleChangeObserver = NotificationCenter.default.addObserver(
             forName: .PDFViewScaleChanged,
             object: pdfView,
@@ -174,6 +175,7 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
         ) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.requestPageFramePublish()
+                self?.activeOverlays.values.forEach { $0.zoomChanged() }
             }
         }
         observations.notices = [pageChangeObserver, scaleChangeObserver]

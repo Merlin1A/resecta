@@ -163,6 +163,9 @@ extension RedactionOverlayView {
             }
         }
 
+        // The border and the ring are sized in screen points.
+        let strokes = Self.searchMarkStrokes(fingerScale: fingerScale)
+
         // Draw search highlights on top of regions so overlaps are visible
         for highlight in searchHighlights {
             let viewRect = pdfNormalizedToOverlay(highlight.normalizedRect)
@@ -171,7 +174,7 @@ extension RedactionOverlayView {
                 // Selected: amber fill 30%, amber 2pt border
                 ctx.setFillColor(UIColor.systemYellow.withAlphaComponent(0.3).cgColor)
                 ctx.setStrokeColor(UIColor.systemOrange.cgColor)
-                ctx.setLineWidth(2.0)
+                ctx.setLineWidth(strokes.border)
                 ctx.addRect(viewRect)
                 ctx.drawPath(using: .fillStroke)
             } else {
@@ -192,10 +195,10 @@ extension RedactionOverlayView {
         if let focusedHighlightID,
            let focused = searchHighlights.first(where: { $0.id == focusedHighlightID }) {
             let ringRect = pdfNormalizedToOverlay(focused.normalizedRect)
-                .insetBy(dx: -3, dy: -3)
+                .insetBy(dx: -strokes.ringOutset, dy: -strokes.ringOutset)
             if ringRect.intersects(rect) {
                 ctx.setStrokeColor(UIColor(ResectaTokens.BrandTeal.tint).cgColor)
-                ctx.setLineWidth(2.0)
+                ctx.setLineWidth(strokes.ring)
                 ctx.stroke(ringRect)
             }
         }
@@ -254,6 +257,13 @@ extension RedactionOverlayView {
     /// `Canvas.lineSelected` selected, `Canvas.line` at rest.
     static func regionLineWidth(isSelected: Bool, fingerScale: CGFloat) -> CGFloat {
         (isSelected ? ResectaTokens.Canvas.lineSelected : ResectaTokens.Canvas.line).width * fingerScale
+    }
+
+    /// The search layer's two strokes, in overlay units: the picked
+    /// highlight's border, 2 on-screen points; the result walk's ring,
+    /// 2 on-screen points wide and 3 outside its highlight.
+    static func searchMarkStrokes(fingerScale: CGFloat) -> (border: CGFloat, ring: CGFloat, ringOutset: CGFloat) {
+        (border: 2 * fingerScale, ring: 2 * fingerScale, ringOutset: 3 * fingerScale)
     }
 
     /// The selection cue under Differentiate Without Color: a dashed outline

@@ -177,6 +177,23 @@ class RedactionOverlayView: UIView {
         1 / max(snapZoomScaleOverride ?? currentZoomScale(), 0.01)
     }
 
+    // MARK: - Redraw on a zoom
+
+    /// The passes of `draw(_:)`, counted for the hosted tests of the
+    /// redraw on a zoom.
+    var drawPassCount = 0
+    /// The zoom's redraw requests, counted for the same tests: marking is
+    /// idempotent, so only this count tells one request from two.
+    private(set) var zoomChangedCount = 0
+
+    /// The page's scale changed: the marks sized in screen points need a
+    /// pass at the new `fingerScale`. Marks the view and never draws it,
+    /// so the changes of one display cycle give one pass.
+    func zoomChanged() {
+        zoomChangedCount += 1
+        setNeedsDisplay()
+    }
+
     // MARK: - Handle Animation State
 
     /// Current scale of resize handles (0 = hidden, 1 = full size).
