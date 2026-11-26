@@ -289,6 +289,44 @@ enum ResectaTokens {
         /// appearances. Every teal drawn on the page is this one.
         static let pageTeal = Tone(red: 0x0B / 255, green: 0x64 / 255, blue: 0x6F / 255, alpha: 1)
 
+        /// A stroke: its colour and its width in on-screen points.
+        nonisolated struct Stroke: Equatable, Sendable {
+            let tone: Tone
+            let width: CGFloat
+        }
+
+        /// Ink, #14222B: the colour of the veil and the faint edge.
+        static let ink = Tone(red: 0x14 / 255, green: 0x22 / 255, blue: 0x2B / 255, alpha: 1)
+        /// The veil over the area a run will paint: ink at 18 %.
+        static let veil = Tone(red: ink.red, green: ink.green, blue: ink.blue, alpha: 0.18)
+        /// The veil with Reduce Transparency on: ink at 26 %.
+        static let veilReducedTransparency = Tone(red: ink.red, green: ink.green, blue: ink.blue, alpha: 0.26)
+        /// The faint edge on the painted area: ink at 50 %, half a point.
+        static let edge = Stroke(tone: Tone(red: ink.red, green: ink.green, blue: ink.blue, alpha: 0.5), width: 0.5)
+        /// The faint edge with Increase Contrast on: ink at 80 %.
+        static let edgeIncreasedContrast = Stroke(tone: Tone(red: ink.red, green: ink.green, blue: ink.blue, alpha: 0.8), width: 0.5)
+        /// The line round a box's own rectangle at rest: page teal, 1.4 points.
+        static let line = Stroke(tone: pageTeal, width: 1.4)
+        /// The line round a selected box's own rectangle: page teal, 2.4 points.
+        static let lineSelected = Stroke(tone: pageTeal, width: 2.4)
+        /// The keyline just outside whichever line is drawn: white at 90 %,
+        /// 0.8 points, outset by half the line's width plus `keylineGap`.
+        static let keyline = Stroke(tone: Tone(red: 1, green: 1, blue: 1, alpha: 0.9), width: 0.8)
+        static let keylineGap: CGFloat = 0.4
+        /// The ink line beside the teal line, and the ink ring round each
+        /// handle and corner dot: ink, opaque, one point. Drawn only where
+        /// `showsInkLine(increaseContrast:)` is true.
+        static let inkLine = Stroke(tone: ink, width: 1)
+        /// Whether the ink line is drawn at the default settings too.
+        static let inkLineAlways = false
+        /// The keyline round the painted area: white at 55 %, half a point,
+        /// outset by `edgeKeylineOutset`.
+        static let edgeKeyline = Stroke(tone: Tone(red: 1, green: 1, blue: 1, alpha: 0.55), width: 0.5)
+        static let edgeKeylineOutset: CGFloat = 0.5
+
+        /// Whether the ink line and rings are drawn.
+        static func showsInkLine(increaseContrast: Bool) -> Bool { inkLineAlways || increaseContrast }
+
         /// A resize handle: a white disc with a page-teal ring.
         static let handle = Disc(radius: 4.5, fill: Tone(red: 1, green: 1, blue: 1, alpha: 1),
                                  ring: pageTeal, ringWidth: 1.75)

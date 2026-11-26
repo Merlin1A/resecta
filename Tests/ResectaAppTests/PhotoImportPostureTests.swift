@@ -65,7 +65,7 @@ struct PhotoImportPostureTests {
         #expect(ResectaApp.testImageName(for: ["--loadTestImage=other", "--uitesting"]) == "other")
         #expect(ResectaApp.testImageName(for: ["--loadTestImage", "--uitesting"]) == "uitest_image")
         let root = repoRoot()
-        for name in ["uitest_image.jpg", "uitest_image.heic"] {
+        for name in ["uitest_image.jpg", "uitest_image.heic", "uitest_image_dark.jpg"] {
             let url = root.appendingPathComponent("UITestFixtures/\(name)")
             let size = try FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int ?? 0
             #expect(size > 0 && size <= 200 * 1024, "\(name) is \(size) bytes")
