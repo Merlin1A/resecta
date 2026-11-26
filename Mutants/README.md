@@ -814,3 +814,4 @@ with its reason and the mutant that is caught in its place.
 | `results-small-print-before-the-hand-drawn-row.patch` | The row about hand-drawn boxes comes before the small print. | ResectaAppTests/ResultsOrderAndSentenceTests orderUnderTheButtons |
 | `results-findings-placed-twice-when-they-come-first.patch` | The Findings group is placed once: before the small print on Checks Passed, else after it. | ResectaAppTests/ResultsOrderAndSentenceTests orderUnderTheButtons |
 | `masthead-hand-drawn-sentence-outranks-the-findings.patch` | On a passing run with a Findings row the sentence points to the findings, whatever else the run has. | ResectaAppTests/ResultsOrderAndSentenceTests passingSentenceTable |
+| `toolbar-active-tool-keeps-its-frame.patch` | The Rectangle tool's item keeps one frame on and off, so turning it on moves nothing on the bar. | ResectaAppUITests/DrawToolStateUITests testTheRectangleTool_onIsAFilledPill_andNothingMoves |
