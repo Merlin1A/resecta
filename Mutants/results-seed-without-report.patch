@@ -5,12 +5,12 @@ Must go red: ResectaAppUITests/SeededStatesUITests testASeedWithoutAReportLeaves
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/App/ResectaApp.swift b/Sources/ResectaApp/App/ResectaApp.swift
-index 2837dfb8..cfec5176 100644
+index 4f6dacb0f..4158e1c11 100644
 --- a/Sources/ResectaApp/App/ResectaApp.swift
 +++ b/Sources/ResectaApp/App/ResectaApp.swift
-@@ -220,6 +220,9 @@ struct ResectaApp: App {
-                                             documentState: ws.documentState,
-                                             redactionState: ws.redactionState)
+@@ -544,6 +544,9 @@ struct ResectaApp: App {
+                                     if let cap = editorSeeds.runQualityCap {
+                                         ws.coordinator.dpiCap = cap
                                      }
 +                                    if let count = DebugSeedOptions.parse(arguments: launchArguments).formValues {
 +                                        ws.documentState.sourceFilledFormFieldCount = count
@@ -18,7 +18,7 @@ index 2837dfb8..cfec5176 100644
                                      // `--seedVerifiedReport=<name>`: the results
                                      // screen on a forged report
                                      // (`VerificationDebugFixtures`), reached by
-@@ -238,9 +241,6 @@ struct ResectaApp: App {
+@@ -562,9 +565,6 @@ struct ResectaApp: App {
                                          // does not carry and the change deletes
                                          // nothing.
                                          let seeds = DebugSeedOptions.parse(arguments: launchArguments)
