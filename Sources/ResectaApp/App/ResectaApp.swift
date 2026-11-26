@@ -170,6 +170,10 @@ struct ResectaApp: App {
         // One page carrying one note annotation and no popup
         // (Scripts/generate_uitest_annotated.py): the import notice.
         "--annotatedDoc": "uitest_annotated",
+        // Two US Legal pages, 612 x 1008 pt, with a text line at each page's
+        // foot (Scripts/generate_uitest_legal.py): a page taller than
+        // Letter, whose foot the bottom controls cover at fit zoom.
+        "--legalDoc": "uitest_legal",
     ]
 
     /// The `--loadTestDocument` fixture name for a launch-argument list.

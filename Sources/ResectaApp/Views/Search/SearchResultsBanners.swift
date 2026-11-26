@@ -19,6 +19,8 @@ import RedactionEngine
     /// via the `reduceMotion` environment threaded above.
     /// "Add whole-word filter" / "Toggle case-sensitive" are
     /// mechanism-description action labels.
+    /// The caution is said twice: the glyph in the caution mark and the fill
+    /// in the warning tint. The headline is in the label colour.
 struct SearchSaturationBanner: View {
     let searchState: SearchState
     let onTriggerSearch: () -> Void
@@ -27,10 +29,10 @@ struct SearchSaturationBanner: View {
         VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xs) {
             HStack(spacing: ResectaTokens.Spacing.xs) {
                 Image(systemName: "exclamationmark.circle.fill")
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(ResectaTokens.Ink.cautionMark)
                 Text(SaturationBannerCopy.headline)
                     .font(.caption.weight(.medium))
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(.primary)
                 Spacer()
             }
             .accessibilityElement(children: .combine)
@@ -64,7 +66,7 @@ struct SearchSaturationBanner: View {
         }
         .padding(.horizontal, ResectaTokens.Spacing.md)
         .padding(.vertical, ResectaTokens.Spacing.xs)
-        .background(Color.orange.opacity(0.08))
+        .background(ResectaTokens.SemanticColor.warningTint.opacity(0.08))
     }
 }
 
