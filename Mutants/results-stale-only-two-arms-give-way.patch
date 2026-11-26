@@ -14,7 +14,7 @@ index 9a166d2b5..45cb3785e 100644
      ) -> String? {
 -        guard resultStands(outputExists: outputExists, isStale: isStale) else { return outputMissingSentence }
          let partition = partition(report)
-+        if case .pass = report.overallStatus, visibleNoteCount(partition) + findingCount == 0, !outputExists {
++        if case .pass = report.overallStatus, visibleNoteCount(partition) + findingRows + handDrawnBoxes == 0, !outputExists {
 +            return outputMissingSentence
 +        }
 +        if report.overallStatus.isSkipped, !outputExists { return outputMissingSentence }
