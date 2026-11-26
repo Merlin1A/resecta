@@ -15,10 +15,12 @@ struct OverlayTopCanvasTests {
 
     private static let overlaySize = CGSize(width: 400, height: 400)
 
-    /// An overlay in a shown window, both bitmaps drawn, nothing marked.
+    /// An overlay in a shown window, given a page's geometry (a touch on
+    /// an overlay no page made is refused), both bitmaps drawn, nothing marked.
     private func hostedOverlay() throws -> (UIWindow, RedactionOverlayView, OverlayTopCanvas) {
         let window = UIWindow(frame: CGRect(origin: .zero, size: Self.overlaySize))
         let overlay = RedactionOverlayView(frame: window.bounds)
+        overlay.geometry = .testUnturned
         window.addSubview(overlay)
         window.isHidden = false
         let canvas = try #require(overlay.topCanvas)
