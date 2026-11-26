@@ -5,10 +5,10 @@ Must go red: RedactionEngineTests/MetaReadBackTests unreadableStops; RedactionEn
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/MetaReadBack.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/MetaReadBack.swift
-index e74efa51..ada30595 100644
+index 3048899db..076c97b47 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/MetaReadBack.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/MetaReadBack.swift
-@@ -82,10 +82,10 @@ package enum MetaReadBack {
+@@ -85,10 +85,10 @@ package enum MetaReadBack {
      /// The four rules over the file at `url`, in order; the first that does
      /// not hold is the outcome.
      package static func check(url: URL, originals: Originals) -> Outcome {
@@ -18,6 +18,6 @@ index e74efa51..ada30595 100644
                let provider = CGDataProvider(data: data as CFData),
 -              let doc = CGPDFDocument(provider) else { return .unreadable }
 +              let doc = CGPDFDocument(provider) else { return .held }
- 
-         // M1.
-         guard let info = doc.info else { return .valuesNotFixed }
+         // `info`, `pair` and their strings point into `doc`: it is held until
+         // the four rules are read.
+         defer { withExtendedLifetime(doc) {} }
