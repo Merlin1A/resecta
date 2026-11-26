@@ -5,15 +5,15 @@ Must go red: RedactionEngineTests/SwitchThroughTheRecordTests keptPlanIsTheRecor
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift
-index be98933..3626378 100644
+index c037955cc..807dc68f5 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/DrawnPlan.swift
-@@ -94,7 +94,7 @@ public struct DrawnPlan: Equatable, Sendable {
-     package init(pageIndex: Int, regions: [RedactionRegion], cropBox: CGSize, rotation: Int,
+@@ -122,7 +122,7 @@ public struct DrawnPlan: Equatable, Sendable {
                   switchOn: Bool, exportDPI: Int, fillColor: FillColor, read: RunRecord.PageRead?, source: PlanSource) {
-         let plan = RunRecord.Page.makePlan(regions: regions.map(RunRecord.DrawnRegion.init(region:)),
--                                           cropBox: cropBox, rotation: rotation, switchOn: switchOn, read: read,
-+                                           cropBox: cropBox, rotation: rotation, switchOn: switchOn, read: nil,
-                                            source: source)
+         let made = RunRecord.Page.makePlanAndInputs(regions: regions.map(RunRecord.DrawnRegion.init(region:)),
+                                                     cropBox: cropBox, rotation: rotation, switchOn: switchOn,
+-                                                    read: read, source: source)
++                                                    read: nil, source: source)
+         let plan = made?.plan
          self.init(pageIndex: pageIndex, switchOn: switchOn, exportDPI: exportDPI, fillColor: fillColor, plan: plan,
                    filledPixels: Self.filledPixels(regions: regions, cropBox: cropBox, rotation: rotation,
