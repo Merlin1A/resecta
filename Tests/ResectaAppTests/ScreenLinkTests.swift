@@ -12,16 +12,16 @@ private final class ScreenLinkCasesBundle: NSObject {}
 // The screen link: the fill the canvas draws for a box is the fill the run
 // makes for it before ink growth, moved outward to whole pixel lines of
 // the overlay's bitmap. The case table is Cases/screen-link.json, its
-// expected values exact rationals; this suite runs every row whose id does
-// not begin "quarter-" (those carry a whole transform, which `fillRect`
-// refuses by design).
+// expected values exact rationals; this suite runs every row, the
+// "quarter-" rows (a page shown turned, its whole transform a quarter turn)
+// among them.
 @Suite("The screen link: the canvas fills what the run fills")
 @MainActor
 struct ScreenLinkTests {
     /// The repo copy of the table of record (sha256 008760a8…): its rows
     /// unchanged, its prose without citations.
     static let tableSHA256 = "22049fd5b4db2fc2013fbe8f34bb01af5de430f85e76048fa23b8a4e1573645a"
-    static let rowsRun = 252
+    static let rowsRun = 301
 
     // MARK: - The table
 
@@ -34,7 +34,7 @@ struct ScreenLinkTests {
         let doc = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
         #expect(doc["rule"] as? String == "screen-link")
         let cases = try #require(doc["cases"] as? [[String: Any]])
-        return cases.filter { !(($0["id"] as? String) ?? "").hasPrefix("quarter-") }
+        return cases
     }
 
     /// One rational, as one correctly rounded division.
@@ -69,7 +69,7 @@ struct ScreenLinkTests {
         return overlay
     }
 
-    @Test("Every row of the table, exactly: 252 rows")
+    @Test("Every row of the table, exactly: 301 rows")
     func table() throws {
         var ran = 0
         let k: CGFloat = 100_000
@@ -81,6 +81,8 @@ struct ScreenLinkTests {
                 try Self.ruleThreeRow(id: id, inputs: inputs, expected: expected)
             } else if id.hasPrefix("turn-") {
                 try Self.turnRow(id: id, inputs: inputs, expected: expected)
+            } else if id.hasPrefix("quarter-") {
+                try Self.quarterRow(id: id, inputs: inputs, expected: expected)
             } else {
                 // Rule 1's route: the share, the draw map, the clip to the
                 // page, then the transform as given and flipped.
@@ -108,6 +110,33 @@ struct ScreenLinkTests {
             ran += 1
         }
         #expect(ran == Self.rowsRun)
+    }
+
+    /// A page shown turned: the pixel box as a rectangle on the canvas, then
+    /// its lines through the whole transform, a quarter turn (or, in one
+    /// row, axis-aligned), and the rectangle they map back to.
+    static func quarterRow(id: String, inputs: [String: Any], expected: [String: Any]) throws {
+        let size = try #require(inputs["overlay"] as? [String: Any])
+        let w = try num(size["w"]), h = try num(size["h"])
+        let q = try #require(inputs["quality"] as? Int)
+        let t = try #require(inputs["transform"] as? [String: Any])
+        let toDevice = CGAffineTransform(a: try num(t["a"]), b: try num(t["b"]), c: try num(t["c"]),
+                                         d: try num(t["d"]), tx: try num(t["tx"]), ty: try num(t["ty"]))
+        let view = overlay(bounds: CGSize(width: w, height: h), rotation: 0)
+        let share = ScreenLink.share(pixel: try pixel(inputs["painted"]), quality: q,
+                                     displayedSize: CGSize(width: w, height: h))
+        let rect = view.pdfNormalizedToOverlay(share)
+        let clip = CGRect(x: 0, y: 0, width: w, height: h)
+        let want = try #require(expected["deviceLines"] as? [String: Int])
+        #expect(ScreenLink.deviceLines(rect, toDevice: toDevice, clip: clip)
+                    == ScreenLink.DeviceLines(x0: try #require(want["x0"]), y0: try #require(want["y0"]),
+                                              x1: try #require(want["x1"]), y1: try #require(want["y1"])), "\(id): lines")
+        let exact = try #require(expected["rectExact"] as? [String: String])
+        let back = ScreenLink.fillRect(rect, toDevice: toDevice, clip: clip)
+        for (key, value) in [("x", back.minX), ("y", back.minY), ("w", back.width), ("h", back.height)] {
+            let e = try frac(exact[key])
+            #expect(abs(Double(value) - e) <= 1e-9 * max(1, abs(e)), "\(id): \(key) \(value), exactly \(e)")
+        }
     }
 
     /// A hand box off the centre on both axes on an offset crop at a turn:
@@ -162,19 +191,38 @@ struct ScreenLinkTests {
 
     // MARK: - What is refused
 
-    @Test("A turned or sheared transform gives no lines and the cut rectangle; an empty clip gives nothing")
-    func rejects() {
+    @Test("A transform turned by 10° gives no lines and the cut rectangle; a quarter turn is accepted; an empty clip gives nothing")
+    func rejects() throws {
         let rect = CGRect(x: 10, y: 20, width: 30, height: 40)
         let clip = CGRect(x: 0, y: 0, width: 35, height: 100)
         let cut = CGRect(x: 10, y: 20, width: 25, height: 40)
-        let quarter = CGAffineTransform(a: 0, b: 3, c: -3, d: 0, tx: 5, ty: 7)
         let tenDegrees = CGAffineTransform(rotationAngle: .pi / 18).scaledBy(x: 3, y: 3)
-        for t in [quarter, tenDegrees] {
-            #expect(ScreenLink.deviceLines(rect, toDevice: t, clip: clip) == nil)
-            #expect(ScreenLink.fillRect(rect, toDevice: t, clip: clip) == cut)
-        }
+        #expect(ScreenLink.deviceLines(rect, toDevice: tenDegrees, clip: clip) == nil)
+        #expect(ScreenLink.fillRect(rect, toDevice: tenDegrees, clip: clip) == cut)
+        // A quarter turn's lines, as the table's quarter rows give them.
+        let row = try #require(try Self.rows().first { $0["id"] as? String == "quarter-90-fit-300" })
+        let inputs = try #require(row["inputs"] as? [String: Any])
+        let t = try #require(inputs["transform"] as? [String: Any])
+        let quarter = CGAffineTransform(a: try Self.num(t["a"]), b: try Self.num(t["b"]), c: try Self.num(t["c"]),
+                                        d: try Self.num(t["d"]), tx: try Self.num(t["tx"]), ty: try Self.num(t["ty"]))
+        let overlay = try #require(inputs["overlay"] as? [String: Any])
+        let w = try Self.num(overlay["w"]), h = try Self.num(overlay["h"])
+        let share = ScreenLink.share(pixel: try Self.pixel(inputs["painted"]), quality: try #require(inputs["quality"] as? Int),
+                                     displayedSize: CGSize(width: w, height: h))
+        let onCanvas = Self.overlay(bounds: CGSize(width: w, height: h), rotation: 0).pdfNormalizedToOverlay(share)
+        let want = try #require((row["expected"] as? [String: Any])?["deviceLines"] as? [String: Int])
+        #expect(ScreenLink.deviceLines(onCanvas, toDevice: quarter, clip: CGRect(x: 0, y: 0, width: w, height: h))
+                    == ScreenLink.DeviceLines(x0: try #require(want["x0"]), y0: try #require(want["y0"]),
+                                              x1: try #require(want["x1"]), y1: try #require(want["y1"])))
+        // A hair off either: b = c = 1e-17 is axis-aligned; a = d = 1e-17
+        // with b = -c is a quarter turn.
         let hair = CGAffineTransform(a: 3, b: 1e-17, c: 1e-17, d: 3, tx: 0.5, ty: 0.25)
         #expect(ScreenLink.deviceLines(rect, toDevice: hair, clip: clip) != nil)
+        let quarterHair = CGAffineTransform(a: 1e-17, b: 3, c: -3, d: 1e-17, tx: 0.5, ty: 0.25)
+        #expect(ScreenLink.isQuarterTurn(quarterHair))
+        #expect(ScreenLink.deviceLines(rect, toDevice: quarterHair, clip: clip)
+                    == ScreenLink.deviceLines(rect, toDevice: CGAffineTransform(a: 0, b: 3, c: -3, d: 0, tx: 0.5, ty: 0.25),
+                                              clip: clip))
         let empty = CGRect(x: 100, y: 100, width: 5, height: 5)
         #expect(ScreenLink.deviceLines(rect, toDevice: .identity, clip: empty) == nil)
         #expect(ScreenLink.fillRect(rect, toDevice: .identity, clip: empty).isNull)
