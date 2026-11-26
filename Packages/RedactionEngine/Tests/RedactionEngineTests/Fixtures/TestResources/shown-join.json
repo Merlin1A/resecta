@@ -204,8 +204,8 @@
   ]
  },
  {
-  "row": "j24-a4-landscape-300-150",
-  "why": "the Mac's J-24 row: the image tops do not agree",
+  "row": "tops-a4-landscape-300-150",
+  "why": "an A4 page shown landscape: the two images' tops do not agree",
   "page": "A4 shown landscape 841.89 x 595.276",
   "widthSixtyFourths": 53881,
   "heightSixtyFourths": 38098,
@@ -272,8 +272,8 @@
   ]
  },
  {
-  "row": "j24-b5-300-150",
-  "why": "J-24 on B5, the worst seeded row",
+  "row": "tops-b5-300-150",
+  "why": "the same on B5, the worst seeded row",
   "page": "B5 498.898 x 708.661",
   "widthSixtyFourths": 31930,
   "heightSixtyFourths": 45355,

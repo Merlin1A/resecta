@@ -40,10 +40,10 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
             guard qualityCap != oldValue, let state = redactionState else { return }
             for (pageIndex, kept) in state.drawnPlans
             where kept.pageVersion == state.pageVersion(pageIndex) && kept.fromStoredRegions == true {
-                noteDrawn(pageIndex: pageIndex, regions: state.regions[pageIndex] ?? [])
+                noteDrawn(pageIndex: pageIndex, regions: state.regions[pageIndex] ?? [], drawn: false)
             }
             for (pageIndex, overlay) in activeOverlays {
-                noteDrawn(pageIndex: pageIndex, regions: state.regions[pageIndex] ?? [])
+                noteDrawn(pageIndex: pageIndex, regions: state.regions[pageIndex] ?? [], drawn: false)
                 overlay.setNeedsDisplay()
             }
         }
@@ -525,7 +525,10 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
     /// the quality a run started now uses (`runQuality`, the run's own
     /// function, under `qualityCap`). No user switch exists yet, so the switch
     /// is passed off, as at run entry.
-    func noteDrawn(pageIndex: Int, regions: [RedactionRegion]) {
+    /// `drawn` is false when a change of the cap re-keys a kept plan: the
+    /// plan is made again, but the quality the page was shown at stays
+    /// until the page is drawn.
+    func noteDrawn(pageIndex: Int, regions: [RedactionRegion], drawn isDrawn: Bool = true) {
         guard let state = redactionState, let settings = settingsState,
               let page = documentState?.sourceDocument?.page(at: pageIndex) else { return }
         let cropBox = page.bounds(for: .cropBox).size
@@ -538,6 +541,7 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
             .stamped(pageVersion: state.pageVersion(pageIndex),
                      fromStoredRegions: regions == state.regions[pageIndex] ?? [])
         if state.drawnPlans[pageIndex] != drawn { state.drawnPlans[pageIndex] = drawn }
+        if isDrawn, state.shownDPIs[pageIndex] != quality { state.shownDPIs[pageIndex] = quality }
     }
 
     // MARK: - Overlay Refresh

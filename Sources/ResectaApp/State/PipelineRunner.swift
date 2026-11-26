@@ -313,10 +313,11 @@ struct PipelineRunner {
             pageCount: coordinator.documentState.pageCount,
             geometry: coordinator.documentState.sourceDocument.map(RunInputs.pageGeometry(of:)) ?? [:],
             geometryAtStore: redactionState.geometryAtStore,
-            // The quality each page was last drawn at, from the newest plan
-            // the editor kept for it, whatever its version: a page changed
-            // while off screen still holds boxes the person saw at it.
-            shownDPIs: redactionState.drawnPlans.mapValues(\.exportDPI),
+            // The quality each page was last drawn at, whatever its version
+            // (a page changed while off screen still holds boxes the person
+            // saw at it), kept apart from the plans: a change of the cap
+            // makes an off-screen page's plan again but does not move it.
+            shownDPIs: redactionState.shownDPIs,
             regions: redactionState.regions, reads: coordinator.documentState.pageReads, settings: runSettings)
         // A box the release cannot apply as planned refuses the run here,
         // before any page is built or rasterised.

@@ -73,8 +73,8 @@ public struct RunRecord: Equatable, Sendable {
         /// stored. Nil when none was noted.
         public let geometryAtStore: RunRecord.PageGeometry?
         /// The quality the page was last drawn at in the editor, in dots per
-        /// inch: the quality of the newest plan the editor kept for it,
-        /// whatever its version. Nil when the editor never drew the page in
+        /// inch, kept apart from the editor's plans: it moves only when the
+        /// page is drawn, whatever its version. Nil when the editor never drew the page in
         /// this document. A run painted at another quality joins each box's
         /// fill with the fill it showed at this one, so the run never paints
         /// less than was shown.

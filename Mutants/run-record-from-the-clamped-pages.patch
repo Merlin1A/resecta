@@ -5,13 +5,12 @@ Must go red: ResectaAppTests/RunRecordTests "Each case" (regionsAsDrawn)
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/State/PipelineRunner.swift b/Sources/ResectaApp/State/PipelineRunner.swift
-index a8eea2147..79622780d 100644
 --- a/Sources/ResectaApp/State/PipelineRunner.swift
 +++ b/Sources/ResectaApp/State/PipelineRunner.swift
-@@ -307,7 +307,14 @@ struct PipelineRunner {
-             // the editor kept for it, whatever its version: a page changed
-             // while off screen still holds boxes the person saw at it.
-             shownDPIs: redactionState.drawnPlans.mapValues(\.exportDPI),
+@@ -318,7 +318,14 @@
+             // saw at it), kept apart from the plans: a change of the cap
+             // makes an off-screen page's plan again but does not move it.
+             shownDPIs: redactionState.shownDPIs,
 -            regions: redactionState.regions, reads: coordinator.documentState.pageReads, settings: runSettings)
 +            regions: redactionState.regions.mapValues { regions in
 +                regions.filter { RedactionRegion.isAdmitted(normalizedRect: $0.normalizedRect) }.map { region in

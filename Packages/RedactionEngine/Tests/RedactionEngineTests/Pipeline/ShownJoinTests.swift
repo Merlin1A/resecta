@@ -235,7 +235,8 @@ struct ShownJoinTests {
         return minX <= maxX ? PixelPlan.PixelRect(minX: minX, minY: minY, maxX: maxX, maxY: maxY) : nil
     }
 
-    /// B5's three boxes: the table's J-24 row, as a share of the page, and two more.
+    /// B5's three boxes, as shares of the page: one whose top the two images
+    /// place apart, and two more.
     static let b5Shares: [CGRect] = [
         CGRect(x: 25714.0 / 31930, y: 342.0 / 45355, width: 2862.0 / 31930, height: 1100.0 / 45355),
         CGRect(x: 0.12341, y: 0.40733, width: 0.31117, height: 0.02391),
@@ -276,11 +277,41 @@ struct ShownJoinTests {
     @Test("A region no box holds, shown at one quality and run at another: its fill joins its own fill shown there, read back")
     func strayHoldsWhatWasShown() async throws {
         let page = try Self.blankPage(width: "612", height: "792")
+        let (share, shownDPI, run, w, h) = try Self.shortRegion()
+        let region = RedactionRegion(id: UUID(), normalizedRect: share, source: .manual)
+        // A record whose plan holds no box: the region is filled on its own.
+        let empty = PaintPlan(widthSixtyFourths: w, heightSixtyFourths: h, boxes: [])
+        let record = RunRecord.Page(pageIndex: 0, regions: [RunRecord.DrawnRegion(region: region)], plan: empty,
+                                    shownDPI: shownDPI)
+        let data = Self.pageData(page, regions: [region], chosen: run.dpi, confirmed: record)
+        let result = try await PageRasterizer().rasterize(data)
+        #expect(result.regionsPaintedOutsideThePlan == [region.id])
+        let own = PixelPlan.PixelRect(bitmapRect: normalizedToFillPixels(share, content: Self.content(run)))
+        let carried = try #require(PageRasterizer.shownRegionFill(region, raster: run, shownDPI: shownDPI))
+        let expected = own.joined(with: PixelPlan.PixelRect(bitmapRect: carried))
+        #expect(expected != own)
+        // The region is filled as itself and as what it showed, carried:
+        // every pixel of each, and the black reaches no further than their join.
+        let bitmap = try PlanPaintTests.Bitmap(result.pageOutput.image)
+        let shown = PixelPlan.PixelRect(bitmapRect: carried)
+        #expect(bitmap.misses(own, level: 0) == 0, "shown at \(shownDPI), run at \(run.dpi)")
+        #expect(bitmap.misses(shown, level: 0) == 0, "shown at \(shownDPI), run at \(run.dpi)")
+        #expect(Self.blackAround(expected.bitmapRect, in: result.pageOutput.image) == expected,
+                "shown at \(shownDPI), run at \(run.dpi)")
+        // The carried strip is read back: a pixel of it outside the region's
+        // own fill, unpainted after the fills, fails the page.
+        let strip = try #require(Self.pixel(of: shown, outside: own))
+        await #expect(throws: PipelineError.self) {
+            try await Self.unpainting(strip) { _ = try await PageRasterizer().rasterize(data) }
+        }
+    }
+
+    /// On Letter, the first pair of qualities and candidate share whose lone
+    /// region's own fill at the run's quality falls short of what it showed.
+    /// A lone region's own fill carries a pixel of margin, so a pair whose
+    /// pixels are close rarely leaves it short.
+    static func shortRegion() throws -> (share: CGRect, shownDPI: Int, run: PixelPlan.Raster, w: Int, h: Int) {
         let w = try #require(PixelPlan.sixtyFourths(ofSide: 612)), h = try #require(PixelPlan.sixtyFourths(ofSide: 792))
-        // A lone region's own fill carries a pixel of margin, so a pair whose
-        // pixels are close rarely leaves it short: the first pair and
-        // candidate whose own fill at the run's quality falls short of what
-        // the shown one showed.
         let candidates = (0..<40).map { i in
             CGRect(x: 0.1 + 0.0137 * Double(i), y: 0.2 + 0.0113 * Double(i), width: 0.2311, height: 0.0219)
         }
@@ -295,20 +326,116 @@ struct ShownJoinTests {
             }
         }
         let (share, shownDPI, run) = try #require(found, "some region falls short without the join")
+        return (share, shownDPI, run, w, h)
+    }
+
+    /// A pixel of `outer` outside `inner`, or nil.
+    static func pixel(of outer: PixelPlan.PixelRect, outside inner: PixelPlan.PixelRect) -> (x: Int, y: Int)? {
+        for y in outer.minY..<outer.maxY {
+            for x in outer.minX..<outer.maxX
+            where !((inner.minX..<inner.maxX).contains(x) && (inner.minY..<inner.maxY).contains(y)) { return (x, y) }
+        }
+        return nil
+    }
+
+    /// `body` with one pixel unpainted after the plan's fills, before their readback.
+    static func unpainting(_ at: (x: Int, y: Int), _ body: () async throws -> Void) async throws {
+        try await PageRasterizer.$afterPlanFills.withValue({ ctx in
+            ctx.setFillColor(CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 1))
+            ctx.fill(CGRect(x: at.x, y: at.y, width: 1, height: 1))
+        }) { try await body() }
+    }
+
+    @Test("A box that does not project, with one region, shown at one quality and run at another: its region's fill joins what was shown for the box")
+    func boxThatDoesNotProjectHoldsWhatWasShown() async throws {
+        let page = try Self.blankPage(width: "612", height: "792")
+        let (share, shownDPI, run, w, h) = try Self.shortRegion()
         let region = RedactionRegion(id: UUID(), normalizedRect: share, source: .manual)
-        // A record whose plan holds no box: the region is filled on its own.
-        let empty = PaintPlan(widthSixtyFourths: w, heightSixtyFourths: h, boxes: [])
-        let record = RunRecord.Page(pageIndex: 0, regions: [RunRecord.DrawnRegion(region: region)], plan: empty,
+        // An empty inner: the box projects at no quality, so the kept plan
+        // showed it as its region's own fill.
+        let y = Int(share.minY * Double(h))
+        let flat = PageRect64(minX: Int(share.minX * Double(w)), minY: y, maxX: Int(share.maxX * Double(w)), maxY: y)
+        let box = PaintedBox(regionIDs: [region.id], inner: flat, paint: flat, tight: flat, limitAbove: nil,
+                             limitBelow: nil, exposure: .canShowLength, treatment: .notAsked, bandMade: false,
+                             inkEnlargedCovered: false, inkEnlargedToCap: false, asDrawn: true)
+        #expect(PixelPlan.project(inner: flat, paint: flat, limitAbove: nil, limitBelow: nil, raster: run) == nil)
+        let plan = PaintPlan(widthSixtyFourths: w, heightSixtyFourths: h, boxes: [box])
+        let record = RunRecord.Page(pageIndex: 0, regions: [RunRecord.DrawnRegion(region: region)], plan: plan,
                                     shownDPI: shownDPI)
         let data = Self.pageData(page, regions: [region], chosen: run.dpi, confirmed: record)
         let result = try await PageRasterizer().rasterize(data)
+        #expect(result.paintedBoxes[0] == nil, "the box is not painted as a box")
         #expect(result.regionsPaintedOutsideThePlan == [region.id])
+        // What was shown for the box: its region's own fill there (the
+        // fallback of shownFill), carried, the same rectangle the region's
+        // own join reads.
+        let shown = try #require(PageRasterizer.shownFill(box: box, regions: [region.id: region], raster: run,
+                                                          shownDPI: shownDPI))
+        #expect(shown.bitmapRect == PageRasterizer.shownRegionFill(region, raster: run, shownDPI: shownDPI))
         let own = PixelPlan.PixelRect(bitmapRect: normalizedToFillPixels(share, content: Self.content(run)))
-        let carried = try #require(PageRasterizer.shownRegionFill(region, raster: run, shownDPI: shownDPI))
-        let expected = own.joined(with: PixelPlan.PixelRect(bitmapRect: carried))
+        let expected = own.joined(with: shown)
         #expect(expected != own)
-        #expect(Self.blackAround(expected.bitmapRect, in: result.pageOutput.image) == expected,
-                "shown at \(shownDPI), run at \(run.dpi)")
+        // Filled as the region and as what was shown: every pixel of each.
+        let bitmap = try PlanPaintTests.Bitmap(result.pageOutput.image)
+        #expect(bitmap.misses(own, level: 0) == 0, "shown at \(shownDPI), run at \(run.dpi)")
+        #expect(bitmap.misses(shown, level: 0) == 0, "shown at \(shownDPI), run at \(run.dpi)")
+        #expect(Self.blackAround(expected.bitmapRect, in: result.pageOutput.image) == expected)
+    }
+
+    @Test("The table's B5 row through the producer: shown at 300 and painted at 150, the box reported is the table's joined fill")
+    func producerPaintsTheTablesRow() async throws {
+        let row = try #require(Self.rows().first { $0.row == "tops-b5-300-150" })
+        let w = row.widthSixtyFourths, h = row.heightSixtyFourths
+        try #require(PixelPlan.sixtyFourths(ofSide: 498.898) == w && PixelPlan.sixtyFourths(ofSide: 708.661) == h,
+                     "the page is the row's")
+        let page = try Self.blankPage(width: "498.898", height: "708.661")
+        // The row's box, in sixty-fourths as the table has it, with its region laid over it.
+        let (box, regions) = Self.box(inner: Self.rect64(row.inner), paint: Self.rect64(row.paint),
+                                      above: row.limitAbove, below: row.limitBelow, w: w, h: h,
+                                      withRegion: row.regionAsInner)
+        let region = try #require(regions.values.first)
+        let plan = PaintPlan(widthSixtyFourths: w, heightSixtyFourths: h, boxes: [box])
+        let record = RunRecord.Page(pageIndex: 0, regions: [RunRecord.DrawnRegion(region: region)], plan: plan,
+                                    shownDPI: row.shownDPI)
+        let data = Self.pageData(page, regions: [region], chosen: 300, confirmed: record)
+        let result = try await PageRasterizer().rasterize(data, dpiCap: row.runDPI)
+        let reported = try #require(result.paintedBoxes[0], "the box is reported")
+        let ran = PixelPlan.PixelRect(minX: reported.firstColumn, minY: reported.firstRowFromBottom,
+                                      maxX: reported.firstColumn + reported.columns,
+                                      maxY: reported.firstRowFromBottom + reported.rows)
+        #expect(Self.pixels(row.joined) != Self.pixels(row.ownFill), "precondition: the join changes this row")
+        #expect(ran == Self.pixels(row.joined), "reported \(ran)")
+        #expect(try PlanPaintTests.Bitmap(result.pageOutput.image).misses(ran, level: 0) == 0)
+    }
+
+    @Test("A box past the page's left edge that projects at the shown quality and not at the run's: what was shown is filled as one more stray rectangle, and read back")
+    func boxShownButNotProjectedHere() async throws {
+        // A box projects at least as far at a lower quality (its margin and
+        // block are coarser there), so such a box was shown below the run's
+        // quality: here at 150, run at 300.
+        let page = try Self.blankPage(width: "612", height: "792")
+        let w = try #require(PixelPlan.sixtyFourths(ofSide: 612)), h = try #require(PixelPlan.sixtyFourths(ofSide: 792))
+        let run = try Self.raster(w, h, 300), shown = try Self.raster(w, h, 150)
+        // Its right side 20/64 pt left of the page: under a pixel at 150, over one at 300.
+        let inner = PageRect64(minX: -640, minY: 64 * 400, maxX: -20, maxY: 64 * 412)
+        let (box, regions) = Self.box(inner: inner, paint: inner, above: nil, below: nil, w: w, h: h, withRegion: true)
+        let region = try #require(regions.values.first)
+        #expect(PixelPlan.project(inner: inner, paint: inner, limitAbove: nil, limitBelow: nil, raster: run) == nil,
+                "precondition: no projection at the run's quality")
+        #expect(PixelPlan.project(inner: inner, paint: inner, limitAbove: nil, limitBelow: nil, raster: shown) != nil,
+                "precondition: a projection at the shown one")
+        let carried = try #require(PageRasterizer.shownFill(box: box, regions: regions, raster: run, shownDPI: 150))
+        let plan = PaintPlan(widthSixtyFourths: w, heightSixtyFourths: h, boxes: [box])
+        let record = RunRecord.Page(pageIndex: 0, regions: [RunRecord.DrawnRegion(region: region)], plan: plan,
+                                    shownDPI: 150)
+        let data = Self.pageData(page, regions: [region], chosen: 300, confirmed: record)
+        let result = try await PageRasterizer().rasterize(data)
+        #expect(result.paintedBoxes[0] == nil, "the box is not painted as a box")
+        #expect(try PlanPaintTests.Bitmap(result.pageOutput.image).misses(carried, level: 0) == 0,
+                "what was shown for the box is filled: \(carried)")
+        await #expect(throws: PipelineError.self) {
+            try await Self.unpainting((carried.minX, carried.minY)) { _ = try await PageRasterizer().rasterize(data) }
+        }
     }
 
     @Test("Every page run at the quality it was shown at is byte for byte the page with no shown quality",

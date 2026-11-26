@@ -1,7 +1,7 @@
 Property: The run's painter hands the floor function the quality the page was shown at.
 Area: the run never paints less than was shown
 Test command: cd Packages/RedactionEngine && swift test --skip-build --no-parallel --filter 'ShownJoinTests' (after swift build --build-tests)
-Must go red: RedactionEngineTests/ShownJoinTests paintedPageHoldsWhatWasShown
+Must go red: RedactionEngineTests/ShownJoinTests paintedPageHoldsWhatWasShown; RedactionEngineTests/ShownJoinTests producerPaintsTheTablesRow
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift

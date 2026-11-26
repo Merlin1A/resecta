@@ -386,7 +386,14 @@ extension PageRasterizer {
                             verdicts[index] = verdict
                             if checked.inkEnlargedCovered || checked.inkEnlargedToCap { widened.insert(index) }
                             var rect = withRegionFills(projection.painted.bitmapRect, of: box)
-                            if let floor = try asPlacedRect(box, grows: grows) { rect = rect.union(floor) }
+                            // Its floor: "as placed", with what was shown. A box that does not
+                            // project as placed still holds what was shown for it.
+                            if let floor = try asPlacedRect(box, grows: grows) {
+                                rect = rect.union(floor)
+                            } else if let shown = Self.shownFill(box: box, regions: regionsByID, raster: raster,
+                                                                 shownDPI: shownDPI) {
+                                rect = rect.union(shown.bitmapRect)
+                            }
                             rects.append((index, rect))
                             painted.formUnion(box.regionIDs)
                             continue
