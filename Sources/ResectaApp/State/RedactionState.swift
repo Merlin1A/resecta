@@ -10,7 +10,7 @@ private let logger = Logger(subsystem: "com.resecta.app", category: "state")
 @Observable
 class RedactionState {
     var regions: [Int: [RedactionRegion]] = [:] {        // pageIndex → regions
-        didSet { notePagesChanged(from: oldValue) }
+        didSet { notePagesChanged(from: oldValue); noteGeometryAtStore() }
     }
 
     /// Each page's version: bumped by every change to that page's stored
@@ -270,6 +270,20 @@ class RedactionState {
     /// this constant.
     static let manualDrawNudgeProximityNormalized: CGFloat = 0.082
 
+    /// How far a stored share may lie from an exact value by the maps'
+    /// rounding: the store map divides by the page's rectangle on the
+    /// canvas, whose corner need not be 0, so a full side can come back a
+    /// few units in the last place off.
+    nonisolated static let shareSlack: CGFloat = 1e-12
+
+    /// Whether a share is the whole page: each edge within `shareSlack` of
+    /// the unit square's. A whole-page mark moved or resized back to its
+    /// place on a page of fractional size comes back that close, not exact.
+    nonisolated static func isWholePage(_ rect: CGRect) -> Bool {
+        abs(rect.minX) <= shareSlack && abs(rect.minY) <= shareSlack
+            && abs(rect.maxX - 1) <= shareSlack && abs(rect.maxY - 1) <= shareSlack
+    }
+
     // Per-document audit of search matches that the user applied as
     // redactions. Keyed by the created RedactionRegion.id so undo/redo can
     // drop and restore entries in lockstep with the regions themselves.
@@ -385,6 +399,8 @@ class RedactionState {
         // since verification" is logically false.
         regionsModifiedSinceVerification = false
         regions = [:]
+        // The canvas probe's answers describe the prior document's pages.
+        canvasProbeFailures = []
         selectedRegionIDs = []
         // Cancel and drop any in-flight search so its sheet does not
         // linger into the next document (the `activeSearch` didSet does
@@ -670,6 +686,25 @@ class RedactionState {
     /// copy and `regions` changes only at the lift, so no run starts until
     /// then (`DocumentState.redactRefusal(with:)`).
     var canvasHoldsATouch: Bool { canvas?.holdsATouch ?? false }
+
+    // MARK: - Box places (`RedactionState+BoxPlace.swift`)
+
+    /// Each page's crop box and rotation as they were when its boxes were
+    /// stored: noted when a page first holds a box, dropped when it holds
+    /// none. The run refuses a page whose geometry has changed since.
+    @ObservationIgnored var geometryAtStore: [Int: RunRecord.PageGeometry] = [:]
+    /// Reads a page's crop box and rotation from the open document; set by
+    /// the pipeline coordinator. A page holding boxes is noted as soon as it
+    /// is set.
+    @ObservationIgnored var pageGeometryReader: ((Int) -> RunRecord.PageGeometry?)? {
+        didSet { noteGeometryAtStore() }
+    }
+    /// The pages whose canvas failed the box-place probe when PDFKit handed
+    /// it its page. Kept for the document; the run refuses such a page.
+    @ObservationIgnored var canvasProbeFailures: Set<Int> = []
+    /// Probes every live canvas now and returns the pages whose canvas
+    /// failed; set by the canvas's coordinator. Nil with no canvas.
+    @ObservationIgnored var probeLiveCanvases: (() -> Set<Int>)?
 }
 
 /// What the editor's canvas tells the run door: whether any of its live

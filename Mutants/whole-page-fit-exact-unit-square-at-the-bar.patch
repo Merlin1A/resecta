@@ -1,0 +1,19 @@
+Property: The page bar reads the whole-page mark through the one predicate, within the maps' rounding.
+Area: the page bar whole-page control
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/WholePageFitTests
+Must go red: ResectaAppTests/WholePageFitTests noExactUnitSquareComparison
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/PageNavigationBar.swift b/Sources/ResectaApp/Views/PageNavigationBar.swift
+index 5c2a7a5e..2a61aeab 100644
+--- a/Sources/ResectaApp/Views/PageNavigationBar.swift
++++ b/Sources/ResectaApp/Views/PageNavigationBar.swift
+@@ -268,7 +268,7 @@ extension PageNavigationBar {
+     /// page's unit rectangle.
+     private static func wholePageRegion(on page: Int, in redactionState: RedactionState) -> RedactionRegion? {
+         redactionState.regions[page]?.first {
+-            $0.source == .manual && RedactionState.isWholePage($0.normalizedRect)
++            $0.source == .manual && $0.normalizedRect == CGRect(x: 0, y: 0, width: 1, height: 1)
+         }
+     }
+ 

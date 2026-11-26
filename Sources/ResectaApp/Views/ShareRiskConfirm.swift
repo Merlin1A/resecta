@@ -192,13 +192,19 @@ extension DocumentEditorView {
             if CouldNotVerifyWarn.matches(layer) {
                 return confirmFactLine(layer: layer, outcome: "could not verify")
             }
-            if layer.status.isFail || layer.status.isAttention, layer.couldNotVerifyPart != nil {
-                let title = VerificationRowModel.title(for: layer)
-                let location = VerificationRowModel.pageLocation(layer.couldNotVerifyPartPages).map { " \($0)" } ?? ""
-                return "\(title): could not verify\(location)"
-            }
-            return nil
+            return couldNotVerifyPartLine(layer: layer)
         }
+    }
+
+    /// The line for the part a failed or needs-review check could not read,
+    /// its pages the part's own, never the issue's: "OCR Check: could not
+    /// verify on page 2". Nil for any other result. The results screen's
+    /// row for that part reads the same line.
+    static func couldNotVerifyPartLine(layer: LayerResult) -> String? {
+        guard layer.status.isFail || layer.status.isAttention, layer.couldNotVerifyPart != nil else { return nil }
+        let title = VerificationRowModel.title(for: layer)
+        let location = VerificationRowModel.pageLocation(layer.couldNotVerifyPartPages).map { " \($0)" } ?? ""
+        return "\(title): could not verify\(location)"
     }
 
     /// Skip-fact line for the SKIPPED confirm family; the sheet draws the

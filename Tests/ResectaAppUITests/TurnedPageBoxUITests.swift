@@ -8,8 +8,8 @@ import XCTest
 ///
 /// Canvas regions are not in the accessibility tree, so both cases read
 /// the screen: the word is found by its own black ink in a screenshot
-/// taken before any box, and a box by its tint (a drawn box red or blue,
-/// a Search box green) in one taken after. Nothing here maps a point into
+/// taken before any box, and a box by its page-teal line (every box, drawn
+/// or placed by Search) in one taken after. Nothing here maps a point into
 /// the page: the drag is pressed at the ink's corners, and every reading
 /// is in window points.
 ///
@@ -48,7 +48,7 @@ nonisolated final class TurnedPageBoxUITests: XCTestCase {
         let end = point(CGPoint(x: word.maxX + 8, y: word.maxY + 8))
         start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.2)
         let page = self.page
-        let box = try XCTUnwrap(waitForTint(within: 10) { $0.tintBounds(.red, in: page) ?? $0.tintBounds(.blue, in: page) },
+        let box = try XCTUnwrap(waitForTint(within: 10) { $0.tintBounds(.teal, in: page) },
                                 "the drawn box is on screen")
         attachScreenshot(named: "turned-page-drawn-box")
         XCTAssertGreaterThan(share(of: word, inside: box), 0.95,
@@ -78,7 +78,7 @@ nonisolated final class TurnedPageBoxUITests: XCTestCase {
         dismiss.tap()
         XCTAssertTrue(dismiss.waitForNonExistence(timeout: 10), "the sheet closed")
         let page = self.page
-        let box = try XCTUnwrap(waitForTint(within: 10) { $0.tintBounds(.green, in: page) },
+        let box = try XCTUnwrap(waitForTint(within: 10) { $0.tintBounds(.teal, in: page) },
                                 "the Search box is on screen")
         attachScreenshot(named: "turned-page-search-box")
         XCTAssertGreaterThan(share(of: word, inside: box), 0.95,

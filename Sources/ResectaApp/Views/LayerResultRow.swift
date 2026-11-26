@@ -84,6 +84,10 @@ struct LayerResultRow: View {
     var groupedLayout: GroupedLayout = .lead
     var showsStatusWord: Bool = false
     var pagesOnChips: Bool = false
+    /// The outcome word at the trailing edge of the title's line, under the
+    /// title at accessibility sizes: a check in the list of checks that did
+    /// not pass.
+    var showsTrailingWord: Bool = false
 
     private var model: VerificationRowModel {
         VerificationRowModel(layer: layer, perPageModes: perPageModes,
@@ -584,9 +588,7 @@ struct LayerResultRow: View {
                 Color.clear.frame(width: ResectaTokens.Results.titleInset, height: 1)
             }
             VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xxs) {
-                Text(model.title)
-                    .font(.body)
-                    .foregroundStyle(.primary)
+                titleLine
                 if groupedLayout == .lead {
                     captionText(font: .subheadline)
                 }
@@ -605,6 +607,28 @@ struct LayerResultRow: View {
         }
         .padding(.vertical, ResectaTokens.Spacing.sm + ResectaTokens.Spacing.xs - 1)
         .frame(minHeight: ResectaTokens.Results.rowMinHeight, alignment: .top)
+    }
+
+    /// The title, with the outcome word beside it or under it when the row
+    /// shows it there.
+    @ViewBuilder
+    private var titleLine: some View {
+        let title = Text(model.title).font(.body).foregroundStyle(.primary)
+        if showsTrailingWord {
+            let word = Text(model.outcome.word)
+                .font(.footnote)
+                .foregroundStyle(ResectaTokens.SemanticColor.supportText)
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: ResectaTokens.Spacing.xxs) { title; word }
+            } else {
+                HStack(alignment: .firstTextBaseline, spacing: ResectaTokens.Spacing.sm) {
+                    title.frame(maxWidth: .infinity, alignment: .leading)
+                    word
+                }
+            }
+        } else {
+            title
+        }
     }
 
     /// The status word (under Findings only, grey; the colour stays on the

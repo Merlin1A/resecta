@@ -172,12 +172,15 @@ struct VerificationMastheadTests {
         state.outputExists && !state.isStale
     }
 
-    /// Every seeded report, plus two arms no seeded report reaches: a pass
-    /// with several notes, and a WARN whose check could not run in full.
-    static var everyArm: [(name: String, report: VerificationReport, findingCount: Int)] {
-        Fixtures.all.sorted { $0.key < $1.key }.map { ($0.key, $0.value, 0) } + [
-            ("a pass with several notes", Fixtures.secureAllPass, 2),
-            ("a check that could not run in full", report(.warn("w"), [row(.warn("w"), .ocrCheck, cnv: true)]), 0),
+    /// Every seeded report, plus four arms no seeded report reaches: a pass
+    /// with one row of findings, a pass with two, a pass with a hand-drawn box
+    /// on a page with no text, and a WARN whose check could not run in full.
+    static var everyArm: [(name: String, report: VerificationReport, findingRows: Int, handDrawnBoxes: Int)] {
+        Fixtures.all.sorted { $0.key < $1.key }.map { ($0.key, $0.value, 0, 0) } + [
+            ("a pass with one row of findings", Fixtures.secureAllPass, 1, 0),
+            ("a pass with two rows of findings", Fixtures.secureAllPass, 2, 0),
+            ("a pass with a hand-drawn box on a page with no text", Fixtures.secureAllPass, 0, 1),
+            ("a check that could not run in full", report(.warn("w"), [row(.warn("w"), .ocrCheck, cnv: true)]), 0, 0),
         ]
     }
 
@@ -194,17 +197,18 @@ struct VerificationMastheadTests {
         #expect(Fixtures.all.count == 18)
         var rows = 0
         for arm in Self.everyArm {
-            let standing = Results.mastheadSubtitle(report: arm.report, findingCount: arm.findingCount)
+            let standing = Results.mastheadSubtitle(report: arm.report, findingRows: arm.findingRows,
+                                                    handDrawnBoxes: arm.handDrawnBoxes)
             #expect(standing != nil && standing != missing, "\(arm.name): a standing result keeps its own sentence")
             for state in Self.states {
                 let shown = Results.mastheadSubtitle(
                     report: arm.report, outputExists: state.outputExists, isStale: state.isStale,
-                    findingCount: arm.findingCount)
+                    findingRows: arm.findingRows, handDrawnBoxes: arm.handDrawnBoxes)
                 #expect(shown == (Self.stands(state) ? standing : missing), "\(arm.name), \(state.name): \(shown ?? "nil")")
                 rows += 1
             }
         }
-        #expect(rows == 20 * 4)
+        #expect(rows == 22 * 4)
     }
 
     @Test("A result that no longer stands is titled Out of Date on every verdict; a standing one keeps its title")

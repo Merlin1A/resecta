@@ -1,0 +1,22 @@
+Property: Boxed text still readable has no step; part of boxed text beside its box has the remedy by its count. Here boxed text still readable is given the remedy of part of boxed text.
+Area: findings on the results screen
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/FindingRowTests
+Must go red: ResectaAppTests/FindingRowTests stepsByKind
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/FindingRow.swift b/Sources/ResectaApp/Views/FindingRow.swift
+index de7cfd24..fbfef2cc 100644
+--- a/Sources/ResectaApp/Views/FindingRow.swift
++++ b/Sources/ResectaApp/Views/FindingRow.swift
+@@ -193,7 +193,10 @@ enum FindingRowModel {
+         case .couldNotRunOnPages:
+             guard previewAvailable, !problem.pages.isEmpty else { return nil }
+             return .sentence(problem.pages.count == 1 ? lookAtThatPage : lookAtThosePages)
+-        case .boxedTextReadable, .coveredTextInOriginal, .formValuesNotCarried, .couldNotFinish, .skippedChecks:
++        case .boxedTextReadable:
++            return .sentence(problem.words.count == 1
++                ? VerificationRowModel.adjustTheBoxRemedy : VerificationRowModel.adjustTheBoxesRemedy)
++        case .coveredTextInOriginal, .formValuesNotCarried, .couldNotFinish, .skippedChecks:
+             return nil
+         }
+     }

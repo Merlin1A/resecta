@@ -7,7 +7,10 @@ import RedactionEngine
 // judged with nothing acknowledged. It composes no sentence; whoever draws a
 // problem owns its words. Every kind is decided from structured fields
 // (status, the check's identity, pages, terms, the fragment flag, query
-// lines, the could-not-verify flag), never from an engine sentence.
+// lines, the could-not-verify flag), never from an engine sentence. A
+// failed or needs-review check that also could not read part of its input
+// has two entries, both with its position: one under its own kind, and that
+// part under the checks that could not run in full or could not finish.
 
 /// One problem of a run, with the checks behind it.
 // nonisolated: a pure value, built and read off the main actor by tests.
@@ -32,9 +35,13 @@ nonisolated struct VerificationProblem: Equatable, Identifiable {
         case possibleItems
         /// The original's filled form values, not carried: no check behind it.
         case formValuesNotCarried
-        /// Checks that could not run in full on named pages: one problem.
+        /// Checks that could not run in full on named pages, with the part a
+        /// failed or needs-review check could not read on named pages: one
+        /// problem.
         case couldNotRunOnPages
-        /// A check that could not finish, with no pages: one problem per check.
+        /// A check that could not finish, with no pages, or the part a failed
+        /// or needs-review check could not read, with no pages: one problem
+        /// per check.
         case couldNotFinish
         /// Skipped checks: one problem.
         case skippedChecks
@@ -131,6 +138,14 @@ nonisolated enum VerificationProblemModel {
                 skipped.append(check)
             } else if check.outcome == .couldNotVerify {
                 if check.pages.isEmpty { unfinished.append(check) } else { onPages.append(check) }
+            }
+            // The one second entry: the part a failed or needs-review check
+            // could not read, with that part's pages and sentence and no words.
+            if layer.status.isFail || layer.status.isAttention, let part = layer.couldNotVerifyPart {
+                let unread = VerificationProblem.Check(
+                    layerIndex: index, outcome: .couldNotVerify, pages: sortedPages(layer.couldNotVerifyPartPages ?? []),
+                    words: [], sentence: part)
+                if unread.pages.isEmpty { unfinished.append(unread) } else { onPages.append(unread) }
             }
         }
 

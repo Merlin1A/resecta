@@ -15,11 +15,13 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
 
     weak var pdfView: PDFView?
     /// The region state. The coordinator sets itself as the state's canvas,
-    /// so the run door can ask whether a finger is down on a page.
+    /// so the run door can ask whether a finger is down on a page, and the
+    /// run entry probes every live canvas through it.
     var redactionState: RedactionState? {
         didSet {
             if oldValue !== redactionState, oldValue?.canvas === self { oldValue?.canvas = nil }
             redactionState?.canvas = self
+            redactionState?.probeLiveCanvases = { [weak self] in self?.boxPlaceProbeFailures() ?? [] }
         }
     }
     /// The settings a drawn page's plan is kept with (`noteDrawn`).
@@ -300,6 +302,7 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
         let overlay = RedactionOverlayView()
         overlay.pageIndex = pageIndex
         overlay.pageRotation = page.rotation
+        overlay.pageSize = page.bounds(for: view.displayBox).size
         overlay.coordinator = self
         overlay.isUserInteractionEnabled = isDrawingEnabled
         overlay.isDrawingMode = isDrawingMode
@@ -330,6 +333,20 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
               pageIndex == visible
         else { return [] }
         return search.livePreviewRects
+    }
+
+    // MARK: - Box places (the canvas probe)
+
+    /// A canvas's probe answer when PDFKit first placed it: a failure is kept
+    /// on the page for the document, and the run refuses the page.
+    func recordBoxPlaceProbe(pageIndex: Int, passes: Bool) {
+        if !passes { redactionState?.canvasProbeFailures.insert(pageIndex) }
+    }
+
+    /// Probes every live canvas now: the pages whose canvas fails, or that
+    /// PDFKit has not yet placed.
+    func boxPlaceProbeFailures() -> Set<Int> {
+        Set(activeOverlays.compactMap { page, overlay in overlay.boxPlaceProbePasses() == true ? nil : page })
     }
 
     func pdfView(_ view: PDFView,
@@ -393,22 +410,27 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
     /// began; the mutators judge that no-op themselves (no step, no Redo
     /// re-armed, the output kept), and the resize is announced only when
     /// the rect changed.
-    func commitResize(_ id: UUID, page: Int, newRect: CGRect, undoManager: UndoManager?) {
-        if redactionState?.resizeRegion(id, page: page, newRect: newRect, undoManager: undoManager) == true {
+    func commitResize(_ id: UUID, page: Int, newRect: CGRect, drawnPageRect: CGRect? = nil,
+                      undoManager: UndoManager?) {
+        if redactionState?.resizeRegion(id, page: page, newRect: newRect, undoManager: undoManager,
+                                        drawnPageRect: drawnPageRect) == true {
             UIAccessibility.post(notification: .announcement, argument: Self.commitAnnouncement(.resized))
         }
         refreshOverlay(for: page)
     }
 
     // Commit region move after drag ends.
-    func commitMove(_ id: UUID, page: Int, newRect: CGRect, undoManager: UndoManager?) {
-        redactionState?.moveRegion(id, page: page, newRect: newRect, undoManager: undoManager)
+    func commitMove(_ id: UUID, page: Int, newRect: CGRect, drawnPageRect: CGRect? = nil,
+                    undoManager: UndoManager?) {
+        redactionState?.moveRegion(id, page: page, newRect: newRect, undoManager: undoManager,
+                                   drawnPageRect: drawnPageRect)
         refreshOverlay(for: page)
     }
 
     /// Commit a batch move of multiple regions on the same page.
-    func commitMoveMultiple(_ moves: [(id: UUID, newRect: CGRect)], page: Int, undoManager: UndoManager?) {
-        redactionState?.moveRegions(moves, page: page, undoManager: undoManager)
+    func commitMoveMultiple(_ moves: [(id: UUID, newRect: CGRect)], page: Int,
+                            drawnPageRects: [UUID: CGRect] = [:], undoManager: UndoManager?) {
+        redactionState?.moveRegions(moves, page: page, undoManager: undoManager, drawnPageRects: drawnPageRects)
         refreshOverlay(for: page)
     }
 

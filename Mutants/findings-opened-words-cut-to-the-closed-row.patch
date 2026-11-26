@@ -1,0 +1,19 @@
+Property: An opened row shows every word its check reported, each once. Here the opened row shows only the first word, as the closed row does.
+Area: findings on the results screen
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/FindingRowTests
+Must go red: ResectaAppTests/FindingRowTests everyWordCanBeRead
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/FindingRow.swift b/Sources/ResectaApp/Views/FindingRow.swift
+index de7cfd24..4997311f 100644
+--- a/Sources/ResectaApp/Views/FindingRow.swift
++++ b/Sources/ResectaApp/Views/FindingRow.swift
+@@ -221,7 +221,7 @@ enum FindingRowModel {
+             }
+             return CheckLine(layerIndex: check.layerIndex, line: line,
+                              sentence: sentenceKind ? check.sentence : nil,
+-                             words: wordKind ? check.words : [], stopLines: stops)
++                             words: wordKind ? Array(check.words.prefix(1)) : [], stopLines: stops)
+         }
+     }
+ 

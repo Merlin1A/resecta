@@ -24,16 +24,17 @@ struct DebugLaunchHookTests {
         "redactionError.insufficientMemory", "redactionError.unsupportedPageGeometry",
         "redactionError.boxCannotShowLength",
         "redactionError.bitmapCreationFailed", "redactionError.fillVerificationFailed",
+        "redactionError.boxPlaceUnconfirmed",
         "redactionError.renderTimeout", "redactionError.pageTooLarge",
         "redactionError.reconstructionFailed", "redactionError.pageSidesNotAsRecorded",
         "verificationError.engineCrash",
         "exportError.diskFull", "exportError.writeFailed", "exportError.filePurged",
     ]
 
-    @Test("Each of the 23 failure names parses to its own case, failing from the editor by default",
+    @Test("Each of the 24 failure names parses to its own case, failing from the editor by default",
           arguments: failureNames)
     func failureNameParses(name: String) {
-        #expect(ResectaApp.seedFailureErrors.count == 23)
+        #expect(ResectaApp.seedFailureErrors.count == 24)
         guard case .seed(let error, let phase, let report) =
                 ResectaApp.seedFailureHook(for: ["--seedFailure=\(name)"]) else {
             Issue.record("\(name) did not parse to a failure")

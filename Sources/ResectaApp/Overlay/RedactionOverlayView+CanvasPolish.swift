@@ -102,9 +102,22 @@ extension RedactionOverlayView {
         regionSize: CGSize,
         overlaySize: CGSize
     ) -> CGPoint {
+        clampedDragOrigin(touchPoint: touchPoint, dragOffset: dragOffset, regionSize: regionSize,
+                          page: CGRect(origin: .zero, size: overlaySize))
+    }
+
+    /// The same, held in the page's rectangle on the canvas
+    /// (`pageRectOnCanvas`), wherever PDFKit puts its corner. With the
+    /// corner at the canvas's origin it is the form above, value for value.
+    static func clampedDragOrigin(
+        touchPoint: CGPoint,
+        dragOffset: CGSize,
+        regionSize: CGSize,
+        page: CGRect
+    ) -> CGPoint {
         let clampedTouch = CGPoint(
-            x: max(0, min(touchPoint.x, overlaySize.width)),
-            y: max(0, min(touchPoint.y, overlaySize.height))
+            x: max(page.minX, min(touchPoint.x, page.maxX)),
+            y: max(page.minY, min(touchPoint.y, page.maxY))
         )
         var newOrigin = CGPoint(
             x: clampedTouch.x - dragOffset.width,
@@ -113,10 +126,10 @@ extension RedactionOverlayView {
         // Step 2: keep the region inside the overlay. The outer max(0, …)
         // pins the degenerate case (region bigger than overlay) at the
         // origin corner rather than re-centering.
-        let maxX = max(0, overlaySize.width - regionSize.width)
-        let maxY = max(0, overlaySize.height - regionSize.height)
-        newOrigin.x = max(0, min(newOrigin.x, maxX))
-        newOrigin.y = max(0, min(newOrigin.y, maxY))
+        let maxX = max(page.minX, page.maxX - regionSize.width)
+        let maxY = max(page.minY, page.maxY - regionSize.height)
+        newOrigin.x = max(page.minX, min(newOrigin.x, maxX))
+        newOrigin.y = max(page.minY, min(newOrigin.y, maxY))
         return newOrigin
     }
 }

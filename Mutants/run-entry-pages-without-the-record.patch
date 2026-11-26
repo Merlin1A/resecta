@@ -5,10 +5,10 @@ Must go red: ResectaAppTests/RunEntryPendingRunGateTests runHandsTheRecordToTheP
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/State/PipelineCoordinator.swift b/Sources/ResectaApp/State/PipelineCoordinator.swift
-index 5586655e..7d889425 100644
+index e40e23853..3bf5c7c0b 100644
 --- a/Sources/ResectaApp/State/PipelineCoordinator.swift
 +++ b/Sources/ResectaApp/State/PipelineCoordinator.swift
-@@ -702,7 +702,7 @@ final class PipelineCoordinator: @unchecked Sendable {
+@@ -709,7 +709,7 @@ final class PipelineCoordinator: @unchecked Sendable {
          effectiveMode: PipelineMode,
          runSettings: RunSettings? = nil,
          inkPlans: [Int: InkStripPlan] = [:],
@@ -18,12 +18,12 @@ index 5586655e..7d889425 100644
          guard let doc = documentState.sourceDocument else { return [] }
          return RunInputs.pageData(
 diff --git a/Sources/ResectaApp/State/PipelineRunner.swift b/Sources/ResectaApp/State/PipelineRunner.swift
-index d62e392d..88c1caae 100644
+index 3cf2e0125..b1e7b5454 100644
 --- a/Sources/ResectaApp/State/PipelineRunner.swift
 +++ b/Sources/ResectaApp/State/PipelineRunner.swift
-@@ -297,8 +297,7 @@ struct PipelineRunner {
-             throw PipelineError.redactionError(.boxCannotShowLength(pageIndex: page))
-         }
+@@ -313,8 +313,7 @@ struct PipelineRunner {
+         let unconfirmedBoxPage = confirmed.firstPageWithUnconfirmedBoxPlace(
+             canvasFailures: redactionState.canvasProbeFailuresAtRunEntry())
          let pages = coordinator.buildPDFPageData(
 -            effectiveMode: effectiveMode, runSettings: runSettings, inkPlans: sensitiveTerms.inkPlans,
 -            record: confirmed)

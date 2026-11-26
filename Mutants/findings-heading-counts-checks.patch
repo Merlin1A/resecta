@@ -1,0 +1,22 @@
+Property: The Findings heading counts its rows, so a row behind several checks counts once. Here it counts the checks behind the rows.
+Area: findings on the results screen
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/FindingRowTests
+Must go red: ResectaAppTests/FindingRowTests theGroupDrawsTheModel
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationDetailsSection.swift b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
+index b26c09eae..0baf789cf 100644
+--- a/Sources/ResectaApp/Views/VerificationDetailsSection.swift
++++ b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
+@@ -113,8 +113,9 @@ struct VerificationDetailsSection: View {
+     /// number of rows; nil when there is no row, and then no group.
+     static func findingsHeading(_ rows: [VerificationProblem]) -> (shown: String, spoken: String)? {
+         guard !rows.isEmpty else { return nil }
+-        return (VerificationLayerPartition.sectionHeader(findingsHeader, count: rows.count),
+-                VerificationLayerPartition.sectionHeaderSpoken(findingsHeader, count: rows.count))
++        let checks = rows.reduce(0) { $0 + max($1.checks.count, 1) }
++        return (VerificationLayerPartition.sectionHeader(findingsHeader, count: checks),
++                VerificationLayerPartition.sectionHeaderSpoken(findingsHeader, count: checks))
+     }
+ 
+     /// The plain warnings' card's heading; its count is the number of rows.

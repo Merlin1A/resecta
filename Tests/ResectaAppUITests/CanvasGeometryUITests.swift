@@ -1,11 +1,12 @@
 import XCTest
 
 /// The canvas's geometry on the 23-page fixture: which region a touch picks
-/// on applied one-line regions, and what a touch does at 2x. The "Amount"
-/// search applied on the 23-page fixture puts a stack of one-line boxes on
-/// page 1, a few points apart at the fit zoom; a tap or a hold at a box's
-/// centre must pick that box, not the one below it. Boxes are read by tint
-/// (`CanvasPixelProbe`): applied boxes are green.
+/// on applied one-line regions, what a touch does at 2x, and how a box is
+/// drawn. The "Amount" search applied on the 23-page fixture puts a stack
+/// of one-line boxes on page 1, a few points apart at the fit zoom; a tap
+/// or a hold at a box's centre must pick that box, not the one below it.
+/// Boxes are read from the screen (`CanvasPixelProbe`): every box is the
+/// veil inside a page-teal line, whatever placed it.
 ///
 /// nonisolated: an XCUITest drives a separate process and touches no
 /// @MainActor state.
@@ -29,7 +30,7 @@ nonisolated final class CanvasGeometryUITests: XCTestCase {
     func testTapAtARowCentreSelectsThatRow() throws {
         let stack = try applyAmountStack()
         let row = 10
-        let before = try stack.rows(in: probe(), tint: .green)
+        let before = try stack.rows(in: probe(), tint: .teal)
         XCTAssertEqual(before.count, Stack.rowCount, "the applied stack is on the page")
         tap(stack.centre(row))
         sleep(1)
@@ -44,14 +45,14 @@ nonisolated final class CanvasGeometryUITests: XCTestCase {
         delete.tap()
         XCTAssertTrue(waitForRegionCount(Stack.rowCount - 1))
         sleep(1)
-        let after = try stack.rows(in: probe(), tint: .green)
+        let after = try stack.rows(in: probe(), tint: .teal)
         XCTAssertEqual(Set(before).subtracting(after), [row], "a tap at row \(row)'s centre selects row \(row)")
     }
 
     func testHoldAtARowCentreDeletesThatRow() throws {
         let stack = try applyAmountStack()
         let row = 10
-        let before = try stack.rows(in: probe(), tint: .green)
+        let before = try stack.rows(in: probe(), tint: .teal)
         XCTAssertEqual(before.count, Stack.rowCount, "the applied stack is on the page")
         let count = currentRegionCount()
         point(stack.centre(row)).press(forDuration: 0.8)
@@ -60,7 +61,7 @@ nonisolated final class CanvasGeometryUITests: XCTestCase {
         delete.tap()
         XCTAssertTrue(waitForRegionCount(count - 1), "one region is deleted")
         sleep(1)
-        let after = try stack.rows(in: probe(), tint: .green)
+        let after = try stack.rows(in: probe(), tint: .teal)
         XCTAssertEqual(Set(before).subtracting(after), [row], "the hold at row \(row)'s centre deletes row \(row)")
     }
 
@@ -75,14 +76,19 @@ nonisolated final class CanvasGeometryUITests: XCTestCase {
         tap(CGPoint(x: boxA.midX, y: boxA.midY))
         sleep(1)
         XCTAssertTrue(try pinchToZoom(above: page), "the pinch zooms the page")
+        // Both lines are teal: A is read in the left half of the canvas, B in
+        // the right, clear of the bars' teal glyphs.
+        let canvas = canvasArea()
+        let left = CGRect(x: canvas.minX, y: canvas.minY, width: canvas.width / 2, height: canvas.height)
+        let right = CGRect(x: canvas.midX, y: canvas.minY, width: canvas.width / 2, height: canvas.height)
         let before = try probe()
-        let a0 = try XCTUnwrap(before.tintBounds(.blue, in: CGRect(x: 0, y: 0, width: window.frame.width / 2, height: window.frame.height)), "A is selected")
-        let b0 = try XCTUnwrap(before.tintBounds(.red, in: CGRect(x: window.frame.width / 2, y: 0, width: window.frame.width / 2, height: window.frame.height)))
+        let a0 = try XCTUnwrap(before.tintBounds(.teal, in: left), "A at zoom")
+        let b0 = try XCTUnwrap(before.tintBounds(.teal, in: right), "B at zoom")
         point(CGPoint(x: a0.midX, y: a0.midY)).press(forDuration: 0.05, thenDragTo: point(CGPoint(x: a0.midX, y: a0.midY - 60)))
         sleep(2)
         let after = try probe()
-        let a1 = try XCTUnwrap(after.tintBounds(.blue, in: CGRect(x: 0, y: 0, width: window.frame.width / 2, height: window.frame.height)))
-        let b1 = try XCTUnwrap(after.tintBounds(.red, in: CGRect(x: window.frame.width / 2, y: 0, width: window.frame.width / 2, height: window.frame.height)))
+        let a1 = try XCTUnwrap(after.tintBounds(.teal, in: left))
+        let b1 = try XCTUnwrap(after.tintBounds(.teal, in: right))
         XCTAssertLessThan(a1.midY, a0.midY - 40, "the selected box moved up with the finger")
         XCTAssertEqual(b1.midY, b0.midY, accuracy: 2, "its neighbour stayed: the page did not scroll")
 
@@ -102,7 +108,7 @@ nonisolated final class CanvasGeometryUITests: XCTestCase {
         sleep(1)
         XCTAssertTrue(try pinchToZoom(above: page), "the pinch zooms the page")
         let zoomed = try probe()
-        let b = try XCTUnwrap(zoomed.tintBounds(.blue, in: CGRect(origin: .zero, size: window.frame.size)), "the selected box at zoom")
+        let b = try XCTUnwrap(zoomed.tintBounds(.teal, in: canvasArea()), "the selected box at zoom")
         point(CGPoint(x: b.midX, y: b.midY)).doubleTap()
         sleep(2)
         XCTAssertFalse(try probe().isBackground(CGPoint(x: page.midX, y: page.minY - 8)), "a double tap on a box keeps the zoom")
@@ -141,11 +147,49 @@ nonisolated final class CanvasGeometryUITests: XCTestCase {
 
     // MARK: - Handles and corner dots
 
-    /// A box 120 x 12 on screen, selected: four corner handles stepped 5
+    /// A hand-drawn box at rest on white: the veil inside a teal line no
+    /// thicker than 1.8 points on its edge, and neither handles nor dots.
+    func testAHandDrawnBoxIsAVeilWithATealLine() throws {
+        launchMultipage()
+        let page = try fitPage()
+        let before = try probe()
+        let white = try XCTUnwrap(Self.whiteArea(in: before, page: page, size: CGSize(width: 140, height: 50)),
+                                  "no white 140 x 50 area on the fit page above its lowest fifth")
+        drawBoxes([white.insetBy(dx: 10, dy: 10)])
+        tap(CGPoint(x: page.midX, y: page.minY + page.height * 0.9))
+        sleep(1)
+        let shot = try probe()
+        let reach = try XCTUnwrap(shot.differenceBounds(from: before, in: white.insetBy(dx: -6, dy: -6)), "the box drew")
+        let box = reach.insetBy(dx: 0.7, dy: 0.7)  // the 1.4-point line is centred on the box's edge
+        let inner = box.insetBy(dx: 2, dy: 2)
+        var inside = 0, veiled = 0
+        for y in stride(from: inner.minY, to: inner.maxY, by: 1) {
+            for x in stride(from: inner.minX, to: inner.maxX, by: 1) {
+                inside += 1
+                let (r, g, b) = shot.rgb(x, y)
+                if CanvasPixelProbe.Tint.veil.matches(r, g, b) { veiled += 1 }
+            }
+        }
+        XCTAssertGreaterThanOrEqual(Double(veiled), 0.8 * Double(inside), "the veil inside the box: \(veiled) of \(inside) points")
+        XCTAssertGreaterThanOrEqual(shot.edgeCoverage(of: box, .teal), 0.8, "a teal line on the box's edge (box \(box))")
+        let run = shot.thickness(of: .teal, across: CGPoint(x: box.midX, y: box.minY), vertical: true)
+        XCTAssertGreaterThan(run, 0, "the top edge's middle is teal")
+        XCTAssertLessThanOrEqual(run, 1.8, "the resting line is \(run) points thick")
+        for c in Self.corners(of: box) {
+            let (r, g, b) = shot.rgb(c.x, c.y)
+            XCTAssertFalse(r >= 235 && g >= 235 && b >= 235, "no white handle disc at the corner \(c)")
+        }
+        for p in Self.outsideCorners(of: box) {
+            XCTAssertEqual(Self.grid(around: p).filter { Self.isTeal(shot, $0) }.count, 0, "no corner dot at \(p)")
+        }
+    }
+
+    /// A box 120 x 12 on screen: at rest a teal line no thicker than 1.8
+    /// points; selected, a heavier one, four corner handles stepped 5
     /// points clear of it and a handle at the middle of the top and the
     /// bottom; none at the middle of the 12-point sides. A handle is a white
     /// disc with a teal ring of radius 4.5.
-    func testASelectedThinBoxShowsHandlesClearOfIt() throws {
+    func testASelectedBoxShowsAHeavierTealLineAndHandlesClearOfIt() throws {
         launchMultipage()
         let page = try fitPage()
         let drawn = CGRect(x: page.minX + page.width * 0.2, y: page.minY + page.height * 0.42, width: 120, height: 12)
@@ -153,11 +197,25 @@ nonisolated final class CanvasGeometryUITests: XCTestCase {
         tap(CGPoint(x: page.midX, y: page.minY + page.height * 0.8))
         sleep(1)
         let search = drawn.insetBy(dx: -20, dy: -20)
-        let line = try XCTUnwrap(try probe().tintBounds(.red, in: search), "the box at rest")
-        let box = line.insetBy(dx: 1, dy: 1)  // the 2-point line is centred on the box's edge
+        let rest = try probe()
+        let line = try XCTUnwrap(rest.tintPixelBounds(.teal, in: search), "the box at rest")
+        let box = line.insetBy(dx: 0.7, dy: 0.7)  // the 1.4-point line is centred on the box's edge
+        // A quarter along the top: clear of the corner and middle handles.
+        let along = CGPoint(x: box.minX + box.width / 4, y: box.minY)
+        let restRun = rest.thickness(of: .teal, across: along, vertical: true)
+        XCTAssertGreaterThan(restRun, 0, "the top edge is teal at rest")
+        XCTAssertLessThanOrEqual(restRun, 1.8, "the resting line is \(restRun) points thick")
         tap(CGPoint(x: box.midX, y: box.midY))
         sleep(1)
         let shot = try probe()
+        let run = shot.thickness(of: .teal, across: along, vertical: true)
+        // Measured on an iOS 26.4.1 simulator at 3x: 4 teal pixels at rest and
+        // 6 selected; a 1.4- and a 2.4-point line lose their blended edge
+        // pixels. Half a pixel of slack keeps a whole-pixel 2.0 from failing on
+        // rounding.
+        XCTAssertGreaterThanOrEqual(run, 2.0 - shot.pixel / 2, "the selected line is heavier: \(run) points, at rest \(restRun)")
+        XCTAssertGreaterThan(run, restRun + shot.pixel / 2, "the selected line is heavier than the resting one")
+        XCTAssertGreaterThanOrEqual(shot.edgeCoverage(of: box, .teal), 0.8, "a teal line on the selected box's edge")
         let out: CGFloat = (22 - box.height) / 2
         let handles = [CGPoint(x: box.minX, y: box.minY - out), CGPoint(x: box.maxX, y: box.minY - out),
                        CGPoint(x: box.minX, y: box.maxY + out), CGPoint(x: box.maxX, y: box.maxY + out),
@@ -167,8 +225,11 @@ nonisolated final class CanvasGeometryUITests: XCTestCase {
             XCTAssertTrue(r >= 235 && g >= 235 && b >= 235, "a white handle disc at \(c) (box \(box)): \((r, g, b))")
             XCTAssertEqual(Self.ring(around: c).filter { Self.isTeal(shot, $0) }.count, 4, "a teal ring round the handle at \(c)")
         }
+        // Across the side only: the ring's points above and below a side's
+        // middle lie on the box's own teal line.
         for c in [CGPoint(x: box.minX, y: box.midY), CGPoint(x: box.maxX, y: box.midY)] {
-            XCTAssertEqual(Self.ring(around: c).filter { Self.isTeal(shot, $0) }.count, 0, "no handle at the short side's middle \(c)")
+            let across = [CGPoint(x: c.x - 4.5, y: c.y), CGPoint(x: c.x + 4.5, y: c.y)]
+            XCTAssertEqual(across.filter { Self.isTeal(shot, $0) }.count, 0, "no handle at the short side's middle \(c)")
         }
     }
 
@@ -185,17 +246,13 @@ nonisolated final class CanvasGeometryUITests: XCTestCase {
         sleep(1)
         let rest = try probe()
         let boxes = try [boxA, boxB].map { drawn in
-            try XCTUnwrap(rest.tintBounds(.red, in: drawn.insetBy(dx: -20, dy: -20)), "box at rest near \(drawn)").insetBy(dx: 1, dy: 1)
+            try XCTUnwrap(rest.tintPixelBounds(.teal, in: drawn.insetBy(dx: -20, dy: -20)), "box at rest near \(drawn)").insetBy(dx: 0.7, dy: 0.7)
         }
-        // Half a point past each corner of the box as measured at rest: the
-        // dot is centred on the corner with teal to about 2.35 points, so the
-        // grid stays on its teal when the measured edge is a pixel off. At
-        // 1.5 points the grid reached the dot's white ring. Neither the red
-        // nor the blue selected border reads as teal.
-        func outside(_ box: CGRect) -> [CGPoint] {
-            [CGPoint(x: box.minX - 0.5, y: box.minY - 0.5), CGPoint(x: box.maxX + 0.5, y: box.minY - 0.5),
-             CGPoint(x: box.minX - 0.5, y: box.maxY + 0.5), CGPoint(x: box.maxX + 0.5, y: box.maxY + 0.5)]
-        }
+        // Every line is teal, so each dot is read outside the line:
+        // `outsideCorners` reads 1.5 points diagonally past each corner,
+        // beyond the selected line's reach of 1.2 points and inside the
+        // dot's teal (about 2.35 points from its centre).
+        func outside(_ box: CGRect) -> [CGPoint] { Self.outsideCorners(of: box) }
         for box in boxes {
             for p in outside(box) {
                 XCTAssertEqual(Self.grid(around: p).filter { Self.isTeal(rest, $0) }.count, 0, "no teal at \(p) at rest")
@@ -216,6 +273,61 @@ nonisolated final class CanvasGeometryUITests: XCTestCase {
         }
         XCTAssertEqual(deleteRow(), "Delete 2 Regions", "both boxes are selected")
     }
+
+    /// On a dark page the white keyline rims the box: just outside the line,
+    /// at rest and selected, the keyline stands 3 : 1 against the page 6
+    /// points further out.
+    func testOnADarkPageTheKeylineRimsTheBox() throws {
+        app.launchArguments = ["--uitesting", "--loadTestImage=uitest_image_dark"]
+        app.launch()
+        XCTAssertTrue(app.buttons["drawTool"].waitForExistence(timeout: 60), "the editor never appeared")
+        sleep(2)
+        let before = try probe()
+        // The page's dark ground, not the canvas's black background.
+        let dark = try XCTUnwrap(Self.area(in: before, within: canvasArea().insetBy(dx: 10, dy: 10), size: CGSize(width: 160, height: 110)) {
+            [$0, $1, $2].allSatisfy { (16...40).contains($0) }
+        }, "no dark ground of 160 x 110 on the page")
+        let drawn = CGRect(x: dark.minX + 20, y: dark.minY + 20, width: 120, height: 30)
+        drawBoxes([drawn])
+        tap(CGPoint(x: dark.midX, y: dark.maxY - 12))
+        sleep(1)
+        let rest = try probe()
+        XCTAssertNotNil(rest.differenceBounds(from: before, in: dark), "the box drew")
+        // The box's edge is the middle of its teal line, read pixel by pixel
+        // (the resting line is 1.4 points). Measured on an iOS 26.4.1 simulator
+        // at 3x: teal at 319.33-320.67 round an edge at 320.0, the keyline
+        // brightest at 321.0-321.33 and faded by 322.0, nearer the line than
+        // the model's middle at 321.5, since a 0.8-point line is drawn on whole
+        // pixels.
+        let box = try XCTUnwrap(rest.tintPixelBounds(.teal, in: dark), "the box's line").insetBy(dx: 0.7, dy: 0.7)
+        func rims(_ shot: CanvasPixelProbe, lineWidth: CGFloat, _ state: String) {
+            // The keyline lies between the line's outer edge and its own
+            // outer edge (half the line, the 0.4 gap and its 0.8 width, a
+            // pixel either side): the brightest pixel in that band, read
+            // outward, against the page 6 points further out.
+            let near = lineWidth / 2 + 0.4 - 0.4, far = lineWidth / 2 + 0.4 + 0.8 + 0.4
+            let points: [(CGPoint, CGVector)] = [1, 2].flatMap { (k: CGFloat) -> [(CGPoint, CGVector)] in
+                let x = box.minX + box.width * k / 3, y = box.minY + box.height * k / 3
+                return [(CGPoint(x: x, y: box.minY), CGVector(dx: 0, dy: -1)), (CGPoint(x: x, y: box.maxY), CGVector(dx: 0, dy: 1)),
+                        (CGPoint(x: box.minX, y: y), CGVector(dx: -1, dy: 0)), (CGPoint(x: box.maxX, y: y), CGVector(dx: 1, dy: 0))]
+            }
+            for (edge, away) in points {
+                let q = CGPoint(x: edge.x + away.dx * (far + 6), y: edge.y + away.dy * (far + 6))
+                var d = near, best = 0.0, at = edge
+                while d <= far {
+                    let p = CGPoint(x: edge.x + away.dx * d, y: edge.y + away.dy * d)
+                    let c = shot.contrast(p, q)
+                    if c > best { best = c; at = p }
+                    d += shot.pixel
+                }
+                XCTAssertGreaterThanOrEqual(best, 3.0, "\(state): the keyline near \(at) against the page at \(q)")
+            }
+        }
+        rims(rest, lineWidth: 1.4, "at rest")
+        tap(CGPoint(x: box.midX, y: box.midY))
+        sleep(1)
+        rims(try probe(), lineWidth: 2.4, "selected")
+    }
 }
 
 // MARK: - Helpers
@@ -225,8 +337,8 @@ private extension CanvasGeometryUITests {
     /// The "Amount" boxes on page 1 of the fixture: one per ledger row,
     /// "Amount" set at x 180–212.4 of the 612-point page on baselines
     /// 472 − 13·row (Scripts/generate_uitest_multipage.py). Rows are placed
-    /// from that geometry and read by tint at each box's left strip, clear of
-    /// the search badge at its top right.
+    /// from that geometry and read by the teal line at each box's left
+    /// edge, clear of the search badge at its top right.
     nonisolated struct Stack {
         static let rowCount = 28
         let page: CGRect
@@ -234,10 +346,15 @@ private extension CanvasGeometryUITests {
         func centre(_ row: Int) -> CGPoint {
             CGPoint(x: page.minX + 196.2 * scale, y: page.minY + (792 - (472 - 13 * CGFloat(row) + 2.5)) * scale)
         }
-        /// The rows whose box shows `tint` at its left strip.
+        /// The rows whose box shows `tint` on its left line, at the word's
+        /// left edge (x 180). Measured on an iOS 26.4.1 simulator at 3x:
+        /// each box's left line is 4 pixels of page teal there, continuous
+        /// down the row; inside it, the veil
+        /// over the row's first glyph and the type badge leave no clear
+        /// strip, so the line is read and not the veil.
         func rows(in probe: CanvasPixelProbe, tint: CanvasPixelProbe.Tint) -> [Int] {
             (0..<Self.rowCount).filter { row in
-                let y = centre(row).y, x = page.minX + 182.5 * scale
+                let y = centre(row).y, x = page.minX + 180 * scale
                 let hits = [-1.5, -0.75, 0, 0.75, 1.5].filter { dy in
                     let (r, g, b) = probe.rgb(x, y + dy)
                     return tint.matches(r, g, b)
@@ -258,6 +375,68 @@ private extension CanvasGeometryUITests {
     /// off still lands.
     nonisolated static func grid(around p: CGPoint) -> [CGPoint] {
         [-1, 0, 1].flatMap { dy in [-1, 0, 1].map { dx in CGPoint(x: p.x + CGFloat(dx) / 3, y: p.y + CGFloat(dy) / 3) } }
+    }
+
+    /// The four corners of `box`.
+    nonisolated static func corners(of box: CGRect) -> [CGPoint] {
+        [CGPoint(x: box.minX, y: box.minY), CGPoint(x: box.maxX, y: box.minY),
+         CGPoint(x: box.minX, y: box.maxY), CGPoint(x: box.maxX, y: box.maxY)]
+    }
+
+    /// The points 1.5 points diagonally outside each corner of `box`.
+    nonisolated static func outsideCorners(of box: CGRect) -> [CGPoint] {
+        [CGPoint(x: box.minX - 1.5, y: box.minY - 1.5), CGPoint(x: box.maxX + 1.5, y: box.minY - 1.5),
+         CGPoint(x: box.minX - 1.5, y: box.maxY + 1.5), CGPoint(x: box.maxX + 1.5, y: box.maxY + 1.5)]
+    }
+
+    /// The first area of `size`, in 10-point steps, every point of which
+    /// shows `ground` in `probe`, inside `within`.
+    nonisolated static func area(in probe: CanvasPixelProbe, within: CGRect, size: CGSize,
+                                 _ ground: (Int, Int, Int) -> Bool) -> CGRect? {
+        for y in stride(from: within.minY, through: within.maxY - size.height, by: 10) {
+            for x in stride(from: within.minX, through: within.maxX - size.width, by: 10) {
+                let area = CGRect(origin: CGPoint(x: x, y: y), size: size)
+                let every = stride(from: area.minY, to: area.maxY, by: 1).allSatisfy { py in
+                    stride(from: area.minX, to: area.maxX, by: 1).allSatisfy { px in
+                        let (r, g, b) = probe.rgb(px, py)
+                        return ground(r, g, b)
+                    }
+                }
+                if every { return area }
+            }
+        }
+        return nil
+    }
+
+    /// A white area of the fit page (every point at least 250), above its
+    /// lowest fifth, where the tap that clears a selection lands.
+    nonisolated static func whiteArea(in probe: CanvasPixelProbe, page: CGRect, size: CGSize) -> CGRect? {
+        let within = CGRect(x: page.minX + 10, y: page.minY + 20, width: page.width - 20, height: page.height * 0.8 - 20)
+        return area(in: probe, within: within, size: size) { $0 >= 250 && $1 >= 250 && $2 >= 250 }
+    }
+
+    /// The canvas a box is read on: the page's scroll view, short of the
+    /// navigation bar, the page bar, the selection bar and the toolbar,
+    /// whose glyphs can be teal too.
+    nonisolated func canvasArea() -> CGRect {
+        let scroll = app.scrollViews.allElementsBoundByIndex.max { $0.frame.height < $1.frame.height }?.frame ?? window.frame
+        var area = scroll.intersection(window.frame)
+        let bar = app.navigationBars.firstMatch
+        if bar.exists, bar.frame.maxY > area.minY {
+            area = CGRect(x: area.minX, y: bar.frame.maxY + 2, width: area.width, height: max(0, area.maxY - bar.frame.maxY - 2))
+        }
+        for id in ["drawTool", "pageNavCounter", "selectionBarCount", "selectionBarDuplicate", "selectionBarDelete"] {
+            let e = app.descendants(matching: .any).matching(identifier: id).firstMatch
+            guard e.exists else { continue }
+            let f = e.frame.insetBy(dx: 0, dy: -8)
+            guard f.intersects(area) else { continue }
+            if f.midY > area.midY {
+                area = CGRect(x: area.minX, y: area.minY, width: area.width, height: max(0, f.minY - area.minY))
+            } else {
+                area = CGRect(x: area.minX, y: f.maxY, width: area.width, height: max(0, area.maxY - f.maxY))
+            }
+        }
+        return area
     }
 
     nonisolated static func isTeal(_ probe: CanvasPixelProbe, _ p: CGPoint) -> Bool {

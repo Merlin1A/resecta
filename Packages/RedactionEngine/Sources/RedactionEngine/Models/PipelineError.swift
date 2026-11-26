@@ -57,6 +57,11 @@ public enum PipelineError: Sendable, LocalizedError {
         case boxCannotShowLength(pageIndex: Int)
         case bitmapCreationFailed(pageIndex: Int)
         case fillVerificationFailed(pageIndex: Int)
+        // The box-place check at run entry: a box on the page could not be
+        // confirmed where it was drawn (`RunRecord.Page.boxPlacesConfirmed`).
+        // Refused before any page is drawn; not retried, since its answer
+        // does not depend on the quality.
+        case boxPlaceUnconfirmed(pageIndex: Int)
         case renderTimeout(pageIndex: Int)
         // Pre-flight reject before CGContextDrawPDFPage, which is a
         // synchronous C call with no cancellation points.
@@ -109,6 +114,7 @@ public enum PipelineError: Sendable, LocalizedError {
             case .boxCannotShowLength(let p): "Page \(p + 1) has a box that cannot be applied as planned. The redaction did not start, and nothing was exported."
             case .bitmapCreationFailed(let p): "Could not create image buffer for page \(p + 1)."
             case .fillVerificationFailed(let p): "Redaction fill verification failed for page \(p + 1). The page may not be fully redacted."
+            case .boxPlaceUnconfirmed(let p): "A box on page \(p + 1) could not be confirmed where it was drawn. The page was not redacted."
             case .renderTimeout(let p): "Page \(p + 1) could not be rendered within the time limit."
             case .pageTooLarge(let p): "Page \(p + 1) has dimensions that exceed the safe rendering limit."
             case .pageSidesNotAsRecorded(let p): "Page \(p + 1)'s size could not be confirmed against the run's record. The page was not redacted."

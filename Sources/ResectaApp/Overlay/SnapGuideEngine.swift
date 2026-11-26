@@ -37,12 +37,11 @@ final class SnapGuideEngine {
         return gen
     }()
 
-    /// What a snap reads from the overlay: its regions, its bounds, the
+    /// What a snap reads from the overlay: its regions, the
     /// normalized-to-overlay transform and the finger scale the proximity
     /// threshold is multiplied by. Built fresh for each call.
     struct Page {
         let regions: [RedactionRegion]
-        let bounds: CGRect
         let fingerScale: CGFloat
         let toOverlay: (CGRect) -> CGRect
     }

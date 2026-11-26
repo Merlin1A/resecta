@@ -1,18 +1,18 @@
 Property: The canvas takes its page's rotation when PDFKit makes it, so every map on it turns.
 Area: canvas overlay (turned pages)
 Test command: xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/CanvasTurnedPageTests
-Must go red: ResectaAppTests/CanvasTurnedPageTests dragIsStoredInTheShownFrame; ResectaAppTests/CanvasTurnedPageTests foundBoxIsDrawnOverItsWord; ResectaAppTests/CanvasTurnedPageTests arrowKeyMovesTheWayItPoints; ResectaAppTests/CanvasTurnedPageTests dragMoveIsStoredWhereDropped; ResectaAppTests/CanvasTurnedPageTests resizeFollowsTheShownEdge
+Must go red: ResectaAppTests/CanvasTurnedPageTests dragIsStoredInTheShownFrame; ResectaAppTests/CanvasTurnedPageTests foundBoxIsDrawnOverItsWord; ResectaAppTests/CanvasTurnedPageTests arrowKeyMovesTheWayItPoints; ResectaAppTests/CanvasTurnedPageTests dragMoveIsStoredWhereDropped; ResectaAppTests/CanvasTurnedPageTests resizeFollowsTheShownEdge; ResectaAppTests/BoxPlaceCheckTests probePassesEverywhere
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
-index 002257e1..34896a90 100644
+index a9dbc431..c7edf10f 100644
 --- a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
 +++ b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
-@@ -168,7 +168,6 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
+@@ -171,7 +171,6 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
  
          let overlay = RedactionOverlayView()
          overlay.pageIndex = pageIndex
 -        overlay.pageRotation = page.rotation
+         overlay.pageSize = page.bounds(for: view.displayBox).size
          overlay.coordinator = self
          overlay.isUserInteractionEnabled = isDrawingEnabled
-         overlay.isDrawingMode = isDrawingMode

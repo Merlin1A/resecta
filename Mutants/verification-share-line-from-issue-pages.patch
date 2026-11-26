@@ -5,15 +5,15 @@ Must go red: ResectaAppTests/VerificationRowPartTests shareLinesForAFailedRowWit
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Views/ShareRiskConfirm.swift b/Sources/ResectaApp/Views/ShareRiskConfirm.swift
-index 143c1a29..94d330c4 100644
+index fcdf92ee6..715769aeb 100644
 --- a/Sources/ResectaApp/Views/ShareRiskConfirm.swift
 +++ b/Sources/ResectaApp/Views/ShareRiskConfirm.swift
-@@ -194,7 +194,7 @@ extension DocumentEditorView {
-             }
-             if layer.status.isFail || layer.status.isAttention, layer.couldNotVerifyPart != nil {
-                 let title = VerificationRowModel.title(for: layer)
--                let location = VerificationRowModel.pageLocation(layer.couldNotVerifyPartPages).map { " \($0)" } ?? ""
-+                let location = VerificationRowModel.pageLocation(layer.pageReferences).map { " \($0)" } ?? ""
-                 return "\(title): could not verify\(location)"
-             }
-             return nil
+@@ -203,7 +203,7 @@ extension DocumentEditorView {
+     static func couldNotVerifyPartLine(layer: LayerResult) -> String? {
+         guard layer.status.isFail || layer.status.isAttention, layer.couldNotVerifyPart != nil else { return nil }
+         let title = VerificationRowModel.title(for: layer)
+-        let location = VerificationRowModel.pageLocation(layer.couldNotVerifyPartPages).map { " \($0)" } ?? ""
++        let location = VerificationRowModel.pageLocation(layer.pageReferences).map { " \($0)" } ?? ""
+         return "\(title): could not verify\(location)"
+     }
+ 

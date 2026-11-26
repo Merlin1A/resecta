@@ -78,6 +78,35 @@ struct VerificationProblemModelTests {
                            couldNotVerify: flagged, reviewIsFragment: fragment)
     }
 
+    /// The result with a part it could not read, on `pages`; every other
+    /// field as it was. The part carries the one placeholder sentence.
+    static func withPart(_ l: LayerResult, pages: [Int]) -> LayerResult {
+        LayerResult(name: l.name, symbolName: l.symbolName, status: l.status, shortDescription: l.shortDescription,
+                    detailDescription: l.detailDescription, pageReferences: l.pageReferences,
+                    durationSeconds: l.durationSeconds, reviewTermTexts: l.reviewTermTexts, layer: l.layer,
+                    queryLines: l.queryLines, couldNotVerify: l.couldNotVerify, reviewIsFragment: l.reviewIsFragment,
+                    couldNotVerifyPart: sentence, couldNotVerifyPartPages: pages, stopped: l.stopped)
+    }
+
+    /// Each one-check generated report whose check failed or needs review
+    /// (19), that check given a part it could not read on a page and on none.
+    static func reportsWithUnreadParts() -> [VerificationReport] {
+        let base = identities.map { layer($0, .passed) }
+        var out: [VerificationReport] = []
+        for i in identities.indices {
+            for s in states(for: identities[i]) {
+                let one = layer(identities[i], s)
+                guard one.status.isFail || one.status.isAttention else { continue }
+                for pages in [[2], []] {
+                    var layers = base
+                    layers[i] = withPart(one, pages: pages)
+                    out.append(report(layers))
+                }
+            }
+        }
+        return out
+    }
+
     /// A report whose verdict is the engine's own fold over its checks.
     static func report(_ layers: [LayerResult]) -> VerificationReport {
         VerificationReport(layers: layers, overallStatus: VerificationEngine().aggregateStatus(layers),
@@ -123,15 +152,24 @@ struct VerificationProblemModelTests {
 
     /// Nothing dropped, nothing counted twice: the checks behind the
     /// problems are exactly those whose outcome gates sharing, plus those
-    /// with possible items left, each once.
+    /// with possible items left, each once; and a failed or needs-review
+    /// check that also could not read part of its input once more, by that
+    /// part, its outcome could not verify.
     static func namesEachGatingCheckOnce(_ report: VerificationReport, _ problems: [VerificationProblem]) -> Bool {
-        let named = problems.flatMap(\.checks).map(\.layerIndex)
+        let checks = problems.flatMap(\.checks)
+        let named = checks.map(\.layerIndex)
         let expected = report.layers.indices.filter { i in
             let l = report.layers[i]
             return VerificationRowModel.outcome(for: l, perPageModes: report.perPageModes).gatesSharing
                 || VerificationRowModel.hasItemsRemaining(l)
         }
-        return named.sorted() == expected && Set(named).count == named.count
+        let parts = report.layers.indices.filter { i in
+            let l = report.layers[i]
+            return (l.status.isFail || l.status.isAttention) && l.couldNotVerifyPart != nil
+        }
+        let second = checks.filter { parts.contains($0.layerIndex) && $0.outcome == .couldNotVerify }.map(\.layerIndex)
+        return named.sorted() == (expected + parts).sorted() && second.sorted() == parts
+            && Set(named).count + parts.count == named.count
     }
 
     /// The kinds come in their declared order.
@@ -230,6 +268,7 @@ struct VerificationProblemModelTests {
     func nothingDroppedNothingTwice() {
         var reports = Self.generatedReports()
         reports += VerificationDebugFixtures.all.values.filter { !$0.layers.isEmpty }
+        reports += Self.reportsWithUnreadParts()
         var ran = 0
         for report in reports {
             let problems = VerificationProblemModel.derive(report: report, coveredPages: [0], formValueCount: 2)
@@ -238,7 +277,7 @@ struct VerificationProblemModelTests {
             ran += 1
         }
         print("[problems-model] reports \(ran)")
-        #expect(ran == 1_265 + 16)
+        #expect(ran == 1_265 + 16 + 38)
     }
 
     // MARK: - The right kind for a failed re-check and a fragment

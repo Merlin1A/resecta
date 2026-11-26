@@ -82,6 +82,19 @@ struct EnginePublicSurfaceTests {
         _ = RunRecord.Page(pageIndex: 0, regions: [], cropBox: .zero, rotation: 0, switchOn: false)
         let read = await RunRecord.PageRead.reads(of: document, pages: [0], hasHiddenOCG: false)[0]
         _ = RunRecord.Page(pageIndex: 0, regions: [], cropBox: .zero, rotation: 0, switchOn: false, read: read)
+        let geometry = RunRecord.PageGeometry(cropBox: .zero, rotation: 0)
+        let drawnRegion = RunRecord.DrawnRegion(region: RedactionRegion(id: UUID(), normalizedRect: .zero, source: .manual))
+        _ = drawnRegion.drawnPageRect
+        let boxPlacePage = RunRecord.Page(
+            pageIndex: 0, regions: [drawnRegion],
+            geometry: geometry, geometryAtStore: geometry, switchOn: false)
+        _ = boxPlacePage.boxPlacesConfirmed(canvasFailed: false)
+        _ = boxPlacePage.displayedShare(ofPagePoint: .zero)
+        _ = RunRecord.Confirmed(fillColor: .black, exportDPI: 300, pages: [boxPlacePage])
+            .firstPageWithUnconfirmedBoxPlace(canvasFailures: [])
+        _ = (geometry.pagePoint(ofDisplayedShare: .zero), geometry.pageRect(ofDisplayedShare: .zero),
+             geometry.displayedShare(ofPageRect: .zero), RunRecord.boxPlaceProbeShares, RunRecord.boxPlaceTolerance)
+        _ = PipelineError.redactionError(.boxPlaceUnconfirmed(pageIndex: 0))
         _ = DocumentSearcher.sharedLoadDiagnostics
         _ = engine.layers(for: .searchableRedaction)
         _ = engine.aggregateStatus(layers)

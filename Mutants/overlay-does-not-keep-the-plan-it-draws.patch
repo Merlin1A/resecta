@@ -5,13 +5,14 @@ Must go red: ResectaAppTests/OverlayDrawnPlanTests drawingKeepsThePlan
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift
+index 443e5e6a..acc693d9 100644
 --- a/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift
 +++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift
-@@ -20,7 +20,6 @@
-     /// resize handles — the first segment of `draw(_:)`.
+@@ -22,7 +22,6 @@ extension RedactionOverlayView {
+     /// segment of `draw(_:)`.
      func drawCommittedRegions(ctx: CGContext, in rect: CGRect) {
          // The plan this page is drawn from is kept with its settings.
 -        coordinator?.noteDrawn(pageIndex: pageIndex, regions: regions)
-         // Draw committed regions
-         for region in regions {
-             let viewRect = pdfNormalizedToOverlay(region.normalizedRect)
+         let paints = paintRects()
+         // Perf: skip boxes entirely outside the dirty rect. The margin covers
+         // the badge, the shadow and a handle stepped clear of a thin box
