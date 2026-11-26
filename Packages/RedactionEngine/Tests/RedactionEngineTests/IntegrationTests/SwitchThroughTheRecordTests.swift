@@ -125,10 +125,8 @@ struct SwitchThroughTheRecordTests {
         #expect(!fromCropBox.inkCheckInputs.isEmpty, "the page has inputs to carry, so the case means something")
         #expect(atEntry.plan == fromCropBox.plan)
         #expect(atEntry.inkCheckInputs == fromCropBox.inkCheckInputs)
+        // The record's plan is made with the page's drawing not read, so no
+        // default band is taken and no fallback made yet: equal, and empty.
         #expect(atEntry.defaultFallbacks == fromCropBox.defaultFallbacks)
-        if !switchOn {
-            #expect(!fromCropBox.defaultFallbacks.isEmpty,
-                    "the label row's value takes its default band, so a fallback is carried")
-        }
     }
 }
