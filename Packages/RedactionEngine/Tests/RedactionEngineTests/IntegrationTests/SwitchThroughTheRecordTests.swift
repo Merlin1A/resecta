@@ -104,4 +104,31 @@ struct SwitchThroughTheRecordTests {
         #expect(offBox.treatment != .widened, "\(offBox.treatment)")
         #expect(onBox.paint.contains(offBox.paint))
     }
+
+    @Test("The run entry's page, made from the page's geometry, carries the ink check's inputs and the default band's fallbacks as the page made from its crop box does",
+          arguments: [false, true])
+    func runEntryPageCarriesTheInkChecksInputs(switchOn: Bool) async throws {
+        let document = try M.document(Self.lines)
+        let data = try #require(document.dataRepresentation())
+        let reopened = try #require(PDFDocument(data: data))
+        defer { withExtendedLifetime(reopened) {} }
+        let page = try #require(reopened.page(at: 0))
+        var found = try await M.results(.text("Quentin Ashby", options: SearchOptions()), in: reopened)
+        found += try await M.results(.text("Mara Lindqvist", options: SearchOptions()), in: reopened)
+        let drawn = found.map { RunRecord.DrawnRegion(region: RedactionRegion(placing: $0)) }
+        let read = try await RunRecordPageReadTests.read(data)
+        let geometry = RunRecord.PageGeometry(cropBox: page.bounds(for: .cropBox), rotation: page.rotation)
+        let atEntry = RunRecord.Page(pageIndex: 0, regions: drawn, geometry: geometry, geometryAtStore: geometry,
+                                     switchOn: switchOn, read: read)
+        let fromCropBox = RunRecord.Page(pageIndex: 0, regions: drawn, cropBox: geometry.cropBox.size,
+                                         rotation: geometry.rotation, switchOn: switchOn, read: read)
+        #expect(!fromCropBox.inkCheckInputs.isEmpty, "the page has inputs to carry, so the case means something")
+        #expect(atEntry.plan == fromCropBox.plan)
+        #expect(atEntry.inkCheckInputs == fromCropBox.inkCheckInputs)
+        #expect(atEntry.defaultFallbacks == fromCropBox.defaultFallbacks)
+        if !switchOn {
+            #expect(!fromCropBox.defaultFallbacks.isEmpty,
+                    "the label row's value takes its default band, so a fallback is carried")
+        }
+    }
 }
