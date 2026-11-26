@@ -164,6 +164,7 @@ targets:
       - path: Tests/ResectaAppTests
     resources:
       - path: Tests/ResectaAppTests/Resources/g8_corpus.json
+      - path: Tests/ResectaAppTests/Resources/page-geometry.json
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.resecta.app.tests

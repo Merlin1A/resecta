@@ -1,0 +1,19 @@
+Property: The Rectangle tool's item keeps one frame on and off, so turning it on moves nothing on the bar. Planted: the on state's frame is 8 pt wider than the off state's.
+Area: the editor's toolbar, the Rectangle tool
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppUITests/DrawToolStateUITests
+Must go red: ResectaAppUITests/DrawToolStateUITests testTheRectangleTool_onIsAFilledPill_andNothingMoves
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/DocumentEditorToolbar.swift b/Sources/ResectaApp/Views/DocumentEditorToolbar.swift
+index 924698b0..18b34d8d 100644
+--- a/Sources/ResectaApp/Views/DocumentEditorToolbar.swift
++++ b/Sources/ResectaApp/Views/DocumentEditorToolbar.swift
+@@ -69,7 +69,7 @@ struct DocumentEditorToolbar {
+     static func rectangleToolLabel(active: Bool) -> some View {
+         Image(systemName: "rectangle.dashed")
+             .foregroundStyle(active ? AnyShapeStyle(Color.white) : AnyShapeStyle(HierarchicalShapeStyle.primary))
+-            .frame(width: rectangleToolSize.width - 2 * barItemSideRoom, height: rectangleToolSize.height)
++            .frame(width: rectangleToolSize.width - 2 * barItemSideRoom + (active ? 8 : 0), height: rectangleToolSize.height)
+             .background {
+                 if active {
+                     Capsule().fill(ResectaTokens.BrandTeal.fill).padding(.horizontal, -barItemSideRoom)

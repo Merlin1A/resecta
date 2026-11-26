@@ -1,4 +1,5 @@
 import Testing
+import Foundation
 @testable import ResectaApp
 
 // The editor toolbar's accessibility labels. iOS 27 drops a toolbar
@@ -38,5 +39,20 @@ struct ToolbarAccessibilityLabelTests {
         #expect(DocumentEditorToolbar.drawToolAccessibilityLabel(active: false, voiceOverRunning: false) == "Rectangle")
         let on = DocumentEditorToolbar.drawToolAccessibilityLabel(active: true, voiceOverRunning: false)
         #expect(on == (onIOS27 ? "Rectangle, Drawing mode active" : "Rectangle"))
+    }
+
+    @Test("The Rectangle tool keeps one fixed frame on and off, warned of in the source, and shows on as a filled pill")
+    func rectangleToolSourcePins() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let source = try String(contentsOf: root.appendingPathComponent("Sources/ResectaApp/Views/DocumentEditorToolbar.swift"),
+                                encoding: .utf8)
+        #expect(source.contains("collapses the whole group into the system \"…\" overflow"))
+        #expect(source.contains(".accessibilityIdentifier(\"drawTool\")"))
+        #expect(source.contains("Self.rectangleToolLabel(active: activeTool == .rectangle)"))
+        #expect(source.contains("Capsule().fill(ResectaTokens.BrandTeal.fill).padding(.horizontal, -barItemSideRoom)"))
+        #expect(source.contains(".frame(width: rectangleToolSize.width - 2 * barItemSideRoom, height: rectangleToolSize.height)"))
+        #expect(DocumentEditorToolbar.rectangleToolSize == CGSize(width: 44.67, height: 36))
+        #expect(DocumentEditorToolbar.barItemSideRoom == 7.17)
     }
 }

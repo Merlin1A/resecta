@@ -281,6 +281,7 @@ extension RedactionState {
             source: region.normalizedRect
         )
         let copy = RedactionRegion(id: UUID(), normalizedRect: newRect, source: .manual)
+        assert(RedactionState.admitsEditorShare(newRect))
         addRegion(copy, page: page, undoManager: undoManager, actionName: UndoName.duplicate, fresh: false)
         selectedRegionIDs = [copy.id]
     }

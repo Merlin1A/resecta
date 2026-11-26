@@ -1,5 +1,6 @@
 import SwiftUI
 import PDFKit
+import RedactionEngine
 
 // The editor's keyboard shortcuts, moved out of `DocumentEditorView.swift`
 // (the hub) along its `// MARK: - Keyboard Shortcuts` seam: Escape,
@@ -11,17 +12,14 @@ import PDFKit
 
 extension DocumentEditorView {
 
-    /// Nudge amount in normalized coordinates: ONE PDF point on the
-    /// current page, i.e. 1/pageWidth × 1/pageHeight from
-    /// the page's crop box; the pre-1.1.0 0.0025 stands in when no page
-    /// geometry is available.
-    static let nudgeFallback: CGFloat = 0.0025
-
-    static func nudgeDelta(pageSize: CGSize?) -> (dx: CGFloat, dy: CGFloat) {
-        guard let size = pageSize, size.width > 0, size.height > 0 else {
-            return (dx: nudgeFallback, dy: nudgeFallback)
-        }
-        return (dx: 1 / size.width, dy: 1 / size.height)
+    /// Nudge amount in normalized coordinates: ONE point of the page as
+    /// shown, from the page's geometry (on a page turned 90 or 270 the
+    /// crop box's sides are swapped); the pre-1.1.0 0.0025 stands in when
+    /// there is no page.
+    static func nudgeStep(page: PDFPage?) -> (dx: CGFloat, dy: CGFloat) {
+        let step = page.map { RunRecord.PageGeometry(page: $0, box: .cropBox).pointStep }
+            ?? CGSize(width: RunRecord.PageGeometry.fallbackStep, height: RunRecord.PageGeometry.fallbackStep)
+        return (dx: step.width, dy: step.height)
     }
 
     /// `rect` nudged by one step and clamped to the page. PDF Y is
@@ -125,9 +123,7 @@ struct DocumentEditorKeyboard: ViewModifier {
     // MARK: - Keyboard Nudge
 
     private var nudgeDelta: (dx: CGFloat, dy: CGFloat) {
-        let page = documentState.currentPageIndex
-        let size = documentState.sourceDocument?.page(at: page)?.bounds(for: .cropBox).size
-        return DocumentEditorView.nudgeDelta(pageSize: size)
+        DocumentEditorView.nudgeStep(page: documentState.sourceDocument?.page(at: documentState.currentPageIndex))
     }
 
     private func nudgeSelection(dx: CGFloat, dy: CGFloat) -> KeyPress.Result {
@@ -140,6 +136,7 @@ struct DocumentEditorKeyboard: ViewModifier {
             return (id: id, newRect: DocumentEditorView.nudgedRect(region.normalizedRect, dx: dx, dy: dy))
         }
         guard !moves.isEmpty else { return .ignored }
+        for move in moves { assert(RedactionState.admitsEditorShare(move.newRect)) }
         let now = Date()
         let selection = redactionState.selectedRegionIDs
         let undo = Self.nudgeContinuesRun(previous: nudgeRun, selection: selection, now: now) ? nil : undoManager

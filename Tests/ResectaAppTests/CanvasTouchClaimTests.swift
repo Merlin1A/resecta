@@ -64,6 +64,7 @@ struct CanvasTouchClaimTests {
         window.addGestureRecognizer(flexLike)
 
         let overlay = RedactionOverlayView(frame: CGRect(x: 0, y: 0, width: 100, height: 100))
+        overlay.geometry = .testUnturned
         #expect(overlay.deferredWindowPanCount == 0)
 
         window.addSubview(overlay)   // didMoveToWindow reconciles

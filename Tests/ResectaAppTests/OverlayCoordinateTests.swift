@@ -15,7 +15,9 @@ struct OverlayCoordinateTests {
     private static let pageFrame = CGRect(x: 0, y: 0, width: 612, height: 792)
 
     private func makeOverlay(frame: CGRect = pageFrame) -> RedactionOverlayView {
-        RedactionOverlayView(frame: frame)
+        let overlay = RedactionOverlayView(frame: frame)
+        overlay.geometry = .testUnturned
+        return overlay
     }
 
     // MARK: - overlayToPDFNormalized
@@ -44,6 +46,7 @@ struct OverlayCoordinateTests {
     @Test("Zero-size bounds returns .zero")
     func overlayToPDFNormalized_zeroBoundsReturnsZero() {
         let overlay = RedactionOverlayView(frame: .zero)
+        overlay.geometry = .testUnturned
         let result = overlay.overlayToPDFNormalized(
             CGRect(x: 10, y: 10, width: 50, height: 50))
         #expect(result == .zero)
@@ -112,6 +115,7 @@ struct OverlayCoordinateTests {
           ])
     func roundTripParameterized(bounds: CGRect) {
         let overlay = RedactionOverlayView(frame: bounds)
+        overlay.geometry = .testUnturned
         let testRect = CGRect(
             x: bounds.width * 0.15,
             y: bounds.height * 0.2,

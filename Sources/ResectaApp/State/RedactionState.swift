@@ -284,6 +284,22 @@ class RedactionState {
             && abs(rect.maxX - 1) <= shareSlack && abs(rect.maxY - 1) <= shareSlack
     }
 
+    /// Whether a share an editor entry stores lies on the page: each edge
+    /// within `shareSlack`, plus `slack`, of the unit square. It says
+    /// nothing of the share's size. The editor's entries assert it (DEBUG)
+    /// and change nothing they store; the state's doors never call it, so a
+    /// found box, an Undo or a seed is stored as handed. `slack` is a group
+    /// move's: how far the group lay past the page before it moved.
+    nonisolated static func admitsEditorShare(_ rect: CGRect, slack: CGFloat = 0) -> Bool {
+        let e = shareSlack + slack
+        return rect.minX >= -e && rect.minY >= -e && rect.maxX <= 1 + e && rect.maxY <= 1 + e
+    }
+
+    /// How far `rect` lies past the page, in shares: 0 on the page.
+    nonisolated static func excessPastThePage(_ rect: CGRect) -> CGFloat {
+        max(0, -rect.minX, -rect.minY, rect.maxX - 1, rect.maxY - 1)
+    }
+
     // Per-document audit of search matches that the user applied as
     // redactions. Keyed by the created RedactionRegion.id so undo/redo can
     // drop and restore entries in lockstep with the regions themselves.

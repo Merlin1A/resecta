@@ -1,4 +1,5 @@
 import UIKit
+import RedactionEngine
 
 // The two transforms between the overlay's points and the page's normalized
 // space, and the snap page, moved out of `RedactionOverlayView.swift` (the
@@ -10,6 +11,7 @@ extension RedactionOverlayView {
 
     /// Convert overlay-view rect to normalized PDF coordinates (0–1, bottom-left origin).
     func overlayToPDFNormalized(_ rect: CGRect) -> CGRect {
+        guard geometry.cropBox.width > 0, geometry.cropBox.height > 0 else { Self.noGeometry(); return .zero }
         let page = pageRectOnCanvas
         let w = page.width
         let h = page.height
@@ -22,15 +24,16 @@ extension RedactionOverlayView {
             width: rect.width / w,
             height: rect.height / h
         )
-        return CanvasTurn.shown(fromStored: stored, rotation: pageRotation)
+        return CanvasTurn.shown(fromStored: stored, rotation: geometry.rotation)
     }
 
     /// Convert normalized PDF coordinates back to overlay-view rect.
     func pdfNormalizedToOverlay(_ normalized: CGRect) -> CGRect {
+        guard geometry.cropBox.width > 0, geometry.cropBox.height > 0 else { Self.noGeometry(); return .zero }
         let page = pageRectOnCanvas
         let w = page.width
         let h = page.height
-        let stored = CanvasTurn.stored(fromShown: normalized, rotation: pageRotation)
+        let stored = CanvasTurn.stored(fromShown: normalized, rotation: geometry.rotation)
         return CGRect(
             x: page.minX + stored.minX * w,
             y: page.minY + (1.0 - stored.minY - stored.height) * h,  // Flip Y back

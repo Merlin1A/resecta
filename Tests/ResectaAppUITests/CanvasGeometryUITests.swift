@@ -145,6 +145,71 @@ nonisolated final class CanvasGeometryUITests: XCTestCase {
         XCTAssertFalse(try probe().isBackground(above), "dismissed: still zoomed")
     }
 
+    // MARK: - The tag
+
+    /// A Search box's tag shows outside the box, above its leading corner,
+    /// only once its line is tall enough on screen: none on the stack at the
+    /// fit zoom, where a row is about 6 points tall; at zoom, an ink tag
+    /// with white words; gone while its box is selected, back at rest.
+    func testTheTagShowsOutsideTheBoxOnlyWhenItsLineIsTallEnough() throws {
+        let stack = try applyAmountStack()
+        let fit = try probe()
+        let corner = CGPoint(x: stack.page.minX + 180 * stack.scale, y: stack.centre(10).y - 4 * stack.scale)
+        let above = CGRect(x: corner.x - 2, y: corner.y - 20, width: 24, height: 20)
+        keepScreenshot("fit")
+        XCTAssertNil(fit.tintBounds(.tagFill, in: above), "no tag above row 10 at fit")
+        XCTAssertNil(fit.tintBounds(.tagFill, in: canvasArea()), "no tag anywhere at fit")
+
+        var tag: CGRect?
+        let canvas = app.scrollViews.allElementsBoundByIndex.max { $0.frame.height < $1.frame.height } ?? app.scrollViews.firstMatch
+        // The pinch zooms about the window's middle, which moves the amount
+        // column off the left edge; each step brings it back to the middle,
+        // then has the overlay redraw at the new zoom.
+        for _ in 1...3 where tag == nil {
+            canvas.pinch(withScale: 2.0, velocity: 1.0)
+            sleep(3)
+            try centreTheBoxes()
+            try redrawAtThisZoom()
+            tag = try probe().tintBounds(.tagFill, in: canvasArea().insetBy(dx: 4, dy: 4))
+        }
+        let zoomed = try probe()
+        keepScreenshot("zoomed")
+        // Each row has its tag; the first whole one from the top is read.
+        let all = try XCTUnwrap(tag, "a tag at zoom")
+        var shown: CGRect?
+        var top = all.minY
+        while shown == nil, top < all.maxY,
+              let b = zoomed.tintBounds(.tagFill, in: CGRect(x: all.minX - 1, y: top, width: all.width + 2, height: 16)) {
+            if b.height >= 12 { shown = b } else { top = b.maxY + 1 }
+        }
+        let one = try XCTUnwrap(shown, "one whole tag at zoom")
+        print("tag at \(one), rgb at its middle \(zoomed.rgb(one.midX, one.midY))")
+        XCTAssertGreaterThanOrEqual(one.height, 12, "the tag is about 15 points tall")
+        var white = 0
+        var y = one.minY
+        while y < one.maxY {
+            var x = one.minX
+            while x < one.maxX {
+                let (r, g, b) = zoomed.rgb(x, y)
+                if r >= 235 && g >= 235 && b >= 235 { white += 1 }
+                x += 1
+            }
+            y += 1
+        }
+        XCTAssertGreaterThanOrEqual(white, 6, "white words inside the tag")
+        let lineBelow = CGRect(x: one.minX, y: one.maxY - 1, width: min(one.width, 20), height: 8)
+        XCTAssertNotNil(zoomed.tintBounds(.teal, in: lineBelow), "the box's teal line just below the tag")
+
+        tap(CGPoint(x: one.minX + 8, y: one.maxY + 8))
+        sleep(1)
+        let selected = try probe()
+        keepScreenshot("selected")
+        XCTAssertNil(selected.tintBounds(.tagFill, in: one), "no tag while its box is selected")
+        tap(CGPoint(x: window.frame.width - 16, y: one.midY))
+        sleep(1)
+        XCTAssertNotNil(try probe().tintBounds(.tagFill, in: one.insetBy(dx: -2, dy: -2)), "the tag is back at rest")
+    }
+
     // MARK: - Handles and corner dots
 
     /// A hand-drawn box at rest on white: the veil inside a teal line no
@@ -338,7 +403,7 @@ private extension CanvasGeometryUITests {
     /// "Amount" set at x 180–212.4 of the 612-point page on baselines
     /// 472 − 13·row (Scripts/generate_uitest_multipage.py). Rows are placed
     /// from that geometry and read by the teal line at each box's left
-    /// edge, clear of the search badge at its top right.
+    /// edge.
     nonisolated struct Stack {
         static let rowCount = 28
         let page: CGRect
@@ -349,9 +414,8 @@ private extension CanvasGeometryUITests {
         /// The rows whose box shows `tint` on its left line, at the word's
         /// left edge (x 180). Measured on an iOS 26.4.1 simulator at 3x:
         /// each box's left line is 4 pixels of page teal there, continuous
-        /// down the row; inside it, the veil
-        /// over the row's first glyph and the type badge leave no clear
-        /// strip, so the line is read and not the veil.
+        /// down the row; inside it, the veil over the row's first glyph
+        /// leaves no clear strip, so the line is read and not the veil.
         func rows(in probe: CanvasPixelProbe, tint: CanvasPixelProbe.Tint) -> [Int] {
             (0..<Self.rowCount).filter { row in
                 let y = centre(row).y, x = page.minX + 180 * scale
@@ -444,6 +508,14 @@ private extension CanvasGeometryUITests {
         return CanvasPixelProbe.Tint.teal.matches(r, g, b)
     }
 
+
+    /// Keeps a screenshot with the run, so a reading can be checked by eye.
+    nonisolated func keepScreenshot(_ name: String) {
+        let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        shot.name = name
+        shot.lifetime = .keepAlways
+        add(shot)
+    }
 
     nonisolated func probe() throws -> CanvasPixelProbe {
         try XCTUnwrap(CanvasPixelProbe(XCUIScreen.main.screenshot(), windowSize: window.frame.size))
@@ -539,6 +611,53 @@ private extension CanvasGeometryUITests {
 
     /// Pinch PDFKit's scroll view (the tallest) 2x, proven by the canvas
     /// background just above the fit page turning page-white.
+    /// Pans the canvas so the boxes, read by their teal lines in the
+    /// window's middle half, sit at its middle across. The drag starts 30
+    /// points beside them, clear of any box's touch area, so it pans and
+    /// neither moves nor selects one; it ends
+    /// slowly so the canvas does not glide on.
+    nonisolated func centreTheBoxes() throws {
+        let band = CGRect(x: 0, y: window.frame.height * 0.25, width: window.frame.width, height: window.frame.height * 0.5)
+            .intersection(canvasArea())
+        guard let boxes = try probe().tintBounds(.teal, in: band) else { return }
+        let shift = window.frame.midX - boxes.midX
+        guard abs(shift) > 20 else { return }
+        let start = CGPoint(x: shift > 0 ? boxes.maxX + 30 : boxes.minX - 30, y: band.midY)
+        point(start).press(forDuration: 0.05, thenDragTo: point(CGPoint(x: start.x + shift, y: start.y)),
+                           withVelocity: .slow, thenHoldForDuration: 0.2)
+        sleep(2)
+    }
+
+    /// Has the overlay redraw at the zoom on screen, with the trigger it has
+    /// today: a tap inside a box selects it, a tap on the page at the
+    /// window's trailing edge clears it. A change of zoom alone does not ask
+    /// for a redraw yet. The box is read down the middle of the boxes in the
+    /// window's middle half: a gap over 12 points between two runs of teal
+    /// is a box's inside (between boxes it is about 8 at this zoom). Does
+    /// nothing while the boxes are shorter than that.
+    nonisolated func redrawAtThisZoom() throws {
+        let band = CGRect(x: 0, y: window.frame.height * 0.25, width: window.frame.width, height: window.frame.height * 0.5)
+            .intersection(canvasArea())
+        let shot = try probe()
+        guard let boxes = shot.tintBounds(.teal, in: band) else { return }
+        var starts: [CGFloat] = []
+        var inRun = false
+        var y = band.minY
+        while y < band.maxY {
+            let (r, g, b) = shot.rgb(boxes.midX, y)
+            let teal = CanvasPixelProbe.Tint.teal.matches(r, g, b)
+            if teal, !inRun { starts.append(y) }
+            inRun = teal
+            y += 1
+        }
+        guard let i = starts.indices.dropLast().first(where: { starts[$0 + 1] - starts[$0] > 12 }) else { return }
+        let inside = CGPoint(x: boxes.midX, y: (starts[i] + starts[i + 1]) / 2)
+        tap(inside)
+        sleep(1)
+        tap(CGPoint(x: window.frame.width - 16, y: inside.y))
+        sleep(1)
+    }
+
     nonisolated func pinchToZoom(above page: CGRect) throws -> Bool {
         let probePoint = CGPoint(x: page.midX, y: page.minY - 8)
         let canvas = app.scrollViews.allElementsBoundByIndex.max { $0.frame.height < $1.frame.height } ?? app.scrollViews.firstMatch

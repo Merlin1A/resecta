@@ -55,6 +55,7 @@ struct CanvasResizeOutcomeTests {
         coordinator.redactionState = state
         let window = UIWindow(frame: CGRect(origin: .zero, size: Self.pageSize))
         let overlay = RedactionOverlayView(frame: window.bounds)
+        overlay.geometry = .testUnturned
         overlay.pageIndex = 0
         overlay.snapZoomScaleOverride = Self.fitScale
         overlay.coordinator = coordinator

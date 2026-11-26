@@ -257,15 +257,13 @@ enum ResectaTokens {
         /// Distance (in screen points; × the overlay's finger scale) within
         /// which an edge aligns to a guide.
         static let proximityThreshold: CGFloat = 5
-        /// Width of rendered guide lines.
-        static let guideLineWidth: CGFloat = 1.0
-        /// Guide line color — orange for contrast (matches WARN color rationale).
-        static let guideColor: UIColor = .systemOrange
+        // The guide's look is `Canvas.guide`.
     }
 
     // MARK: - Canvas
 
-    /// The marks drawn on the page: the resize handles and the corner dots.
+    /// The marks drawn on the page: the boxes' lines, the resize handles and
+    /// the corner dots, the box being drawn, the lasso, the tags and the guides.
     /// Sizes are on-screen points, multiplied by the overlay's finger scale
     /// before drawing. The colours are fixed, the same in light and dark
     /// appearance, because the page under them does not change with it.
@@ -340,6 +338,60 @@ enum ResectaTokens {
         /// white 90 % ring centred on its edge.
         static let selectionDot = Disc(radius: 2.75, fill: pageTeal,
                                        ring: Tone(red: 1, green: 1, blue: 1, alpha: 0.9), ringWidth: 0.8)
+
+        // MARK: The marks of drawing and choosing
+
+        /// The white under-stroke beneath a mark's stroke: white at 90 %, the
+        /// stroke's own width plus `underStrokeGrowth`, on the same path and
+        /// dash, so the mark reads on any page colour.
+        static let underStroke = Tone(red: 1, green: 1, blue: 1, alpha: 0.9)
+        static let underStrokeGrowth: CGFloat = 1.6
+
+        /// A mark drawn over the page while a finger moves: its stroke, its
+        /// dash in on-screen points (none when empty), its fill, and whether
+        /// its caps are round (a dash of almost nothing then draws a dot).
+        nonisolated struct Mark: Equatable, Sendable {
+            let stroke: Stroke
+            let dash: [CGFloat]
+            let fill: Tone
+            let roundCaps: Bool
+        }
+
+        /// The box being drawn: page teal, 1.75 points, dashes 6 on 3.5 off,
+        /// filled with page teal at 10 %.
+        static let band = Mark(stroke: Stroke(tone: pageTeal, width: 1.75), dash: [6, 3.5],
+                               fill: Tone(red: pageTeal.red, green: pageTeal.green, blue: pageTeal.blue, alpha: 0.1),
+                               roundCaps: false)
+        /// The lasso: page teal, 1.5 points, drawn as round dots 3.6 points
+        /// apart, filled with page teal at 5 %.
+        static let lasso = Mark(stroke: Stroke(tone: pageTeal, width: 1.5), dash: [0.01, 3.6],
+                                fill: Tone(red: pageTeal.red, green: pageTeal.green, blue: pageTeal.blue, alpha: 0.05),
+                                roundCaps: true)
+        /// A box too small to keep, as it shrinks away: a solid border of
+        /// page teal, 1.75 points, filled with page teal at 10 %.
+        static let rejectedBand = Mark(stroke: Stroke(tone: pageTeal, width: 1.75), dash: [], fill: band.fill,
+                                       roundCaps: false)
+        /// An alignment guide: page teal, opaque, one point, the page's full
+        /// width or height.
+        static let guide = Stroke(tone: pageTeal, width: 1)
+
+        /// A box's tag: the words naming what found it, white on ink, outside
+        /// the box above its leading corner. Sizes in on-screen points.
+        nonisolated struct Tag: Equatable, Sendable {
+            let height: CGFloat
+            let corner: CGFloat
+            let fontSize: CGFloat
+            /// Between the words and each side.
+            let padding: CGFloat
+            /// Between the tag and the box's edge.
+            let gap: CGFloat
+            let fill: Tone
+            let words: Tone
+        }
+        static let tag = Tag(height: 15, corner: 3.5, fontSize: 10, padding: 5, gap: 1.5, fill: ink,
+                             words: Tone(red: 1, green: 1, blue: 1, alpha: 1))
+        /// A box shorter than this on screen shows no tag.
+        static let tagShortestBox: CGFloat = 15
 
         /// On an axis shorter than this, the handles at its ends step outward.
         static let handlesStepOutBelow: CGFloat = 22

@@ -3,27 +3,15 @@ import Foundation
 import CoreGraphics
 @testable import ResectaApp
 
-// Canvas a11y polish bundle. Three sub-fixes pinned by token-value
+// Canvas a11y polish bundle. Its sub-fixes pinned by token-value
 // / predicate / shape tests so each can fail in isolation if a future
 // tweak drifts a duration, a stroke width, or the Reduce-Motion gate.
 //
-// Badge outer stroke width (dark-mode contrast)
-// Resize-handle outer stroke width (selection visibility)
 // Handle in/out durations sourced from `ResectaTokens.Anim`.
 
 @Suite("Canvas accessibility polish")
 @MainActor
 struct CanvasAccessibilityPolishTests {
-
-    // MARK: - Badge outer stroke
-
-    @Test("Badge outer stroke is a 0.5pt hairline")
-    func badgeOuterStrokeIsHairline() {
-        // 0.5pt sub-pixel on 2× / 3× retina. Wide enough to register as a
-        // perimeter line without bulking up the badge, so the badge color
-        // still reads first and the stroke only kicks in at the edge.
-        #expect(RedactionOverlayView.badgeOuterStrokeWidth == 0.5)
-    }
 
     // MARK: - Handle animation tokens
 

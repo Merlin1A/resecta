@@ -1,0 +1,19 @@
+Property: The readable zoom reads the box as shown, not its rectangle in the page's own space, so a turned page's box is framed at its shown height.
+Area: the canvas's page geometry (turned pages)
+Test command: xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/CanvasRotatedPageTests
+Must go red: ResectaAppTests/CanvasRotatedPageTests zoomReadsTheBoxAsShown
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/PDFDocumentView.swift b/Sources/ResectaApp/Views/PDFDocumentView.swift
+index 881cc28..e64f7a2 100644
+--- a/Sources/ResectaApp/Views/PDFDocumentView.swift
++++ b/Sources/ResectaApp/Views/PDFDocumentView.swift
+@@ -348,7 +348,7 @@ final class FitFlooredPDFView: PDFView {
+         // The zoom reads the box as the reader sees it: on a turned page
+         // the page rectangle's sides are swapped against the page as shown.
+         if let target = PDFDocumentView.readabilityTargetScale(
+-            rectInPage: geometry.displayedRect(share: share),
++            rectInPage: geometry.pageRect(share: share),
+             viewportSize: bounds.size,
+             fitScale: fit,
+             maxScale: maxScaleFactor

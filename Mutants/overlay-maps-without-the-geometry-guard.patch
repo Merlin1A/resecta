@@ -1,0 +1,38 @@
+Property: An overlay with no page geometry maps nothing and begins no gesture: both guards, the maps' and the touch's, refuse it.
+Area: the canvas's page geometry (turned pages)
+Test command: xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/PageGeometryTests
+Must go red: ResectaAppTests/PageGeometryTests everyRow; ResectaAppTests/DoorShareBoundsTests defaultOverlayBeginsNothing
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Coordinates.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Coordinates.swift
+index 5e8c49b..a8e7c11 100644
+--- a/Sources/ResectaApp/Overlay/RedactionOverlayView+Coordinates.swift
++++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+Coordinates.swift
+@@ -11,7 +11,6 @@ extension RedactionOverlayView {
+ 
+     /// Convert overlay-view rect to normalized PDF coordinates (0–1, bottom-left origin).
+     func overlayToPDFNormalized(_ rect: CGRect) -> CGRect {
+-        guard geometry.cropBox.width > 0, geometry.cropBox.height > 0 else { Self.noGeometry(); return .zero }
+         let page = pageRectOnCanvas
+         let w = page.width
+         let h = page.height
+@@ -29,7 +28,6 @@ extension RedactionOverlayView {
+ 
+     /// Convert normalized PDF coordinates back to overlay-view rect.
+     func pdfNormalizedToOverlay(_ normalized: CGRect) -> CGRect {
+-        guard geometry.cropBox.width > 0, geometry.cropBox.height > 0 else { Self.noGeometry(); return .zero }
+         let page = pageRectOnCanvas
+         let w = page.width
+         let h = page.height
+diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Touches.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Touches.swift
+index 929179e..99dd9a3 100644
+--- a/Sources/ResectaApp/Overlay/RedactionOverlayView+Touches.swift
++++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+Touches.swift
+@@ -16,7 +16,6 @@ extension RedactionOverlayView {
+         guard touches.count == 1, let touch = touches.first else { return }
+         // An overlay with no page geometry begins no gesture: nothing is
+         // stored or drawn from it.
+-        guard geometry.cropBox.width > 0, geometry.cropBox.height > 0 else { Self.noGeometry(); return }
+         // Ignore secondary touchesBegan while a gesture is already
+         // in flight. Prevents a finger landing during a Pencil drag from
+         // hijacking the gesture state machine.

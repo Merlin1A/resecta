@@ -50,6 +50,7 @@ struct CanvasHitTargetTests {
         coordinator.redactionState = state
         let window = UIWindow(frame: CGRect(origin: .zero, size: Self.pageSize))
         let overlay = RedactionOverlayView(frame: window.bounds)
+        overlay.geometry = .testUnturned
         overlay.snapZoomScaleOverride = Self.fitScale
         overlay.coordinator = coordinator
         overlay.configure(with: regions, selectedIDs: selectedIDs)

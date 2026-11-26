@@ -51,6 +51,31 @@ struct DocumentEditorToolbar {
     /// The iPhone editor's own … menu, on iOS 27.
     static let moreMenuIdentifier = "editorMoreMenu"
 
+    /// The Rectangle tool's item on the bar, on and off: the shipped item's
+    /// own size (measured at 44.67 by 36 pt on iOS 26.4 and 27.2), so turning
+    /// the tool on moves nothing.
+    static let rectangleToolSize = CGSize(width: 44.67, height: 36)
+
+    /// The room the bar adds on each side of an item's own label (measured
+    /// on iOS 26.4 and 27.2: a label 44.7 pt wide made an item 59.00 pt
+    /// wide). The label is the item's size less this room on both sides.
+    static let barItemSideRoom: CGFloat = 7.17
+
+    /// The Rectangle tool's label: the glyph in a fixed frame, so the item
+    /// is the shipped size in both states; while the tool is on, white on a
+    /// pill filled with the brand teal's fill tier, as wide as the item.
+    @ViewBuilder
+    static func rectangleToolLabel(active: Bool) -> some View {
+        Image(systemName: "rectangle.dashed")
+            .foregroundStyle(active ? AnyShapeStyle(Color.white) : AnyShapeStyle(HierarchicalShapeStyle.primary))
+            .frame(width: rectangleToolSize.width - 2 * barItemSideRoom, height: rectangleToolSize.height)
+            .background {
+                if active {
+                    Capsule().fill(ResectaTokens.BrandTeal.fill).padding(.horizontal, -barItemSideRoom)
+                }
+            }
+    }
+
     /// The Rectangle tool's accessibility label. iOS 27 drops a toolbar
     /// button's accessibility value, so there the label also carries
     /// drawing mode; earlier iOS keeps the plain label and the value says it.
@@ -86,22 +111,24 @@ struct DocumentEditorToolbar {
 
     /// Routine actions render neutral — the group's
     /// ambient tint is `.primary`, applied here (inside the property,
-    /// not at the `.toolbar {}` call site — see the comment above). Per-
-    /// element overrides (the draw tools' `.tint(active ? BrandTeal.tint
-    /// : nil)`) still win: `nil` now inherits this neutral instead of
-    /// the root's brand teal, so only the ACTIVE tool stays teal.
+    /// not at the `.toolbar {}` call site — see the comment above). A per-
+    /// element override still wins: the Add-to-Selection toggle's `nil`
+    /// tint inherits this neutral, so only an active toggle stays teal. The
+    /// Rectangle tool draws its own on state instead (`rectangleToolLabel`).
     @ViewBuilder
     var leadingToolbarItems: some View {
         Group {
         switch documentState.runChromePhaseKind {
         case .editing:
             // Drawing tools.
-            // iPhone nav-bar overflow: keep a CONSTANT-width glyph per draw tool
-            // and signal "active" via .tint only. A wider active glyph (the former
-            // rectangle.dashed.badge.checkmark / scribble.variable) grows the leading
-            // ToolbarItemGroup past the bar width and collapses the whole group into the
-            // system "…" overflow menu.
-            Button("Rectangle", systemImage: "rectangle.dashed") {
+            // iPhone nav-bar overflow: keep a CONSTANT-width item per draw tool.
+            // A wider active item (the former rectangle.dashed.badge.checkmark /
+            // scribble.variable) grows the leading ToolbarItemGroup past the bar
+            // width and collapses the whole group into the system "…" overflow
+            // menu. "Active" is a white glyph on a filled teal pill as wide as
+            // the item, behind a label of one fixed size (`rectangleToolLabel`),
+            // the same on and off, so the item never changes size.
+            Button {
                 // Draw wins: entering the tool drops the
                 // selection and the Add-to-Selection toggle so the next
                 // drag draws instead of resizing or marquee-selecting.
@@ -110,8 +137,9 @@ struct DocumentEditorToolbar {
                 let effects = DocumentEditorView.drawToolEntryEffects(entering: entering)
                 if effects.clearSelection { redactionState.deselectAllRegions() }
                 if effects.disableMultiSelect { isMultiSelectActive = false }
+            } label: {
+                Self.rectangleToolLabel(active: activeTool == .rectangle)
             }
-            .tint(activeTool == .rectangle ? ResectaTokens.BrandTeal.tint : nil)
             .accessibilityIdentifier("drawTool")
             .accessibilityValue(activeTool == .rectangle
                                 ? "Drawing mode active" : "Tap to enter drawing mode")

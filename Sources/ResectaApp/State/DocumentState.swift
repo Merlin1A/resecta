@@ -190,8 +190,9 @@ class DocumentState {
     struct CanvasScrollTarget: Equatable {
         let pageIndex: Int
         /// 0–1, bottom-left origin — `RedactionRegion.normalizedRect`
-        /// convention; converted at the consumer via the engine's
-        /// canonical `normalizedToPDFPageCoordinates`.
+        /// convention, a share of the page as shown; converted at the
+        /// consumer through the page's geometry
+        /// (`RunRecord.PageGeometry.pageRect(share:)`).
         let normalizedRect: CGRect
         /// The zoom intent riding the one
         /// seam. `.none` = today's page write + past-fit

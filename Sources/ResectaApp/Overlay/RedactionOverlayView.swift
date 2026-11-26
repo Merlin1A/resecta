@@ -12,9 +12,19 @@ import RedactionEngine
 class RedactionOverlayView: UIView {
 
     var pageIndex: Int = 0
-    /// The page's `/Rotate`, set when PDFKit asks for this overlay; the
-    /// app never turns a page, so it holds for the overlay's life.
-    var pageRotation: Int = 0
+    /// The page's geometry (its crop box, with its origin, and its
+    /// `/Rotate`), set when PDFKit asks for this overlay; the app never
+    /// turns a page, so it holds for the overlay's life. The default has
+    /// no crop and refuses: an overlay no page made maps nothing and
+    /// begins no gesture (`noGeometry`).
+    var geometry = RunRecord.PageGeometry(cropBox: .zero, rotation: 0)
+#if DEBUG
+    /// Called when a map or a touch meets an overlay with no geometry. A
+    /// test may set it to count the refusal instead of trapping.
+    static var noGeometry: () -> Void = { assertionFailure("overlay with no page geometry") }
+#else
+    static func noGeometry() {}
+#endif
     /// The page's own size in points (its display box, before the turn),
     /// set when PDFKit asks for this overlay. PDFKit sizes the overlay to
     /// the page rounded to the screen's pixels (A4's 595.276 x 841.89 pt
@@ -161,8 +171,8 @@ class RedactionOverlayView: UIView {
     /// handle boxes, snap proximity) are specified in
     /// SCREEN points; the overlay's space is the page's unscaled bounds
     /// (PDFKit zooms the container), so a tolerance in overlay units is
-    /// the screen tolerance × 1/zoom. Document geometry (page-margin
-    /// inset, the dimension label) is deliberately NOT scaled.
+    /// the screen tolerance × 1/zoom. Document geometry (the page-margin
+    /// inset) is deliberately NOT scaled.
     var fingerScale: CGFloat {
         1 / max(snapZoomScaleOverride ?? currentZoomScale(), 0.01)
     }
@@ -189,12 +199,8 @@ class RedactionOverlayView: UIView {
     static let subThresholdRejectionAnnouncement =
         "Region too small. Zoom in to draw a smaller region."
 
-    // Polish helpers + adaptive-stroke constants live in
-    // the sibling extension file `RedactionOverlayView+CanvasPolish.swift`:
-    //   badgeOuterStrokeWidth / selectionHandleOuterStrokeWidth,
-    //   dimensionLabelSmallRegionThreshold,
-    //   DimensionLabelPosition + dimensionLabelPosition(…),
-    //   clampedDragOrigin(…).
+    // The move-drag's pure helper, `clampedDragOrigin(…)`, lives in the
+    // sibling extension file `RedactionOverlayView+CanvasPolish.swift`.
 
     // Predicate for the region tap that toggles on lift through
     // `coordinator?.toggleRegionSelection`. Returns true when either

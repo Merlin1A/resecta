@@ -283,7 +283,7 @@ struct TurnedPageBoxBurnTests {
 
     /// The arrow keys reach the editor through its SwiftUI key handler,
     /// which a hosted test cannot press; this applies that handler's own
-    /// step and move (`nudgeDelta`, `nudgedRect`) with its signs for the
+    /// step and move (`nudgeStep`, `nudgedRect`) with its signs for the
     /// right and down arrows, then reads where the canvas draws the box.
     @Test("The right and down arrows move a box right and down on screen on a turned page", arguments: turns)
     func arrowsMoveTheBoxAsShown(rotation: Int) throws {
@@ -293,7 +293,7 @@ struct TurnedPageBoxBurnTests {
                                         to: CGPoint(x: word.maxX, y: word.maxY))
         canvas.overlay.configure(with: canvas.state.regions[0] ?? [], selectedIDs: [])
         let before = try #require(Self.paintedOnScreen(canvas.overlay))
-        let step = DocumentEditorView.nudgeDelta(pageSize: canvas.page.bounds(for: .cropBox).size)
+        let step = DocumentEditorView.nudgeStep(page: canvas.page)
         for (dx, dy) in [(step.dx, 0.0), (step.dx, 0.0), (0.0, step.dy), (0.0, step.dy)] + Array(repeating: (step.dx, 0.0), count: 18) + Array(repeating: (0.0, step.dy), count: 18) {
             let region = try Self.onlyRegion(canvas)
             _ = canvas.state.moveRegion(id, page: 0, newRect: DocumentEditorView.nudgedRect(region.normalizedRect, dx: dx, dy: dy),
