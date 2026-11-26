@@ -1,0 +1,21 @@
+Property: A touch applies, with the moved boxes, every box whose plan box it changes, so a neighbour follows when a join forms or breaks. Here only the moved boxes are applied.
+Area: editor overlay (the boxes' layers)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BoxLayerHostTests
+Must go red: ResectaAppTests/BoxLayerHostTests breakingAJoinAppliesTheOther
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/BoxLayers.swift b/Sources/ResectaApp/Overlay/BoxLayers.swift
+--- a/Sources/ResectaApp/Overlay/BoxLayers.swift
++++ b/Sources/ResectaApp/Overlay/BoxLayers.swift
+@@ -350,11 +350,6 @@
+         let pass = source.boxLayerPass(toDevice: toDevice)
+         // Per touch, every box whose plan box changed since the last pass
+         // comes too, so a neighbour follows when a join forms or breaks.
+-        if !all, let last = lastPlanBoxes {
+-            let now = pass.planBoxes
+-            for box in now where !last.contains(box) { regions.formUnion(box.regionIDs.map(\.uuidString)) }
+-            for box in last where !now.contains(box) { regions.formUnion(box.regionIDs.map(\.uuidString)) }
+-        }
+         // A box's keys are those of every region in its plan box.
+         for box in pass.planBoxes {
+             let ids = Set(box.regionIDs.map(\.uuidString))

@@ -1,0 +1,18 @@
+Property: A resized box stays in its own groups; only a moved box is lifted. Here a resize lifts the box into the moving group.
+Area: editor overlay (the boxes' layers)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BoxLayerHostTests
+Must go red: ResectaAppTests/BoxLayerHostTests resizeAppliesTheBox
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift
+--- a/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift
++++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift
+@@ -40,7 +40,7 @@
+         let boxes = made.boxes.filter { box in
+             box.fill.reduce(box.tight) { $0.union($1) }.insetBy(dx: -margin, dy: -margin).intersects(rect)
+         }
+-        let moving: Set<UUID> = isDraggingExistingRegion ? selectedIDs : []
++        let moving: Set<UUID> = isDraggingExistingRegion || activeResizeHandle != nil ? selectedIDs : []
+         return Self.inkSteps(boxes: boxes, selectionCount: selectedIDs.count,
+                              handlesActive: resizeHandlesActive, moving: moving,
+                              settings: .current, fingerScale: fingerScale, page: bounds, handleScale: handleScale)
