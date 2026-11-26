@@ -7,14 +7,14 @@ Apply in a scratch worktree with `git apply`; discard after.
 diff --git a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
 --- a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
 +++ b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
-@@ -38,10 +38,6 @@
-     var qualityCap: Int = defaultDPICap {
-         didSet {
-             guard qualityCap != oldValue, let state = redactionState else { return }
--            for (pageIndex, kept) in state.drawnPlans
--            where kept.pageVersion == state.pageVersion(pageIndex) && kept.fromStoredRegions == true {
--                noteDrawn(pageIndex: pageIndex, regions: state.regions[pageIndex] ?? [], drawn: false)
--            }
-             for (pageIndex, overlay) in activeOverlays {
-                 noteDrawn(pageIndex: pageIndex, regions: state.regions[pageIndex] ?? [], drawn: false)
-                 overlay.setNeedsDisplay()
+@@ -48,10 +48,6 @@
+ 
+     private func keepPlansAtTheRunQuality() {
+         guard let state = redactionState else { return }
+-        for (pageIndex, kept) in state.drawnPlans
+-        where kept.pageVersion == state.pageVersion(pageIndex) && kept.fromStoredRegions == true {
+-            noteDrawn(pageIndex: pageIndex, regions: state.regions[pageIndex] ?? [], drawn: false)
+-        }
+         for (pageIndex, overlay) in activeOverlays {
+             noteDrawn(pageIndex: pageIndex, regions: state.regions[pageIndex] ?? [], drawn: false)
+             overlay.setNeedsDisplay()

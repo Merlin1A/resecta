@@ -4,14 +4,13 @@ Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcod
 Must go red: ResectaAppTests/OverlayDrawnPlanTests drawingKeepsThePlan
 Apply in a scratch worktree with `git apply`; discard after.
 diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift
-index 8e9cb09bb..c70f71a2c 100644
 --- a/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift
 +++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift
-@@ -20,7 +20,6 @@ extension RedactionOverlayView {
+@@ -20,7 +20,6 @@
      /// handles or corner dots of a selection — the first segment of `draw(_:)`.
      func drawCommittedRegions(ctx: CGContext, in rect: CGRect) {
          // The plan this page is drawn from is kept with its settings.
 -        coordinator?.noteDrawn(pageIndex: pageIndex, regions: regions)
-         let paints = paintRects()
-         // Perf: skip boxes entirely outside the dirty rect. The margin covers
-         // the shadow (20 overlay points), and whichever reaches further of a
+         // The context maps overlay points to the pixels being drawn without
+         // a turn: the veil is snapped to them.
+         assert(ScreenLink.isAxisAligned(ctx.userSpaceToDeviceSpaceTransform),
