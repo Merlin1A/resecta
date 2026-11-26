@@ -19,6 +19,10 @@ extension RedactionOverlayView {
         super.layoutSubviews()
         cachedAccessibilityElements = nil
         cachedPageRectOnCanvas = nil
+        if boxLayers.root.frame != bounds {
+            boxLayers.root.frame = bounds
+            boxLayers.mark(.all)
+        }
         reportBoxPlaceProbeOnce()
     }
 

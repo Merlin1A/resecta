@@ -1,29 +1,32 @@
-Property: The overlay's own draw(_:) draws only the committed boxes; the Search layer is drawn by the top canvas above them. Here the Search pass is left in the overlay's draw(_:), beneath the canvas.
+Property: The overlay draws no bitmap (its boxes are layers); the Search layer is drawn by the top canvas above them. Here the Search pass is left in a draw(_:) of the overlay's own, beneath the canvas.
 Area: editor overlay
 Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/OverlayTopCanvasTests
 Must go red: ResectaAppTests/OverlayTopCanvasTests drawBodiesNameTheirPasses
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Overlay/OverlayTopCanvas.swift b/Sources/ResectaApp/Overlay/OverlayTopCanvas.swift
-index 533a9895..1401904b 100644
 --- a/Sources/ResectaApp/Overlay/OverlayTopCanvas.swift
 +++ b/Sources/ResectaApp/Overlay/OverlayTopCanvas.swift
-@@ -29,7 +29,6 @@ final class OverlayTopCanvas: UIView {
-     override func draw(_ rect: CGRect) {
+@@ -30,7 +30,6 @@
          guard let host, let ctx = UIGraphicsGetCurrentContext() else { return }
+         host.drawPassCount += 1
          ctx.clip(to: rect)
 -        host.drawSearchLayer(ctx: ctx, in: rect)
          host.drawSnapGuides(ctx: ctx)
          host.drawInProgressShapes(ctx: ctx)
      }
 diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+DrawEntry.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+DrawEntry.swift
-index c7afd65c..67f55d6c 100644
 --- a/Sources/ResectaApp/Overlay/RedactionOverlayView+DrawEntry.swift
 +++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+DrawEntry.swift
-@@ -19,5 +19,6 @@ extension RedactionOverlayView {
-         // are drawn, in that order, by the top canvas above it
-         // (`OverlayTopCanvas`).
-         drawCommittedRegions(ctx: ctx, in: rect)
+@@ -7,6 +7,11 @@
+ // canvas's (`OverlayTopCanvas`).
+ 
+ extension RedactionOverlayView: BoxLayerSource {
++    override func draw(_ rect: CGRect) {
++        guard let ctx = UIGraphicsGetCurrentContext() else { return }
 +        drawSearchLayer(ctx: ctx, in: rect)
-     }
- }
++    }
++
+     /// The committed boxes' layer descriptions, with `toDevice` the map from
+     /// overlay points to the screen's device pixels. The plan this page is
+     /// drawn from is kept with its settings first, and the boxes are made

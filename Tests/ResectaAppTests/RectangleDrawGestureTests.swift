@@ -80,6 +80,10 @@ struct RectangleDrawGestureTests {
     @Test("A rejected sub-threshold rubber band schedules a repaint on touch-up")
     func testRejectedDragRepaintsOnEnd() {
         let (overlay, coordinator) = makeOverlay()
+        // In a window, so a pass is on the pixel lines and leaves none asked for.
+        let window = UIWindow(frame: overlay.frame)
+        window.addSubview(overlay)
+        window.isHidden = false
         let touch = StubTouch(location: CGPoint(x: 100, y: 100), view: overlay)
         overlay.touchesBegan([touch], with: nil)
         // Past the 8-pt start gate (a band is painted), under the 20-pt
@@ -88,16 +92,18 @@ struct RectangleDrawGestureTests {
         overlay.touchesMoved([touch], with: nil)
         #expect(overlay.currentDragRect == CGRect(x: 100, y: 100, width: 12, height: 12))
 
-        overlay.layer.displayIfNeeded()
-        #expect(overlay.layer.needsDisplay() == false,
+        overlay.topCanvas?.layer.displayIfNeeded()
+        overlay.boxLayers.applyPendingPass()
+        #expect(overlay.topCanvas?.layer.needsDisplay() == false && !overlay.boxLayers.isPassPending,
                 "precondition: the mid-drag repaint was flushed")
 
         overlay.touchesEnded([touch], with: nil)
         #expect(coordinator.addedRegions.isEmpty)
         #expect(overlay.currentDragRect == nil)
         #expect(overlay.isActivelyDragging == false)
-        #expect(overlay.layer.needsDisplay(),
+        #expect(overlay.topCanvas?.layer.needsDisplay() == true && overlay.boxLayers.isPassPending,
                 "resetDragState must schedule the repaint that erases the ghost band, label and guides")
+        withExtendedLifetime(window) {}
     }
 
     @Test("A move commit on a selected region schedules a repaint on touch-up")
@@ -112,14 +118,19 @@ struct RectangleDrawGestureTests {
         let (overlay, coordinator) = makeOverlay(
             drawing: false, regions: [region], selectedIDs: [region.id]
         )
+        // In a window, so a pass is on the pixel lines and leaves none asked for.
+        let window = UIWindow(frame: overlay.frame)
+        window.addSubview(overlay)
+        window.isHidden = false
         let touch = StubTouch(location: CGPoint(x: 200, y: 200), view: overlay)
         overlay.touchesBegan([touch], with: nil)
         #expect(overlay.isActivelyDragging, "touch-down inside the selected body begins a move")
         touch.move(to: CGPoint(x: 240, y: 230))
         overlay.touchesMoved([touch], with: nil)
 
-        overlay.layer.displayIfNeeded()
-        #expect(overlay.layer.needsDisplay() == false,
+        overlay.topCanvas?.layer.displayIfNeeded()
+        overlay.boxLayers.applyPendingPass()
+        #expect(overlay.topCanvas?.layer.needsDisplay() == false && !overlay.boxLayers.isPassPending,
                 "precondition: the mid-drag repaint was flushed")
 
         overlay.touchesEnded([touch], with: nil)
@@ -127,8 +138,9 @@ struct RectangleDrawGestureTests {
         #expect(coordinator.movedRegions.first?.id == region.id)
         #expect(coordinator.addedRegions.isEmpty)
         #expect(overlay.isActivelyDragging == false)
-        #expect(overlay.layer.needsDisplay(),
+        #expect(overlay.topCanvas?.layer.needsDisplay() == true && overlay.boxLayers.isPassPending,
                 "resetDragState must schedule the repaint that drops the lifted look and restores the handles")
+        withExtendedLifetime(window) {}
     }
 
     // MARK: - Anchored-edge snapping

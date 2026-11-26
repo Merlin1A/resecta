@@ -2,46 +2,15 @@ import UIKit
 import SwiftUI
 import RedactionEngine
 
-// The canvas drawing, moved out of `RedactionOverlayView.swift` (the hub)
-// along its `// MARK: - Drawing` seam. The hub's `draw(_:)` keeps the
-// context, the dirty-rect clip and the ORDER; its body's three segments
-// are the three methods below, each drawn exactly as the body drew them
-// (the committed regions; the search layer — live preview, highlights,
-// the walk's ring; the in-progress shapes — the box being drawn and the
-// lasso), followed by the helpers those segments call (the steps' drawing
-// and the snap guides).
+// The canvas drawing: the committed boxes' steps, which `BoxLayerHost`
+// keeps as layers (`boxLayerPass(toDevice:)`), and the top canvas's three
+// passes, in its order (the search layer — live preview, highlights, the
+// walk's ring; the snap guides; the in-progress shapes — the box being
+// drawn and the lasso), followed by the helpers they call.
 
 extension RedactionOverlayView {
 
     // MARK: - draw(_:) segments
-
-    /// The committed regions, drawn as Ink boxes layer by layer across all
-    /// of them (`inkSteps`), with the tags of the boxes at rest and the
-    /// handles or corner dots of a selection — the first segment of `draw(_:)`.
-    func drawCommittedRegions(ctx: CGContext, in rect: CGRect) {
-        // The plan this page is drawn from is kept with its settings.
-        coordinator?.noteDrawn(pageIndex: pageIndex, regions: regions)
-        // The context maps overlay points to the pixels being drawn without
-        // a turn: the veil is snapped to them.
-        assert(ScreenLink.isAxisAligned(ctx.userSpaceToDeviceSpaceTransform),
-               "the canvas's drawing context is turned or sheared")
-        let steps = committedSteps(in: rect, plan: coordinator?.redactionState?.drawnPlans[pageIndex])
-        for step in steps where !step.lifted { draw(step, ctx: ctx) }
-
-        // The box being moved is drawn whole, on top, on its own rectangles:
-        // the shadow alone marks it. The shadow falls on the page, which is
-        // white in either appearance, so one dark shadow reads in both; its
-        // offset and blur keep one on-screen size at every zoom.
-        let lifted = steps.filter(\.lifted)
-        guard !lifted.isEmpty else { return }
-        ctx.saveGState()
-        ctx.setShadow(offset: CGSize(width: 0, height: 4 * fingerScale), blur: 12 * fingerScale,
-                      color: Self.liftShadowColor.cgColor)
-        ctx.beginTransparencyLayer(auxiliaryInfo: nil)
-        for step in lifted { draw(step, ctx: ctx) }
-        ctx.endTransparencyLayer()
-        ctx.restoreGState()
-    }
 
     /// The steps a pass over `rect` draws for the committed regions, from
     /// `plan`, the page's kept plan. Every region of the page is checked
@@ -77,80 +46,32 @@ extension RedactionOverlayView {
                              settings: .current, fingerScale: fingerScale, page: bounds, handleScale: handleScale)
     }
 
-    /// Draws one step: a fill of all its rectangles as one path (a width of
-    /// zero), a stroke of them and of its lines, or its handles, dots or
-    /// rings; a tag's words over its fill.
+    /// Draws one step of the marks of drawing and choosing (the band, the
+    /// lasso and the guides): a fill of all its rectangles as one path (a
+    /// width of zero), or a stroke of them and of its lines. The boxes' own
+    /// steps are layers (`BoxLayerHost`).
     private func draw(_ step: InkStep, ctx: CGContext) {
-        typealias C = ResectaTokens.Canvas
         ctx.setLineDash(phase: 0, lengths: step.dash)
-        switch step.layer {
-        case .handles:
-            // The disc and its shadow grow in with `handleScale`; the ring
-            // keeps its width.
-            guard step.handleScale > 0.001 else { return }
-            let radius = C.handle.radius * step.handleScale * fingerScale
-            let shadowRadius = (C.handle.radius + C.handleShadowGrowth) * step.handleScale * fingerScale
-            let drop = C.handleShadowDrop * step.handleScale * fingerScale
-            for p in step.rects.map({ CGPoint(x: $0.midX, y: $0.midY) }) {
-                ctx.setFillColor(C.handleShadow.uiColor.cgColor)
-                ctx.fillEllipse(in: Self.disc(at: CGPoint(x: p.x, y: p.y + drop), radius: shadowRadius))
-                let disc = Self.disc(at: p, radius: radius)
-                ctx.setFillColor(C.handle.fill.uiColor.cgColor)
-                ctx.fillEllipse(in: disc)
-                ctx.setStrokeColor(step.tone.uiColor.cgColor)
-                ctx.setLineWidth(step.width)
-                ctx.strokeEllipse(in: disc)
+        ctx.saveGState()
+        ctx.setLineCap(step.roundCaps ? .round : .butt)
+        for r in step.rects {
+            ctx.addPath(step.corner > 0
+                ? UIBezierPath(roundedRect: r, cornerRadius: step.corner).cgPath
+                : CGPath(rect: r, transform: nil))
+        }
+        if step.width == 0 {
+            ctx.setFillColor(step.tone.uiColor.cgColor)
+            ctx.fillPath(using: .winding)
+        } else {
+            for i in stride(from: 0, to: step.lines.count - 1, by: 2) {
+                ctx.move(to: step.lines[i])
+                ctx.addLine(to: step.lines[i + 1])
             }
-        case .dots:
-            for dot in step.rects {
-                ctx.setFillColor(step.tone.uiColor.cgColor)
-                ctx.fillEllipse(in: dot)
-                ctx.setStrokeColor(C.selectionDot.ring.uiColor.cgColor)
-                ctx.setLineWidth(step.width)
-                ctx.strokeEllipse(in: dot)
-            }
-        case .inkRings:
             ctx.setStrokeColor(step.tone.uiColor.cgColor)
             ctx.setLineWidth(step.width)
-            for ring in step.rects { ctx.strokeEllipse(in: ring) }
-        case .veil:
-            Self.fillOnPixelLines(step.rects, clip: pageRectOnCanvas.intersection(bounds),
-                                  color: step.tone.uiColor.cgColor, ctx: ctx)
-        default:
-            ctx.saveGState()
-            ctx.setLineCap(step.roundCaps ? .round : .butt)
-            for r in step.rects {
-                ctx.addPath(step.corner > 0
-                    ? UIBezierPath(roundedRect: r, cornerRadius: step.corner).cgPath
-                    : CGPath(rect: r, transform: nil))
-            }
-            if step.width == 0 {
-                ctx.setFillColor(step.tone.uiColor.cgColor)
-                ctx.fillPath(using: .winding)
-            } else {
-                for i in stride(from: 0, to: step.lines.count - 1, by: 2) {
-                    ctx.move(to: step.lines[i])
-                    ctx.addLine(to: step.lines[i + 1])
-                }
-                ctx.setStrokeColor(step.tone.uiColor.cgColor)
-                ctx.setLineWidth(step.width)
-                ctx.strokePath()
-            }
-            ctx.restoreGState()
-            if step.layer == .tag { drawTagWords(step) }
+            ctx.strokePath()
         }
-    }
-
-    /// A tag's words, white, centred on its height after its leading padding.
-    private func drawTagWords(_ step: InkStep) {
-        let tag = ResectaTokens.Canvas.tag
-        let font = Self.tagFont(fingerScale: fingerScale)
-        let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: tag.words.uiColor]
-        for (rect, words) in zip(step.rects, step.words) {
-            (words as NSString).draw(
-                at: CGPoint(x: rect.minX + tag.padding * fingerScale, y: rect.midY - font.lineHeight / 2),
-                withAttributes: attributes)
-        }
+        ctx.restoreGState()
     }
 
     /// The search layer over the regions — the live-preview fills, the
@@ -256,9 +177,6 @@ extension RedactionOverlayView {
     /// Overlay points are page points, shown at 1 / `fingerScale`; each size
     /// below is multiplied by `fingerScale` so it keeps one on-screen size.
 
-    /// The lift shadow's colour: the page is white in either appearance.
-    static let liftShadowColor = UIColor.black.withAlphaComponent(0.20)
-
     /// A box's line round its own rectangle, in overlay points:
     /// `Canvas.lineSelected` selected, `Canvas.line` at rest.
     static func regionLineWidth(isSelected: Bool, fingerScale: CGFloat) -> CGFloat {
@@ -284,22 +202,6 @@ extension RedactionOverlayView {
               !showsHandles(isSelected: isSelected, selectionCount: selectionCount, handlesActive: handlesActive)
         else { return nil }
         return (2 * fingerScale, [4 * fingerScale, 3 * fingerScale])
-    }
-
-    /// Fills `rects`, the fill the run makes, each moved outward to whole
-    /// pixel lines of the bitmap `ctx` draws into (read from the context's
-    /// own transform), cut to `clip`, with antialiasing off.
-    static func fillOnPixelLines(_ rects: [CGRect], clip: CGRect, color: CGColor, ctx: CGContext) {
-        let toDevice = ctx.userSpaceToDeviceSpaceTransform
-        ctx.saveGState()
-        ctx.setShouldAntialias(false)
-        for rect in rects {
-            let fill = ScreenLink.fillRect(rect, toDevice: toDevice, clip: clip)
-            if !fill.isNull { ctx.addRect(fill) }
-        }
-        ctx.setFillColor(color)
-        ctx.fillPath(using: .winding)
-        ctx.restoreGState()
     }
 
     /// Keeps this page's result in the document's set of pages whose fill

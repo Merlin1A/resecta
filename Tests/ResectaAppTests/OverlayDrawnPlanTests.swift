@@ -49,7 +49,7 @@ struct OverlayDrawnPlanTests {
         overlay.configure(with: regions, selectedIDs: [])
         #expect(state.drawnPlans[0] == nil)
 
-        _ = UIGraphicsImageRenderer(size: overlay.bounds.size).image { overlay.drawCommittedRegions(ctx: $0.cgContext, in: overlay.bounds) }
+        _ = overlay.boxLayerPass(toDevice: .identity)
 
         let kept = try #require(state.drawnPlans[0])
         let page = try #require(pdf.page(at: 0))
@@ -69,7 +69,7 @@ struct OverlayDrawnPlanTests {
 
         // A changed setting is kept at the next drawing.
         settings.fillColor = .black
-        _ = UIGraphicsImageRenderer(size: overlay.bounds.size).image { overlay.drawCommittedRegions(ctx: $0.cgContext, in: overlay.bounds) }
+        _ = overlay.boxLayerPass(toDevice: .identity)
         #expect(state.drawnPlans[0]?.fillColor == .black)
     }
 
@@ -188,9 +188,7 @@ struct OverlayDrawnPlanTests {
         let overlay = try #require(coordinator.pdfView(view, overlayViewFor: page) as? RedactionOverlayView)
         overlay.frame = CGRect(x: 0, y: 0, width: 300, height: 420)
         func draw() {
-            _ = UIGraphicsImageRenderer(size: overlay.bounds.size).image {
-                overlay.drawCommittedRegions(ctx: $0.cgContext, in: overlay.bounds)
-            }
+            _ = overlay.boxLayerPass(toDevice: .identity)
         }
         // The drag draws a working copy.
         var moved = region

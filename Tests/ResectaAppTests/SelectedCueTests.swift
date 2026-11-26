@@ -49,10 +49,10 @@ struct SelectedCueTests {
         overlay.geometry = .testUnturned
         window.addSubview(overlay)
         window.isHidden = false
-        overlay.layer.displayIfNeeded()
-        #expect(overlay.layer.needsDisplay() == false)
+        overlay.boxLayers.applyPendingPass()
+        #expect(overlay.boxLayers.isPassPending == false)
         NotificationCenter.default.post(name: UIAccessibility.differentiateWithoutColorDidChangeNotification, object: nil)
-        #expect(overlay.layer.needsDisplay())
+        #expect(overlay.boxLayers.isPassPending, "the boxes' layers are asked for a pass")
         withExtendedLifetime(window) {}
     }
 }
