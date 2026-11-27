@@ -25,7 +25,7 @@ struct SeededEdgeGrowthTests {
                 space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue))
             bitmap.setFillColor(gray: 0.5, alpha: 1)
             bitmap.fill(CGRect(x: 0, y: 0, width: pixels.width, height: pixels.height))
-            picture = try #require(bitmap.makeImage())
+            picture = bitmap.makeImage()
         }
         let renderer = UIGraphicsPDFRenderer(bounds: CGRect(origin: .zero, size: pageSize))
         let data = renderer.pdfData { context in
