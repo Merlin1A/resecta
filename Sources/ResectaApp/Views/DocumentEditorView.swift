@@ -89,6 +89,9 @@ struct DocumentEditorView: View {
     /// A search session parked for the close dialog, kept whole for Cancel
     /// (`restoreParkedSearchIfNeeded()`); Close drops it with the session.
     @State var parkedEditorSearch: SearchState?
+    /// The Search session in `parkedEditorSearch` was parked for the stop at
+    /// Redact, and comes back when the stop goes without a run.
+    @State var stopParkedSearch = false
 
     // Drives the bespoke share-risk confirm sheet shown when a
     // Share tap reaches handleExportTap while the report is FAIL/ATTENTION
@@ -122,14 +125,17 @@ struct DocumentEditorView: View {
     /// rationale is enforced by the binding's getter so two
     /// near-simultaneous transitions in the same runloop tick can't drop a
     /// sheet silently.
-    private enum ActiveSheet: Identifiable {
+    enum ActiveSheet: Identifiable {
         case search(SearchState)
         case rationale(UUID)
+        /// The stop at Redact, first of all when its case awaits an answer.
+        case beforeRedact
 
         var id: String {
             switch self {
             case .search(let state): return "search-\(state.id)"
             case .rationale(let regionID): return "rationale-\(regionID)"
+            case .beforeRedact: return "before-redact"
             }
         }
     }
@@ -318,17 +324,20 @@ struct DocumentEditorView: View {
         // the session down at the Apply seam (`runFullPipeline`).
         .sheet(item: Binding<ActiveSheet?>(
             get: {
-                if let searchState = redactionState.activeSearch,
-                   Self.sheetSlotMayPresentSearch(in: documentState.phaseKind) {
-                    return .search(searchState)
-                }
-                if let regionID = redactionState.pendingCanvasRationaleRequest {
-                    return .rationale(regionID)
-                }
-                return nil
+                Self.slotItem(stopUp: sheetSlotShowsStop, activeSearch: redactionState.activeSearch,
+                              mayPresentSearch: Self.sheetSlotMayPresentSearch(in: documentState.phaseKind),
+                              rationale: redactionState.pendingCanvasRationaleRequest)
             },
             set: { newValue in
                 if newValue == nil {
+                    // The stop swiped down is its Cancel, deferred as the arms below are.
+                    if sheetSlotShowsStop {
+                        Task { @MainActor in
+                            guard sheetSlotShowsStop else { return }
+                            answerStop(.swipedDown)
+                        }
+                        return
+                    }
                     // Clear whichever source was driving the sheet. Order
                     // mirrors the getter's precedence so the active source
                     // is the one cleared.
@@ -368,6 +377,7 @@ struct DocumentEditorView: View {
                 }
             }
         ), onDismiss: {
+            handOffAfterStop()
             if settingsAwaitsSheetDismissal {  // parked for Settings: open it now
                 settingsAwaitsSheetDismissal = false
                 showSettings = true
@@ -442,7 +452,21 @@ struct DocumentEditorView: View {
                     .messageHost(toastManager, place: .otherSheet)
                     .messageLayer(toastManager, role: .draws)
                 }
+            case .beforeRedact:
+                if case .pagesNotRead(let pages) = documentState.redactRefusalAwaitingAnswer {
+                    let stop = BeforeYouRedactSheet.stop(
+                        casePages: pages, runs: redactionState.closedSearchRuns,
+                        answered: redactionState.redactStopAnswered, words: .stop)
+                    BeforeYouRedactSheet(content: stop.content, reRun: stop.reRun,
+                                         captureMonitor: captureMonitor, onAnswer: answerStop)
+                    .messageHost(toastManager, place: .otherSheet)
+                    .messageLayer(toastManager, role: .draws)
+                }
             }
+        }
+        // The stop's case arriving parks a Search session that is up.
+        .onChange(of: Self.stopAwaitsAnswer(documentState)) { _, awaits in
+            if awaits { parkSearchForStop() }
         }
         .modifier(EditorAnnouncementObservers(
             documentState: documentState, redactionState: redactionState,

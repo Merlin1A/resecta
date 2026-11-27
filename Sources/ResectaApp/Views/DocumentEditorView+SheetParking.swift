@@ -52,9 +52,16 @@ extension DocumentEditorView {
     }
 
     /// Mirrors the `.sheet(item:)` getter: the slot is presenting whenever
-    /// either source is live.
+    /// either source is live, or the stop at Redact is up.
     var editorSheetIsPresented: Bool {
-        Self.sheetSlotIsPresenting(redactionState)
+        Self.editorSlotIsPresenting(documentState: documentState, redactionState: redactionState)
+    }
+
+    /// The editor's presenting flag as a pure read: the stop at Redact first,
+    /// then the slot's two sources.
+    static func editorSlotIsPresenting(documentState: DocumentState, redactionState: RedactionState) -> Bool {
+        sheetSlotShowsStop(stopAwaitsAnswer: stopAwaitsAnswer(documentState), phaseKind: documentState.phaseKind)
+            || sheetSlotIsPresenting(redactionState)
     }
 
     /// The slot's rule, readable outside the editor (the workspace's drop
@@ -70,14 +77,31 @@ extension DocumentEditorView {
     /// results and selections intact, flagged so the sheet's teardown
     /// spares it; a rationale sheet is simply dropped.
     func parkEditorSheet() {
-        if let search = redactionState.activeSearch {
-            search.parkedForHomeClose = true
-            search.parkedDocument = documentState.sourceDocumentToken
-            parkedEditorSearch = search
-            redactionState.activeSearch = nil
+        if sheetSlotShowsStop {
+            // The stop goes as a Cancel; a Search it parked is left to the
+            // restore of whatever parks the slot now.
+            stopParkedSearch = false
+            Self.applyStopAnswer(.cancel, documentState: documentState, redactionState: redactionState,
+                                 coordinator: coordinator, documentOverride: documentOverride)
+        } else if redactionState.activeSearch != nil {
+            _ = Self.parkSearchSession(redactionState, document: documentState.sourceDocumentToken,
+                                       parked: &parkedEditorSearch)
         } else if redactionState.pendingCanvasRationaleRequest != nil {
             redactionState.pendingCanvasRationaleRequest = nil
         }
+    }
+
+    /// Park the Search session that is up, whole: kept in `parked`, its
+    /// results and selections intact, flagged so the sheet's teardown spares
+    /// it, and taken out of the slot. False when no session is up.
+    static func parkSearchSession(_ redactionState: RedactionState, document: UUID,
+                                  parked: inout SearchState?) -> Bool {
+        guard let search = redactionState.activeSearch else { return false }
+        search.parkedForHomeClose = true
+        search.parkedDocument = document
+        parked = search
+        redactionState.activeSearch = nil
+        return true
     }
 
     /// Re-present a search session parked for the dialog when it went down

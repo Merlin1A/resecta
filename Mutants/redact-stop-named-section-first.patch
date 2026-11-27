@@ -1,0 +1,19 @@
+Property: The stop's section with no name comes first.
+Area: the stop at Redact
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BeforeYouRedactSheetTests
+Must go red: ResectaAppTests/BeforeYouRedactSheetTests sectionsBySearches
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/BeforeYouRedactSheet.swift b/Sources/ResectaApp/Views/BeforeYouRedactSheet.swift
+index ee77fb726..8bd1e53fd 100644
+--- a/Sources/ResectaApp/Views/BeforeYouRedactSheet.swift
++++ b/Sources/ResectaApp/Views/BeforeYouRedactSheet.swift
+@@ -252,7 +252,7 @@ extension BeforeYouRedactSheet {
+         let withOptions = RedactStop.textsNamedWithOptions(shown)
+         var named: [Set<RedactStopUnit>] = []
+         for group in shown { if let units = group.units, !named.contains(units) { named.append(units) } }
+-        let sets: [Set<RedactStopUnit>?] = (shown.contains { $0.units == nil } ? [nil] : []) + named.map { Optional($0) }
++        let sets: [Set<RedactStopUnit>?] = named.map { Optional($0) } + (shown.contains { $0.units == nil } ? [nil] : [])
+         let sections = sets.map { units -> NotSearchedListContent.Section in
+             let groups = shown.filter { $0.units == units }
+             let names = RedactStop.names(of: groups[0], runs: runs)

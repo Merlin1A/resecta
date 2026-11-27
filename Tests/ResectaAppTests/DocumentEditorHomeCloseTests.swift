@@ -197,7 +197,17 @@ struct DocumentEditorHomeCloseTests {
     func parkedSearchWiringSourcePin() throws {
         let home = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorView+Home.swift")
         let parking = try loadRepoFile("Sources/ResectaApp/Views/DocumentEditorView+SheetParking.swift")
-        #expect(parking.contains("parkedEditorSearch = search"), "the park keeps the session")
+        let park = try #require(parking.range(of: "func parkEditorSheet() {"))
+        let parkEnd = try #require(parking.range(of: "\n    }\n", range: park.upperBound..<parking.endIndex))
+        let parkBody = parking[park.upperBound..<parkEnd.lowerBound]
+        #expect(parkBody.contains("Self.parkSearchSession(redactionState,"), "the editor's park keeps the session up")
+        #expect(parkBody.contains("parked: &parkedEditorSearch)"), "in the hub's slot")
+        let keep = try #require(parking.range(of: "static func parkSearchSession("))
+        let keepEnd = try #require(parking.range(of: "\n    }\n", range: keep.upperBound..<parking.endIndex))
+        let keepBody = parking[keep.upperBound..<keepEnd.lowerBound]
+        #expect(keepBody.contains("parked: inout SearchState?"), "the slot is the caller's own")
+        #expect(keepBody.contains("guard let search = redactionState.activeSearch"), "the session kept is the one up")
+        #expect(keepBody.contains("parked = search"), "kept whole, in that slot")
         #expect(parking.contains("func restoreParkedSearchIfNeeded()"))
         #expect(parking.contains("redactionState.activeSearch = parked"), "Cancel re-presents the same session")
         let binding = try #require(home.range(of: "var doneConfirmationPresented: Binding<Bool> {"))

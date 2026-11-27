@@ -440,6 +440,8 @@ with its reason and the mutant that is caught in its place.
 | `search-sheet-text-tier-allow-list-exact.patch` | The Search sheet's grey allow-list is exact: an entry with no line fails. | ResectaAppTests/SearchSheetTextTierTests noSystemGreyOnText |
 | `search-sheet-text-tier-teal.patch` | The Search sheet's own teal words take the teal text tier. | ResectaAppTests/SearchSheetTextTierTests tealWordsUseTheTextTier |
 | `search-not-presented-on-results.patch` | Search is not presented over a run or its results. | ResectaAppTests/DocumentEditorHomeCloseTests sheetSlotPresentsSearchOnlyInItsPhases; ResectaAppTests/DocumentEditorHomeCloseTests searchOutsideItsPhasesMustComeDown; ResectaAppUITests/SheetSlotPhaseUITests testSearchSetOnTheResultsScreenIsNotPresentedAndDoesNotReturn |
+| `home-close-park-to-another-slot.patch` | The editor's park keeps the Search session up in the hub's own slot, where Cancel brings it back from. | ResectaAppTests/DocumentEditorHomeCloseTests parkedSearchWiringSourcePin |
+| `home-close-park-drops-the-session.patch` | The park keeps the session that was up, whole, in the slot it is handed; it is not dropped. | ResectaAppTests/DocumentEditorHomeCloseTests parkedSearchWiringSourcePin |
 | `search-untried-forms-accent-default.patch` | Accents are not folded by default on typed pages, so a name with an accent and the same name without it stay apart unless the Accents option is on. | ResectaAppTests/SearchUntriedFormsTests staysAMiss |
 | `editor-top-banner-precedence.patch` | The editor's band shows the paused notice before the import annotation notice: the places are declared in the band's order. | ResectaAppTests/TopBannerSlotTests occupantForEverySet; ResectaAppTests/TopBannerSlotTests editorsRead |
 | `notice-fold-touching-edges.patch` | A notice meets a page only when they share a point inside both; a notice whose edge touches a page's edge stays open. | ResectaAppTests/NoticeRulesTests meetsOnlyInside; ResectaAppTests/NoticeRulesTests touchingCornerTable |
@@ -780,6 +782,26 @@ with its reason and the mutant that is caught in its place.
 | `redact-stop-pattern-holds-accents.patch` | A pattern's unit holds neither Accents nor digit separators. | ResectaAppTests/RedactStopGroupsTests patternIgnoresAccentsAndDigits |
 | `redact-stop-names-out-of-run-order.patch` | A group names its searches in the order they were first run. | ResectaAppTests/RedactStopGroupsTests namesInRunOrder |
 | `redact-stop-not-reached-cause-when-mixed.patch` | Not reached names how its runs ended only when every one ended that way. | ResectaAppTests/RedactStopGroupsTests notReachedEnding |
+| `redact-stop-rerun-session-drops-recognition.patch` | Search These Pages's session takes the re-run's options, recognition on and any term. | ResectaAppTests/BeforeYouRedactSheetTests reRunSessionByKind |
+| `redact-stop-auto-run-not-consumed.patch` | The one-shot runs once as the sheet appears. | ResectaAppTests/BeforeYouRedactSheetTests autoRunFiresOnce |
+| `redact-stop-search-drops-users-session.patch` | Search These Pages keeps the user's own session the stop parked; only a run drops it. | ResectaAppTests/BeforeYouRedactSheetTests searchThesePagesKeepsTheUsersSession |
+| `redact-stop-session-back-under-the-rerun.patch` | The session the stop parked comes back only when no Search holds the slot. | ResectaAppTests/BeforeYouRedactSheetTests searchThesePagesKeepsTheUsersSession |
+| `redact-stop-park-answers-the-stop.patch` | The stop's case arriving parks the Search session that is up, whole; the session is never left in the slot under the stop. | ResectaAppTests/BeforeYouRedactSheetTests theStopParksTheUsersSessionThroughSearchThesePages; ResectaAppTests/BeforeYouRedactSheetTests cancelBringsTheParkedSessionBack |
+| `redact-stop-session-back-under-the-stop.patch` | Nothing the stop parked comes back while the stop is up: the Search sheet taken down for it is dismissed under it. | ResectaAppTests/BeforeYouRedactSheetTests searchThesePagesKeepsTheUsersSession; ResectaAppTests/BeforeYouRedactSheetTests theStopParksTheUsersSessionThroughSearchThesePages |
+| `redact-stop-shows-pages-not-in-its-case.patch` | The stop shows only the pages and reasons its case carries. | ResectaAppTests/BeforeYouRedactSheetTests showsOnlyTheCasesPages; ResectaAppTests/BeforeYouRedactSheetTests offersOnlyForAShownGroup |
+| `redact-stop-named-section-first.patch` | The stop's section with no name comes first. | ResectaAppTests/BeforeYouRedactSheetTests sectionsBySearches |
+| `redact-stop-offers-for-a-group-not-shown.patch` | Search These Pages is offered only for a group the stop shows. | ResectaAppTests/BeforeYouRedactSheetTests offersOnlyForAShownGroup |
+| `stop-sheet-swipe-is-cancel.patch` | The stop swiped down is its Cancel, never Redact Anyway. | ResectaAppTests/BeforeYouRedactSheetTests answers |
+| `redact-stop-redact-anyway-teal.patch` | Exactly one capsule is teal, and it is never Redact Anyway. | ResectaAppTests/BeforeYouRedactSheetTests oneTealCapsule |
+| `redact-stop-shown-over-an-unparked-search.patch` | The stop is shown only once no Search session holds the slot: a session up when its case arrives is parked first. | ResectaAppTests/BeforeYouRedactSheetTests stopTakesTheSlotFirst |
+| `redact-stop-go-to-page-records.patch` | Go to page answers nothing. | ResectaAppTests/BeforeYouRedactSheetTests cancelAndGoToPageRecordNothing |
+| `redact-stop-shows-in-every-phase.patch` | The slot shows the stop only while editing. | ResectaAppTests/BeforeYouRedactSheetTests onlyWhileEditing |
+| `redact-stop-not-presenting.patch` | The editor counts the stop as presenting. | ResectaAppTests/BeforeYouRedactSheetTests stopCountsAsPresenting |
+| `redact-stop-no-capture-cover.patch` | The stop sheet carries the capture cover. | ResectaAppTests/BeforeYouRedactSheetTests carriesTheCaptureCover |
+| `redact-stop-drop-door-asks.patch` | A drop over the stop at Redact is refused, not asked. | ResectaAppTests/DropReplaceConfirmTests stopUpRefuses |
+| `redact-stop-drop-names-dismiss.patch` | A drop refused over the stop names its Cancel. | ResectaAppTests/DropReplaceConfirmTests stopRefusalNamesCancel; ResectaAppTests/DropReplaceConfirmTests stopUpRefuses |
+| `redact-stop-words-cause-when-ended-apart.patch` | Not reached names no cause when its searches ended in different ways. | ResectaAppTests/BeforeYouRedactSheetTests notReachedRows |
+| `redact-stop-words-pages-as-a-list.patch` | The stop's pages follow the strings table's range rule. | ResectaAppTests/BeforeYouRedactSheetTests notReachedRows |
 | `search-run-replaced-report-commented-out.patch` | The run's replaced-run report is installed in code, not only quoted in a comment. | ResectaAppTests/SearchRunLogTests runInstallsTheReplacedReport |
 | `run-log-named-in-a-log-line.patch` | No log line names the run log, the answered set or their types. | ResectaAppTests/RunLogStaysInMemoryTests noLogLineNamesThem() |
 | `preview-kept-plan-ignores-the-cap.patch` | A drawn page's plan is kept at the run's quality, under the run's cap. | ResectaAppTests/OverlayDrawnPlanTests keptPlanReadsTheCap |

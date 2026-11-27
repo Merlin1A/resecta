@@ -1,0 +1,19 @@
+Property: The stop is shown only once no Search session holds the slot: a session up when its case arrives is parked first.
+Area: the stop at Redact
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BeforeYouRedactSheetTests
+Must go red: ResectaAppTests/BeforeYouRedactSheetTests stopTakesTheSlotFirst
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/DocumentEditorView+BeforeRedact.swift b/Sources/ResectaApp/Views/DocumentEditorView+BeforeRedact.swift
+index 7bdb205f7..0e5e3a35a 100644
+--- a/Sources/ResectaApp/Views/DocumentEditorView+BeforeRedact.swift
++++ b/Sources/ResectaApp/Views/DocumentEditorView+BeforeRedact.swift
+@@ -30,7 +30,7 @@ extension DocumentEditorView {
+     /// present it; then the canvas rationale.
+     static func slotItem(stopUp: Bool, activeSearch: SearchState?, mayPresentSearch: Bool,
+                          rationale: UUID?) -> ActiveSheet? {
+-        if stopUp, activeSearch == nil { return .beforeRedact }
++        if stopUp { return .beforeRedact }
+         if let activeSearch, mayPresentSearch { return .search(activeSearch) }
+         if let rationale { return .rationale(rationale) }
+         return nil

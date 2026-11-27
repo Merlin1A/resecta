@@ -1,0 +1,19 @@
+Property: The stop shows only the pages and reasons its case carries.
+Area: the stop at Redact
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BeforeYouRedactSheetTests
+Must go red: ResectaAppTests/BeforeYouRedactSheetTests showsOnlyTheCasesPages; ResectaAppTests/BeforeYouRedactSheetTests offersOnlyForAShownGroup
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/BeforeYouRedactSheet.swift b/Sources/ResectaApp/Views/BeforeYouRedactSheet.swift
+index ee77fb726..4662fe16e 100644
+--- a/Sources/ResectaApp/Views/BeforeYouRedactSheet.swift
++++ b/Sources/ResectaApp/Views/BeforeYouRedactSheet.swift
+@@ -244,7 +244,7 @@ extension BeforeYouRedactSheet {
+                      answered: Set<RedactStop.Page>, words: BeforeYouRedactWords) -> BeforeYouRedactStop {
+         var shown: [RedactStop.Group] = []
+         for group in RedactStop.groups(runs: runs, answered: answered) {
+-            let pages = group.pages.filter { casePages.contains(RedactStop.Page(page: $0, reason: group.reason)) }
++            let pages = group.pages
+             guard !pages.isEmpty else { continue }
+             shown.append(RedactStop.Group(reason: group.reason, units: group.units, pages: pages,
+                                           notReachedEnding: group.notReachedEnding))

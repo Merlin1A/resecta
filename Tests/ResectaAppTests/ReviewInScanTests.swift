@@ -21,14 +21,14 @@ struct ReviewInScanTests {
         VerificationResultsView.reviewInScan(documentState: documentState, redactionState: redactionState)
         #expect(documentState.phaseKind == .editing)
         #expect(redactionState.activeSearch?.searchModeType == .piiScan)
-        #expect(redactionState.activeSearch?.pendingAutoRunScan == true)
+        #expect(redactionState.activeSearch?.pendingAutoRun == .piiScan)
     }
 
     @Test("The Scan session is the detectors' scan, armed to run once")
     func scanSession() {
         let session = SearchState.scanSession()
         #expect(session.searchModeType == .piiScan)
-        #expect(session.pendingAutoRunScan)
+        #expect(session.pendingAutoRun == .piiScan)
     }
 
     @Test("Offered only on a Detection Sweep row that reports possible items remaining")
