@@ -428,6 +428,10 @@ nonisolated final class EditorChromeUITests: XCTestCase {
     /// sliding in.
     private struct BottomReading {
         let message: CGRect
+        /// The receipt's words alone. The capsule keeps its one-line
+        /// height while the words still fit beside Undo, so only the
+        /// words show that a text size took.
+        let words: CGRect
         let bar: CGRect
         /// The gap between the message's foot and the top of the bar's glass.
         var gap: CGFloat { (bar.minY - EditorChromeUITests.pageBarTopPadding) - message.maxY }
@@ -449,8 +453,10 @@ nonisolated final class EditorChromeUITests: XCTestCase {
             if next == frame { break }
             frame = next
         }
-        let read = BottomReading(message: frame, bar: bar.frame)
-        let reading = XCTAttachment(string: "gap \(read.gap) pt; message \(read.message); page bar \(read.bar)")
+        let words = message.staticTexts["Deleted 2 regions."]
+        XCTAssertTrue(words.exists, "The receipt's words are missing.")
+        let read = BottomReading(message: frame, words: words.frame, bar: bar.frame)
+        let reading = XCTAttachment(string: "gap \(read.gap) pt; message \(read.message); words \(read.words); page bar \(read.bar)")
         reading.name = "\(name)-gap"
         reading.lifetime = .keepAlways
         add(reading)
@@ -505,16 +511,16 @@ nonisolated final class EditorChromeUITests: XCTestCase {
     /// The same reading at the default text size, then at `textSize`. The
     /// counter's tappable height is floored to the touch target, so its own
     /// height no longer tells one line from two; the default reading is the
-    /// measure instead. The message is taller than at the default size, or
-    /// the size name was ignored (the system says nothing).
+    /// measure instead. The receipt's words are taller than at the default
+    /// size, or the size name was ignored (the system says nothing).
     private func readBottomAgainstTheDefault(textSize: String, _ name: String) -> (base: BottomReading, sized: BottomReading) {
         launchEditor(textSize: nil)
         let base = readBottom("\(name)-default")
         app.terminate()
         launchEditor(textSize: textSize)
         let sized = readBottom(name)
-        XCTAssertGreaterThan(sized.message.height, base.message.height + 1,
-                             "The text size did not take: the message is \(sized.message.height) pt tall, \(base.message.height) pt at the default size.")
+        XCTAssertGreaterThan(sized.words.height, base.words.height + 1,
+                             "The text size did not take: the message's words are \(sized.words.height) pt tall, \(base.words.height) pt at the default size.")
         return (base, sized)
     }
 
