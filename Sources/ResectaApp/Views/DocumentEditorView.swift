@@ -125,7 +125,7 @@ struct DocumentEditorView: View {
     /// rationale is enforced by the binding's getter so two
     /// near-simultaneous transitions in the same runloop tick can't drop a
     /// sheet silently.
-    private enum ActiveSheet: Identifiable {
+    enum ActiveSheet: Identifiable {
         case search(SearchState)
         case rationale(UUID)
         /// The stop at Redact, first of all when its case awaits an answer.
@@ -324,16 +324,9 @@ struct DocumentEditorView: View {
         // the session down at the Apply seam (`runFullPipeline`).
         .sheet(item: Binding<ActiveSheet?>(
             get: {
-                // A session still up when the stop's case arrives is parked first, so its teardown never runs.
-                if sheetSlotShowsStop, redactionState.activeSearch == nil { return .beforeRedact }
-                if let searchState = redactionState.activeSearch,
-                   Self.sheetSlotMayPresentSearch(in: documentState.phaseKind) {
-                    return .search(searchState)
-                }
-                if let regionID = redactionState.pendingCanvasRationaleRequest {
-                    return .rationale(regionID)
-                }
-                return nil
+                Self.slotItem(stopUp: sheetSlotShowsStop, activeSearch: redactionState.activeSearch,
+                              mayPresentSearch: Self.sheetSlotMayPresentSearch(in: documentState.phaseKind),
+                              rationale: redactionState.pendingCanvasRationaleRequest)
             },
             set: { newValue in
                 if newValue == nil {

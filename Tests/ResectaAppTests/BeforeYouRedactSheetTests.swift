@@ -145,11 +145,69 @@ struct BeforeYouRedactSheetTests {
         #expect(!DocumentEditorView.stopAnswerDropsParkedSearch(.searchThesePages(Self.reRun)))
         #expect(!DocumentEditorView.stopAnswerDropsParkedSearch(.cancel))
         // The re-run's session holds the slot: the user's waits.
-        #expect(!DocumentEditorView.handOffRestores(stopParkedSearch: true, searchUp: true, homeWaits: false, settingsWaits: false))
+        #expect(!DocumentEditorView.handOffRestores(stopParkedSearch: true, stopUp: false, searchUp: true, homeWaits: false, settingsWaits: false))
         // The re-run's session closed: the user's comes back.
-        #expect(DocumentEditorView.handOffRestores(stopParkedSearch: true, searchUp: false, homeWaits: false, settingsWaits: false))
-        #expect(!DocumentEditorView.handOffRestores(stopParkedSearch: true, searchUp: false, homeWaits: true, settingsWaits: false))
-        #expect(!DocumentEditorView.handOffRestores(stopParkedSearch: false, searchUp: false, homeWaits: false, settingsWaits: false))
+        #expect(DocumentEditorView.handOffRestores(stopParkedSearch: true, stopUp: false, searchUp: false, homeWaits: false, settingsWaits: false))
+        #expect(!DocumentEditorView.handOffRestores(stopParkedSearch: true, stopUp: false, searchUp: false, homeWaits: true, settingsWaits: false))
+        #expect(!DocumentEditorView.handOffRestores(stopParkedSearch: false, stopUp: false, searchUp: false, homeWaits: false, settingsWaits: false))
+        // The stop still up: the Search sheet taken down for it is dismissed under it, and nothing comes back.
+        #expect(!DocumentEditorView.handOffRestores(stopParkedSearch: true, stopUp: true, searchUp: false, homeWaits: false, settingsWaits: false))
+    }
+
+    @Test("The stop's case arriving with Search up parks the user's own session whole; the Search sheet's dismissal under the stop keeps it parked; Search These Pages keeps it until the re-run's session closes, and then it comes back")
+    func theStopParksTheUsersSessionThroughSearchThesePages() {
+        let redactionState = RedactionState()
+        let users = SearchState()
+        let document = UUID()
+        redactionState.activeSearch = users
+        var parked: SearchState?
+        var stopParked = false
+        // The case arrives with the user's session up: parked whole, out of the slot, and the stop is shown.
+        DocumentEditorView.parkSearchForStop(stopUp: true, redactionState: redactionState, document: document,
+                                             parked: &parked, stopParked: &stopParked)
+        #expect(parked === users)
+        #expect(stopParked)
+        #expect(redactionState.activeSearch == nil)
+        #expect(users.parkedForHomeClose && users.parkedDocument == document)
+        #expect(DocumentEditorView.slotItem(stopUp: true, activeSearch: redactionState.activeSearch,
+                                            mayPresentSearch: true, rationale: nil)?.id == "before-redact")
+        // The Search sheet's dismissal, with the stop up: the session stays parked.
+        #expect(!DocumentEditorView.handOffAfterStop(stopUp: true, redactionState: redactionState, homeWaits: false,
+                                                     settingsWaits: false, stopParked: &stopParked))
+        #expect(stopParked && parked === users)
+        // Search These Pages: the stop goes down and the re-run's session holds the slot; the user's waits.
+        redactionState.activeSearch = SearchState.reRunSession(for: Self.reRun)
+        #expect(!DocumentEditorView.handOffAfterStop(stopUp: false, redactionState: redactionState, homeWaits: false,
+                                                     settingsWaits: false, stopParked: &stopParked))
+        #expect(stopParked && parked === users)
+        // The re-run's session closed: the user's comes back.
+        redactionState.activeSearch = nil
+        #expect(DocumentEditorView.handOffAfterStop(stopUp: false, redactionState: redactionState, homeWaits: false,
+                                                    settingsWaits: false, stopParked: &stopParked))
+        #expect(!stopParked)
+    }
+
+    @Test("Cancel with the user's session parked for the stop, and nothing else waiting for the slot: the session comes back; with no stop up nothing is parked")
+    func cancelBringsTheParkedSessionBack() {
+        let redactionState = RedactionState()
+        let users = SearchState()
+        redactionState.activeSearch = users
+        var parked: SearchState?
+        var stopParked = false
+        // No stop up: the park for the stop leaves the session where it is.
+        DocumentEditorView.parkSearchForStop(stopUp: false, redactionState: redactionState, document: UUID(),
+                                             parked: &parked, stopParked: &stopParked)
+        #expect(parked == nil && !stopParked && redactionState.activeSearch === users)
+        DocumentEditorView.parkSearchForStop(stopUp: true, redactionState: redactionState, document: UUID(),
+                                             parked: &parked, stopParked: &stopParked)
+        #expect(parked === users && stopParked)
+        // Home's dialog waiting for the slot keeps it parked for Home.
+        #expect(!DocumentEditorView.handOffAfterStop(stopUp: false, redactionState: redactionState, homeWaits: true,
+                                                     settingsWaits: false, stopParked: &stopParked))
+        // Cancel, nothing waiting: it comes back.
+        #expect(DocumentEditorView.handOffAfterStop(stopUp: false, redactionState: redactionState, homeWaits: false,
+                                                    settingsWaits: false, stopParked: &stopParked))
+        #expect(!stopParked)
     }
 
     /// Hand words: the name line lists the texts; a row names its reason and pages.
@@ -288,11 +346,24 @@ struct BeforeYouRedactSheetTests {
     @Test("The stop takes the slot ahead of Search and the canvas rationale")
     func stopTakesTheSlotFirst() throws {
         let text = try Self.source("Sources/ResectaApp/Views/DocumentEditorView.swift")
+        let search = SearchState(), region = UUID()
+        // The stop first: ahead of the canvas rationale.
+        #expect(DocumentEditorView.slotItem(stopUp: true, activeSearch: nil, mayPresentSearch: true,
+                                            rationale: region)?.id == "before-redact")
+        // A session not yet parked holds the slot: the stop waits for the park, so the session's teardown never runs.
+        #expect(DocumentEditorView.slotItem(stopUp: true, activeSearch: search, mayPresentSearch: true,
+                                            rationale: nil)?.id == "search-\(search.id)")
+        #expect(DocumentEditorView.slotItem(stopUp: false, activeSearch: search, mayPresentSearch: true,
+                                            rationale: region)?.id == "search-\(search.id)")
+        #expect(DocumentEditorView.slotItem(stopUp: false, activeSearch: nil, mayPresentSearch: true,
+                                            rationale: region)?.id == "rationale-\(region)")
+        #expect(DocumentEditorView.slotItem(stopUp: false, activeSearch: search, mayPresentSearch: false,
+                                            rationale: nil) == nil)
+        // The slot's getter is that rule.
         let get = try #require(Self.offset(of: "get: {", in: text))
-        let stop = try #require(Self.offset(of: "if sheetSlotShowsStop, redactionState.activeSearch == nil { return .beforeRedact }", in: text, from: get))
-        let search = try #require(Self.offset(of: "if let searchState = redactionState.activeSearch", in: text, from: get))
-        #expect(stop < search)
+        let rule = try #require(Self.offset(of: "Self.slotItem(stopUp: sheetSlotShowsStop", in: text, from: get))
         let set = try #require(Self.offset(of: "set: { newValue in", in: text))
+        #expect(rule < set)
         let swipe = try #require(Self.offset(of: "answerStop(.swipedDown)", in: text, from: set))
         let session = try #require(Self.offset(of: "if let session = redactionState.activeSearch", in: text, from: set))
         #expect(swipe < session)

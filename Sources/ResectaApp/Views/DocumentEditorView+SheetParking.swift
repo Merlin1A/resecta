@@ -83,14 +83,25 @@ extension DocumentEditorView {
             stopParkedSearch = false
             Self.applyStopAnswer(.cancel, documentState: documentState, redactionState: redactionState,
                                  coordinator: coordinator, documentOverride: documentOverride)
-        } else if let search = redactionState.activeSearch {
-            search.parkedForHomeClose = true
-            search.parkedDocument = documentState.sourceDocumentToken
-            parkedEditorSearch = search
-            redactionState.activeSearch = nil
+        } else if redactionState.activeSearch != nil {
+            _ = Self.parkSearchSession(redactionState, document: documentState.sourceDocumentToken,
+                                       parked: &parkedEditorSearch)
         } else if redactionState.pendingCanvasRationaleRequest != nil {
             redactionState.pendingCanvasRationaleRequest = nil
         }
+    }
+
+    /// Park the Search session that is up, whole: kept in `parked`, its
+    /// results and selections intact, flagged so the sheet's teardown spares
+    /// it, and taken out of the slot. False when no session is up.
+    static func parkSearchSession(_ redactionState: RedactionState, document: UUID,
+                                  parked: inout SearchState?) -> Bool {
+        guard let search = redactionState.activeSearch else { return false }
+        search.parkedForHomeClose = true
+        search.parkedDocument = document
+        parked = search
+        redactionState.activeSearch = nil
+        return true
     }
 
     /// Re-present a search session parked for the dialog when it went down
