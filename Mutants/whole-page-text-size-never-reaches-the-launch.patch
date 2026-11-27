@@ -5,13 +5,13 @@ Must go red: ResectaAppUITests/EditorChromeUITests testWholePageControl_atTheLar
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Tests/ResectaAppUITests/EditorChromeUITests.swift b/Tests/ResectaAppUITests/EditorChromeUITests.swift
-index efa21d06..014e082f 100644
+index 8655af229..27c5760b1 100644
 --- a/Tests/ResectaAppUITests/EditorChromeUITests.swift
 +++ b/Tests/ResectaAppUITests/EditorChromeUITests.swift
-@@ -98,7 +98,7 @@ nonisolated final class EditorChromeUITests: XCTestCase {
- 
-     private func launchEditorForWholePage(textSize: String?) {
+@@ -101,7 +101,7 @@ nonisolated final class EditorChromeUITests: XCTestCase {
+     private func launchEditorForWholePage(textSize: String?, withMessage: Bool = false) {
          var arguments = ["--uitesting", "--loadTestDocument", "--multipageDoc"]
+         if withMessage { arguments.append("--showToast=selectionLimit") }
 -        if let textSize { arguments += ["-UIPreferredContentSizeCategoryName", textSize] }
 +        _ = textSize  // mutant: the size name never reaches the launch
          app.launchArguments = arguments
