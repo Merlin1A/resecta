@@ -14,17 +14,11 @@ extension RedactionOverlayView {
         // Clip to dirty rect for performance with many regions.
         ctx.clip(to: rect)
 
-        // The segments live in `RedactionOverlayView+Draw.swift`, drawn
-        // in the order this body always drew them: the committed
-        // regions, the search layer, the snap chrome, the in-progress
-        // shapes.
+        // The segments live in `RedactionOverlayView+Draw.swift`. This
+        // bitmap holds the committed regions only; the passes drawn after
+        // them (the search layer, the snap chrome, the in-progress shapes)
+        // are drawn, in that order, by the top canvas above it
+        // (`OverlayTopCanvas`).
         drawCommittedRegions(ctx: ctx, in: rect)
-
-        drawSearchLayer(ctx: ctx, in: rect)
-
-        // Draw active snap guide lines
-        drawSnapGuides(ctx: ctx)
-
-        drawInProgressShapes(ctx: ctx)
     }
 }
