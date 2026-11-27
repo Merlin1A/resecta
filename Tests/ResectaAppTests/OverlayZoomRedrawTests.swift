@@ -84,14 +84,16 @@ struct OverlayZoomRedrawTests {
     func markedOnScaleChange() async throws {
         let m = mounted()
         let overlay = try overlay(m, page: 0)
-        overlay.layer.displayIfNeeded()
-        #expect(!overlay.layer.needsDisplay())
+        Self.flush(overlay)
+        let passes = overlay.drawPassCount, boxPasses = overlay.boxLayers.boxPassCount
         let before = overlay.zoomChangedCount
 
         postScaleChange(m)
         await settle(until: { overlay.zoomChangedCount > before })
         await idle()
-        #expect(overlay.layer.needsDisplay())
+        Self.flush(overlay)
+        #expect(overlay.drawPassCount > passes, "the top canvas was marked and drawn")
+        #expect(overlay.boxLayers.boxPassCount > boxPasses, "the boxes' layers were asked for a pass")
         #expect(overlay.zoomChangedCount == before + 1)
     }
 

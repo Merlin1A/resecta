@@ -35,8 +35,10 @@ struct OverlayTopCanvasTests {
     func setNeedsDisplayReachesTheCanvas() throws {
         let (window, overlay, canvas) = try hostedOverlay()
         #expect(canvas.layer.needsDisplay() == false, "precondition: the canvas was drawn")
+        overlay.boxLayers.root.layoutIfNeeded()
+        #expect(!overlay.boxLayers.isPassPending, "precondition: the boxes' layers were applied")
         overlay.setNeedsDisplay()
-        #expect(overlay.layer.needsDisplay())
+        #expect(overlay.boxLayers.isPassPending, "and asks the boxes' layers for a pass")
         #expect(canvas.layer.needsDisplay())
         withExtendedLifetime(window) {}
     }

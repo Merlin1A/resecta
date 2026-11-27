@@ -564,20 +564,20 @@ extension ScreenLinkTests {
         c.coordinator.noteDrawn(pageIndex: 0, regions: [word])
         #expect(c.state.drawnPlans[0]?.exportDPI == 300)
 
-        c.overlay.layer.displayIfNeeded()
-        try #require(!c.overlay.layer.needsDisplay())
+        c.overlay.boxLayers.root.layoutIfNeeded()
+        try #require(!c.overlay.boxLayers.isPassPending)
         settings.exportDPI = 150
         c.coordinator.chosenQuality = 150
         #expect(c.state.drawnPlans[0]?.exportDPI == 150, "the setting's change keeps the plan at 150")
-        #expect(c.overlay.layer.needsDisplay(), "the setting's change marks the canvas")
+        #expect(c.overlay.boxLayers.isPassPending, "the setting's change marks the canvas")
 
         settings.exportDPI = 300
         c.coordinator.chosenQuality = 300
-        c.overlay.layer.displayIfNeeded()
-        try #require(!c.overlay.layer.needsDisplay())
+        c.overlay.boxLayers.root.layoutIfNeeded()
+        try #require(!c.overlay.boxLayers.isPassPending)
         c.coordinator.qualityCap = 150
         #expect(c.state.drawnPlans[0]?.exportDPI == 150, "the memory warning's cap keeps the plan at 150")
-        #expect(c.overlay.layer.needsDisplay(), "the memory warning's cap marks the canvas")
+        #expect(c.overlay.boxLayers.isPassPending, "the memory warning's cap marks the canvas")
         withExtendedLifetime((c.coordinator, c.window)) {}
     }
 

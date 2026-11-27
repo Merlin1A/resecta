@@ -105,6 +105,10 @@ struct BoxLayerHostTests {
             window.addSubview(overlay)
             window.isHidden = false
         }
+        // The handles' scale animation, run to its end, so a pass shows them.
+        let target: CGFloat = selected.count == 1 ? 1 : 0
+        let end = Date().addingTimeInterval(2)
+        while overlay.handleScale != target, Date() < end { RunLoop.main.run(until: Date().addingTimeInterval(0.02)) }
         let canvas = Canvas(window: window, overlay: overlay, coordinator: coordinator, state: state)
         canvas.flush()
         return canvas
@@ -298,27 +302,54 @@ struct BoxLayerHostTests {
         withExtendedLifetime(c.window) {}
     }
 
-    @Test("c9: a move that breaks a join applies the other member's keys on that touch")
+    /// The overlay's own pass, with the plan boxes it is given in place of
+    /// the kept plan's.
+    @MainActor
+    final class ScriptedPlanSource: BoxLayerSource {
+        let overlay: RedactionOverlayView
+        var planBoxes: [DrawnPlan.Box]
+        init(_ overlay: RedactionOverlayView, planBoxes: [DrawnPlan.Box]) {
+            self.overlay = overlay
+            self.planBoxes = planBoxes
+        }
+        func boxLayerPass(toDevice: CGAffineTransform) -> BoxLayerPass {
+            var pass = overlay.boxLayerPass(toDevice: toDevice)
+            pass.planBoxes = planBoxes
+            return pass
+        }
+    }
+
+    @Test("c9: a touch on which another box's plan box changes, as when a join breaks, applies that box's keys on that touch")
     func breakingAJoinAppliesTheOther() throws {
-        let a = Self.region(CGRect(x: 80, y: 200, width: 160, height: 100))
-        let b = Self.region(CGRect(x: 220, y: 200, width: 160, height: 100))
+        // The canvas's plan reads no page text, so no plan box on it holds
+        // two regions; the change a broken join makes to the other member's
+        // plan box is given by a scripted source.
+        let a = Self.region(CGRect(x: 80, y: 120, width: 200, height: 120))
+        let b = Self.region(CGRect(x: 80, y: 560, width: 200, height: 100))
         let c = try Self.placed([a, b], selected: [a.id], suite: "BoxLayerHostTests.c9")
-        let plan = try #require(c.state.drawnPlans[0])
-        let joined = plan.boxes.contains { $0.regionIDs == [a.id, b.id] }
-        try #require(joined, "precondition: the two overlapping boxes share one plan box")
-        let start = CGPoint(x: 120, y: 250)
-        let touch = StubTouch(location: start, view: c.overlay)
-        c.overlay.touchesBegan([touch], with: nil)
-        touch.move(to: CGPoint(x: start.x, y: start.y + 200))
-        c.overlay.touchesMoved([touch], with: nil)
+        let kept = try #require(c.state.drawnPlans[0]).boxes
+        var shifted = b
+        shifted.normalizedRect = b.normalizedRect.offsetBy(dx: 0.05, dy: 0)
+        c.coordinator.noteDrawn(pageIndex: 0, regions: [a, shifted])
+        let changed = try #require(c.state.drawnPlans[0]).boxes
+        let before = kept.first { $0.regionIDs.contains(b.id) }, after = changed.first { $0.regionIDs.contains(b.id) }
+        try #require(before != nil && after != nil && before != after, "precondition: the other box's plan box changed")
+        try #require(kept.first { $0.regionIDs.contains(a.id) } == changed.first { $0.regionIDs.contains(a.id) })
+        let source = ScriptedPlanSource(c.overlay, planBoxes: kept)
+        c.host.source = source
+        c.host.mark(.keys([a.id.uuidString]))
         c.flush()
-        let apart = try #require(c.state.drawnPlans[0])
-        let split = apart.boxes.contains { $0.regionIDs == [b.id] }
-        try #require(split, "precondition: the move broke the join")
+        #expect(Self.ids(c.host.lastAppliedKeys) == [a.id.uuidString], "precondition: the touched box's keys alone")
+        source.planBoxes = changed
+        c.host.mark(.keys([a.id.uuidString]))
+        c.flush()
         let applied = Self.ids(c.host.lastAppliedKeys)
-        #expect(applied.contains(b.id.uuidString), "the other member's keys were applied on the touch")
-        c.overlay.touchesCancelled([touch], with: nil)
-        withExtendedLifetime(c.window) {}
+        #expect(applied.contains(b.id.uuidString), "the other box's keys were applied on the touch, not only \(applied)")
+        c.host.mark(.keys([a.id.uuidString]))
+        c.flush()
+        #expect(Self.ids(c.host.lastAppliedKeys) == [a.id.uuidString], "with its plan box unchanged, the touched box's keys alone")
+        c.host.source = c.overlay
+        withExtendedLifetime((c.window, source)) {}
     }
 
     // MARK: - c10 to c15: groups, settings, windows
