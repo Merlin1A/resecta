@@ -131,6 +131,49 @@ struct PerPageRetryTests {
         #expect(history.last?.dpiCap == 150)
     }
 
+    // MARK: - retryKeepsTheJoin
+
+    @Test("A page shown at 200 whose first render fails its fill check: the retry at 150 holds the join",
+          .timeLimit(.minutes(1)))
+    func retryKeepsTheJoin() async throws {
+        let coord = makeCoordinatorWithMultiPagePDF(pages: 1, regions: false)
+        let doc = try #require(coord.documentState.sourceDocument)
+        // Twelve boxes with edges off the pixel grid: at 150 against 200 on
+        // this page most boxes' own fill falls short of what 200 showed.
+        coord.redactionState.regions[0] = (0..<12).map { i in
+            RedactionRegion(id: UUID(),
+                            normalizedRect: CGRect(x: 0.05 + 0.0711 * Double(i % 4), y: 0.1 + 0.0713 * Double(i),
+                                                   width: 0.1931 + 0.0017 * Double(i), height: 0.0219),
+                            source: .manual)
+        }
+        func pageData(shownDPI: Int?) throws -> PDFPageData {
+            let record = RunInputs.confirmedRecord(
+                pageCount: 1, geometry: RunInputs.pageGeometry(of: doc),
+                shownDPIs: shownDPI.map { [0: $0] } ?? [:], regions: coord.redactionState.regions, reads: [:],
+                settings: .snapshot(from: coord.settingsState))
+            return try #require(coord.buildPDFPageData(effectiveMode: .secureRasterization, record: record).first)
+        }
+        let shown = try pageData(shownDPI: 200)
+        #expect(shown.confirmedPage?.shownDPI == 200)
+
+        let recorder = PageRasterizerTestSeam.Recorder(simulatedVerifyFailures: [shown.pageIndex])
+        var retried: RasterizeResult?
+        try await PageRasterizerTestSeam.withActivated(recorder) {
+            retried = try await coord.rasterizeWithRetry(shown, rasterizer: PageRasterizer(), primaryDPICap: 300)
+        }
+        #expect(recorder.dpiCapHistory.last?.dpiCap == 150, "the retry ran at 150")
+        let image = try #require(retried?.pageOutput.image)
+
+        // The same page painted at 150 straight away, with the shown quality
+        // and without it.
+        let direct = try await PageRasterizer().rasterize(shown, dpiCap: 150).pageOutput.image
+        let unjoined = try await PageRasterizer().rasterize(try pageData(shownDPI: nil), dpiCap: 150).pageOutput.image
+        func bytes(_ image: CGImage) -> Data? { image.dataProvider?.data as Data? }
+        #expect(image.width == direct.width && image.height == direct.height)
+        #expect(bytes(image) == bytes(direct), "the retry paints the join, as a render at 150 with the shown quality does")
+        #expect(bytes(direct) != bytes(unjoined), "precondition: on this page the join changes the paint at 150")
+    }
+
     // MARK: - Helpers
 
     /// Build a coordinator backed by a multi-page PDF with a small redaction

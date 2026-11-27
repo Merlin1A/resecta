@@ -1,0 +1,18 @@
+Property: The run's entry records each page's shown quality as the editor last drew it, kept apart from the plans.
+Area: the run never paints less than was shown (the run entry)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/ShownQualityAtRunEntryTests
+Must go red: ResectaAppTests/ShownQualityAtRunEntryTests shownQualityComesFromWhatWasDrawn(); ResectaAppTests/ShownQualityAtRunEntryTests shownQualityIsNotThePlans()
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/PipelineRunner.swift b/Sources/ResectaApp/State/PipelineRunner.swift
+--- a/Sources/ResectaApp/State/PipelineRunner.swift
++++ b/Sources/ResectaApp/State/PipelineRunner.swift
+@@ -317,7 +317,7 @@
+             // (a page changed while off screen still holds boxes the person
+             // saw at it), kept apart from the plans: a change of the cap
+             // makes an off-screen page's plan again but does not move it.
+-            shownDPIs: redactionState.shownDPIs,
++            shownDPIs: [:],
+             regions: redactionState.regions, reads: coordinator.documentState.pageReads, settings: runSettings)
+         // A box the release cannot apply as planned refuses the run here,
+         // before any page is built or rasterised.

@@ -5,15 +5,15 @@ Must go red: RedactionEngineTests/RunPlanKeptTests keptPlanIsAsPlaced; Redaction
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
-index 201ef8fb..204feab4 100644
+index f524870db..b9d0a8c49 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
-@@ -94,7 +94,7 @@ public struct RunRecord: Equatable, Sendable {
+@@ -101,7 +101,7 @@ public struct RunRecord: Equatable, Sendable {
          public init(pageIndex: Int, regions: [DrawnRegion], cropBox: CGSize, rotation: Int, switchOn: Bool,
-                     read: PageRead? = nil) {
+                     read: PageRead? = nil, shownDPI: Int? = nil) {
              self.init(pageIndex: pageIndex, regions: regions, cropBox: cropBox, rotation: rotation, switchOn: switchOn,
--                      read: read, source: RunRecord.planSource)
-+                      read: read, source: .switchPolicy)
+-                      read: read, source: RunRecord.planSource, shownDPI: shownDPI)
++                      read: read, source: .switchPolicy, shownDPI: shownDPI)
          }
  
          /// The same page under a plan source given here: the run passes its

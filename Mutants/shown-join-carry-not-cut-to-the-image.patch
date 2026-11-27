@@ -1,0 +1,25 @@
+Property: The carried rectangle is cut to the run's image.
+Area: the run never paints less than was shown
+Test command: cd Packages/RedactionEngine && swift test --skip-build --no-parallel --filter 'ShownJoinTests' (after swift build --build-tests)
+Must go red: RedactionEngineTests/ShownJoinTests carriedHoldsTheShownRectangle
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PixelPlan.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PixelPlan.swift
+index 95a3b63ca..4ac7b73c0 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PixelPlan.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PixelPlan.swift
+@@ -171,10 +171,10 @@ package enum PixelPlan {
+         }
+         let d = raster.dpi
+         return PixelRect(
+-            minX: clipX(floorDiv(rect.minX * d, shownDPI)),
+-            minY: clipY(floorDiv(rect.minY * d, shownDPI)),
+-            maxX: clipX(ceilDiv(rect.maxX * d, shownDPI)),
+-            maxY: clipY(ceilDiv(rect.maxY * d, shownDPI))
++            minX: floorDiv(rect.minX * d, shownDPI),
++            minY: floorDiv(rect.minY * d, shownDPI),
++            maxX: ceilDiv(rect.maxX * d, shownDPI),
++            maxY: ceilDiv(rect.maxY * d, shownDPI)
+         )
+     }
+ }

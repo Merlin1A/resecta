@@ -72,6 +72,13 @@ public struct RunRecord: Equatable, Sendable {
         /// The page's crop box and rotation as they were when its boxes were
         /// stored. Nil when none was noted.
         public let geometryAtStore: RunRecord.PageGeometry?
+        /// The quality the page was last drawn at in the editor, in dots per
+        /// inch, kept apart from the editor's plans: it moves only when the
+        /// page is drawn, whatever its version. Nil when the editor never drew the page in
+        /// this document. A run painted at another quality joins each box's
+        /// fill with the fill it showed at this one, so the run never paints
+        /// less than was shown.
+        public let shownDPI: Int?
 
         /// The page's regions that admission refuses, each with its reason,
         /// in the order they were drawn. Given by the regions as drawn, so it
@@ -94,12 +101,13 @@ public struct RunRecord: Equatable, Sendable {
         /// check. The page's read, when there is one, goes to its plan as in
         /// the initialiser below.
         public init(pageIndex: Int, regions: [DrawnRegion], geometry: RunRecord.PageGeometry,
-                    geometryAtStore: RunRecord.PageGeometry?, switchOn: Bool, read: PageRead? = nil) {
+                    geometryAtStore: RunRecord.PageGeometry?, switchOn: Bool, read: PageRead? = nil,
+                    shownDPI: Int? = nil) {
             let planned = Page(pageIndex: pageIndex, regions: regions,
                                cropBox: geometry.cropBox.size, rotation: geometry.rotation, switchOn: switchOn,
                                read: read)
             self.init(pageIndex: pageIndex, regions: regions, plan: planned.plan,
-                      geometry: geometry, geometryAtStore: geometryAtStore)
+                      geometry: geometry, geometryAtStore: geometryAtStore, shownDPI: shownDPI)
         }
 
         /// One page as confirmed, with its plan made at run entry from the
@@ -113,18 +121,19 @@ public struct RunRecord: Equatable, Sendable {
         /// when there is one, gives the plan the page's words, text and facts;
         /// with none the plan is made with no words.
         public init(pageIndex: Int, regions: [DrawnRegion], cropBox: CGSize, rotation: Int, switchOn: Bool,
-                    read: PageRead? = nil) {
+                    read: PageRead? = nil, shownDPI: Int? = nil) {
             self.init(pageIndex: pageIndex, regions: regions, cropBox: cropBox, rotation: rotation, switchOn: switchOn,
-                      read: read, source: RunRecord.planSource)
+                      read: read, source: RunRecord.planSource, shownDPI: shownDPI)
         }
 
         /// The same page under a plan source given here: the run passes its
         /// own; a test can name the switch's policy before the run reads it.
         package init(pageIndex: Int, regions: [DrawnRegion], cropBox: CGSize, rotation: Int, switchOn: Bool,
-                     read: PageRead?, source: PlanSource) {
+                     read: PageRead?, source: PlanSource, shownDPI: Int? = nil) {
             self.init(pageIndex: pageIndex, regions: regions,
                       plan: Self.makePlan(regions: regions, cropBox: cropBox, rotation: rotation, switchOn: switchOn,
-                                          read: read, source: source))
+                                          read: read, source: source),
+                      shownDPI: shownDPI)
         }
 
         /// The one maker of a page's plan from its regions as drawn: the run's
@@ -162,12 +171,14 @@ public struct RunRecord: Equatable, Sendable {
         }
 
         package init(pageIndex: Int, regions: [DrawnRegion], plan: PaintPlan?,
-                     geometry: RunRecord.PageGeometry? = nil, geometryAtStore: RunRecord.PageGeometry? = nil) {
+                     geometry: RunRecord.PageGeometry? = nil, geometryAtStore: RunRecord.PageGeometry? = nil,
+                     shownDPI: Int? = nil) {
             self.pageIndex = pageIndex
             self.regions = regions
             self.plan = plan
             self.geometry = geometry
             self.geometryAtStore = geometryAtStore
+            self.shownDPI = shownDPI
         }
     }
 

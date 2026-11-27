@@ -148,6 +148,35 @@ package enum PixelPlan {
         )
         return Projection(painted: painted, marginEdge: margin)
     }
+
+    /// `rect`, a pixel rectangle of this page's image at `shownDPI`, on
+    /// `raster`'s image of the same page: each side carried outward to a whole
+    /// pixel, within the image.
+    ///
+    /// Both images share the page's bottom-left corner, and a pixel
+    /// rectangle counts columns from the left and rows from the bottom, so a
+    /// line `y` pixels up one image lies `y · d / s` pixels up the other,
+    /// exactly: the left and bottom sides are ⌊v · d / s⌋, the right and top
+    /// ⌈v · d / s⌉, for the run's `d = raster.dpi` and the shown `s`. No image
+    /// height and no block line enters it. The carried rectangle holds every
+    /// page point the shown one holds, and the clip to the image drops none:
+    /// the image never crops the page. A non-positive `shownDPI` carries
+    /// nothing: the rectangle comes back as it is, cut to the image.
+    package static func carried(_ rect: PixelRect, shownDPI: Int, onto raster: Raster) -> PixelRect {
+        func clipX(_ x: Int) -> Int { min(max(x, 0), raster.pixelWidth) }
+        func clipY(_ y: Int) -> Int { min(max(y, 0), raster.pixelHeight) }
+        guard shownDPI > 0 else {
+            return PixelRect(minX: clipX(rect.minX), minY: clipY(rect.minY),
+                             maxX: clipX(rect.maxX), maxY: clipY(rect.maxY))
+        }
+        let d = raster.dpi
+        return PixelRect(
+            minX: clipX(floorDiv(rect.minX * d, shownDPI)),
+            minY: clipY(floorDiv(rect.minY * d, shownDPI)),
+            maxX: clipX(ceilDiv(rect.maxX * d, shownDPI)),
+            maxY: clipY(ceilDiv(rect.maxY * d, shownDPI))
+        )
+    }
 }
 
 /// ⌊a / b⌋ for a positive `b`, for any sign of `a`.

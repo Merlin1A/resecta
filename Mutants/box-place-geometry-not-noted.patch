@@ -5,15 +5,14 @@ Must go red: ResectaAppTests/BoxPlaceCheckTests geometryNotedAtStore
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/State/RunInputs.swift b/Sources/ResectaApp/State/RunInputs.swift
-index b6f170345..c86755944 100644
 --- a/Sources/ResectaApp/State/RunInputs.swift
 +++ b/Sources/ResectaApp/State/RunInputs.swift
-@@ -38,7 +38,7 @@ enum RunInputs {
+@@ -42,7 +42,7 @@
                  }
                  guard let sides = geometry[page] else { return RunRecord.Page(pageIndex: page, regions: drawn) }
                  return RunRecord.Page(pageIndex: page, regions: drawn,
 -                                      geometry: sides, geometryAtStore: geometryAtStore[page],
 +                                      geometry: sides, geometryAtStore: sides,
-                                       switchOn: snapshot.boxesAcrossColumn, read: reads[page])
+                                       switchOn: snapshot.boxesAcrossColumn, read: reads[page],
+                                       shownDPI: shownDPIs[page])
              })
-     }

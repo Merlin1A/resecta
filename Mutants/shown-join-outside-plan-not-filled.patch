@@ -1,0 +1,17 @@
+Property: What was shown for a box that projects at the shown quality and not at the run's is filled as one more stray rectangle.
+Area: the run never paints less than was shown
+Test command: cd Packages/RedactionEngine && swift test --skip-build --no-parallel --filter 'ShownJoinTests' (after swift build --build-tests)
+Must go red: RedactionEngineTests/ShownJoinTests boxShownButNotProjectedHere
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
+@@ -417,7 +417,6 @@
+         // A stray region's fill joined with its own fill at the shown
+         // quality, carried.
+         let strayShown = strays.compactMap { Self.shownRegionFill($0, raster: raster, shownDPI: shownDPI) }
+-            + shownOutsidePlan
+ 
+         // 5. The fills.
+         for (_, rect) in rects {

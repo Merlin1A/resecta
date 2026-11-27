@@ -5,13 +5,12 @@ Must go red: ResectaAppTests/RunRecordTests "Each case" (regionsAsDrawn)
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/State/PipelineRunner.swift b/Sources/ResectaApp/State/PipelineRunner.swift
-index 2e00a8bd0..ffa5de969 100644
 --- a/Sources/ResectaApp/State/PipelineRunner.swift
 +++ b/Sources/ResectaApp/State/PipelineRunner.swift
-@@ -313,7 +313,14 @@ struct PipelineRunner {
-             pageCount: coordinator.documentState.pageCount,
-             geometry: coordinator.documentState.sourceDocument.map(RunInputs.pageGeometry(of:)) ?? [:],
-             geometryAtStore: redactionState.geometryAtStore,
+@@ -318,7 +318,14 @@
+             // saw at it), kept apart from the plans: a change of the cap
+             // makes an off-screen page's plan again but does not move it.
+             shownDPIs: redactionState.shownDPIs,
 -            regions: redactionState.regions, reads: coordinator.documentState.pageReads, settings: runSettings)
 +            regions: redactionState.regions.mapValues { regions in
 +                regions.filter { RedactionRegion.isAdmitted(normalizedRect: $0.normalizedRect) }.map { region in
