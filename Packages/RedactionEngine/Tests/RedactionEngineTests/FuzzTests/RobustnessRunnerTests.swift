@@ -589,7 +589,7 @@ struct Family4FactorySmokeTests {
         #expect(page.string?.contains("USERUNIT PROBE LINE") == true,
                 "text layer must survive so the scan leg has work")
         #expect(validatePage(page) == false,
-                "the H-16 /UserUnit guard must reject this page")
+                "the /UserUnit guard must reject this page")
         #expect(validatePageGeometry(page) == false,
                 "the refusal is the geometry half's, not the memory half's")
     }

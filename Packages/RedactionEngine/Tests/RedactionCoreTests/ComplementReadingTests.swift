@@ -2,7 +2,7 @@ import Foundation
 import Testing
 import RedactionCore
 
-/// G-02b's readings on hand-built pages: lines, runs, the stack, the room,
+/// The complement's readings on hand-built pages: lines, runs, the stack, the room,
 /// the column, the bridges, direction and trust. Every page is drawn on whole
 /// sixty-fourths of a point, so turning a box into sixty-fourths moves
 /// nothing. Letters are 6 pt wide and 10 pt tall, words 4 pt apart, lines

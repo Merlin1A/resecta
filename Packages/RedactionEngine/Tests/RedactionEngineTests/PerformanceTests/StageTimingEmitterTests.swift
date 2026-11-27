@@ -16,7 +16,7 @@ import CryptoKit
 //
 // Stages: validate_page · text_layer_detect · scan_text (H1.2 naturalRun) ·
 // scan_ocr_natural (scan-sim product path) · scan_ocr_forced (packet, the
-// L-20 seam) · rasterize_render_fill (per page, H2.2 processDocument mirror
+// forced-recognition seam) · rasterize_render_fill (per page, H2.2 processDocument mirror
 // shape) · reconstruct_append / reconstruct_finalize · verify_layer:<name>
 // (per-layer LayerResult.durationSeconds through the H2.2 runVerification
 // mirror) · cancel_fill / cancel_verify (the PERF-8 cancel→surrender window).

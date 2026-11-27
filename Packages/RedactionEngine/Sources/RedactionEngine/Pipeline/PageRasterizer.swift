@@ -295,7 +295,7 @@ public final class PageRasterizer: @unchecked Sendable {
         // For Secure Rasterization pages, skip entirely.
         var textLayerEntries: [CharacterInfo]? = nil
         var pageDigest: PageFilterDigest? = nil
-        // J-12: the text-layer line assembly receives the page's redaction
+        // The text-layer line assembly receives the page's redaction
         // rects (PDF points) so a bridge never crosses one.
         var redactionRectsForTextLayer: [CGRect] = []
         // Effective per-page fallback reason. Starts as the pre-flight
