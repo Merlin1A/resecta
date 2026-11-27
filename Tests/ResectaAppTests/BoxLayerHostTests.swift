@@ -237,13 +237,14 @@ struct BoxLayerHostTests {
         let c = Self.mounted([a], selected: [a.id])
         let owned = [c.host.root] + Array(c.host.groupLayers.values) + Array(c.host.layers.values)
         #expect(c.host.layers.count > 3, "precondition: the box has layers")
-        // The action each layer would run for each property the host sets:
-        // none. A layer with its implicit actions on gives an animation here
-        // whether or not it is on a screen that draws.
+        // The pass turns actions off for its own changes; a change made
+        // outside it, such as a redrawn layer's contents, is kept quiet by
+        // the layer's own actions: every property the host sets is in them
+        // as NSNull. (action(forKey:) cannot tell: it gives nil for NSNull
+        // and for a layer with no actions alike.)
         for layer in owned {
             for key in BoxLayerHost.quietActions.keys.sorted() {
-                let action = layer.action(forKey: key)
-                #expect(action == nil, "\(layer) has an action for \(key): \(String(describing: action))")
+                #expect(layer.actions?[key] is NSNull, "\(layer) has no quiet action for \(key)")
             }
         }
         for layer in owned {
