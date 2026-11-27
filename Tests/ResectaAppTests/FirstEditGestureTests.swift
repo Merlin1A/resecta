@@ -48,6 +48,8 @@ struct FirstEditGestureTests {
         let group: Bool?
         let then: String?
         let read: TableRead?
+        /// The page the row's words come from: `synthetic` or `sample-p1`.
+        let text: String?
     }
     struct Expected: Decodable {
         let written: Bool?
@@ -118,12 +120,14 @@ struct FirstEditGestureTests {
     }
 
     /// The regions stored on page 0, `selected` selected, the overlay at the
-    /// zoom, each box's start in `starts` given through its reader.
-    func mount(_ regions: [RedactionRegion], selected: Set<UUID>, starts: [UUID: CGRect]) throws -> Canvas {
+    /// zoom, each box's start in `starts` given through its reader; on
+    /// `coordinator` when one is given (one that holds a document).
+    func mount(_ regions: [RedactionRegion], selected: Set<UUID>, starts: [UUID: CGRect],
+               coordinator given: PDFViewCoordinator? = nil) throws -> Canvas {
         let state = RedactionState()
         for r in regions { state.addRegion(r, page: 0, undoManager: nil) }
         state.selectedRegionIDs = selected
-        let coordinator = PDFViewCoordinator()
+        let coordinator = given ?? PDFViewCoordinator()
         coordinator.redactionState = state
         let window = UIWindow(frame: CGRect(origin: .zero, size: Self.pageSize))
         let overlay = RedactionOverlayView(frame: window.bounds)
@@ -236,22 +240,29 @@ struct FirstEditGestureTests {
         var starts: [UUID: CGRect] = [:]
         if box.anchored, let start = row.expected.start { starts[region.id] = Self.share(start) }
         let c = try mount(regions, selected: Set(regions.map(\.id)), starts: starts)
-        let cancel = row.inputs.then == "cancel"
+        try perform(gesture, on: region.id, in: c, group: regions.count > 1, cancel: row.inputs.then == "cancel")
+        return (region.id, c)
+    }
+
+    /// A row's gesture on the box `id` as the canvas shows it now: a move
+    /// from a touch on its body (the selection's group move when `group`),
+    /// or a resize as at most two handle drags; cancelled, not lifted, when
+    /// `cancel`.
+    func perform(_ gesture: Gesture, on id: UUID, in c: Canvas, group: Bool, cancel: Bool) throws {
         if gesture.type == "move" {
-            let down = Self.body(c.overlay.pdfNormalizedToOverlay(own))
+            let down = Self.body(c.overlay.pdfNormalizedToOverlay(try #require(c.copy(id)).normalizedRect))
             let travel = CGVector(dx: CGFloat(gesture.dx ?? 0) / 64, dy: -CGFloat(gesture.dy ?? 0) / 64)
-            drag(c, from: down, through: Self.path(from: down, travel: travel),
-                 grab: regions.count > 1 ? .groupMove : .move, cancel: cancel)
+            drag(c, from: down, through: Self.path(from: down, travel: travel), grab: group ? .groupMove : .move,
+                 cancel: cancel)
         } else {
             for (handle, travel) in Self.handleDrags(gesture) {
-                let drawn = c.overlay.pdfNormalizedToOverlay(try #require(c.copy(region.id)).normalizedRect)
+                let drawn = c.overlay.pdfNormalizedToOverlay(try #require(c.copy(id)).normalizedRect)
                 let down = Self.grabPoint(handle, in: drawn, canvas: c.overlay.bounds)
                 drag(c, from: down, through: Self.path(from: down, travel: travel), grab: .resize(handle),
                      cancel: cancel)
                 if cancel { break }
             }
         }
-        return (region.id, c)
     }
 
     /// The rows whose box the table moves past the page's edge. The canvas

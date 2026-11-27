@@ -1,0 +1,19 @@
+Property: A start read where the page has kept no plan of its current version comes from the plan made at the read with the page's words. Here that plan is made without them.
+Area: the first edit's gesture (App)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/FirstEditSamplePageTests
+Must go red: ResectaAppTests/FirstEditSamplePageTests aFirstEditThroughThePlanMadeAtTheRead
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
+index 66c1886c7..b3190c06a 100644
+--- a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
++++ b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
+@@ -585,7 +585,7 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
+         return DrawnPlan(pageIndex: pageIndex, regions: state.regions[pageIndex] ?? [],
+                          cropBox: page.bounds(for: .cropBox).size, rotation: page.rotation,
+                          switchOn: settings.boxesAcrossColumn, exportDPI: keptQuality(of: page, settings: settings),
+-                         fillColor: settings.fillColor, read: documentState.pageReads[pageIndex])
++                         fillColor: settings.fillColor, read: nil)
+     }
+ 
+     /// Reads one page for its kept plan, once at a time, and redraws the page
