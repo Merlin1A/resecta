@@ -73,31 +73,34 @@ extension DocumentSearcher {
         let doc = document.document
         let pageCount = doc.pageCount
 
-        switch mode {
-        case .text(let query, let options):
-            await searchText(
-                doc: doc, query: query, options: options,
-                pageCount: pageCount, progress: progress,
-                continuation: continuation
-            )
-        case .regex(let pattern, let options):
-            await searchRegex(
-                doc: doc, pattern: pattern, options: options,
-                pageCount: pageCount, progress: progress,
-                continuation: continuation
-            )
-        case .multiTerm(let terms, let options):
-            await searchMultiTerm(
-                doc: doc, terms: terms, options: options,
-                pageCount: pageCount, progress: progress,
-                continuation: continuation
-            )
-        case .piiScan(let categories, let options):
-            await searchPII(
-                doc: doc, categories: categories, options: options,
-                pageCount: pageCount, progress: progress,
-                continuation: continuation
-            )
+        // The coverage sink is taken once, as the walk starts; see `walkCoverageSink`.
+        await Self.$walkCoverageSink.withValue(pageCoverageSink) {
+            switch mode {
+            case .text(let query, let options):
+                await searchText(
+                    doc: doc, query: query, options: options,
+                    pageCount: pageCount, progress: progress,
+                    continuation: continuation
+                )
+            case .regex(let pattern, let options):
+                await searchRegex(
+                    doc: doc, pattern: pattern, options: options,
+                    pageCount: pageCount, progress: progress,
+                    continuation: continuation
+                )
+            case .multiTerm(let terms, let options):
+                await searchMultiTerm(
+                    doc: doc, terms: terms, options: options,
+                    pageCount: pageCount, progress: progress,
+                    continuation: continuation
+                )
+            case .piiScan(let categories, let options):
+                await searchPII(
+                    doc: doc, categories: categories, options: options,
+                    pageCount: pageCount, progress: progress,
+                    continuation: continuation
+                )
+            }
         }
     }
 }

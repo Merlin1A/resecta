@@ -265,6 +265,8 @@ class DocumentState {
 
     /// Active pipeline task — stored for cancellation support.
     var activePipelineTask: Task<Void, Never>?
+    /// A refusal shown as a sheet, published by the run funnel until it is answered.
+    var redactRefusalAwaitingAnswer: RedactRefusal?
 
     /// Active import task — stored for cancellation support. Parallels
     /// `activePipelineTask`. The import path has its own
@@ -396,43 +398,6 @@ class DocumentState {
     /// `.editing` phase with no active pipeline task already running.
     var canStartPipeline: Bool {
         phaseKind == .editing && activePipelineTask == nil
-    }
-
-    /// Why Redact may not start now. The button, ⇧⌘R and the run funnel
-    /// (`PipelineCoordinator.runFullPipeline`) read this one rule.
-    enum RedactRefusal: Equatable {
-        case selectedMatches  // unapplied search selections; a run would drop them
-        case noRegions        // no region survives the minimum-dimension filter
-        case busy             // another phase, a run in flight, a pending review or a touch held on the canvas; no hint
-
-        /// The hint the button speaks and the funnel shows.
-        var hint: String {
-            switch self {
-            case .selectedMatches: return "Apply or clear the selected matches first"
-            case .noRegions: return "Draw regions or apply Scan or Search results first"
-            case .busy: return ""
-            }
-        }
-    }
-
-    /// True while the live search session holds selections not yet applied
-    /// (a selected row no live region covers, or an auto-selected set never
-    /// reviewed) — the sheet's own dismiss rule. Redact refuses on it; Home
-    /// asks before closing on it.
-    static func hasUnappliedSelections(_ redactionState: RedactionState) -> Bool {
-        redactionState.activeSearch?.hasUnappliedSelections(
-            liveApplied: redactionState.liveAppliedSearchResultIDs) ?? false
-    }
-
-    /// The refusal that holds now, or nil when Redact may start. The
-    /// selected matches come first, then the missing regions. A finger held
-    /// on the canvas refuses as busy: the run would burn the stored place of
-    /// a box the screen shows elsewhere.
-    func redactRefusal(with redactionState: RedactionState) -> RedactRefusal? {
-        if Self.hasUnappliedSelections(redactionState) { return .selectedMatches }
-        if !redactionState.hasEffectiveRegions { return .noRegions }
-        if !canStartPipeline || redactionState.canvasHoldsATouch { return .busy }
-        return nil
     }
 
     /// True when caller mutations of `redactionState.regions` /
@@ -651,6 +616,7 @@ class DocumentState {
         documentOverride = nil
         wasPausedByBackground = false
         pausedFromPhase = nil  // clear alongside wasPausedByBackground
+        redactRefusalAwaitingAnswer = nil
         transition(to: .empty)
     }
 

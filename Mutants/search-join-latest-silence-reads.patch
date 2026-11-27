@@ -1,0 +1,19 @@
+Property: A page the latest run gave nothing stays as the latest left it in the join.
+Area: the search account's public face
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/SearchAccountJoinTests (or on the host: cd Packages/RedactionEngine && swift test --filter 'SearchAccountJoinTests')
+Must go red: RedactionEngineTests/SearchAccountJoinTests latestGaveNothing
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchAccount.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchAccount.swift
+index d8a91202..cc4cbbc2 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchAccount.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchAccount.swift
+@@ -120,7 +120,7 @@ public struct SearchAccount: Sendable, Hashable {
+             if let reading {
+                 facts[page] = reading.account.facts[page]
+                 settled.insert(page)
+-            } else if !facts[page].isEmpty {
++            } else {
+                 // A page the latest run gave nothing (no report, or not reached)
+                 // stays as the latest left it: taking only the earlier "read"
+                 // facts would drop the earlier gap and count an unknown read as read.

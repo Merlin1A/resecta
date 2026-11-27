@@ -189,6 +189,78 @@ class RedactionState {
     }
     var lastDetectionRun: DetectionRunRecord? = nil
 
+    /// Every closed search account of this document, by the token minted
+    /// when its run started. An applied search's record names its token.
+    var searchAccounts: [UUID: SearchAccount] = [:]
+    /// The newest closed account's token: the latest run, applied or not.
+    var latestSearchAccountToken: UUID?
+
+    /// Every search run of this document that started reading, oldest first,
+    /// with its query: the stop at Redact counts every run, applied or not.
+    var searchRunLog: [SearchRunLogEntry] = []
+
+    struct SearchRunLogEntry: Equatable {
+        let token: UUID
+        let query: AppliedSearchQuery
+    }
+
+    func recordSearchRunOpened(token: UUID, query: AppliedSearchQuery) {
+        searchRunLog.append(SearchRunLogEntry(token: token, query: query))
+    }
+
+    /// The pages answered at the stop at Redact, by page and reason: Redact
+    /// Anyway records them, and they last while the document is open.
+    var redactStopAnswered: Set<RedactStop.Page> = []
+
+    /// Redact Anyway: the pages the stop named are answered, and no other.
+    func answerRedactStop(_ pages: Set<RedactStop.Page>) {
+        redactStopAnswered.formUnion(pages)
+    }
+
+    /// The replaced runs whose accounts were kept, since an Apply took a
+    /// record from each while it was open.
+    var replacedSearchTokens: Set<UUID> = []
+
+    func recordSearchRunReplaced(token: UUID) {
+        replacedSearchTokens.insert(token)
+    }
+
+    /// The account tokens the document's regions still carry, through their applied records.
+    nonisolated static func liveAccountTokens(
+        regions: [Int: [RedactionRegion]], audit: [UUID: MatchAuditSnapshot]
+    ) -> Set<UUID> {
+        Set(regions.values.joined().compactMap { audit[$0.id]?.searchRecord?.accountToken })
+    }
+
+    /// The runs whose accounts closed, oldest first, each with its query. A
+    /// replaced run with no account is not among them; a replaced run whose
+    /// account was kept counts only while a region from it remains.
+    var closedSearchRuns: [(query: AppliedSearchQuery, account: SearchAccount)] {
+        let live = Self.liveAccountTokens(regions: regions, audit: appliedMatchAudit)
+        return searchRunLog.compactMap { entry in
+            guard !replacedSearchTokens.contains(entry.token) || live.contains(entry.token) else { return nil }
+            return searchAccounts[entry.token].map { (entry.query, $0) }
+        }
+    }
+
+    func recordSearchAccount(_ account: SearchAccount, token: UUID) {
+        searchAccounts[token] = account
+        latestSearchAccountToken = token
+    }
+
+    /// The pages too large for recognition in the accounts that matter: the
+    /// applied searches' (by their records' tokens) and the latest run's.
+    /// Zero-based, as the results strip reads them.
+    func pagesTooLarge(applied tokens: [UUID]) -> Set<Int> {
+        var pages = Set<Int>()
+        for token in Set(tokens + [latestSearchAccountToken].compactMap { $0 }) {
+            guard let account = searchAccounts[token] else { continue }
+            pages.formUnion(account.pages(for: .tooLarge))
+            pages.formUnion(account.pages(for: .picturesNotRead(.tooLarge)))
+        }
+        return pages
+    }
+
     /// Writer for `lastDetectionRun` — bumps the run counter.
     /// `scanSummary` is passed by the Scan-interface run path.
     func recordDetectionRun(
@@ -432,6 +504,11 @@ class RedactionState {
         // The detection-run record would describe a run
         // that never happened on the next document.
         lastDetectionRun = nil
+        searchAccounts = [:]
+        latestSearchAccountToken = nil
+        searchRunLog = []
+        replacedSearchTokens = []
+        redactStopAnswered = []
         // A stale region UUID must not present a blank rationale sheet
         // over the next document.
         pendingCanvasRationaleRequest = nil

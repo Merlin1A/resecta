@@ -1,0 +1,19 @@
+Property: A pattern is its own unit, named by its pattern; only a Scan is named by its kind alone.
+Area: the stop at Redact
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/RedactStopUnitTests
+Must go red: ResectaAppTests/RedactStopUnitTests kindAndText
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/RedactStopUnit.swift b/Sources/ResectaApp/State/RedactStopUnit.swift
+index 212f434a..1cfafc26 100644
+--- a/Sources/ResectaApp/State/RedactStopUnit.swift
++++ b/Sources/ResectaApp/State/RedactStopUnit.swift
+@@ -27,7 +27,7 @@ struct RedactStopUnit: Hashable, Sendable {
+ 
+     init(kind: Kind, text: String, options: SearchOptions) {
+         self.kind = kind
+-        self.text = kind == .scan ? "" : text
++        self.text = kind == .text ? text : ""
+         caseSensitive = options.caseSensitive
+         wholeWord = options.wholeWord
+         // Accents and digit separators change nothing a pattern matches, so

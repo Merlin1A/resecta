@@ -1,0 +1,18 @@
+Property: The stop opens when a page that stops Redact is not yet answered.
+Area: the stop at Redact
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/RedactStopTests
+Must go red: ResectaAppTests/RedactStopTests blankScannedPage; ResectaAppTests/RedactStopTests declinedStillCounts; ResectaAppTests/RedactStopTests scanTakenWhole
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/RedactStop.swift b/Sources/ResectaApp/State/RedactStop.swift
+index 0bbec379..72603136 100644
+--- a/Sources/ResectaApp/State/RedactStop.swift
++++ b/Sources/ResectaApp/State/RedactStop.swift
+@@ -67,6 +67,6 @@ enum RedactStop {
+ 
+     /// Every page the stop names, by page and reason, across its units.
+     static func namedPages(runs: [Run], answered: Set<Page>) -> Set<Page> {
+-        pagesToName(runs: runs, answered: answered).values.reduce(into: Set<Page>()) { $0.formUnion($1) }
++        []
+     }
+ }

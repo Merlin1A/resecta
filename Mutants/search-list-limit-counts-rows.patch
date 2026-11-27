@@ -5,10 +5,10 @@ Must go red: ResectaAppTests/SearchListLimitOccurrenceTests listLimit (the rows 
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/State/SearchState+RunLifecycle.swift b/Sources/ResectaApp/State/SearchState+RunLifecycle.swift
-index ec02e60c..5b1543d9 100644
+index 6a60ba24..9435aac8 100644
 --- a/Sources/ResectaApp/State/SearchState+RunLifecycle.swift
 +++ b/Sources/ResectaApp/State/SearchState+RunLifecycle.swift
-@@ -152,16 +152,13 @@ extension SearchState {
+@@ -154,18 +154,15 @@ extension SearchState {
          // Matches never outnumber rows, so they are counted only once
          // the rows reach the limit.
          if results.count + pendingResults.count >= DocumentSearcher.maxResults {
@@ -21,6 +21,8 @@ index ec02e60c..5b1543d9 100644
 +            return
          }
          pendingResults.append((run: runToken, result: result))
+         // A match with no box is a row of the stop at Redact: the account keeps its text.
+         if !result.hasBox { recordUnboxedMatch(page: result.pageIndex, text: result.matchedText, run: runToken) }
 -        if !resultsAtCap, results.count + pendingResults.count >= DocumentSearcher.maxResults,
 -           listedMatchKeys().count >= DocumentSearcher.maxResults {
 -            noteCapReached()  // the match that reaches the limit is kept, with its later lines

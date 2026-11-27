@@ -1,0 +1,19 @@
+Property: A report of a page that could not be opened is the could-not-open fact.
+Area: the account of what a search read
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/AccountReportToFactTests (or on the host: cd Packages/RedactionEngine && swift test --filter 'AccountReportToFactTests')
+Must go red: RedactionEngineTests/AccountReportToFactTests eachRoute; RedactionEngineTests/AccountReportToFactTests unopenableFolds
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/AccountOfWhatWasRead.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/AccountOfWhatWasRead.swift
+index 95699f18..382860ab 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/AccountOfWhatWasRead.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/AccountOfWhatWasRead.swift
+@@ -73,7 +73,7 @@ struct AccountOfWhatWasRead: Sendable, Hashable {
+                 }
+             case .ocrSkippedOversize: facts.insert(.tooLarge)
+             case .ocrUnavailable: facts.insert(.recognitionFailed)
+-            case .unopenable: facts.insert(.unopenable)
++            case .unopenable: facts.insert(.recognitionFailed)
+             }
+             self = facts
+         }

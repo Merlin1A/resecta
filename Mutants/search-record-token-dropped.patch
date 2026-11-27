@@ -1,0 +1,19 @@
+Property: An applied search's record names its account's token.
+Area: the record of an applied search
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/SearchAccountLifecycleTests
+Must go red: ResectaAppTests/SearchAccountLifecycleTests applyMidRunThenClose; ResectaAppTests/SearchAccountLifecycleTests applyAfterClose
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/SearchState+AppliedRecord.swift b/Sources/ResectaApp/State/SearchState+AppliedRecord.swift
+index 42885f5b..f821f715 100644
+--- a/Sources/ResectaApp/State/SearchState+AppliedRecord.swift
++++ b/Sources/ResectaApp/State/SearchState+AppliedRecord.swift
+@@ -47,7 +47,7 @@ extension SearchState {
+             scanConfiguration: scanConfiguration,
+             // An open account has no ending yet: the record carries only its
+             // token, and the account is read from the store once the run ends.
+-            accountToken: accountInHandToken ?? lastAccountToken,
++            accountToken: nil,
+             account: accountInHand == nil ? lastAccount : nil)
+     }
+ }

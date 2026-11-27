@@ -1,0 +1,19 @@
+Property: A walk over pages read by recognition reports into the sink set when it started, not a later one.
+Area: the account of a search run
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/WalkCoverageSinkTests (or on the host: cd Packages/RedactionEngine && swift test --no-parallel --filter 'WalkCoverageSinkTests')
+Must go red: RedactionEngineTests/WalkCoverageSinkTests laterSinkGetsNothingOnRecognisedPages
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+OCRPages.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+OCRPages.swift
+index a73fc162..02811669 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+OCRPages.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+OCRPages.swift
+@@ -114,7 +114,7 @@ extension DocumentSearcher {
+             }
+         }
+ 
+-        Self.walkCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocr,
++        pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .ocr,
+                                              emptyRead: ocrPageCache.emptyRead(for: pageIndex)))
+         return textLines
+     }

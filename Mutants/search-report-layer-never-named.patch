@@ -5,10 +5,11 @@ Must go red: RedactionEngineTests/PageCoverageReportTests anotherAppsLayer
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+HybridRoute.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+HybridRoute.swift
+index 027e25f7..7aa70068 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+HybridRoute.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+HybridRoute.swift
-@@ -33,7 +33,7 @@
-         if let sink = pageCoverageSink {
+@@ -33,7 +33,7 @@ extension DocumentSearcher {
+         if let sink = Self.walkCoverageSink {
              let reason = page.pageRef.flatMap { Self.fitReason(page, cgPage: $0) }
              sink(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer, pictures: .required,
 -                                    throughAnotherAppsLayer: reason == .anotherAppsText,

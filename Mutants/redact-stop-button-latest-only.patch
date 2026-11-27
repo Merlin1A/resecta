@@ -1,0 +1,19 @@
+Property: Search These Pages re-runs at once every typed text of the group that can share one run.
+Area: the stop at Redact
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/RedactStopGroupsTests
+Must go red: ResectaAppTests/RedactStopGroupsTests oneGroupNoName
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/RedactStop+Groups.swift b/Sources/ResectaApp/State/RedactStop+Groups.swift
+index a25e81b6..b9932c32 100644
+--- a/Sources/ResectaApp/State/RedactStop+Groups.swift
++++ b/Sources/ResectaApp/State/RedactStop+Groups.swift
+@@ -77,7 +77,7 @@ extension RedactStop {
+         }
+         if let largest = sets.max(by: { $0.count < $1.count }) {
+             let options = largest[0].searchOptions(base: latestQuery(of: largest[0], in: runs)?.options)
+-            let words = largest.map(\.text)
++            let words = [largest[largest.count - 1].text]
+             return AppliedSearchQuery(kind: words.count == 1 ? .text(words[0]) : .multiTerm(words), options: options)
+         }
+         guard let alone = chosen.first, let latest = latestQuery(of: alone, in: runs) else { return nil }

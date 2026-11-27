@@ -1,0 +1,19 @@
+Property: A pattern's unit holds neither Accents nor digit separators.
+Area: the stop at Redact
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/RedactStopGroupsTests
+Must go red: ResectaAppTests/RedactStopGroupsTests patternIgnoresAccentsAndDigits
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/RedactStopUnit.swift b/Sources/ResectaApp/State/RedactStopUnit.swift
+index 212f434a..e2b00cbb 100644
+--- a/Sources/ResectaApp/State/RedactStopUnit.swift
++++ b/Sources/ResectaApp/State/RedactStopUnit.swift
+@@ -32,7 +32,7 @@ struct RedactStopUnit: Hashable, Sendable {
+         wholeWord = options.wholeWord
+         // Accents and digit separators change nothing a pattern matches, so
+         // a pattern's unit does not hold them.
+-        accents = kind == .pattern ? false : options.foldDiacritics
++        accents = options.foldDiacritics
+         digitSeparators = kind == .pattern ? false : options.stripDigitSeparators
+         quotesAndDashes = options.normalizeSmartPunctuation
+     }

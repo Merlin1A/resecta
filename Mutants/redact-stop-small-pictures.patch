@@ -1,0 +1,18 @@
+Property: Small pictures alone never open the stop.
+Area: the stop at Redact
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/RedactStopTests
+Must go red: ResectaAppTests/RedactStopTests smallPicturesRun; ResectaAppTests/RedactStopTests namesExactlyWhatStops
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/RedactStop.swift b/Sources/ResectaApp/State/RedactStop.swift
+index ff1685b1..69cac8ad 100644
+--- a/Sources/ResectaApp/State/RedactStop.swift
++++ b/Sources/ResectaApp/State/RedactStop.swift
+@@ -50,6 +50,7 @@ enum RedactStop {
+             for page in account.pages(for: reason) { pages.insert(Page(page: page, reason: .line(reason))) }
+         }
+         if let stop = account.stopPage { pages.insert(Page(page: stop, reason: .searchedInPart)) }
++        for page in account.quietPages { pages.insert(Page(page: page, reason: .searchedInPart)) }
+         return pages
+     }
+ 

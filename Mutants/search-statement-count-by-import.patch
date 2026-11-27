@@ -1,0 +1,19 @@
+Property: The recognition count is the pages read by recognition or another app's text, never a page whose recognition failed.
+Area: the Search sheet's statement
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/SearchStatementTableTests -only-testing:ResectaAppTests/SearchStatementRuleTests
+Must go red: ResectaAppTests/SearchStatementTableTests table; ResectaAppTests/SearchStatementRuleTests k201
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/Search/SearchStatement.swift b/Sources/ResectaApp/Views/Search/SearchStatement.swift
+index 0e6f904a..97e11183 100644
+--- a/Sources/ResectaApp/Views/Search/SearchStatement.swift
++++ b/Sources/ResectaApp/Views/Search/SearchStatement.swift
+@@ -70,7 +70,7 @@ enum SearchStatement {
+     /// makes no no-match statement; pages read by recognition always carry
+     /// the warning, whatever else is unread.
+     private static func headline(_ account: SearchAccount) -> Headline {
+-        let recognised = account.qualifiedPages.count
++        let recognised = account.qualifiedPages.count + account.pages(for: .recognitionFailed).count
+         guard account.ending == .completed else {
+             return recognised > 0 ? .stoppedWithRecognition(recognised) : .stopped
+         }

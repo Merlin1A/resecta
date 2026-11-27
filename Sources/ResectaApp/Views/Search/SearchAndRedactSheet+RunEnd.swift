@@ -29,6 +29,7 @@ extension SearchAndRedactSheet {
         searchState: SearchState, redactionState: RedactionState
     ) -> Bool {
         guard !searchState.runEndsCancelled(run: run, taskCancelled: taskCancelled) else { return false }
+        searchState.closeAccount(.completed, run: run)
         searchState.flushPendingResults()
         // A completed (non-cancelled) run flips the
         // empty-state discriminator from "not run yet" to a

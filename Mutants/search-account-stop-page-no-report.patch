@@ -1,0 +1,19 @@
+Property: The stop page is given to the not-reached line, never to the no-report line.
+Area: the search account's public face
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/SearchAccountTests (or on the host: cd Packages/RedactionEngine && swift test --filter 'SearchAccountTests')
+Must go red: RedactionEngineTests/SearchAccountTests stopPageWithNoReport
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchAccount.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchAccount.swift
+index 75b37f82..ab7f73b8 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchAccount.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchAccount.swift
+@@ -90,7 +90,7 @@ public struct SearchAccount: Sendable, Hashable {
+         case .notReached:
+             return (summary.pages(in: .notReachedResultLimit) + summary.pages(in: .notReachedStopped)).sorted()
+         // The stop page belongs to "not reached" as searched in part, even with no report.
+-        case .noReport: return summary.pages(in: .noReport).filter { $0 != stopPage }
++        case .noReport: return summary.pages(in: .noReport)
+         }
+     }
+ 

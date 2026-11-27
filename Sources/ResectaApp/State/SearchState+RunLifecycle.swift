@@ -46,6 +46,7 @@ extension SearchState {
     // MARK: - Methods
 
     func cancelSearch() async {
+        closeAccount(.cancelled)
         let task = activeSearchTask
         activeSearchTask = nil
         task?.cancel()
@@ -62,6 +63,7 @@ extension SearchState {
     // wipes shared state regardless, so a leaked cleanup tail has
     // nothing to clobber.
     func cancelSearchWithoutAwait() {
+        closeAccount(.cancelled)
         activeSearchTask?.cancel()
         activeSearchTask = nil
         isSearching = false
@@ -159,6 +161,8 @@ extension SearchState {
             }
         }
         pendingResults.append((run: runToken, result: result))
+        // A match with no box is a row of the stop at Redact: the account keeps its text.
+        if !result.hasBox { recordUnboxedMatch(page: result.pageIndex, text: result.matchedText, run: runToken) }
         if !resultsAtCap, results.count + pendingResults.count >= DocumentSearcher.maxResults,
            listedMatchKeys().count >= DocumentSearcher.maxResults {
             noteCapReached()  // the match that reaches the limit is kept, with its later lines

@@ -10,7 +10,7 @@ import Foundation
 /// report can only add facts, never remove one, so within a run a page's
 /// state is the worst that any term's visit reported. A page's state is the
 /// first row of `state(of:position:)` that applies.
-struct AccountOfWhatWasRead: Sendable, Equatable {
+struct AccountOfWhatWasRead: Sendable, Hashable {
 
     /// What the reports said of one page. Each is a fact a report adds.
     struct Facts: OptionSet, Sendable, Hashable {
@@ -85,7 +85,7 @@ struct AccountOfWhatWasRead: Sendable, Equatable {
     }
 
     /// How the run ended. Pages are zero-based indices.
-    enum Ending: Sendable, Equatable {
+    enum Ending: Sendable, Hashable {
         case completed
         /// The result limit was reached on this page.
         case stoppedAtResultLimit(page: Int)
@@ -201,11 +201,22 @@ struct AccountOfWhatWasRead: Sendable, Equatable {
     let pageCount: Int
     private(set) var facts: [Facts]
     private(set) var ending: Ending = .completed
+    /// In an account joined from several runs, the pages an earlier run read:
+    /// each stands before the end, whatever the latest run's ending.
+    private(set) var settled: Set<Int> = []
 
     /// Every page starts with no facts: "not read: no report".
     init(pageCount: Int) {
         self.pageCount = max(0, pageCount)
         facts = Array(repeating: [], count: self.pageCount)
+    }
+
+    /// An account derived from others: a run's account for one of its texts, or several runs joined.
+    init(facts: [Facts], ending: Ending, settled: Set<Int>) {
+        pageCount = facts.count
+        self.facts = facts
+        self.ending = ending
+        self.settled = settled
     }
 
     /// Adds a report's facts to one page. A page outside the document is ignored.
@@ -221,6 +232,7 @@ struct AccountOfWhatWasRead: Sendable, Equatable {
     mutating func end(_ ending: Ending) { self.ending = ending }
 
     func position(of page: Int) -> Position {
+        if settled.contains(page) { return .beforeTheEnd }
         switch ending {
         case .completed: return .beforeTheEnd
         case .stoppedAtResultLimit(let last):

@@ -1,0 +1,19 @@
+Property: A page whose pictures went unread is given one cause.
+Area: the search account's public face
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/SearchAccountTests (or on the host: cd Packages/RedactionEngine && swift test --filter 'SearchAccountTests')
+Must go red: RedactionEngineTests/SearchAccountTests linesCoverWhatStopsRedact; RedactionEngineTests/SearchAccountTests onePictureCause
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchAccount.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchAccount.swift
+index 75b37f82..20a48c4c 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchAccount.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/SearchAccount.swift
+@@ -117,7 +117,7 @@ public struct SearchAccount: Sendable, Hashable {
+         summary.states.indices.filter { page in
+             guard case .partlyRead(let reasons) = summary.states[page] else { return false }
+             let first = knownCauses.first { reasons.contains($0.1) }?.0
+-            if let first { return first == cause }
++            if let first, cause != .notReported { return first == cause }
+             return cause == .notReported && reasons.contains(.picturesNotRead)
+         }
+     }

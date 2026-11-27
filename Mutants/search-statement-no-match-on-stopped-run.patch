@@ -1,0 +1,19 @@
+Property: A run that did not complete makes no no-match statement.
+Area: the Search sheet's statement
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/SearchStatementTableTests -only-testing:ResectaAppTests/SearchStatementRuleTests
+Must go red: ResectaAppTests/SearchStatementTableTests table; ResectaAppTests/SearchStatementRuleTests stoppedRunMakesNoNoMatch
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/Search/SearchStatement.swift b/Sources/ResectaApp/Views/Search/SearchStatement.swift
+index 0e6f904a..6e6b1ed4 100644
+--- a/Sources/ResectaApp/Views/Search/SearchStatement.swift
++++ b/Sources/ResectaApp/Views/Search/SearchStatement.swift
+@@ -71,7 +71,7 @@ enum SearchStatement {
+     /// the warning, whatever else is unread.
+     private static func headline(_ account: SearchAccount) -> Headline {
+         let recognised = account.qualifiedPages.count
+-        guard account.ending == .completed else {
++        guard account.ending == .completed || account.pageCount > 0 else {
+             return recognised > 0 ? .stoppedWithRecognition(recognised) : .stopped
+         }
+         if account.plainNoMatchAllowed { return .plain }

@@ -1,0 +1,19 @@
+Property: A search walk reports into the coverage sink set when it started, never a sink set later by another run.
+Area: the account of a search run
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme RedactionEngine -destination id=<simulator> -only-testing:RedactionEngineTests/WalkCoverageSinkTests (or on the host: cd Packages/RedactionEngine && swift test --no-parallel --filter 'WalkCoverageSinkTests')
+Must go red: RedactionEngineTests/WalkCoverageSinkTests laterSinkGetsNothing
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+TextModes.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+TextModes.swift
+index 809d9538..0af083a5 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+TextModes.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Search/DocumentSearcher+TextModes.swift
+@@ -36,7 +36,7 @@ extension DocumentSearcher {
+ 
+             if !pageText.isEmpty && pageHasRichTextLayer(pageIndex) {
+                 // Text-layer path
+-                Self.walkCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer))
++                pageCoverageSink?(PageSearchCoverage(pageIndex: pageIndex, route: .textLayer))
+                 let results = await withInkFitRead(page) { findTextMatches(
+                     pageText: pageText, query: query, options: options,
+                     page: page, pageIndex: pageIndex, term: query
