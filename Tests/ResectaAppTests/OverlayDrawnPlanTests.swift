@@ -220,12 +220,12 @@ struct OverlayDrawnPlanTests {
     }
 
     @Test("A cap drop makes an off-screen page's plan again at 150 but keeps the 300 it was shown at; a 150 run joins it")
-    func aCapDropKeepsTheShownQuality() throws {
+    func aCapDropKeepsTheShownQuality() async throws {
         let pdf = try Self.document()
         let state = RedactionState()
         let region = RedactionRegion(id: UUID(), normalizedRect: CGRect(x: 0.5, y: 0.6, width: 0.2, height: 0.03), source: .manual)
         state.addRegion(region, page: 0, undoManager: nil)
-        let coordinator = try Self.coordinator(pdf, state, suite: "OverlayDrawnPlanTests.aCapDropKeepsTheShownQuality")
+        let coordinator = try await Self.coordinator(pdf, state, suite: "OverlayDrawnPlanTests.aCapDropKeepsTheShownQuality")
         // Drawn at 300, then off screen: no overlay is active.
         coordinator.noteDrawn(pageIndex: 0, regions: [region])
         #expect(state.drawnPlans[0]?.exportDPI == 300)
