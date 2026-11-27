@@ -173,14 +173,13 @@ struct VerificationResultsActions: View {
         shareDisabled || report.overallStatus.isFail || report.overallStatus.isAttention
     }
 
-    /// Share's capsule: filled teal; outlined red on FAIL and pink on
-    /// ATTENTION under the filled Keep Editing. A disabled capsule is grey
-    /// in either shape — the style reads `isEnabled`.
+    /// Share's capsule: filled teal, or outlined in the same teal under the
+    /// filled Keep Editing, on every verdict. A button wears its own role's
+    /// colour; the verdict's colour is the ring's and the failing row's mark.
+    /// A disabled capsule is grey in either shape — the style reads
+    /// `isEnabled`.
     static func shareCapsuleKind(report: VerificationReport, swapped: Bool) -> ResultsCapsuleButtonStyle.Kind {
-        guard swapped else { return .filled(.teal) }
-        if report.overallStatus.isFail { return .outlined(.red) }
-        if report.overallStatus.isAttention { return .outlined(.pink) }
-        return .outlined(.teal)
+        swapped ? .outlined(.teal) : .filled(.teal)
     }
 
     /// The action rows: Run Verification on a skipped report while its
@@ -212,8 +211,9 @@ struct VerificationResultsActions: View {
 
     /// The Share hint: spoken only, exactly when tapping Share opens a
     /// confirm. It asks the Share tap's gate, with the document's own
-    /// acknowledgements — never the rows — so after a completed share,
-    /// whose acknowledgement stays spent, no hint promises a confirm.
+    /// acknowledgements — never the rows. Every share sheet's end re-arms
+    /// them (DocumentState.rearmShareRiskConfirms()), so after a share the
+    /// hint promises the confirm again.
     static let shareConfirmHint = "Asks you to confirm before sharing."
 
     /// Whether Share will ask for confirmation: Share is enabled and the
@@ -255,7 +255,7 @@ private struct KeepEditingAccessibility: ViewModifier {
 /// the grey fill with the tertiary label in either shape, no stroke, no
 /// press effect.
 struct ResultsCapsuleButtonStyle: ButtonStyle {
-    enum Tint: Equatable { case teal, red, pink }
+    enum Tint: Equatable { case teal }
     enum Kind: Equatable { case filled(Tint), outlined(Tint) }
 
     let kind: Kind
@@ -311,16 +311,12 @@ struct ResultsCapsuleButtonStyle: ButtonStyle {
         static func fill(_ tint: Tint) -> Color {
             switch tint {
             case .teal: ResectaTokens.BrandTeal.fill
-            case .red: .red
-            case .pink: .pink
             }
         }
 
         static func text(_ tint: Tint) -> Color {
             switch tint {
             case .teal: ResectaTokens.BrandTeal.text
-            case .red: ResectaTokens.SemanticColor.failText
-            case .pink: ResectaTokens.SemanticColor.attentionText
             }
         }
     }
@@ -371,7 +367,7 @@ struct ResultsActionRow: View {
                     .foregroundStyle(.primary)
                 if let subtitle {
                     Text(subtitle)
-                        .font(.footnote)
+                        .font(.subheadline)
                         .foregroundStyle(ResectaTokens.SemanticColor.supportText)
                 }
             }

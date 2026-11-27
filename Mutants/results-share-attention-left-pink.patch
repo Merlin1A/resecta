@@ -1,0 +1,45 @@
+Property: On a needs-review result Share is outlined teal, not pink.
+Area: results (Share's capsule)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationResultsActionsTests
+Must go red: ResectaAppTests/VerificationResultsActionsTests shareCapsuleStyle; ResectaAppTests/VerificationResultsActionsTests shareDrawsNoRed
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationResultsActions.swift b/Sources/ResectaApp/Views/VerificationResultsActions.swift
+index 2f9028a..3d217d7 100644
+--- a/Sources/ResectaApp/Views/VerificationResultsActions.swift
++++ b/Sources/ResectaApp/Views/VerificationResultsActions.swift
+@@ -179,7 +179,9 @@ struct VerificationResultsActions: View {
+     /// A disabled capsule is grey in either shape — the style reads
+     /// `isEnabled`.
+     static func shareCapsuleKind(report: VerificationReport, swapped: Bool) -> ResultsCapsuleButtonStyle.Kind {
+-        swapped ? .outlined(.teal) : .filled(.teal)
++        guard swapped else { return .filled(.teal) }
++        if report.overallStatus.isAttention { return .outlined(.pink) }
++        return .outlined(.teal)
+     }
+ 
+     /// The action rows: Run Verification on a skipped report while its
+@@ -255,7 +257,7 @@ private struct KeepEditingAccessibility: ViewModifier {
+ /// the grey fill with the tertiary label in either shape, no stroke, no
+ /// press effect.
+ struct ResultsCapsuleButtonStyle: ButtonStyle {
+-    enum Tint: Equatable { case teal }
++    enum Tint: Equatable { case teal, pink }
+     enum Kind: Equatable { case filled(Tint), outlined(Tint) }
+ 
+     let kind: Kind
+@@ -311,12 +313,14 @@ struct ResultsCapsuleButtonStyle: ButtonStyle {
+         static func fill(_ tint: Tint) -> Color {
+             switch tint {
+             case .teal: ResectaTokens.BrandTeal.fill
++            case .pink: .pink
+             }
+         }
+ 
+         static func text(_ tint: Tint) -> Color {
+             switch tint {
+             case .teal: ResectaTokens.BrandTeal.text
++            case .pink: ResectaTokens.SemanticColor.attentionText
+             }
+         }
+     }

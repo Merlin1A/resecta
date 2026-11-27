@@ -1,0 +1,19 @@
+Property: Under the filled Keep Editing, Share is outlined, so one capsule is filled.
+Area: results (Share's capsule)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationResultsActionsTests
+Must go red: ResectaAppTests/VerificationResultsActionsTests shareCapsuleStyle
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationResultsActions.swift b/Sources/ResectaApp/Views/VerificationResultsActions.swift
+index 2f9028a..932637d 100644
+--- a/Sources/ResectaApp/Views/VerificationResultsActions.swift
++++ b/Sources/ResectaApp/Views/VerificationResultsActions.swift
+@@ -179,7 +179,7 @@ struct VerificationResultsActions: View {
+     /// A disabled capsule is grey in either shape — the style reads
+     /// `isEnabled`.
+     static func shareCapsuleKind(report: VerificationReport, swapped: Bool) -> ResultsCapsuleButtonStyle.Kind {
+-        swapped ? .outlined(.teal) : .filled(.teal)
++        .filled(.teal)
+     }
+ 
+     /// The action rows: Run Verification on a skipped report while its
