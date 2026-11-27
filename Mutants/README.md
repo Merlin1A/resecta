@@ -854,3 +854,10 @@ with its reason and the mutant that is caught in its place.
 | `shown-join-strips-not-read-back.patch` | Every rectangle the run fills for what was shown, beside a box or a region it fills on its own, is read back. | RedactionEngineTests/ShownJoinTests strayHoldsWhatWasShown; RedactionEngineTests/ShownJoinTests boxShownButNotProjectedHere |
 | `shown-join-outside-plan-not-filled.patch` | What was shown for a box that projects at the shown quality and not at the run's is filled as one more stray rectangle. | RedactionEngineTests/ShownJoinTests boxShownButNotProjectedHere |
 | `shown-join-judged-floor-not-joined.patch` | Under the switch's policy a judged box's floor holds what was shown for it, so the ink check never paints less than was shown. | RedactionEngineTests/PlanSwitchTests judgedBoxHoldsWhatWasShown |
+| `check-name-left-as-shipped.patch` | Every check named plainer carries its new name; none keeps the one it shipped with. | ResectaAppTests/VerificationRowModelTests everyCheckHasItsPlainName, noOldNameIsLeft |
+| `check-names-swapped.patch` | Each check carries its own new name, not a neighbour's. | ResectaAppTests/VerificationRowModelTests everyCheckHasItsPlainName |
+| `check-name-one-letter-off.patch` | A new name is its strings row letter for letter. | ResectaAppTests/VerificationRowModelTests everyCheckHasItsPlainName |
+| `check-name-kept-one-changed.patch` | A check whose name is kept keeps it. | ResectaAppTests/VerificationRowModelTests everyCheckHasItsPlainName |
+| `check-name-engine-renamed-too.patch` | The engine's own name for a check is not renamed with its row. | ResectaAppTests/VerificationRowModelTests engineNamesUnchanged |
+| `check-step-plural-says-ocr-on.patch` | The step on searches that still match names the Include OCR Pages switch in both forms. | ResectaAppTests/VerificationRowModelTests recheckReviewCaption |
+| `check-skipped-caption-shipped.patch` | A skipped check's caption says it needs a full Redact run. | ResectaAppTests/VerificationRowModelTests skippedRow |
