@@ -21,7 +21,8 @@ nonisolated final class RotatedPageWalkUITests: XCTestCase {
     /// pins it to within half a point.
     static let wordWidth: CGFloat = 53.34
     /// The ring is the match's box outset 3 points each side and stroked 2
-    /// wide, in the overlay's points, which are the page's.
+    /// wide, in screen points at every zoom (`searchMarkStrokes`), so its
+    /// outer edge lies 4 screen points outside the box on each side.
     static let ringPad: CGFloat = 8
 
     override func setUp() {
@@ -59,8 +60,8 @@ nonisolated final class RotatedPageWalkUITests: XCTestCase {
 
         var scale: CGFloat = 0
         let ring = try RingCentre.assertRingCentred(app, step: "1 (the one match, turned page)") { band, window, ring in
-            // s from the ring's width: (the word's width + the ring's pad) × s.
-            let s = ring.width / (Self.wordWidth + Self.ringPad)
+            // s from the ring's width: the word's width × s + the ring's pad.
+            let s = (ring.width - Self.ringPad) / Self.wordWidth
             scale = s
             return CGPoint(
                 x: Self.expectedOnScreen(centre: Self.word.x, page: Self.page.width, bandStart: window.minX,
@@ -74,7 +75,7 @@ nonisolated final class RotatedPageWalkUITests: XCTestCase {
         XCTAssertTrue(box.minY >= band.lowerBound && box.maxY <= band.upperBound
                         && box.minX >= window.minX && box.maxX <= window.maxX,
                       "The outlined match \(box) is not inside the visible canvas (band \(band)).")
-        let matchHeight = box.height - Self.ringPad * scale
+        let matchHeight = box.height - Self.ringPad
         XCTAssertGreaterThanOrEqual(matchHeight, 15, "The match is \(matchHeight) pt tall on screen (s = \(scale)): not framed readably.")
         attachScreenshot(named: "rpw-turned-page-framed")
     }
