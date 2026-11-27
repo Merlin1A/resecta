@@ -399,10 +399,6 @@ enum ResectaTokens {
         static let handleLargestStep: CGFloat = 6.5
         /// The shortest side that has a handle at its middle.
         static let edgeHandleShortestSide: CGFloat = 60
-        /// The core of a drawn handle of the selected box: a square this many
-        /// on-screen points wide, centred on the handle, where that handle
-        /// takes the touch even over another box's body.
-        static let handleCore: CGFloat = 22
         /// On an axis shorter than this, the corner dots step outward.
         static let dotsStepOutBelow: CGFloat = 12
         /// The most a corner dot steps outward.
