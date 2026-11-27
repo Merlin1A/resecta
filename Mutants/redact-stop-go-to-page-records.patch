@@ -5,14 +5,14 @@ Must go red: ResectaAppTests/BeforeYouRedactSheetTests cancelAndGoToPageRecordNo
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Views/DocumentEditorView+BeforeRedact.swift b/Sources/ResectaApp/Views/DocumentEditorView+BeforeRedact.swift
-index a86a4ffd..91379f92 100644
+index 7bdb205f7..81347480c 100644
 --- a/Sources/ResectaApp/Views/DocumentEditorView+BeforeRedact.swift
 +++ b/Sources/ResectaApp/Views/DocumentEditorView+BeforeRedact.swift
-@@ -39,6 +39,7 @@ extension DocumentEditorView {
-         case .cancel, .swipedDown:
-             coordinator.cancelRefusalAwaitingAnswer()
-         case .goToPage(let page):
-+            if case .pagesNotRead(let shown) = documentState.redactRefusalAwaitingAnswer { redactionState.redactStopAnswered.formUnion(shown) }
-             coordinator.cancelRefusalAwaitingAnswer()
-             PageNavigationBar.showPage(page, documentState: documentState, redactionState: redactionState)
+@@ -49,6 +49,7 @@ extension DocumentEditorView {
+             coordinator.answerPagesNotReadAndRun(documentOverride: documentOverride)
+             return
          }
++        if effects.showsPage != nil, case .pagesNotRead(let shown) = documentState.redactRefusalAwaitingAnswer { redactionState.redactStopAnswered.formUnion(shown) }
+         if effects.clearsCase { coordinator.cancelRefusalAwaitingAnswer() }
+         if effects.opensSearch, case .searchThesePages(let query) = answer {
+             redactionState.activeSearch = SearchState.reRunSession(for: query)

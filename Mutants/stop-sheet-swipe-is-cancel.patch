@@ -5,7 +5,7 @@ Must go red: ResectaAppTests/BeforeYouRedactSheetTests answers; and by hand, UI 
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Views/BeforeYouRedactSheet.swift b/Sources/ResectaApp/Views/BeforeYouRedactSheet.swift
-index ee77fb72..51324369 100644
+index ee77fb726..513243691 100644
 --- a/Sources/ResectaApp/Views/BeforeYouRedactSheet.swift
 +++ b/Sources/ResectaApp/Views/BeforeYouRedactSheet.swift
 @@ -80,7 +80,9 @@ struct BeforeYouRedactSheet: View {

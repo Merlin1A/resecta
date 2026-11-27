@@ -5,10 +5,10 @@ Must go red: ResectaAppTests/BeforeYouRedactSheetTests notReachedRows
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Views/BeforeYouRedactWords.swift b/Sources/ResectaApp/Views/BeforeYouRedactWords.swift
-index 73fb616e..4b222683 100644
+index a3aa457da..d7de22f4f 100644
 --- a/Sources/ResectaApp/Views/BeforeYouRedactWords.swift
 +++ b/Sources/ResectaApp/Views/BeforeYouRedactWords.swift
-@@ -83,7 +83,7 @@ enum StopWords {
+@@ -81,7 +81,7 @@ enum StopWords {
          let searches = names.contains { $0.kind != .scan }
          let oneBased = group.pages.map { $0 + 1 }
          // The strings table's page rule: a run of three or more as "3–9".

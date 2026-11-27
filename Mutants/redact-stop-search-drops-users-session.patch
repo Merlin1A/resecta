@@ -5,10 +5,10 @@ Must go red: ResectaAppTests/BeforeYouRedactSheetTests searchThesePagesKeepsTheU
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Views/DocumentEditorView+BeforeRedact.swift b/Sources/ResectaApp/Views/DocumentEditorView+BeforeRedact.swift
-index a86a4ffd..bcf7c187 100644
+index 7bdb205f7..022db6dd6 100644
 --- a/Sources/ResectaApp/Views/DocumentEditorView+BeforeRedact.swift
 +++ b/Sources/ResectaApp/Views/DocumentEditorView+BeforeRedact.swift
-@@ -49,7 +49,7 @@ extension DocumentEditorView {
+@@ -63,7 +63,7 @@ extension DocumentEditorView {
      /// and any results not yet applied, and it comes back once the re-run's
      /// session is down.
      static func stopAnswerDropsParkedSearch(_ answer: BeforeYouRedactAnswer) -> Bool {
@@ -16,4 +16,4 @@ index a86a4ffd..bcf7c187 100644
 +        BeforeYouRedactSheet.effects(of: answer).entersRun || BeforeYouRedactSheet.effects(of: answer).opensSearch
      }
  
-     /// The session the stop parked comes back when the slot is free: no
+     /// The session the stop parked comes back when the slot is free: the stop

@@ -5,7 +5,7 @@ Must go red: ResectaAppTests/DropReplaceConfirmTests stopRefusalNamesCancel; Res
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Views/RedactWorkspaceView.swift b/Sources/ResectaApp/Views/RedactWorkspaceView.swift
-index d0d2db06..0e2a4de7 100644
+index 6a8a534d0..2ceed1341 100644
 --- a/Sources/ResectaApp/Views/RedactWorkspaceView.swift
 +++ b/Sources/ResectaApp/Views/RedactWorkspaceView.swift
 @@ -175,7 +175,7 @@ struct RedactWorkspaceView: View {

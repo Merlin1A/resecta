@@ -5,10 +5,10 @@ Must go red: ResectaAppTests/BeforeYouRedactSheetTests showsOnlyTheCasesPages; R
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Views/BeforeYouRedactSheet.swift b/Sources/ResectaApp/Views/BeforeYouRedactSheet.swift
-index b97d044a..189a8015 100644
+index ee77fb726..4662fe16e 100644
 --- a/Sources/ResectaApp/Views/BeforeYouRedactSheet.swift
 +++ b/Sources/ResectaApp/Views/BeforeYouRedactSheet.swift
-@@ -241,7 +241,7 @@ extension BeforeYouRedactSheet {
+@@ -244,7 +244,7 @@ extension BeforeYouRedactSheet {
                       answered: Set<RedactStop.Page>, words: BeforeYouRedactWords) -> BeforeYouRedactStop {
          var shown: [RedactStop.Group] = []
          for group in RedactStop.groups(runs: runs, answered: answered) {

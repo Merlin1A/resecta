@@ -5,15 +5,15 @@ Must go red: ResectaAppTests/BeforeYouRedactSheetTests searchThesePagesKeepsTheU
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Views/DocumentEditorView+BeforeRedact.swift b/Sources/ResectaApp/Views/DocumentEditorView+BeforeRedact.swift
-index a86a4ffd..43ada4a4 100644
+index 7bdb205f7..e10bac288 100644
 --- a/Sources/ResectaApp/Views/DocumentEditorView+BeforeRedact.swift
 +++ b/Sources/ResectaApp/Views/DocumentEditorView+BeforeRedact.swift
-@@ -57,7 +57,7 @@ extension DocumentEditorView {
-     /// Home's dialog nor Settings waiting to take it.
-     static func handOffRestores(stopParkedSearch: Bool, searchUp: Bool,
+@@ -72,7 +72,7 @@ extension DocumentEditorView {
+     /// closes), and neither Home's dialog nor Settings waiting to take it.
+     static func handOffRestores(stopParkedSearch: Bool, stopUp: Bool, searchUp: Bool,
                                  homeWaits: Bool, settingsWaits: Bool) -> Bool {
--        stopParkedSearch && !searchUp && !homeWaits && !settingsWaits
-+        stopParkedSearch && !homeWaits && !settingsWaits
+-        stopParkedSearch && !stopUp && !searchUp && !homeWaits && !settingsWaits
++        stopParkedSearch && !stopUp && !homeWaits && !settingsWaits
      }
  
      /// The view half of an answer; see `stopAnswerDropsParkedSearch`.

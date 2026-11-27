@@ -5,10 +5,10 @@ Must go red: ResectaAppTests/BeforeYouRedactSheetTests notReachedRows
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Views/BeforeYouRedactWords.swift b/Sources/ResectaApp/Views/BeforeYouRedactWords.swift
-index 73fb616e..db9f90ff 100644
+index a3aa457da..f1b782d35 100644
 --- a/Sources/ResectaApp/Views/BeforeYouRedactWords.swift
 +++ b/Sources/ResectaApp/Views/BeforeYouRedactWords.swift
-@@ -99,7 +99,7 @@ enum StopWords {
+@@ -97,7 +97,7 @@ enum StopWords {
              switch group.notReachedEnding {
              case .stopped?: cause = "\(subject) stopped before \(they) reached"
              case .atResultLimit?: cause = "\(subject) reached \(limit) of 1,000 results before \(they) reached"

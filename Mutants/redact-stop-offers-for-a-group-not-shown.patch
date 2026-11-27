@@ -5,7 +5,7 @@ Must go red: ResectaAppTests/BeforeYouRedactSheetTests offersOnlyForAShownGroup
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Views/BeforeYouRedactSheet.swift b/Sources/ResectaApp/Views/BeforeYouRedactSheet.swift
-index ee77fb72..012bc8cf 100644
+index ee77fb726..012bc8cfa 100644
 --- a/Sources/ResectaApp/Views/BeforeYouRedactSheet.swift
 +++ b/Sources/ResectaApp/Views/BeforeYouRedactSheet.swift
 @@ -260,7 +260,7 @@ extension BeforeYouRedactSheet {

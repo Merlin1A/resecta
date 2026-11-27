@@ -5,7 +5,7 @@ Must go red: ResectaAppTests/BeforeYouRedactSheetTests oneTealCapsule
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Views/BeforeYouRedactSheet.swift b/Sources/ResectaApp/Views/BeforeYouRedactSheet.swift
-index ee77fb72..f0f50aef 100644
+index ee77fb726..f0f50aefb 100644
 --- a/Sources/ResectaApp/Views/BeforeYouRedactSheet.swift
 +++ b/Sources/ResectaApp/Views/BeforeYouRedactSheet.swift
 @@ -53,7 +53,7 @@ struct BeforeYouRedactSheet: View {
