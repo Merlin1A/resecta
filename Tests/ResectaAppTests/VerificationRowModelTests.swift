@@ -296,16 +296,16 @@ struct VerificationRowModelTests {
     // MARK: - The copy
 
     static let titles: [(VerificationLayer?, String)] = [
-        (.textExtraction, "Text & Annotations in the Redacted PDF"),
-        (.ocrCheck, "OCR of Page Images"),
-        (.binaryStringSearch, "Terms in Text & Bytes"),
-        (.structureCheck, "Active Content & Structure"),
-        (.metadataCheck, "Document Metadata"),
-        (.spatialVerification, "Character Positions"),
+        (.textExtraction, "Leftover Text & Markup"),
+        (.ocrCheck, "Text Recognition of Each Page"),
+        (.binaryStringSearch, "Boxed Text in the File"),
+        (.structureCheck, "Scripts & Attachments"),
+        (.metadataCheck, "Author & File Details"),
+        (.spatialVerification, "Kept Text Clear of Boxes"),
         (.characterCount, "Character Count"),
-        (.fontVerification, "Monospace Fonts"),
-        (.characterLineage, "Character Sequence"),
-        (.operatorReExtraction, "Terms in Content Streams"),
+        (.fontVerification, "Fonts in the Searchable Copy"),
+        (.characterLineage, "Kept Text Unchanged"),
+        (.operatorReExtraction, "Boxed Text in Drawing Commands"),
         (.hiddenWordInk, "Hidden Words Under Boxes"),
         (.searchRecheck, "Search Re-check"),
         (.detectionSweep, "Detection Sweep"),
@@ -313,12 +313,50 @@ struct VerificationRowModelTests {
         (nil, "Page Count"),
     ]
 
-    @Test("Every identity has its plain-language title; the page-count gate reads Page Count")
-    func titleMapCoversEveryIdentity() {
+    @Test("Every check has its plain name; the page-count gate reads Page Count")
+    func everyCheckHasItsPlainName() {
         #expect(Self.titles.count == VerificationLayer.allCases.count + 1)
         for (identity, title) in Self.titles {
             #expect(VerificationRowModel.title(for: Self.layer(.pass, identity: identity)) == title)
         }
+    }
+
+    /// The names the ten checks shipped with, before their plainer ones.
+    static let shippedNames = [
+        "Text & Annotations in the Redacted PDF", "OCR of Page Images", "Terms in Text & Bytes",
+        "Active Content & Structure", "Document Metadata", "Character Positions", "Monospace Fonts",
+        "Character Sequence", "Terms in Content Streams",
+    ]
+
+    @Test("No shipped check name is left in the app's code, outside comments and the forged engine sentences")
+    func noOldNameIsLeft() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let sources = root.appendingPathComponent("Sources/ResectaApp")
+        let walk = try #require(FileManager.default.enumerator(at: sources, includingPropertiesForKeys: nil))
+        var read = 0
+        for case let file as URL in walk where file.pathExtension == "swift" {
+            guard file.lastPathComponent != "VerificationDetailsSection+DebugFixtures.swift" else { continue }
+            read += 1
+            let code = try String(contentsOf: file, encoding: .utf8).split(separator: "\n")
+                .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+                .joined(separator: "\n")
+            for name in Self.shippedNames {
+                #expect(!code.contains(name), "\(file.lastPathComponent) still names \(name)")
+            }
+        }
+        #expect(read > 100, "the walk read the app's sources")
+        let model = try String(contentsOf: sources.appendingPathComponent("Views/VerificationRowModel.swift"), encoding: .utf8)
+        for name in Self.shippedNames { #expect(!model.contains("\"\(name)\""), "the title table quotes \(name)") }
+    }
+
+    @Test("The engine keeps its own names for the checks; only the rows' titles are plainer")
+    func engineNamesUnchanged() {
+        #expect(VerificationLayer.allCases.map(\.name) == [
+            "Text Extraction", "OCR Check", "Binary String Search", "Structure Check", "Metadata Check",
+            "Spatial Verification", "Character Count", "Font Verification", "Character Lineage",
+            "Operator Re-Extraction", "Hidden Words Under Boxes", "Search Re-check", "Detection Sweep", "Box Fill",
+        ])
     }
 
     @Test("An identity-less row named for another check keeps its engine name")
@@ -446,8 +484,8 @@ struct VerificationRowModelTests {
         for identity in [VerificationLayer.characterCount, .characterLineage] {
             let model = VerificationRowModel(layer: Self.layer(.skipped, identity: identity), perPageModes: [])
             #expect(model.outcome == .couldNotVerify)
-            #expect(model.caption == "Skipped. No record to compare with.")
-            #expect(model.lead == ["Only a full Redact run saves that record."])
+            #expect(model.caption == "Skipped. This check needs a full Redact run.")
+            #expect(model.lead == ["A full run saves the record it compares with."])
             #expect(model.showsEngineDetail == false)
         }
     }
@@ -582,15 +620,15 @@ struct VerificationRowModelTests {
     func spokenLabelPerOutcome() {
         let cases: [(LayerResult, [PipelineMode], String)] = [
             (Self.layer(.pass, identity: .ocrCheck), [],
-             "OCR of Page Images, Passed. Reads page images against redactions."),
+             "Text Recognition of Each Page, Passed. Reads page images against redactions."),
             (Self.layer(.notApplicable("x"), identity: .characterCount), [.secureRasterization],
              "Character Count, Nothing to check. No Searchable pages to check."),
             (Self.layer(.info("x"), identity: .ocrCheck, short: "Fill artifact on page 1."), [],
-             "OCR of Page Images, Note. Fill artifact on page 1."),
+             "Text Recognition of Each Page, Note. Fill artifact on page 1."),
             (Self.layer(.warn("x"), identity: .structureCheck, short: "A second %%EOF."), [],
-             "Active Content & Structure, Warning. A second %%EOF."),
+             "Scripts & Attachments, Warning. A second %%EOF."),
             (Self.layer(.warn("x"), identity: .ocrCheck, short: "OCR could not be run on 1 page", cnv: true), [],
-             "OCR of Page Images, Could not verify. OCR could not be run on 1 page."),
+             "Text Recognition of Each Page, Could not verify. OCR could not be run on 1 page."),
             (Self.layer(.attention("x"), identity: .searchRecheck, short: "Text remains."), [],
              "Search Re-check, Needs review. Text remains."),
             (Self.layer(.fail("x"), identity: nil, short: "Page count changed."), [],
@@ -736,7 +774,7 @@ struct VerificationRowModelTests {
                     .rule(VerificationRowModel.rule(for: .characterCount)), .detail("Engine detail."), took])
         // Skipped: the lead first; no engine detail (it names a reason that does not apply).
         #expect(items(Self.layer(.skipped, identity: .characterLineage))
-                == [.lead("Only a full Redact run saves that record."),
+                == [.lead("A full run saves the record it compares with."),
                     .explainer("Compares kept characters with the record."),
                     .rule(VerificationRowModel.rule(for: .characterLineage)), took])
         // The sweep note: its lines and its pages; its time is the re-check's.
@@ -749,7 +787,7 @@ struct VerificationRowModelTests {
                 == [.rule(VerificationRowModel.pageCountGateRule), took])
     }
 
-    @Test("Terms in Content Streams says where its scan stopped when later pages exist")
+    @Test("Boxed Text in Drawing Commands says where its scan stopped when later pages exist")
     func contentStreamStopLine() {
         let row = Self.layer(.attention("x"), identity: .operatorReExtraction, pages: [1], terms: ["Delia"])
         let modes: [PipelineMode] = [.searchableRedaction, .searchableRedaction, .searchableRedaction]
@@ -781,7 +819,7 @@ struct VerificationRowModelTests {
                               lines: [line("\u{201C}Delia\u{201D}", 1), line("\u{201C}Fox\u{201D}", 0)]),
             perPageModes: [])
         #expect(one.caption == "Your search \u{201C}Delia\u{201D} still has 1 match on\u{00A0}page\u{00A0}2.")
-        #expect(one.lead == ["Run it again with OCR on to redact the rest."])
+        #expect(one.lead == ["Run it again with Include OCR Pages on to redact the rest."])
         #expect(one.captionIsPrivacySensitive)
         let two = VerificationRowModel(
             layer: Self.layer(.attention("x"), identity: .searchRecheck, pages: [0, 1],
@@ -789,7 +827,7 @@ struct VerificationRowModelTests {
             perPageModes: [])
         #expect(two.caption == "Your searches \u{201C}Delia\u{201D} and \u{201C}\\d{4}\u{201D} still have 3 matches "
                 + "on pages 1\u{00A0}and\u{00A0}2.")
-        #expect(two.lead == ["Run them again with OCR on to redact the rest."])
+        #expect(two.lead == ["Run them again with Include OCR Pages on to redact the rest."])
     }
 
     @Test("The spoken pages: up to five, then four and a count")

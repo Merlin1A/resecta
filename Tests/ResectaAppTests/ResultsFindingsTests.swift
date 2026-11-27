@@ -82,7 +82,7 @@ struct ResultsFindingsTests {
         let row = LayerResult(name: "Text Extraction", symbolName: "doc.text", status: .pass,
                               shortDescription: "", detailDescription: "", pageReferences: nil, durationSeconds: 0,
                               layer: .textExtraction)
-        #expect(VerificationRowModel.title(for: row) == "Text & Annotations in the Redacted PDF")
+        #expect(VerificationRowModel.title(for: row) == "Leftover Text & Markup")
     }
 
     // MARK: - Form values and hand-drawn regions

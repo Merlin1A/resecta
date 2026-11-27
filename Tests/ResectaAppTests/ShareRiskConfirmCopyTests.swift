@@ -16,18 +16,18 @@ struct ShareRiskConfirmCopyTests {
     @Test("The FAIL/ATTENTION family's lines: title, outcome, pages, the short titles, then the checks that did not run in full")
     func atRiskLines() {
         #expect(DocumentEditorView.atRiskItemLines(report: Fixtures.searchableAttentionMixed)
-                == ["Terms in Text & Bytes: needs review on\u{00A0}page\u{00A0}2",
-                    "OCR of Page Images: could not verify on\u{00A0}page\u{00A0}3",
-                    "Monospace Fonts: could not verify on\u{00A0}page\u{00A0}3"],
+                == ["Boxed Text in the File: needs review on\u{00A0}page\u{00A0}2",
+                    "Text Recognition of Each Page: could not verify on\u{00A0}page\u{00A0}3",
+                    "Fonts in the Searchable Copy: could not verify on\u{00A0}page\u{00A0}3"],
                 "the same report's could-not-verify checks follow the at-risk ones")
         #expect(DocumentEditorView.atRiskItemLines(report: Fixtures.searchableAttentionFull)
-                == ["Terms in Text & Bytes: needs review on pages 2\u{00A0}and\u{00A0}3",
-                    "Terms in Content Streams: needs review on\u{00A0}page\u{00A0}2"]
+                == ["Boxed Text in the File: needs review on pages 2\u{00A0}and\u{00A0}3",
+                    "Boxed Text in Drawing Commands: needs review on\u{00A0}page\u{00A0}2"]
                     + DocumentEditorView.couldNotVerifyItemLines(report: Fixtures.searchableAttentionFull))
         #expect(DocumentEditorView.atRiskItemLines(report: Fixtures.pageCountGate)
                 == ["Page Count: failed"] + DocumentEditorView.couldNotVerifyItemLines(report: Fixtures.pageCountGate))
         #expect(DocumentEditorView.atRiskItemLines(report: Fixtures.secureFail)
-                == ["Text & Annotations in the Redacted PDF: failed on\u{00A0}page\u{00A0}1"]
+                == ["Leftover Text & Markup: failed on\u{00A0}page\u{00A0}1"]
                     + DocumentEditorView.couldNotVerifyItemLines(report: Fixtures.secureFail))
         for line in DocumentEditorView.atRiskItemLines(report: Fixtures.secureAllFailed) {
             #expect(line.count <= 90, "\(line)")
@@ -37,10 +37,10 @@ struct ShareRiskConfirmCopyTests {
     @Test("The incomplete family lists the could-not-verify and the skipped checks; no masthead sentence")
     func incompleteLines() {
         #expect(DocumentEditorView.couldNotVerifyItemLines(report: Fixtures.searchableSkipInduced)
-                == ["Character Count: skipped", "Character Sequence: skipped"])
+                == ["Character Count: skipped", "Kept Text Unchanged: skipped"])
         #expect(DocumentEditorView.couldNotVerifyItemLines(report: Fixtures.searchableAttentionMixed)
-                == ["OCR of Page Images: could not verify on\u{00A0}page\u{00A0}3",
-                    "Monospace Fonts: could not verify on\u{00A0}page\u{00A0}3"])
+                == ["Text Recognition of Each Page: could not verify on\u{00A0}page\u{00A0}3",
+                    "Fonts in the Searchable Copy: could not verify on\u{00A0}page\u{00A0}3"])
         let kind = ShareRiskConfirmKind.incompleteWarn(Fixtures.searchableSkipInduced)
         #expect(kind.title == "Share with incomplete checks?")
         #expect(kind.listHeader == "These checks did not run in full:")

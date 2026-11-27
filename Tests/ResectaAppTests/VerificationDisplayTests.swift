@@ -453,7 +453,7 @@ struct AttentionRowCompositionTests {
     func spokenLabelUsesComposedText() {
         let layer = attentionLayer(terms: ["DELIA"], pages: [1, 2])
         let label = LayerResultRow.accessibilityLabel(model: .init(layer: layer, perPageModes: []), layer: layer)
-        #expect(label.hasPrefix("Terms in Text & Bytes, Needs review."))
+        #expect(label.hasPrefix("Boxed Text in the File, Needs review."))
         #expect(label.contains("\u{201C}DELIA\u{201D} is still readable on pages 2\u{00A0}and\u{00A0}3."))
         #expect(label.hasSuffix(" Pages 2 and 3."))
     }

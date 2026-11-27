@@ -1,0 +1,19 @@
+Property: A check whose name is kept keeps it.
+Area: the names of the checks
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationRowModelTests
+Must go red: ResectaAppTests/VerificationRowModelTests everyCheckHasItsPlainName; and by hand, ResectaAppUITests/SearchRecheckUITests testDetectionSweep_drawnBox_rowPresentAndNoDetectionLine
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationRowModel.swift b/Sources/ResectaApp/Views/VerificationRowModel.swift
+index a3b93bf7..3ed76e8b 100644
+--- a/Sources/ResectaApp/Views/VerificationRowModel.swift
++++ b/Sources/ResectaApp/Views/VerificationRowModel.swift
+@@ -237,7 +237,7 @@ nonisolated struct VerificationRowModel: Equatable {
+         case .operatorReExtraction: return "Boxed Text in Drawing Commands"
+         case .hiddenWordInk:        return "Hidden Words Under Boxes"
+         case .searchRecheck:        return "Search Re-check"
+-        case .detectionSweep:       return "Detection Sweep"
++        case .detectionSweep:       return "Detection Check"
+         case .boxFill:              return "Box Fill"
+         }
+     }

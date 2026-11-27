@@ -1,0 +1,19 @@
+Property: The engine's own name for a check is not renamed with its row.
+Area: the names of the checks
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationRowModelTests
+Must go red: ResectaAppTests/VerificationRowModelTests engineNamesUnchanged
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationLayer.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationLayer.swift
+index 37e2cfb6..3e01e123 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationLayer.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/VerificationLayer.swift
+@@ -51,7 +51,7 @@ public enum VerificationLayer: String, CaseIterable, Sendable, Hashable {
+         case .ocrCheck: "OCR Check"
+         case .binaryStringSearch: "Binary String Search"
+         case .structureCheck: "Structure Check"
+-        case .metadataCheck: "Metadata Check"
++        case .metadataCheck: "Author & File Details"
+         case .spatialVerification: "Spatial Verification"
+         case .characterCount: "Character Count"
+         case .fontVerification: "Font Verification"

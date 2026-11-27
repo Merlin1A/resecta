@@ -1,0 +1,19 @@
+Property: A preview reading on a page whose size in pixels is not whole is scaled by picture x 72 / (quality x side), not by its inverse.
+Area: the screen test's correction for a page whose size in pixels is not whole
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppUITests/WitnessMeasureTests
+Must go red: ResectaAppUITests/WitnessMeasureTests testCorrectedOnAnA4WidthAt150AndALetterWidth
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Tests/ResectaAppUITests/Support/WitnessMeasure.swift b/Tests/ResectaAppUITests/Support/WitnessMeasure.swift
+index 62bb1d0f6..3c1d2170b 100644
+--- a/Tests/ResectaAppUITests/Support/WitnessMeasure.swift
++++ b/Tests/ResectaAppUITests/Support/WitnessMeasure.swift
+@@ -131,7 +131,7 @@ nonisolated enum WitnessMeasure {
+ 
+     /// A preview reading, in points from the page's left or bottom, to the content's place.
+     static func corrected(_ reading: CGFloat, side: CGFloat, picture: Int, quality: Int) -> CGFloat {
+-        reading * CGFloat(picture) * 72 / (CGFloat(quality) * side)
++        reading * CGFloat(quality) * side / (CGFloat(picture) * 72)
+     }
+ 
+     /// Whether the page's own white agrees with the read-out. Down the column 8 pt inside
