@@ -5,13 +5,13 @@ Must go red: ResectaAppTests/ResultsOrderAndSentenceTests passingSentenceTable
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Views/VerificationMasthead.swift b/Sources/ResectaApp/Views/VerificationMasthead.swift
-index 93c2877a..78bfec3a 100644
+index e2641e1..3f00a51 100644
 --- a/Sources/ResectaApp/Views/VerificationMasthead.swift
 +++ b/Sources/ResectaApp/Views/VerificationMasthead.swift
-@@ -235,16 +235,16 @@ extension VerificationResultsView {
-     /// else the notes in view ("Read the note below…"); else Preview, or
-     /// the sentence for a PDF that no longer exists.
-     static func passingSentence(findingRows: Int, handDrawnBoxes: Int, notes: Int, outputExists: Bool) -> String {
+@@ -254,16 +254,16 @@ extension VerificationResultsView {
+     /// else the notes in view ("Read the note below…"); else Preview. Its one
+     /// caller, `mastheadSubtitle`, asks only when the result stands.
+     static func passingSentence(findingRows: Int, handDrawnBoxes: Int, notes: Int) -> String {
 -        if findingRows > 0 {
 -            return findingRows == 1
 -                ? "Read the finding below before you share the PDF."  // LegalPhrases:safe (approved row words)
@@ -28,5 +28,5 @@ index 93c2877a..78bfec3a 100644
 +                : "Read the findings below before you share the PDF."
 +        }
          switch notes {
-         case 0:
-             return outputExists
+         case 0:  return "Look over the redacted PDF in Preview before you share it."
+         case 1:  return "Read the note below before you share the PDF."
