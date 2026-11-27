@@ -1,0 +1,20 @@
+Property: A box being moved is drawn at its own size, its line and its fill alike.
+Area: the editor, one picture of a box
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild build-for-testing -scheme ResectaApp -destination id=<simulator>, then DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test-without-building -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BoxPictureTests
+Must go red: ResectaAppTests/BoxPictureTests tableCase(_:) [hand-moving-fs-1]; ResectaAppTests/BoxPictureTests tableCase(_:) [hand-moving-fs-1/0.64]; ResectaAppTests/BoxPictureTests tableCase(_:) [hand-moving-fs-0.5]; ResectaAppTests/BoxPictureTests tableCase(_:) [tag-never-moving]
+Apply in a scratch worktree with `git apply`; discard after.
+
+--- a/Sources/ResectaApp/Overlay/BoxPicture.swift
++++ b/Sources/ResectaApp/Overlay/BoxPicture.swift
+@@ -164,7 +164,10 @@
+             handleBoxes: handleBoxes,
+             bodyZone: bodyZone,
+             cores: cores,
+-            lift: input.selection == .moving ? Lift(line: lineRect, fill: fill) : nil,
++            lift: input.selection == .moving
++                ? Lift(line: lineRect.insetBy(dx: -lineRect.width / 100, dy: -lineRect.height / 100),
++                       fill: fill.insetBy(dx: -fill.width / 100, dy: -fill.height / 100))
++                : nil,
+             accessibilityFrame: shown,
+             keepInView: shown,
+             showsInkLine: C.showsInkLine(increaseContrast: input.settings.increaseContrast),
