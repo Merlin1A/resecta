@@ -184,6 +184,26 @@ struct FirstEditGestureTests {
         return CGPoint(x: min(max(p.x, canvas.minX), canvas.maxX - e), y: min(max(p.y, canvas.minY), canvas.maxY - e))
     }
 
+    /// Where a touch takes `handle` of the selected box: its grab point, or,
+    /// where another box's rectangle also holds that point (a box inside a
+    /// wider one, on their shared edge), the first point outward from it, in
+    /// steps of a sixteenth of the smallest handle touch box, that the
+    /// overlay gives to the handle: a touch just past the edge. The resize
+    /// reads the finger's travel, so where in the handle it goes down does
+    /// not move the result.
+    static func grabbable(_ handle: RedactionOverlayView.ResizeHandle, in rect: CGRect,
+                          overlay: RedactionOverlayView) -> CGPoint {
+        let p = grabPoint(handle, in: rect, canvas: overlay.bounds)
+        let out = CGVector(dx: p.x > rect.midX ? 1 : p.x < rect.midX ? -1 : 0,
+                           dy: p.y > rect.midY ? 1 : p.y < rect.midY ? -1 : 0)
+        let step = 22 * overlay.fingerScale / 16
+        for i in 0...8 {
+            let q = CGPoint(x: p.x + out.dx * step * CGFloat(i), y: p.y + out.dy * step * CGFloat(i))
+            if overlay.hitTestResizeHandle(at: q) == handle { return q }
+        }
+        return p
+    }
+
     /// A point on a box's body, clear of its handles' touch boxes.
     static func body(_ rect: CGRect) -> CGPoint { CGPoint(x: rect.minX + rect.width / 4, y: rect.midY) }
 
@@ -257,7 +277,7 @@ struct FirstEditGestureTests {
         } else {
             for (handle, travel) in Self.handleDrags(gesture) {
                 let drawn = c.overlay.pdfNormalizedToOverlay(try #require(c.copy(id)).normalizedRect)
-                let down = Self.grabPoint(handle, in: drawn, canvas: c.overlay.bounds)
+                let down = Self.grabbable(handle, in: drawn, overlay: c.overlay)
                 drag(c, from: down, through: Self.path(from: down, travel: travel), grab: .resize(handle),
                      cancel: cancel)
                 if cancel { break }
