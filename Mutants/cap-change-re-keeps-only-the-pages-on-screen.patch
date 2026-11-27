@@ -5,17 +5,16 @@ Must go red: ResectaAppTests/OverlayDrawnPlanTests aCapChangeRedrawsThePagesOnSc
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
-index 814ef401..cffb6e15 100644
 --- a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
 +++ b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
-@@ -28,10 +28,6 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
+@@ -38,10 +38,6 @@
      var qualityCap: Int = defaultDPICap {
          didSet {
              guard qualityCap != oldValue, let state = redactionState else { return }
 -            for (pageIndex, kept) in state.drawnPlans
 -            where kept.pageVersion == state.pageVersion(pageIndex) && kept.fromStoredRegions == true {
--                noteDrawn(pageIndex: pageIndex, regions: state.regions[pageIndex] ?? [])
+-                noteDrawn(pageIndex: pageIndex, regions: state.regions[pageIndex] ?? [], drawn: false)
 -            }
              for (pageIndex, overlay) in activeOverlays {
-                 noteDrawn(pageIndex: pageIndex, regions: state.regions[pageIndex] ?? [])
+                 noteDrawn(pageIndex: pageIndex, regions: state.regions[pageIndex] ?? [], drawn: false)
                  overlay.setNeedsDisplay()

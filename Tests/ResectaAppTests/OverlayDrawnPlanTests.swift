@@ -212,6 +212,32 @@ struct OverlayDrawnPlanTests {
         #expect(kept.pageVersion == state.pageVersion(0))
     }
 
+    @Test("A cap drop makes an off-screen page's plan again at 150 but keeps the 300 it was shown at; a 150 run joins it")
+    func aCapDropKeepsTheShownQuality() throws {
+        let pdf = try Self.document()
+        let state = RedactionState()
+        let region = RedactionRegion(id: UUID(), normalizedRect: CGRect(x: 0.5, y: 0.6, width: 0.2, height: 0.03), source: .manual)
+        state.addRegion(region, page: 0, undoManager: nil)
+        let coordinator = try Self.coordinator(pdf, state, suite: "OverlayDrawnPlanTests.aCapDropKeepsTheShownQuality")
+        // Drawn at 300, then off screen: no overlay is active.
+        coordinator.noteDrawn(pageIndex: 0, regions: [region])
+        #expect(state.drawnPlans[0]?.exportDPI == 300)
+        #expect(state.shownDPIs[0] == 300, "drawing a page records the quality it was shown at")
+        coordinator.qualityCap = 150
+        #expect(state.drawnPlans[0]?.exportDPI == 150, "the cap re-keys the off-screen page's plan")
+        #expect(state.shownDPIs[0] == 300, "but the page was last shown at 300, and no draw has moved that")
+        // A run at 150 records the 300 the page showed, so its paint is joined with it.
+        let record = RunInputs.confirmedRecord(
+            pageCount: pdf.pageCount, geometry: RunInputs.pageGeometry(of: pdf), shownDPIs: state.shownDPIs,
+            regions: state.regions, reads: [:],
+            settings: .init(pipelineMode: .secureRasterization, autoVerify: false, paranoidMode: false,
+                            fillColor: .black, exportDPI: 150))
+        #expect(record.pages.first { $0.pageIndex == 0 }?.shownDPI == 300)
+        // Drawn again under the cap, it is shown at 150.
+        coordinator.noteDrawn(pageIndex: 0, regions: [region])
+        #expect(state.shownDPIs[0] == 150)
+    }
+
     @Test("A cap change keeps no plan of regions a page was not drawn with")
     func aCapChangeKeepsOnlyWhatWasDrawn() throws {
         let pdf = try Self.document()

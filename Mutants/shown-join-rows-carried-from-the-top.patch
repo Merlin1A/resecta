@@ -1,0 +1,25 @@
+Property: The carry counts rows from the page's bottom, which both images share, never from the image's top.
+Area: the run never paints less than was shown
+Test command: cd Packages/RedactionEngine && swift test --skip-build --no-parallel --filter 'ShownJoinTests' (after swift build --build-tests)
+Must go red: RedactionEngineTests/ShownJoinTests carriedHoldsTheShownRectangle
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PixelPlan.swift b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PixelPlan.swift
+index 95a3b63ca..4a304d592 100644
+--- a/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PixelPlan.swift
++++ b/Packages/RedactionEngine/Sources/RedactionCore/Geometry/PixelPlan.swift
+@@ -170,11 +170,12 @@ package enum PixelPlan {
+                              maxX: clipX(rect.maxX), maxY: clipY(rect.maxY))
+         }
+         let d = raster.dpi
++        let shownHeight = ceilDiv(raster.heightSixtyFourths * shownDPI, sixtyFourthsPerInch)
+         return PixelRect(
+             minX: clipX(floorDiv(rect.minX * d, shownDPI)),
+-            minY: clipY(floorDiv(rect.minY * d, shownDPI)),
++            minY: clipY(raster.pixelHeight - ceilDiv((shownHeight - rect.minY) * d, shownDPI)),
+             maxX: clipX(ceilDiv(rect.maxX * d, shownDPI)),
+-            maxY: clipY(ceilDiv(rect.maxY * d, shownDPI))
++            maxY: clipY(raster.pixelHeight - floorDiv((shownHeight - rect.maxY) * d, shownDPI))
+         )
+     }
+ }

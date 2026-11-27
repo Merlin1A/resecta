@@ -57,6 +57,12 @@ extension PixelPlan.PixelRect {
     /// The same pixels as a bitmap rectangle, origin bottom-left.
     var bitmapRect: CGRect { CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY) }
 
+    /// On each side the further out of this rectangle and `other`.
+    func joined(with other: PixelPlan.PixelRect) -> PixelPlan.PixelRect {
+        PixelPlan.PixelRect(minX: min(minX, other.minX), minY: min(minY, other.minY),
+                            maxX: max(maxX, other.maxX), maxY: max(maxY, other.maxY))
+    }
+
     /// A bitmap rectangle of whole pixels (as the fills hand out), as pixels.
     init(bitmapRect r: CGRect) {
         self.init(minX: Int(r.minX), minY: Int(r.minY), maxX: Int(r.maxX), maxY: Int(r.maxY))
@@ -71,15 +77,82 @@ extension PageRasterizer {
     /// check judges is painted with this as its floor, so the run never
     /// paints less than this. Nil when the box does not project; the run
     /// then fills its regions as strays, each by the region path.
+    ///
+    /// `shownDPI` is the quality the page was last shown at. With one that
+    /// differs from the raster's, the fill is joined with the fill shown
+    /// there, carried onto this raster (`shownFill`): on each side the
+    /// further out of the two. With none, or the raster's own, it is the
+    /// fill at this quality alone. Only the run passes it; the kept plan
+    /// reads the fill at its own quality.
     package static func boxFill(box: PaintedBox, regions: [UUID: RedactionRegion], raster: PixelPlan.Raster,
-                                content: CGSize) -> PixelPlan.PixelRect? {
-        boxFillAndProjection(box: box, regions: regions, raster: raster, content: content)?.fill
+                                content: CGSize, shownDPI: Int? = nil) -> PixelPlan.PixelRect? {
+        boxFillAndProjection(box: box, regions: regions, raster: raster, content: content, shownDPI: shownDPI)?.fill
     }
 
     /// `boxFill` with the projection it was made from (the run's growth reads
-    /// the projection's margin edge).
+    /// the projection's margin edge, which the join leaves as it is).
     static func boxFillAndProjection(box: PaintedBox, regions: [UUID: RedactionRegion], raster: PixelPlan.Raster,
-                                     content: CGSize) -> (fill: PixelPlan.PixelRect, projection: PixelPlan.Projection)? {
+                                     content: CGSize, shownDPI: Int? = nil)
+        -> (fill: PixelPlan.PixelRect, projection: PixelPlan.Projection)? {
+        guard let own = ownFillAndProjection(box: box, regions: regions, raster: raster, content: content)
+        else { return nil }
+        guard let shown = shownFill(box: box, regions: regions, raster: raster, shownDPI: shownDPI)
+        else { return own }
+        return (own.fill.joined(with: shown), own.projection)
+    }
+
+    /// The raster of the same page at `shownDPI`, with its content span, when
+    /// that quality differs from `raster`'s. Nil otherwise.
+    static func shownRaster(of raster: PixelPlan.Raster, shownDPI: Int?)
+        -> (raster: PixelPlan.Raster, content: CGSize)? {
+        guard let shownDPI, shownDPI != raster.dpi,
+              let shown = PixelPlan.Raster(widthSixtyFourths: raster.widthSixtyFourths,
+                                           heightSixtyFourths: raster.heightSixtyFourths, dpi: shownDPI)
+        else { return nil }
+        return (shown, CGSize(width: contentSpan(raster.widthSixtyFourths, dpi: shownDPI),
+                              height: contentSpan(raster.heightSixtyFourths, dpi: shownDPI)))
+    }
+
+    /// What the page showed for `box` at `shownDPI`, carried onto `raster`:
+    /// the box's fill there by this same rule at its own quality, or, for a
+    /// box that does not project there, its regions' own fills there, as the
+    /// kept plan shows such a box. Nil when the quality is the raster's own,
+    /// when there is none, or when nothing was shown.
+    static func shownFill(box: PaintedBox, regions: [UUID: RedactionRegion], raster: PixelPlan.Raster,
+                          shownDPI: Int?) -> PixelPlan.PixelRect? {
+        guard let (shown, content) = shownRaster(of: raster, shownDPI: shownDPI) else { return nil }
+        var fill = ownFillAndProjection(box: box, regions: regions, raster: shown, content: content)?.fill
+        if fill == nil {
+            var rect = CGRect.null
+            for id in box.regionIDs {
+                guard let region = regions[id] else { continue }
+                let filled = normalizedToFillPixels(region.normalizedRect, content: content)
+                if !filled.isEmpty { rect = rect.union(filled) }
+            }
+            if !rect.isNull { fill = PixelPlan.PixelRect(bitmapRect: rect) }
+        }
+        guard let fill, !fill.isEmpty else { return nil }
+        let carried = PixelPlan.carried(fill, shownDPI: shown.dpi, onto: raster)
+        return carried.isEmpty ? nil : carried
+    }
+
+    /// A region's own fill at `shownDPI`, carried onto `raster`, as the run
+    /// joins it for a region it fills on its own. Nil where `shownFill` is.
+    static func shownRegionFill(_ region: RedactionRegion, raster: PixelPlan.Raster,
+                                shownDPI: Int?) -> CGRect? {
+        guard let (shown, content) = shownRaster(of: raster, shownDPI: shownDPI) else { return nil }
+        let filled = normalizedToFillPixels(region.normalizedRect, content: content)
+        guard !filled.isEmpty else { return nil }
+        let carried = PixelPlan.carried(PixelPlan.PixelRect(bitmapRect: filled), shownDPI: shown.dpi, onto: raster)
+        return carried.isEmpty ? nil : carried.bitmapRect
+    }
+
+    /// The box's fill at the raster's own quality: its projection joined
+    /// with each of its regions as the region path fills it, within the
+    /// bitmap.
+    private static func ownFillAndProjection(box: PaintedBox, regions: [UUID: RedactionRegion],
+                                             raster: PixelPlan.Raster, content: CGSize)
+        -> (fill: PixelPlan.PixelRect, projection: PixelPlan.Projection)? {
         guard let projection = PixelPlan.project(
             inner: box.inner, paint: box.paint,
             limitAbove: box.limitAbove, limitBelow: box.limitBelow, raster: raster) else { return nil }
@@ -264,6 +337,9 @@ extension PageRasterizer {
         var widened: Set<Int> = []
         let atSwitch = page.planSource == .switchPolicy
         var grid: InkCheck.Grid?
+        // What was shown for a box that does not project here: filled as one
+        // more stray rectangle, and read back.
+        var shownOutsidePlan: [CGRect] = []
         func withRegionFills(_ rect: CGRect, of box: PaintedBox) -> CGRect {
             var rect = rect
             for id in box.regionIDs {
@@ -275,9 +351,13 @@ extension PageRasterizer {
         }
         // A box's paint at "as placed": its projection, its regions' own
         // fills, and its growth over the ink that crosses its edge.
+        // The quality the page was shown at: each box's paint holds the fill
+        // shown there (`boxFill`).
+        let shownDPI = page.confirmedPage?.shownDPI
         func asPlacedRect(_ box: PaintedBox, grows: Bool) throws -> CGRect? {
             guard let (fill, projection) = Self.boxFillAndProjection(
-                box: box, regions: regionsByID, raster: raster, content: content) else { return nil }
+                box: box, regions: regionsByID, raster: raster, content: content,
+                shownDPI: shownDPI) else { return nil }
             var rect = fill.bitmapRect
             if grows,
                let grown = try inkGrowthRect(context: ctx, fillRect: projection.marginEdge.bitmapRect) {
@@ -306,7 +386,14 @@ extension PageRasterizer {
                             verdicts[index] = verdict
                             if checked.inkEnlargedCovered || checked.inkEnlargedToCap { widened.insert(index) }
                             var rect = withRegionFills(projection.painted.bitmapRect, of: box)
-                            if let floor = try asPlacedRect(box, grows: grows) { rect = rect.union(floor) }
+                            // Its floor: "as placed", with what was shown. A box that does not
+                            // project as placed still holds what was shown for it.
+                            if let floor = try asPlacedRect(box, grows: grows) {
+                                rect = rect.union(floor)
+                            } else if let shown = Self.shownFill(box: box, regions: regionsByID, raster: raster,
+                                                                 shownDPI: shownDPI) {
+                                rect = rect.union(shown.bitmapRect)
+                            }
                             rects.append((index, rect))
                             painted.formUnion(box.regionIDs)
                             continue
@@ -316,19 +403,28 @@ extension PageRasterizer {
                 // Not judged: painted as at "as placed", below.
                 verdicts[index] = .indeterminate
             }
-            guard let rect = try asPlacedRect(box, grows: grows) else { continue }
+            guard let rect = try asPlacedRect(box, grows: grows) else {
+                if let shown = Self.shownFill(box: box, regions: regionsByID, raster: raster, shownDPI: shownDPI) {
+                    shownOutsidePlan.append(shown.bitmapRect)
+                }
+                continue
+            }
             painted.formUnion(box.regionIDs)
             rects.append((index, rect))
         }
         let strays = page.regions.filter { !painted.contains($0.id) }
         let strayGrowth = try inkGrowthRects(context: ctx, regions: strays, content: content)
+        // A stray region's fill joined with its own fill at the shown
+        // quality, carried.
+        let strayShown = strays.compactMap { Self.shownRegionFill($0, raster: raster, shownDPI: shownDPI) }
+            + shownOutsidePlan
 
         // 5. The fills.
         for (_, rect) in rects {
             try fillInBands(context: ctx, rect: rect, fillColor: page.fillColor)
         }
         try applyRedactionFills(context: ctx, regions: strays, fillColor: page.fillColor, content: content)
-        for rect in strayGrowth {
+        for rect in strayGrowth + strayShown {
             try fillInBands(context: ctx, rect: rect, fillColor: page.fillColor)
         }
 
@@ -339,7 +435,7 @@ extension PageRasterizer {
         // 6. The readback, of the rectangles filled.
         let filled = rects.map(\.rect)
             + strays.map { normalizedToFillPixels($0.normalizedRect, content: content).intersection(bitmap) }
-            + strayGrowth
+            + strayGrowth + strayShown
         for rect in filled where !rect.isEmpty {
             guard try verifyFill(context: ctx, rect: rect, expectedColor: page.fillColor.expectedPixel) else {
                 throw PipelineError.redactionError(.fillVerificationFailed(pageIndex: page.pageIndex))

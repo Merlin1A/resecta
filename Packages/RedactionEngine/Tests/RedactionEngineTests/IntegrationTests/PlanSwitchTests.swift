@@ -78,6 +78,7 @@ struct PlanSwitchTests {
         let bitmap: PlanPaintTests.Bitmap
         let plan: PaintPlan
         let raster: PixelPlan.Raster
+        var regions: [UUID: RedactionRegion] = [:]
         func projection(_ i: Int) throws -> PixelPlan.PixelRect {
             let box = plan.boxes[i]
             return try #require(PixelPlan.project(inner: box.inner, paint: box.paint, limitAbove: box.limitAbove,
@@ -96,7 +97,8 @@ struct PlanSwitchTests {
     /// typed text, except those in `uncheckable` (as for a box placed from
     /// the page's picture).
     static func run(source: PlanSource, inputsFor: Set<Int>, uncheckable: Set<Int> = [],
-                    bars: [CGRect] = bars, boxes: [Box] = boxes) async throws -> Run {
+                    bars: [CGRect] = bars, boxes: [Box] = boxes,
+                    dpi: Int = PlanSwitchTests.dpi, shownDPI: Int? = nil) async throws -> Run {
         let doc = try #require(PDFDocument(data: pdf(bars: bars)))
         defer { withExtendedLifetime(doc) {} }
         let page = try #require(doc.page(at: 0))
@@ -126,14 +128,16 @@ struct PlanSwitchTests {
             pipelineMode: .searchableRedaction, rotation: page.rotation,
             cropBoxBounds: page.bounds(for: .cropBox), cgPage: page.pageRef,
             hasText: page.string?.isEmpty == false,
-            confirmedPage: RunRecord.Page(pageIndex: 0, regions: drawn, plan: plan))
+            confirmedPage: RunRecord.Page(pageIndex: 0, regions: drawn, plan: plan, shownDPI: shownDPI))
         data.planSource = source
         for i in inputsFor { data.inkCheckInputs[i] = InkCheckInputs(lineHeight: lineHeight, others: []) }
         let result = try await PageRasterizer().rasterize(data, dpiCap: dpi)
         let raster = try #require(PixelPlan.Raster(widthSixtyFourths: plan.widthSixtyFourths,
                                                    heightSixtyFourths: plan.heightSixtyFourths, dpi: dpi))
-        return Run(result: result, bitmap: try PlanPaintTests.Bitmap(result.pageOutput.image), plan: plan,
-                   raster: raster)
+        var run = Run(result: result, bitmap: try PlanPaintTests.Bitmap(result.pageOutput.image), plan: plan,
+                      raster: raster)
+        for region in regions { run.regions[region.id] = region }
+        return run
     }
 
     // MARK: - The source and the choice
@@ -284,6 +288,32 @@ struct PlanSwitchTests {
         #expect(judged.bitmap.misses(a, level: 0) == 0)
         if verdict == .residual || verdict == .absent {
             #expect(a != (try placed.projection(0)), "growth reaches past the box on this page")
+        }
+    }
+
+    @Test("A judged box under the switch's policy, shown at one quality and run at another: its paint holds what was shown",
+          arguments: zip([300, 150], [150, 300]))
+    func judgedBoxHoldsWhatWasShown(shown: Int, ran: Int) async throws {
+        let box = Self.boxes[1]
+        let judged = try await Self.run(source: .switchPolicy, inputsFor: [0], boxes: [box], dpi: ran, shownDPI: shown)
+        let verdict = try #require(judged.result.inkVerdicts[0], "the box is judged")
+        #expect(verdict != .indeterminate)
+        let carried = try #require(PageRasterizer.shownFill(box: judged.plan.boxes[0], regions: judged.regions,
+                                                            raster: judged.raster, shownDPI: shown))
+        let painted = try judged.reported(0)
+        #expect(painted.joined(with: carried) == painted, "judged \(painted) does not hold the shown \(carried)")
+        #expect(judged.bitmap.misses(carried, level: 0) == 0)
+        let plain = try await Self.run(source: .switchPolicy, inputsFor: [0], boxes: [box], dpi: ran)
+        let alone = try plain.reported(0)
+        if shown < ran {
+            // Shown at the lower quality, the same box run with nothing shown
+            // falls short of it: the join is what holds it.
+            #expect(alone.joined(with: carried) != alone, "precondition: \(alone) alone does not hold \(carried)")
+        } else {
+            // On this page 150's pixels nest in 300's, so run at 150 the box
+            // already holds what 300 showed: the join changes nothing, and
+            // this argument cannot see it. The paper's case as written.
+            #expect(alone == painted, "the grids nest: the join changes nothing")
         }
     }
 }

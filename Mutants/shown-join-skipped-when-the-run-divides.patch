@@ -1,0 +1,19 @@
+Property: On a page run at another quality than it was shown at, the join is made for every pair of qualities, including one where the run's divides the shown one.
+Area: the run never paints less than was shown
+Test command: cd Packages/RedactionEngine && swift test --skip-build --no-parallel --filter 'ShownJoinTests' (after swift build --build-tests)
+Must go red: RedactionEngineTests/ShownJoinTests joinedFillMatchesTheTable; RedactionEngineTests/ShownJoinTests joinedHoldsWhatWasShown; RedactionEngineTests/ShownJoinTests paintedPageHoldsWhatWasShown
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
+index 3db368c61..cf91f3244 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
+@@ -105,7 +105,7 @@ extension PageRasterizer {
+     /// that quality differs from `raster`'s. Nil otherwise.
+     static func shownRaster(of raster: PixelPlan.Raster, shownDPI: Int?)
+         -> (raster: PixelPlan.Raster, content: CGSize)? {
+-        guard let shownDPI, shownDPI != raster.dpi,
++        guard let shownDPI, shownDPI != raster.dpi, shownDPI % raster.dpi != 0,
+               let shown = PixelPlan.Raster(widthSixtyFourths: raster.widthSixtyFourths,
+                                            heightSixtyFourths: raster.heightSixtyFourths, dpi: shownDPI)
+         else { return nil }
