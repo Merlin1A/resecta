@@ -254,23 +254,38 @@ struct CanvasRotatedPageTests {
         withExtendedLifetime(c) {}
     }
 
-    @Test("Case 11b: a plain scroll request clears the armed framing, so a later layout pass does not re-apply it")
+    @Test("Case 11b: a plain scroll request clears the armed framing, so a later layout pass does not re-apply it: the view keeps the plain request's page, scale and position")
     func plainRequestClearsTheFraming() throws {
-        let c = try Self.canvas()
-        try Self.onTurnedPage(c)
-        let first = try #require(c.view.document?.page(at: 0))
-        let framed = PDFDocumentView.consumeCanvasScrollTarget(
-            Self.target(page: 1, share: Self.s, zoom: .readability, anchor: .center), in: c.view, lastHandledToken: nil)
+        // Twice, the same steps: the second canvas has its framing dropped by
+        // hand before the plain request, so it shows what the view does with
+        // no framing armed (the pass may still move the zoom floor; both
+        // canvases take that move alike). The first must end where it does.
         let t = CGRect(x: 0.1, y: 0.8, width: 0.2, height: 0.03)
-        _ = PDFDocumentView.consumeCanvasScrollTarget(
-            Self.target(page: 0, share: t, zoom: .none, anchor: .visible), in: c.view, lastHandledToken: framed)
-        #expect(c.view.currentPage == first, "the plain request went to its page")
-        var frame = c.view.frame
-        frame.size.height -= 100
-        c.view.frame = frame
-        c.view.layoutIfNeeded()
-        #expect(c.view.currentPage == first, "after the pass the view is still on the plain request's page, not the framed one")
-        withExtendedLifetime(c) {}
+        var seen: [(scale: CGFloat, onScreen: CGRect)] = []
+        for clearedByHand in [false, true] {
+            let c = try Self.canvas()
+            try Self.onTurnedPage(c)
+            let first = try #require(c.view.document?.page(at: 0))
+            let framed = PDFDocumentView.consumeCanvasScrollTarget(
+                Self.target(page: 1, share: Self.s, zoom: .readability, anchor: .center), in: c.view, lastHandledToken: nil)
+            if clearedByHand { c.view.clearReadabilityFraming() }
+            _ = PDFDocumentView.consumeCanvasScrollTarget(
+                Self.target(page: 0, share: t, zoom: .none, anchor: .visible), in: c.view, lastHandledToken: framed)
+            #expect(c.view.currentPage == first, "the plain request went to its page (cleared by hand: \(clearedByHand))")
+            var frame = c.view.frame
+            frame.size.height -= 100
+            c.view.frame = frame
+            c.view.layoutIfNeeded()
+            #expect(c.view.currentPage == first,
+                    "after the pass the view is still on the plain request's page, not the framed one (cleared by hand: \(clearedByHand))")
+            let pageRect = PDFDocumentView.pageRect(forShown: t, on: first, box: c.view.displayBox)
+            seen.append((c.view.scaleFactor, c.view.convert(pageRect, from: first)))
+            withExtendedLifetime(c) {}
+        }
+        #expect(abs(seen[0].scale - seen[1].scale) < 0.005,
+                "after the pass the view keeps the plain request's scale: \(seen[0].scale), with no framing armed \(seen[1].scale)")
+        #expect(abs(seen[0].onScreen.minX - seen[1].onScreen.minX) < 0.5 && abs(seen[0].onScreen.minY - seen[1].onScreen.minY) < 0.5,
+                "after the pass T is where the plain request put it: \(seen[0].onScreen), with no framing armed \(seen[1].onScreen)")
     }
 
     @Test("Case 13: one arrow-key press on a page turned 90° moves a box one point as the page is shown")

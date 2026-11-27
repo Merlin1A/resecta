@@ -1,0 +1,19 @@
+Property: The keyboard's nudge handler stores the box stepped and clamped to the page, so its Debug check admits each box it stores and a press at the page's edge holds the box there.
+Area: the editor's keyboard (DocumentEditorKeyboard.nudgeSelection)
+Test command: xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppUITests/EditorKeyboardNudgeUITests
+Must go red: ResectaAppUITests/EditorKeyboardNudgeUITests testArrowKeysStepTheSelectedBoxAndHoldItAtThePageEdge (the Debug check stops the app at the first press past the edge)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/DocumentEditorKeyboard.swift b/Sources/ResectaApp/Views/DocumentEditorKeyboard.swift
+index 8330b82a1..0d737108d 100644
+--- a/Sources/ResectaApp/Views/DocumentEditorKeyboard.swift
++++ b/Sources/ResectaApp/Views/DocumentEditorKeyboard.swift
+@@ -133,7 +133,7 @@ struct DocumentEditorKeyboard: ViewModifier {
+         let moves: [(id: UUID, newRect: CGRect)] = redactionState.selectedRegionIDs.compactMap { id in
+             guard let regions = redactionState.regions[page],
+                   let region = regions.first(where: { $0.id == id }) else { return nil }
+-            return (id: id, newRect: DocumentEditorView.nudgedRect(region.normalizedRect, dx: dx, dy: dy))
++            return (id: id, newRect: region.normalizedRect.offsetBy(dx: dx, dy: -dy))
+         }
+         guard !moves.isEmpty else { return .ignored }
+         for move in moves { assert(RedactionState.admitsEditorShare(move.newRect)) }
