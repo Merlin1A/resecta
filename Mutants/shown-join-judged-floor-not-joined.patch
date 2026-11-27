@@ -5,14 +5,15 @@ Must go red: RedactionEngineTests/PlanSwitchTests judgedBoxHoldsWhatWasShown
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
+index 212ae6653..e5c0f794f 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
-@@ -357,7 +357,7 @@
+@@ -396,7 +396,7 @@ extension PageRasterizer {
          func asPlacedRect(_ box: PaintedBox, grows: Bool) throws -> CGRect? {
              guard let (fill, projection) = Self.boxFillAndProjection(
                  box: box, regions: regionsByID, raster: raster, content: content,
 -                shownDPI: shownDPI) else { return nil }
 +                shownDPI: atSwitch ? nil : shownDPI) else { return nil }
              var rect = fill.bitmapRect
-             if grows,
-                let grown = try inkGrowthRect(context: ctx, fillRect: projection.marginEdge.bitmapRect) {
+             guard grows else { return rect }
+             let edge = projection.marginEdge.bitmapRect

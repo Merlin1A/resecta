@@ -5,14 +5,15 @@ Must go red: ResectaAppTests/OverlayDrawnPlanTests aCapDropKeepsTheShownQuality(
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
+index 7fc7852f4..d4565d429 100644
 --- a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
 +++ b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
-@@ -539,7 +539,7 @@
-             .stamped(pageVersion: state.pageVersion(pageIndex),
-                      fromStoredRegions: regions == state.regions[pageIndex] ?? [])
-         if state.drawnPlans[pageIndex] != drawn { state.drawnPlans[pageIndex] = drawn }
+@@ -540,7 +540,7 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
+         // Nil where the run refuses the page for its size; no run fills it.
+         let quality = runQuality(chosenDPI: settings.exportDPI, dpiCap: qualityCap, cropBox: cropBox,
+                                  rotation: page.rotation) ?? min(settings.exportDPI, qualityCap)
 -        if isDrawn, state.shownDPIs[pageIndex] != quality { state.shownDPIs[pageIndex] = quality }
 +        if state.shownDPIs[pageIndex] != quality { state.shownDPIs[pageIndex] = quality }
-     }
- 
-     // MARK: - Overlay Refresh
+         let read = documentState.pageReads[pageIndex]
+         if RunRecord.planReadsWords, read == nil, !regions.isEmpty {
+             state.drawnPlans[pageIndex] = nil
