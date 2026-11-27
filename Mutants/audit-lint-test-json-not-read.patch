@@ -1,0 +1,19 @@
+Property: AL-6 reads the added lines of a test or source JSON as data.
+Area: the pre-commit lint (Scripts/audit-lint.sh)
+Test command: Scripts/audit-lint.sh --self-test
+Must go red: the self-test line "AL-6 files" (it reads DRIFTED and the self-test exits 1)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Scripts/audit-lint.sh b/Scripts/audit-lint.sh
+index 9691f636a..f43388439 100755
+--- a/Scripts/audit-lint.sh
++++ b/Scripts/audit-lint.sh
+@@ -318,7 +318,7 @@ AL6_NAME_RE='\bJesse\b'
+ AL6_KEY_RE='\b(?:U-[A-Z][0-9]+[A-Za-z]?|[GHJKLMN]-[0-9]{2}[a-z]?[0-9]?|C-[0-9]{3}[a-z]?)\b'
+ AL6_SEAT_RE='(?<![\w-])(?:lane-[a-z]{1,4}[0-9]{0,2}|leader-[0-9]+)(?![\w-])'
+ AL6_DATA_WORD_RE='\borders UPDATE\b|\b[Rr]evision [0-9]+\b'
+-AL6_RESOURCE_RE='(^|/)(Tests|Sources)/.*\.(json|txt|md|plist|entitlements|strings|stringsdict|ya?ml|csv|tsv|xml|html)$'
++AL6_RESOURCE_RE='(^|/)(Tests|Sources)/.*\.(txt|md|plist|entitlements|strings|stringsdict|ya?ml|csv|tsv|xml|html)$'
+ # Prints `code`, `data` or nothing for a path: how AL-6 reads it.
+ al6_kind() {
+     case "$1" in *.swift|*.xcstrings) echo code; return ;; esac
