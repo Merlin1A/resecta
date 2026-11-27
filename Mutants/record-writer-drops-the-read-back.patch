@@ -5,12 +5,12 @@ Must go red: ResectaAppTests/RunRecordInfoDictionaryTests ordinaryExportRecordsT
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
-index 7342b316f..2205ad54e 100644
+index e9a54f688..e4735fa7c 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
-@@ -262,7 +262,6 @@ extension RunRecord.Produced {
-     /// rasterizer recorded is kept.
+@@ -275,7 +275,6 @@ extension RunRecord.Produced {
      public mutating func record(writer account: RunRecord.Produced) {
+         pageImageDigests = account.pageImageDigests
          infoDictionary = account.infoDictionary
 -        metaReadBack = account.metaReadBack
      }
