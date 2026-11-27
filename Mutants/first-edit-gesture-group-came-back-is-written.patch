@@ -1,0 +1,19 @@
+Property: A group move the start slop gave a start to that comes back writes nothing and keeps the selection. Here it is judged as before, so it is committed.
+Area: the first edit's gesture (App)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/FirstEditGestureTests
+Must go red: ResectaAppTests/FirstEditGestureTests groupWithAStartBackIsNoTap
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Move.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Move.swift
+index c221528aa..471719634 100644
+--- a/Sources/ResectaApp/Overlay/RedactionOverlayView+Move.swift
++++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+Move.swift
+@@ -112,7 +112,7 @@ extension RedactionOverlayView {
+     /// step.
+     func endGroupMove() {
+         let members = regions.filter { selectedIDs.contains($0.id) }
+-        if !firstEditStarts.isEmpty {
++        if false {
+             if cameBackToTheStart(members, before: preDragGroupRects) {
+                 restoreFirstEditCopies(preDragGroupRects)
+                 return

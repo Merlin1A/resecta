@@ -55,6 +55,44 @@ extension RedactionOverlayView {
         return hasPassedStartSlop
     }
 
+    /// At the start slop's crossing, each of the boxes `ids` that is still
+    /// anchored to its text (`FirstEdit.applies`) takes its start, read once
+    /// here and kept for the drag: the plan read now is the one the last
+    /// drawing pass made, with the box still anchored, while a later pass
+    /// holds it as edited and has no start for it. The box's copy is no
+    /// longer anchored from here; the stored region changes at the lift.
+    func takeFirstEditStarts(for ids: Set<UUID>) {
+        for i in regions.indices where ids.contains(regions[i].id) && FirstEdit.applies(to: regions[i]) {
+            let id = regions[i].id
+            firstEditStarts[id] = startReader(id)?.share ?? regions[i].normalizedRect
+            regions[i].textAnchored = false
+        }
+    }
+
+    /// True when every box the slop gave a start is back on it, and every
+    /// other box of `members` back on its rect in `before`, each compared in
+    /// sixty-fourths of the page as shown: a drag that came back, which
+    /// changes nothing.
+    func cameBackToTheStart(_ members: [RedactionRegion], before: [UUID: CGRect]) -> Bool {
+        let sides = geometry.displayedSize
+        return members.allSatisfy { member in
+            guard let place = firstEditStarts[member.id] ?? before[member.id] else { return false }
+            return FirstEdit.samePlace(member.normalizedRect, place, displayedSize: sides)
+        }
+    }
+
+    /// Puts the copies of the boxes in `before` back to those rects, and the
+    /// boxes the slop gave a start back to anchored, as the stored regions
+    /// still are: no configure follows a drag that wrote nothing.
+    func restoreFirstEditCopies(_ before: [UUID: CGRect]) {
+        for i in regions.indices {
+            let id = regions[i].id
+            if let rect = before[id] { regions[i].normalizedRect = rect }
+            if firstEditStarts[id] != nil { regions[i].textAnchored = true }
+            if let drawn = preGestureDrawnPageRects[id] { regions[i].drawnPageRect = drawn }
+        }
+    }
+
     /// With Add to Selection on, a touch on a region edits the selection
     /// when it lifts: the touch records the region and the primary touch's
     /// lift toggles it. A cancelled touch (the region's menu, a pinch, a
@@ -67,11 +105,19 @@ extension RedactionOverlayView {
 
     /// End a group move on lift. A lift with no travel, every member still
     /// at its pre-drag rect, was a tap on one member: it selects only that
-    /// member and commits nothing. Otherwise the members' new rects commit
-    /// as one step.
+    /// member and commits nothing. A group the start slop gave a start to
+    /// that comes back, each such member on its start and every other on its
+    /// pre-drag rect, is no tap: nothing is written, the copies go back and
+    /// the selection stays. Otherwise the members' new rects commit as one
+    /// step.
     func endGroupMove() {
         let members = regions.filter { selectedIDs.contains($0.id) }
-        if let touchedID = groupMoveTouchedID,
+        if !firstEditStarts.isEmpty {
+            if cameBackToTheStart(members, before: preDragGroupRects) {
+                restoreFirstEditCopies(preDragGroupRects)
+                return
+            }
+        } else if let touchedID = groupMoveTouchedID,
            members.allSatisfy({ preDragGroupRects[$0.id] == $0.normalizedRect }) {
             coordinator?.selectRegion(touchedID)
             return
@@ -87,10 +133,14 @@ extension RedactionOverlayView {
     /// delta moves every member, clamped so the group's union stays on
     /// the page: an edge stops the whole group, keeping its spacing.
     func updateGroupMove(to point: CGPoint) {
+        let crossing = !hasPassedStartSlop
         guard passStartSlop(to: point), let start = dragStartPoint else { return }
+        if crossing { takeFirstEditStarts(for: selectedIDs) }
+        // Each member moves from its start, or from its pre-drag rect.
+        func anchor(_ id: UUID) -> CGRect? { firstEditStarts[id] ?? preDragGroupRects[id] }
         var union = CGRect.null
         for region in regions where selectedIDs.contains(region.id) {
-            if let originalNorm = preDragGroupRects[region.id] {
+            if let originalNorm = anchor(region.id) {
                 union = union.union(pdfNormalizedToOverlay(originalNorm))
             }
         }
@@ -101,7 +151,7 @@ extension RedactionOverlayView {
         let dy = min(max(point.y - start.y, page.minY - union.minY), page.maxY - union.maxY)
 
         for i in regions.indices where selectedIDs.contains(regions[i].id) {
-            guard let originalNorm = preDragGroupRects[regions[i].id] else { continue }
+            guard let originalNorm = anchor(regions[i].id) else { continue }
             let moved = pdfNormalizedToOverlay(originalNorm).offsetBy(dx: dx, dy: dy)
             storeFromGesture(i, overlayRect: moved)
         }
@@ -109,9 +159,22 @@ extension RedactionOverlayView {
 
     /// Update the selected region's position during a move drag.
     func updateSelectedRegionForMove(to point: CGPoint) {
+        let crossing = !hasPassedStartSlop
         guard passStartSlop(to: point), let selectedID,
               let idx = regions.firstIndex(where: { $0.id == selectedID })
         else { return }
+        if crossing {
+            takeFirstEditStarts(for: [selectedID])
+            // The box moves from its start, and the point of the page under
+            // the touch-down stays under the finger: the grab offset is
+            // retaken from the touch-down against the start, through the
+            // canvas's own map (which takes the page's turn).
+            if let start = firstEditStarts[selectedID], let touchDown = dragStartPoint {
+                regions[idx].normalizedRect = start
+                let origin = pdfNormalizedToOverlay(start).origin
+                dragOffset = CGSize(width: touchDown.x - origin.x, height: touchDown.y - origin.y)
+            }
+        }
 
         // Capture old rect for dirty-region invalidation
         let oldOverlayRect = pdfNormalizedToOverlay(regions[idx].normalizedRect)
