@@ -7,10 +7,10 @@ Apply in a scratch worktree with `git apply`; discard after.
 diff --git a/Sources/ResectaApp/State/PipelineRunner.swift b/Sources/ResectaApp/State/PipelineRunner.swift
 --- a/Sources/ResectaApp/State/PipelineRunner.swift
 +++ b/Sources/ResectaApp/State/PipelineRunner.swift
-@@ -348,7 +348,7 @@ struct PipelineRunner {
+@@ -387,7 +387,7 @@ struct PipelineRunner {
              appliedSearches: appliedSearches,
              burnedRegionVersion: burnedRegionVersion, captureRuns: captureRuns,
-             confirmed: confirmed,
+             confirmed: confirmed, unconfirmedBoxPage: unconfirmedBoxPage,
 -            pagesNotSearchedInFull: RedactStop.pagesNotSearchedInFull(runs: closedRuns),
 +            pagesNotSearchedInFull: Set(RedactStop.namedPages(runs: closedRuns, answered: redactionState.redactStopAnswered).map(\.page)),
              smallPicturePages: RedactStop.smallPicturePages(runs: closedRuns))
