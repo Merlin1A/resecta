@@ -1,7 +1,7 @@
 Property: A first edit of a box placed from the page's text starts from its start, the rectangle its plan paints. Here it starts from the stored box.
 Area: the first edit's gesture (App)
-Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/FirstEditGestureTests
-Must go red: ResectaAppTests/FirstEditGestureTests everyGestureRowFromItsStart; ResectaAppTests/FirstEditGestureTests theStartIsKeptFromTheCrossing
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/FirstEditGestureTests -only-testing:ResectaAppTests/FirstEditSamplePageTests
+Must go red: ResectaAppTests/FirstEditGestureTests everyGestureRowFromItsStart; ResectaAppTests/FirstEditGestureTests theStartIsKeptFromTheCrossing; ResectaAppTests/FirstEditSamplePageTests aHolderGoneBeforeTheDrawingPass
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Move.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Move.swift
