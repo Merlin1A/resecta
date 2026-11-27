@@ -227,6 +227,16 @@ extension RedactionOverlayView {
             return
         }
 
+        // A first edit that came back to its start writes nothing: the copy
+        // goes back to the stored rect, anchored, with no step and no haptic.
+        if isDraggingExistingRegion || activeResizeHandle != nil, hasPassedStartSlop, let id = selectedID,
+           firstEditStarts[id] != nil, let region = regions.first(where: { $0.id == id }),
+           let before = isDraggingExistingRegion ? preDragNormalizedRect : preResizeNormalizedRect,
+           cameBackToTheStart([region], before: [id: before]) {
+            restoreFirstEditCopies([id: before])
+            return
+        }
+
         // Commit single move
         if isDraggingExistingRegion, hasPassedStartSlop, let id = selectedID,
            let region = regions.first(where: { $0.id == id }) {
@@ -309,9 +319,12 @@ extension RedactionOverlayView {
             // Restore the pre-resize rect (nothing was committed)
             regions[idx].normalizedRect = preResizeNormalizedRect
         }
-        // The page rectangles the gesture's steps took go back with the places.
+        // The page rectangles the gesture's steps took go back with the places,
+        // and a box the start slop un-anchored is anchored again: the restore,
+        // never the start.
         for i in regions.indices {
             if let before = preGestureDrawnPageRects[regions[i].id] { regions[i].drawnPageRect = before }
+            if firstEditStarts[regions[i].id] != nil { regions[i].textAnchored = true }
         }
         resetDragState()
         setNeedsDisplay()
@@ -339,6 +352,7 @@ extension RedactionOverlayView {
         preDragGroupRects = [:]
         dragStartPoint = nil
         hasPassedStartSlop = false
+        firstEditStarts = [:]
         groupMoveTouchedID = nil
         pendingToggleID = nil
         // Snap state cleanup

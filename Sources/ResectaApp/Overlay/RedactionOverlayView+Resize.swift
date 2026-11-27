@@ -13,7 +13,8 @@ extension RedactionOverlayView {
     // MARK: - Resize
 
     /// Begin a resize on the selected region's `handle`: the rect it starts
-    /// from is the drag's anchor and the cancel's restore.
+    /// from is the cancel's restore, and the drag's anchor unless the region
+    /// takes a first-edit start at the start slop.
     func beginResize(_ handle: ResizeHandle, at point: CGPoint) {
         activeResizeHandle = handle
         preResizeNormalizedRect = selectedID.flatMap { id in regions.first { $0.id == id }?.normalizedRect }
@@ -28,10 +29,15 @@ extension RedactionOverlayView {
     /// edges that now move, and the size floor holds after it, on those
     /// axes only.
     func updateSelectedRegionForResize(handle: ResizeHandle, to point: CGPoint) {
+        let crossing = !hasPassedStartSlop
         guard passStartSlop(to: point), let selectedID,
               let idx = regions.firstIndex(where: { $0.id == selectedID }),
-              let start = preResizeNormalizedRect, let touchDown = dragStartPoint
+              let restore = preResizeNormalizedRect, let touchDown = dragStartPoint
         else { return }
+        if crossing { takeFirstEditStarts(for: [selectedID]) }
+        // A first edit anchors on the box's start; the rect the resize began
+        // with stays the cancel's restore.
+        let start = firstEditStarts[selectedID] ?? restore
 
         let startRect = pdfNormalizedToOverlay(start)
         let grabbed = Self.handlePoint(handle, in: startRect)
