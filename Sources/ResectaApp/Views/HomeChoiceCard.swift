@@ -260,7 +260,8 @@ struct HomeChoiceCardButtonStyle: ButtonStyle {
 /// The three trust words as one line — `On-device · No tracking · Open
 /// source` — in the support text colour, the separators too; when the line
 /// does not fit, the words stack with no separator. One spoken element.
-/// Shared by the home screen and the verification progress screen.
+/// Shared by the home screen, the verification progress screen and the
+/// results screen.
 struct TrustLine: View {
     static let words = ["On-device", "No tracking", "Open source"]
     /// What VoiceOver reads: the words, comma-separated, no glyph.

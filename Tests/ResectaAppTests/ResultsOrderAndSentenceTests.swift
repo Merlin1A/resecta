@@ -46,27 +46,26 @@ struct ResultsOrderAndSentenceTests {
 
     @Test("The passing sentence: findings, then hand-drawn boxes, then the notes in view, then Preview")
     func passingSentenceTable() {
-        typealias Row = (findings: Int, boxes: Int, notes: Int, output: Bool, sentence: String)
+        typealias Row = (findings: Int, boxes: Int, notes: Int, sentence: String)
         let rows: [Row] = [
-            (1, 0, 0, true, "Read the finding below before you share the PDF."),  // LegalPhrases:safe (approved row words, test data)
-            (1, 3, 2, true, "Read the finding below before you share the PDF."),  // LegalPhrases:safe (approved row words, test data)
-            (3, 0, 0, true, "Read the findings below before you share the PDF."),
-            (2, 1, 0, false, "Read the findings below before you share the PDF."),
-            (0, 1, 0, true, "No check could read what 1 hand-drawn box covers."),
-            (0, 2, 0, true, "No check could read what 2 hand-drawn boxes cover."),
-            (0, 12, 0, true, "No check could read what 12 hand-drawn boxes cover."),
-            (0, 1, 2, true, "No check could read what 1 hand-drawn box covers."),
-            (0, 0, 1, true, "Read the note below before you share the PDF."),
-            (0, 0, 2, true, "Read the notes below before you share the PDF."),
-            (0, 0, 0, true, "Look over the redacted PDF in Preview before you share it."),
-            (0, 0, 0, false, View.outputMissingSentence),
+            (1, 0, 0, "Read the finding below before you share the PDF."),  // LegalPhrases:safe (approved row words, test data)
+            (1, 3, 2, "Read the finding below before you share the PDF."),  // LegalPhrases:safe (approved row words, test data)
+            (3, 0, 0, "Read the findings below before you share the PDF."),
+            (2, 1, 0, "Read the findings below before you share the PDF."),
+            (0, 1, 0, "No check could read what 1 hand-drawn box covers."),
+            (0, 2, 0, "No check could read what 2 hand-drawn boxes cover."),
+            (0, 12, 0, "No check could read what 12 hand-drawn boxes cover."),
+            (0, 1, 2, "No check could read what 1 hand-drawn box covers."),
+            (0, 0, 1, "Read the note below before you share the PDF."),
+            (0, 0, 2, "Read the notes below before you share the PDF."),
+            (0, 0, 0, "Look over the redacted PDF in Preview before you share it."),
         ]
         for (index, row) in rows.enumerated() {
-            #expect(View.passingSentence(findingRows: row.findings, handDrawnBoxes: row.boxes, notes: row.notes,
-                                         outputExists: row.output) == row.sentence, "row \(index)")
+            #expect(View.passingSentence(findingRows: row.findings, handDrawnBoxes: row.boxes, notes: row.notes)
+                    == row.sentence, "row \(index)")
         }
         print("[passing-sentence] rows \(rows.count)")
-        #expect(rows.count == 12)
+        #expect(rows.count == 11)
         // The passing arm is that function of the screen's numbers.
         #expect(View.mastheadSubtitle(report: Self.passReport, findingRows: 2, handDrawnBoxes: 1)
                 == "Read the findings below before you share the PDF.")
@@ -91,6 +90,26 @@ struct ResultsOrderAndSentenceTests {
         let source = try? Self.source("VerificationResultsView.swift")
         #expect(source?.contains("findingRows: Self.findingRowCount(report: report, findings: findings)") == true)
         #expect(source?.contains("handDrawnBoxes: Self.handDrawnBoxCount(in: findings)") == true)
+    }
+
+    @Test("Source pin: the screen tells the masthead the boxes changed since, and the masthead tells all five of its parts")
+    func theScreenTellsTheMastheadTheBoxesChanged() throws {
+        // Both arguments have a default of false, so dropping one compiles
+        // and leaves a result that no longer stands looking as if it stood.
+        let screen = try Self.source("VerificationResultsView.swift")
+        let call = try #require(screen.range(of: "VerificationMasthead(report: report, outputExists: outputExists,"))
+        let callEnd = try #require(screen.range(of: "handDrawnBoxes: Self.handDrawnBoxCount(in: findings))",
+                                                range: call.upperBound..<screen.endIndex))
+        #expect(screen[call.upperBound..<callEnd.lowerBound].contains("isStale: isVerificationStale,"))
+        // The sentence, the privacy flag, the ring, the title and the spoken label.
+        let source = try Self.source("VerificationMasthead.swift")
+        let start = try #require(source.range(of: "struct VerificationMasthead: View {"))
+        let end = try #require(source.range(of: "    /// What the ring shows", range: start.upperBound..<source.endIndex))
+        let body = String(source[start.upperBound..<end.lowerBound])
+        let parts = body.components(separatedBy: "outputExists: outputExists").count - 1
+        let told = body.components(separatedBy: "outputExists: outputExists, isStale: isStale").count - 1
+        #expect(parts == 5)
+        #expect(told == parts)
     }
 
     // MARK: - Hand-drawn boxes

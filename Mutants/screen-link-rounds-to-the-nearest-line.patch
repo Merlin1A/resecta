@@ -1,0 +1,20 @@
+Property: Each edge moves outward to the first whole pixel line, floor on the low side and ceiling on the high side.
+Area: canvas overlay (the screen link)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/ScreenLinkTests
+Must go red: ResectaAppTests/ScreenLinkTests table(); ResectaAppTests/ScreenLinkTests properties()
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/ScreenLink.swift b/Sources/ResectaApp/Overlay/ScreenLink.swift
+--- a/Sources/ResectaApp/Overlay/ScreenLink.swift
++++ b/Sources/ResectaApp/Overlay/ScreenLink.swift
+@@ -61,8 +61,8 @@
+         } else {
+             return nil
+         }
+-        return DeviceLines(x0: Int(onLine(xs.min()!).rounded(.down)), y0: Int(onLine(ys.min()!).rounded(.down)),
+-                           x1: Int(onLine(xs.max()!).rounded(.up)), y1: Int(onLine(ys.max()!).rounded(.up)))
++        return DeviceLines(x0: Int(onLine(xs.min()!).rounded()), y0: Int(onLine(ys.min()!).rounded()),
++                           x1: Int(onLine(xs.max()!).rounded()), y1: Int(onLine(ys.max()!).rounded()))
+     }
+ 
+     /// The rectangle to fill, with antialiasing off, so that the fill lies

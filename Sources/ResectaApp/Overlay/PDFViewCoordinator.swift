@@ -36,18 +36,28 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
     /// regions the page was not drawn with. The pages on screen redraw, and
     /// keep a plan of what they draw.
     var qualityCap: Int = defaultDPICap {
-        didSet {
-            guard qualityCap != oldValue, let state = redactionState else { return }
-            for (pageIndex, kept) in state.drawnPlans
-            where kept.pageVersion == state.pageVersion(pageIndex) && kept.fromStoredRegions == true {
-                noteDrawn(pageIndex: pageIndex, regions: state.regions[pageIndex] ?? [], drawn: false)
-            }
-            for (pageIndex, overlay) in activeOverlays {
-                noteDrawn(pageIndex: pageIndex, regions: state.regions[pageIndex] ?? [], drawn: false)
-                overlay.setNeedsDisplay()
-            }
+        didSet { if qualityCap != oldValue { keepPlansAtTheRunQuality() } }
+    }
+
+    /// The quality chosen in Settings, set by the view. A change keeps every
+    /// plan and redraws the pages on screen as a change of `qualityCap`
+    /// does, so the canvas fills at the quality a run started now uses.
+    var chosenQuality: Int = 300 {
+        didSet { if chosenQuality != oldValue { keepPlansAtTheRunQuality() } }
+    }
+
+    private func keepPlansAtTheRunQuality() {
+        guard let state = redactionState else { return }
+        for (pageIndex, kept) in state.drawnPlans
+        where kept.pageVersion == state.pageVersion(pageIndex) && kept.fromStoredRegions == true {
+            noteDrawn(pageIndex: pageIndex, regions: state.regions[pageIndex] ?? [], drawn: false)
+        }
+        for (pageIndex, overlay) in activeOverlays {
+            noteDrawn(pageIndex: pageIndex, regions: state.regions[pageIndex] ?? [], drawn: false)
+            overlay.setNeedsDisplay()
         }
     }
+
     /// Toast surface for the too-small-draw notice, the selection delete's
     /// notice and the lasso's 500-region warning. Optional so the
     /// coordinator stays usable in tests that don't wire the toast manager.

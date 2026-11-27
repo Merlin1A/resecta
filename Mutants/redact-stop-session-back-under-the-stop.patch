@@ -1,0 +1,19 @@
+Property: Nothing the stop parked comes back while the stop is up: the Search sheet taken down for it is dismissed under it.
+Area: the stop at Redact
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BeforeYouRedactSheetTests
+Must go red: ResectaAppTests/BeforeYouRedactSheetTests searchThesePagesKeepsTheUsersSession; ResectaAppTests/BeforeYouRedactSheetTests theStopParksTheUsersSessionThroughSearchThesePages
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/DocumentEditorView+BeforeRedact.swift b/Sources/ResectaApp/Views/DocumentEditorView+BeforeRedact.swift
+index 7bdb205f7..8ad6f6439 100644
+--- a/Sources/ResectaApp/Views/DocumentEditorView+BeforeRedact.swift
++++ b/Sources/ResectaApp/Views/DocumentEditorView+BeforeRedact.swift
+@@ -72,7 +72,7 @@ extension DocumentEditorView {
+     /// closes), and neither Home's dialog nor Settings waiting to take it.
+     static func handOffRestores(stopParkedSearch: Bool, stopUp: Bool, searchUp: Bool,
+                                 homeWaits: Bool, settingsWaits: Bool) -> Bool {
+-        stopParkedSearch && !stopUp && !searchUp && !homeWaits && !settingsWaits
++        stopParkedSearch && !searchUp && !homeWaits && !settingsWaits
+     }
+ 
+     /// The view half of an answer; see `stopAnswerDropsParkedSearch`.

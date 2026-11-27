@@ -370,7 +370,7 @@ struct VerificationCorpusRunnerTests {
         return URL(fileURLWithPath: root).appendingPathComponent(row.path)
     }
 
-    /// GT paths are ALWAYS DOCS_ROOT-relative (manifest schema note, L-19),
+    /// GT paths are ALWAYS DOCS_ROOT-relative (the manifest's schema note),
     /// with the bundled packet GT reachable as a bundle fallback for
     /// root-less host runs.
     static func loadGT(_ row: ManifestRow, root: String?) -> GTFile? {

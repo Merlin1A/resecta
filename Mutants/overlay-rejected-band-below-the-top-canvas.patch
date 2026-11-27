@@ -1,0 +1,19 @@
+Property: A rejected rubber band, while shown, is above the top canvas. Here it is added beneath every subview, so the canvas covers it.
+Area: editor overlay
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/OverlayTopCanvasTests
+Must go red: ResectaAppTests/OverlayTopCanvasTests rejectedBandIsAboveTheCanvas
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Touches.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Touches.swift
+index 1e36da947..332970d07 100644
+--- a/Sources/ResectaApp/Overlay/RedactionOverlayView+Touches.swift
++++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+Touches.swift
+@@ -371,7 +371,7 @@ extension RedactionOverlayView {
+         rejectView.backgroundColor = style.fill
+         rejectView.layer.borderColor = style.border.cgColor
+         rejectView.layer.borderWidth = style.width
+-        addSubview(rejectView)
++        insertSubview(rejectView, at: 0)
+ 
+         if UIAccessibility.isReduceMotionEnabled {
+             // Respect reduce-motion: simple fade without scale transform

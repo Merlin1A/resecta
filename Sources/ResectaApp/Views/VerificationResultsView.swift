@@ -393,15 +393,6 @@ struct VerificationResultsView: View {
     /// The undo footnote under the actions, on every run.
     static let undoFootnote = "Redact cleared undo; use Delete\u{00A0}Region instead."
 
-    /// Red-tints the Share tile on ANY verification FAIL verdict. Keyed on the
-    /// status verdict ALONE — independent of userOverrodeFailure — so the tint
-    /// does NOT flip as a side effect of the "Share Anyway" override / share
-    /// round-trip (DocumentEditorView.swift:1408-1411). Static so it is a single
-    /// source of truth and unit-testable without a SwiftUI host.
-    static func shouldTintShareRed(report: VerificationReport) -> Bool {
-        report.overallStatus.isFail
-    }
-
     /// The Share-card caption for a source that was encrypted. Static so the
     /// copy is pinned without a SwiftUI host.
     static func notProtectedCaption(hadRestrictions: Bool) -> String {
@@ -417,15 +408,15 @@ struct VerificationResultsView: View {
 
     // MARK: - Trust strip
     //
-    // HomeView's words ("On-device · No tracking · Open source") as one
-    // plain centred line, the page's last: standing facts about the app,
-    // status-independent; the run's outcome lives in the masthead.
+    // The shared trust line Home and the running screen draw, centred as
+    // the page's last line: standing facts about the app, status-independent;
+    // the run's outcome lives in the masthead. The running screen cross-fades
+    // into this one in one frame, so both draw the same view at one weight.
+    // No identifier: the running screen's own `verificationTrustLine` stays
+    // the only one.
 
     private var trustStrip: some View {
-        Text("On-device · No tracking · Open source")
-            .font(.footnote)
-            .foregroundStyle(ResectaTokens.SemanticColor.supportText)
-            .multilineTextAlignment(.center)
+        TrustLine()
             .frame(maxWidth: .infinity)
     }
 

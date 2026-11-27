@@ -1,0 +1,19 @@
+Property: The passed checks' row sits one block gap below the block above.
+Area: results (the even rhythm)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationEvenRhythmTests
+Must go red: ResectaAppTests/VerificationEvenRhythmTests blocksShareOneGap
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationDetailsSection.swift b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
+index da1c21c..2101d06 100644
+--- a/Sources/ResectaApp/Views/VerificationDetailsSection.swift
++++ b/Sources/ResectaApp/Views/VerificationDetailsSection.swift
+@@ -92,7 +92,7 @@ struct VerificationDetailsSection: View {
+             }
+             if !Self.listRowMembers(partition).isEmpty {
+                 GroupedSection { passCluster(partition) }
+-                    .padding(.top, ResectaTokens.Results.blockGap)
++                    .padding(.top, ResectaTokens.Spacing.xl)
+             }
+         }
+     }

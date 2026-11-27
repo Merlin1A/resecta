@@ -20,8 +20,9 @@ extension RedactionState {
     }
 
     /// The pages whose canvas did not pass the probe: those PDFKit handed a
-    /// failing canvas, and those whose live canvas fails it now.
+    /// failing canvas, those whose live canvas fails it now, and those whose
+    /// canvas last could not confirm its fills where the boxes were drawn.
     func canvasProbeFailuresAtRunEntry() -> Set<Int> {
-        canvasProbeFailures.union(probeLiveCanvases?() ?? [])
+        canvasProbeFailures.union(probeLiveCanvases?() ?? []).union(pagesWithUnconfirmedFill)
     }
 }

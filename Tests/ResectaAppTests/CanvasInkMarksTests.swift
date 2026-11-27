@@ -80,7 +80,7 @@ struct CanvasInkMarksTests {
     private static let page = CGRect(x: 0, y: 0, width: 612, height: 792)
 
     private static func box(_ tight: CGRect, selected: Bool = false, tag: String? = "Email") -> InkBox {
-        InkBox(id: UUID(), tight: tight, paint: tight, isSelected: selected, tag: tag)
+        InkBox(id: UUID(), tight: tight, fill: [tight], isSelected: selected, tag: tag)
     }
 
     private static func tags(_ boxes: [InkBox], selectionCount: Int? = nil, handlesActive: Bool = true,

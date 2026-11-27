@@ -103,8 +103,12 @@ extension PipelineCoordinator {
         // same gate refuses a file whose information-dictionary rewrite left
         // a literal part-written (a write that threw part-way, and writing it
         // again whole failed too): the rest of an old value may be in it.
+        // And it refuses a file whose read-back did not hold: a fixed value
+        // missing, an identifier not derived from the file, or a value the
+        // writer stamped still in its bytes (`MetaReadBack`).
         guard await reconstructor.writtenPageCount == pages.count,
-              await reconstructor.infoPatchesWhole else {
+              await reconstructor.infoPatchesWhole,
+              await reconstructor.metaReadBackHeld else {
             throw PipelineError.redactionError(.reconstructionFailed)
         }
 

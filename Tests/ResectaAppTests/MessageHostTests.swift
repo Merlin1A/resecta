@@ -44,7 +44,7 @@ struct MessageHostTests {
     /// before agreement) and the canvas's pointer-hover popover.
     static let presentationTable: [String: [Int]] = [
         "Views/ContentView.swift": [0, 1, 1],
-        "Views/DocumentEditorView.swift": [1, 2, 1],
+        "Views/DocumentEditorView.swift": [1, 3, 2],
         "Views/SearchAndRedactSheet.swift": [1, 4, 4],
         "Views/Search/SavedSearchListSheet.swift": [0, 0, 1],
         "Views/RedactWorkspaceView.swift": [2, 2, 2],

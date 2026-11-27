@@ -21,29 +21,11 @@ extension RedactionOverlayView {
     func drawCommittedRegions(ctx: CGContext, in rect: CGRect) {
         // The plan this page is drawn from is kept with its settings.
         coordinator?.noteDrawn(pageIndex: pageIndex, regions: regions)
-        let paints = paintRects()
-        // Perf: skip boxes entirely outside the dirty rect. The margin covers
-        // the shadow (20 overlay points), and whichever reaches further of a
-        // handle stepped clear of a thin box (16 on-screen points) and a tag
-        // with its gap and keyline, round both the box's own rectangle and
-        // the area it paints.
-        typealias C = ResectaTokens.Canvas
-        let tagReach = C.tag.height + C.tag.gap + C.keylineGap + C.keyline.width
-        let margin = max(20, max(16, tagReach) * fingerScale)
-        let metadata = coordinator?.redactionState?.regionMetadata
-        var boxes: [InkBox] = []
-        for region in regions {
-            let tight = pdfNormalizedToOverlay(region.normalizedRect)
-            let paint = paints[region.id] ?? tight
-            guard tight.union(paint).insetBy(dx: -margin, dy: -margin).intersects(rect) else { continue }
-            let tag = region.source == .manual ? nil : metadata?[region.id]?.badgeLabel
-            boxes.append(InkBox(id: region.id, tight: tight, paint: paint,
-                                isSelected: selectedIDs.contains(region.id), tag: tag))
-        }
-        let moving: Set<UUID> = isDraggingExistingRegion ? selectedIDs : []
-        let steps = Self.inkSteps(boxes: boxes, selectionCount: selectedIDs.count,
-                                  handlesActive: resizeHandlesActive, moving: moving,
-                                  settings: .current, fingerScale: fingerScale, page: bounds)
+        // The context maps overlay points to the pixels being drawn without
+        // a turn: the veil is snapped to them.
+        assert(ScreenLink.isAxisAligned(ctx.userSpaceToDeviceSpaceTransform),
+               "the canvas's drawing context is turned or sheared")
+        let steps = committedSteps(in: rect, plan: coordinator?.redactionState?.drawnPlans[pageIndex])
         for step in steps where !step.lifted { draw(step, ctx: ctx) }
 
         // The box being moved is drawn whole, on top, on its own rectangles:
@@ -61,17 +43,38 @@ extension RedactionOverlayView {
         ctx.restoreGState()
     }
 
-    /// Each region's painted area, in overlay points, from the plan this
-    /// page was last drawn from; a region the plan holds no box for paints
-    /// its own rectangle.
-    private func paintRects() -> [UUID: CGRect] {
-        guard let plan = coordinator?.redactionState?.drawnPlans[pageIndex] else { return [:] }
-        var paints: [UUID: CGRect] = [:]
-        for box in plan.boxes {
-            let paint = pdfNormalizedToOverlay(box.paint)
-            for id in box.regionIDs { paints[id] = paint }
+    /// The steps a pass over `rect` draws for the committed regions, from
+    /// `plan`, the page's kept plan. Every region of the page is checked
+    /// before the boxes are cut to the ones the pass reaches, and the page's
+    /// result is kept (`noteFillCheck`), so a pass over one box never clears
+    /// another's failure.
+    func committedSteps(in rect: CGRect, plan: DrawnPlan?) -> [InkStep] {
+        let metadata = coordinator?.redactionState?.regionMetadata
+        var tags: [UUID: String] = [:]
+        for region in regions where region.source != .manual {
+            if let label = metadata?[region.id]?.badgeLabel { tags[region.id] = label }
         }
-        return paints
+        let page = pageRectOnCanvas
+        let made = Self.inkBoxes(
+            regions: regions, plan: plan, pageIndex: pageIndex, geometry: geometry,
+            placed: isPlacedOnItsPage, page: page, clip: page.intersection(bounds),
+            selectedIDs: selectedIDs, tags: tags, map: pdfNormalizedToOverlay)
+        noteFillCheck(made.check)
+        // Perf: skip boxes entirely outside the dirty rect. The margin covers
+        // the shadow (20 overlay points), and whichever reaches further of a
+        // handle stepped clear of a thin box (16 on-screen points) and a tag
+        // with its gap and keyline, round both the box's own rectangle and
+        // the area it fills.
+        typealias C = ResectaTokens.Canvas
+        let tagReach = C.tag.height + C.tag.gap + C.keylineGap + C.keyline.width
+        let margin = max(20, max(16, tagReach) * fingerScale)
+        let boxes = made.boxes.filter { box in
+            box.fill.reduce(box.tight) { $0.union($1) }.insetBy(dx: -margin, dy: -margin).intersects(rect)
+        }
+        let moving: Set<UUID> = isDraggingExistingRegion ? selectedIDs : []
+        return Self.inkSteps(boxes: boxes, selectionCount: selectedIDs.count,
+                             handlesActive: resizeHandlesActive, moving: moving,
+                             settings: .current, fingerScale: fingerScale, page: bounds, handleScale: handleScale)
     }
 
     /// Draws one step: a fill of all its rectangles as one path (a width of
@@ -84,10 +87,10 @@ extension RedactionOverlayView {
         case .handles:
             // The disc and its shadow grow in with `handleScale`; the ring
             // keeps its width.
-            guard handleScale > 0.001 else { return }
-            let radius = C.handle.radius * handleScale * fingerScale
-            let shadowRadius = (C.handle.radius + C.handleShadowGrowth) * handleScale * fingerScale
-            let drop = C.handleShadowDrop * handleScale * fingerScale
+            guard step.handleScale > 0.001 else { return }
+            let radius = C.handle.radius * step.handleScale * fingerScale
+            let shadowRadius = (C.handle.radius + C.handleShadowGrowth) * step.handleScale * fingerScale
+            let drop = C.handleShadowDrop * step.handleScale * fingerScale
             for p in step.rects.map({ CGPoint(x: $0.midX, y: $0.midY) }) {
                 ctx.setFillColor(C.handleShadow.uiColor.cgColor)
                 ctx.fillEllipse(in: Self.disc(at: CGPoint(x: p.x, y: p.y + drop), radius: shadowRadius))
@@ -110,6 +113,9 @@ extension RedactionOverlayView {
             ctx.setStrokeColor(step.tone.uiColor.cgColor)
             ctx.setLineWidth(step.width)
             for ring in step.rects { ctx.strokeEllipse(in: ring) }
+        case .veil:
+            Self.fillOnPixelLines(step.rects, clip: pageRectOnCanvas.intersection(bounds),
+                                  color: step.tone.uiColor.cgColor, ctx: ctx)
         default:
             ctx.saveGState()
             ctx.setLineCap(step.roundCaps ? .round : .butt)
@@ -278,6 +284,37 @@ extension RedactionOverlayView {
               !showsHandles(isSelected: isSelected, selectionCount: selectionCount, handlesActive: handlesActive)
         else { return nil }
         return (2 * fingerScale, [4 * fingerScale, 3 * fingerScale])
+    }
+
+    /// Fills `rects`, the fill the run makes, each moved outward to whole
+    /// pixel lines of the bitmap `ctx` draws into (read from the context's
+    /// own transform), cut to `clip`, with antialiasing off.
+    static func fillOnPixelLines(_ rects: [CGRect], clip: CGRect, color: CGColor, ctx: CGContext) {
+        let toDevice = ctx.userSpaceToDeviceSpaceTransform
+        ctx.saveGState()
+        ctx.setShouldAntialias(false)
+        for rect in rects {
+            let fill = ScreenLink.fillRect(rect, toDevice: toDevice, clip: clip)
+            if !fill.isNull { ctx.addRect(fill) }
+        }
+        ctx.setFillColor(color)
+        ctx.fillPath(using: .winding)
+        ctx.restoreGState()
+    }
+
+    /// Keeps this page's result in the document's set of pages whose fill
+    /// could not be confirmed, which the run's entry refuses; a change of
+    /// the result redraws the whole canvas, so every box on it is drawn
+    /// under the same result. A canvas not yet placed writes nothing.
+    private func noteFillCheck(_ check: CanvasFillCheck) {
+        guard let state = coordinator?.redactionState else { return }
+        let changed: Bool
+        switch check {
+        case .unchecked: return
+        case .confirmed: changed = state.pagesWithUnconfirmedFill.remove(pageIndex) != nil
+        case .unconfirmed: changed = state.pagesWithUnconfirmedFill.insert(pageIndex).inserted
+        }
+        if changed { setNeedsDisplay() }
     }
 
     /// Redraw when a display setting the boxes read changes: Differentiate

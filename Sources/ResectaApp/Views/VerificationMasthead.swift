@@ -148,7 +148,7 @@ extension VerificationResultsView {
         switch report.overallStatus {
         case .pass, .info, .notApplicable:
             return passingSentence(findingRows: findingRows, handDrawnBoxes: handDrawnBoxes,
-                                   notes: visibleNoteCount(partition), outputExists: outputExists)
+                                   notes: visibleNoteCount(partition))
         case .warn:
             let couldNotVerify = partition.couldNotVerify.map { report.layers[$0] }
             if !couldNotVerify.isEmpty, couldNotVerify.allSatisfy(\.status.isSkipped) {
@@ -257,9 +257,9 @@ extension VerificationResultsView {
     /// The sentence on a passing run, first match wins: a Findings row (the
     /// sentence points to the rows below); else hand-drawn boxes no check could
     /// read under ("No check could read what 1 hand-drawn box covers.");
-    /// else the notes in view ("Read the note below…"); else Preview, or
-    /// the sentence for a PDF that no longer exists.
-    static func passingSentence(findingRows: Int, handDrawnBoxes: Int, notes: Int, outputExists: Bool) -> String {
+    /// else the notes in view ("Read the note below…"); else Preview. Its one
+    /// caller, `mastheadSubtitle`, asks only when the result stands.
+    static func passingSentence(findingRows: Int, handDrawnBoxes: Int, notes: Int) -> String {
         if findingRows > 0 {
             return findingRows == 1
                 ? "Read the finding below before you share the PDF."  // LegalPhrases:safe (approved row words)
@@ -271,9 +271,7 @@ extension VerificationResultsView {
                 : "No check could read what \(handDrawnBoxes) hand-drawn boxes cover."
         }
         switch notes {
-        case 0:
-            return outputExists
-                ? "Look over the redacted PDF in Preview before you share it." : outputMissingSentence
+        case 0:  return "Look over the redacted PDF in Preview before you share it."
         case 1:  return "Read the note below before you share the PDF."
         default: return "Read the notes below before you share the PDF."
         }

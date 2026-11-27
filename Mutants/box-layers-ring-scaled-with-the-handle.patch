@@ -1,0 +1,27 @@
+Property: A handle's ring keeps its own width while the disc and its shadow grow in with the handles' scale.
+Area: canvas overlay (the box layers)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BoxLayerSpecTests
+Must go red: ResectaAppTests/BoxLayerSpecTests layers()
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/BoxLayers.swift b/Sources/ResectaApp/Overlay/BoxLayers.swift
+--- a/Sources/ResectaApp/Overlay/BoxLayers.swift
++++ b/Sources/ResectaApp/Overlay/BoxLayers.swift
+@@ -177,7 +177,7 @@
+                     let rs = (C.handle.radius + C.handleShadowGrowth) * k * f
+                     let drop = C.handleShadowDrop * k * f
+                     let disc = CGRect(x: centre.x - r, y: centre.y - r, width: 2 * r, height: 2 * r)
+-                    let ring = out(disc, w / 2)
++                    let ring = out(disc, w * k / 2)
+                     specs.append(LayerSpec(
+                         key: "handleShadow:\(name)", group: group, kind: .shadow,
+                         frame: CGRect(x: centre.x - rs, y: centre.y + drop - rs, width: 2 * rs, height: 2 * rs),
+@@ -186,7 +186,7 @@
+                     specs.append(LayerSpec(key: key, group: group, kind: .disc, frame: disc, cornerRadius: r,
+                                            fill: C.handle.fill))
+                     specs.append(LayerSpec(key: "handleRing:\(name)", group: group, kind: .ring, frame: ring,
+-                                           cornerRadius: ring.width / 2, borderWidth: w, borderColor: step.tone))
++                                           cornerRadius: ring.width / 2, borderWidth: w * k, borderColor: step.tone))
+                 case .dots:
+                     let ring = out(rect, w / 2)
+                     specs.append(LayerSpec(key: key, group: group, kind: .disc, frame: rect,

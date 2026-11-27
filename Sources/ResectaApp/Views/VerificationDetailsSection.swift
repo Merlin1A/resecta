@@ -88,11 +88,11 @@ struct VerificationDetailsSection: View {
             let card = cardItems
             if !card.isEmpty {
                 GroupedSection { factCard(card) }
-                    .padding(.top, ResectaTokens.Spacing.xl)
+                    .padding(.top, ResectaTokens.Results.blockGap)
             }
             if !Self.listRowMembers(partition).isEmpty {
                 GroupedSection { passCluster(partition) }
-                    .padding(.top, ResectaTokens.Spacing.xl)
+                    .padding(.top, ResectaTokens.Results.blockGap)
             }
         }
     }

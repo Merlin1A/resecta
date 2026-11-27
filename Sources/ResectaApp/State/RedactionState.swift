@@ -494,8 +494,10 @@ class RedactionState {
         // since verification" is logically false.
         regionsModifiedSinceVerification = false
         regions = [:]
-        // The canvas probe's answers describe the prior document's pages.
+        // The canvas probe's answers, and the canvas's own check of its
+        // fills, describe the prior document's pages.
         canvasProbeFailures = []
+        pagesWithUnconfirmedFill = []
         selectedRegionIDs = []
         // Cancel and drop any in-flight search so its sheet does not
         // linger into the next document (the `activeSearch` didSet does
@@ -803,6 +805,11 @@ class RedactionState {
     /// The pages whose canvas failed the box-place probe when PDFKit handed
     /// it its page. Kept for the document; the run refuses such a page.
     @ObservationIgnored var canvasProbeFailures: Set<Int> = []
+    /// The pages whose canvas, the last time it made its boxes, could not
+    /// confirm that the fill it draws is the run's fill where the box was
+    /// drawn: the page's latest result, removed when the page next passes.
+    /// The run refuses such a page, as it does a failed probe.
+    @ObservationIgnored var pagesWithUnconfirmedFill: Set<Int> = []
     /// Probes every live canvas now and returns the pages whose canvas
     /// failed; set by the canvas's coordinator. Nil with no canvas.
     @ObservationIgnored var probeLiveCanvases: (() -> Set<Int>)?

@@ -5,15 +5,14 @@ Must go red: ResectaAppTests/CanvasInkLookTests stepsForOneBox (The steps for on
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Ink.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Ink.swift
-index 1b60f133..211fd525 100644
 --- a/Sources/ResectaApp/Overlay/RedactionOverlayView+Ink.swift
 +++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+Ink.swift
-@@ -85,7 +85,7 @@ extension RedactionOverlayView {
-             rects.isEmpty ? nil : InkStep(layer: layer, rects: rects, tone: s.tone, width: s.width * f)
+@@ -195,7 +195,7 @@
+         edgeKeyline?.onPaint = true
+         edgeKeyline?.outset = C.edgeKeylineOutset * f
+         var steps: [InkStep?] = [edgeKeyline]
+-        for (boxes, line) in [(rest, C.line), (selected, C.lineSelected)] {
++        for (boxes, line) in [(rest, C.line)] {
+             steps.append(stroke(.keyline, out(boxes.map(\.tight), line.width / 2 + C.keylineGap + inkWidth), C.keyline,
+                                 keys: keys("keyline", boxes)))
          }
-         var steps: [InkStep?] = [stroke(.edgeKeyline, out(paints, C.edgeKeylineOutset), C.edgeKeyline)]
--        for (rects, line) in [(rest, C.line), (selected, C.lineSelected)] {
-+        for (rects, line) in [(rest, C.line)] {
-             steps.append(stroke(.keyline, out(rects, line.width / 2 + C.keylineGap + inkWidth), C.keyline))
-         }
-         steps.append(InkStep(layer: .veil, rects: paints,

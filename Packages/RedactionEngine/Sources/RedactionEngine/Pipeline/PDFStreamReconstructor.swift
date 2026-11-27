@@ -60,6 +60,13 @@ public actor PDFStreamReconstructor {
     private var _infoPatchesWhole = true
     public var infoPatchesWhole: Bool { _infoPatchesWhole }
 
+    /// What the read-back of the finished file saw (`MetaReadBack`): set by
+    /// `finalize` after the writer's values are replaced. Until then, and for
+    /// a file it cannot read, it is not `.held`; the coordinator reads
+    /// `metaReadBackHeld` with `writtenPageCount` before the atomic rename.
+    private var _metaReadBack: MetaReadBack.Outcome = .unreadable
+    public var metaReadBackHeld: Bool { _metaReadBack == .held }
+
     /// One page's data, produced by `encodeBufferedPage` (or the test seam) and
     /// consumed immediately by `drawBufferedPage`. JPEG bytes are encoded so the
     /// source CGImage can be released back to the caller's autoreleasepool; the
@@ -230,6 +237,11 @@ public actor PDFStreamReconstructor {
         ctx.closePDF()
         context = nil
 
+        // The writer's own values, read before they are replaced, for the
+        // read-back below. In memory only: they name the system build and
+        // the moment the file was written.
+        let originals = MetaReadBack.originals(of: tempURL)
+
         // The system writer auto-injects a `/Producer` literal naming
         // the OS version and build that wrote the file, and `/CreationDate`
         // and `/ModDate` literals carrying the moment it was written.
@@ -242,9 +254,16 @@ public actor PDFStreamReconstructor {
         // valid. Any anomaly leaves that literal untouched — the export
         // never fails on this step, unless a literal was left part-written
         // (`infoPatchesWhole`, which the coordinator reads before promotion).
-        let rewrite = Self.overwriteInfoLiteralsReporting(at: tempURL)
-        infoDictionaryWay = rewrite.way
-        _infoPatchesWhole = rewrite.whole
+        #if DEBUG
+        let skipsFixedValues = Self.finalizeSkipsFixedValues
+        #else
+        let skipsFixedValues = false
+        #endif
+        if !skipsFixedValues {
+            let rewrite = Self.overwriteInfoLiteralsReporting(at: tempURL)
+            infoDictionaryWay = rewrite.way
+            _infoPatchesWhole = rewrite.whole
+        }
 
         // The writer also stamps a random per-export `/ID` pair in the
         // trailer. Both halves are rewritten, at their exact offsets, to the
@@ -252,7 +271,20 @@ public actor PDFStreamReconstructor {
         // — after the literal rewrite above, so the digest covers the fixed
         // values. Same contract: length-preserving, any anomaly leaves the
         // pair untouched and only logs.
-        Self.overwriteFileIdentifier(at: tempURL)
+        #if DEBUG
+        let skipsIdentifier = Self.finalizeSkipsIdentifier
+        #else
+        let skipsIdentifier = false
+        #endif
+        if !skipsIdentifier { Self.overwriteFileIdentifier(at: tempURL) }
+
+        // The file read back as a whole: the fixed values, the derived
+        // identifier, and none of the writer's own values left in its bytes.
+        // The coordinator keeps the file only when this holds.
+        _metaReadBack = MetaReadBack.check(url: tempURL, originals: originals)
+        #if DEBUG
+        if Self.readBackAccepts { _metaReadBack = .held }
+        #endif
 
         // Apply `.complete` file protection to the finalized temp
         // file. PipelineCoordinator.downgradeTempProtectionOnSessionClose()
@@ -279,6 +311,7 @@ public actor PDFStreamReconstructor {
         var produced = RunRecord.Produced()
         produced.pageImageDigests = pageImageDigests
         produced.infoDictionary = infoDictionaryWay
+        produced.metaReadBack = finalized ? _metaReadBack : nil
         return produced
     }
 
@@ -360,6 +393,13 @@ public actor PDFStreamReconstructor {
     @TaskLocal static var tailShortFirstWrite = false
     /// Test seam: writing a part-written patch again whole fails too.
     @TaskLocal static var rewriteWholeFails = false
+    /// Test seams for the read-back: `finalize` leaves the writer's three
+    /// values, or its identifier pair, as the writer wrote them.
+    @TaskLocal static var finalizeSkipsFixedValues = false
+    @TaskLocal static var finalizeSkipsIdentifier = false
+    /// Test seam: the read-back reads as held whatever the file holds, so a
+    /// test can show what the gate's other conditions stop on their own.
+    @TaskLocal static var readBackAccepts = false
     #endif
 
     @discardableResult

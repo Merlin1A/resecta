@@ -67,7 +67,8 @@ enum ProductionPageLoop {
         let written = await reconstructor.writtenPageCount
         // The coordinator's gate before the rename, both conditions: every
         // page written, and no information-dictionary literal left part-written.
-        guard written == pages.count, await reconstructor.infoPatchesWhole else {
+        guard written == pages.count, await reconstructor.infoPatchesWhole,
+              await reconstructor.metaReadBackHeld else {
             throw PipelineError.redactionError(.reconstructionFailed)
         }
         _ = try FileManager.default.replaceItemAt(outputURL, withItemAt: tempURL)

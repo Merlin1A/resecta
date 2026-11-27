@@ -1,0 +1,19 @@
+Property: The identifier's digest reads both payloads as zeros, so the pair it writes is the one the file is checked against.
+Area: the file identifier (Engine)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --package-path Packages/RedactionEngine --filter 'MetaReadBackTests|PDFFileIdentifierTests'
+Must go red: RedactionEngineTests/MetaReadBackTests madeFileHolds; RedactionEngineTests/PDFFileIdentifierTests "The digest ignores the pair's current value and tracks every other byte"
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/PDFFileIdentifier.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/PDFFileIdentifier.swift
+index 5460b7d9..825db51e 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/PDFFileIdentifier.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Utilities/PDFFileIdentifier.swift
+@@ -80,7 +80,7 @@ enum PDFFileIdentifier {
+         var hasher = SHA256()
+         let zeros = Data(repeating: 0x30, count: hexLength)
+         hasher.update(data: fileData[fileData.startIndex..<location.first.lowerBound])
+-        hasher.update(data: zeros)
++        hasher.update(data: fileData[location.first])
+         hasher.update(data: fileData[location.first.upperBound..<location.second.lowerBound])
+         hasher.update(data: zeros)
+         hasher.update(data: fileData[location.second.upperBound..<fileData.endIndex])

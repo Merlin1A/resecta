@@ -1,0 +1,19 @@
+Property: The stop's case arriving parks the Search session that is up, whole; the session is never left in the slot under the stop.
+Area: the stop at Redact
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BeforeYouRedactSheetTests
+Must go red: ResectaAppTests/BeforeYouRedactSheetTests theStopParksTheUsersSessionThroughSearchThesePages; ResectaAppTests/BeforeYouRedactSheetTests cancelBringsTheParkedSessionBack
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/DocumentEditorView+BeforeRedact.swift b/Sources/ResectaApp/Views/DocumentEditorView+BeforeRedact.swift
+index 7bdb205f7..a408ce243 100644
+--- a/Sources/ResectaApp/Views/DocumentEditorView+BeforeRedact.swift
++++ b/Sources/ResectaApp/Views/DocumentEditorView+BeforeRedact.swift
+@@ -92,7 +92,7 @@ extension DocumentEditorView {
+     /// is parked: the slot's own park answers a stop that is up as Cancel.
+     static func parkSearchForStop(stopUp: Bool, redactionState: RedactionState, document: UUID,
+                                   parked: inout SearchState?, stopParked: inout Bool) {
+-        guard stopUp, parkSearchSession(redactionState, document: document, parked: &parked) else { return }
++        guard stopUp, redactionState.activeSearch != nil else { return }
+         stopParked = true
+     }
+ 

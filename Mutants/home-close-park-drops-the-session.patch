@@ -1,0 +1,19 @@
+Property: The park keeps the session that was up, whole, in the slot it is handed; it is not dropped.
+Area: the editor's sheet parking
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/DocumentEditorHomeCloseTests
+Must go red: ResectaAppTests/DocumentEditorHomeCloseTests parkedSearchWiringSourcePin
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/DocumentEditorView+SheetParking.swift b/Sources/ResectaApp/Views/DocumentEditorView+SheetParking.swift
+index a9780a285..726dbc6cf 100644
+--- a/Sources/ResectaApp/Views/DocumentEditorView+SheetParking.swift
++++ b/Sources/ResectaApp/Views/DocumentEditorView+SheetParking.swift
+@@ -99,7 +99,7 @@ extension DocumentEditorView {
+         guard let search = redactionState.activeSearch else { return false }
+         search.parkedForHomeClose = true
+         search.parkedDocument = document
+-        parked = search
++        parked = nil
+         redactionState.activeSearch = nil
+         return true
+     }

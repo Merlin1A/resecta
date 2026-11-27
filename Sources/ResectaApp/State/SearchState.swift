@@ -49,13 +49,13 @@ final class SearchState: Identifiable {
     /// drop, so its run says nothing more). Reset by that run.
     var skipNextRerunNotice = false
 
-    /// One-shot arm for the toolbar Scan button's one-tap contract:
-    /// the button sets this before presenting the sheet, and the
-    /// sheet's `.onAppear` consumes it exactly once to fire the run.
-    /// A single consume site keeps the auto-run to one scan; overlapping
-    /// `triggerSearch()` calls additionally coalesce through the
-    /// single-flight gate below.
-    var pendingAutoRunScan: Bool = false
+    /// One-shot arm for a session that runs as it opens (the toolbar Scan
+    /// button, and the stop's Search These Pages): the mode it was armed
+    /// for, set before the sheet is presented. The sheet's `.onAppear`
+    /// consumes it exactly once and runs only when that mode is still the
+    /// mode in hand. Overlapping `triggerSearch()` calls additionally
+    /// coalesce through the single-flight gate below.
+    var pendingAutoRun: SearchModeType? = nil
 
     // MARK: - Trigger single-flight
 
@@ -547,7 +547,7 @@ final class SearchState: Identifiable {
         recentMultiTermSets = []
         activeSearchTask?.cancel()
         activeSearchTask = nil
-        pendingAutoRunScan = false
+        pendingAutoRun = nil
         priorScanFingerprints = nil
         navigationScope = .wholeDocument
         filterFlushTask?.cancel()

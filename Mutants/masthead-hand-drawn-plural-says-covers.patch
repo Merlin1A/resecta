@@ -5,10 +5,10 @@ Must go red: ResectaAppTests/ResultsOrderAndSentenceTests passingSentenceTable
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Views/VerificationMasthead.swift b/Sources/ResectaApp/Views/VerificationMasthead.swift
-index 93c2877a..46f8e9fc 100644
+index e2641e1..5947031 100644
 --- a/Sources/ResectaApp/Views/VerificationMasthead.swift
 +++ b/Sources/ResectaApp/Views/VerificationMasthead.swift
-@@ -243,7 +243,7 @@ extension VerificationResultsView {
+@@ -262,7 +262,7 @@ extension VerificationResultsView {
          if handDrawnBoxes > 0 {
              return handDrawnBoxes == 1
                  ? "No check could read what 1 hand-drawn box covers."
@@ -16,4 +16,4 @@ index 93c2877a..46f8e9fc 100644
 +                : "No check could read what \(handDrawnBoxes) hand-drawn boxes covers."
          }
          switch notes {
-         case 0:
+         case 0:  return "Look over the redacted PDF in Preview before you share it."

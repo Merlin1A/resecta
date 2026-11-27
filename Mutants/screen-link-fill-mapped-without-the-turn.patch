@@ -1,0 +1,22 @@
+Property: The run's fill is mapped onto the canvas through the page's turn, as each box's outline is.
+Area: canvas overlay (the screen link)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/ScreenLinkTests
+Must go red: ResectaAppTests/ScreenLinkTests identityOnTurnedPages()
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Ink.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Ink.swift
+--- a/Sources/ResectaApp/Overlay/RedactionOverlayView+Ink.swift
++++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+Ink.swift
+@@ -328,10 +328,10 @@
+                 return box(i, fill: [])
+             }
+             let fill = planned.fill.map { pixels in
+-                map(ScreenLink.share(
++                map(CanvasTurn.shown(fromStored: ScreenLink.share(
+                     pixel: ScreenLink.PixelBox(minX: Int(pixels.minX.rounded()), minY: Int(pixels.minY.rounded()),
+                                                maxX: Int(pixels.maxX.rounded()), maxY: Int(pixels.maxY.rounded())),
+-                    quality: plan.exportDPI, displayedSize: shown))
++                    quality: plan.exportDPI, displayedSize: shown), rotation: geometry.rotation))
+             }
+             let cut = fill.map { $0.intersection(clip) }.filter { !$0.isNull && !$0.isEmpty }
+             let outline = outlines[i].intersection(clip)

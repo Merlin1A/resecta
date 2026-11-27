@@ -1,0 +1,18 @@
+Property: A veil's frame is its fill moved outward to whole device pixel lines by the screen link.
+Area: canvas overlay (the box layers)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BoxLayerSpecTests
+Must go red: ResectaAppTests/BoxLayerSpecTests layers(); ResectaAppTests/BoxLayerSpecTests marksOnTheFill()
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/BoxLayers.swift b/Sources/ResectaApp/Overlay/BoxLayers.swift
+--- a/Sources/ResectaApp/Overlay/BoxLayers.swift
++++ b/Sources/ResectaApp/Overlay/BoxLayers.swift
+@@ -123,7 +123,7 @@
+         var snapped: [(suffix: String, frame: CGRect)] = []
+         for step in steps where step.layer == .veil {
+             for (rect, key) in zip(step.rects, step.keys) {
+-                snapped.append((suffix(key), ScreenLink.fillRect(rect, toDevice: toDevice, clip: clip)))
++                snapped.append((suffix(key), rect))
+             }
+         }
+         func veilFrame(_ suffix: String) -> CGRect? { snapped.first { $0.suffix == suffix }?.frame }

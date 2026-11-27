@@ -185,6 +185,7 @@ enum MessageID: Equatable {
             .importBlockedDuringRun,
             .importBlockedOnThisScreen(wayBack: DocumentState.keepEditingTitle),
             RedactWorkspaceView.dropOverSheetRefusal,
+            RedactWorkspaceView.dropOverStopRefusal,
             .outputReclaimed,
             .shared,
             .shareSheetUnavailable,

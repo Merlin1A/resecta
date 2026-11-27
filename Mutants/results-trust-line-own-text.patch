@@ -1,0 +1,22 @@
+Property: The results screen draws the shared trust line.
+Area: results (the even rhythm)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationEvenRhythmTests
+Must go red: ResectaAppTests/VerificationEvenRhythmTests resultsTrustLine
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationResultsView.swift b/Sources/ResectaApp/Views/VerificationResultsView.swift
+index f720812..0605669 100644
+--- a/Sources/ResectaApp/Views/VerificationResultsView.swift
++++ b/Sources/ResectaApp/Views/VerificationResultsView.swift
+@@ -381,7 +381,10 @@ struct VerificationResultsView: View {
+     // the only one.
+ 
+     private var trustStrip: some View {
+-        TrustLine()
++        Text("On-device · No tracking · Open source")
++            .font(.footnote)
++            .foregroundStyle(ResectaTokens.SemanticColor.supportText)
++            .multilineTextAlignment(.center)
+             .frame(maxWidth: .infinity)
+     }
+ 

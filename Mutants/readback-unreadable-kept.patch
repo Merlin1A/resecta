@@ -1,0 +1,23 @@
+Property: A file the read-back cannot read, or whose writer values were not read whole, is never kept.
+Area: the read-back of the finished file (Engine)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --package-path Packages/RedactionEngine --filter MetaReadBackTests
+Must go red: RedactionEngineTests/MetaReadBackTests unreadableStops; RedactionEngineTests/MetaReadBackTests originalsReadWhole
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/MetaReadBack.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/MetaReadBack.swift
+index 3048899db..076c97b47 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/MetaReadBack.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/MetaReadBack.swift
+@@ -85,10 +85,10 @@ package enum MetaReadBack {
+     /// The four rules over the file at `url`, in order; the first that does
+     /// not hold is the outcome.
+     package static func check(url: URL, originals: Originals) -> Outcome {
+-        guard originals.complete,
++        guard true,
+               let data = try? Data(contentsOf: url, options: .alwaysMapped),
+               let provider = CGDataProvider(data: data as CFData),
+-              let doc = CGPDFDocument(provider) else { return .unreadable }
++              let doc = CGPDFDocument(provider) else { return .held }
+         // `info`, `pair` and their strings point into `doc`: it is held until
+         // the four rules are read.
+         defer { withExtendedLifetime(doc) {} }

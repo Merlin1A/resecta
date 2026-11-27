@@ -5,14 +5,14 @@ Must go red: RedactionEngineTests/BoxFillOwnRecordTests digestIsOfTheStoredPictu
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
-index 19dfb7c1..0dd71421 100644
+index e9a54f688..08325be43 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
-@@ -176,7 +176,6 @@ extension RunRecord.Produced {
-     /// information dictionary for its rewrite. The one writer of those fields
-     /// in a run; what the rasterizer recorded is kept.
+@@ -273,7 +273,6 @@ extension RunRecord.Produced {
+     /// finished file saw. The one writer of those fields in a run; what the
+     /// rasterizer recorded is kept.
      public mutating func record(writer account: RunRecord.Produced) {
 -        pageImageDigests = account.pageImageDigests
          infoDictionary = account.infoDictionary
+         metaReadBack = account.metaReadBack
      }
- }

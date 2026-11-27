@@ -1,0 +1,20 @@
+Property: The editor counts the stop as presenting.
+Area: the stop at Redact
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BeforeYouRedactSheetTests
+Must go red: ResectaAppTests/BeforeYouRedactSheetTests stopCountsAsPresenting
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/DocumentEditorView+SheetParking.swift b/Sources/ResectaApp/Views/DocumentEditorView+SheetParking.swift
+index a9780a285..3c0e38348 100644
+--- a/Sources/ResectaApp/Views/DocumentEditorView+SheetParking.swift
++++ b/Sources/ResectaApp/Views/DocumentEditorView+SheetParking.swift
+@@ -60,8 +60,7 @@ extension DocumentEditorView {
+     /// The editor's presenting flag as a pure read: the stop at Redact first,
+     /// then the slot's two sources.
+     static func editorSlotIsPresenting(documentState: DocumentState, redactionState: RedactionState) -> Bool {
+-        sheetSlotShowsStop(stopAwaitsAnswer: stopAwaitsAnswer(documentState), phaseKind: documentState.phaseKind)
+-            || sheetSlotIsPresenting(redactionState)
++        sheetSlotIsPresenting(redactionState)
+     }
+ 
+     /// The slot's rule, readable outside the editor (the workspace's drop

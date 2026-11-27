@@ -5,10 +5,9 @@ Must go red: ResectaAppTests/OverlayDrawnPlanTests theViewHandsOnTheSettings
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Views/PDFDocumentView.swift b/Sources/ResectaApp/Views/PDFDocumentView.swift
-index 2e9a0326..c7b410ef 100644
 --- a/Sources/ResectaApp/Views/PDFDocumentView.swift
 +++ b/Sources/ResectaApp/Views/PDFDocumentView.swift
-@@ -33,7 +33,6 @@ struct PDFDocumentView: UIViewRepresentable {
+@@ -39,7 +39,6 @@
          let coordinator = PDFViewCoordinator()
          coordinator.documentState = documentState
          coordinator.redactionState = redactionState
@@ -16,11 +15,11 @@ index 2e9a0326..c7b410ef 100644
          coordinator.toastManager = toastManager
          return coordinator
      }
-@@ -150,7 +149,6 @@ struct PDFDocumentView: UIViewRepresentable {
+@@ -165,7 +164,6 @@
  
          // Propagate state to coordinator
          coordinator.redactionState = redactionState
 -        coordinator.settingsState = settingsState
          coordinator.qualityCap = pipelineCoordinator.dpiCap
+         coordinator.chosenQuality = settingsState.exportDPI
          coordinator.toastManager = toastManager
-         let isEditing = documentState.phaseKind == .editing

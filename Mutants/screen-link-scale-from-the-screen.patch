@@ -1,0 +1,19 @@
+Property: The pixel lines are read from the drawing context's own transform, never from the screen's scale.
+Area: canvas overlay (the screen link)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/ScreenLinkTests
+Must go red: ResectaAppTests/ScreenLinkTests rendered(scale:)
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift
+--- a/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift
++++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift
+@@ -280,7 +280,8 @@
+     /// pixel lines of the bitmap `ctx` draws into (read from the context's
+     /// own transform), cut to `clip`, with antialiasing off.
+     static func fillOnPixelLines(_ rects: [CGRect], clip: CGRect, color: CGColor, ctx: CGContext) {
+-        let toDevice = ctx.userSpaceToDeviceSpaceTransform
++        let scale = UITraitCollection.current.displayScale
++        let toDevice = CGAffineTransform(scaleX: scale, y: scale)
+         ctx.saveGState()
+         ctx.setShouldAntialias(false)
+         for rect in rects {

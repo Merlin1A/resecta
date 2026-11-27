@@ -167,6 +167,7 @@ struct PDFDocumentView: UIViewRepresentable {
         coordinator.redactionState = redactionState
         coordinator.settingsState = settingsState
         coordinator.qualityCap = pipelineCoordinator.dpiCap
+        coordinator.chosenQuality = settingsState.exportDPI
         coordinator.toastManager = toastManager
         let isEditing = documentState.phaseKind == .editing
         coordinator.updateDrawingMode(isEditing, isDrawing: isEditing && isDrawingMode)

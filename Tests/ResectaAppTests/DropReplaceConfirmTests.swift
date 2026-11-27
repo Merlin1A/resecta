@@ -106,6 +106,32 @@ struct DropReplaceConfirmTests {
         #expect(MessageCatalog.row(for: id).text.hasPrefix("Cannot import from this screen."))
     }
 
+    @Test("A drop refused over the stop at Redact names its Cancel")
+    func stopRefusalNamesCancel() {
+        #expect(RedactWorkspaceView.dropOverStopRefusal == .importBlockedOnThisScreen(wayBack: "Cancel"))
+        #expect(DocumentState.importBlockedOnThisScreenMessage(wayBack: BeforeYouRedactSheet.cancelTitle)
+                == "Cannot import from this screen. Tap Cancel first.")
+    }
+
+    @Test("With the stop at Redact up, a drop that owes the confirm is refused, not asked")
+    func stopUpRefuses() {
+        let workspace = Self.editingWorkspace("stop")
+        workspace.redactionState.regions[0] = [Self.box()]
+        workspace.documentState.redactRefusalAwaitingAnswer =
+            .pagesNotRead([RedactStop.Page(page: 1, reason: .line(.recognitionOff))])
+        #expect(workspace.redactionState.activeSearch == nil)
+        guard case .refuse(let id) = RedactWorkspaceView.dropAdmission(
+            documentState: workspace.documentState, redactionState: workspace.redactionState, door: nil)
+        else {
+            Issue.record("a drop over the stop at Redact must be refused")
+            return
+        }
+        #expect(id == RedactWorkspaceView.dropOverStopRefusal)
+        workspace.documentState.redactRefusalAwaitingAnswer = nil
+        #expect(RedactWorkspaceView.dropAdmission(
+            documentState: workspace.documentState, redactionState: workspace.redactionState, door: nil) == .confirmReplace)
+    }
+
     // MARK: - The dialog's words
 
     @Test("The dialog asks with the deleted replace dialog's words and the Close dialog's sentence")
