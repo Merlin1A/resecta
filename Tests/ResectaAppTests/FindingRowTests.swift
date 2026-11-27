@@ -318,7 +318,9 @@ struct FindingRowTests {
         print("[problem-places] seeded reports \(examined), checks that make Share ask \(named), "
               + "built checks with an unread part \(withPart)")
         #expect(examined == 18)
-        #expect(named == 23, "the seeded reports' checks that make Share ask")
+        // 24 with Box Fill: the secure all-failed report's Box Fill row needs review,
+        // so it makes Share ask as well.
+        #expect(named == 24, "the seeded reports' checks that make Share ask")
         #expect(withPart == 3)
     }
 
