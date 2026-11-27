@@ -332,7 +332,7 @@ extension FilterResult {
     }
 
     /// SHA-256 over `(character, globalPos)` for each non-whitespace
-    /// composed-character sequence in CANONICAL order (J-12, 2026-06-09):
+    /// composed-character sequence in CANONICAL order (the line layout of 2026-06-09):
     /// run groups band by the shared Y sweep (`SandwichMetrics.yBands`),
     /// X ascending within a band — mirroring `computeOutputLineageHash`'s
     /// canonical sort of the output units. PDFKit's string order on

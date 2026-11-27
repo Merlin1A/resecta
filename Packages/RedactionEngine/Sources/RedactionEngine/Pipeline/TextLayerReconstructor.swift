@@ -12,13 +12,13 @@ private let textLayerLogger = Logger(subsystem: "com.resecta.engine", category: 
 // by `HiddenTextFonts` (no original document fonts; a line any glyph of which
 // the system lays out in another face is not drawn). Bland et al. glyph
 // positioning attack vector reduced — the three faces have uniform advance
-// widths and CTLineDraw produces only simple Tj operators. The J-12
+// widths and CTLineDraw produces only simple Tj operators. The line
 // layout (2026-06-09) derives one quantized pitch per line band from source
 // metrics: the content-dependent channel this re-opens is the
 // band's quantized size class — bounded bits, redundant with the visible
 // raster.
 
-/// One assembled drawn line (J-12): same-band run groups merged X-ascending
+/// One assembled drawn line: same-band run groups merged X-ascending
 /// with whole-cell bridge spaces, at the band's pooled quantized pitch.
 struct TextLayerLine {
     let origin: CGPoint
@@ -138,7 +138,7 @@ enum TextLayerReconstructor {
 
     /// Assemble the drawn lines for a page's surviving set.
     ///
-    /// J-12 layout (2026-06-09; measured on the committed real-document
+    /// The line layout (2026-06-09; measured on the committed real-document
     /// fixture, RealDocProbeTests rounds 1–8):
     ///
     ///  1. **Band pooling** — run groups band by the shared Y sweep
@@ -561,7 +561,7 @@ enum TextLayerReconstructor {
     ///
     /// Sorting: bottom-to-top (higher midY first = lower on page in PDF coords),
     /// left-to-right. Adjacent characters within 1.5× character width are grouped.
-    /// This sort + adjacency rule is the shared run definition: the J-12
+    /// This sort + adjacency rule is the shared run definition: the drawn
     /// line layout and the filter-side lineage walk
     /// (`FilterResult.computeLineageHash`) both derive from it.
     ///
