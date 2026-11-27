@@ -237,6 +237,15 @@ struct BoxLayerHostTests {
         let c = Self.mounted([a], selected: [a.id])
         let owned = [c.host.root] + Array(c.host.groupLayers.values) + Array(c.host.layers.values)
         #expect(c.host.layers.count > 3, "precondition: the box has layers")
+        // The action each layer would run for each property the host sets:
+        // none. A layer with its implicit actions on gives an animation here
+        // whether or not it is on a screen that draws.
+        for layer in owned {
+            for key in BoxLayerHost.quietActions.keys.sorted() {
+                let action = layer.action(forKey: key)
+                #expect(action == nil, "\(layer) has an action for \(key): \(String(describing: action))")
+            }
+        }
         for layer in owned {
             let frame = layer.frame, opacity = layer.opacity
             layer.frame = frame.offsetBy(dx: 3, dy: 2)
