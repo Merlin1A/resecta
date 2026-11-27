@@ -1,0 +1,19 @@
+Property: The top canvas takes no touch, so a touch on a box is the overlay's. Here the canvas is interactive, so the hit view is the canvas.
+Area: editor overlay
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/CanvasHitTargetTests
+Must go red: ResectaAppTests/CanvasHitTargetTests touchOnSmallBoxUnderPageBox
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/OverlayTopCanvas.swift b/Sources/ResectaApp/Overlay/OverlayTopCanvas.swift
+index 533a9895..9ef3d967 100644
+--- a/Sources/ResectaApp/Overlay/OverlayTopCanvas.swift
++++ b/Sources/ResectaApp/Overlay/OverlayTopCanvas.swift
+@@ -19,7 +19,7 @@ final class OverlayTopCanvas: UIView {
+         autoresizingMask = [.flexibleWidth, .flexibleHeight]
+         isOpaque = false
+         backgroundColor = .clear
+-        isUserInteractionEnabled = false
++        isUserInteractionEnabled = true
+         accessibilityElementsHidden = true
+     }
+ 

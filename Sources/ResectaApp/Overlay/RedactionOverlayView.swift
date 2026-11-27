@@ -296,6 +296,12 @@ class RedactionOverlayView: UIView {
         isOpaque = false
         backgroundColor = .clear
 
+        // The top canvas, first of the subviews, so a view added later (the
+        // rejected rubber band) is above it.
+        let canvas = OverlayTopCanvas(host: self)
+        addSubview(canvas)
+        topCanvas = canvas
+
         // Hover gesture for iPad pointer — updates hoveredRegionID
         let hover = UIHoverGestureRecognizer(target: self, action: #selector(handleHover(_:)))
         addGestureRecognizer(hover)
@@ -318,6 +324,22 @@ class RedactionOverlayView: UIView {
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
+
+    // MARK: - Redraw
+
+    /// Every redraw of the overlay reaches the top canvas too, so a caller
+    /// marks one view and both bitmaps redraw. Nil only while `init` runs.
+    private(set) var topCanvas: OverlayTopCanvas?
+
+    override func setNeedsDisplay() {
+        super.setNeedsDisplay()
+        topCanvas?.setNeedsDisplay()
+    }
+
+    override func setNeedsDisplay(_ rect: CGRect) {
+        super.setNeedsDisplay(rect)
+        topCanvas?.setNeedsDisplay(rect)
+    }
 
     // MARK: - Hit Testing (tool-based routing)
 
