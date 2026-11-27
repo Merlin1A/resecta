@@ -8,8 +8,9 @@ import Testing
 
 // A first edit's start, as the plan works it out: the start rule's cases from
 // the table in Fixtures/TestResources/first-edit-start.json, whether a joined
-// box stands on one line, the share's round trip to whole sixty-fourths, and a
-// plan made with the page's words and without them.
+// box stands on one line, the share's round trip to whole sixty-fourths, a
+// plan made with the page's words and without them, and the maker's one-line
+// test on a typed page with a second line.
 //
 // Every comparison of a start is in whole sixty-fourths.
 
@@ -352,6 +353,98 @@ struct FirstEditStartTests {
                                                 maxX: start.share.maxX, maxY: start.share.maxY),
                                widthSixtyFourths: w, heightSixtyFourths: h) != nil)
             #expect(without.firstEditStart(for: region.id) == nil)
+        }
+        // Each start by its sides: its top and bottom, and its outer end, are
+        // the joined paint's; its inner end is the other box's own edge.
+        let w = try #require(with.widthSixtyFourths), h = try #require(with.heightSixtyFourths)
+        func r64(_ r: CGRect) throws -> PageRect64 {
+            try #require(PageRect64(share: PointRect(minX: r.minX, minY: r.minY, maxX: r.maxX, maxY: r.maxY),
+                                    widthSixtyFourths: w, heightSixtyFourths: h))
+        }
+        let paint = try r64(try #require(with.boxes.first).paint)
+        let byX = page.regions.sorted { $0.normalizedRect.minX < $1.normalizedRect.minX }
+        let left = try r64(byX[0].normalizedRect), right = try r64(byX[1].normalizedRect)
+        #expect(left.maxX < right.minX, "a space between the two")
+        #expect(try r64(try #require(with.firstEditStart(for: byX[0].id)).share)
+            == PageRect64(minX: paint.minX, minY: paint.minY, maxX: right.minX, maxY: paint.maxY))
+        #expect(try r64(try #require(with.firstEditStart(for: byX[1].id)).share)
+            == PageRect64(minX: left.maxX, minY: paint.minY, maxX: paint.maxX, maxY: paint.maxY))
+    }
+
+    /// A raw page with "Ann Ann" in Helvetica 24 on one line, its baseline
+    /// at 700, and, when `second`, "Bob" on the next line under the first
+    /// "Ann", its baseline at 668.
+    static func annAnnPage(second: Bool) -> Data {
+        var stream = "BT /F1 24 Tf 1 0 0 1 72 700 Tm (Ann Ann) Tj ET"
+        if second { stream += " BT /F1 24 Tf 1 0 0 1 72 668 Tm (Bob) Tj ET" }
+        return buildRawPDF(objects: [
+            PDFObject(id: 1, content: "<< /Type /Catalog /Pages 2 0 R >>"),
+            PDFObject(id: 2, content: "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+            PDFObject(id: 3, content: """
+                << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] \
+                /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+                """),
+            PDFObject(id: 4, content: "<< /Length \(stream.utf8.count) >>\nstream\n\(stream)\nendstream"),
+            PDFObject(id: 5, content: "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"),
+        ], rootId: 1)
+    }
+
+    /// The page's plan, with the page's words, of a found region over each
+    /// "Ann", placed from its text and anchored to its characters, each
+    /// reaching down to `reach` points; with the row the two words' letters
+    /// make, and the letters of the page's other words.
+    static func annAnnPlan(_ data: Data, reach: Double) async throws
+        -> (plan: DrawnPlan, regions: [RedactionRegion], row: PageRect64, others: [PageRect64]) {
+        let document = SendablePDFDocument(try #require(PDFDocument(data: data)))
+        let read = try #require(await RunRecord.PageRead.reads(of: document, pages: [0], hasHiddenOCG: false)[0])
+        let side = CGSize(width: 612, height: 792)
+        let ann = read.words.words.filter { $0.letters.count == 3 && $0.box.map { $0.minY > 690 } == true }
+        let regions = try ann.map { word in
+            let box = try #require(word.box)
+            var region = RedactionRegion(
+                id: UUID(),
+                normalizedRect: CGRect(x: box.minX / side.width, y: reach / side.height,
+                                       width: (box.maxX - box.minX) / side.width,
+                                       height: (box.maxY - reach) / side.height),
+                source: .searchMatch(term: "Ann"), textAnchored: true)
+            region.pageCharacters = try #require(word.letters.first)..<(try #require(word.letters.last) + 1)
+            return region
+        }
+        let letters = ann.flatMap(\.letterBoxes).compactMap { PageRect64(outward: $0.rect) }
+        let row = try #require(letters.first.map { letters.reduce($0) { $0.union($1) } })
+        let others = read.words.words.filter { word in !ann.contains { $0.letters == word.letters } }
+            .flatMap(\.letterBoxes).compactMap { PageRect64(outward: $0.rect) }
+        return (Self.plan(regions, side: side, read: read), regions, row, others)
+    }
+
+    @Test("A joined box on one row whose paint holds a whole letter of another line is not on one line: its boxes start by clause 4")
+    func aLetterOfAnotherLineInThePaint() async throws {
+        // Two found boxes over "Ann" and "Ann", reaching down as far as each
+        // other: alone on the page they join on one line, level, by clause 3.
+        let reach = 655.0
+        let alone = try await Self.annAnnPlan(Self.annAnnPage(second: false), reach: reach)
+        #expect(alone.regions.count == 2 && alone.others.isEmpty)
+        try #require(alone.plan.boxes.contains { $0.regionIDs.count == 2 }, "the two join: \(alone.plan.boxes.map(\.paint))")
+        for region in alone.regions { #expect(alone.plan.firstEditStart(for: region.id)?.clause == 3) }
+        // With "Bob" on the next line, under their reach: a letter of another
+        // line lies wholly inside the joined paint, so the box is not on one
+        // line, and its boxes start by clause 4, from the whole paint.
+        let held = try await Self.annAnnPlan(Self.annAnnPage(second: true), reach: reach)
+        #expect(held.regions.count == 2 && held.others.count == 3)
+        let box = try #require(held.plan.boxes.first { $0.regionIDs.count == 2 },
+                               "the two still join: \(held.plan.boxes.map { ($0.regionIDs.count, $0.paint) })")
+        let w = try #require(held.plan.widthSixtyFourths), h = try #require(held.plan.heightSixtyFourths)
+        func r64(_ r: CGRect) throws -> PageRect64 {
+            try #require(PageRect64(share: PointRect(minX: r.minX, minY: r.minY, maxX: r.maxX, maxY: r.maxY),
+                                    widthSixtyFourths: w, heightSixtyFourths: h))
+        }
+        let paint = try r64(box.paint)
+        try #require(held.others.contains { paint.contains($0) && !$0.sharesALine(with: held.row) },
+                     "a letter of \(held.others) inside \(paint), off the row \(held.row)")
+        for region in held.regions {
+            let start = try #require(held.plan.firstEditStart(for: region.id))
+            #expect(start.clause == 4, "clause \(start.clause)")
+            #expect(try r64(start.share) == paint, "the whole paint")
         }
     }
 
