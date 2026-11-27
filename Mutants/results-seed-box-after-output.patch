@@ -7,7 +7,7 @@ Apply in a scratch worktree with `git apply`; discard after.
 diff --git a/Sources/ResectaApp/App/ResectaApp.swift b/Sources/ResectaApp/App/ResectaApp.swift
 --- a/Sources/ResectaApp/App/ResectaApp.swift
 +++ b/Sources/ResectaApp/App/ResectaApp.swift
-@@ -519,10 +519,6 @@ struct ResectaApp: App {
+@@ -568,10 +568,6 @@ struct ResectaApp: App {
                                          if seeds.coveredText {
                                              DebugSeedOptions.coverFirstLine(of: ws.documentState.sourceDocument)
                                          }
@@ -18,7 +18,7 @@ diff --git a/Sources/ResectaApp/App/ResectaApp.swift b/Sources/ResectaApp/App/Re
                                          // `--seedOutput`: a copy of the loaded
                                          // sample stands in for the redacted PDF,
                                          // so Share, its confirm and Preview are
-@@ -538,6 +534,10 @@ struct ResectaApp: App {
+@@ -587,6 +583,10 @@ struct ResectaApp: App {
                                                  ws.redactionState.outputURL = copy
                                              }
                                          }
@@ -28,4 +28,4 @@ diff --git a/Sources/ResectaApp/App/ResectaApp.swift b/Sources/ResectaApp/App/Re
 +                                        }
                                          if let run = VerificationDebugFixtures.runInputs(for: String(name)) {
                                              // Seeded by hand: no run, so no record.
-                                             ws.redactionState.recordLastRunInputs(seeds.withRunLineFacts(.init(
+                                             ws.redactionState.recordLastRunInputs(seeds.lastRunInputs(over: run))

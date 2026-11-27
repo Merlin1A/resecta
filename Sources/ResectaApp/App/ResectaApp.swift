@@ -589,12 +589,7 @@ struct ResectaApp: App {
                                         }
                                         if let run = VerificationDebugFixtures.runInputs(for: String(name)) {
                                             // Seeded by hand: no run, so no record.
-                                            ws.redactionState.recordLastRunInputs(seeds.withRunLineFacts(.init(
-                                                perPageModes: seeds.pageModes(run.modes),
-                                                perPageFallbackReasons: seeds.fallbackReasons(run.reasons),
-                                                sensitiveTerms: seeds.sensitiveTerms,
-                                                appliedSearches: seeds.appliedSearches, deselection: seeds.deselection,
-                                                ocrSkippedPages: run.ocrSkippedPages, degradeFailures: nil)))
+                                            ws.redactionState.recordLastRunInputs(seeds.lastRunInputs(over: run))
                                         }
                                         ws.documentState.transition(to: .redacting(progress: .init(
                                             currentPage: 1, totalPages: 1, currentStep: "Seeded")))

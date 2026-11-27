@@ -243,6 +243,16 @@ extension DebugSeedOptions {
         return inputs
     }
 
+    /// The inputs the launch hook records for a seeded report: `run`'s own
+    /// page modes, reasons and skipped pages, under the seeded facts.
+    func lastRunInputs(over run: (modes: [PipelineMode], reasons: [TextLayerDetector.FallbackReason?],
+                                  ocrSkippedPages: Set<Int>)) -> RedactionState.LastRunInputs {
+        withRunLineFacts(.init(
+            perPageModes: pageModes(run.modes), perPageFallbackReasons: fallbackReasons(run.reasons),
+            sensitiveTerms: sensitiveTerms, appliedSearches: appliedSearches, deselection: deselection,
+            ocrSkippedPages: run.ocrSkippedPages, degradeFailures: nil))
+    }
+
     /// The box `--seedBoxesChanged` adds: a small hand-drawn box near the
     /// foot of page 1.
     static func changedBox() -> RedactionRegion {
