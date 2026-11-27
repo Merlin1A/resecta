@@ -202,9 +202,9 @@ struct ErrorRecoveryTests {
         #expect(secure.contains(.ocrCheck))
         #expect(searchable.contains(.characterLineage))
         #expect(PipelineError.verificationError(.engineCrash(check: .ocrCheck)).localizedRecovery
-            == "OCR of Page Images could not finish, so this PDF has no verification result. Run Verification again, or share it without verification.")
+            == "Text Recognition of Each Page could not finish, so this PDF has no verification result. Run Verification again, or share it without verification.")
         #expect(PipelineError.verificationError(.engineCrash(check: .characterLineage)).localizedRecovery
-            == "Character Sequence could not finish, so this PDF has no verification result. Run Verification again, or share it without verification.")
+            == "Kept Text Unchanged could not finish, so this PDF has no verification result. Run Verification again, or share it without verification.")
         for check in secure + searchable {
             let error = PipelineError.verificationError(.engineCrash(check: check))
             #expect(error.localizedRecovery == VerificationRowModel.title(for: check) + Self.cardTail, "\(check)")
