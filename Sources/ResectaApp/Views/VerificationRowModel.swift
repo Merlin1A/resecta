@@ -238,6 +238,7 @@ nonisolated struct VerificationRowModel: Equatable {
         case .hiddenWordInk:        return "Hidden Words Under Boxes"
         case .searchRecheck:        return "Search Re-check"
         case .detectionSweep:       return "Detection Sweep"
+        case .boxFill:              return "Box Fill"
         }
     }
 
@@ -263,6 +264,7 @@ nonisolated struct VerificationRowModel: Equatable {
             "Looks for hidden copies of boxed words."
         case .searchRecheck:        "Re-runs your searches on the redacted PDF."
         case .detectionSweep:       "Runs the detectors on the redacted PDF."
+        case .boxFill:              "Reads each box's fill from the page image."
         }
     }
 
@@ -297,6 +299,8 @@ nonisolated struct VerificationRowModel: Equatable {
             "Each text, regex, or multi-term search is re-run with OCR on and must match nothing. Misread text is not seen."
         case .detectionSweep:
             "The detectors must report nothing beyond the items you chose to leave."
+        case .boxFill:
+            "Image blocks each box touches must be exactly the fill in brightness. Margin edges are not confirmed."
         }
     }
 
@@ -323,7 +327,7 @@ nonisolated struct VerificationRowModel: Equatable {
             "No Searchable pages to check."
         case .hiddenWordInk:
             "No page keeps hidden text over a picture of the page."
-        case .textExtraction, .ocrCheck, .structureCheck, .metadataCheck, .spatialVerification:
+        case .textExtraction, .ocrCheck, .structureCheck, .metadataCheck, .spatialVerification, .boxFill:
             nil
         }
     }

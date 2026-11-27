@@ -1,4 +1,5 @@
 import CoreGraphics
+import CryptoKit
 import Foundation
 import ImageIO
 import OSLog
@@ -110,6 +111,7 @@ public actor PDFStreamReconstructor {
             throw PipelineError.redactionError(.reconstructionFailed)
         }
         let buffered = try Self.encodeBufferedPage(from: output)
+        recordDigest(of: buffered)
         drawBufferedPage(buffered)
         _appendedPageCount += 1
     }
@@ -125,10 +127,21 @@ public actor PDFStreamReconstructor {
     /// `internal` — visible only to `@testable` test builds, never to the
     /// production app module. `textLayerEntries` makes it a Searchable page.
     func appendUnencodedPageForTesting(jpegData: Data, size: CGSize, textLayerEntries: [CharacterInfo]? = nil) {
-        drawBufferedPage(BufferedPage(
+        let page = BufferedPage(
             jpegData: jpegData, size: size,
-            textLayerEntries: textLayerEntries, redactionRectsInPoints: [], rotation: 0))
+            textLayerEntries: textLayerEntries, redactionRectsInPoints: [], rotation: 0)
+        recordDigest(of: page)
+        drawBufferedPage(page)
         _appendedPageCount += 1
+    }
+
+    /// The SHA-256 of each page's picture as it is handed to the draw, by
+    /// page index: the bytes the file stores unchanged as the page's image
+    /// stream. The box check locates each page's picture by it.
+    private var pageImageDigests: [Int: Data] = [:]
+
+    private func recordDigest(of page: BufferedPage) {
+        pageImageDigests[_appendedPageCount] = Data(SHA256.hash(data: page.jpegData))
     }
 
     /// Open the output PDF context lazily, pinned to `firstPageSize`'s media
@@ -258,11 +271,13 @@ public actor PDFStreamReconstructor {
     /// `finalize` has run it.
     private var infoDictionaryWay: RunRecord.InfoDictionaryWay?
 
-    /// The producer's own account of this file, for the run's record: which
-    /// way found the information dictionary. Read after `finalize`; nothing
-    /// in the producer reads it back.
+    /// The producer's own account of this file, for the run's record: the
+    /// SHA-256 of each page's picture, and which way found the information
+    /// dictionary. Read after `finalize`; nothing in the producer reads it
+    /// back.
     public var produced: RunRecord.Produced {
         var produced = RunRecord.Produced()
+        produced.pageImageDigests = pageImageDigests
         produced.infoDictionary = infoDictionaryWay
         return produced
     }

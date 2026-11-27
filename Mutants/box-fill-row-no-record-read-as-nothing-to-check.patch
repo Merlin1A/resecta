@@ -1,0 +1,21 @@
+Property: A run with no record reads Skipped, never Nothing to check.
+Area: the Box Fill row
+Test command: cd Packages/RedactionEngine && swift test --skip-build --no-parallel --filter BoxFillRowTests (after swift build --build-tests)
+Must go red: RedactionEngineTests/BoxFillRowTests each [no record of the run: Skipped], neverMapped, throughTheEngine
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/BoxFillRow.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/BoxFillRow.swift
+index 18037bc5..87d785ce 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/BoxFillRow.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/BoxFillRow.swift
+@@ -29,7 +29,9 @@ enum BoxFillRow {
+     /// (a page without a plan, or pages out of order) leaves every page of it
+     /// unread, and a page of the file the record does not hold is unread too.
+     static func reading(report: BoxCheckReport, record: RunRecord?) -> Reading {
+-        guard let record else { return .skipped }
++        guard let record else {
++            return .row(CheckRow(status: .notApplicable("No boxes to check."), pages: nil, couldNotVerify: false), nil)
++        }
+         let pictures: [BoxCheckPage]
+         if case .pages(let read) = report { pictures = read } else { pictures = [] }
+         var unreadPages: Set<Int> = []
