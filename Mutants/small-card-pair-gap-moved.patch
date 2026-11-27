@@ -1,0 +1,19 @@
+Property: The parked card's gap between the arrows is the card's value, on its named site.
+Area: the parked Search card's metrics
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/CompactCardMetricsTests
+Must go red: ResectaAppTests/CompactCardMetricsTests valuesOfRecord
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/Search/SearchAndRedactSheet+CompactStrip.swift b/Sources/ResectaApp/Views/Search/SearchAndRedactSheet+CompactStrip.swift
+index 1bc65901e..2d9e024d8 100644
+--- a/Sources/ResectaApp/Views/Search/SearchAndRedactSheet+CompactStrip.swift
++++ b/Sources/ResectaApp/Views/Search/SearchAndRedactSheet+CompactStrip.swift
+@@ -41,7 +41,7 @@ enum ResultNavSite {
+         self == .parked ? CircularIconButtonStyle.parkedGlyphPointSize : CircularIconButtonStyle.glyphPointSize
+     }
+     var pairSpacing: CGFloat {
+-        self == .parked ? 8 : 6
++        self == .parked ? 10 : 6
+     }
+     var counterFont: Font {
+         self == .parked ? .subheadline : .caption

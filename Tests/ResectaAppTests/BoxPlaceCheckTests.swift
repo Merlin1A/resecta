@@ -149,7 +149,7 @@ struct BoxPlaceCheckTests {
     static func record(_ state: RedactionState, _ document: PDFDocument) -> RunRecord.Confirmed {
         RunInputs.confirmedRecord(
             pageCount: document.pageCount, geometry: RunInputs.pageGeometry(of: document),
-            geometryAtStore: state.geometryAtStore, regions: state.regions, reads: [:],
+            geometryAtStore: state.geometryAtStore, shownDPIs: [:], regions: state.regions, reads: [:],
             settings: .init(pipelineMode: .secureRasterization, autoVerify: false, paranoidMode: false,
                             fillColor: .black, exportDPI: 150))
     }
@@ -367,7 +367,7 @@ struct BoxPlaceCheckTests {
         #expect(state.geometryAtStore[1] == RunRecord.PageGeometry(cropBox: Self.letter, rotation: 90))
         func refused() -> Int? {
             RunInputs.confirmedRecord(pageCount: document.pageCount, geometry: RunInputs.pageGeometry(of: document),
-                                      geometryAtStore: state.geometryAtStore, regions: state.regions, reads: [:],
+                                      geometryAtStore: state.geometryAtStore, shownDPIs: [:], regions: state.regions, reads: [:],
                                       settings: .init(pipelineMode: .secureRasterization, autoVerify: false,
                                                       paranoidMode: false, fillColor: .black, exportDPI: 150))
                 .firstPageWithUnconfirmedBoxPlace(canvasFailures: [])

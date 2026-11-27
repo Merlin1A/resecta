@@ -40,7 +40,7 @@ struct RunRecordBoxesCaptureTests {
         let doc = makeMultiPagePDFDocument(pages: 3)
         let snapshot = settings()
         let record = RunInputs.confirmedRecord(
-            pageCount: doc.pageCount, geometry: RunInputs.pageGeometry(of: doc),
+            pageCount: doc.pageCount, geometry: RunInputs.pageGeometry(of: doc), shownDPIs: [:],
             regions: regions, reads: [:], settings: snapshot)
         let pages = RunInputs.pageData(
             document: doc, regions: regions, textLayerStatus: [0: .rich, 1: .rich, 2: .rich],

@@ -26,7 +26,7 @@ struct CircularIconButtonStyle: ButtonStyle {
     /// on screen in the attached sheet regime) with a 20-pt glyph — the
     /// full-size controls of the taller handle. The medium+ search bar
     /// keeps `diameter` / `glyphPointSize` (pinned geometry).
-    static let parkedDiameter: CGFloat = ResectaTokens.TouchTarget.minimum
+    static let parkedDiameter: CGFloat = max(ResectaTokens.TouchTarget.minimum, 46)
     static let parkedGlyphPointSize: CGFloat = 20
     /// Circle wash — matched by eye to the retired `.bordered`
     /// small-control background on both appearances.

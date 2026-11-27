@@ -42,6 +42,13 @@ class RedactionState {
     /// with it. Written while the editor draws, so nothing observes it.
     @ObservationIgnored var drawnPlans: [Int: DrawnPlan] = [:]
 
+    /// The quality each page was last drawn at, in dots per inch, apart
+    /// from its kept plan: it changes only when the page is drawn, never
+    /// when a change of the run's quality cap makes an off-screen page's
+    /// plan again. A run painted at another quality joins each box's fill
+    /// with the fill it showed at this one.
+    @ObservationIgnored var shownDPIs: [Int: Int] = [:]
+
     /// Multi-region selection set. Single selection is the common case.
     var selectedRegionIDs: Set<UUID> = []
 
@@ -519,6 +526,7 @@ class RedactionState {
         // The kept plans describe the prior document's pages. Page versions
         // keep counting, so no later plan reads as made at an earlier one.
         drawnPlans = [:]
+        shownDPIs = [:]
     }
 
     /// Clear pre-redaction text extraction buffer on success path.

@@ -1,0 +1,642 @@
+[
+ {
+  "row": "fall-300-200-a4",
+  "why": "the count's worst row at 200 against 300",
+  "page": "A4 595.276 x 841.89",
+  "widthSixtyFourths": 38098,
+  "heightSixtyFourths": 53881,
+  "inner": [
+   29409,
+   26405,
+   31647,
+   27345
+  ],
+  "paint": [
+   29409,
+   26405,
+   31647,
+   27345
+  ],
+  "limitAbove": null,
+  "limitBelow": null,
+  "regionAsInner": true,
+  "shownDPI": 300,
+  "runDPI": 200,
+  "runImage": [
+   1654,
+   2339
+  ],
+  "ownFill": [
+   1272,
+   1139,
+   1376,
+   1188
+  ],
+  "shownImage": [
+   2481,
+   3508
+  ],
+  "shownFill": [
+   1912,
+   1716,
+   2064,
+   1788
+  ],
+  "carried": [
+   1274,
+   1144,
+   1376,
+   1192
+  ],
+  "joined": [
+   1272,
+   1139,
+   1376,
+   1192
+  ],
+  "shortWithoutJoinPt": [
+   0.0,
+   0.0,
+   0.0,
+   1.44
+  ],
+  "joinedPastOwnPx": [
+   0,
+   0,
+   0,
+   4
+  ]
+ },
+ {
+  "row": "fall-200-150-a4",
+  "why": "the count's worst row at 150 against 200",
+  "page": "A4 595.276 x 841.89",
+  "widthSixtyFourths": 38098,
+  "heightSixtyFourths": 53881,
+  "inner": [
+   211,
+   47990,
+   5441,
+   49075
+  ],
+  "paint": [
+   211,
+   47990,
+   5441,
+   49075
+  ],
+  "limitAbove": null,
+  "limitBelow": null,
+  "regionAsInner": true,
+  "shownDPI": 200,
+  "runDPI": 150,
+  "runImage": [
+   1241,
+   1754
+  ],
+  "ownFill": [
+   0,
+   1561,
+   184,
+   1602
+  ],
+  "shownImage": [
+   1654,
+   2339
+  ],
+  "shownFill": [
+   8,
+   2075,
+   240,
+   2131
+  ],
+  "carried": [
+   6,
+   1556,
+   180,
+   1599
+  ],
+  "joined": [
+   0,
+   1556,
+   184,
+   1602
+  ],
+  "shortWithoutJoinPt": [
+   0.0,
+   2.28,
+   0.0,
+   0.0
+  ],
+  "joinedPastOwnPx": [
+   0,
+   5,
+   0,
+   0
+  ]
+ },
+ {
+  "row": "nest-300-150-letter",
+  "why": "the grids nest: the join changes nothing",
+  "page": "Letter 612 x 792",
+  "widthSixtyFourths": 39168,
+  "heightSixtyFourths": 50688,
+  "inner": [
+   6400,
+   19200,
+   12800,
+   19968
+  ],
+  "paint": [
+   6400,
+   19200,
+   12800,
+   19968
+  ],
+  "limitAbove": null,
+  "limitBelow": null,
+  "regionAsInner": true,
+  "shownDPI": 300,
+  "runDPI": 150,
+  "runImage": [
+   1275,
+   1650
+  ],
+  "ownFill": [
+   207,
+   618,
+   424,
+   651
+  ],
+  "shownImage": [
+   2550,
+   3300
+  ],
+  "shownFill": [
+   415,
+   1244,
+   840,
+   1301
+  ],
+  "carried": [
+   207,
+   622,
+   420,
+   651
+  ],
+  "joined": [
+   207,
+   618,
+   424,
+   651
+  ],
+  "shortWithoutJoinPt": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "joinedPastOwnPx": [
+   0,
+   0,
+   0,
+   0
+  ]
+ },
+ {
+  "row": "tops-a4-landscape-300-150",
+  "why": "an A4 page shown landscape: the two images' tops do not agree",
+  "page": "A4 shown landscape 841.89 x 595.276",
+  "widthSixtyFourths": 53881,
+  "heightSixtyFourths": 38098,
+  "inner": [
+   6400,
+   17188,
+   12800,
+   17956
+  ],
+  "paint": [
+   6400,
+   17188,
+   12800,
+   17956
+  ],
+  "limitAbove": null,
+  "limitBelow": null,
+  "regionAsInner": true,
+  "shownDPI": 300,
+  "runDPI": 150,
+  "runImage": [
+   1754,
+   1241
+  ],
+  "ownFill": [
+   207,
+   553,
+   424,
+   586
+  ],
+  "shownImage": [
+   3508,
+   2481
+  ],
+  "shownFill": [
+   415,
+   1113,
+   840,
+   1177
+  ],
+  "carried": [
+   207,
+   556,
+   420,
+   589
+  ],
+  "joined": [
+   207,
+   553,
+   424,
+   589
+  ],
+  "shortWithoutJoinPt": [
+   0.0,
+   0.0,
+   0.0,
+   1.2
+  ],
+  "joinedPastOwnPx": [
+   0,
+   0,
+   0,
+   3
+  ]
+ },
+ {
+  "row": "tops-b5-300-150",
+  "why": "the same on B5, the worst seeded row",
+  "page": "B5 498.898 x 708.661",
+  "widthSixtyFourths": 31930,
+  "heightSixtyFourths": 45355,
+  "inner": [
+   5054,
+   186,
+   13598,
+   1865
+  ],
+  "paint": [
+   5054,
+   186,
+   13598,
+   1865
+  ],
+  "limitAbove": null,
+  "limitBelow": null,
+  "regionAsInner": true,
+  "shownDPI": 300,
+  "runDPI": 150,
+  "runImage": [
+   1040,
+   1477
+  ],
+  "ownFill": [
+   160,
+   5,
+   448,
+   62
+  ],
+  "shownImage": [
+   2079,
+   2953
+  ],
+  "shownFill": [
+   328,
+   9,
+   888,
+   129
+  ],
+  "carried": [
+   164,
+   4,
+   444,
+   65
+  ],
+  "joined": [
+   160,
+   4,
+   448,
+   65
+  ],
+  "shortWithoutJoinPt": [
+   0.0,
+   0.24,
+   0.0,
+   1.2
+  ],
+  "joinedPastOwnPx": [
+   0,
+   1,
+   0,
+   3
+  ]
+ },
+ {
+  "row": "rise-150-300-b5",
+  "why": "the other direction: shown at 150, run at 300",
+  "page": "B5 498.898 x 708.661",
+  "widthSixtyFourths": 31930,
+  "heightSixtyFourths": 45355,
+  "inner": [
+   3190,
+   37507,
+   14596,
+   38156
+  ],
+  "paint": [
+   3190,
+   37507,
+   14596,
+   38156
+  ],
+  "limitAbove": null,
+  "limitBelow": null,
+  "regionAsInner": true,
+  "shownDPI": 150,
+  "runDPI": 300,
+  "runImage": [
+   2079,
+   2953
+  ],
+  "ownFill": [
+   200,
+   2440,
+   952,
+   2489
+  ],
+  "shownImage": [
+   1040,
+   1477
+  ],
+  "shownFill": [
+   96,
+   1213,
+   480,
+   1245
+  ],
+  "carried": [
+   192,
+   2426,
+   960,
+   2490
+  ],
+  "joined": [
+   192,
+   2426,
+   960,
+   2490
+  ],
+  "shortWithoutJoinPt": [
+   1.92,
+   3.36,
+   1.92,
+   0.24
+  ],
+  "joinedPastOwnPx": [
+   8,
+   14,
+   8,
+   1
+  ]
+ },
+ {
+  "row": "same-quality-200",
+  "why": "shown and run at one quality: the join is not made",
+  "page": "A4 595.276 x 841.89",
+  "widthSixtyFourths": 38098,
+  "heightSixtyFourths": 53881,
+  "inner": [
+   29409,
+   26405,
+   31647,
+   27345
+  ],
+  "paint": [
+   29409,
+   26405,
+   31647,
+   27345
+  ],
+  "limitAbove": null,
+  "limitBelow": null,
+  "regionAsInner": true,
+  "shownDPI": 200,
+  "runDPI": 200,
+  "runImage": [
+   1654,
+   2339
+  ],
+  "ownFill": [
+   1272,
+   1139,
+   1376,
+   1188
+  ],
+  "shownFill": [
+   1272,
+   1139,
+   1376,
+   1188
+  ],
+  "carried": null,
+  "joined": [
+   1272,
+   1139,
+   1376,
+   1188
+  ]
+ },
+ {
+  "row": "not-shown",
+  "why": "a page that was not shown: the join is not made",
+  "page": "A4 595.276 x 841.89",
+  "widthSixtyFourths": 38098,
+  "heightSixtyFourths": 53881,
+  "inner": [
+   29409,
+   26405,
+   31647,
+   27345
+  ],
+  "paint": [
+   29409,
+   26405,
+   31647,
+   27345
+  ],
+  "limitAbove": null,
+  "limitBelow": null,
+  "regionAsInner": true,
+  "shownDPI": null,
+  "runDPI": 200,
+  "runImage": [
+   1654,
+   2339
+  ],
+  "ownFill": [
+   1272,
+   1139,
+   1376,
+   1188
+  ],
+  "shownFill": null,
+  "carried": null,
+  "joined": [
+   1272,
+   1139,
+   1376,
+   1188
+  ]
+ },
+ {
+  "row": "clip-200-150-a4",
+  "why": "the carried shown fill reaches past the run's image: it is cut to the image",
+  "page": "A4 595.276 x 841.89",
+  "widthSixtyFourths": 38098,
+  "heightSixtyFourths": 53881,
+  "inner": [
+   1599,
+   51665,
+   2585,
+   53845
+  ],
+  "paint": [
+   1599,
+   51665,
+   2585,
+   53845
+  ],
+  "limitAbove": null,
+  "limitBelow": null,
+  "regionAsInner": true,
+  "shownDPI": 200,
+  "runDPI": 150,
+  "runImage": [
+   1241,
+   1754
+  ],
+  "ownFill": [
+   48,
+   1674,
+   88,
+   1754
+  ],
+  "shownImage": [
+   1654,
+   2339
+  ],
+  "shownFill": [
+   64,
+   2235,
+   120,
+   2339
+  ],
+  "carried": [
+   48,
+   1676,
+   90,
+   1754
+  ],
+  "joined": [
+   48,
+   1674,
+   90,
+   1754
+  ],
+  "shortWithoutJoinPt": [
+   0.0,
+   0.0,
+   0.96,
+   0.0
+  ],
+  "joinedPastOwnPx": [
+   0,
+   0,
+   2,
+   0
+  ],
+  "carriedBeforeTheClip": [
+   48,
+   1676,
+   90,
+   1755
+  ]
+ },
+ {
+  "row": "limit-passed-200-150",
+  "why": "a limit line the shown fill held: the carried top passes it by less than one pixel of the run's raster",
+  "page": "A4 595.276 x 841.89",
+  "widthSixtyFourths": 38098,
+  "heightSixtyFourths": 53881,
+  "inner": [
+   12241,
+   47237,
+   14655,
+   47714
+  ],
+  "paint": [
+   12199,
+   47195,
+   14697,
+   47756
+  ],
+  "limitAbove": 47808,
+  "limitBelow": 47100,
+  "regionAsInner": false,
+  "shownDPI": 200,
+  "runDPI": 150,
+  "runImage": [
+   1241,
+   1754
+  ],
+  "ownFill": [
+   392,
+   1530,
+   480,
+   1556
+  ],
+  "shownImage": [
+   1654,
+   2339
+  ],
+  "shownFill": [
+   528,
+   2043,
+   640,
+   2075
+  ],
+  "carried": [
+   396,
+   1532,
+   480,
+   1557
+  ],
+  "joined": [
+   392,
+   1530,
+   480,
+   1557
+  ],
+  "shortWithoutJoinPt": [
+   0.0,
+   0.0,
+   0.0,
+   0.12
+  ],
+  "joinedPastOwnPx": [
+   0,
+   0,
+   0,
+   1
+  ],
+  "joinedTopPastLimitPx": 0.75
+ }
+]
