@@ -1,0 +1,19 @@
+Property: After each fixed value's closing parenthesis only white space may stand before the next key.
+Area: the read-back of the finished file (Engine)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --package-path Packages/RedactionEngine --filter MetaReadBackTests
+Must go red: RedactionEngineTests/MetaReadBackTests oldBytesAfterTheLiteralStop
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/MetaReadBack.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/MetaReadBack.swift
+index e74efa51..f259d507 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/MetaReadBack.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/MetaReadBack.swift
+@@ -136,7 +136,7 @@ package enum MetaReadBack {
+             seen = true
+             index += literal.count
+             while index < data.endIndex, data[index] != 0x2F, data[index] != 0x3E {  // "/" and ">"
+-                guard isSpace(data[index]) else { return false }
++                guard isSpace(data[index]) else { index += 1; continue }
+                 index += 1
+             }
+         }

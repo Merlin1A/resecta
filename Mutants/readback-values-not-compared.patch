@@ -1,0 +1,19 @@
+Property: A file is kept only when its information dictionary reads the fixed values.
+Area: the read-back of the finished file (Engine)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer swift test --package-path Packages/RedactionEngine --filter MetaReadBackTests
+Must go red: RedactionEngineTests/MetaReadBackTests infoNotRewrittenStops; RedactionEngineTests/MetaReadBackTests oneDateLeftStops
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/MetaReadBack.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/MetaReadBack.swift
+index e74efa51..c51276ff 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/MetaReadBack.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/MetaReadBack.swift
+@@ -97,7 +97,7 @@ package enum MetaReadBack {
+                   let text = CGPDFStringCopyTextString(ref) else { return .valuesNotFixed }
+             var read = text as String
+             while read.hasSuffix(" ") { read.removeLast() }
+-            guard read == value else { return .valuesNotFixed }
++            _ = read == value
+         }
+ 
+         // M2.
