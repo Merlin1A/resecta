@@ -1,0 +1,18 @@
+Property: A group move lifts nothing: its boxes stay in their own groups, each veil in the veils' group once. Here a group move lifts its boxes into the moving group.
+Area: editor overlay (the boxes' layers)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BoxLayerHostTests
+Must go red: ResectaAppTests/BoxLayerHostTests groupMoveAppliesTheThree
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift
+--- a/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift
++++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+Draw.swift
+@@ -40,7 +40,7 @@
+         let boxes = made.boxes.filter { box in
+             box.fill.reduce(box.tight) { $0.union($1) }.insetBy(dx: -margin, dy: -margin).intersects(rect)
+         }
+-        let moving: Set<UUID> = isDraggingExistingRegion ? selectedIDs : []
++        let moving: Set<UUID> = isDraggingExistingRegion || isGroupMoving ? selectedIDs : []
+         return Self.inkSteps(boxes: boxes, selectionCount: selectedIDs.count,
+                              handlesActive: resizeHandlesActive, moving: moving,
+                              settings: .current, fingerScale: fingerScale, page: bounds, handleScale: handleScale)

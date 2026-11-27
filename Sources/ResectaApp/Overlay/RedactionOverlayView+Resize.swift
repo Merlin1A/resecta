@@ -46,7 +46,9 @@ extension RedactionOverlayView {
         guard !newRect.isNull else { return }
 
         storeFromGesture(idx, overlayRect: newRect)
-        setNeedsDisplay()
+        // The touch's redraw (`redrawGesture`) marks the top canvas and the
+        // resized box's layers; a mark of the whole overlay here would pass
+        // every box.
     }
 
     /// The edges a handle moves.

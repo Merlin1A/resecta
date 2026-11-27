@@ -56,7 +56,7 @@ extension RedactionOverlayView {
         // Ease-out cubic: 1 - (1-t)^3
         t = 1.0 - pow(1.0 - t, 3)
         handleScale = handleAnimFromScale + (handleAnimTargetScale - handleAnimFromScale) * CGFloat(t)
-        setNeedsDisplay()
+        boxLayers.mark(.handles)
         if elapsed >= handleAnimDuration {
             handleScale = handleAnimTargetScale
             link.invalidate()

@@ -64,7 +64,9 @@ class RedactionOverlayView: UIView {
     /// selection rather than replacing the selection. iPhone parity for
     /// the iPad Shift+tap path — both routes converge on
     /// `coordinator?.toggleRegionSelection(_:)`.
-    var isMultiSelectActive: Bool = false { didSet { setNeedsDisplay() } }  // the handles show only while off
+    var isMultiSelectActive: Bool = false {  // the handles show only while off
+        didSet { if isMultiSelectActive != oldValue { setNeedsDisplay() } }
+    }
 
     var regions: [RedactionRegion] = []
     var selectedIDs: Set<UUID> = []
@@ -179,8 +181,8 @@ class RedactionOverlayView: UIView {
 
     // MARK: - Redraw on a zoom
 
-    /// The passes of `draw(_:)`, counted for the hosted tests of the
-    /// redraw on a zoom.
+    /// The top canvas's passes, counted for the hosted tests of the redraw
+    /// on a zoom (the boxes' passes are `boxLayers.boxPassCount`).
     var drawPassCount = 0
     /// The zoom's redraw requests, counted for the same tests: marking is
     /// idempotent, so only this count tells one request from two.
@@ -296,6 +298,15 @@ class RedactionOverlayView: UIView {
         isOpaque = false
         backgroundColor = .clear
 
+        // The boxes' layers, beneath every subview's.
+        boxLayers.view = self
+        boxLayers.source = self
+        boxLayers.root.frame = bounds
+        layer.insertSublayer(boxLayers.root, at: 0)
+        registerForTraitChanges([UITraitDisplayScale.self]) { (view: RedactionOverlayView, _: UITraitCollection) in
+            view.boxLayers.mark(.all)
+        }
+
         // The top canvas, first of the subviews, so a view added later (the
         // rejected rubber band) is above it.
         let canvas = OverlayTopCanvas(host: self)
@@ -327,19 +338,28 @@ class RedactionOverlayView: UIView {
 
     // MARK: - Redraw
 
-    /// Every redraw of the overlay reaches the top canvas too, so a caller
-    /// marks one view and both bitmaps redraw. Nil only while `init` runs.
+    /// Every redraw of the overlay reaches the top canvas and asks the
+    /// boxes' layers for a pass over every box, so a caller marks one view.
+    /// Nil only while `init` runs.
     private(set) var topCanvas: OverlayTopCanvas?
+    /// The committed boxes' layers.
+    let boxLayers = BoxLayerHost()
 
     override func setNeedsDisplay() {
         super.setNeedsDisplay()
         topCanvas?.setNeedsDisplay()
+        boxLayers.mark(.all)
     }
 
     override func setNeedsDisplay(_ rect: CGRect) {
         super.setNeedsDisplay(rect)
         topCanvas?.setNeedsDisplay(rect)
+        boxLayers.mark(.all)
     }
+
+    // A move of the view on the screen moves the device's pixel lines.
+    override var frame: CGRect { didSet { if frame != oldValue { boxLayers.mark(.all) } } }
+    override var center: CGPoint { didSet { if center != oldValue { boxLayers.mark(.all) } } }
 
     // MARK: - Hit Testing (tool-based routing)
 
@@ -375,6 +395,7 @@ class RedactionOverlayView: UIView {
 
     override func didMoveToWindow() {
         super.didMoveToWindow()
+        boxLayers.mark(.all)
         reconcileWindowPanDeference()
         observeDifferentiateWithoutColor()
     }

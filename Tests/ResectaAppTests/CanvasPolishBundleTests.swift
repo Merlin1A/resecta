@@ -93,12 +93,11 @@ struct CanvasPolishBundleTests {
         #expect(abs(fit - 2.4) < 0.01 && abs(zoomed - 2.4) < 0.01, "the selected line: 2.4 on-screen points")
     }
 
-    @Test("The lift shadow resolves to the same colour in dark appearance as in light")
+    @Test("The lift shadow is one dark colour, the same in either appearance")
     func liftShadowShowsInDarkAppearance() {
-        let shadow = RedactionOverlayView.liftShadowColor
-        let light = shadow.resolvedColor(with: UITraitCollection(userInterfaceStyle: .light))
-        let dark = shadow.resolvedColor(with: UITraitCollection(userInterfaceStyle: .dark))
-        #expect(light == dark)
-        #expect(dark.cgColor.alpha >= 0.2, "a shadow on the white page reads in either appearance")
+        // A plain colour, not a dynamic one: no appearance changes it.
+        let shadow = BoxLayers.liftShadow
+        #expect(shadow.red == 0 && shadow.green == 0 && shadow.blue == 0)
+        #expect(shadow.alpha >= 0.2, "a shadow on the white page reads in either appearance")
     }
 }

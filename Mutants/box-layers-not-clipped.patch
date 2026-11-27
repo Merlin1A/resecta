@@ -1,0 +1,18 @@
+Property: The boxes' container clips to the overlay, so a veil moved out to the pixel lines draws nothing past the page. Here it does not clip.
+Area: editor overlay (the boxes' layers)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BoxLayerHostTests
+Must go red: ResectaAppTests/BoxLayerHostTests containerClipsToTheOverlay
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/BoxLayers.swift b/Sources/ResectaApp/Overlay/BoxLayers.swift
+--- a/Sources/ResectaApp/Overlay/BoxLayers.swift
++++ b/Sources/ResectaApp/Overlay/BoxLayers.swift
+@@ -292,7 +292,7 @@
+ 
+     override init() {
+         super.init()
+-        root.masksToBounds = true
++        root.masksToBounds = false
+         root.actions = Self.quietActions
+         root.delegate = self
+         for group in BoxLayerGroup.allCases {

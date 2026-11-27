@@ -256,82 +256,6 @@ struct ScreenLinkTests {
             #expect(ScreenLink.fillRect(rect, toDevice: t, clip: clip) == fill, "\(i): the same each time")
         }
     }
-
-    // MARK: - Drawn
-
-    /// The fill drawn by the canvas's own fill into a bitmap, through a
-    /// context translated by a fraction of a point and scaled by 1.37.
-    static func drawn(_ rect: CGRect, scale: CGFloat, through dirty: CGRect? = nil)
-        -> (lines: ScreenLink.DeviceLines?, image: UIImage, size: CGSize) {
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = scale
-        format.opaque = false
-        let size = CGSize(width: 120, height: 90)
-        var lines: ScreenLink.DeviceLines?
-        let image = UIGraphicsImageRenderer(size: size, format: format).image { context in
-            let ctx = context.cgContext
-            ctx.translateBy(x: 0.37, y: 0.61)
-            ctx.scaleBy(x: 1.37, y: 1.37)
-            if let dirty {
-                // UIKit's dirty rectangles lie on the bitmap's pixel lines:
-                // the rectangle moved out to whole pixels, so the clip
-                // covers no pixel in part.
-                let t = ctx.userSpaceToDeviceSpaceTransform
-                let d = dirty.applying(t)
-                let x0 = d.minX.rounded(.down), y0 = d.minY.rounded(.down)
-                let onLines = CGRect(x: x0, y: y0, width: d.maxX.rounded(.up) - x0, height: d.maxY.rounded(.up) - y0)
-                ctx.clip(to: onLines.applying(t.inverted()))
-            }
-            let toDevice = ctx.userSpaceToDeviceSpaceTransform
-            lines = ScreenLink.deviceLines(rect, toDevice: toDevice, clip: CGRect(x: 0, y: 0, width: 80, height: 60))
-            RedactionOverlayView.fillOnPixelLines([rect], clip: CGRect(x: 0, y: 0, width: 80, height: 60),
-                                                  color: UIColor.black.cgColor, ctx: ctx)
-        }
-        return (lines, image, size)
-    }
-
-    /// Each pixel's coverage: 0 clear, 255 filled, anything else partly
-    /// covered. Rows from the image's top.
-    static func coverage(_ image: UIImage) throws -> [[UInt8]] {
-        let cg = try #require(image.cgImage)
-        let data = try #require(cg.dataProvider?.data)
-        let bytes = try #require(CFDataGetBytePtr(data))
-        let step = cg.bitsPerPixel / 8
-        return (0..<cg.height).map { row in
-            (0..<cg.width).map { column in
-                let at = row * cg.bytesPerRow + column * step
-                return (0..<step).map { bytes[at + $0] }.max() ?? 0
-            }
-        }
-    }
-
-    @Test("Drawn into a bitmap at 2× and 3×, the filled pixels are the lines given, none partly covered, the same through a dirty rectangle", arguments: [CGFloat(2), 3])
-    func rendered(scale: CGFloat) throws {
-        let rect = CGRect(x: 10.123, y: 7.456, width: 33.789, height: 21.321)
-        let whole = Self.drawn(rect, scale: scale)
-        let lines = try #require(whole.lines)
-        let cover = try Self.coverage(whole.image)
-        #expect(!cover.joined().contains { $0 != 0 && $0 != 255 }, "no edge pixel is partly covered")
-        var columns = Set<Int>(), rows = Set<Int>()
-        for (r, row) in cover.enumerated() { for (c, v) in row.enumerated() where v == 255 { columns.insert(c); rows.insert(r) } }
-        #expect(columns.min() == lines.x0 && columns.max() == lines.x1 - 1)
-        let height = cover.count
-        // Device rows count from the bitmap's bottom, image rows from its top.
-        let deviceRows = Set(rows.map { height - 1 - $0 })
-        let flipped = deviceRows.min() == lines.y0 && deviceRows.max() == lines.y1 - 1
-        let straight = rows.min() == lines.y0 && rows.max() == lines.y1 - 1
-        #expect(flipped || straight, "the filled rows are the lines given")
-        // A partial pass through a dirty rectangle across the box lands on
-        // the same pixels inside it.
-        let dirty = CGRect(x: 20, y: 0, width: 10, height: 60)
-        let part = try Self.coverage(Self.drawn(rect, scale: scale, through: dirty).image)
-        let inside = whole.image.size.width * scale
-        for (r, row) in part.enumerated() {
-            for (c, v) in row.enumerated() where v != 0 {
-                #expect(cover[r][c] == v, "pixel \(c), \(r) of \(Int(inside))")
-            }
-        }
-    }
 }
 
 // MARK: - The steps a placed canvas makes
@@ -614,7 +538,7 @@ extension ScreenLinkTests {
         withExtendedLifetime((c.coordinator, c.window)) {}
     }
 
-    @Test("The drawing pass's context on each of the five turned pages is not turned (debug builds stop otherwise)",
+    @Test("The boxes' pass on each of the five turned pages reads a map square to the screen (debug builds stop otherwise)",
           arguments: 0..<5)
     func turnedContext(index: Int) throws {
         let c = try Self.placed(index, suite: "ScreenLinkTests.turnedContext.\(index)")
@@ -623,8 +547,9 @@ extension ScreenLinkTests {
         c.overlay.configure(with: [word], selectedIDs: [])
         c.state.drawnPlans[index] = nil
         c.overlay.setNeedsDisplay()
-        c.overlay.layer.displayIfNeeded()
-        #expect(c.state.drawnPlans[index] != nil, "page \(index): a drawing pass ran")
+        c.overlay.boxLayers.applyPendingPass()
+        #expect(c.state.drawnPlans[index] != nil, "page \(index): a pass ran")
+        #expect(!c.overlay.boxLayers.isPassPending, "page \(index): the pass is on the pixel lines")
         #expect(!c.state.pagesWithUnconfirmedFill.contains(index))
         withExtendedLifetime((c.coordinator, c.window)) {}
     }
@@ -639,20 +564,20 @@ extension ScreenLinkTests {
         c.coordinator.noteDrawn(pageIndex: 0, regions: [word])
         #expect(c.state.drawnPlans[0]?.exportDPI == 300)
 
-        c.overlay.layer.displayIfNeeded()
-        try #require(!c.overlay.layer.needsDisplay())
+        c.overlay.boxLayers.root.layoutIfNeeded()
+        try #require(!c.overlay.boxLayers.isPassPending)
         settings.exportDPI = 150
         c.coordinator.chosenQuality = 150
         #expect(c.state.drawnPlans[0]?.exportDPI == 150, "the setting's change keeps the plan at 150")
-        #expect(c.overlay.layer.needsDisplay(), "the setting's change marks the canvas")
+        #expect(c.overlay.boxLayers.isPassPending, "the setting's change marks the canvas")
 
         settings.exportDPI = 300
         c.coordinator.chosenQuality = 300
-        c.overlay.layer.displayIfNeeded()
-        try #require(!c.overlay.layer.needsDisplay())
+        c.overlay.boxLayers.root.layoutIfNeeded()
+        try #require(!c.overlay.boxLayers.isPassPending)
         c.coordinator.qualityCap = 150
         #expect(c.state.drawnPlans[0]?.exportDPI == 150, "the memory warning's cap keeps the plan at 150")
-        #expect(c.overlay.layer.needsDisplay(), "the memory warning's cap marks the canvas")
+        #expect(c.overlay.boxLayers.isPassPending, "the memory warning's cap marks the canvas")
         withExtendedLifetime((c.coordinator, c.window)) {}
     }
 

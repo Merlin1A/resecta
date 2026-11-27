@@ -1,0 +1,29 @@
+Property: A pass runs in the container's layout, never through the view's layoutSubviews. Here a mark asks the view for a layout and the pass runs in it.
+Area: editor overlay (the boxes' layers)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BoxLayerHostTests
+Must go red: ResectaAppTests/BoxLayerHostTests tenMarksOnePass
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/BoxLayers.swift b/Sources/ResectaApp/Overlay/BoxLayers.swift
+--- a/Sources/ResectaApp/Overlay/BoxLayers.swift
++++ b/Sources/ResectaApp/Overlay/BoxLayers.swift
+@@ -314,7 +314,7 @@
+         case .keys(let keys): pendingRegions.formUnion(keys)
+         case .handles: pendingHandles = true
+         }
+-        root.setNeedsLayout()
++        view?.setNeedsLayout()
+     }
+ 
+     nonisolated func action(for layer: CALayer, forKey event: String) -> CAAction? { NSNull() }
+diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Accessibility.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Accessibility.swift
+--- a/Sources/ResectaApp/Overlay/RedactionOverlayView+Accessibility.swift
++++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+Accessibility.swift
+@@ -23,6 +23,7 @@
+             boxLayers.root.frame = bounds
+             boxLayers.mark(.all)
+         }
++        boxLayers.applyPendingPass()
+         reportBoxPlaceProbeOnce()
+     }
+ 

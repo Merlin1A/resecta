@@ -84,14 +84,16 @@ struct OverlayZoomRedrawTests {
     func markedOnScaleChange() async throws {
         let m = mounted()
         let overlay = try overlay(m, page: 0)
-        overlay.layer.displayIfNeeded()
-        #expect(!overlay.layer.needsDisplay())
+        Self.flush(overlay)
+        let passes = overlay.drawPassCount, boxPasses = overlay.boxLayers.boxPassCount
         let before = overlay.zoomChangedCount
 
         postScaleChange(m)
         await settle(until: { overlay.zoomChangedCount > before })
         await idle()
-        #expect(overlay.layer.needsDisplay())
+        Self.flush(overlay)
+        #expect(overlay.drawPassCount > passes, "the top canvas was marked and drawn")
+        #expect(overlay.boxLayers.boxPassCount > boxPasses, "the boxes' layers were asked for a pass")
         #expect(overlay.zoomChangedCount == before + 1)
     }
 
@@ -109,19 +111,26 @@ struct OverlayZoomRedrawTests {
         #expect(second.zoomChangedCount == before.1 + 1)
     }
 
+    /// Runs what is marked: the top canvas's bitmap and the boxes' layers.
+    static func flush(_ overlay: RedactionOverlayView) {
+        overlay.topCanvas?.layer.displayIfNeeded()
+        overlay.boxLayers.applyPendingPass()
+    }
+
     @Test("Ten scale changes in one turn give one draw pass")
     func oneDrawForTenChanges() async throws {
         let m = mounted()
         let overlay = try overlay(m, page: 0)
-        overlay.layer.displayIfNeeded()
+        Self.flush(overlay)
         let changes = overlay.zoomChangedCount
-        let passes = overlay.drawPassCount
+        let passes = overlay.drawPassCount, boxPasses = overlay.boxLayers.boxPassCount
 
         for _ in 0..<10 { postScaleChange(m) }
         await settle(until: { overlay.zoomChangedCount >= changes + 10 })
-        overlay.layer.displayIfNeeded()
+        Self.flush(overlay)
         #expect(overlay.zoomChangedCount == changes + 10)
         #expect(overlay.drawPassCount == passes + 1, "marking, never drawing: one pass for ten changes")
+        #expect(overlay.boxLayers.boxPassCount == boxPasses + 1, "one pass of the boxes' layers for ten changes")
     }
 
     /// Holds at main and at any later state: the box's line is drawn at
@@ -138,10 +147,10 @@ struct OverlayZoomRedrawTests {
         #expect(fit > 0)
         m.view.scaleFactor = fit
         m.view.layoutIfNeeded()
-        overlay.layer.displayIfNeeded()
+        Self.flush(overlay)
         #expect(abs(overlay.fingerScale - 1 / m.view.scaleFactor) < 0.0001)
         let changes = overlay.zoomChangedCount
-        let passes = overlay.drawPassCount
+        let passes = overlay.drawPassCount, boxPasses = overlay.boxLayers.boxPassCount
 
         m.view.scaleFactor = fit * 3.5
         m.view.layoutIfNeeded()
@@ -149,8 +158,9 @@ struct OverlayZoomRedrawTests {
         #expect(zoom > fit * 2, "the view took the zoom: \(zoom) at fit \(fit)")
         await settle(until: { overlay.zoomChangedCount > changes })
         #expect(overlay.zoomChangedCount > changes, "the zoom asked for a redraw")
-        overlay.layer.displayIfNeeded()
+        Self.flush(overlay)
         #expect(overlay.drawPassCount > passes, "one pass after the zoom")
+        #expect(overlay.boxLayers.boxPassCount > boxPasses, "one pass of the boxes' layers after the zoom")
 
         #expect(abs(overlay.fingerScale - 1 / zoom) < 0.0001)
         let selected = RedactionOverlayView.regionLineWidth(isSelected: true, fingerScale: overlay.fingerScale)

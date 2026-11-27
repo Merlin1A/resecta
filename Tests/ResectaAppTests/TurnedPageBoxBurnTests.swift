@@ -310,10 +310,11 @@ struct TurnedPageBoxBurnTests {
     // MARK: - On screen
 
     /// The box of what the overlay paints, in its own space, carried to the
-    /// window by the overlay's own transform as the screen shows it.
+    /// window by the overlay's own transform as the screen shows it. The
+    /// boxes are layers that the boxes' pass makes when their container is
+    /// laid out, which rendering the layer does not do: the pass runs first.
     static func paintedOnScreen(_ overlay: RedactionOverlayView) -> CGRect? {
-        overlay.layer.setNeedsDisplay()
-        overlay.layer.displayIfNeeded()
+        overlay.boxLayers.root.layoutIfNeeded()
         let format = UIGraphicsImageRendererFormat()
         format.opaque = false
         format.scale = 1

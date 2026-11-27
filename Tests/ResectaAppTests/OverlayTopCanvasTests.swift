@@ -35,8 +35,10 @@ struct OverlayTopCanvasTests {
     func setNeedsDisplayReachesTheCanvas() throws {
         let (window, overlay, canvas) = try hostedOverlay()
         #expect(canvas.layer.needsDisplay() == false, "precondition: the canvas was drawn")
+        overlay.boxLayers.root.layoutIfNeeded()
+        #expect(!overlay.boxLayers.isPassPending, "precondition: the boxes' layers were applied")
         overlay.setNeedsDisplay()
-        #expect(overlay.layer.needsDisplay())
+        #expect(overlay.boxLayers.isPassPending, "and asks the boxes' layers for a pass")
         #expect(canvas.layer.needsDisplay())
         withExtendedLifetime(window) {}
     }
@@ -61,16 +63,23 @@ struct OverlayTopCanvasTests {
 
     // MARK: - Each draw body names its own passes
 
-    @Test("The overlay draws only the boxes; the top canvas draws the three later passes, in order")
+    @Test("The overlay draws no bitmap; the top canvas draws the three later passes, in order")
     func drawBodiesNameTheirPasses() throws {
-        let overlayBody = try Self.drawBody(of: "Sources/ResectaApp/Overlay/RedactionOverlayView+DrawEntry.swift")
         let canvasBody = try Self.drawBody(of: "Sources/ResectaApp/Overlay/OverlayTopCanvas.swift")
         let later = ["drawSearchLayer(", "drawSnapGuides(", "drawInProgressShapes("]
 
-        #expect(overlayBody.contains("drawCommittedRegions("))
-        for pass in later { #expect(!overlayBody.contains(pass), "the overlay's draw(_:) still calls \(pass)") }
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let folder = root.appendingPathComponent("Sources/ResectaApp/Overlay")
+        let names = try FileManager.default.contentsOfDirectory(atPath: folder.path)
+            .filter { $0.hasPrefix("RedactionOverlayView") && $0.hasSuffix(".swift") }
+        try #require(names.count > 10, "the overlay's sources were not found")
+        for name in names {
+            let text = try String(contentsOf: folder.appendingPathComponent(name), encoding: .utf8)
+            #expect(!text.contains("override func draw("), "\(name) overrides draw(_:): the boxes are layers")
+        }
 
-        #expect(!canvasBody.contains("drawCommittedRegions("))
+        #expect(!canvasBody.contains("boxLayerPass("))
         let offsets = try later.map { pass in
             try #require(canvasBody.range(of: pass), "the top canvas's draw(_:) does not call \(pass)").lowerBound
         }
