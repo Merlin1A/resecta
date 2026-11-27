@@ -1,0 +1,18 @@
+Property: A change of the quality chosen in Settings keeps each plan at the new quality and redraws the pages on screen.
+Area: canvas overlay (the screen link)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/ScreenLinkTests
+Must go red: ResectaAppTests/ScreenLinkTests qualityRedraws()
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
+--- a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
++++ b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
+@@ -43,7 +43,7 @@
+     /// plan and redraws the pages on screen as a change of `qualityCap`
+     /// does, so the canvas fills at the quality a run started now uses.
+     var chosenQuality: Int = 300 {
+-        didSet { if chosenQuality != oldValue { keepPlansAtTheRunQuality() } }
++        didSet { _ = oldValue }
+     }
+ 
+     private func keepPlansAtTheRunQuality() {

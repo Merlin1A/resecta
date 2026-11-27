@@ -1,0 +1,19 @@
+Property: A plan's two sides, held in sixty-fourths, are compared with the page's displayed sides before its fill is drawn.
+Area: canvas overlay (the screen link)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/ScreenLinkTests
+Must go red: ResectaAppTests/ScreenLinkTests identityOnTurnedPages()
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Ink.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Ink.swift
+--- a/Sources/ResectaApp/Overlay/RedactionOverlayView+Ink.swift
++++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+Ink.swift
+@@ -319,8 +319,7 @@
+         let shown = turned ? CGSize(width: crop.height, height: crop.width) : crop
+         guard plan.pageIndex == pageIndex,
+               abs(page.width - crop.width) <= 0.01, abs(page.height - crop.height) <= 0.01,
+-              let w64 = plan.widthSixtyFourths, let h64 = plan.heightSixtyFourths,
+-              abs(CGFloat(w64) / 64 - shown.width) <= 0.016, abs(CGFloat(h64) / 64 - shown.height) <= 0.016
++              plan.widthSixtyFourths != nil, plan.heightSixtyFourths != nil
+         else { return (lineOnly, .unconfirmed) }
+         var check = CanvasFillCheck.confirmed
+         let boxes = regions.indices.map { i -> InkBox in

@@ -944,3 +944,20 @@ with its reason and the mutant that is caught in its place.
 | `seed-cap-named-outside-debug.patch` | The run quality cap's debug seed is named only inside #if DEBUG, so a release build carries none of it. | ResectaAppTests/DebugSeedOptionsTests seedsAreReadOnlyInsideDebug |
 | `cap-written-a-fourth-time.patch` | Three code lines write the run's quality cap (its declaration, the memory warning and the DEBUG launch hook), and no other. | ResectaAppTests/DebugArgumentsAreDebugOnlyTests theCapHasThreeWriters |
 | `scan-every-not-paper-pixel-is-fill.patch` | The classed reading tells the teal line from the fill, so an outline with nothing inside reads as no fill. | ResectaAppUITests/EdgeScanTests testAnOutlineWithNoFillInsideTheWindowGivesNoFillEdges |
+| `screen-link-no-guard.patch` | A pixel line a hair from a whole number is taken as that number before the floor or ceiling. | ResectaAppTests/ScreenLinkTests table() |
+| `screen-link-rounds-to-the-nearest-line.patch` | Each edge moves outward to the first whole pixel line, floor on the low side and ceiling on the high side. | ResectaAppTests/ScreenLinkTests table(); ResectaAppTests/ScreenLinkTests properties() |
+| `screen-link-share-counts-rows-from-the-top.patch` | A pixel box's rows are counted from the image's bottom, as the run's fill bitmap counts them. | ResectaAppTests/ScreenLinkTests table() |
+| `screen-link-no-clip.patch` | The fill is cut to the clip, the page on the canvas, before its edges move outward. | ResectaAppTests/ScreenLinkTests table() |
+| `screen-link-scale-from-the-screen.patch` | The pixel lines are read from the drawing context's own transform, never from the screen's scale. | ResectaAppTests/ScreenLinkTests rendered(scale:) |
+| `screen-link-quality-setting-does-not-redraw.patch` | A change of the quality chosen in Settings keeps each plan at the new quality and redraws the pages on screen. | ResectaAppTests/ScreenLinkTests qualityRedraws() |
+| `screen-link-fill-mapped-without-the-turn.patch` | The run's fill is mapped onto the canvas through the page's turn, as each box's outline is. | ResectaAppTests/ScreenLinkTests identityOnTurnedPages() |
+| `screen-link-lift-grows-the-box.patch` | A box being moved is drawn on its own rectangles, the size it has at rest. | ResectaAppTests/ScreenLinkTests liftAtRest() |
+| `screen-link-no-page-check.patch` | A canvas fills only from its own page's plan. | ResectaAppTests/ScreenLinkTests otherPagesPlan() |
+| `screen-link-read-sides-not-compared.patch` | A plan's two sides, held in sixty-fourths, are compared with the page's displayed sides before its fill is drawn. | ResectaAppTests/ScreenLinkTests identityOnTurnedPages() |
+| `screen-link-identity-left-to-the-drawer.patch` | A box whose fill does not hold its outline has no fill in the steps, so it is drawn by its line alone. | ResectaAppTests/ScreenLinkTests identityOnTurnedPages(); ResectaAppTests/ScreenLinkTests identityDoor() |
+| `screen-link-cap-does-not-redraw.patch` | A change of the run's quality cap (the memory warning) keeps each plan at the new quality and redraws the pages on screen. | ResectaAppTests/ScreenLinkTests qualityRedraws() |
+| `screen-link-clip-at-the-bounds.patch` | A box's fill is cut to the page on the canvas, never to the canvas's bounds. | ResectaAppTests/ScreenLinkTests identityOnTurnedPages() |
+| `screen-link-page-read-from-the-frame.patch` | The page on the canvas is compared with the crop's size by PDFKit's own page rectangle, never by the canvas's frame. | ResectaAppTests/ScreenLinkTests identityOnTurnedPages() |
+| `screen-link-failure-not-kept.patch` | A page whose fill could not be confirmed is kept in the document's set, which the run refuses. | ResectaAppTests/ScreenLinkTests identityDoor() |
+| `screen-link-pass-clears-the-probe.patch` | The fill check's pass never clears the canvas probe's own failure. | ResectaAppTests/ScreenLinkTests identityDoor() |
+| `screen-link-check-after-the-cull.patch` | Every region of the page is checked in each pass, before the pass keeps only the boxes it reaches. | ResectaAppTests/ScreenLinkTests identityDoor() |

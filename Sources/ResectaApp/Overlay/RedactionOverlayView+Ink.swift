@@ -1,3 +1,5 @@
+import PDFKit
+import RedactionEngine
 import UIKit
 
 /// The three display settings the canvas reads, read in one place: Reduce
@@ -18,12 +20,14 @@ nonisolated struct CanvasDisplaySettings: Equatable, Sendable {
 
 /// One committed box as the canvas draws it, in overlay points: its own
 /// rectangle (`tight`, the selected text, or the drawn rectangle), the
-/// area a run will paint (`paint`), and the words of its tag (nil for a box
-/// drawn by hand, or one with no word).
+/// rectangles a run fills it with before ink growth (`fill`: one for a box
+/// that projects, several for one that does not, none when the fill could
+/// not be confirmed, so that the box is drawn by its line alone), and the
+/// words of its tag (nil for a box drawn by hand, or one with no word).
 nonisolated struct InkBox: Equatable, Sendable {
     let id: UUID
     let tight: CGRect
-    let paint: CGRect
+    let fill: [CGRect]
     let isSelected: Bool
     var tag: String? = nil
 }
@@ -60,12 +64,12 @@ nonisolated struct InkStep: Equatable, Sendable {
 extension RedactionOverlayView {
 
     /// The steps that draw `boxes`, layer by layer across all of them: the
-    /// edge keylines round each `paint`, the keylines round each `tight`,
-    /// the veil over the `paint`s, the faint edges round each `paint`, the
-    /// ink lines where they are shown, the lines round each `tight` (heavier
-    /// when selected), then the tags of the boxes at rest, then the
-    /// Differentiate Without Color cue, then handles or corner dots. Each
-    /// different `paint` is drawn once. No colour depends on where a box came
+    /// edge keylines round each rectangle of a `fill`, the keylines round
+    /// each `tight`, the veil over the fills, the faint edges round each
+    /// rectangle of a fill, the ink lines where they are shown, the lines
+    /// round each `tight` (heavier when selected), then the tags of the boxes
+    /// at rest, then the Differentiate Without Color cue, then handles or
+    /// corner dots. Each different rectangle of a fill is drawn once. No colour depends on where a box came
     /// from. The boxes being moved (`moving`) are drawn last, whole, with
     /// neither tags, handles nor dots. `page` is the page in overlay points:
     /// a tag stays inside it.
@@ -90,7 +94,7 @@ extension RedactionOverlayView {
         typealias C = ResectaTokens.Canvas
         guard !boxes.isEmpty else { return [] }
         var paints: [CGRect] = []
-        for box in boxes where !paints.contains(box.paint) { paints.append(box.paint) }
+        for box in boxes { for rect in box.fill where !paints.contains(rect) { paints.append(rect) } }
         let rest = boxes.filter { !$0.isSelected }.map(\.tight)
         let selected = boxes.filter(\.isSelected).map(\.tight)
         let ink = C.showsInkLine(increaseContrast: settings.increaseContrast)
@@ -103,8 +107,10 @@ extension RedactionOverlayView {
         for (rects, line) in [(rest, C.line), (selected, C.lineSelected)] {
             steps.append(stroke(.keyline, out(rects, line.width / 2 + C.keylineGap + inkWidth), C.keyline))
         }
-        steps.append(InkStep(layer: .veil, rects: paints,
-                             tone: settings.reduceTransparency ? C.veilReducedTransparency : C.veil, width: 0))
+        if !paints.isEmpty {
+            steps.append(InkStep(layer: .veil, rects: paints,
+                                 tone: settings.reduceTransparency ? C.veilReducedTransparency : C.veil, width: 0))
+        }
         steps.append(stroke(.edge, paints, settings.increaseContrast ? C.edgeIncreasedContrast : C.edge))
         if ink {
             for (rects, line) in [(rest, C.line), (selected, C.lineSelected)] {
@@ -264,5 +270,108 @@ extension RedactionOverlayView {
             InkStep(layer: layers.stroke, rects: rects, tone: settings.increaseContrast ? C.ink : mark.stroke.tone,
                     width: mark.stroke.width * f, dash: dash, roundCaps: mark.roundCaps),
         ]
+    }
+}
+
+// MARK: - The boxes, with their fills checked
+
+/// What the box maker found for its page: every fill confirmed, one or more
+/// not confirmed (a check failed), or nothing checked (the canvas is not yet
+/// placed by its PDF view, or no plan is kept for the page).
+nonisolated enum CanvasFillCheck: Equatable, Sendable {
+    case confirmed, unconfirmed, unchecked
+}
+
+extension RedactionOverlayView {
+
+    /// The canvas's boxes for every region of the page, each with the fill
+    /// the run makes for it before ink growth, and whether the page's fills
+    /// could be confirmed where they are drawn. Every region of the page is
+    /// checked, whatever a pass then draws.
+    ///
+    /// A fill is the kept plan's pixels for its box (`DrawnPlan.Box.fill`),
+    /// each as a share of the page as displayed (`ScreenLink.share`) through
+    /// `map`, the canvas's one draw map, unsnapped, cut to `clip` (the page
+    /// on the canvas, within its bounds). It is confirmed when:
+    /// the plan is this page's; the page on the canvas, `page`, is the
+    /// geometry's crop size unturned to 0.01 pt; the plan's two sides are
+    /// the geometry's displayed sides to 0.016 pt (a side is held in whole
+    /// sixty-fourths, rounded up); and each box's fill, cut to `clip`, holds
+    /// each of its regions' outlines cut to `clip`, to 1e-6 pt. A page that
+    /// fails gives every box no fill; a box that fails gives itself none. A
+    /// canvas not yet placed, or a page with no plan, gives no fill and
+    /// checks nothing. A region the plan holds no box for has no fill: the
+    /// run does not paint it.
+    static func inkBoxes(
+        regions: [RedactionRegion], plan: DrawnPlan?, pageIndex: Int, geometry: RunRecord.PageGeometry,
+        placed: Bool, page: CGRect, clip: CGRect, selectedIDs: Set<UUID>, tags: [UUID: String],
+        map: (CGRect) -> CGRect
+    ) -> (boxes: [InkBox], check: CanvasFillCheck) {
+        let outlines = regions.map { map($0.normalizedRect) }
+        func box(_ i: Int, fill: [CGRect]) -> InkBox {
+            let id = regions[i].id
+            return InkBox(id: id, tight: outlines[i], fill: fill, isSelected: selectedIDs.contains(id), tag: tags[id])
+        }
+        let lineOnly = regions.indices.map { box($0, fill: []) }
+        guard placed, let plan else { return (lineOnly, .unchecked) }
+        let crop = geometry.cropBox.size
+        let turned = geometry.rotation == 90 || geometry.rotation == 270
+        let shown = turned ? CGSize(width: crop.height, height: crop.width) : crop
+        guard plan.pageIndex == pageIndex,
+              abs(page.width - crop.width) <= 0.01, abs(page.height - crop.height) <= 0.01,
+              let w64 = plan.widthSixtyFourths, let h64 = plan.heightSixtyFourths,
+              abs(CGFloat(w64) / 64 - shown.width) <= 0.016, abs(CGFloat(h64) / 64 - shown.height) <= 0.016
+        else { return (lineOnly, .unconfirmed) }
+        var check = CanvasFillCheck.confirmed
+        let boxes = regions.indices.map { i -> InkBox in
+            guard let planned = plan.boxes.first(where: { $0.regionIDs.contains(regions[i].id) }) else {
+                return box(i, fill: [])
+            }
+            let fill = planned.fill.map { pixels in
+                map(ScreenLink.share(
+                    pixel: ScreenLink.PixelBox(minX: Int(pixels.minX.rounded()), minY: Int(pixels.minY.rounded()),
+                                               maxX: Int(pixels.maxX.rounded()), maxY: Int(pixels.maxY.rounded())),
+                    quality: plan.exportDPI, displayedSize: shown))
+            }
+            let cut = fill.map { $0.intersection(clip) }.filter { !$0.isNull && !$0.isEmpty }
+            let outline = outlines[i].intersection(clip)
+            guard outline.isNull || outline.isEmpty || fillHolds(outline: outline, fill: cut) else {
+                check = .unconfirmed
+                return box(i, fill: [])
+            }
+            return box(i, fill: cut)
+        }
+        return (boxes, check)
+    }
+
+    /// True when the set `fill`'s rectangles cover holds `outline`, never
+    /// their bounding box: the outline is cut along every edge of the
+    /// rectangles that crosses it, and each piece must lie in one rectangle
+    /// grown by 1e-6 pt on each side.
+    nonisolated static func fillHolds(outline: CGRect, fill: [CGRect], slack: CGFloat = 1e-6) -> Bool {
+        guard !fill.isEmpty else { return false }
+        let grown = fill.map { $0.insetBy(dx: -slack, dy: -slack) }
+        func cuts(_ lo: CGFloat, _ hi: CGFloat, _ edges: [CGFloat]) -> [CGFloat] {
+            Array(Set([lo, hi] + edges.filter { $0 > lo && $0 < hi })).sorted()
+        }
+        let xs = cuts(outline.minX, outline.maxX, fill.flatMap { [$0.minX, $0.maxX] })
+        let ys = cuts(outline.minY, outline.maxY, fill.flatMap { [$0.minY, $0.maxY] })
+        let xSpans = xs.count == 1 ? [(xs[0], xs[0])] : zip(xs, xs.dropFirst()).map { ($0, $1) }
+        let ySpans = ys.count == 1 ? [(ys[0], ys[0])] : zip(ys, ys.dropFirst()).map { ($0, $1) }
+        for (x0, x1) in xSpans {
+            for (y0, y1) in ySpans {
+                let held = grown.contains { r in r.minX <= x0 && r.minY <= y0 && r.maxX >= x1 && r.maxY >= y1 }
+                if !held { return false }
+            }
+        }
+        return true
+    }
+
+    /// True once PDFKit has placed this canvas: it has its PDF view, and the
+    /// view's document has the canvas's page, so the page's rectangle on the
+    /// canvas comes from PDFKit and not from the fallback.
+    var isPlacedOnItsPage: Bool {
+        guard let view = hostPDFView else { return false }
+        return view.document?.page(at: pageIndex) != nil
     }
 }
