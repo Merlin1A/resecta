@@ -1,0 +1,19 @@
+Property: The record's page numbers are checked on every page, not the first alone: a repeated number or a gap gives the box check no input, so the row reads Could not verify.
+Area: the Box Fill row
+Test command: cd Packages/RedactionEngine && swift test --skip-build --no-parallel --filter BoxFillRowTests (after swift build --build-tests)
+Must go red: RedactionEngineTests/BoxFillRowTests recordTheCheckCouldNotTake
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
+index 0b46e217..73f26756 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/ExactFillCheck.swift
+@@ -29,7 +29,7 @@ extension BoxCheckInput {
+     init?(record: RunRecord) {
+         var pages: [Page] = []
+         for page in record.confirmed.pages {
+-            guard let plan = page.plan, page.pageIndex == pages.count else { return nil }
++            guard let plan = page.plan, !pages.isEmpty || page.pageIndex == 0 else { return nil }
+             var reported: [Int: RunRecord.PaintedPixels] = [:]
+             for (position, pixels) in record.produced.paintedRectangles where position.pageIndex == page.pageIndex {
+                 reported[position.box] = pixels

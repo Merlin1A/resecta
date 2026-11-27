@@ -1,0 +1,18 @@
+Property: Three code lines write the run's quality cap (its declaration, the memory warning and the DEBUG launch hook), and no other.
+Area: the pin on the cap's writers
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/DebugArgumentsAreDebugOnlyTests
+Must go red: ResectaAppTests/DebugArgumentsAreDebugOnlyTests theCapHasThreeWriters
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/State/PipelineCoordinator.swift b/Sources/ResectaApp/State/PipelineCoordinator.swift
+index 5586655e5..43d787291 100644
+--- a/Sources/ResectaApp/State/PipelineCoordinator.swift
++++ b/Sources/ResectaApp/State/PipelineCoordinator.swift
+@@ -216,6 +216,7 @@ final class PipelineCoordinator: @unchecked Sendable {
+     /// multiple times.
+     func tearDownTempDirectory() {
+         tempExportDirectory.tearDown()
++        dpiCap = defaultDPICap
+     }
+ 
+     // MARK: - Full Pipeline

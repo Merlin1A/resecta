@@ -78,16 +78,24 @@ struct VerificationOrchestratorTests {
         #expect(report.layers.map(\.name) == layers.map(\.name),
                 "the report lists every layer in canonical order")
         #expect(events.map(shape) == [
-            "S1/7 textExtraction after:0",
+            "S1/8 textExtraction after:0",
             "F1 textExtraction", "F2 ocrCheck", "F3 binaryStringSearch",
-            "S4/7 structureCheck after:3", "F4 structureCheck",
-            "S5/7 metadataCheck after:4", "F5 metadataCheck",
-            "S6/7 searchRecheck after:5", "F6 searchRecheck",
-            "S7/7 detectionSweep after:6", "F7 detectionSweep",
-        ], "the post batch publishes the re-check then the sweep, each started and finished in canonical order")
-        // The results a `.layerStarted` carries are exactly the ones published before it.
-        for case .layerStarted(_, let ordinal, _, let completed) in events {
-            #expect(completed.map(\.name) == Array(report.layers.prefix(ordinal - 1)).map(\.name))
+            "S4/8 structureCheck after:3", "F4 structureCheck",
+            "S5/8 metadataCheck after:4", "F5 metadataCheck",
+            "S8/8 boxFill after:5", "F8 boxFill",
+            "S6/8 searchRecheck after:6", "F6 searchRecheck",
+            "S7/8 detectionSweep after:7", "F7 detectionSweep",
+        ], "Box Fill runs with the catalog readers though it is numbered last; the post batch publishes the re-check then the sweep")
+        // The results a `.layerStarted` carries are exactly the ones
+        // published before it, in publication order.
+        var published: [String] = []
+        for event in events {
+            switch event {
+            case .layerStarted(_, _, _, let completed):
+                #expect(completed.map(\.name) == published)
+            case .layerFinished(_, _, let result):
+                published.append(result.name)
+            }
         }
     }
 
@@ -119,21 +127,22 @@ struct VerificationOrchestratorTests {
         )
 
         let layers = VerificationEngine().layers(for: .searchableRedaction)
-        #expect(layers.count == 13)
+        #expect(layers.count == 14)
         #expect(report.layers.map(\.name) == layers.map(\.name),
                 "the report lists every layer in canonical order")
         #expect(events.map(shape) == [
-            "S1/13 textExtraction after:0",
+            "S1/14 textExtraction after:0",
             "F1 textExtraction", "F2 ocrCheck", "F3 binaryStringSearch", "F10 operatorReExtraction",
-            "S4/13 structureCheck after:4", "F4 structureCheck",
-            "S5/13 metadataCheck after:5", "F5 metadataCheck",
-            "S6/13 spatialVerification after:6", "F6 spatialVerification",
-            "S7/13 characterCount after:7", "F7 characterCount",
-            "S8/13 fontVerification after:8", "F8 fontVerification",
-            "S9/13 characterLineage after:9", "F9 characterLineage",
-            "S11/13 hiddenWordInk after:10", "F11 hiddenWordInk",
-            "S12/13 searchRecheck after:11", "F12 searchRecheck",
-            "S13/13 detectionSweep after:12", "F13 detectionSweep",
+            "S4/14 structureCheck after:4", "F4 structureCheck",
+            "S5/14 metadataCheck after:5", "F5 metadataCheck",
+            "S14/14 boxFill after:6", "F14 boxFill",
+            "S6/14 spatialVerification after:7", "F6 spatialVerification",
+            "S7/14 characterCount after:8", "F7 characterCount",
+            "S8/14 fontVerification after:9", "F8 fontVerification",
+            "S9/14 characterLineage after:10", "F9 characterLineage",
+            "S11/14 hiddenWordInk after:11", "F11 hiddenWordInk",
+            "S12/14 searchRecheck after:12", "F12 searchRecheck",
+            "S13/14 detectionSweep after:13", "F13 detectionSweep",
         ], "the batch publishes in canonical order, then the catalog readers, the sandwich checks and the post batch each start and finish in order")
         // The results a `.layerStarted` carries are exactly the ones
         // published before it, in publication order.
@@ -192,6 +201,6 @@ struct VerificationOrchestratorTests {
         )
         let layers = VerificationEngine().layers(for: .secureRasterization)
         #expect(report.layers.map(\.name) == layers.map(\.name))
-        #expect(events.count == 12)
+        #expect(events.count == 14)
     }
 }

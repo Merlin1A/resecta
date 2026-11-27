@@ -90,7 +90,7 @@ struct PacketSearchableProbeTests {
             let run = try await RealDocProbe.run(fixture, regions: regions)
             defer { try? FileManager.default.removeItem(at: run.outputURL) }
 
-            #expect(run.layers.count == 13, "Searchable mode must run all 13 layers.")
+            #expect(run.layers.count == 14, "Searchable mode must run all 14 layers.")
             #expect(run.outputDocument.pageCount == 12, "Output must keep 12 pages.")
 
             // Transcribe the per-layer verdict matrix and derive OVERALL.

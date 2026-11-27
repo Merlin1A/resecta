@@ -1,0 +1,19 @@
+Property: A record the box check could not take (a page without a plan, or pages out of order) leaves every page unread and reads Could not verify, never Skipped.
+Area: the Box Fill row
+Test command: cd Packages/RedactionEngine && swift test --skip-build --no-parallel --filter BoxFillRowTests (after swift build --build-tests)
+Must go red: RedactionEngineTests/BoxFillRowTests recordTheCheckCouldNotTake
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/BoxFillRow.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/BoxFillRow.swift
+index 18037bc5..e94c3e42 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Verification/BoxFillRow.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Verification/BoxFillRow.swift
+@@ -31,7 +31,7 @@ enum BoxFillRow {
+     static func reading(report: BoxCheckReport, record: RunRecord?) -> Reading {
+         guard let record else { return .skipped }
+         let pictures: [BoxCheckPage]
+-        if case .pages(let read) = report { pictures = read } else { pictures = [] }
++        if case .pages(let read) = report { pictures = read } else { return .skipped }
+         var unreadPages: Set<Int> = []
+         for index in pictures.indices where index >= record.confirmed.pages.count {
+             unreadPages.insert(index)

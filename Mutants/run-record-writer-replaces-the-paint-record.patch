@@ -5,13 +5,13 @@ Must go red: ResectaAppTests/RunRecordInfoDictionaryTests ordinaryExportFoundByI
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/State/PipelineCoordinator+Rasterization.swift b/Sources/ResectaApp/State/PipelineCoordinator+Rasterization.swift
-index 7302baa2..d0eb31d2 100644
+index 63ab5f34f..f0aa61be9 100644
 --- a/Sources/ResectaApp/State/PipelineCoordinator+Rasterization.swift
 +++ b/Sources/ResectaApp/State/PipelineCoordinator+Rasterization.swift
-@@ -126,7 +126,7 @@ extension PipelineCoordinator {
- 
+@@ -127,7 +127,7 @@ extension PipelineCoordinator {
          // What the writer says it did joins what the rasterizer said: which
-         // way found the information dictionary for the fixed-value rewrite.
+         // way reached the information dictionary for the fixed-value rewrite,
+         // and the SHA-256 of each page picture as it was handed to the file.
 -        produced.record(writer: await reconstructor.produced)
 +        produced = await reconstructor.produced
          return PipelineRunContext(

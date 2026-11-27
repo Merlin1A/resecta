@@ -225,24 +225,25 @@ nonisolated struct VerificationRowModel: Equatable {
     /// before it has a result.
     static func title(for identity: VerificationLayer) -> String {
         switch identity {
-        case .textExtraction:       return "Text & Annotations in the Redacted PDF"
-        case .ocrCheck:             return "OCR of Page Images"
-        case .binaryStringSearch:   return "Terms in Text & Bytes"
-        case .structureCheck:       return "Active Content & Structure"
-        case .metadataCheck:        return "Document Metadata"
-        case .spatialVerification:  return "Character Positions"
+        case .textExtraction:       return "Leftover Text & Markup"
+        case .ocrCheck:             return "Text Recognition of Each Page"
+        case .binaryStringSearch:   return "Boxed Text in the File"
+        case .structureCheck:       return "Scripts & Attachments"
+        case .metadataCheck:        return "Author & File Details"
+        case .spatialVerification:  return "Kept Text Clear of Boxes"
         case .characterCount:       return "Character Count"
-        case .fontVerification:     return "Monospace Fonts"
-        case .characterLineage:     return "Character Sequence"
-        case .operatorReExtraction: return "Terms in Content Streams"
+        case .fontVerification:     return "Fonts in the Searchable Copy"
+        case .characterLineage:     return "Kept Text Unchanged"
+        case .operatorReExtraction: return "Boxed Text in Drawing Commands"
         case .hiddenWordInk:        return "Hidden Words Under Boxes"
         case .searchRecheck:        return "Search Re-check"
         case .detectionSweep:       return "Detection Sweep"
+        case .boxFill:              return "Box Fill"
         }
     }
 
     /// One line on what the check reads — a passing row's caption, and the
-    /// first line of every other row's expanded block. Character Positions
+    /// first line of every other row's expanded block. Kept Text Clear of Boxes
     /// reads differently when no page of the run kept a text layer.
     static func explainer(for identity: VerificationLayer, perPageModes: [PipelineMode] = []) -> String {
         switch identity {
@@ -263,6 +264,7 @@ nonisolated struct VerificationRowModel: Equatable {
             "Looks for hidden copies of boxed words."
         case .searchRecheck:        "Re-runs your searches on the redacted PDF."
         case .detectionSweep:       "Runs the detectors on the redacted PDF."
+        case .boxFill:              "Reads each box's fill from the page image."
         }
     }
 
@@ -297,6 +299,8 @@ nonisolated struct VerificationRowModel: Equatable {
             "Each text, regex, or multi-term search is re-run with OCR on and must match nothing. Misread text is not seen."
         case .detectionSweep:
             "The detectors must report nothing beyond the items you chose to leave."
+        case .boxFill:
+            "Image blocks each box touches must be exactly the fill in brightness. Margin edges are not confirmed."
         }
     }
 
@@ -323,15 +327,15 @@ nonisolated struct VerificationRowModel: Equatable {
             "No Searchable pages to check."
         case .hiddenWordInk:
             "No page keeps hidden text over a picture of the page."
-        case .textExtraction, .ocrCheck, .structureCheck, .metadataCheck, .spatialVerification:
+        case .textExtraction, .ocrCheck, .structureCheck, .metadataCheck, .spatialVerification, .boxFill:
             nil
         }
     }
 
     /// A skipped check's caption: the state and its cause.
-    static let skippedCaption = "Skipped. No record to compare with."
+    static let skippedCaption = "Skipped. This check needs a full Redact run."
     /// A skipped check's lead: what would have saved the record.
-    static let skippedLead = "Only a full Redact run saves that record."
+    static let skippedLead = "A full run saves the record it compares with."
 
     /// The caption under the title, by outcome — never by text. A failed or
     /// needs-review row whose check also could not read part of its input
@@ -411,8 +415,8 @@ nonisolated struct VerificationRowModel: Equatable {
         case .needsReview:
             if composesRecheckCaption(layer) {
                 return [matchingQueryLines(layer).count == 1
-                    ? "Run it again with OCR on to redact the rest."
-                    : "Run them again with OCR on to redact the rest."]
+                    ? "Run it again with Include OCR Pages on to redact the rest."
+                    : "Run them again with Include OCR Pages on to redact the rest."]
             }
             if composesTermCaption(layer) {
                 let terms = normalizedTerms(layer.reviewTermTexts ?? [])
@@ -431,9 +435,9 @@ nonisolated struct VerificationRowModel: Equatable {
 
     // MARK: - Needs review
 
-    /// The three checks whose needs review texts are document terms (OCR of
-    /// Page Images, Terms in Text & Bytes, Terms in Content Streams). The
-    /// Search Re-check's are query labels — a regex would quote its pattern.
+    /// The three checks whose needs review texts are document terms (Text
+    /// Recognition of Each Page, Boxed Text in the File, Boxed Text in Drawing
+    /// Commands). The Search Re-check's are query labels — a regex would quote its pattern.
     static func quotesReviewTerms(_ identity: VerificationLayer?) -> Bool {
         switch identity {
         case .ocrCheck, .binaryStringSearch, .operatorReExtraction: true

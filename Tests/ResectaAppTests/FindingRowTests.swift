@@ -318,7 +318,9 @@ struct FindingRowTests {
         print("[problem-places] seeded reports \(examined), checks that make Share ask \(named), "
               + "built checks with an unread part \(withPart)")
         #expect(examined == 18)
-        #expect(named == 23, "the seeded reports' checks that make Share ask")
+        // 24 with Box Fill: the secure all-failed report's Box Fill row needs review,
+        // so it makes Share ask as well.
+        #expect(named == 24, "the seeded reports' checks that make Share ask")
         #expect(withPart == 3)
     }
 
@@ -339,7 +341,7 @@ struct FindingRowTests {
                                                 sentence: part)])
         #expect(unread.pages == [1] && unread.mark == .couldNotVerify && unread.count == 1 && unread.words.isEmpty)
         let sheet = DocumentEditorView.couldNotVerifyItemLines(report: failed)
-        #expect(sheet == ["Document Metadata: could not verify on\u{00A0}page\u{00A0}2"])
+        #expect(sheet == ["Author & File Details: could not verify on\u{00A0}page\u{00A0}2"])
         let lines = Model.checkLines(unread, report: failed)
         #expect(lines.map(\.line) == sheet)
         #expect(lines.map(\.sentence) == [part])
@@ -365,7 +367,7 @@ struct FindingRowTests {
         #expect(finish.id == "couldNotFinish-0" && finish.pages.isEmpty)
         #expect(finish.checks.map(\.outcome) == [.couldNotVerify] && finish.checks.map(\.sentence) == [whole])
         let reviewSheet = DocumentEditorView.couldNotVerifyItemLines(report: review)
-        #expect(reviewSheet == ["Active Content & Structure: could not verify"])
+        #expect(reviewSheet == ["Scripts & Attachments: could not verify"])
         #expect(Model.mainLine(finish, report: review, previewAvailable: true) == reviewSheet.first)
         #expect(Model.subLine(finish, report: review) == whole)
         #expect(Model.checkLines(finish, report: review).map(\.line) == reviewSheet)
