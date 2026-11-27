@@ -1,0 +1,19 @@
+Property: A skipped check's caption says it needs a full Redact run.
+Area: the names of the checks
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/VerificationRowModelTests
+Must go red: ResectaAppTests/VerificationRowModelTests skippedRow
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/VerificationRowModel.swift b/Sources/ResectaApp/Views/VerificationRowModel.swift
+index a3b93bf7..ca463257 100644
+--- a/Sources/ResectaApp/Views/VerificationRowModel.swift
++++ b/Sources/ResectaApp/Views/VerificationRowModel.swift
+@@ -333,7 +333,7 @@ nonisolated struct VerificationRowModel: Equatable {
+     }
+ 
+     /// A skipped check's caption: the state and its cause.
+-    static let skippedCaption = "Skipped. This check needs a full Redact run."
++    static let skippedCaption = "Skipped. No record to compare with."
+     /// A skipped check's lead: what would have saved the record.
+     static let skippedLead = "A full run saves the record it compares with."
+ 

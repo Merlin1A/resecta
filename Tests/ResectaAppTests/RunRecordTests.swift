@@ -25,12 +25,13 @@ struct RunRecordTests {
         case clearedWithTheOutput
         case notEncodableAndWrittenNowhere
         case noInputsNoRecord
+        case boxFillReadsTheRunsOwnRecord
         var testDescription: String { rawValue }
     }
 
-    @Test("The table holds exactly six cases")
+    @Test("The table holds exactly seven cases")
     func tableLength() {
-        #expect(Case.allCases.count == 6)
+        #expect(Case.allCases.count == 7)
     }
 
     @Test("Each case", .timeLimit(.minutes(3)), arguments: Case.allCases)
@@ -42,6 +43,7 @@ struct RunRecordTests {
         case .clearedWithTheOutput: try await clearedWithTheOutput()
         case .notEncodableAndWrittenNowhere: try notEncodableAndWrittenNowhere()
         case .noInputsNoRecord: try await noInputsNoRecord()
+        case .boxFillReadsTheRunsOwnRecord: try await boxFillReadsTheRunsOwnRecord()
         }
     }
 
@@ -217,5 +219,20 @@ struct RunRecordTests {
         coord.runVerifyOnly()
         await coord.documentState.activePipelineTask?.value
         #expect(coord.redactionState.lastRunInputs?.record == nil, "no record is built from the live regions")
+    }
+
+    /// A finished run, verified against its own record: the writer recorded
+    /// each page's picture as it went to the file, so the box check reads
+    /// every page and the Box Fill row reads Passed.
+    func boxFillReadsTheRunsOwnRecord() async throws {
+        let coord = try await Self.finishedRun()
+        #expect(coord.redactionState.lastRunInputs?.record != nil, "the run keeps its record")
+        guard case .verified(let report) = coord.documentState.phase else {
+            Issue.record("the run was not verified: \(coord.documentState.phaseKind)")
+            return
+        }
+        let row = try #require(report.layers.first { $0.layer == .boxFill }, "the report has a Box Fill row")
+        #expect(row.status == .pass, "\(row.status): \(row.shortDescription)")
+        #expect(row.couldNotVerify == false)
     }
 }

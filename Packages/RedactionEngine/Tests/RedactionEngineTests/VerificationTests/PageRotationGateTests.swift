@@ -153,7 +153,19 @@ struct PageRotationGateTests {
             perPageFallbackReasons: [nil], appliedSearches: [],
             provisionLayerDocuments: { _ in nil }, events: { _ in })
         let rows = report.layers.map { "\($0.name)=\($0.status)" }.joined(separator: " | ")
-        #expect(report.overallStatus == .pass, "/Rotate \(rotate): \(report.overallStatus) :: \(rows)")
+        // This run is built without the app's run record, so Box Fill reads
+        // Skipped (no record to compare with); every other check passes or has
+        // nothing to check.
+        #expect(report.layers.first { $0.layer == .boxFill }?.status == .skipped,
+                "/Rotate \(rotate): Box Fill with no record :: \(rows)")
+        for result in report.layers where result.layer != .boxFill {
+            switch result.status {
+            case .pass, .notApplicable:
+                break
+            default:
+                Issue.record("/Rotate \(rotate): \(result.name)=\(result.status) :: \(rows)")
+            }
+        }
     }
 
     @Test("A right-angle /Rotate inherited from the /Pages node is admitted")

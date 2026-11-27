@@ -194,7 +194,7 @@ struct VerificationProblemModelTests {
             ("searchableSkipInduced", [.skippedChecks]),
             ("searchableRecheckReview", [.searchesStillMatch]),
             ("secureAllFailed", [.failedCheck, .failedCheck, .failedCheck, .failedCheck, .failedCheck,
-                                 .searchesStillMatch, .couldNotRunOnPages]),
+                                 .searchesStillMatch, .otherNeedsReview, .couldNotRunOnPages]),
             ("searchableSweepReview", [.otherNeedsReview]),
         ]
         let counts: [String: [Kind: Int]] = [

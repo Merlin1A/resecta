@@ -222,12 +222,21 @@ struct VerificationDisplayTests {
         #expect(VerificationResultsView.reviewTermTexts(report: report) == ["DELIA"])
     }
 
-    @Test("ATTENTION masthead subtitle stays generic without term texts")
+    @Test("ATTENTION masthead subtitle without a term row asks that the rows be read, by their number")
     func attentionMastheadGenericFallback() {
         let report = VerificationReport(
             layers: [], overallStatus: .attention("x"), durationSeconds: 0)
         #expect(VerificationResultsView.mastheadSubtitle(report: report)
-                == "Keep\u{00A0}Editing, then use text\u{00A0}search to redact the terms below.")
+                == "Read the findings below before you share the PDF.") // LegalPhrases:safe (approved words)
+        let box = LayerResult(
+            name: VerificationLayer.boxFill.name, symbolName: VerificationLayer.boxFill.symbolName,
+            status: .attention("A box on page 4 is not exactly the fill"),
+            shortDescription: "A box on page 4 is not exactly the fill", detailDescription: "",
+            pageReferences: [3], durationSeconds: 0, layer: .boxFill)
+        let one = VerificationReport(
+            layers: [box], overallStatus: .attention("x"), durationSeconds: 0)
+        #expect(VerificationResultsView.mastheadSubtitle(report: one)
+                == "Read the finding below before you share the PDF.") // LegalPhrases:safe (approved words)
     }
 
     // MARK: - Privacy-sensitive marking
@@ -444,7 +453,7 @@ struct AttentionRowCompositionTests {
     func spokenLabelUsesComposedText() {
         let layer = attentionLayer(terms: ["DELIA"], pages: [1, 2])
         let label = LayerResultRow.accessibilityLabel(model: .init(layer: layer, perPageModes: []), layer: layer)
-        #expect(label.hasPrefix("Terms in Text & Bytes, Needs review."))
+        #expect(label.hasPrefix("Boxed Text in the File, Needs review."))
         #expect(label.contains("\u{201C}DELIA\u{201D} is still readable on pages 2\u{00A0}and\u{00A0}3."))
         #expect(label.hasSuffix(" Pages 2 and 3."))
     }
@@ -697,7 +706,7 @@ struct SearchRecheckQueryLineDisplayTests {
 
     // MARK: - The schedule's summary line
 
-    @Test("A clean run reads N of N checks passed with no suffix — seven in Secure Rasterization, thirteen in Searchable")
+    @Test("A clean run reads N of N checks passed with no suffix — eight in Secure Rasterization, fourteen in Searchable")
     func cleanRunSummaryPerMode() {
         func report(_ mode: PipelineMode) -> VerificationReport {
             let layers = VerificationEngine().layers(for: mode).map { layer in
@@ -708,8 +717,8 @@ struct SearchRecheckQueryLineDisplayTests {
             }
             return VerificationReport(layers: layers, overallStatus: .pass, durationSeconds: 0)
         }
-        #expect(VerificationResultsView.detailsSummaryText(for: report(.secureRasterization)) == "7 of 7 checks passed")
-        #expect(VerificationResultsView.detailsSummaryText(for: report(.searchableRedaction)) == "13 of 13 checks passed")
+        #expect(VerificationResultsView.detailsSummaryText(for: report(.secureRasterization)) == "8 of 8 checks passed")
+        #expect(VerificationResultsView.detailsSummaryText(for: report(.searchableRedaction)) == "14 of 14 checks passed")
     }
 
 }

@@ -14,16 +14,16 @@ struct VerificationLayerIdentityTests {
 
     private let engine = VerificationEngine()
 
-    @Test("Secure Rasterization runs 7 layers, Searchable 13; the search re-check then the detection sweep are last in both")
+    @Test("Secure Rasterization runs 8 layers, Searchable 14; the search re-check, the detection sweep, then Box Fill are last in both")
     func countsAndLastLayers() {
         let raster = engine.layers(for: .secureRasterization)
         let searchable = engine.layers(for: .searchableRedaction)
-        #expect(raster.count == 7)
-        #expect(searchable.count == 13)
-        #expect(raster.suffix(2) == [.searchRecheck, .detectionSweep])
-        #expect(searchable.suffix(2) == [.searchRecheck, .detectionSweep])
-        #expect(raster.last == .detectionSweep)
-        #expect(searchable.last == .detectionSweep)
+        #expect(raster.count == 8)
+        #expect(searchable.count == 14)
+        #expect(raster.suffix(3) == [.searchRecheck, .detectionSweep, .boxFill])
+        #expect(searchable.suffix(3) == [.searchRecheck, .detectionSweep, .boxFill])
+        #expect(raster.last == .boxFill)
+        #expect(searchable.last == .boxFill)
         #expect(engine.layers(for: .secureRasterization).count == raster.count)
         #expect(engine.layers(for: .searchableRedaction).count == searchable.count)
         // The Searchable order IS the declaration order.
@@ -58,7 +58,7 @@ struct VerificationLayerIdentityTests {
         #expect(VerificationLayer.allCases.filter { $0.phase == .parallelBase }
                 == [.textExtraction, .ocrCheck, .binaryStringSearch, .operatorReExtraction])
         #expect(VerificationLayer.allCases.filter { $0.phase == .catalogSequential }
-                == [.structureCheck, .metadataCheck])
+                == [.structureCheck, .metadataCheck, .boxFill])
         #expect(VerificationLayer.allCases.filter { $0.phase == .sandwichSequential }
                 == [.spatialVerification, .characterCount, .fontVerification, .characterLineage, .hiddenWordInk])
         #expect(VerificationLayer.allCases.filter { $0.phase == .postSequential }
@@ -68,6 +68,7 @@ struct VerificationLayerIdentityTests {
         #expect(!raster.contains { $0.phase == .sandwichSequential })
         #expect(!raster.contains(.operatorReExtraction))
         #expect(raster.contains(.detectionSweep))
+        #expect(raster.contains(.boxFill))
     }
 
     @Test("Mode-aware names: index 5 is the re-check in raster and Spatial Verification in searchable")

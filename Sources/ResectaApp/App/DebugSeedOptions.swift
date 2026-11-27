@@ -3,12 +3,13 @@ import Foundation
 import PDFKit
 import RedactionEngine
 
-/// The debug launch arguments that seed one state of the results screen
-/// each, read beside `--seedVerifiedReport=<name>` by the launch hook in
-/// `ResectaApp`. Each seeds exactly one fact; without `--seedVerifiedReport`
-/// none of them does anything, and with none of them present the launch is
-/// the hook's own. A malformed value seeds nothing and leaves the rest of
-/// the launch as it is.
+/// The debug launch arguments that seed one state each. Each seeds exactly
+/// one fact, and with none of them present the launch is the hook's own. A
+/// malformed value seeds nothing and leaves the rest of the launch as it is.
+///
+/// The results screen's, read beside `--seedVerifiedReport=<name>` by the
+/// launch hook in `ResectaApp`; without `--seedVerifiedReport` none of them
+/// does anything:
 ///
 /// - `--seedHandBoxes=<n>`: the run's inputs record `n` hand-drawn boxes on
 ///   page 1 with no text under them.
@@ -36,6 +37,23 @@ import RedactionEngine
 ///   by the stop at Redact and pages 1 to `m` as small pictures only (each
 ///   from 0, not both 0).
 ///
+/// The editor's, read on any launch that loads a document, outside the
+/// `--seedVerifiedReport` branch:
+///
+/// - `--seedHandBoxAt=<x>,<y>,<w>,<h>[,<page>]`: one hand box whose
+///   `normalizedRect` is the four shares as given: origin at the bottom-left
+///   of the page as displayed, each share from 0 to 1, the width and the
+///   height above 0, on page `page` (0 when absent). It may be given more
+///   than once; each seeds one box. The shares are stored as given: nothing
+///   divides them, and no map of the canvas or member of the page geometry
+///   is called, so a fault in either cannot move a seeded box in both views
+///   alike. Applied straight after the document loads.
+/// - `--seedExportQuality=<150|200|300>`: the stored export quality, written
+///   before any store reads it. Without it `--uitesting` removes the stored
+///   quality; `--uitesting` always removes the stored fill colour.
+/// - `--pinRunQualityCap=<150|200>`: the coordinator's quality cap, lowered
+///   as a memory warning lowers it, applied where the hand boxes are.
+///
 /// Honest limits: hand boxes, form values, the left items, the applied
 /// search, the burned boxes, the output's size, the pages and the unread
 /// pages are put into state directly; they show how the screen reads
@@ -61,6 +79,12 @@ nonisolated struct DebugSeedOptions: Equatable, Sendable {
         let smallPictures: Int
     }
 
+    /// One seeded hand box: its share of the page as displayed, and its page.
+    struct HandBox: Equatable {
+        let rect: CGRect
+        let page: Int
+    }
+
     var handBoxes: Int?
     var formValues: Int?
     var coveredText = false
@@ -72,9 +96,13 @@ nonisolated struct DebugSeedOptions: Equatable, Sendable {
     var outputBytes: Int?
     var securePages: Int?
     var unread: Unread?
+    var handBoxesAt: [HandBox] = []
+    var exportQuality: Int?
+    var runQualityCap: Int?
 
     /// The options in `arguments`. The first occurrence of each argument
-    /// counts; a value that is not of its form seeds nothing.
+    /// counts, except `--seedHandBoxAt=`, of which each occurrence seeds one
+    /// box; a value that is not of its form seeds nothing.
     static func parse(arguments: [String]) -> DebugSeedOptions {
         var options = DebugSeedOptions()
         options.handBoxes = value(of: "--seedHandBoxes=", in: arguments).flatMap(positive)
@@ -94,11 +122,36 @@ nonisolated struct DebugSeedOptions: Equatable, Sendable {
         options.outputBytes = value(of: "--seedOutputBytes=", in: arguments).flatMap(positive)
         options.securePages = value(of: "--seedSecurePages=", in: arguments).flatMap(positive)
         options.unread = value(of: "--seedUnread=", in: arguments).flatMap(unread)
+        options.handBoxesAt = arguments.filter { $0.hasPrefix("--seedHandBoxAt=") }
+            .compactMap { handBox(String($0.dropFirst("--seedHandBoxAt=".count))) }
+        options.exportQuality = value(of: "--seedExportQuality=", in: arguments).flatMap(nonNegative)
+            .flatMap { [150, 200, 300].contains($0) ? $0 : nil }
+        options.runQualityCap = value(of: "--pinRunQualityCap=", in: arguments).flatMap(nonNegative)
+            .flatMap { [150, 200].contains($0) ? $0 : nil }
         return options
     }
 
     private static func value(of prefix: String, in arguments: [String]) -> String? {
         arguments.first { $0.hasPrefix(prefix) }.map { String($0.dropFirst(prefix.count)) }
+    }
+
+    /// Four shares, then an optional page index; nil for anything else.
+    private static func handBox(_ raw: String) -> HandBox? {
+        let parts = raw.split(separator: ",", omittingEmptySubsequences: false).map(String.init)
+        guard parts.count == 4 || parts.count == 5 else { return nil }
+        let shares = parts.prefix(4).compactMap(share)
+        guard shares.count == 4, shares[2] > 0, shares[3] > 0,
+              let page = parts.count == 5 ? nonNegative(parts[4]) : 0 else { return nil }
+        return HandBox(rect: CGRect(x: shares[0], y: shares[1], width: shares[2], height: shares[3]), page: page)
+    }
+
+    /// A share: digits with at most one point, from 0 to 1. No sign, no
+    /// exponent, no spaces.
+    private static func share(_ raw: String) -> Double? {
+        guard !raw.isEmpty, raw.allSatisfy({ $0.isASCII && ($0.isNumber || $0 == ".") }),
+              raw.filter({ $0 == "." }).count <= 1,
+              let value = Double(raw), (0...1).contains(value) else { return nil }
+        return value
     }
 
     private static func nonNegative(_ raw: String) -> Int? {

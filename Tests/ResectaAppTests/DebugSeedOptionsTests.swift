@@ -2,9 +2,9 @@ import Testing
 import Foundation
 @testable import ResectaApp
 
-// The debug launch arguments that seed one state of the results screen
-// each: every argument alone, all of them together, each malformed form,
-// and an empty list. A malformed value seeds nothing and leaves the rest
+// The debug launch arguments that seed one state each, of the results
+// screen or of the editor: every argument alone, all of the results
+// screen's together, each malformed form, and an empty list. A malformed value seeds nothing and leaves the rest
 // of the launch as it is.
 
 @Suite("Debug seed launch arguments")
@@ -89,10 +89,32 @@ struct DebugSeedOptionsTests {
         Case(name: "a malformed seed leaves the others",
              arguments: [report, "--seedHandBoxes=x", "--seedFormValues=2", "--seedLeft=5", "--seedCoveredText"],
              expected: options { $0.formValues = 2; $0.coveredText = true }),
+        Case(name: "a hand box at four shares, with no report", arguments: ["--uitesting", "--seedHandBoxAt=0.3,0.4,0.2,0.1"],
+             expected: options { $0.handBoxesAt = [.init(rect: CGRect(x: 0.3, y: 0.4, width: 0.2, height: 0.1), page: 0)] }),
+        Case(name: "a hand box on page 2", arguments: ["--seedHandBoxAt=0.1,0.25,0.5,0.125,1"],
+             expected: options { $0.handBoxesAt = [.init(rect: CGRect(x: 0.1, y: 0.25, width: 0.5, height: 0.125), page: 1)] }),
+        Case(name: "a hand box given twice seeds two, in order",
+             arguments: ["--seedHandBoxAt=0,0,1,1", "--seedHandBoxAt=0.5,0.5,0.25,0.25,2"],
+             expected: options {
+                 $0.handBoxesAt = [.init(rect: CGRect(x: 0, y: 0, width: 1, height: 1), page: 0),
+                                   .init(rect: CGRect(x: 0.5, y: 0.5, width: 0.25, height: 0.25), page: 2)]
+             }),
+        Case(name: "a malformed hand box seeds nothing",
+             arguments: ["--seedHandBoxAt=0.1,0.2,0.3", "--seedHandBoxAt=0.1,0.2,0,0.4", "--seedHandBoxAt=1.5,0.2,0.3,0.4",
+                         "--seedHandBoxAt=-0.1,0.2,0.3,0.4", "--seedHandBoxAt=0.1,0.2,0.3,0.4,-1",
+                         "--seedHandBoxAt=1e-1,0.2,0.3,0.4", "--seedHandBoxAt=0.1,0.2,0.3,0.4,1,2",
+                         "--seedHandBoxAt=0.1,0.2,0.3,0.4,", "--seedHandBoxAt=0..1,0.2,0.3,0.4", "--seedHandBoxAt="],
+             expected: DebugSeedOptions()),
+        Case(name: "the export quality at 200", arguments: ["--uitesting", "--seedExportQuality=200"],
+             expected: options { $0.exportQuality = 200 }),
+        Case(name: "the export quality at 250 seeds nothing", arguments: ["--uitesting", "--seedExportQuality=250"],
+             expected: DebugSeedOptions()),
+        Case(name: "the run's quality cap at 150", arguments: ["--uitesting", "--pinRunQualityCap=150"],
+             expected: options { $0.runQualityCap = 150 }),
     ]
 
     @Test("The table's length is pinned")
-    func tableLength() { #expect(Self.cases.count == 35) }
+    func tableLength() { #expect(Self.cases.count == 42) }
 
     @Test("Each argument seeds its one option; a malformed value seeds nothing", arguments: cases)
     func parsesEachSeedAndIgnoresMalformedOnes(_ c: Case) {
@@ -123,13 +145,14 @@ struct DebugSeedOptionsTests {
 
     // MARK: - Debug builds only
 
-    /// The seeds' own names: the options type and its eleven arguments.
+    /// The seeds' own names: the options type and its fourteen arguments.
     /// (`--seedVerifiedReport` and `--seedOutput` are the hook's older
     /// arguments and are not pinned here.)
     nonisolated static let seedNames = [
         "DebugSeedOptions", "--seedHandBoxes", "--seedFormValues", "--seedCoveredText", "--seedLeft",
         "--seedAppliedSearch", "--seedBoxesChanged", "--seedVerifying", "--seedBurnedBoxes", "--seedOutputBytes",
         "--seedSecurePages", "--seedUnread",
+        "--seedHandBoxAt", "--seedExportQuality", "--pinRunQualityCap",
     ]
 
     /// Every code line of the app's sources that names a seed lies inside

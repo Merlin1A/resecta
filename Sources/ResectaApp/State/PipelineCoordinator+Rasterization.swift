@@ -125,7 +125,8 @@ extension PipelineCoordinator {
         }
 
         // What the writer says it did joins what the rasterizer said: which
-        // way found the information dictionary for the fixed-value rewrite.
+        // way reached the information dictionary for the fixed-value rewrite,
+        // and the SHA-256 of each page picture as it was handed to the file.
         produced.record(writer: await reconstructor.produced)
         return PipelineRunContext(
             outputURL: outputURL,
