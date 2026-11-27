@@ -43,14 +43,24 @@ nonisolated enum ScreenLink {
 
     /// `rect` cut to `clip`, its edges mapped through `toDevice` and moved
     /// outward to whole device pixel lines. Nil when nothing is left after
-    /// the clip, or when `toDevice` is not axis-aligned.
+    /// the clip, or when `toDevice` is neither axis-aligned nor a quarter
+    /// turn.
     static func deviceLines(_ rect: CGRect, toDevice: CGAffineTransform, clip: CGRect) -> DeviceLines? {
-        guard let cut = edges(of: rect, cutTo: clip), isAxisAligned(toDevice) else { return nil }
+        guard let cut = edges(of: rect, cutTo: clip) else { return nil }
         let t = toDevice
+        let xs: [CGFloat], ys: [CGFloat]
         // Each edge on its own, in the order the transform is written, so the
-        // guard sees the value a build computes.
-        let xs = [t.a * cut.x0 + t.tx, t.a * cut.x1 + t.tx]
-        let ys = [t.d * cut.y0 + t.ty, t.d * cut.y1 + t.ty]
+        // guard sees the value a build computes. On a quarter turn the
+        // device's x comes from the overlay's y, and its y from the x.
+        if isAxisAligned(t) {
+            xs = [t.a * cut.x0 + t.tx, t.a * cut.x1 + t.tx]
+            ys = [t.d * cut.y0 + t.ty, t.d * cut.y1 + t.ty]
+        } else if isQuarterTurn(t) {
+            xs = [t.c * cut.y0 + t.tx, t.c * cut.y1 + t.tx]
+            ys = [t.b * cut.x0 + t.ty, t.b * cut.x1 + t.ty]
+        } else {
+            return nil
+        }
         return DeviceLines(x0: Int(onLine(xs.min()!).rounded(.down)), y0: Int(onLine(ys.min()!).rounded(.down)),
                            x1: Int(onLine(xs.max()!).rounded(.up)), y1: Int(onLine(ys.max()!).rounded(.up)))
     }
@@ -58,17 +68,26 @@ nonisolated enum ScreenLink {
     /// The rectangle to fill, with antialiasing off, so that the fill lies
     /// on whole device pixel lines, each the first one outward from `rect`
     /// cut to `clip`. `.null` when nothing is left after the clip. For a
-    /// transform that is not axis-aligned, the cut rectangle unchanged.
+    /// transform that is neither axis-aligned nor a quarter turn, the cut
+    /// rectangle unchanged.
     static func fillRect(_ rect: CGRect, toDevice: CGAffineTransform, clip: CGRect) -> CGRect {
         guard let cut = edges(of: rect, cutTo: clip) else { return .null }
-        // A transform that turns or shears gets the cut rectangle unchanged;
-        // the drawing pass asserts that its own transform is axis-aligned.
-        guard isAxisAligned(toDevice), let lines = deviceLines(rect, toDevice: toDevice, clip: clip) else {
+        // A transform that turns by another angle, or shears, gets the cut
+        // rectangle unchanged; the drawing pass asserts that its own
+        // transform is axis-aligned.
+        guard let lines = deviceLines(rect, toDevice: toDevice, clip: clip) else {
             return CGRect(x: cut.x0, y: cut.y0, width: cut.x1 - cut.x0, height: cut.y1 - cut.y0)
         }
         let t = toDevice
-        let xs = [(CGFloat(lines.x0) - t.tx) / t.a, (CGFloat(lines.x1) - t.tx) / t.a]
-        let ys = [(CGFloat(lines.y0) - t.ty) / t.d, (CGFloat(lines.y1) - t.ty) / t.d]
+        let xs: [CGFloat], ys: [CGFloat]
+        if isAxisAligned(t) {
+            xs = [(CGFloat(lines.x0) - t.tx) / t.a, (CGFloat(lines.x1) - t.tx) / t.a]
+            ys = [(CGFloat(lines.y0) - t.ty) / t.d, (CGFloat(lines.y1) - t.ty) / t.d]
+        } else {
+            // A quarter turn: the device's lines of x are the overlay's of y.
+            xs = [(CGFloat(lines.y0) - t.ty) / t.b, (CGFloat(lines.y1) - t.ty) / t.b]
+            ys = [(CGFloat(lines.x0) - t.tx) / t.c, (CGFloat(lines.x1) - t.tx) / t.c]
+        }
         return CGRect(x: xs.min()!, y: ys.min()!, width: xs.max()! - xs.min()!, height: ys.max()! - ys.min()!)
     }
 
@@ -90,6 +109,14 @@ nonisolated enum ScreenLink {
     static func isAxisAligned(_ t: CGAffineTransform) -> Bool {
         let scale = max(abs(t.a), abs(t.d))
         return scale > 0 && abs(t.b) <= 1e-9 * scale && abs(t.c) <= 1e-9 * scale
+    }
+
+    /// True when the transform turns by a quarter, either way, without a
+    /// shear: `a` and `d` are at most a billionth of the larger of `b` and
+    /// `c`.
+    static func isQuarterTurn(_ t: CGAffineTransform) -> Bool {
+        let scale = max(abs(t.b), abs(t.c))
+        return scale > 0 && abs(t.a) <= 1e-9 * scale && abs(t.d) <= 1e-9 * scale
     }
 
     /// A value a hair from a whole number is taken as that number, so a

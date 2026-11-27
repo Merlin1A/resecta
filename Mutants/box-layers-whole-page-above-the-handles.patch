@@ -1,0 +1,18 @@
+Property: The whole page's marks, its hatches among them, stack beneath the handles.
+Area: canvas overlay (the box layers)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BoxLayerSpecTests
+Must go red: ResectaAppTests/BoxLayerSpecTests layers(); ResectaAppTests/BoxLayerSpecTests stepGroups()
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/RedactionOverlayView+Ink.swift b/Sources/ResectaApp/Overlay/RedactionOverlayView+Ink.swift
+--- a/Sources/ResectaApp/Overlay/RedactionOverlayView+Ink.swift
++++ b/Sources/ResectaApp/Overlay/RedactionOverlayView+Ink.swift
+@@ -37,7 +37,7 @@
+ /// lines, then the tags, the whole page marked, the handles and the box
+ /// being moved.
+ nonisolated enum BoxLayerGroup: Int, CaseIterable, Comparable, Sendable {
+-    case edgeKeylines, keylines, veils, edges, inkLines, lines, tags, wholePage, handles, moving
++    case edgeKeylines, keylines, veils, edges, inkLines, lines, tags, handles, wholePage, moving
+ 
+     static func < (a: BoxLayerGroup, b: BoxLayerGroup) -> Bool { a.rawValue < b.rawValue }
+ }

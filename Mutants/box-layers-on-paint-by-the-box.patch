@@ -1,0 +1,19 @@
+Property: A mark on a fill is framed from the veil whose key has its own suffix, so each of a box's fill rectangles keeps its own edge.
+Area: canvas overlay (the box layers)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/BoxLayerSpecTests
+Must go red: ResectaAppTests/BoxLayerSpecTests stepFields(); ResectaAppTests/BoxLayerSpecTests layers()
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/BoxLayers.swift b/Sources/ResectaApp/Overlay/BoxLayers.swift
+--- a/Sources/ResectaApp/Overlay/BoxLayers.swift
++++ b/Sources/ResectaApp/Overlay/BoxLayers.swift
+@@ -155,7 +155,8 @@
+                                            frame: ScreenLink.fillRect(rect, toDevice: toDevice, clip: clip),
+                                            fill: opaque(step.tone), opacity: step.tone.alpha))
+                 case .edgeKeyline, .keyline, .edge, .inkLine, .line, .wholeKeyline, .wholeFrame:
+-                    let on = step.onPaint ? veilFrame(suffix(key)).map { out($0, step.outset) } : nil
++                    let box = String(suffix(key).prefix { $0 != ":" })
++                    let on = step.onPaint ? snapped.first(where: { $0.suffix.hasPrefix(box) }).map { out($0.frame, step.outset) } : nil
+                     specs.append(LayerSpec(key: key, group: group, kind: .stroke, frame: out(on ?? rect, w / 2),
+                                            borderWidth: w, borderColor: step.tone))
+                 case .cueUnder, .cue:

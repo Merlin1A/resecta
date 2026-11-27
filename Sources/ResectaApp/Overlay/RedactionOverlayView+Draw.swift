@@ -74,7 +74,7 @@ extension RedactionOverlayView {
         let moving: Set<UUID> = isDraggingExistingRegion ? selectedIDs : []
         return Self.inkSteps(boxes: boxes, selectionCount: selectedIDs.count,
                              handlesActive: resizeHandlesActive, moving: moving,
-                             settings: .current, fingerScale: fingerScale, page: bounds)
+                             settings: .current, fingerScale: fingerScale, page: bounds, handleScale: handleScale)
     }
 
     /// Draws one step: a fill of all its rectangles as one path (a width of
@@ -87,10 +87,10 @@ extension RedactionOverlayView {
         case .handles:
             // The disc and its shadow grow in with `handleScale`; the ring
             // keeps its width.
-            guard handleScale > 0.001 else { return }
-            let radius = C.handle.radius * handleScale * fingerScale
-            let shadowRadius = (C.handle.radius + C.handleShadowGrowth) * handleScale * fingerScale
-            let drop = C.handleShadowDrop * handleScale * fingerScale
+            guard step.handleScale > 0.001 else { return }
+            let radius = C.handle.radius * step.handleScale * fingerScale
+            let shadowRadius = (C.handle.radius + C.handleShadowGrowth) * step.handleScale * fingerScale
+            let drop = C.handleShadowDrop * step.handleScale * fingerScale
             for p in step.rects.map({ CGPoint(x: $0.midX, y: $0.midY) }) {
                 ctx.setFillColor(C.handleShadow.uiColor.cgColor)
                 ctx.fillEllipse(in: Self.disc(at: CGPoint(x: p.x, y: p.y + drop), radius: shadowRadius))
