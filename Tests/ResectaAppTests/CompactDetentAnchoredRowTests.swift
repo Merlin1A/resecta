@@ -24,15 +24,15 @@ struct CompactDetentAnchoredRowTests {
 
     @Test("Hug constant matches the compact handle contract")
     func hugConstantMatchesContract() {
-        // 15-pt grabber inset + the controls row's 46-pt layout floor +
-        // breathing room: the row alone, the smallest attached hug. Was
+        // 15-pt grabber inset + the card's own top padding + the controls
+        // row + the room under it: the row alone, the smallest attached hug. Was
         // 60 under the title-only handle, 72 under the cluster handle,
         // 80 with the per-item Apply on board, 108 (120 at accessibility
         // sizes) while the match line sat over the row.
         #expect(CompactFloatDetent.hugHeight == 101)
         #expect(CompactFloatDetent.hugHeight
-                == CompactFloatDetent.grabberInset + ResectaTokens.TouchTarget.minimum
-                + CompactFloatDetent.bottomInset)
+                == CompactFloatDetent.grabberInset + CompactCard.rowTopPadding
+                + CompactFloatDetent.rowHeight + CompactFloatDetent.bottomInset)
     }
 
     @Test("The hug sits in the attached sheet regime — ON its edge (≥ 101 on iOS 26)")

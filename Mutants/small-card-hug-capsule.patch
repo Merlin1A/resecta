@@ -1,0 +1,19 @@
+Property: The parked card's hug stays in the attached sheet regime (101 or more).
+Area: the parked Search card's metrics
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/CompactDetentAnchoredRowTests
+Must go red: ResectaAppTests/CompactDetentAnchoredRowTests hugStaysInTheAttachedRegime
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/Search/CompactFloatDetent.swift b/Sources/ResectaApp/Views/Search/CompactFloatDetent.swift
+index a3bdf1eaa..cbe149f98 100644
+--- a/Sources/ResectaApp/Views/Search/CompactFloatDetent.swift
++++ b/Sources/ResectaApp/Views/Search/CompactFloatDetent.swift
+@@ -56,7 +56,7 @@ struct CompactFloatDetent: CustomPresentationDetent {
+     /// Grabber inset + the card's own top padding + the controls row +
+     /// the room under it (15 + 0 + 46 + 40). Stays ≥ 101: the attached
+     /// regime (see the file comment).
+-    static let hugHeight: CGFloat = 101
++    static let hugHeight: CGFloat = 100
+     /// The grabber capsule's inset above the content (6 + 5 + 4).
+     static let grabberInset: CGFloat = 15
+     /// The controls row's height: the tallest of Apply and the arrow

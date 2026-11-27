@@ -1,0 +1,18 @@
+Property: The observers are set up once, so a second setup adds no second scale observer.
+Area: editor canvas (overlay redraw on a zoom)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/OverlayZoomRedrawTests
+Must go red: ResectaAppTests/OverlayZoomRedrawTests "Setting up the observers twice still gives one request per scale change"
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
+index 24e788bcf..64475acd5 100644
+--- a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
++++ b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
+@@ -105,7 +105,6 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
+     // MARK: - Observer Setup
+ 
+     func setupObservers(for pdfView: PDFView) {
+-        guard observations.notices.isEmpty else { return }
+         self.pdfView = pdfView
+ 
+         // Page change — sync currentPageIndex back to DocumentState.

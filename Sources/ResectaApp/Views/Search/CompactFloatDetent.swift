@@ -53,15 +53,38 @@ struct CompactFloatDetent: CustomPresentationDetent {
         hugHeight
     }
 
-    /// Grabber inset + the controls row's 46-pt layout floor + breathing
-    /// room (15 + 46 + 40). Stays ≥ 101: the attached regime (see the
-    /// file comment).
+    /// Grabber inset + the card's own top padding + the controls row +
+    /// the room under it (15 + 0 + 46 + 40). Stays ≥ 101: the attached
+    /// regime (see the file comment).
     static let hugHeight: CGFloat = 101
     /// The grabber capsule's inset above the content (6 + 5 + 4).
     static let grabberInset: CGFloat = 15
-    /// Breathing room under the controls row — what the smallest
-    /// attached hug leaves once the grabber inset and the row are paid.
+    /// The controls row's height: the tallest of Apply and the arrow
+    /// circle, never under the touch floor.
+    static var rowHeight: CGFloat {
+        max(ResectaTokens.TouchTarget.minimum, CompactCard.applyHeight, CircularIconButtonStyle.parkedDiameter)
+    }
+    /// The room under the controls row: hugHeight − grabberInset −
+    /// CompactCard.rowTopPadding − rowHeight (101 − 15 − 0 − 46). It holds
+    /// the line under the row at xxLarge.
     static let bottomInset: CGFloat = 40
+}
+
+/// The small card's own numbers, read by the parked Search card. Card-local,
+/// so a retune moves the card and nothing app-wide; literals only.
+nonisolated enum CompactCard {
+    /// Apply's height; read as max(TouchTarget.minimum, applyHeight).
+    static let applyHeight: CGFloat = 46
+    /// Apply's side padding.
+    static let applyPadding: CGFloat = 16
+    /// The row's top padding inside the card, under the grabber's inset:
+    /// the row sits CompactFloatDetent.grabberInset + rowTopPadding below
+    /// the card's top.
+    static let rowTopPadding: CGFloat = 0
+    /// The row's side inset.
+    static let sideInset: CGFloat = 16
+    /// The gap from the row to the line under it.
+    static let countLineGap: CGFloat = 6
 }
 
 extension PresentationDetent {

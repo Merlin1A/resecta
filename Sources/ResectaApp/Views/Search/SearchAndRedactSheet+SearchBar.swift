@@ -149,8 +149,8 @@ extension SearchAndRedactSheet {
             .frame(width: diameter, height: diameter)
             .background(CircularIconButtonStyle.wash, in: Circle())
             .frame(
-                width: ResectaTokens.TouchTarget.minimum,
-                height: ResectaTokens.TouchTarget.minimum
+                width: max(ResectaTokens.TouchTarget.minimum, diameter),
+                height: max(ResectaTokens.TouchTarget.minimum, diameter)
             )
             .contentShape(Rectangle())
     }

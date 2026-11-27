@@ -28,7 +28,7 @@ import SwiftUI
 /// pinned geometry (Ø44 circles in 46-pt frames, pair spacing 6, a
 /// caption counter always shown — `UIFixChromeUITests` measures it); the
 /// parked strip draws full-size controls (the circle fills the 46-pt
-/// frame, a 20-pt glyph, pair spacing `Spacing.sm`, a subheadline
+/// frame, a 20-pt glyph, pair spacing 8, a subheadline
 /// counter that hides from XXXL up).
 enum ResultNavSite {
     case searchBar
@@ -41,7 +41,7 @@ enum ResultNavSite {
         self == .parked ? CircularIconButtonStyle.parkedGlyphPointSize : CircularIconButtonStyle.glyphPointSize
     }
     var pairSpacing: CGFloat {
-        self == .parked ? ResectaTokens.Spacing.sm : 6
+        self == .parked ? 8 : 6
     }
     var counterFont: Font {
         self == .parked ? .subheadline : .caption
@@ -63,10 +63,10 @@ extension SearchAndRedactSheet {
                     HStack(spacing: ResectaTokens.Spacing.sm) {
                         if showsResultNavCluster {
                             applyCurrentResultButton()
-                                .padding(.leading, ResectaTokens.Spacing.md)
+                                .padding(.leading, CompactCard.sideInset)
                             Spacer(minLength: 0)
                             resultNavCluster(site: .parked)
-                                .padding(.trailing, ResectaTokens.Spacing.md)
+                                .padding(.trailing, CompactCard.sideInset)
                         } else {
                             Spacer(minLength: 0)
                             compactStripTitle
@@ -77,10 +77,10 @@ extension SearchAndRedactSheet {
                     ZStack {
                         if showsResultNavCluster {
                             applyCurrentResultButton()
-                                .padding(.leading, ResectaTokens.Spacing.md)
+                                .padding(.leading, CompactCard.sideInset)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             resultNavCluster(site: .parked)
-                                .padding(.trailing, ResectaTokens.Spacing.md)
+                                .padding(.trailing, CompactCard.sideInset)
                                 .frame(maxWidth: .infinity, alignment: .trailing)
                         } else {
                             compactStripTitle
@@ -89,7 +89,7 @@ extension SearchAndRedactSheet {
                     }
                 }
             }
-            .frame(minHeight: ResectaTokens.TouchTarget.minimum)
+            .frame(minHeight: max(ResectaTokens.TouchTarget.minimum, CompactFloatDetent.rowHeight))
             // On the Group, so EVERY element the parked strip serves
             // (the title, the Apply capsule, the chevrons) offers the
             // action: the sighted raise is the grabber drag, which has
@@ -97,6 +97,8 @@ extension SearchAndRedactSheet {
             .accessibilityAction(named: Self.showFullSheetActionName) {
                 selectedDetent = .medium
             }
+            // Inside the identified element, so its frame does not move.
+            .padding(.top, CompactCard.rowTopPadding)
             Spacer(minLength: 0)
         }
         .accessibilityElement(children: .contain)

@@ -5,14 +5,13 @@ Must go red: ResectaAppTests/OverlayDrawnPlanTests aNewDocumentDropsTheKeptPlans
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/State/RedactionState.swift b/Sources/ResectaApp/State/RedactionState.swift
-index 0cc36ddd..239994fe 100644
 --- a/Sources/ResectaApp/State/RedactionState.swift
 +++ b/Sources/ResectaApp/State/RedactionState.swift
-@@ -409,7 +409,6 @@ class RedactionState {
+@@ -448,7 +448,6 @@
          fitNoticeClosedPages = []
          // The kept plans describe the prior document's pages. Page versions
          // keep counting, so no later plan reads as made at an earlier one.
 -        drawnPlans = [:]
+         shownDPIs = [:]
      }
  
-     /// Clear pre-redaction text extraction buffer on success path.

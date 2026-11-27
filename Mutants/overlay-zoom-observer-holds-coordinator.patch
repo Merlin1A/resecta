@@ -1,0 +1,24 @@
+Property: The scale observer holds the coordinator weakly, so the coordinator and its overlays are released.
+Area: editor canvas (overlay redraw on a zoom)
+Test command: DEVELOPER_DIR=/Applications/Xcode-27.2.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/OverlayZoomRedrawTests
+Must go red: ResectaAppTests/OverlayZoomRedrawTests "The scale observer holds neither the coordinator nor its overlays"
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
+index 24e788bcf..77adbefa5 100644
+--- a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
++++ b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
+@@ -146,10 +146,10 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
+             forName: .PDFViewScaleChanged,
+             object: pdfView,
+             queue: .main
+-        ) { [weak self] _ in
++        ) { [self] _ in
+             MainActor.assumeIsolated {
+-                self?.requestPageFramePublish()
+-                self?.activeOverlays.values.forEach { $0.zoomChanged() }
++                self.requestPageFramePublish()
++                self.activeOverlays.values.forEach { $0.zoomChanged() }
+             }
+         }
+         observations.notices = [pageChangeObserver, scaleChangeObserver]

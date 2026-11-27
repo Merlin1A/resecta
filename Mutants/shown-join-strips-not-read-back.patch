@@ -1,0 +1,18 @@
+Property: Every rectangle the run fills for what was shown, beside a box or a region it fills on its own, is read back.
+Area: the run never paints less than was shown
+Test command: cd Packages/RedactionEngine && swift test --skip-build --no-parallel --filter 'ShownJoinTests' (after swift build --build-tests)
+Must go red: RedactionEngineTests/ShownJoinTests strayHoldsWhatWasShown; RedactionEngineTests/ShownJoinTests boxShownButNotProjectedHere
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
+@@ -435,7 +435,7 @@
+         // 6. The readback, of the rectangles filled.
+         let filled = rects.map(\.rect)
+             + strays.map { normalizedToFillPixels($0.normalizedRect, content: content).intersection(bitmap) }
+-            + strayGrowth + strayShown
++            + strayGrowth
+         for rect in filled where !rect.isEmpty {
+             guard try verifyFill(context: ctx, rect: rect, expectedColor: page.fillColor.expectedPixel) else {
+                 throw PipelineError.redactionError(.fillVerificationFailed(pageIndex: page.pageIndex))

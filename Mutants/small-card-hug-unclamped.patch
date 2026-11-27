@@ -1,0 +1,19 @@
+Property: The parked card's height never exceeds the available height.
+Area: the parked Search card's metrics
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/CompactDetentAnchoredRowTests
+Must go red: ResectaAppTests/CompactDetentAnchoredRowTests clampsToAvailableHeight
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Views/Search/CompactFloatDetent.swift b/Sources/ResectaApp/Views/Search/CompactFloatDetent.swift
+index a3bdf1eaa..f0b7093d0 100644
+--- a/Sources/ResectaApp/Views/Search/CompactFloatDetent.swift
++++ b/Sources/ResectaApp/Views/Search/CompactFloatDetent.swift
+@@ -41,7 +41,7 @@ struct CompactFloatDetent: CustomPresentationDetent {
+ 
+     /// The fixed hug, never exceeding the available height.
+     static func compactHeight(maxDetentValue: CGFloat) -> CGFloat {
+-        min(hugHeight, maxDetentValue)
++        hugHeight
+     }
+ 
+     /// The ONE hug value the chrome outside the sheet reads — the

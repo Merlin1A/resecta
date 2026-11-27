@@ -1,0 +1,18 @@
+Property: A change of the run's quality cap makes an off-screen page's plan again but never moves the quality the page was shown at; only drawing the page does.
+Area: the run never paints less than was shown (the editor's kept plans)
+Test command: DEVELOPER_DIR=/Applications/Xcode-26.6.app/Contents/Developer xcodebuild test -scheme ResectaApp -destination id=<simulator> -only-testing:ResectaAppTests/OverlayDrawnPlanTests
+Must go red: ResectaAppTests/OverlayDrawnPlanTests aCapDropKeepsTheShownQuality()
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
+--- a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
++++ b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
+@@ -539,7 +539,7 @@
+             .stamped(pageVersion: state.pageVersion(pageIndex),
+                      fromStoredRegions: regions == state.regions[pageIndex] ?? [])
+         if state.drawnPlans[pageIndex] != drawn { state.drawnPlans[pageIndex] = drawn }
+-        if isDrawn, state.shownDPIs[pageIndex] != quality { state.shownDPIs[pageIndex] = quality }
++        if state.shownDPIs[pageIndex] != quality { state.shownDPIs[pageIndex] = quality }
+     }
+ 
+     // MARK: - Overlay Refresh

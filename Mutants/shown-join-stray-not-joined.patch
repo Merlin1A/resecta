@@ -1,0 +1,20 @@
+Property: A region the run fills on its own is joined with its own fill at the quality the page was shown at.
+Area: the run never paints less than was shown
+Test command: cd Packages/RedactionEngine && swift test --skip-build --no-parallel --filter 'ShownJoinTests' (after swift build --build-tests)
+Must go red: RedactionEngineTests/ShownJoinTests strayHoldsWhatWasShown
+Apply in a scratch worktree with `git apply`; discard after.
+
+diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
+index 3db368c61..4f4f67ceb 100644
+--- a/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
++++ b/Packages/RedactionEngine/Sources/RedactionEngine/Pipeline/PageRasterizer+Plan.swift
+@@ -409,8 +409,7 @@ extension PageRasterizer {
+         let strayGrowth = try inkGrowthRects(context: ctx, regions: strays, content: content)
+         // A stray region's fill joined with its own fill at the shown
+         // quality, carried.
+-        let strayShown = strays.compactMap { Self.shownRegionFill($0, raster: raster, shownDPI: shownDPI) }
+-            + shownOutsidePlan
++        let strayShown = shownOutsidePlan
+ 
+         // 5. The fills.
+         for (_, rect) in rects {
