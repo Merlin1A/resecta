@@ -5,15 +5,15 @@ Must go red: ResectaAppTests/OverlayDrawnPlanTests keptPlanReadsTheCap
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
-index 51f43cc..eee3b12 100644
+index 7fc7852f4..7457e6d1a 100644
 --- a/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
 +++ b/Sources/ResectaApp/Overlay/PDFViewCoordinator.swift
-@@ -502,7 +502,7 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
-         }
+@@ -538,7 +538,7 @@ class PDFViewCoordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDelegate,
+               let page = documentState.sourceDocument?.page(at: pageIndex) else { return }
          let cropBox = page.bounds(for: .cropBox).size
          // Nil where the run refuses the page for its size; no run fills it.
 -        let quality = runQuality(chosenDPI: settings.exportDPI, dpiCap: qualityCap, cropBox: cropBox,
 +        let quality = runQuality(chosenDPI: settings.exportDPI, dpiCap: defaultDPICap, cropBox: cropBox,
                                   rotation: page.rotation) ?? min(settings.exportDPI, qualityCap)
-         let drawn = DrawnPlan(pageIndex: pageIndex, regions: regions, cropBox: cropBox,
-                               rotation: page.rotation, switchOn: settings.boxesAcrossColumn,
+         if isDrawn, state.shownDPIs[pageIndex] != quality { state.shownDPIs[pageIndex] = quality }
+         let read = documentState.pageReads[pageIndex]

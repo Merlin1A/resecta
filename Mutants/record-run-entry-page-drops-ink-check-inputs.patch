@@ -5,15 +5,15 @@ Must go red: RedactionEngineTests/SwitchThroughTheRecordTests runEntryPageCarrie
 Apply in a scratch worktree with `git apply`; discard after.
 
 diff --git a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
-index 15b47d0f4..36435171c 100644
+index 0ae9440da..837460262 100644
 --- a/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
 +++ b/Packages/RedactionEngine/Sources/RedactionEngine/Models/RunRecord.swift
-@@ -107,7 +107,7 @@ public struct RunRecord: Equatable, Sendable {
-                                cropBox: geometry.cropBox.size, rotation: geometry.rotation, switchOn: switchOn,
+@@ -116,7 +116,7 @@ public struct RunRecord: Equatable, Sendable {
                                 read: read)
              self.init(pageIndex: pageIndex, regions: regions, plan: planned.plan,
--                      geometry: geometry, geometryAtStore: geometryAtStore, inkCheckInputs: planned.inkCheckInputs,
-+                      geometry: geometry, geometryAtStore: geometryAtStore,
-                       defaultFallbacks: planned.defaultFallbacks)
+                       geometry: geometry, geometryAtStore: geometryAtStore, shownDPI: shownDPI,
+-                      inkCheckInputs: planned.inkCheckInputs, defaultFallbacks: planned.defaultFallbacks)
++                      defaultFallbacks: planned.defaultFallbacks)
          }
  
+         /// One page as confirmed, with its plan made at run entry from the
